@@ -331,7 +331,7 @@ fn win_utf8_to_utf16_buf(src: *const u8, dst: *mut u16, cap: i64) -> i32:
     win_utf8_to_utf16(src, win_cstr_len(src), dst, cap)
 
 fn win_str_data(s: &str) -> *const u8:
-    unsafe **(&s as *const *const *const u8)
+    unsafe *(s as *const str as *const *const u8)
 
 fn win_str_to_utf16_buf(src: &str, dst: *mut u16, cap: i64) -> i32:
     win_utf8_to_utf16(win_str_data(src), src.len(), dst, cap)
@@ -1564,7 +1564,7 @@ type WindowsAddrInfo:
     ai_next: *mut WindowsAddrInfo
 
 fn rt_net_str_data(s: &str) -> *const u8:
-    unsafe **(&s as *const *const *const u8)
+    unsafe *(s as *const str as *const *const u8)
 
 fn rt_net_wsa_ensure() -> i32:
     // 0x0202 == Winsock 2.2. WSAStartup is refcounted; we never WSACleanup

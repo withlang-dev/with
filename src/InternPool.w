@@ -51,7 +51,7 @@ impl InternStringArena:
     mut fn store(s: &str) -> str:
         if s.len() == 0:
             return ""
-        let src = unsafe **(&s as *const *const *const u8)
+        let src = unsafe *(s as *const str as *const *const u8)
         let len = s.len()
         let need = len + 1
         if self.offset + need > INTERN_PAGE_SIZE:

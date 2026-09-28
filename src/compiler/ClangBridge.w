@@ -536,7 +536,7 @@ unsafe fn str_to_cstr(s: &str) -> *mut u8:
     let out = with_alloc(s.len() + 1)
     if out as i64 == 0: return 0 as *mut u8
     if s.len() > 0:
-        let sp = **(&s as *const *const *const u8)
+        let sp = *(s as *const str as *const *const u8)
         with_memcpy(out, sp, s.len())
     *((out as i64 + s.len()) as *mut u8) = 0
     out
@@ -728,7 +728,7 @@ unsafe fn copy_cstr_to_buf(dst: *mut u8, cap: i64, src: *const u8):
     *((dst as i64 + i) as *mut u8) = 0
 
 unsafe fn str_data_ptr(s: &str) -> *const u8:
-    **(&s as *const *const *const u8)
+    *(s as *const str as *const *const u8)
 
 unsafe fn copy_first_line_to_buf(text: &str, dst: *mut u8, cap: i64) -> i32:
     if cap <= 0:
@@ -1823,7 +1823,7 @@ pub fn with_cimport_is_name_emitted(name: &str) -> i32:
         var buf: [512]u8 = [0 as u8; 512]
         let len = if name.len() < 511: name.len() else: 511
         if len > 0:
-            let sp = **(&name as *const *const *const u8)
+            let sp = *(name as *const str as *const *const u8)
             with_memcpy(&raw mut buf as *mut [512]u8 as *mut u8, sp, len)
         buf[len] = 0
         is_name_emitted(&buf as *const [512]u8 as *const u8)
@@ -1834,7 +1834,7 @@ pub fn with_cimport_mark_name_emitted(name: &str) -> i32:
         var buf: [512]u8 = [0 as u8; 512]
         let len = if name.len() < 511: name.len() else: 511
         if len > 0:
-            let sp = **(&name as *const *const *const u8)
+            let sp = *(name as *const str as *const *const u8)
             with_memcpy(&raw mut buf as *mut [512]u8 as *mut u8, sp, len)
         buf[len] = 0
         mark_name_emitted(&buf as *const [512]u8 as *const u8)
@@ -1882,7 +1882,7 @@ pub fn with_cimport_add_include_path(path: &str) -> i32:
         if g_cimport_include_count >= 32 or path.len() <= 0: return 0
         let buf = with_alloc(path.len() + 1)
         if buf as i64 == 0: return 0
-        let sp = **(&path as *const *const *const u8)
+        let sp = *(path as *const str as *const *const u8)
         with_memcpy(buf, sp, path.len())
         *((buf as i64 + path.len()) as *mut u8) = 0
         g_cimport_include_paths[g_cimport_include_count] = buf
@@ -1925,7 +1925,7 @@ pub fn with_cimport_set_resource_dir(path: &str) -> Unit:
             resource_dir_buf[0] = 0
             return
         let len = if path.len() < 1023: path.len() else: 1023
-        let sp = **(&path as *const *const *const u8)
+        let sp = *(path as *const str as *const *const u8)
         with_memcpy(&raw mut resource_dir_buf as *mut [1024]u8 as *mut u8, sp, len)
         resource_dir_buf[len] = 0
 
@@ -1980,7 +1980,7 @@ pub fn with_cimport_parse(header_code: &str) -> i64:
             (*s).err_msg = c_strdup("failed to create temp file\0" as *const u8)
             return s as i64
 
-        let src_ptr = **(&header_code as *const *const *const u8)
+        let src_ptr = *(header_code as *const str as *const *const u8)
         let _ = rt_write(fd, src_ptr, header_code.len() as u64)
         let _ = rt_write(fd, "\n\0" as *const u8, 1 as u64)
         let _ = rt_close(fd)
@@ -3102,7 +3102,7 @@ unsafe fn cimport_collect_macros_from_libclang(ms: *mut MacroSession, header_cod
     if fd < 0:
         with_cimport_dispose(s as i64)
         return 0
-    let src_ptr = **(&header_code as *const *const *const u8)
+    let src_ptr = *(header_code as *const str as *const *const u8)
     let _ = rt_write(fd, src_ptr, header_code.len() as u64)
     let _ = rt_write(fd, "\n\0" as *const u8, 1 as u64)
     let _ = rt_close(fd)
@@ -3185,7 +3185,7 @@ pub fn with_cimport_collect_object_macro_types(header_code: &str, macro_names: &
             with_cimport_dispose(s as i64)
             return ""
 
-        let src_ptr = **(&header_code as *const *const *const u8)
+        let src_ptr = *(header_code as *const str as *const *const u8)
         let _ = rt_write(fd, src_ptr, header_code.len() as u64)
         let _ = rt_write(fd, "\n\0" as *const u8, 1 as u64)
 
@@ -3294,7 +3294,7 @@ pub fn with_cimport_parse_macro_probe(header_code: &str, macro_names: &str) -> i
             with_cimport_dispose(s as i64)
             return 0
 
-        let src_ptr = **(&header_code as *const *const *const u8)
+        let src_ptr = *(header_code as *const str as *const *const u8)
         let _ = rt_write(fd, src_ptr, header_code.len() as u64)
         let _ = rt_write(fd, "\n\0" as *const u8, 1 as u64)
         for name in macro_names.split("|"):

@@ -27,7 +27,7 @@ fn FndInternStringArena.new() -> FndInternStringArena:
 fn FndInternStringArena.store(mut self: FndInternStringArena, s: &str) -> str:
     if s.len() == 0:
         return ""
-    let src = unsafe **(&s as *const *const *const u8)
+    let src = unsafe *(s as *const str as *const *const u8)
     let len = s.len()
     let need = len + 1
     if self.offset + need > FND_INTERN_PAGE_SIZE:

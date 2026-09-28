@@ -735,7 +735,7 @@ type DarwinAddrInfo:
     ai_next: *mut DarwinAddrInfo
 
 fn rt_str_data(s: &str) -> *const u8:
-    unsafe **(&s as *const *const *const u8)
+    unsafe *(s as *const str as *const *const u8)
 
 fn rt_net_copy_str_to_c_buf(s: &str, out: *mut u8, cap: i64) -> i32:
     if s.len() + 1 > cap:
@@ -1024,7 +1024,7 @@ fn posix_str_to_c_buf(s: &str) -> *mut u8:
     if out as i64 == 0:
         return 0 as *mut u8
     if s.len() > 0:
-        let sp = unsafe **(&s as *const *const *const u8)
+        let sp = unsafe *(s as *const str as *const *const u8)
         with_memcpy(out, sp, s.len())
     unsafe *((out as i64 + s.len()) as *mut u8) = 0
     out
