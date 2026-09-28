@@ -3,12 +3,12 @@ use std.tommyds.defs
 use std.libc
 
 fn tommy_ilog2_u32(__param_value: c_uint) -> c_uint {
-    return (((__param_value as u32).clz() as c_int) ^ (31 as c_int))
+    return (((((__param_value as u32).clz() as c_int) ^ (31 as c_int)) as c_uint))
 
 }
 
 fn tommy_ilog2_u64(__param_value: c_ulonglong) -> c_uint {
-    return (((__param_value as u64).clz() as c_int) ^ (63 as c_int))
+    return (((((__param_value as u64).clz() as c_int) ^ (63 as c_int)) as c_uint))
 
 }
 
@@ -65,7 +65,7 @@ fn tommy_roundup_pow2_u64(__param_value: c_ulonglong) -> c_ulonglong {
 }
 
 fn tommy_haszero_u32(__param_value: c_uint) -> c_int {
-    return (if ((((((__param_value as c_uint) -% (16843009 as c_uint)) as c_uint) & ((~__param_value) as c_uint)) as c_uint) & ((2155905152 as c_uint) as c_uint)) != 0: 1 else: 0)
+    return (if ((((((__param_value as c_uint) -% (16843009 as c_uint)) as c_uint) & ((~__param_value) as c_uint)) as c_uint) & (2155905152 as c_uint)) != 0: 1 else: 0)
 
 }
 
@@ -233,7 +233,7 @@ pub unsafe fn tommy_trie_inplace_insert(__param_trie_inplace: *mut tommy_trie_in
 
     }
 
-    if ((((if not ((if ((__param_key as c_ulonglong) >> ((32 - ((32 % __ci_expr_ternary_7) + (3 * __ci_expr_ternary_15))) as c_uint)) < 64: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if ((__param_key as c_ulonglong) >> ((32 - ((32 % __ci_expr_ternary_7) + (3 * __ci_expr_ternary_15))) as c_uint)) < 64: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"tommy_trie_inplace_insert".ptr, c"tommytrieinp.c".ptr, (133 as c_int), c"key >> TOMMY_TRIE_INPLACE_BUCKET_SHIFT < TOMMY_TRIE_INPLACE_BUCKET_MAX".ptr)
     } else {
         0
@@ -552,7 +552,7 @@ pub unsafe fn tommy_trie_inplace_remove(__param_trie_inplace: *mut tommy_trie_in
 
     }
 
-    if ((((if not ((if ((__param_key as c_ulonglong) >> ((32 - ((32 % __ci_expr_ternary_7) + (3 * __ci_expr_ternary_15))) as c_uint)) < 64: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if ((__param_key as c_ulonglong) >> ((32 - ((32 % __ci_expr_ternary_7) + (3 * __ci_expr_ternary_15))) as c_uint)) < 64: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"tommy_trie_inplace_remove".ptr, c"tommytrieinp.c".ptr, (224 as c_int), c"key >> TOMMY_TRIE_INPLACE_BUCKET_SHIFT < TOMMY_TRIE_INPLACE_BUCKET_MAX".ptr)
     } else {
         0
@@ -863,7 +863,7 @@ pub unsafe fn tommy_trie_inplace_bucket(__param_trie_inplace: *mut tommy_trie_in
 
     }
 
-    if ((((if not ((if ((__param_key as c_ulonglong) >> ((32 - ((32 % __ci_expr_ternary_7) + (3 * __ci_expr_ternary_15))) as c_uint)) < 64: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if ((__param_key as c_ulonglong) >> ((32 - ((32 % __ci_expr_ternary_7) + (3 * __ci_expr_ternary_15))) as c_uint)) < 64: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"tommy_trie_inplace_bucket".ptr, c"tommytrieinp.c".ptr, (265 as c_int), c"key >> TOMMY_TRIE_INPLACE_BUCKET_SHIFT < TOMMY_TRIE_INPLACE_BUCKET_MAX".ptr)
     } else {
         0
@@ -1198,7 +1198,7 @@ pub unsafe fn tommy_trie_inplace_remove_existing(__param_trie_inplace: *mut tomm
 
     }
 
-    if ((((if not ((if ((__local_key as c_ulonglong) >> ((32 - ((32 % __ci_expr_ternary_7) + (3 * __ci_expr_ternary_15))) as c_uint)) < 64: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if ((__local_key as c_ulonglong) >> ((32 - ((32 % __ci_expr_ternary_7) + (3 * __ci_expr_ternary_15))) as c_uint)) < 64: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"tommy_trie_inplace_remove_existing".ptr, c"tommytrieinp.c".ptr, (245 as c_int), c"key >> TOMMY_TRIE_INPLACE_BUCKET_SHIFT < TOMMY_TRIE_INPLACE_BUCKET_MAX".ptr)
     } else {
         0
@@ -1352,7 +1352,7 @@ pub unsafe fn tommy_trie_inplace_remove_existing(__param_trie_inplace: *mut tomm
 
     (__local_ret = trie_inplace_bucket_remove((26 as c_uint), __local_let_ptr, __param_node, __local_key))
 
-    if ((((if not ((if __local_ret == __param_node: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if __local_ret == __param_node: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"tommy_trie_inplace_remove_existing".ptr, c"tommytrieinp.c".ptr, (252 as c_int), c"ret == node".ptr)
     } else {
         0
@@ -1370,7 +1370,7 @@ pub unsafe fn tommy_trie_inplace_count(__param_trie_inplace: *mut tommy_trie_inp
 }
 
 pub unsafe fn tommy_trie_inplace_memory_usage(__param_trie_inplace: *mut tommy_trie_inplace_struct) -> c_ulonglong {
-    return ((tommy_trie_inplace_count(__param_trie_inplace) as c_ulonglong) *% ((sizeof[tommy_trie_inplace_node_struct]() as c_ulonglong) as c_ulonglong))
+    return ((tommy_trie_inplace_count(__param_trie_inplace) as c_ulonglong) *% (sizeof[tommy_trie_inplace_node_struct]() as c_ulonglong))
 
 }
 

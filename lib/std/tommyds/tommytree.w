@@ -3,12 +3,12 @@ use std.tommyds.defs
 use std.libc
 
 fn tommy_ilog2_u32(__param_value: c_uint) -> c_uint {
-    return (((__param_value as u32).clz() as c_int) ^ (31 as c_int))
+    return (((((__param_value as u32).clz() as c_int) ^ (31 as c_int)) as c_uint))
 
 }
 
 fn tommy_ilog2_u64(__param_value: c_ulonglong) -> c_uint {
-    return (((__param_value as u64).clz() as c_int) ^ (63 as c_int))
+    return (((((__param_value as u64).clz() as c_int) ^ (63 as c_int)) as c_uint))
 
 }
 
@@ -65,7 +65,7 @@ fn tommy_roundup_pow2_u64(__param_value: c_ulonglong) -> c_ulonglong {
 }
 
 fn tommy_haszero_u32(__param_value: c_uint) -> c_int {
-    return (if ((((((__param_value as c_uint) -% (16843009 as c_uint)) as c_uint) & ((~__param_value) as c_uint)) as c_uint) & ((2155905152 as c_uint) as c_uint)) != 0: 1 else: 0)
+    return (if ((((((__param_value as c_uint) -% (16843009 as c_uint)) as c_uint) & ((~__param_value) as c_uint)) as c_uint) & (2155905152 as c_uint)) != 0: 1 else: 0)
 
 }
 
@@ -139,7 +139,7 @@ pub unsafe fn tommy_tree_search_compare(__param_tree: *mut tommy_tree_struct, __
 pub unsafe fn tommy_tree_remove_existing(__param_tree: *mut tommy_tree_struct, __param_node: *mut tommy_node_struct) -> *mut c_void {
     var __local_data: *mut c_void = tommy_tree_remove(__param_tree, (*__param_node).data)
 
-    if ((((if not ((if __local_data != 0: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if __local_data != 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"tommy_tree_remove_existing".ptr, c"tommytree.c".ptr, (239 as c_int), c"data != 0".ptr)
     } else {
         0

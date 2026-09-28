@@ -41,7 +41,7 @@ pub unsafe fn _pcre2_compile_get_hash_from_name8(__param_name: *const u8, __para
         }
     }
 
-    (__local_hash = ((((((((__param_name[0]) as c_int) as c_int) & (127 as c_int)) as c_int) | (((((((__param_name[((__param_length as c_uint) -% (1 as c_uint))]) as c_int) as c_int) & (255 as c_int)) as c_int) << (7 as c_uint)) as c_int)) as c_ushort)))
+    (__local_hash = (((((((__param_name[0]) as c_int) & (127 as c_int)) as c_int) | ((((((__param_name[((__param_length as c_uint) -% (1 as c_uint))]) as c_int) & (255 as c_int)) as c_int) << (7 as c_uint)) as c_int)) as c_ushort)))
 
     loop {
         0
@@ -69,7 +69,7 @@ pub unsafe fn _pcre2_compile_find_named_group8(__param_name: *const u8, __param_
         var __ci_expr_logic_0: c_int = 0
 
         if ((if __param_length == (*__local_ng).length: 1 else: 0) != 0) {
-            (__ci_expr_logic_0 = (if (if __local_hash == ((((*__local_ng).hash_dup as c_int) as c_int) & ((32767 as c_int) as c_int)): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_0 = (if (if __local_hash == (((*__local_ng).hash_dup as c_int) & (32767 as c_int)): 1 else: 0) != 0: 1 else: 0))
         }
 
         if (__ci_expr_logic_0 != 0) {
@@ -110,7 +110,7 @@ pub unsafe fn _pcre2_compile_add_name_to_table8(__param_cb: *mut compile_block_8
         }
     }
 
-    if ((if ((((*__local_ng).hash_dup as c_int) as c_int) & ((32768 as c_int) as c_int)) != 0: 1 else: 0) != 0) {
+    if ((if (((*__local_ng).hash_dup as c_int) & (32768 as c_int)) != 0: 1 else: 0) != 0) {
         var __local_ng_it: *mut named_group_8
 
         var __local_end: *mut named_group_8 = ((*__param_cb).named_groups + (((*__param_cb).names_found as c_uint) as usize))
@@ -251,7 +251,7 @@ pub unsafe fn _pcre2_compile_find_dupname_details8(__param_name: *const u8, __pa
     while true {
         (__local_count = __local_count + 1)
 
-        (__local_groupnumber = (((((((__local_slot[0]) as c_int) << (8 as c_uint)) as c_int) | (((__local_slot[(0 + 1)]) as c_int) as c_int)) as c_uint)))
+        (__local_groupnumber = (((((((__local_slot[0]) as c_int) << (8 as c_uint)) as c_int) | ((__local_slot[(0 + 1)]) as c_int)) as c_uint)))
 
         var __ci_expr_ternary_1: c_uint = 0
 
@@ -334,7 +334,7 @@ pub unsafe fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut c_uint, 
     if ((if __local_captures == null: 1 else: 0) != 0) {
         ((*__param_errorcodeptr) = ERR21)
 
-        ((*__param_cb).erroroffset = ((((((((__local_pptr[1]) as c_ulong) as c_ulong) << (32 as c_uint)) as c_ulong) | (((__local_pptr[2]) as c_ulong) as c_ulong)) as c_ulong)))
+        ((*__param_cb).erroroffset = (((((((__local_pptr[1]) as c_ulong) << (32 as c_uint)) as c_ulong) | ((__local_pptr[2]) as c_ulong)) as c_ulong)))
 
 
 
@@ -348,7 +348,7 @@ pub unsafe fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut c_uint, 
         var __ci_expr_switch_continue_0: i32 = 0
 
         while true {
-            match (((*__local_pptr) as c_uint) & ((4294901760 as c_uint) as c_uint)) {
+            match (((*__local_pptr) as c_uint) & (4294901760 as c_uint)) {
                 2148925440 => {
                     (__local_pptr = __local_pptr + 1)
 
@@ -398,7 +398,7 @@ pub unsafe fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut c_uint, 
 
                         (__local_bit = ((((1 as c_int) << ((((*__local_ng).number as c_uint) & (7 as c_uint)) as c_uint)) as u8)))
 
-                        if ((if ((((*__local_capture_ptr) as c_int) as c_int) & ((__local_bit as c_int) as c_int)) == 0: 1 else: 0) != 0) {
+                        if ((if (((*__local_capture_ptr) as c_int) & (__local_bit as c_int)) == 0: 1 else: 0) != 0) {
                             ((*__local_capture_ptr) = ((*__local_capture_ptr) as u8) | (__local_bit as u8))
 
                             (__local_all_found = ((0 as c_int)))
@@ -445,7 +445,7 @@ pub unsafe fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut c_uint, 
 
                     (__local_bit = ((((1 as c_int) << ((((__local_pptr[-1]) as c_uint) & (7 as c_uint)) as c_uint)) as u8)))
 
-                    if ((if ((((*__local_capture_ptr) as c_int) as c_int) & ((__local_bit as c_int) as c_int)) != 0: 1 else: 0) != 0) {
+                    if ((if (((*__local_capture_ptr) as c_int) & (__local_bit as c_int)) != 0: 1 else: 0) != 0) {
                         ((__local_pptr[-1]) = ((0 as c_uint)))
 
                         (__ci_expr_switch_continue_0 = 1)
@@ -550,7 +550,7 @@ pub unsafe fn _pcre2_compile_parse_recurse_args8(__param_pptr_start: *mut c_uint
         var __ci_expr_switch_continue_3: i32 = 0
 
         while true {
-            match (((*__local_pptr) as c_uint) & ((4294901760 as c_uint) as c_uint)) {
+            match (((*__local_pptr) as c_uint) & (4294901760 as c_uint)) {
                 2148925440 => {
                     (__local_pptr = __local_pptr + ((2 as isize) as usize))
 
@@ -647,7 +647,7 @@ pub unsafe fn _pcre2_compile_parse_recurse_args8(__param_pptr_start: *mut c_uint
         }
     }
 
-    ((*__local_args).skip_size = ((((((((__local_pptr as usize) -% (__param_pptr_start as usize)) / sizeof[c_uint]()) as c_ulong) as c_ulong) -% (1 as c_ulong)) as c_ulong)))
+    ((*__local_args).skip_size = (((((((__local_pptr as usize) -% (__param_pptr_start as usize)) / sizeof[c_uint]()) as c_ulong) -% (1 as c_ulong)) as c_ulong)))
 
     if ((if __local_size == 1: 1 else: 0) != 0) {
         return 1
@@ -741,9 +741,9 @@ unsafe fn _pcre2_compile_process_capture_list(__param_pptr: *mut c_uint, __param
         var __ci_expr_switch_continue_0: i32 = 0
 
         while true {
-            match (((*__local_pptr) as c_uint) & ((4294901760 as c_uint) as c_uint)) {
+            match (((*__local_pptr) as c_uint) & (4294901760 as c_uint)) {
                 2148925440 => {
-                    (__local_offset = ((((((((__local_pptr[1]) as c_ulong) as c_ulong) << (32 as c_uint)) as c_ulong) | (((__local_pptr[2]) as c_ulong) as c_ulong)) as c_ulong)))
+                    (__local_offset = (((((((__local_pptr[1]) as c_ulong) << (32 as c_uint)) as c_ulong) | ((__local_pptr[2]) as c_ulong)) as c_ulong)))
 
                     (__local_pptr = __local_pptr + ((2 as isize) as usize))
 
@@ -775,7 +775,7 @@ unsafe fn _pcre2_compile_process_capture_list(__param_pptr: *mut c_uint, __param
 
                     }
 
-                    if ((if ((((*__local_ng).hash_dup as c_int) as c_int) & ((32768 as c_int) as c_int)) == 0: 1 else: 0) != 0) {
+                    if ((if (((*__local_ng).hash_dup as c_int) & (32768 as c_int)) == 0: 1 else: 0) != 0) {
                         ((__local_pptr[-1]) = ((2149122048 as c_uint)))
 
                         ((__local_pptr[0]) = (*__local_ng).number)

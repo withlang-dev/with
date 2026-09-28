@@ -4,12 +4,12 @@ use std.tommyds.tommyarray
 use std.libc
 
 fn tommy_ilog2_u32(__param_value: c_uint) -> c_uint {
-    return (((__param_value as u32).clz() as c_int) ^ (31 as c_int))
+    return (((((__param_value as u32).clz() as c_int) ^ (31 as c_int)) as c_uint))
 
 }
 
 fn tommy_ilog2_u64(__param_value: c_ulonglong) -> c_uint {
-    return (((__param_value as u64).clz() as c_int) ^ (63 as c_int))
+    return (((((__param_value as u64).clz() as c_int) ^ (63 as c_int)) as c_uint))
 
 }
 
@@ -66,7 +66,7 @@ fn tommy_roundup_pow2_u64(__param_value: c_ulonglong) -> c_ulonglong {
 }
 
 fn tommy_haszero_u32(__param_value: c_uint) -> c_int {
-    return (if ((((((__param_value as c_uint) -% (16843009 as c_uint)) as c_uint) & ((~__param_value) as c_uint)) as c_uint) & ((2155905152 as c_uint) as c_uint)) != 0: 1 else: 0)
+    return (if ((((((__param_value as c_uint) -% (16843009 as c_uint)) as c_uint) & ((~__param_value) as c_uint)) as c_uint) & (2155905152 as c_uint)) != 0: 1 else: 0)
 
 }
 
@@ -128,7 +128,7 @@ pub unsafe fn tommy_arrayblk_grow(__param_array: *mut tommy_arrayblk_struct, __p
 pub unsafe fn tommy_arrayblk_ref(__param_array: *mut tommy_arrayblk_struct, __param_pos: c_ulonglong) -> *mut *mut c_void {
     var __local_ptr: *mut *mut c_void
 
-    if ((((if not ((if __param_pos < (*__param_array).count: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if __param_pos < (*__param_array).count: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"tommy_arrayblk_ref".ptr, c"tommyarrayblk.h".ptr, (91 as c_int), c"pos < array->count".ptr)
     } else {
         0

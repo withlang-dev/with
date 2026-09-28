@@ -1333,7 +1333,7 @@ pub let lcc_offset: c_int = 0
 pub let fcc_offset: c_int = 256
 pub let cbits_offset: c_int = 512
 pub let ctypes_offset: c_int = (512 + 320)
-pub let TABLES_LENGTH: c_int = (ctypes_offset + 256)
+pub let TABLES_LENGTH: c_int = ((ctypes_offset + 256) as c_int)
 pub let PCRE2_OPTIM_AUTO_POSSESS: c_uint = 0x00000001
 pub let PCRE2_OPTIM_DOTSTAR_ANCHOR: c_uint = 0x00000002
 pub let PCRE2_OPTIM_START_OPTIMIZE: c_uint = 0x00000004
@@ -1344,7 +1344,7 @@ pub let CHAR_FF: c_int = 12
 pub let CHAR_CR: c_int = 13
 pub let CHAR_LF: c_int = 10
 pub let CHAR_NL: c_int = 10
-pub let CHAR_NEL: u8 = (133 as u8)
+pub let CHAR_NEL: u8 = ((133 as u8) as u8)
 pub let CHAR_BS: c_int = 8
 pub let CHAR_BEL: c_int = 7
 pub let CHAR_ESC: c_int = 27
@@ -1445,7 +1445,7 @@ pub let CHAR_LEFT_CURLY_BRACKET: c_int = 123
 pub let CHAR_VERTICAL_LINE: c_int = 124
 pub let CHAR_RIGHT_CURLY_BRACKET: c_int = 125
 pub let CHAR_TILDE: c_int = 126
-pub let CHAR_NBSP: u8 = (160 as u8)
+pub let CHAR_NBSP: u8 = ((160 as u8) as u8)
 pub let STR_HT = "\x09"
 pub let STR_VT = "\x0b"
 pub let STR_FF = "\x0c"
@@ -1613,24 +1613,24 @@ pub let UCD_SCRIPTX_MASK: c_int = 0x3ff
 pub let UCD_BIDICLASS_SHIFT: c_int = 11
 pub let UCD_BPROPS_MASK: c_int = 0xfff
 pub fn UCD_ANY_I[T](ch: T) -> T {
-    ((((ch as u32) | 0x20) == 0x69) or (((ch as u32) | 1) == 0x0131))
+    ((((ch as u32) | 0x20u32) == 0x69u32) or (((ch as u32) | 1u32) == 0x0131u32))
 }
 pub fn UCD_DOTTED_I[T](ch: T) -> T {
-    (((ch as u32) == 0x69) or ((ch as u32) == 0x0130))
+    (((ch as u32) == 0x69u32) or ((ch as u32) == 0x0130u32))
 }
 pub fn UCD_FOLD_I_TURKISH[T](ch: T) -> T {
-    (if ((ch as u32) == 0x0130): 0x69 else: (if ((ch as u32) == 0x49): 0x0131 else: (ch as u32)))
+    (if ((ch as u32) == 0x0130u32): 0x69u32 else: (if ((ch as u32) == 0x49u32): 0x0131u32 else: (ch as u32)))
 }
 pub let MAX_NON_UTF_CHAR: f64 = 4294967295.0
 pub let CONFIGURED_LINK_SIZE: c_int = 2
-pub let MAX_PATTERN_SIZE: c_int = (1 << 16)
+pub let MAX_PATTERN_SIZE: c_int = ((1 << 16) as c_int)
 pub let IMM2_SIZE: c_int = 2
 pub fn MAX_255[T](c: T) -> c_int {
     1
 }
-pub let MAX_MARK: c_uint = ((1 << 8) - 1)
+pub let MAX_MARK: c_uint = (((1u32 << 8) - 1) as c_uint)
 pub fn CHMAX_255[T](c: T) -> T {
-    (c <= 255)
+    (c <= 255u32)
 }
 pub fn UCHAR21[T](eptr: T) -> T {
     (unsafe *eptr)
@@ -1643,7 +1643,7 @@ pub fn HAS_EXTRALEN[T](c: T) -> T {
     HASUTF8EXTRALEN(c)
 }
 pub fn NOT_FIRSTCU[T](c: T) -> T {
-    ((c & 0xc0) == 0x80)
+    ((c & 0xc0u32) == 0x80u32)
 }
 pub fn CU2BYTES[T](x: T) -> T {
     (x * (8 / 8))
@@ -1651,7 +1651,7 @@ pub fn CU2BYTES[T](x: T) -> T {
 pub fn BYTES2CU[T](x: T) -> T {
     (x / (8 / 8))
 }
-pub let LOOKBEHIND_MAX: c_int = (65535 as c_int)
+pub let LOOKBEHIND_MAX: c_int = ((65535 as c_int) as c_int)
 pub let HEAPFRAME_ALIGNMENT: c_ulong = 8
 pub let _pcre2_default_tables_8: [1088]u8 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 91, 92, 93, 94, 95, 96, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255, 0x00, 0x3e, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0x03, 0x7e, 0x00, 0x00, 0x00, 0x7e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xfe, 0xff, 0xff, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xfe, 0xff, 0xff, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0x03, 0xfe, 0xff, 0xff, 0x87, 0xfe, 0xff, 0xff, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xfe, 0xff, 0x00, 0xfc, 0x01, 0x00, 0x00, 0xf8, 0x01, 0x00, 0x00, 0x78, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x01, 0x01, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
 
@@ -1931,10 +1931,10 @@ pub let META_FIRST_QUANTIFIER: c_uint = 0x80380000
 pub let META_LAST_QUANTIFIER: c_uint = 0x80430000
 pub let META_ATOMIC_SCRIPT_RUN: c_uint = 0x8fff0000
 pub fn META_CODE[T](x: T) -> T {
-    (x & 0xffff0000)
+    (x & 0xffff0000u32)
 }
 pub fn META_DATA[T](x: T) -> T {
-    (x & 0x0000ffff)
+    (x & 0x0000ffffu32)
 }
 pub fn META_DIFF[T](x: T, y: T) -> T {
     ((x - y) >> 16)
@@ -1956,8 +1956,8 @@ pub let PC_GRAPH: c_int = 8
 pub let PC_PRINT: c_int = 9
 pub let PC_PUNCT: c_int = 10
 pub let PC_XDIGIT: c_int = 13
-pub let NAMED_GROUP_HASH_MASK: c_ushort = (0x7fff as u16)
-pub let NAMED_GROUP_IS_DUPNAME: c_ushort = (0x8000 as u16)
+pub let NAMED_GROUP_HASH_MASK: c_ushort = ((0x7fff as u16) as c_ushort)
+pub let NAMED_GROUP_IS_DUPNAME: c_ushort = ((0x8000 as u16) as c_ushort)
 pub type eclass_context { options: c_uint = 0, xoptions: c_uint = 0, errorcodeptr: *mut c_int = null, cb: *mut compile_block_8 = null, needs_bitmap: c_int = 0 }
 impl Copy for eclass_context
 
@@ -2064,13 +2064,13 @@ pub let OP_EXTUNI_EXTRA: c_int = 320
 pub let OP_ANYNL_EXTRA: c_int = 340
 pub let OP_HSPACE_EXTRA: c_int = 360
 pub let OP_VSPACE_EXTRA: c_int = 380
-pub let INTS_PER_STATEBLOCK: c_int = ((sizeof[stateblock]() / sizeof[c_int]()) as c_int)
-pub let OVEC_UNIT: c_ulong = (sizeof[usize]() / sizeof[c_int]())
-pub let RWS_BASE_SIZE: c_ulong = (30720 / sizeof[c_int]())
+pub let INTS_PER_STATEBLOCK: c_int = (((sizeof[stateblock]() / sizeof[c_int]()) as c_int) as c_int)
+pub let OVEC_UNIT: c_ulong = ((sizeof[usize]() / sizeof[c_int]()) as c_ulong)
+pub let RWS_BASE_SIZE: c_ulong = ((30720 / sizeof[c_int]()) as c_ulong)
 pub let RWS_RSIZE: c_int = 1000
-pub let RWS_OVEC_RSIZE: c_ulong = (1000 * OVEC_UNIT)
-pub let RWS_OVEC_OSIZE: c_ulong = (2 * OVEC_UNIT)
-pub let RWS_ANCHOR_SIZE: c_ulong = (sizeof[RWS_anchor]() / sizeof[c_int]())
+pub let RWS_OVEC_RSIZE: c_ulong = ((1000 * OVEC_UNIT) as c_ulong)
+pub let RWS_OVEC_OSIZE: c_ulong = ((2 * OVEC_UNIT) as c_ulong)
+pub let RWS_ANCHOR_SIZE: c_ulong = ((sizeof[RWS_anchor]() / sizeof[c_int]()) as c_ulong)
 pub let FF: c_int = 196608
 pub let REPTYPE_MIN: c_int = 0
 pub let REPTYPE_MAX: c_int = 1
@@ -2160,13 +2160,13 @@ pub let GF_NOCAPTURE: c_uint = 0x00020000
 pub let GF_CONDASSERT: c_uint = 0x00030000
 pub let GF_RECURSE: c_uint = 0x00040000
 pub fn GF_IDMASK[T](a: T) -> T {
-    (a & 0xffff0000)
+    (a & 0xffff0000u32)
 }
 pub fn GF_DATAMASK[T](a: T) -> T {
-    (a & 0x0000ffff)
+    (a & 0x0000ffffu32)
 }
 pub let SERIALIZED_DATA_MAGIC: c_uint = 0x50523253
-pub let SERIALIZED_DATA_VERSION: c_int = (10 | (47 << 16))
+pub let SERIALIZED_DATA_VERSION: c_int = ((10 | (47 << 16)) as c_int)
 pub type case_state { to_case: c_int = 0, single_char: c_int = 0 }
 impl Copy for case_state
 
@@ -2186,8 +2186,8 @@ pub let SCRIPT_HANPENDING: c_int = 2
 pub let SCRIPT_HANHIRAKATA: c_int = 3
 pub let SCRIPT_HANBOPOMOFO: c_int = 4
 pub let SCRIPT_HANHANGUL: c_int = 5
-pub let UCD_MAPSIZE: c_int = ((ucp_Unknown / 32) + 1)
-pub let FULL_MAPSIZE: c_int = ((ucp_Script_Count / 32) + 1)
+pub let UCD_MAPSIZE: c_int = (((ucp_Unknown / 32) + 1) as c_int)
+pub let FULL_MAPSIZE: c_int = (((ucp_Script_Count / 32) + 1) as c_int)
 pub let FOUND_BOPOMOFO: c_int = 1
 pub let FOUND_HIRAGANA: c_int = 2
 pub let FOUND_KATAKANA: c_int = 4
@@ -2411,7 +2411,7 @@ pub fn PCRE2_SUFFIX[T](a: T) -> T {
     a
 }
 pub fn U32OVERFLOW[T](x: T) -> T {
-    (x > 4294967295)
+    (x > 4294967295u32)
 }
 pub fn S32OVERFLOW[T](x: T) -> T {
     ((x > 2147483647) or (x < (-2147483647 - 1)))
@@ -2449,8 +2449,8 @@ pub let CTL_STARTCHAR: c_uint = 0x10000000
 pub let CTL_USE_LENGTH: c_uint = 0x20000000
 pub let CTL_UTF8_INPUT: c_uint = 0x40000000
 pub let CTL_ZERO_TERMINATE: c_uint = 0x80000000
-pub let CTL_DEBUG: c_uint = (0x00002000 | 0x00020000)
-pub let CTL_ANYGLOB: c_uint = (0x00000010 | 0x00008000)
+pub let CTL_DEBUG: c_uint = ((0x00002000 | 0x00020000) as c_uint)
+pub let CTL_ANYGLOB: c_uint = ((0x00000010 | 0x00008000) as c_uint)
 pub let CTL2_SUBSTITUTE_CALLOUT: c_uint = 0x00000001
 pub let CTL2_SUBSTITUTE_EXTENDED: c_uint = 0x00000002
 pub let CTL2_SUBSTITUTE_LITERAL: c_uint = 0x00000004
@@ -2480,7 +2480,7 @@ pub let POSIX_SUPPORTED_COMPILE_EXTRA_OPTIONS: c_int = 0
 pub let POSIX_SUPPORTED_COMPILE_CONTROLS: c_int = 562103299
 pub let POSIX_SUPPORTED_COMPILE_CONTROLS2: c_int = 0
 pub let POSIX_SUPPORTED_MATCH_OPTIONS: c_int = 7
-pub let POSIX_SUPPORTED_MATCH_CONTROLS: c_uint = (0x00000001 | 0x00000002)
+pub let POSIX_SUPPORTED_MATCH_CONTROLS: c_uint = ((0x00000001 | 0x00000002) as c_uint)
 pub let POSIX_SUPPORTED_MATCH_CONTROLS2: c_uint = 0x00002000
 pub let PUSH_SUPPORTED_COMPILE_CONTROLS: c_int = 774578336
 pub let PUSH_SUPPORTED_COMPILE_CONTROLS2: c_int = 1610645504

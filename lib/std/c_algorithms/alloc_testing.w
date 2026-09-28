@@ -52,7 +52,7 @@ pub unsafe fn alloc_test_free(__param_ptr: *mut c_void) -> Unit {
 
     (__local_block_size = (*__local_header).bytes)
 
-    if ((((if not ((if allocated_bytes >= __local_block_size: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if allocated_bytes >= __local_block_size: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"alloc_test_free".ptr, c"alloc-testing.c".ptr, (145 as c_int), c"allocated_bytes >= block_size".ptr)
     } else {
         0
@@ -151,7 +151,7 @@ unsafe fn alloc_test_get_header(__param_ptr: *mut c_void) -> *mut _BlockHeader {
 
     (__local_result = (__param_ptr as *mut _BlockHeader) - ((1 as isize) as usize))
 
-    if ((((if not ((if (*__local_result).magic_number == 1928102610: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if (*__local_result).magic_number == 1928102610: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"alloc_test_get_header".ptr, c"alloc-testing.c".ptr, (70 as c_int), c"result->magic_number == ALLOC_TEST_MAGIC".ptr)
     } else {
         0

@@ -145,7 +145,7 @@ unsafe fn do_bumpalong(__param_match_data: *mut pcre2_real_match_data_8, __param
 
         }
 
-        return (((__local_next as usize) -% (__local_subject as usize)) / sizeof[u8]())
+        return (((((__local_next as usize) -% (__local_subject as usize)) / sizeof[u8]()) as c_ulong))
 
     }
 

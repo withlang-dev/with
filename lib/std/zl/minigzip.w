@@ -145,7 +145,7 @@ unsafe fn file_compress(__param_file: *mut i8, __param_mode: *mut i8) -> Unit {
 
     (__local_end = ((string_copy((&__local_outfile[0] as *mut c_char), (__param_file as *const i8), ((1025 * sizeof[c_char]()) as c_ulong)) as *mut c_char)))
 
-    string_copy(__local_end, c".gz".ptr, ((((1025 * sizeof[c_char]()) as c_ulong) -% (((((__local_end as usize) -% ((&__local_outfile[0] as *mut c_char) as usize)) / sizeof[c_char]()) as c_ulong) as c_ulong)) as c_ulong))
+    string_copy(__local_end, c".gz".ptr, ((((1025 * sizeof[c_char]()) as c_ulong) -% ((((__local_end as usize) -% ((&__local_outfile[0] as *mut c_char) as usize)) / sizeof[c_char]()) as c_ulong)) as c_ulong))
 
     (__local_in_ = fopen((__param_file as *const i8), c"rb".ptr))
 

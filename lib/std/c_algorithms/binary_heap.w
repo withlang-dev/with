@@ -19,7 +19,7 @@ pub fn binary_heap_new(__param_heap_type: i32, __param_compare_func: unsafe exte
 
     ((unsafe *__local_heap).alloced_size = ((16 as c_uint)))
 
-    ((unsafe *__local_heap).values = (((unsafe { with_alloc(((((sizeof[usize]() as c_ulong) *% ((unsafe *__local_heap).alloced_size as c_ulong)) as c_ulong) as i64)) } as *mut c_void) as *mut *mut c_void)))
+    ((unsafe *__local_heap).values = (((unsafe { with_alloc(((((sizeof[usize]() as c_ulong) *% ((*__local_heap).alloced_size as c_ulong)) as c_ulong) as i64)) } as *mut c_void) as *mut *mut c_void)))
 
     if ((if (unsafe *__local_heap).values == null: 1 else: 0) != 0) {
         unsafe { with_free(((__local_heap as *mut c_void) as *mut u8)) }

@@ -26,7 +26,7 @@ pub unsafe fn crc32_z(__param_crc: c_ulong, __param_buf: *const u8, __param_len:
         return 0
     }
 
-    (__local_crc = (((((~__local_crc) as c_ulong) & ((4294967295 as c_ulong) as c_ulong)) as c_ulong)))
+    (__local_crc = (((((~__local_crc) as c_ulong) & (4294967295 as c_ulong)) as c_ulong)))
 
     if ((if __local_len >= 47: 1 else: 0) != 0) {
         var __local_blks: c_ulong
@@ -41,7 +41,7 @@ pub unsafe fn crc32_z(__param_crc: c_ulong, __param_buf: *const u8, __param_len:
             var __ci_expr_logic_0: c_int = 0
 
             if (__local_len != 0) {
-                (__ci_expr_logic_0 = (if (if (((__local_buf as c_ulong) as c_ulong) & (7 as c_ulong)) != 0: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_0 = (if (if ((__local_buf as c_ulong) & (7 as c_ulong)) != 0: 1 else: 0) != 0: 1 else: 0))
             }
 
             if (not (__ci_expr_logic_0 != 0)) {
@@ -338,7 +338,7 @@ pub unsafe fn crc32_z(__param_crc: c_ulong, __param_buf: *const u8, __param_len:
 
     }
 
-    return ((__local_crc as c_ulong) ^ ((4294967295 as c_ulong) as c_ulong))
+    return ((__local_crc as c_ulong) ^ (4294967295 as c_ulong))
 
 }
 
@@ -347,7 +347,7 @@ pub fn crc32_combine_op(__param_crc1: c_ulong, __param_crc2: c_ulong, __param_op
         return 0
     }
 
-    return ((multmodp(__param_op, (((__param_crc1 as c_ulong) & ((4294967295 as c_ulong) as c_ulong)) as c_ulong)) as c_ulong) ^ (((__param_crc2 as c_ulong) & ((4294967295 as c_ulong) as c_ulong)) as c_ulong))
+    return ((multmodp(__param_op, (((__param_crc1 as c_ulong) & (4294967295 as c_ulong)) as c_ulong)) as c_ulong) ^ (((__param_crc2 as c_ulong) & (4294967295 as c_ulong)) as c_ulong))
 
 }
 
@@ -381,7 +381,7 @@ pub fn crc32_combine_gen64(__param_len2: c_longlong) -> c_ulong {
 }
 
 fn byte_swap(__param_word: c_ulong) -> c_ulong {
-    return ((((((((((((((((((__param_word as c_ulong) & (((0 as c_ulong) -% 72057594037927936) as c_ulong)) as c_ulong) >> (56 as c_uint)) as c_ulong) | (((((__param_word as c_ulong) & ((71776119061217280 as c_ulong) as c_ulong)) as c_ulong) >> (40 as c_uint)) as c_ulong)) as c_ulong) | (((((__param_word as c_ulong) & ((280375465082880 as c_ulong) as c_ulong)) as c_ulong) >> (24 as c_uint)) as c_ulong)) as c_ulong) | (((((__param_word as c_ulong) & ((1095216660480 as c_ulong) as c_ulong)) as c_ulong) >> (8 as c_uint)) as c_ulong)) as c_ulong) | (((((__param_word as c_ulong) & ((4278190080 as c_ulong) as c_ulong)) as c_ulong) << (8 as c_uint)) as c_ulong)) as c_ulong) | (((((__param_word as c_ulong) & (16711680 as c_ulong)) as c_ulong) << (24 as c_uint)) as c_ulong)) as c_ulong) | (((((__param_word as c_ulong) & (65280 as c_ulong)) as c_ulong) << (40 as c_uint)) as c_ulong)) as c_ulong) | (((((__param_word as c_ulong) & (255 as c_ulong)) as c_ulong) << (56 as c_uint)) as c_ulong))
+    return ((((((((((((((((((__param_word as c_ulong) & (((0 as c_ulong) -% 72057594037927936) as c_ulong)) as c_ulong) >> (56 as c_uint)) as c_ulong) | (((((__param_word as c_ulong) & (71776119061217280 as c_ulong)) as c_ulong) >> (40 as c_uint)) as c_ulong)) as c_ulong) | (((((__param_word as c_ulong) & (280375465082880 as c_ulong)) as c_ulong) >> (24 as c_uint)) as c_ulong)) as c_ulong) | (((((__param_word as c_ulong) & (1095216660480 as c_ulong)) as c_ulong) >> (8 as c_uint)) as c_ulong)) as c_ulong) | (((((__param_word as c_ulong) & (4278190080 as c_ulong)) as c_ulong) << (8 as c_uint)) as c_ulong)) as c_ulong) | (((((__param_word as c_ulong) & (16711680 as c_ulong)) as c_ulong) << (24 as c_uint)) as c_ulong)) as c_ulong) | (((((__param_word as c_ulong) & (65280 as c_ulong)) as c_ulong) << (40 as c_uint)) as c_ulong)) as c_ulong) | (((((__param_word as c_ulong) & (255 as c_ulong)) as c_ulong) << (56 as c_uint)) as c_ulong))
 
 }
 
@@ -392,7 +392,7 @@ fn multmodp(__param_a: c_ulong, __param_b: c_ulong) -> c_ulong {
     var __local_p: c_ulong
 
 
-    (__local_m = (((((1 as c_ulong) as c_ulong) << (31 as c_uint)) as c_ulong)))
+    (__local_m = ((((1 as c_ulong) << (31 as c_uint)) as c_ulong)))
 
     (__local_p = ((0 as c_ulong)))
 
@@ -411,7 +411,7 @@ fn multmodp(__param_a: c_ulong, __param_b: c_ulong) -> c_ulong {
         var __ci_expr_ternary_0: c_ulong = 0
 
         if (((__local_b as c_ulong) & (1 as c_ulong)) != 0) {
-            (__ci_expr_ternary_0 = ((((((__local_b as c_ulong) >> (1 as c_uint)) as c_ulong) ^ ((3988292384 as c_ulong) as c_ulong)) as c_ulong)))
+            (__ci_expr_ternary_0 = ((((((__local_b as c_ulong) >> (1 as c_uint)) as c_ulong) ^ (3988292384 as c_ulong)) as c_ulong)))
         } else {
             (__ci_expr_ternary_0 = ((((__local_b as c_ulong) >> (1 as c_uint)) as c_ulong)))
         }
@@ -430,7 +430,7 @@ fn x2nmodp(__param_n: c_longlong, __param_k: c_uint) -> c_ulong {
     var __local_k = __param_k
     var __local_p: c_ulong
 
-    (__local_p = (((((1 as c_ulong) as c_ulong) << (31 as c_uint)) as c_ulong)))
+    (__local_p = ((((1 as c_ulong) << (31 as c_uint)) as c_ulong)))
 
     while (__local_n != 0) {
         if (((__local_n as c_longlong) & (1 as c_longlong)) != 0) {

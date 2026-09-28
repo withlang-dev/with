@@ -4,12 +4,12 @@ use std.tommyds.tommyhash
 use std.tommyds.tommylist
 
 fn tommy_ilog2_u32(__param_value: c_uint) -> c_uint {
-    return (((__param_value as u32).clz() as c_int) ^ (31 as c_int))
+    return (((((__param_value as u32).clz() as c_int) ^ (31 as c_int)) as c_uint))
 
 }
 
 fn tommy_ilog2_u64(__param_value: c_ulonglong) -> c_uint {
-    return (((__param_value as u64).clz() as c_int) ^ (63 as c_int))
+    return (((((__param_value as u64).clz() as c_int) ^ (63 as c_int)) as c_uint))
 
 }
 
@@ -66,14 +66,14 @@ fn tommy_roundup_pow2_u64(__param_value: c_ulonglong) -> c_ulonglong {
 }
 
 fn tommy_haszero_u32(__param_value: c_uint) -> c_int {
-    return (if ((((((__param_value as c_uint) -% (16843009 as c_uint)) as c_uint) & ((~__param_value) as c_uint)) as c_uint) & ((2155905152 as c_uint) as c_uint)) != 0: 1 else: 0)
+    return (if ((((((__param_value as c_uint) -% (16843009 as c_uint)) as c_uint) & ((~__param_value) as c_uint)) as c_uint) & (2155905152 as c_uint)) != 0: 1 else: 0)
 
 }
 
 pub unsafe fn tommy_hashdyn_init(__param_hashdyn: *mut tommy_hashdyn_struct) -> Unit {
     ((*__param_hashdyn).bucket_bit = ((4 as c_uint)))
 
-    ((*__param_hashdyn).bucket_max = (((((1 as c_ulonglong) as c_ulonglong) << ((*__param_hashdyn).bucket_bit as c_uint)) as c_ulonglong)))
+    ((*__param_hashdyn).bucket_max = ((((1 as c_ulonglong) << ((*__param_hashdyn).bucket_bit as c_uint)) as c_ulonglong)))
 
     ((*__param_hashdyn).bucket_mask = (((((*__param_hashdyn).bucket_max as c_ulonglong) -% (1 as c_ulonglong)) as c_ulonglong)))
 
@@ -238,7 +238,7 @@ pub unsafe fn tommy_hashdyn_count(__param_hashdyn: *mut tommy_hashdyn_struct) ->
 }
 
 pub unsafe fn tommy_hashdyn_memory_usage(__param_hashdyn: *mut tommy_hashdyn_struct) -> c_ulonglong {
-    return (((((*__param_hashdyn).bucket_max as c_ulonglong) *% ((sizeof[usize]() as c_ulonglong) as c_ulonglong)) as c_ulonglong) +% (((tommy_hashdyn_count(__param_hashdyn) as c_ulonglong) *% ((sizeof[tommy_node_struct]() as c_ulonglong) as c_ulonglong)) as c_ulonglong))
+    return (((((*__param_hashdyn).bucket_max as c_ulonglong) *% (sizeof[usize]() as c_ulonglong)) as c_ulonglong) +% (((tommy_hashdyn_count(__param_hashdyn) as c_ulonglong) *% (sizeof[tommy_node_struct]() as c_ulonglong)) as c_ulonglong))
 
 }
 
@@ -257,7 +257,7 @@ unsafe fn tommy_hashdyn_resize(__param_hashdyn: *mut tommy_hashdyn_struct, __par
 
     (__local_bucket_max = (*__param_hashdyn).bucket_max)
 
-    (__local_new_bucket_max = (((((1 as c_ulonglong) as c_ulonglong) << (__param_new_bucket_bit as c_uint)) as c_ulonglong)))
+    (__local_new_bucket_max = ((((1 as c_ulonglong) << (__param_new_bucket_bit as c_uint)) as c_ulonglong)))
 
     (__local_new_bucket_mask = ((((__local_new_bucket_max as c_ulonglong) -% (1 as c_ulonglong)) as c_ulonglong)))
 

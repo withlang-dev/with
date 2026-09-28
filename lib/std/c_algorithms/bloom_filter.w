@@ -100,7 +100,7 @@ pub unsafe fn bloom_filter_query(__param_bloomfilter: *mut _BloomFilter, __param
 
         (__local_bit = ((((1 as c_int) << (((__local_index as c_uint) % (8 as c_uint)) as c_uint)) as c_int)))
 
-        if ((if (((__local_b as c_int) as c_int) & (__local_bit as c_int)) == 0: 1 else: 0) != 0) {
+        if ((if ((__local_b as c_int) & (__local_bit as c_int)) == 0: 1 else: 0) != 0) {
             return 0
 
         }
@@ -174,7 +174,7 @@ pub unsafe fn bloom_filter_union(__param_filter1: *mut _BloomFilter, __param_fil
     (__local_i = ((0 as c_uint)))
 
     while ((if __local_i < __local_array_size: 1 else: 0) != 0) {
-        (((*__local_result).table[__local_i]) = (((((((*__param_filter1).table[__local_i]) as c_int) as c_int) | ((((*__param_filter2).table[__local_i]) as c_int) as c_int)) as u8)))
+        (((*__local_result).table[__local_i]) = ((((((*__param_filter1).table[__local_i]) as c_int) | (((*__param_filter2).table[__local_i]) as c_int)) as u8)))
 
 
         (__local_i = (__local_i +% 1))
@@ -227,7 +227,7 @@ pub unsafe fn bloom_filter_intersection(__param_filter1: *mut _BloomFilter, __pa
     (__local_i = ((0 as c_uint)))
 
     while ((if __local_i < __local_array_size: 1 else: 0) != 0) {
-        (((*__local_result).table[__local_i]) = (((((((*__param_filter1).table[__local_i]) as c_int) as c_int) & ((((*__param_filter2).table[__local_i]) as c_int) as c_int)) as u8)))
+        (((*__local_result).table[__local_i]) = ((((((*__param_filter1).table[__local_i]) as c_int) & (((*__param_filter2).table[__local_i]) as c_int)) as u8)))
 
 
         (__local_i = (__local_i +% 1))

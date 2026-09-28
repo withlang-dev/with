@@ -16,12 +16,12 @@ use std.tommyds.tommyhashlin
 use std.libc
 
 fn tommy_ilog2_u32(__param_value: c_uint) -> c_uint {
-    return (((__param_value as u32).clz() as c_int) ^ (31 as c_int))
+    return (((((__param_value as u32).clz() as c_int) ^ (31 as c_int)) as c_uint))
 
 }
 
 fn tommy_ilog2_u64(__param_value: c_ulonglong) -> c_uint {
-    return (((__param_value as u64).clz() as c_int) ^ (63 as c_int))
+    return (((((__param_value as u64).clz() as c_int) ^ (63 as c_int)) as c_uint))
 
 }
 
@@ -78,7 +78,7 @@ fn tommy_roundup_pow2_u64(__param_value: c_ulonglong) -> c_ulonglong {
 }
 
 fn tommy_haszero_u32(__param_value: c_uint) -> c_int {
-    return (if ((((((__param_value as c_uint) -% (16843009 as c_uint)) as c_uint) & ((~__param_value) as c_uint)) as c_uint) & ((2155905152 as c_uint) as c_uint)) != 0: 1 else: 0)
+    return (if ((((((__param_value as c_uint) -% (16843009 as c_uint)) as c_uint) & ((~__param_value) as c_uint)) as c_uint) & (2155905152 as c_uint)) != 0: 1 else: 0)
 
 }
 
@@ -162,7 +162,7 @@ pub fn rnd(__param_max: c_uint) -> c_uint {
 
     '__ci_bb_1 {
         (__local_divider__goto_209_17 = ((((((0 as c_ulonglong) -% 1) as c_ulonglong) / (__param_max as c_ulonglong)) as c_ulonglong)))
-        (SEED = ((((((SEED as c_ulonglong) *% ((6364136223846793005 as c_ulonglong) as c_ulonglong)) as c_ulonglong) +% ((1442695040888963407 as c_ulonglong) as c_ulonglong)) as c_ulonglong)))
+        (SEED = ((((((SEED as c_ulonglong) *% (6364136223846793005 as c_ulonglong)) as c_ulonglong) +% (1442695040888963407 as c_ulonglong)) as c_ulonglong)))
         (__local_r__goto_208_11 = ((((SEED as c_ulonglong) / (__local_divider__goto_209_17 as c_ulonglong)) as c_uint)))
         if ((if __local_r__goto_208_11 >= __param_max: 1 else: 0) != 0) {
             goto '__ci_bb_2
@@ -225,7 +225,7 @@ pub fn cache_clear() -> Unit {
     (__local_i = ((0 as c_uint)))
 
     while ((if __local_i < (16777216 * sizeof[u8]()): 1 else: 0) != 0) {
-        (the_cache[__local_i] = ((the_cache[__local_i] as c_int) +% (1 as u8)))
+        (the_cache[__local_i] = ((((the_cache[__local_i] as c_int) +% (1 as u8)) as u8)))
 
         (__local_i = (__local_i +% 32))
 

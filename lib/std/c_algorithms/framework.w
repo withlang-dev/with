@@ -24,7 +24,7 @@ fn run_test(__param_test: extern "C" fn() -> Unit) -> Unit {
 
     __param_test()
 
-    if ((((if not ((if alloc_test_get_allocated() == 0: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if alloc_test_get_allocated() == 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"run_test".ptr, c"framework.c".ptr, (41 as c_int), c"alloc_test_get_allocated() == 0".ptr)
     } else {
         0

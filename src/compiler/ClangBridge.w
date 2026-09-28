@@ -4196,6 +4196,23 @@ pub fn with_ci_type_is_pointer(session: i64, cursor_idx: i32) -> i32:
         if canonical.kind == CXType_Pointer: return 1
         0
 
+// The width in bits of the arithmetic type of a cursor's value as c_import
+// models it (`long` is c_long, i64, on every target), or 0 for any other
+// type — an enum, a bool, a pointer. Reads the canonical kind only, never
+// clang_Type_getSizeOf, which crashes on some incomplete types.
+pub fn with_ci_scalar_type_bits(session: i64, cursor_idx: i32) -> i32:
+    unsafe:
+        let s = session as *mut CImportSession
+        if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return 0
+        let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
+        let k = clang_getCanonicalType(clang_getCursorType(cursor)).kind
+        if k == CXType_Char_S or k == CXType_Char_U or k == CXType_SChar or k == CXType_UChar: return 8
+        if k == CXType_Short or k == CXType_UShort or k == CXType_Half or k == CXType_Float16: return 16
+        if k == CXType_Int or k == CXType_UInt or k == CXType_Float: return 32
+        if k == CXType_Long or k == CXType_ULong or k == CXType_LongLong or k == CXType_ULongLong or k == CXType_Double or k == CXType_LongDouble: return 64
+        if k == CXType_Int128 or k == CXType_UInt128 or k == CXType_Float128: return 128
+        0
+
 pub fn with_ci_type_is_float(session: i64, cursor_idx: i32) -> i32:
     unsafe:
         let s = session as *mut CImportSession

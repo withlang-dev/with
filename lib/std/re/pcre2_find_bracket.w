@@ -47,10 +47,10 @@ pub unsafe fn _pcre2_find_bracket_8(__param_code: *const u8, __param_utf: c_int,
         }
 
         if (__ci_expr_logic_0 != 0) {
-            (__local_code = __local_code + (((((((__local_code[1]) as c_int) << (8 as c_uint)) as c_int) | (((__local_code[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
+            (__local_code = __local_code + (((((((__local_code[1]) as c_int) << (8 as c_uint)) as c_int) | ((__local_code[(1 + 1)]) as c_int)) as c_uint) as usize))
         } else {
             if ((if __local_c == OP_CALLOUT_STR: 1 else: 0) != 0) {
-                (__local_code = __local_code + (((((((__local_code[(1 + (2 * 2))]) as c_int) << (8 as c_uint)) as c_int) | (((__local_code[((1 + (2 * 2)) + 1)]) as c_int) as c_int)) as c_uint) as usize))
+                (__local_code = __local_code + (((((((__local_code[(1 + (2 * 2))]) as c_int) << (8 as c_uint)) as c_int) | ((__local_code[((1 + (2 * 2)) + 1)]) as c_int)) as c_uint) as usize))
             } else {
                 var __ci_expr_logic_1: c_int
 
@@ -93,7 +93,7 @@ pub unsafe fn _pcre2_find_bracket_8(__param_code: *const u8, __param_utf: c_int,
                     }
 
                     if (__ci_expr_logic_4 != 0) {
-                        var __local_n: c_int = ((((((((__local_code[(1 + 2)]) as c_int) << (8 as c_uint)) as c_int) | (((__local_code[((1 + 2) + 1)]) as c_int) as c_int)) as c_uint) as c_int))
+                        var __local_n: c_int = ((((((((__local_code[(1 + 2)]) as c_int) << (8 as c_uint)) as c_int) | ((__local_code[((1 + 2) + 1)]) as c_int)) as c_uint) as c_int))
 
                         if ((if __local_n == __param_number: 1 else: 0) != 0) {
                             return __local_code

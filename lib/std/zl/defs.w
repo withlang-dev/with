@@ -447,10 +447,10 @@ pub type deflate_state = internal_state
 
 pub type block_state = c_uint
 
-pub let need_more: c_uint = 0
-pub let block_done: c_uint = 1
-pub let finish_started: c_uint = 2
-pub let finish_done: c_uint = 3
+pub let need_more: c_int = 0
+pub let block_done: c_int = 1
+pub let finish_started: c_int = 2
+pub let finish_done: c_int = 3
 pub type compress_func = unsafe extern "C" fn(*mut internal_state, c_int) -> i32
 
 pub type config_s { good_length: c_ushort = 0, max_lazy: c_ushort = 0, nice_length: c_ushort = 0, max_chain: c_ushort = 0, func: unsafe extern "C" fn(*mut internal_state, c_int) -> i32 }
@@ -460,18 +460,12 @@ pub type config = config_s
 
 pub let deflate_copyright: [68]c_char = [32, 100, 101, 102, 108, 97, 116, 101, 32, 49, 46, 51, 46, 50, 32, 67, 111, 112, 121, 114, 105, 103, 104, 116, 32, 49, 57, 57, 53, 45, 50, 48, 50, 54, 32, 74, 101, 97, 110, 45, 108, 111, 117, 112, 32, 71, 97, 105, 108, 108, 121, 32, 97, 110, 100, 32, 77, 97, 114, 107, 32, 65, 100, 108, 101, 114, 32, 0]
 
-pub fn deflateInit[T](strm: T, level: T) -> T {
-    unsafe { deflateInit_(strm, level, ZLIB_VERSION, (sizeof[z_stream_s]() as c_int)) }
-}
-pub fn deflateInit2[T](strm: T, level: T, method: T, windowBits: T, memLevel: T, strategy: T) -> T {
-    unsafe { deflateInit2_(strm, level, method, windowBits, memLevel, strategy, ZLIB_VERSION, (sizeof[z_stream_s]() as c_int)) }
-}
 pub let LENGTH_CODES: c_int = 29
 pub let LITERALS: c_int = 256
 pub let L_CODES: c_int = ((256 + 1) + 29)
 pub let D_CODES: c_int = 30
 pub let BL_CODES: c_int = 19
-pub let HEAP_SIZE: c_int = ((2 * L_CODES) + 1)
+pub let HEAP_SIZE: c_int = (((2 * L_CODES) + 1) as c_int)
 pub let MAX_BITS: c_int = 15
 pub let Buf_size: c_int = 16
 pub let INIT_STATE: c_int = 42
@@ -521,57 +515,48 @@ impl Copy for code
 
 pub type codetype = c_uint
 
-pub let CODES: c_uint = 0
-pub let LENS: c_uint = 1
-pub let DISTS: c_uint = 2
+pub let CODES: c_int = 0
+pub let LENS: c_int = 1
+pub let DISTS: c_int = 2
 pub type inflate_mode = c_uint
 
-pub let HEAD: c_uint = 16180
-pub let FLAGS: c_uint = 16181
-pub let TIME: c_uint = 16182
-pub let OS: c_uint = 16183
-pub let EXLEN: c_uint = 16184
-pub let EXTRA: c_uint = 16185
-pub let NAME: c_uint = 16186
-pub let COMMENT: c_uint = 16187
-pub let HCRC: c_uint = 16188
-pub let DICTID: c_uint = 16189
-pub let DICT: c_uint = 16190
-pub let TYPE: c_uint = 16191
-pub let TYPEDO: c_uint = 16192
-pub let STORED: c_uint = 16193
-pub let COPY_: c_uint = 16194
-pub let TABLE: c_uint = 16196
-pub let LENLENS: c_uint = 16197
-pub let CODELENS: c_uint = 16198
-pub let LEN_: c_uint = 16199
-pub let LEN: c_uint = 16200
-pub let LENEXT: c_uint = 16201
-pub let DIST: c_uint = 16202
-pub let DISTEXT: c_uint = 16203
-pub let MATCH: c_uint = 16204
-pub let LIT: c_uint = 16205
-pub let CHECK: c_uint = 16206
-pub let LENGTH: c_uint = 16207
-pub let DONE: c_uint = 16208
-pub let BAD: c_uint = 16209
-pub let MEM: c_uint = 16210
-pub let SYNC: c_uint = 16211
+pub let HEAD: c_int = 16180
+pub let FLAGS: c_int = 16181
+pub let TIME: c_int = 16182
+pub let OS: c_int = 16183
+pub let EXLEN: c_int = 16184
+pub let EXTRA: c_int = 16185
+pub let NAME: c_int = 16186
+pub let COMMENT: c_int = 16187
+pub let HCRC: c_int = 16188
+pub let DICTID: c_int = 16189
+pub let DICT: c_int = 16190
+pub let TYPE: c_int = 16191
+pub let TYPEDO: c_int = 16192
+pub let STORED: c_int = 16193
+pub let COPY_: c_int = 16194
+pub let TABLE: c_int = 16196
+pub let LENLENS: c_int = 16197
+pub let CODELENS: c_int = 16198
+pub let LEN_: c_int = 16199
+pub let LEN: c_int = 16200
+pub let LENEXT: c_int = 16201
+pub let DIST: c_int = 16202
+pub let DISTEXT: c_int = 16203
+pub let MATCH: c_int = 16204
+pub let LIT: c_int = 16205
+pub let CHECK: c_int = 16206
+pub let LENGTH: c_int = 16207
+pub let DONE: c_int = 16208
+pub let BAD: c_int = 16209
+pub let MEM: c_int = 16210
+pub let SYNC: c_int = 16211
 pub type inflate_state { strm: *mut z_stream_s = null, mode: i32 = 0, last: c_int = 0, wrap: c_int = 0, havedict: c_int = 0, flags: c_int = 0, dmax: c_uint = 0, check_: c_ulong = 0, total: c_ulong = 0, head: *mut gz_header_s = null, wbits: c_uint = 0, wsize: c_uint = 0, whave: c_uint = 0, wnext: c_uint = 0, window: *mut u8 = null, hold: c_ulong = 0, bits: c_uint = 0, length: c_uint = 0, offset: c_uint = 0, extra: c_uint = 0, lencode: *const code = null, distcode: *const code = null, lenbits: c_uint = 0, distbits: c_uint = 0, ncode: c_uint = 0, nlen: c_uint = 0, ndist: c_uint = 0, have: c_uint = 0, next: *mut code = null, lens: [320]c_ushort = [0 as c_ushort; 320], work: [288]c_ushort = [0 as c_ushort; 288], codes: [1444]code, sane: c_int = 0, back: c_int = 0, was: c_uint = 0 }
 impl Copy for inflate_state
 
-pub fn inflateBackInit[T](strm: T, windowBits: T, window: T) -> T {
-    unsafe { inflateBackInit_(strm, windowBits, window, ZLIB_VERSION, (sizeof[z_stream_s]() as c_int)) }
-}
 pub let ENOUGH_LENS: c_int = 852
 pub let ENOUGH_DISTS: c_int = 592
 pub let ENOUGH: c_int = 1444
-pub fn inflateInit[T](strm: T) -> T {
-    unsafe { inflateInit_(strm, ZLIB_VERSION, (sizeof[z_stream_s]() as c_int)) }
-}
-pub fn inflateInit2[T](strm: T, windowBits: T) -> T {
-    unsafe { inflateInit2_(strm, windowBits, ZLIB_VERSION, (sizeof[z_stream_s]() as c_int)) }
-}
 pub let inflate_copyright: [47]c_char = [32, 105, 110, 102, 108, 97, 116, 101, 32, 49, 46, 51, 46, 50, 32, 67, 111, 112, 121, 114, 105, 103, 104, 116, 32, 49, 57, 57, 53, 45, 50, 48, 50, 54, 32, 77, 97, 114, 107, 32, 65, 100, 108, 101, 114, 32, 0]
 
 pub let MAXBITS: c_int = 15

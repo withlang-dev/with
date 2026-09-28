@@ -788,7 +788,7 @@ pub unsafe fn unzReadCurrentFile(__param_file: *mut c_void, __param_buf: *mut c_
     }
 
     if (__ci_expr_logic_1 != 0) {
-        ((*__local_pfile_in_zip_read_info).stream.avail_out = ((((((*__local_pfile_in_zip_read_info).rest_read_compressed as c_uint) as c_uint) +% ((*(&raw const (*__local_pfile_in_zip_read_info).stream as *const z_stream_s)).avail_in as c_uint)) as c_uint)))
+        ((*__local_pfile_in_zip_read_info).stream.avail_out = (((((*__local_pfile_in_zip_read_info).rest_read_compressed as c_uint) +% ((*(&raw const (*__local_pfile_in_zip_read_info).stream as *const z_stream_s)).avail_in as c_uint)) as c_uint)))
     }
 
 
@@ -1183,14 +1183,14 @@ unsafe fn decrypt_byte(__param_pkeys: *mut c_ulong, __param_pcrc_32_tab: *const 
 
     __param_pcrc_32_tab
 
-    (__local_temp = ((((((((*(__param_pkeys + ((2 as isize) as usize))) as c_uint) as c_uint) & (65535 as c_uint)) as c_uint) | (2 as c_uint)) as c_uint)))
+    (__local_temp = (((((((*(__param_pkeys + ((2 as isize) as usize))) as c_uint) & (65535 as c_uint)) as c_uint) | (2 as c_uint)) as c_uint)))
 
     return ((((((((__local_temp as c_uint) *% (((__local_temp as c_uint) ^ (1 as c_uint)) as c_uint)) as c_uint) >> (8 as c_uint)) as c_uint) & (255 as c_uint)) as c_int))
 
 }
 
 unsafe fn update_keys(__param_pkeys: *mut c_ulong, __param_pcrc_32_tab: *const c_uint, __param_c: c_int) -> c_int {
-    ((*(__param_pkeys + ((0 as isize) as usize))) = (((((*(__param_pcrc_32_tab + ((((((((*(__param_pkeys + ((0 as isize) as usize))) as c_int) as c_int) ^ (__param_c as c_int)) as c_int) & (255 as c_int)) as isize) as usize))) as c_ulong) ^ ((((*(__param_pkeys + ((0 as isize) as usize))) as c_ulong) >> (8 as c_uint)) as c_ulong)) as c_ulong)))
+    ((*(__param_pkeys + ((0 as isize) as usize))) = (((((*(__param_pcrc_32_tab + (((((((*(__param_pkeys + ((0 as isize) as usize))) as c_int) ^ (__param_c as c_int)) as c_int) & (255 as c_int)) as isize) as usize))) as c_ulong) ^ ((((*(__param_pkeys + ((0 as isize) as usize))) as c_ulong) >> (8 as c_uint)) as c_ulong)) as c_ulong)))
 
     ((*(__param_pkeys + ((1 as isize) as usize))) = ((*(__param_pkeys + ((1 as isize) as usize))) +% (((*(__param_pkeys + ((0 as isize) as usize))) as c_ulong) & (255 as c_ulong))))
 
@@ -1198,7 +1198,7 @@ unsafe fn update_keys(__param_pkeys: *mut c_ulong, __param_pcrc_32_tab: *const c
 
     var __local_keyshift: c_int = (((((*(__param_pkeys + ((1 as isize) as usize))) as c_ulong) >> (24 as c_uint)) as c_int))
 
-    ((*(__param_pkeys + ((2 as isize) as usize))) = (((((*(__param_pcrc_32_tab + ((((((((*(__param_pkeys + ((2 as isize) as usize))) as c_int) as c_int) ^ (__local_keyshift as c_int)) as c_int) & (255 as c_int)) as isize) as usize))) as c_ulong) ^ ((((*(__param_pkeys + ((2 as isize) as usize))) as c_ulong) >> (8 as c_uint)) as c_ulong)) as c_ulong)))
+    ((*(__param_pkeys + ((2 as isize) as usize))) = (((((*(__param_pcrc_32_tab + (((((((*(__param_pkeys + ((2 as isize) as usize))) as c_int) ^ (__local_keyshift as c_int)) as c_int) & (255 as c_int)) as isize) as usize))) as c_ulong) ^ ((((*(__param_pkeys + ((2 as isize) as usize))) as c_ulong) >> (8 as c_uint)) as c_ulong)) as c_ulong)))
 
 
     return __param_c
@@ -1228,7 +1228,7 @@ unsafe fn unz64local_getShort(__param_pzlib_filefunc_def: *const zlib_filefunc64
     var __local_err: c_int = (((*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).zread_file((*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, __param_filestream, (&__local_c[0] as *mut u8), (2 as c_ulong)) as c_int))
 
     if ((if __local_err == 2: 1 else: 0) != 0) {
-        ((*__param_pX) = (((((__local_c[0] as c_int) as c_ulong) | ((((__local_c[1] as c_ulong) as c_ulong) << (8 as c_uint)) as c_ulong)) as c_ulong)))
+        ((*__param_pX) = (((((__local_c[0] as c_int) as c_ulong) | (((__local_c[1] as c_ulong) << (8 as c_uint)) as c_ulong)) as c_ulong)))
 
         return 0
 
@@ -1249,7 +1249,7 @@ unsafe fn unz64local_getLong(__param_pzlib_filefunc_def: *const zlib_filefunc64_
     var __local_err: c_int = (((*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).zread_file((*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, __param_filestream, (&__local_c[0] as *mut u8), (4 as c_ulong)) as c_int))
 
     if ((if __local_err == 4: 1 else: 0) != 0) {
-        ((*__param_pX) = (((((((((__local_c[0] as c_int) as c_ulong) | ((((__local_c[1] as c_ulong) as c_ulong) << (8 as c_uint)) as c_ulong)) as c_ulong) | ((((__local_c[2] as c_ulong) as c_ulong) << (16 as c_uint)) as c_ulong)) as c_ulong) | ((((__local_c[3] as c_ulong) as c_ulong) << (24 as c_uint)) as c_ulong)) as c_ulong)))
+        ((*__param_pX) = (((((((((__local_c[0] as c_int) as c_ulong) | (((__local_c[1] as c_ulong) << (8 as c_uint)) as c_ulong)) as c_ulong) | (((__local_c[2] as c_ulong) << (16 as c_uint)) as c_ulong)) as c_ulong) | (((__local_c[3] as c_ulong) << (24 as c_uint)) as c_ulong)) as c_ulong)))
 
         return 0
 
@@ -1270,7 +1270,7 @@ unsafe fn unz64local_getLong64(__param_pzlib_filefunc_def: *const zlib_filefunc6
     var __local_err: c_int = (((*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).zread_file((*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, __param_filestream, (&__local_c[0] as *mut u8), (8 as c_ulong)) as c_int))
 
     if ((if __local_err == 8: 1 else: 0) != 0) {
-        ((*__param_pX) = (((((((((((((((((__local_c[0] as c_int) as c_ulong) | ((((__local_c[1] as c_ulong) as c_ulong) << (8 as c_uint)) as c_ulong)) as c_ulong) | ((((__local_c[2] as c_ulong) as c_ulong) << (16 as c_uint)) as c_ulong)) as c_ulong) | ((((__local_c[3] as c_ulong) as c_ulong) << (24 as c_uint)) as c_ulong)) as c_ulong) | ((((__local_c[4] as c_ulong) as c_ulong) << (32 as c_uint)) as c_ulong)) as c_ulong) | ((((__local_c[5] as c_ulong) as c_ulong) << (40 as c_uint)) as c_ulong)) as c_ulong) | ((((__local_c[6] as c_ulong) as c_ulong) << (48 as c_uint)) as c_ulong)) as c_ulong) | ((((__local_c[7] as c_ulong) as c_ulong) << (56 as c_uint)) as c_ulong)) as c_ulong)))
+        ((*__param_pX) = (((((((((((((((((__local_c[0] as c_int) as c_ulong) | (((__local_c[1] as c_ulong) << (8 as c_uint)) as c_ulong)) as c_ulong) | (((__local_c[2] as c_ulong) << (16 as c_uint)) as c_ulong)) as c_ulong) | (((__local_c[3] as c_ulong) << (24 as c_uint)) as c_ulong)) as c_ulong) | (((__local_c[4] as c_ulong) << (32 as c_uint)) as c_ulong)) as c_ulong) | (((__local_c[5] as c_ulong) << (40 as c_uint)) as c_ulong)) as c_ulong) | (((__local_c[6] as c_ulong) << (48 as c_uint)) as c_ulong)) as c_ulong) | (((__local_c[7] as c_ulong) << (56 as c_uint)) as c_ulong)) as c_ulong)))
 
         return 0
 
@@ -1308,7 +1308,7 @@ unsafe fn strcmpcasenosensitive_internal(__param_fileName1: *const i8, __param_f
         }
 
         if (__ci_expr_logic_2 != 0) {
-            (__local_c1 = __local_c1 - 32)
+            (__local_c1 = (((__local_c1 - 32) as c_char)))
         }
 
 
@@ -1319,7 +1319,7 @@ unsafe fn strcmpcasenosensitive_internal(__param_fileName1: *const i8, __param_f
         }
 
         if (__ci_expr_logic_3 != 0) {
-            (__local_c2 = __local_c2 - 32)
+            (__local_c2 = (((__local_c2 - 32) as c_char)))
         }
 
 
@@ -1981,7 +1981,7 @@ unsafe fn unz64local_GetCurrentFileInfoInternal(__param_file: *mut c_void, __par
 
     (__local_file_info_internal.offset_curfile = __local_uL)
 
-    (__local_lSeek = __local_lSeek + (*(&raw const __local_file_info as *const unz_file_info64_s)).size_filename)
+    (__local_lSeek = (((__local_lSeek + (*(&raw const __local_file_info as *const unz_file_info64_s)).size_filename) as c_long)))
 
     var __ci_expr_logic_0: c_int = 0
 
@@ -2014,7 +2014,7 @@ unsafe fn unz64local_GetCurrentFileInfoInternal(__param_file: *mut c_void, __par
         }
 
 
-        (__local_lSeek = __local_lSeek - __local_uSizeRead)
+        (__local_lSeek = (((__local_lSeek - __local_uSizeRead) as c_long)))
 
     }
 
@@ -2056,10 +2056,10 @@ unsafe fn unz64local_GetCurrentFileInfoInternal(__param_file: *mut c_void, __par
         }
 
 
-        (__local_lSeek = __local_lSeek + (((*(&raw const __local_file_info as *const unz_file_info64_s)).size_file_extra as c_ulong) -% (__local_uSizeRead_1 as c_ulong)))
+        (__local_lSeek = (((__local_lSeek + (((*(&raw const __local_file_info as *const unz_file_info64_s)).size_file_extra as c_ulong) -% (__local_uSizeRead_1 as c_ulong))) as c_long)))
 
     } else {
-        (__local_lSeek = __local_lSeek + (*(&raw const __local_file_info as *const unz_file_info64_s)).size_file_extra)
+        (__local_lSeek = (((__local_lSeek + (*(&raw const __local_file_info as *const unz_file_info64_s)).size_file_extra) as c_long)))
     }
 
 
@@ -2072,7 +2072,7 @@ unsafe fn unz64local_GetCurrentFileInfoInternal(__param_file: *mut c_void, __par
     if (__ci_expr_logic_4 != 0) {
         var __local_acc: c_ulong = ((0 as c_ulong))
 
-        (__local_lSeek = __local_lSeek - (*(&raw const __local_file_info as *const unz_file_info64_s)).size_file_extra)
+        (__local_lSeek = (((__local_lSeek - (*(&raw const __local_file_info as *const unz_file_info64_s)).size_file_extra) as c_long)))
 
         if ((if __local_lSeek != 0: 1 else: 0) != 0) {
             if ((if call_zseek64((((&raw const (*__local_s).z_filefunc as *const zlib_filefunc64_32_def_s) as *mut zlib_filefunc64_32_def_s) as *const zlib_filefunc64_32_def_s), (*__local_s).filestream, (__local_lSeek as c_ulong), (1 as c_int)) == 0: 1 else: 0) != 0) {
@@ -2179,10 +2179,10 @@ unsafe fn unz64local_GetCurrentFileInfoInternal(__param_file: *mut c_void, __par
         }
 
 
-        (__local_lSeek = __local_lSeek + (((*(&raw const __local_file_info as *const unz_file_info64_s)).size_file_comment as c_ulong) -% (__local_uSizeRead_2 as c_ulong)))
+        (__local_lSeek = (((__local_lSeek + (((*(&raw const __local_file_info as *const unz_file_info64_s)).size_file_comment as c_ulong) -% (__local_uSizeRead_2 as c_ulong))) as c_long)))
 
     } else {
-        (__local_lSeek = __local_lSeek + (*(&raw const __local_file_info as *const unz_file_info64_s)).size_file_comment)
+        (__local_lSeek = (((__local_lSeek + (*(&raw const __local_file_info as *const unz_file_info64_s)).size_file_comment) as c_long)))
     }
 
 

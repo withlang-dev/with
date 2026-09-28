@@ -704,7 +704,7 @@ unsafe fn gz_comp(__param_state: *mut gz_state, __param_flush: c_int) -> c_int {
 
     var __local_put: c_uint
 
-    var __local_max: c_uint = (((((((-1 as c_uint) as c_uint) >> (2 as c_uint)) as c_uint) +% (1 as c_uint)) as c_uint))
+    var __local_max: c_uint = ((((((-1 as c_uint) >> (2 as c_uint)) as c_uint) +% (1 as c_uint)) as c_uint))
 
 
     var __local_strm: *mut z_stream_s = (((&raw const (*__param_state).strm as *const z_stream_s) as *mut z_stream_s))

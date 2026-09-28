@@ -55,26 +55,26 @@ pub unsafe fn unzRepair(__param_file: *const i8, __param_fileOut: *const i8, __p
         while ((if fread((&__local_header[0] as *mut c_char), (1 as c_ulong), (30 as c_ulong), __local_fpZip) == 30: 1 else: 0) != 0) {
             var __local_currentOffset: c_int = __local_offset
 
-            if ((if (((((((*(&__local_header[0] as *mut c_char)) as u8) as c_int) as c_int) | (((((*((&__local_header[0] as *mut c_char) + ((1 as isize) as usize))) as u8) as c_int) << (8 as c_uint)) as c_int)) as c_int) | ((((((((*((&__local_header[0] as *mut c_char) + ((2 as isize) as usize))) as u8) as c_int) as c_int) | (((((*(((&__local_header[0] as *mut c_char) + ((2 as isize) as usize)) + ((1 as isize) as usize))) as u8) as c_int) << (8 as c_uint)) as c_int)) as c_int) << (16 as c_uint)) as c_int)) == 67324752: 1 else: 0) != 0) {
-                var __local_version: c_uint = (((((((*((&__local_header[0] as *mut c_char) + ((4 as isize) as usize))) as u8) as c_int) as c_int) | (((((*(((&__local_header[0] as *mut c_char) + ((4 as isize) as usize)) + ((1 as isize) as usize))) as u8) as c_int) << (8 as c_uint)) as c_int)) as c_uint))
+            if ((if ((((((*(&__local_header[0] as *mut c_char)) as u8) as c_int) | (((((*((&__local_header[0] as *mut c_char) + ((1 as isize) as usize))) as u8) as c_int) << (8 as c_uint)) as c_int)) as c_int) | (((((((*((&__local_header[0] as *mut c_char) + ((2 as isize) as usize))) as u8) as c_int) | (((((*(((&__local_header[0] as *mut c_char) + ((2 as isize) as usize)) + ((1 as isize) as usize))) as u8) as c_int) << (8 as c_uint)) as c_int)) as c_int) << (16 as c_uint)) as c_int)) == 67324752: 1 else: 0) != 0) {
+                var __local_version: c_uint = ((((((*((&__local_header[0] as *mut c_char) + ((4 as isize) as usize))) as u8) as c_int) | (((((*(((&__local_header[0] as *mut c_char) + ((4 as isize) as usize)) + ((1 as isize) as usize))) as u8) as c_int) << (8 as c_uint)) as c_int)) as c_uint))
 
-                var __local_gpflag: c_uint = (((((((*((&__local_header[0] as *mut c_char) + ((6 as isize) as usize))) as u8) as c_int) as c_int) | (((((*(((&__local_header[0] as *mut c_char) + ((6 as isize) as usize)) + ((1 as isize) as usize))) as u8) as c_int) << (8 as c_uint)) as c_int)) as c_uint))
+                var __local_gpflag: c_uint = ((((((*((&__local_header[0] as *mut c_char) + ((6 as isize) as usize))) as u8) as c_int) | (((((*(((&__local_header[0] as *mut c_char) + ((6 as isize) as usize)) + ((1 as isize) as usize))) as u8) as c_int) << (8 as c_uint)) as c_int)) as c_uint))
 
-                var __local_method: c_uint = (((((((*((&__local_header[0] as *mut c_char) + ((8 as isize) as usize))) as u8) as c_int) as c_int) | (((((*(((&__local_header[0] as *mut c_char) + ((8 as isize) as usize)) + ((1 as isize) as usize))) as u8) as c_int) << (8 as c_uint)) as c_int)) as c_uint))
+                var __local_method: c_uint = ((((((*((&__local_header[0] as *mut c_char) + ((8 as isize) as usize))) as u8) as c_int) | (((((*(((&__local_header[0] as *mut c_char) + ((8 as isize) as usize)) + ((1 as isize) as usize))) as u8) as c_int) << (8 as c_uint)) as c_int)) as c_uint))
 
-                var __local_filetime: c_uint = (((((((*((&__local_header[0] as *mut c_char) + ((10 as isize) as usize))) as u8) as c_int) as c_int) | (((((*(((&__local_header[0] as *mut c_char) + ((10 as isize) as usize)) + ((1 as isize) as usize))) as u8) as c_int) << (8 as c_uint)) as c_int)) as c_uint))
+                var __local_filetime: c_uint = ((((((*((&__local_header[0] as *mut c_char) + ((10 as isize) as usize))) as u8) as c_int) | (((((*(((&__local_header[0] as *mut c_char) + ((10 as isize) as usize)) + ((1 as isize) as usize))) as u8) as c_int) << (8 as c_uint)) as c_int)) as c_uint))
 
-                var __local_filedate: c_uint = (((((((*((&__local_header[0] as *mut c_char) + ((12 as isize) as usize))) as u8) as c_int) as c_int) | (((((*(((&__local_header[0] as *mut c_char) + ((12 as isize) as usize)) + ((1 as isize) as usize))) as u8) as c_int) << (8 as c_uint)) as c_int)) as c_uint))
+                var __local_filedate: c_uint = ((((((*((&__local_header[0] as *mut c_char) + ((12 as isize) as usize))) as u8) as c_int) | (((((*(((&__local_header[0] as *mut c_char) + ((12 as isize) as usize)) + ((1 as isize) as usize))) as u8) as c_int) << (8 as c_uint)) as c_int)) as c_uint))
 
-                var __local_crc: c_uint = (((((((((*((&__local_header[0] as *mut c_char) + ((14 as isize) as usize))) as u8) as c_int) as c_int) | (((((*(((&__local_header[0] as *mut c_char) + ((14 as isize) as usize)) + ((1 as isize) as usize))) as u8) as c_int) << (8 as c_uint)) as c_int)) as c_int) | ((((((((*(((&__local_header[0] as *mut c_char) + ((14 as isize) as usize)) + ((2 as isize) as usize))) as u8) as c_int) as c_int) | (((((*((((&__local_header[0] as *mut c_char) + ((14 as isize) as usize)) + ((2 as isize) as usize)) + ((1 as isize) as usize))) as u8) as c_int) << (8 as c_uint)) as c_int)) as c_int) << (16 as c_uint)) as c_int)) as c_uint))
+                var __local_crc: c_uint = ((((((((*((&__local_header[0] as *mut c_char) + ((14 as isize) as usize))) as u8) as c_int) | (((((*(((&__local_header[0] as *mut c_char) + ((14 as isize) as usize)) + ((1 as isize) as usize))) as u8) as c_int) << (8 as c_uint)) as c_int)) as c_int) | (((((((*(((&__local_header[0] as *mut c_char) + ((14 as isize) as usize)) + ((2 as isize) as usize))) as u8) as c_int) | (((((*((((&__local_header[0] as *mut c_char) + ((14 as isize) as usize)) + ((2 as isize) as usize)) + ((1 as isize) as usize))) as u8) as c_int) << (8 as c_uint)) as c_int)) as c_int) << (16 as c_uint)) as c_int)) as c_uint))
 
-                var __local_cpsize: c_uint = (((((((((*((&__local_header[0] as *mut c_char) + ((18 as isize) as usize))) as u8) as c_int) as c_int) | (((((*(((&__local_header[0] as *mut c_char) + ((18 as isize) as usize)) + ((1 as isize) as usize))) as u8) as c_int) << (8 as c_uint)) as c_int)) as c_int) | ((((((((*(((&__local_header[0] as *mut c_char) + ((18 as isize) as usize)) + ((2 as isize) as usize))) as u8) as c_int) as c_int) | (((((*((((&__local_header[0] as *mut c_char) + ((18 as isize) as usize)) + ((2 as isize) as usize)) + ((1 as isize) as usize))) as u8) as c_int) << (8 as c_uint)) as c_int)) as c_int) << (16 as c_uint)) as c_int)) as c_uint))
+                var __local_cpsize: c_uint = ((((((((*((&__local_header[0] as *mut c_char) + ((18 as isize) as usize))) as u8) as c_int) | (((((*(((&__local_header[0] as *mut c_char) + ((18 as isize) as usize)) + ((1 as isize) as usize))) as u8) as c_int) << (8 as c_uint)) as c_int)) as c_int) | (((((((*(((&__local_header[0] as *mut c_char) + ((18 as isize) as usize)) + ((2 as isize) as usize))) as u8) as c_int) | (((((*((((&__local_header[0] as *mut c_char) + ((18 as isize) as usize)) + ((2 as isize) as usize)) + ((1 as isize) as usize))) as u8) as c_int) << (8 as c_uint)) as c_int)) as c_int) << (16 as c_uint)) as c_int)) as c_uint))
 
-                var __local_uncpsize: c_uint = (((((((((*((&__local_header[0] as *mut c_char) + ((22 as isize) as usize))) as u8) as c_int) as c_int) | (((((*(((&__local_header[0] as *mut c_char) + ((22 as isize) as usize)) + ((1 as isize) as usize))) as u8) as c_int) << (8 as c_uint)) as c_int)) as c_int) | ((((((((*(((&__local_header[0] as *mut c_char) + ((22 as isize) as usize)) + ((2 as isize) as usize))) as u8) as c_int) as c_int) | (((((*((((&__local_header[0] as *mut c_char) + ((22 as isize) as usize)) + ((2 as isize) as usize)) + ((1 as isize) as usize))) as u8) as c_int) << (8 as c_uint)) as c_int)) as c_int) << (16 as c_uint)) as c_int)) as c_uint))
+                var __local_uncpsize: c_uint = ((((((((*((&__local_header[0] as *mut c_char) + ((22 as isize) as usize))) as u8) as c_int) | (((((*(((&__local_header[0] as *mut c_char) + ((22 as isize) as usize)) + ((1 as isize) as usize))) as u8) as c_int) << (8 as c_uint)) as c_int)) as c_int) | (((((((*(((&__local_header[0] as *mut c_char) + ((22 as isize) as usize)) + ((2 as isize) as usize))) as u8) as c_int) | (((((*((((&__local_header[0] as *mut c_char) + ((22 as isize) as usize)) + ((2 as isize) as usize)) + ((1 as isize) as usize))) as u8) as c_int) << (8 as c_uint)) as c_int)) as c_int) << (16 as c_uint)) as c_int)) as c_uint))
 
-                var __local_fnsize: c_uint = (((((((*((&__local_header[0] as *mut c_char) + ((26 as isize) as usize))) as u8) as c_int) as c_int) | (((((*(((&__local_header[0] as *mut c_char) + ((26 as isize) as usize)) + ((1 as isize) as usize))) as u8) as c_int) << (8 as c_uint)) as c_int)) as c_uint))
+                var __local_fnsize: c_uint = ((((((*((&__local_header[0] as *mut c_char) + ((26 as isize) as usize))) as u8) as c_int) | (((((*(((&__local_header[0] as *mut c_char) + ((26 as isize) as usize)) + ((1 as isize) as usize))) as u8) as c_int) << (8 as c_uint)) as c_int)) as c_uint))
 
-                var __local_extsize: c_uint = (((((((*((&__local_header[0] as *mut c_char) + ((28 as isize) as usize))) as u8) as c_int) as c_int) | (((((*(((&__local_header[0] as *mut c_char) + ((28 as isize) as usize)) + ((1 as isize) as usize))) as u8) as c_int) << (8 as c_uint)) as c_int)) as c_uint))
+                var __local_extsize: c_uint = ((((((*((&__local_header[0] as *mut c_char) + ((28 as isize) as usize))) as u8) as c_int) | (((((*(((&__local_header[0] as *mut c_char) + ((28 as isize) as usize)) + ((1 as isize) as usize))) as u8) as c_int) << (8 as c_uint)) as c_int)) as c_uint))
 
                 (__local_extra[0] = ((0 as c_char)))
 
@@ -95,7 +95,7 @@ pub unsafe fn unzRepair(__param_file: *const i8, __param_fileOut: *const i8, __p
                     if ((if __local_fnsize < (1024 * sizeof[c_char]()): 1 else: 0) != 0) {
                         if ((if fread((&__local_filename[0] as *mut c_char), (1 as c_ulong), (__local_fnsize as c_ulong), __local_fpZip) == __local_fnsize: 1 else: 0) != 0) {
                             if ((if fwrite((&__local_filename[0] as *mut c_char), (1 as c_ulong), (__local_fnsize as c_ulong), __local_fpOut) == __local_fnsize: 1 else: 0) != 0) {
-                                (__local_offset = __local_offset + __local_fnsize)
+                                (__local_offset = (((__local_offset + __local_fnsize) as c_int)))
 
                             } else {
                                 (__local_err = ((-1 as c_int)))
@@ -129,7 +129,7 @@ pub unsafe fn unzRepair(__param_file: *const i8, __param_fileOut: *const i8, __p
                     if ((if __local_extsize < (1024 * sizeof[c_char]()): 1 else: 0) != 0) {
                         if ((if fread((&__local_extra[0] as *mut c_char), (1 as c_ulong), (__local_extsize as c_ulong), __local_fpZip) == __local_extsize: 1 else: 0) != 0) {
                             if ((if fwrite((&__local_extra[0] as *mut c_char), (1 as c_ulong), (__local_extsize as c_ulong), __local_fpOut) == __local_extsize: 1 else: 0) != 0) {
-                                (__local_offset = __local_offset + __local_extsize)
+                                (__local_offset = (((__local_offset + __local_extsize) as c_int)))
 
                             } else {
                                 (__local_err = ((-1 as c_int)))
@@ -751,7 +751,7 @@ pub unsafe fn unzRepair(__param_file: *const i8, __param_fileOut: *const i8, __p
 
                     if ((if __local_fnsize > 0: 1 else: 0) != 0) {
                         if ((if fwrite((&__local_filename[0] as *mut c_char), (1 as c_ulong), (__local_fnsize as c_ulong), __local_fpOutCD) == __local_fnsize: 1 else: 0) != 0) {
-                            (__local_offsetCD = __local_offsetCD + __local_fnsize)
+                            (__local_offsetCD = (((__local_offsetCD + __local_fnsize) as c_int)))
 
                         } else {
                             (__local_err = ((-1 as c_int)))
@@ -769,7 +769,7 @@ pub unsafe fn unzRepair(__param_file: *const i8, __param_fileOut: *const i8, __p
 
                     if ((if __local_extsize > 0: 1 else: 0) != 0) {
                         if ((if fwrite((&__local_extra[0] as *mut c_char), (1 as c_ulong), (__local_extsize as c_ulong), __local_fpOutCD) == __local_extsize: 1 else: 0) != 0) {
-                            (__local_offsetCD = __local_offsetCD + __local_extsize)
+                            (__local_offsetCD = (((__local_offsetCD + __local_extsize) as c_int)))
 
                         } else {
                             (__local_err = ((-1 as c_int)))

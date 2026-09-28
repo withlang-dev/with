@@ -404,8 +404,8 @@ fn adler32_combine_(__param_adler1: c_ulong, __param_adler2: c_ulong, __param_le
         (__local_sum1 = (__local_sum1 -% 65521))
     }
 
-    if ((if __local_sum2 >= (((65521 as c_ulong) as c_ulong) << (1 as c_uint)): 1 else: 0) != 0) {
-        (__local_sum2 = (__local_sum2 -% (((65521 as c_ulong) as c_ulong) << (1 as c_uint))))
+    if ((if __local_sum2 >= ((65521 as c_ulong) << (1 as c_uint)): 1 else: 0) != 0) {
+        (__local_sum2 = (__local_sum2 -% ((65521 as c_ulong) << (1 as c_uint))))
     }
 
     if ((if __local_sum2 >= 65521: 1 else: 0) != 0) {
