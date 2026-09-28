@@ -8,7 +8,7 @@ which one gives it back, what a returned pointer borrows from.
 
 ```
 with run          # builds vendor/tally.c, then the program
-with build :test  # 12 tests over the real libraries
+with build :test  # 13 tests over the real libraries
 ```
 
 ## What each file shows
