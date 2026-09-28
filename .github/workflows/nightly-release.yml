@@ -445,11 +445,11 @@ jobs:
             seed_version: nightly-20260929-local-1-2fa54a7197df
             seed_asset: with-darwin-aarch64
             seed_sha256: 0a02266d9cbfffa9c0c4fcb32eb434d79813da0366f5501ff69d4bc93c03ad64
-            sdk_version: nightly-sdk-test-20260815-680aa139
+            sdk_version: nightly-sdk-20260928-3ae5c9ec0b31
             sdk_asset: with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz
-            sdk_sha256: 4f99fc99a933ee3cf0578336a4fbbbcaaedbbe89112cd49454ea64149c188e6d
-            sdk_sidecar_sha256: 0df49017de4631cdc6367eb66dd39f15657b793757a65d743393898f9d848a75
-            sdk_manifest_sha256: 96e84c9b27a6d0dfbfe33cc221aebabdc2daaaeea04dc0b04721c61109a53623
+            sdk_sha256: dd824534e89fe9570558036a69fcddfecb6075b0fcad1bfa7f502c67272de7a4
+            sdk_sidecar_sha256: 66258ada1ca04f6bfa4ff1f55753fa890b75a2cc3b7fb978f6d9979ae24179f1
+            sdk_manifest_sha256: 9623c66f4f03265c64f2cda63ddc20be0eac9b690d0fab1155fb30f47c3b781e
             release_asset: with-darwin-aarch64
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 360
