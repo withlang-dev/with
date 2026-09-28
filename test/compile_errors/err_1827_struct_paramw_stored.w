@@ -1,0 +1,27 @@
+//! expect-check-fail: call to `show` mutates global `G` while its argument is a live view into it
+
+// #1827 (§9.1c: globals are places; §21.1 rules 1 and 7): a struct global with a `str` field, viewed by
+// an argument that views the whole global, written by a function stored in a field and called through it
+// while the view is live.
+// A call writes every global its callee writes, and a drop every global
+// its Drop impls write (§2.4).
+
+type S:
+    name: str
+    n: i32
+
+var G = S { name: "ab" ++ "cd", n: 1 }
+
+type H:
+    f: fn() -> Unit
+
+fn grow_g():
+    G.name = "wx" ++ "yz"
+
+fn show(r: &S):
+    let h = H { f: grow_g }
+    h.f()
+    print(r.name)
+
+fn main:
+    show(G)
