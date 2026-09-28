@@ -5675,6 +5675,19 @@ impl MirBuilder:
         self.body.new_operand(OperandKind.OK_COPY, place)
 
     mut fn lower_cast(expr: i32, target_type_id: i32, node: i32) -> i32:
+        // §4.5 (D75, #1802): Sema decided what a relabeling cast does with its
+        // source (cast_modes); this materializes it.
+        let mode = self.sema.cast_modes.get(node) ?? 0
+        if mode == CastMode.BORROW as i32 and self.sema.get_type_kind(self.sema.resolve_alias(target_type_id as TypeId)) == TypeKind.TY_REF:
+            return self.lower_borrow_cast(expr, target_type_id, node)
+        if mode == CastMode.REF_RELABEL as i32:
+            let ref_op = self.lower_expr(expr)
+            var ref_ty = self.operand_type(ref_op)
+            if ref_ty == 0 or ref_ty == self.sema.ty_void as i32:
+                ref_ty = self.expr_type(expr)
+            return self.lower_value_cast(ref_op, ref_ty, target_type_id, self.ast.get_start(node))
+        if mode == CastMode.MOVE as i32:
+            return self.lower_move_cast(expr, target_type_id, node)
         var op = self.lower_expr(expr)
         // D22 contextual materialization records the cast target on its source
         // expression. The central adjustment consumer has already copied the
@@ -5726,6 +5739,38 @@ impl MirBuilder:
             // operand is the same place, read.
             op = self.body.new_operand(OperandKind.OK_COPY, self.body.operand_d0[op])
         self.lower_value_cast(op, src_sema_ty, target_type_id, self.ast.get_start(node))
+
+    // §4.5 (D75): `s as Name` moves the owned source into the result — the
+    // source is consumed (reset-on-move) and the result is an owned temp,
+    // dropped at the statement's end unless something takes it.
+    mut fn lower_move_cast(expr: i32, target_type_id: i32, node: i32) -> i32:
+        var op = self.lower_expr(expr)
+        if self.body.operand_kinds[op] == OperandKind.OK_COPY:
+            op = self.body.new_operand(OperandKind.OK_MOVE, self.body.operand_d0[op])
+        var src_ty = self.operand_type(op)
+        if src_ty == 0 or src_ty == self.sema.ty_void as i32:
+            src_ty = self.expr_type(expr)
+        self.consume_moved_operand(op)
+        let span = self.ast.get_start(node)
+        let rv = self.body.new_rvalue(RvalueKind.RK_CAST, op, target_type_id, src_ty)
+        let temp = self.new_temp(target_type_id)
+        let place = self.place_for_local(temp)
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rv, span)
+        self.call_result_operand(temp, place, target_type_id)
+
+    // §4.5 (D75): `n as &str` borrows the place `n` names, exactly as `&n`
+    // does, and the reference is the target's (the representations agree).
+    mut fn lower_borrow_cast(expr: i32, target_type_id: i32, node: i32) -> i32:
+        let place = self.lower_expr_place(expr)
+        if self.place_type_is_str(place) != 0:
+            self.mark_string_place_copied(place)
+        else:
+            self.mark_string_base_fields_may_alias(self.place_base_local(place))
+        let rv = self.body.new_rvalue(RvalueKind.RK_REF, BorrowKind.SHARED, place, 0)
+        let temp = self.new_temp(target_type_id)
+        let temp_place = self.place_for_local(temp)
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, temp_place, rv, self.ast.get_start(node))
+        self.body.new_operand(OperandKind.OK_COPY, temp_place)
 
     // The value cast of `op` (of `src_ty`) to `target_ty`: every emitter of
     // an RK_CAST between values goes through here — `as` itself, and the D22

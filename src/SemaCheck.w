@@ -419,6 +419,98 @@ impl Sema:
             return false
         self.resolve_alias(self.get_type_d0(target) as TypeId) == self.resolve_alias(self.get_type_d0(self.resolve_alias(ref_ty as TypeId)) as TypeId)
 
+    // §4.5: a distinct type's representation through every distinct layer
+    // (`type B = distinct A`, `type A = distinct str`: str); any other type
+    // is its own.
+    fn distinct_underlying(tid: i32) -> i32:
+        var t = tid
+        var inner = self.unwrap_builtin_arg_distinct(t)
+        var depth = 0
+        while inner != 0 and inner != t and depth < 64:
+            t = inner
+            inner = self.unwrap_builtin_arg_distinct(t)
+            depth += 1
+        t
+
+    // §4.5 (D75): a cast from `src` to `target` relabels the value — into or
+    // out of a distinct type, between two distinct types over one
+    // representation, or to the same type — so the result is the source
+    // value itself under another name.
+    fn cast_relabels_value(src: i32, target: i32) -> bool:
+        src != 0 and target != 0 and self.types_identical(self.distinct_underlying(src), self.distinct_underlying(target))
+
+    // A cast operand naming a place reached through a view — a field of a
+    // borrowed base (D22 §13.6) or a binding that names what's there — is
+    // cast through a reference.
+    fn cast_operand_is_borrowed_place(node: i32) -> bool:
+        var n = node
+        while n != 0 and self.ast.kind(n) == NodeKind.NK_GROUPED:
+            n = self.ast.get_data0(n)
+        if n == 0:
+            return false
+        if self.view_projection_exprs.contains(n):
+            return true
+        self.ast.kind(n) == NodeKind.NK_IDENT and self.scope_has(self.ast.get_data0(n)) != 0 and self.scope_is_view_bound(self.ast.get_data0(n)) != 0
+
+    // §4.5 (D75, #1802): "Casting an owned value into or out of its distinct
+    // type moves it … A cast whose target is a view (`n as &str`), or any
+    // cast through a reference, borrows and yields a view." The target states
+    // the mode, as a parameter's type does; Sema records it in cast_modes and
+    // MirLower materializes it. Before, a cast read its source: `s as Name`
+    // left the buffer with `s` and `n as str` made a second owner.
+    // - a `&T` source relabeled (`r as str`, `r as &Tag`) is the same
+    //   reference, typed `&Target`, with the source's origins. A Copy target
+    //   keeps D22 §6.2: a cast target is an owned demand, met by a copy.
+    // - an owned source cast to a view (`n as &str`, `s as []u8`) borrows
+    //   it, exactly as `&n` does.
+    // - an owned non-Copy source relabeled moves into the result; one that
+    //   names a place reached through a view is cast through a reference.
+    // Other casts (numbers, pointers, discriminants) are value conversions.
+    // Returns the cast's type.
+    mut fn classify_cast_ownership(node: i32, src_node: i32, src_tid: i32, cast_tid: i32) -> i32:
+        let src = self.resolve_alias(src_tid as TypeId) as i32
+        let target = self.resolve_alias(cast_tid as TypeId) as i32
+        let src_kind = self.get_type_kind(src as TypeId)
+        let target_kind = self.get_type_kind(target as TypeId)
+        let target_is_view = target_kind == TypeKind.TY_REF and self.get_type_d1(target as TypeId) == 0
+        let target_value = if target_is_view: self.get_type_d0(target as TypeId) else: target
+        if src_kind == TypeKind.TY_REF:
+            if self.get_type_d1(src as TypeId) != 0 or not self.cast_relabels_value(self.get_type_d0(src as TypeId), target_value):
+                return cast_tid
+            if not target_is_view and self.is_copy(target as TypeId) != 0:
+                return cast_tid
+            self.cast_modes.insert(node, CastMode.REF_RELABEL as i32)
+            self.record_transparent_view_origins(node, src_node)
+            return if target_is_view: cast_tid else: self.ensure_exact_type(TypeKind.TY_REF, cast_tid, 0, 0) as i32
+        if src_kind == TypeKind.TY_PTR or target_kind == TypeKind.TY_PTR:
+            return cast_tid
+        if target_kind == TypeKind.TY_SLICE or target_is_view:
+            if target_is_view and not self.cast_relabels_value(src, target_value):
+                return cast_tid
+            self.record_cast_borrow(node, src_node)
+            return cast_tid
+        if not self.cast_relabels_value(src, target) or self.is_copy(src as TypeId) != 0:
+            return cast_tid
+        if self.cast_operand_is_borrowed_place(src_node):
+            self.record_cast_borrow(node, src_node)
+            return self.ensure_exact_type(TypeKind.TY_REF, cast_tid, 0, 0) as i32
+        self.mark_moved_if_consumed(src_node)
+        self.cast_modes.insert(node, CastMode.MOVE as i32)
+        cast_tid
+
+    // A cast that views its source place borrows it as `&place` does: the
+    // place is a shared borrow and the result's origin. A string literal is
+    // static storage — a view of it has no origin and is no temporary.
+    mut fn record_cast_borrow(node: i32, src_node: i32):
+        self.cast_modes.insert(node, CastMode.BORROW as i32)
+        var literal = src_node
+        while literal != 0 and self.ast.kind(literal) == NodeKind.NK_GROUPED:
+            literal = self.ast.get_data0(literal)
+        if literal != 0 and self.ast.kind(literal) == NodeKind.NK_STRING_LIT:
+            return
+        self.check_borrow_create(src_node, BorrowKind.SHARED, node)
+        self.record_view_producer_origins(node, src_node)
+
     // `&place as *T` is the blessed address-taking spelling; a cast operand
     // spelled with an explicit borrow must not materialize its pointee.
     fn cast_operand_is_explicit_borrow(node: i32) -> i32:
@@ -7221,8 +7313,11 @@ impl Sema:
                     // `T` and turned its value into an address — `r as *const
                     // i32` on `r: &i32`, and the facade's `ud as *const U` for
                     // a scalar userdata, a fault in safe code.
+                    // §4.5 (D75): a view target is no owned demand — `r as
+                    // &Tag` relabels the reference (classify_cast_ownership).
                     let cast_src_resolved = self.resolve_alias(src_tid)
-                    if self.get_type_kind(cast_src_resolved) == TypeKind.TY_REF and self.get_type_d1(cast_src_resolved) == 0 and self.cast_operand_is_explicit_borrow(src_node) == 0 and not self.cast_relabels_reference(cast_src_resolved as i32, cast_tid as i32):
+                    let cast_target_is_ref = self.get_type_kind(self.resolve_alias(cast_tid)) == TypeKind.TY_REF
+                    if self.get_type_kind(cast_src_resolved) == TypeKind.TY_REF and self.get_type_d1(cast_src_resolved) == 0 and not cast_target_is_ref and self.cast_operand_is_explicit_borrow(src_node) == 0 and not self.cast_relabels_reference(cast_src_resolved as i32, cast_tid as i32):
                         let _ = self.record_contextual_copy_adjustment(src_node, self.get_type_d0(cast_src_resolved), src_tid as i32)
             // Store resolved cast type so MIR lowering can read it without
             // calling resolve_type_expr (which would add_type on a shallow-copied Sema).
@@ -7239,6 +7334,10 @@ impl Sema:
                     self.note_raw_pointer_validity_precondition(self.ast.get_data0(node))
                     if self.require_unsafe_operation("raw pointer to safe memory abstraction conversion requires unsafe context", node) == 0:
                         return 0 as TypeId
+                let cast_result = self.classify_cast_ownership(node, src_node, src_tid as i32, cast_tid as i32)
+                if cast_result != cast_tid as i32:
+                    self.typed_expr_types.insert(node, cast_result)
+                    return cast_result as TypeId
             return cast_tid
 
         if kind == NodeKind.NK_PIPELINE:
@@ -11183,6 +11282,12 @@ impl Sema:
                         is_view = true
                 if is_view:
                     out = self.push_unique_i32(move out, cap_sym)
+            return out
+        // §4.5 (D75): a cast that borrows its source place carries the
+        // place's origins recorded at the cast, as `&place` does below.
+        if kind == NodeKind.NK_CAST and (self.cast_modes.get(node) ?? 0) == CastMode.BORROW as i32:
+            for i in 0..self.expr_view_dep_count(node):
+                out = self.push_unique_i32(move out, self.expr_view_dep_at(node, i))
             return out
         if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_UNSAFE_BLOCK or kind == NodeKind.NK_NO_SUSPEND:
             out = self.collect_expr_view_deps(self.ast.get_data0(node), move out)

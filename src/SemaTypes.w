@@ -34,6 +34,20 @@ pub enum BorrowKind: i32:
     SHARED = 0
     EXCLUSIVE = 1
 
+// §4.5 (D75, #1802): what a cast whose target relabels its source does with
+// the source (Sema.cast_modes). The target states the mode, as a parameter's
+// type does.
+pub enum CastMode: i32:
+    // An owned value crosses into or out of its distinct type: the source is
+    // consumed and the result owns it.
+    MOVE = 1
+    // An owned place viewed as a view type (`n as &str`, `s as []u8`): the
+    // result borrows the place.
+    BORROW = 2
+    // A cast through a reference (`r as str`, `r: &Name`): the result is the
+    // same reference, relabeled — a view with the source's origins.
+    REF_RELABEL = 3
+
 // D61 (§15.4.7): how `:?` formats one registered type (Sema.debug_fmt_*).
 pub enum DebugFmtKind: i32:
     // A formatter MirLower synthesizes: struct, enum, tuple, array, slice,
