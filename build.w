@@ -290,6 +290,9 @@ fn add_stage1_runtime_targets(out0: Build, host_runtime: &HostRuntimeSpec, corpu
     metadata = metadata.extra_output(dir ++ "/llvm_ld")
     metadata = metadata.dep("stage1-llvm-bridge-object")
     metadata = metadata.dep("stage1-clang-bridge-object")
+    // #1840's SDK probe captures under out/command/<target>, as the other
+    // link-metadata targets declare.
+    metadata = metadata.write_scope("out/command/stage1-llvm-link-metadata")
     out = out.add_target(metadata)
     objects.push("stage1-llvm-link-metadata")
 
