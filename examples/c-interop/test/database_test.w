@@ -8,6 +8,12 @@ fn seeded -> Database:
 
 fn message(db: &Database) -> str: db.errmsg().map(m => m.to_str_lossy()) ?? ""
 
+type Scale { by: i32 }
+fn scaled(ctx: Context, args: &[Value], scale: &Scale):
+    var sum = 0
+    for i in 0..args.len() as i32: sum = sum + args[i].int()
+    ctx.result_int(sum * scale.by)
+
 @[test]
 fn exec_reports_rows_changed:
     let db = seeded()
@@ -54,3 +60,13 @@ fn a_failed_open_still_has_its_message:
             assert(status == SQLITE_CANTOPEN)
             assert(failed.errmsg().map(m => m.to_str_lossy()) == Some("unable to open database file"))
         _ => assert(false)
+
+@[test]
+fn a_with_function_reads_its_sql_arguments_and_its_data:
+    // An SQL function in With: SQLite hands it its arguments as `&[Value]`
+    // and the application data the registration boxed as `&Scale`, valid for
+    // the call; the body needs no `unsafe`.
+    let db = seeded()
+    assert(db.create_function_v2("scaled", -1, SQLITE_UTF8, Scale { by: 10 }, scaled, null, null) == SQLITE_OK)
+    let rows = db.prepare("SELECT scaled(n, 2), scaled() FROM t WHERE n = 3").unwrap()
+    assert(rows.step() == SQLITE_ROW and rows.column_int(0) == 50 and rows.column_int(1) == 0)
