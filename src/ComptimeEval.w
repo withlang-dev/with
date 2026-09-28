@@ -89,6 +89,11 @@ extern fn with_str_from_byte(byte: i32) -> str
 extern fn with_str_starts_with_ref(s: &str, prefix: &str) -> i32
 extern fn with_str_ends_with_ref(s: &str, suffix: &str) -> i32
 extern fn with_str_replace_ref(s: &str, old: &str, new_s: &str) -> str
+extern fn with_str_trim_ref(s: &str) -> str
+extern fn with_str_to_upper_ref(s: &str) -> str
+extern fn with_str_to_lower_ref(s: &str) -> str
+extern fn with_str_index_of_ref(hay: &str, needle: &str) -> i64
+extern fn with_str_repeat_ref(s: &str, count: i64) -> str
 extern fn with_sysinfo_hostname() -> str
 
 const COMPTIME_RECURSION_LIMIT: i32 = 256
@@ -3489,6 +3494,39 @@ impl ComptimeEvaluator:
             if arg_count != 0:
                 return self.fail(node, "str." ++ method ++ "() takes no arguments")
             return comptime_control_value(comptime_value_str(with_str_clone_ref(text)))
+        // The rest of MirLower's str intrinsic set (#1866): the build layer
+        // runs here whenever the native runner cannot be linked yet, and
+        // build/seed.w's seed_lock_value trims every lock line. Same runtime
+        // helpers as codegen, so comptime and runtime agree byte for byte.
+        if method == "trim" or method == "to_upper" or method == "upper" or method == "to_lower" or method == "lower":
+            if arg_count != 0:
+                return self.fail(node, "str." ++ method ++ "() takes no arguments")
+            if method == "trim":
+                return comptime_control_value(comptime_value_str(with_str_trim_ref(text)))
+            if method == "to_upper" or method == "upper":
+                return comptime_control_value(comptime_value_str(with_str_to_upper_ref(text)))
+            return comptime_control_value(comptime_value_str(with_str_to_lower_ref(text)))
+        if method == "index_of":
+            if arg_count != 1:
+                return self.fail(node, "str.index_of() expects exactly one argument")
+            let needle_signal = self.eval_expr(self.ast.get_extra(extra_start))
+            if needle_signal.kind != ComptimeControlKind.CTL_VALUE:
+                return needle_signal
+            if needle_signal.value.kind != ComptimeValueKind.CV_STR:
+                return self.fail(node, "str.index_of() argument must be a string")
+            return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i64 as i32), with_str_index_of_ref(text, needle_signal.value.text)))
+        if method == "repeat":
+            if arg_count != 1:
+                return self.fail(node, "str.repeat() expects exactly one argument")
+            let count_signal = self.eval_expr(self.ast.get_extra(extra_start))
+            if count_signal.kind != ComptimeControlKind.CTL_VALUE:
+                return count_signal
+            if comptime_value_is_intlike(count_signal.value) == 0:
+                return self.fail(node, "str.repeat() count must be an integer")
+            let count = comptime_value_intlike(count_signal.value)
+            if count < 0:
+                return self.fail(node, "str.repeat() count is negative in comptime")
+            return comptime_control_value(comptime_value_str(with_str_repeat_ref(text, count)))
         self.fail(node, "str method '" ++ method ++ "' is not comptime-evaluable yet")
 
     mut fn concrete_method_comptime_type_args(fn_sym: i32, concrete_sig: i32, node: i32) -> ComptimeGenericResolvedArgs:
