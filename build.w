@@ -3326,6 +3326,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(cli_selfhost_lsp_tests)
 
     var cli_selfhost_edge_tests = target_new(.Action, "cli-selfhost-edge-tests", "").output("out/test-graph/cli-selfhost-edge-tests")
+    cli_selfhost_edge_tests = cli_selfhost_edge_tests.allow_parallel()
     cli_selfhost_edge_tests.action = run_cli_selfhost_edge_action
     cli_selfhost_edge_tests = cli_selfhost_edge_tests.input(release_compiler_bin("with"))
     cli_selfhost_edge_tests = cli_selfhost_edge_tests.dep("build")
@@ -3344,12 +3345,14 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(c_migrator_pcre2_prep_tests)
 
     var c_migrator_basic_tests = target_new(.Action, "c-migrator-basic-tests", "").output("out/test-graph/c-migrator-basic-tests")
+    c_migrator_basic_tests = c_migrator_basic_tests.allow_parallel()
     c_migrator_basic_tests.action = run_cli_selfhost_migrate_basic_action
     c_migrator_basic_tests = c_migrator_basic_tests.input(release_compiler_bin("with"))
     c_migrator_basic_tests = c_migrator_basic_tests.dep("build")
     out = out.add_target(c_migrator_basic_tests)
 
     var c_migrator_core_tests = target_new(.Action, "c-migrator-core-tests", "").output("out/test-graph/c-migrator-core-tests")
+    c_migrator_core_tests = c_migrator_core_tests.allow_parallel()
     c_migrator_core_tests.action = run_cli_selfhost_migrate_core_action
     c_migrator_core_tests = c_migrator_core_tests.input(release_compiler_bin("with"))
     c_migrator_core_tests = c_migrator_core_tests.dep("build")
@@ -3394,6 +3397,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(embedded_runtime_regression)
 
     var emit_c_smoke = target_new(.Action, "emit-c-smoke", "").output("out/test-graph/emit-c-smoke")
+    emit_c_smoke = emit_c_smoke.allow_parallel()
     emit_c_smoke.action = run_emit_c_smoke_action
     emit_c_smoke = emit_c_smoke.input(release_compiler_bin("with"))
     emit_c_smoke = emit_c_smoke.input("test/hello.w")
@@ -3438,7 +3442,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     // two-week-old fixture rot — a lane that exists but never runs is
     // silent debt. 14 s, input-keyed (skips when compiler+fixtures fresh).
     tests = tests.dep("debug-alloc-tests")
-    tests = tests.dep("stdlib-complexity")
     tests = tests.dep("internals-tests")
     tests = tests.dep("lexer-tests")
     tests = tests.dep("parser-tests")
@@ -3451,10 +3454,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("cli-selfhost-fmt-tests")
     tests = tests.dep("cli-selfhost-object-symbol-tests")
     tests = tests.dep("bundle-interface-tests")
-    tests = tests.dep("wo-drift")
-    // The corpora lane (docs/proposals/stdlib_sourcing_plan.md): every migrated
-    // container corpus runs its upstream test programs under With.
-    tests = corpora_test_deps(move tests)
     tests = tests.dep("cli-selfhost-build-w-tests")
     tests = tests.dep("build-helper-programs")
     tests = tests.dep("examples-tests")
@@ -3462,12 +3461,21 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("cli-selfhost-project-tests")
     tests = tests.dep("cli-selfhost-lsp-tests")
     tests = tests.dep("cli-selfhost-edge-tests")
-    tests = tests.dep("cli-selfhost-parallel-tests")
     tests = tests.dep("c-migrator-tests")
     tests = tests.dep("issue61-regression")
     tests = tests.dep("invariance-check")
     tests = tests.dep("embedded-runtime-regression")
     tests = tests.dep("emit-c-smoke")
+    // Serial lanes run together after the pooled wave, so none of them
+    // drains the pool in the middle of it: stdlib-complexity measures
+    // runtimes and needs a quiet machine; cli-selfhost-parallel-tests
+    // runs 32 concurrent compiles under a 120 s budget each.
+    tests = tests.dep("cli-selfhost-parallel-tests")
+    tests = tests.dep("stdlib-complexity")
+    tests = tests.dep("wo-drift")
+    // The corpora lane (docs/proposals/stdlib_sourcing_plan.md): every migrated
+    // container corpus runs its upstream test programs under With.
+    tests = corpora_test_deps(move tests)
     tests = tests.dep("spec-inventory-check")
     tests = tests.dep("libc-surface-check")
     tests = tests.dep("runtime-domain-audit")
