@@ -188,7 +188,7 @@ MAP_LIT       := '[' EXPR ':' EXPR { ',' EXPR ':' EXPR } [ ',' ] ']'
 ```
 PATTERN     := LITERAL_PAT | IDENT_PAT | TUPLE_PAT | STRUCT_PAT
               | ENUM_PAT | SLICE_PAT | RANGE_PAT | OR_PAT
-              | BIND_PAT | WILDCARD | IN_PAT | REST_PAT
+              | BIND_PAT | TYPED_BIND_PAT | WILDCARD | IN_PAT | REST_PAT
 LITERAL_PAT := INT_LIT | STR_LIT | CHAR_LIT | 'true' | 'false'
 IDENT_PAT   := IDENT
 TUPLE_PAT   := '(' PATTERN { ',' PATTERN } ')'
@@ -198,6 +198,7 @@ SLICE_PAT   := '[' [ PATTERN { ',' PATTERN } [ '..' [ IDENT ] ] ] ']'
 RANGE_PAT   := PATTERN '..' PATTERN | PATTERN '..=' PATTERN
 OR_PAT      := PATTERN { '|' PATTERN }
 BIND_PAT    := IDENT '@' PATTERN
+TYPED_BIND_PAT := IDENT ':' TYPE
 IN_PAT      := 'in' '[' EXPR { ',' EXPR } ']'
 WILDCARD    := '_'
 REST_PAT    := '..'
