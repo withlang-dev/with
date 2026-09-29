@@ -5580,6 +5580,14 @@ impl Sema:
             return false
         self.get_type_d1(resolved) == 0
 
+    // An integer or float type itself. A `repr` enum is numeric to an
+    // operator (numeric_operand_type) but is not a number an untyped literal
+    // may become: `[0, K.A]` stays an array of integers, never of `K`
+    // (D71: a discriminant enum is made from an integer with `from_int`).
+    fn is_plain_numeric_type(tid: i32) -> bool:
+        let kind = self.get_type_kind(self.resolve_alias(tid as TypeId))
+        kind == TypeKind.TY_INT or kind == TypeKind.TY_FLOAT
+
     fn is_numeric_type(tid: i32) -> bool:
         let resolved = self.numeric_operand_type(tid)
         let kind = self.get_type_kind(resolved)
