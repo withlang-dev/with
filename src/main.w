@@ -1015,6 +1015,14 @@ fn run_cli(argc: i32) -> i32:
             with_write(compiler_abi_sha())
             with_write("\n")
             return 0
+        if cli_has_flag(argc, "--self-id"):
+            // The sha256 of this compiler's unstamped image (compiler.AbiStamp);
+            // empty for an unstamped binary. The build cache asks another
+            // compiler binary for it instead of hashing the file.
+            if compiler_self_id_is_stamped():
+                with_write(compiler_self_id())
+            with_write("\n")
+            return 0
         with_write("with ")
         with_write(with_str_from_cstr(c"WITHVERSIONSTAMPv1XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX".ptr))
         with_write("\n")

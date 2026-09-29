@@ -17,3 +17,19 @@ pub fn compiler_abi_sha() -> str:
 // sentinel). Bundle keys must never be computed from an unstamped compiler.
 pub fn compiler_abi_sha_is_stamped() -> bool:
     not compiler_abi_sha().starts_with("WITHABISHASTAMP")
+
+// The compiler's own identity: the sha256 of its unstamped image, patched in
+// post-link by build/compiler.w (comp_patch_version_binary) like the version
+// and ABI stamps. The build cache keys on it (build_cache_current_compiler_
+// fingerprint) instead of hashing the running 100+ MB binary on every
+// invocation, which cost every `with build`, no-op included, most of a
+// second. The version stamp is provenance, not semantics (D13), so it is
+// taken before the version is patched in.
+pub fn compiler_self_id() -> str:
+    with_str_from_cstr(c"WITHSELFIDSTAMPv1XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX".ptr)
+
+// True once the slot has been patched. An unstamped binary (a compile's
+// intermediate, or a compiler older than the slot) is fingerprinted by
+// hashing the file, as before.
+pub fn compiler_self_id_is_stamped() -> bool:
+    not compiler_self_id().starts_with("WITHSELFIDSTAMP")

@@ -6,6 +6,7 @@ use BuildGraphSupport
 use BuildGraphOps
 use compiler.TrackedInputs
 use compiler.Runtime
+use compiler.AbiStamp
 use std.crypto.sha256
 use std.collections.HashMap
 
@@ -211,10 +212,46 @@ fn build_cache_resolve_executable_path(argv0: &str) -> str:
         i = i + 1
     ""
 
+// A compiler binary's identity for a cache key: its self-id (the sha256 of
+// its unstamped image, compiler.AbiStamp) when it carries one, else its file
+// fingerprint. Every compiler-fingerprint site goes through here, so a
+// binary has one identity whether it is the running driver or a file another
+// driver names (a seed, a test lane's compiler), and no invocation hashes a
+// 100+ MB binary that was already hashed when it was stamped.
+fn build_cache_self_id_fingerprint(self_id: &str): build_cache_sha256_text("compiler-self-id\n" ++ self_id ++ "\n")
+
+fn build_cache_is_hex_digest(text: &str) -> bool:
+    if text.len() != 64: return false
+    for i in 0..64:
+        let c = text[i]
+        if not ((c >= '0' and c <= '9') or (c >= 'a' and c <= 'f')): return false
+    true
+
+// What `path version --self-id` prints: its self-id, or "" when it has none
+// (an unstamped binary, or a compiler older than the slot).
+fn build_cache_binary_self_id(path: &str) -> str:
+    let tmp = build_graph_rt_getenv("TMPDIR")
+    let dir = if tmp.len() > 0: tmp else: "/tmp"
+    let base = dir ++ f"/with-self-id-{build_graph_rt_getpid()}"
+    var argv = build_graph_argv_append("", path)
+    argv = build_graph_argv_append(argv, "version")
+    argv = build_graph_argv_append(argv, "--self-id")
+    let rc = build_graph_rt_exec_argv_capture(argv, base ++ ".out", base ++ ".err", 30000)
+    let text = if rc == 0: build_graph_rt_read_file(base ++ ".out").trim().clone() else: ""
+    let _ = build_graph_rt_remove_file(base ++ ".out")
+    let _ = build_graph_rt_remove_file(base ++ ".err")
+    if build_cache_is_hex_digest(text): text else: ""
+
+pub fn build_cache_compiler_binary_fingerprint(path: &str) -> str:
+    let self_id = build_cache_binary_self_id(path)
+    if self_id.len() > 0: build_cache_self_id_fingerprint(self_id) else: build_cache_fingerprint_file(path)
+
 fn build_cache_current_compiler_fingerprint():
     if build_cache_compiler_fingerprint_ready == 0:
         let compiler_path = build_cache_resolve_executable_path(build_graph_rt_arg_at(0))
-        build_cache_compiler_fingerprint = if compiler_path.len() == 0:
+        build_cache_compiler_fingerprint = if compiler_self_id_is_stamped():
+            build_cache_self_id_fingerprint(compiler_self_id())
+        else if compiler_path.len() == 0:
             build_cache_sha256_text("compiler:unresolved\n")
         else:
             build_cache_fingerprint_file(compiler_path)
@@ -246,7 +283,7 @@ fn build_cache_producer_fingerprint(target: &BuildGraphTarget) -> str:
     if target.kind == 23 and build_cache_target_names_compiler(target):
         let seed = build_cache_resolve_executable_path(build_graph_rt_getenv("WITH"))
         if seed.len() > 0 and build_graph_rt_file_exists(seed) != 0:
-            return build_cache_fingerprint_file(seed)
+            return build_cache_compiler_binary_fingerprint(seed)
     build_cache_current_compiler_fingerprint()
 
 fn build_cache_target_names_compiler(target: &BuildGraphTarget) -> bool:
@@ -535,6 +572,11 @@ pub fn build_cache_test_compiler_fingerprint(compiler_path: &str) -> str:
     // (D13: the stamp is provenance, not semantics). Key verdicts on the
     // unstamped sibling when it exists so banked passes survive
     // commit-identity-only changes; fall back for compilers with no sibling.
+    // A stamped compiler reports that same identity (its self-id is the
+    // unstamped image's sha256), so neither file is hashed.
+    let self_id = build_cache_binary_self_id(compiler_path)
+    if self_id.len() > 0:
+        return build_cache_self_id_fingerprint(self_id)
     let unstamped = compiler_path ++ ".unstamped"
     if build_graph_rt_file_exists(unstamped) != 0:
         return build_cache_fingerprint_file(unstamped)
