@@ -2709,6 +2709,53 @@ fn bs_check_build_effects_audit(ctx: &ActionCtx, compiler_path: &str, case_dir: 
         return bs_fail(ctx, "strict env effects build unexpectedly succeeded")
     bs_assert_contains(ctx, strict_env.stderr, "comptime can only call comptime functions", "effects_strict_env")
 
+// #1885: the evaluated-graph cache is keyed on what the plan is made from.
+// A build.w that names a target from `ctx.env_input` is planned again when
+// that variable is set, changed or unset; the cache used to serve the plan
+// made under the old value until out/ was removed.
+fn bs_check_build_graph_replans_on_env(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    var rc = bs_write_project_manifest(ctx, case_dir, "envreplan")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "src/main.w"), "fn main:\n    print(\"probe\")\n", "env replan source")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    let tag = ctx.env_input(\"WITH_PLAN_TAG\")\n    let name = if tag.len() > 0: \"probe-\" ++ tag else: \"probe-unset\"\n    ctx.new_build().executable(name, \"src/main.w\")\n", "env replan build")
+    if rc != 0: return rc
+    let build_args: Vec[str] = Vec.new()
+    build_args |> push("build")
+    let values: Vec[str] = Vec.new()
+    values.push("a")
+    values.push("b")
+    values.push("")
+    for i in 0..values.len() as i32:
+        let value = values[i]
+        var env = ProcessEnv { vars: Vec.new() }
+        env.vars.push(ProcessEnvVar { name: "WITH_PLAN_TAG", value: selfhost_owned_text(value) })
+        let expected = if value.len() > 0: "probe-" ++ value else: "probe-unset"
+        let run = bs_run_cli_capture_cwd_with_env(ctx, compiler_path, "env-replan-" ++ expected, build_args, 120000, case_dir, env)
+        if run.rc != 0:
+            return bs_fail(ctx, "env replan build (" ++ expected ++ ") failed: " ++ run.stderr)
+        rc = bs_expect_file(ctx, bs_join(case_dir, "out/bin/" ++ expected), "env replan output " ++ expected ++ " (#1885: the cached plan served the old WITH_PLAN_TAG)")
+        if rc != 0: return rc
+    0
+
+// #1885: an install destination spelled absolute, beneath the project root,
+// is inside the project; it was refused as escaping it without an install
+// prefix (a WITH_WO_DIR under the worktree, with its drive letter).
+fn bs_check_build_install_under_root(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    var rc = bs_write_project_manifest(ctx, case_dir, "rootstore")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "src/data.txt"), "stored\n", "root store data")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    let root = ctx.project_info().project_root()\n    var out = ctx.new_build()\n    let stored = target_new(.Install, \"store-copy\", \"src/data.txt\").output(root ++ \"/out/store/data.txt\")\n    out = out.add_target(stored)\n    out.default(\"store-copy\")\n", "root store build")
+    if rc != 0: return rc
+    let build_args: Vec[str] = Vec.new()
+    build_args |> push("build")
+    build_args |> push(":store-copy")
+    let run = bs_run_cli_capture_cwd(ctx, compiler_path, "install-under-root", build_args, 120000, case_dir)
+    if run.rc != 0:
+        return bs_fail(ctx, "an install destination under the project root was refused (#1885): " ++ run.stderr)
+    bs_expect_file_contains(ctx, bs_join(case_dir, "out/store/data.txt"), "stored", "install under root")
+
 pub fn run_cli_selfhost_project_action(ctx: ActionCtx) -> i32:
     if os() == "Windows":
         return bs_windows_skip(ctx, "#809")
@@ -2772,6 +2819,10 @@ pub fn run_cli_selfhost_project_action(ctx: ActionCtx) -> i32:
     rc = bs_check_build_cache_tracks_embed_file(ctx, compiler_path, bs_join(output_dir, "build_cache_embed_case"))
     if rc != 0: return rc
     rc = bs_check_build_effects_audit(ctx, compiler_path, bs_join(output_dir, "build_effects_case"))
+    if rc != 0: return rc
+    rc = bs_check_build_graph_replans_on_env(ctx, compiler_path, bs_join(output_dir, "build_env_replan_case"))
+    if rc != 0: return rc
+    rc = bs_check_build_install_under_root(ctx, compiler_path, bs_join(output_dir, "build_install_root_case"))
     if rc != 0: return rc
     rc = bs_check_build_graph_inferred_edge(ctx, compiler_path, bs_join(output_dir, "build_graph_edge_case"))
     if rc != 0: return rc

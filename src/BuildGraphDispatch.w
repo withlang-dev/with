@@ -106,7 +106,7 @@ fn build_graph_verify_completed_deps(target: &BuildGraphTarget, completed: &Vec[
     0
 
 pub fn build_graph_dispatch_standard_target(root: &str, target: &BuildGraphTarget, completed_targets: &Vec[str]) -> BuildGraphDispatchResult:
-    let containment_rc = build_graph_validate_target_containment(target)
+    let containment_rc = build_graph_validate_target_containment(root, target)
     if containment_rc != 0:
         return build_graph_dispatch_result(true, containment_rc)
     if target.kind == 7:

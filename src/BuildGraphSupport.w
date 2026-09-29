@@ -154,11 +154,43 @@ pub fn build_graph_path_project_contained(path: &str) -> bool:
         return false
     if path.starts_with("$"):
         return false
+    build_graph_path_chars_valid(path)
+
+fn build_graph_path_chars_valid(path: &str) -> bool:
     for i in 0..path.len() as i32:
         let ch = path[i]
         if ch == 0 or ch == 10 or ch == 13 or ch == 9:
             return false
     true
+
+// An absolute path beneath the project root is inside the project too
+// (#1885: a WITH_WO_DIR under the worktree, spelled with its drive letter,
+// was refused as escaping it). Compared as the host compares paths:
+// separators either way, and case-blind on Windows; a `..` segment is never
+// trusted to stay inside.
+pub fn build_graph_path_within_root(root: &str, path: &str) -> bool:
+    if root.len() == 0 or not runtime_path_is_absolute(path) or path.contains(".."):
+        return false
+    if not build_graph_path_chars_valid(path):
+        return false
+    let base = build_graph_path_fold(root)
+    let candidate = build_graph_path_fold(path)
+    candidate.starts_with(base ++ "/")
+
+fn build_graph_path_fold(path: &str) -> str:
+    var out = path.replace("\\", "/")
+    while out.len() > 1 and out.ends_with("/"):
+        out = out.slice(0, out.len() - 1)
+    if runtime_sysinfo_os() != "Windows":
+        return out
+    var folded = ""
+    for i in 0..out.len() as i32:
+        let ch = out[i]
+        folded = folded ++ str_from_byte(if ch >= 65 and ch <= 90: ch + 32 else: ch)
+    folded
+
+fn build_graph_output_contained(root: &str, path: &str) -> bool:
+    build_graph_path_project_contained(path) or build_graph_path_within_root(root, path)
 
 // One expansion for an install destination: the install operation writes
 // through it and the freshness check looks for the output through it (#1157:
@@ -166,7 +198,7 @@ pub fn build_graph_path_project_contained(path: &str) -> bool:
 // permanently stale and everything downstream of it rebuilt).
 pub fn build_graph_expand_install_path(root: &str, path: &str) -> str:
     if path.starts_with("$HOME/"):
-        let home = build_graph_rt_getenv("HOME")
+        let home = runtime_home_dir()
         if home.len() > 0:
             return resolve_join(home, path.slice(6, path.len()))
     if path.starts_with("$INSTALL_BINDIR/"):
@@ -205,15 +237,15 @@ pub fn build_graph_validate_target_containment(root: &str, target: &BuildGraphTa
         return 0
     if target.output.len() > 0:
         if is_install:
-            if not build_graph_path_is_install_dest(target.output) and not build_graph_path_project_contained(target.output):
+            if not build_graph_path_is_install_dest(target.output) and not build_graph_output_contained(root, target.output):
                 build_graph_rt_eprint("error: install target '" ++ target.name ++ "' output escapes project root without install prefix: " ++ target.output)
                 return 1
         else if is_promote:
-            if not build_graph_path_project_contained(target.output):
+            if not build_graph_output_contained(root, target.output):
                 build_graph_rt_eprint("error: promote target '" ++ target.name ++ "' output escapes project root: " ++ target.output)
                 return 1
         else:
-            if not build_graph_path_project_contained(target.output):
+            if not build_graph_output_contained(root, target.output):
                 build_graph_rt_eprint("error: target '" ++ target.name ++ "' output escapes project root: " ++ target.output)
                 return 1
     let is_command = kind == 7

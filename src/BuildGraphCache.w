@@ -1015,6 +1015,28 @@ impl BcgReader:
             out.push(self.read_str())
         out
 
+// The cached graph was planned under the environment build.w read: each
+// `ctx.env_input` is recorded in build.w.effects as `env\t<build>\t<name>\t
+// <sha256 of value>`, and the plan is served only while every recorded value
+// is the current one (#1885: the key hashed sources and options alone, so an
+// unset WITH_WO_DIR kept the store the cached plan was made with). A
+// removed variable hashes as "", the value env_input returns for it.
+fn build_cache_build_env_current(root: &str) -> bool:
+    let effects = build_graph_rt_read_file(build_cache_build_effects_path(root))
+    if effects.len() == 0:
+        return true
+    let lines = effects.split("\n")
+    for i in 0..lines.len() as i32:
+        let state = build_cache_effect_env_state_line(lines[i])
+        if state.len() == 0:
+            continue
+        let name_end = build_cache_last_colon(state)
+        let name = state.slice(4, name_end as i64)
+        let recorded = state.slice((name_end + 1) as i64, state.len())
+        if build_cache_sha256_text(build_graph_rt_getenv(name)) != recorded:
+            return false
+    true
+
 pub fn build_cache_graph_try_read(root: &str, key: &str) -> BuildGraph:
     var graph = empty_build_graph()
     let text = build_graph_rt_read_file(build_cache_graph_path(root))
@@ -1024,6 +1046,8 @@ pub fn build_cache_graph_try_read(root: &str, key: &str) -> BuildGraph:
     if r.read_line() != "WGRAPH2":
         return graph
     if r.read_str() != key or not r.ok:
+        return graph
+    if not build_cache_build_env_current(root):
         return graph
     graph.package_name = r.read_str()
     graph.package_version = r.read_str()
