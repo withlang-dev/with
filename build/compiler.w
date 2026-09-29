@@ -2876,7 +2876,7 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
         rsp = rsp ++ comp_windows_sdk_um_lib("psapi.lib") ++ "\n"
         rsp = rsp ++ comp_windows_sdk_um_lib("dbghelp.lib") ++ "\n"
         rsp = rsp ++ comp_windows_sdk_um_lib("ntdll.lib") ++ "\n"
-        // No CRT here: Link.w's link_stage_windows_crt_static is the one
+        // No CRT here: Link.w's link_stage_windows_is_compiler_link is the one
         // place that picks it, and a link carrying this file is a
         // static-CRT link there (#1267), as the cross rsps already are.
         ld_rsp = ld_rsp ++ comp_windows_msvc_lib("oldnames.lib") ++ "\n"

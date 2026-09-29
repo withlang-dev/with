@@ -10,6 +10,7 @@ use compiler.EmbeddedSysroot
 use std.string.StringBuilder
 use std.collections.Atomic
 use TargetSpec
+use compiler.EmbeddedClangResourceData
 
 extern fn with_str_clone_ref(s: &str) -> str
 
@@ -314,12 +315,21 @@ fn link_stage_restore_env(saved: &LinkStageSavedEnv):
     for i in 0..saved.names.len() as i32:
         let _ = runtime_setenv(saved.names[i], saved.values[i])
 
+// WITH_LINK_VERBOSE=1 prints every link's argv before it runs, and asks a
+// COFF link for lld-link's /verbose (each input it reads, each member it
+// loads): the evidence of what a link reads, for a toolchain audit (#1915).
+fn link_stage_verbose() -> bool: runtime_getenv("WITH_LINK_VERBOSE") == "1"
+
 impl LinkStageCommand:
     fn run() -> i32:
         var argv = ""
         argv = link_stage_argv_append(argv, self.linker)
+        var shown = with_str_clone_ref(self.linker)
         for i in 0..self.args.len() as i32:
             argv = link_stage_argv_append(argv, self.args[i])
+            shown = shown ++ " " ++ self.args[i]
+        if link_stage_verbose():
+            with_eprint("link: " ++ shown)
         let saved = link_stage_apply_env(&self.env)
         let linux_target = if target_spec_is_native(): runtime_sysinfo_os() == "Linux" else: target_spec_active_kind() == 1 or target_spec_active_kind() == 2
         // #1915: a failed macOS link says why (lld's own diagnostics, or the
@@ -597,25 +607,20 @@ fn link_stage_windows_libpath(var_name: &str, fallback: &str) -> str:
     fallback ++ ""
 
 // Unix-only library spellings that have no Windows import lib and whose
-// symbols are already provided by the CRT/UCRT linked unconditionally below
-// (cos/abs/… in libucrt via libcmt; strlen/malloc/… in libcmt). A `link:`
-// directive naming one of these (e.g. `c_import("math.h", link: "m")`) must be
-// dropped on the Windows link, not turned into a nonexistent `m.lib`.
+// symbols the C runtime linked below already provides (cos/abs/... in the
+// UCRT and mingwex, strlen/malloc/... in the UCRT). A `link:` directive naming
+// one of these (e.g. `c_import("math.h", link: "m")`) must be dropped on the
+// Windows link, not turned into a nonexistent `m.lib`.
 fn link_stage_windows_lib_is_crt_implicit(name: &str): name == "m" or name == "c"
 
-// The one CRT decision for a Windows link, read by every path that links a
-// program on the target (build.w's stage links and `with build file.w`
-// alike; #1267). The LLVM/Clang SDK archives are built MultiThreaded
-// (static UCRT): a link that carries the LLVM static bridge response file
-// (`@…/llvm_ld.rsp`, the compiler being built as a program) is a static-CRT
-// link, or lld-link resolves `_invalid_parameter_noinfo`/`_wctype` from both
-// libucrt.lib and ucrt.lib. An ordinary program keeps the DLL runtime that
-// every prebuilt Windows library expects (below). WITH_WINDOWS_CRT_STATIC=1
-// still forces the static runtime for a self-contained binary that links
-// no such library.
-fn link_stage_windows_crt_static(extras: &Vec[str]) -> bool:
-    if with_getenv_str("WITH_WINDOWS_CRT_STATIC") == "1":
-        return true
+// The compiler's own link (#1267): a link that carries the LLVM static bridge
+// response file (`@…/llvm_ld.rsp`) is the compiler being built as a program.
+// Until the SDK's LLVM/Clang archives are rebuilt against its own libc++
+// (#1915 step 3), those archives are MSVC-built, MultiThreaded (static UCRT)
+// and need Visual Studio's static C and C++ runtime (libcmt, libcpmt). That
+// is the only link that still reads Visual Studio or a Windows Kit
+// (WITH_WINDOWS_*_LIBDIR); every program link reads the SDK only.
+fn link_stage_windows_is_compiler_link(extras: &Vec[str]) -> bool:
     for i in 0..extras.len() as i32:
         if link_stage_is_llvm_bridge_rsp(extras[i]):
             return true
@@ -624,11 +629,111 @@ fn link_stage_windows_crt_static(extras: &Vec[str]) -> bool:
 fn link_stage_is_llvm_bridge_rsp(extra: &str) -> bool:
     extra.starts_with("@") and extra.ends_with("/llvm_ld.rsp")
 
+// The architecture of a Windows link: the cross target's, else the host's.
+fn link_stage_windows_arch() -> str:
+    if not target_spec_is_native():
+        return if target_spec_active_kind() == 6: "aarch64" else: "x86_64"
+    let arch = runtime_sysinfo_arch()
+    if arch == "armv8" or arch == "aarch64": "aarch64" else: "x86_64"
+
+// The LLVM SDK a link reads: the directory above the bin/ holding the lld it
+// runs (.deps/llvm-<ver>-<host>/bin/lld-link.exe).
+fn link_stage_sdk_dir_of(llvm_ld: &str) -> str: link_stage_dirname(link_stage_dirname(llvm_ld))
+
+// The SDK's Windows C runtime (#1915; build/sdk.w
+// run_sdk_windows_libc_action), the sysroot of the SDK's clang for a
+// <arch>-w64-windows-gnu target: include/ holds mingw-w64's headers, which
+// c_import parses; <arch>-w64-mingw32/lib holds its UCRT startup objects,
+// support libraries and the in-box DLLs' import libraries, which a program
+// links. WITH_WINDOWS_LIBC_DIR names another directory laid out the same.
+fn link_stage_windows_libc_root_of(llvm_ld: &str) -> str:
+    let explicit = runtime_getenv("WITH_WINDOWS_LIBC_DIR")
+    if explicit.len() > 0:
+        return explicit ++ ""
+    link_stage_sdk_dir_of(llvm_ld) ++ "/libc/windows"
+
+fn link_stage_windows_libc_dir(llvm_ld: &str, arch: &str) -> str:
+    link_stage_windows_libc_root_of(llvm_ld) ++ "/" ++ arch ++ "-w64-mingw32/lib"
+
+// The C target a Windows c_import parses for: mingw-w64's headers are
+// written for the GNU environment. The C ABI of the declarations is the
+// same as the MSVC environment With's own objects use (LLP64, the Microsoft
+// x64 calling convention, MS bitfield layout), except long double, which is
+// 80-bit here and 64-bit there.
+pub fn link_stage_windows_c_target() -> str: link_stage_windows_arch() ++ "-w64-windows-gnu"
+
+// Whether this compilation targets Windows x86_64, whose programs and
+// c_import read the SDK's libc (windows-aarch64 follows in its own slice).
+pub fn link_stage_windows_c_target_uses_sdk_libc() -> bool:
+    let windows = if target_spec_is_native(): runtime_sysinfo_os() == "Windows" else: target_spec_active_kind() == 5 or target_spec_active_kind() == 6
+    windows and link_stage_windows_arch() == "x86_64"
+
+// The Windows libc c_import reads for this compilation: the SDK's (the same
+// one the link will read), "" when the target is not Windows x86_64 or the
+// SDK carries none.
+pub fn link_stage_windows_libc_root() -> str:
+    if not link_stage_windows_c_target_uses_sdk_libc():
+        return ""
+    let ld = link_stage_llvm_ld_path()
+    if ld.len() == 0:
+        return ""
+    let root = link_stage_windows_libc_root_of(ld)
+    if not link_stage_file_exists(root ++ "/include/stdio.h"):
+        return ""
+    root
+
+// The lld a link runs, as link_stage_link_with_extras_libs_args_plan
+// resolves it: the build's recorded llvm_ld, else (a native Windows link
+// before the metadata exists) the environment's. "" when there is none.
+fn link_stage_llvm_ld_path() -> str:
+    let root = link_stage_resolve_runtime_root()
+    var ld_path = link_stage_read_file_trimmed(root ++ "/llvm_ld")
+    if ld_path.len() == 0 and runtime_sysinfo_os() == "Windows" and target_spec_is_native():
+        ld_path = link_stage_windows_lld_from_env()
+    ld_path
+
+// compiler-rt's builtins for the target, in the SDK's clang resource dir: the
+// mingw-w64 runtime's ___chkstk_ms and its 128-bit and soft-float helpers.
+fn link_stage_windows_builtins(llvm_ld: &str, arch: &str) -> str:
+    link_stage_sdk_dir_of(llvm_ld) ++ "/lib/clang/" ++ embedded_clang_resource_version() ++ "/lib/windows/libclang_rt.builtins-" ++ arch ++ ".a"
+
+// The in-box DLLs every program links (their import libraries ship in the
+// SDK's libc; build/sdk.w sdk_windows_import_libs names the same set).
+fn link_stage_windows_system_libs() -> Vec[str]:
+    let names: Vec[str] = Vec.new()
+    names.push("kernel32.lib")
+    names.push("ntdll.lib")
+    names.push("advapi32.lib")
+    names.push("bcrypt.lib")
+    names.push("ws2_32.lib")
+    names.push("dbghelp.lib")
+    names.push("shell32.lib")
+    names.push("user32.lib")
+    names.push("ole32.lib")
+    names.push("oleaut32.lib")
+    names.push("version.lib")
+    names.push("psapi.lib")
+    names
+
 fn link_stage_make_windows_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_path: &str, extras: &Vec[str], link_libs: &Vec[str], link_args: &Vec[str]) -> LinkStageCommand:
     let args: Vec[str] = Vec.new()
     let env: Vec[LinkStageEnvVar] = Vec.new()
     let inputs: Vec[str] = Vec.new()
     let outputs: Vec[str] = Vec.new()
+    let compiler_link = link_stage_windows_is_compiler_link(extras)
+    let arch = link_stage_windows_arch()
+    // The SDK recipe covers x86_64; windows-aarch64 programs keep the
+    // Visual Studio recipe until its libc slice lands (#1915).
+    let sdk_libc = not compiler_link and arch == "x86_64"
+    let libc_dir = if sdk_libc: link_stage_windows_libc_dir(llvm_ld, arch) else: ""
+    let builtins = if sdk_libc: link_stage_windows_builtins(llvm_ld, arch) else: ""
+    if sdk_libc:
+        if not link_stage_file_exists(libc_dir ++ "/crt2.o"):
+            with_eprint("error: the LLVM SDK at " ++ link_stage_sdk_dir_of(llvm_ld) ++ " carries no Windows C runtime (" ++ libc_dir ++ "/crt2.o); a Windows link reads the SDK only (#1915). Install an SDK built with `with build :sdk-windows-libc` (or name one with WITH_WINDOWS_LIBC_DIR).")
+            return link_stage_empty_command()
+        if not link_stage_file_exists(builtins):
+            with_eprint("error: the LLVM SDK at " ++ link_stage_sdk_dir_of(llvm_ld) ++ " carries no compiler-rt builtins for Windows (" ++ builtins ++ "); build them with `with build :sdk-compiler-rt-builtins` (#1915).")
+            return link_stage_empty_command()
     args.push("/nologo")
     // Reproducible PE output: lld-link derives the header timestamp and the
     // PDB GUID from a hash of the image instead of the wall clock, so
@@ -644,13 +749,21 @@ fn link_stage_make_windows_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_
     args.push("/stack:8388608")
     args.push("/opt:ref")
     args.push("/opt:icf")
-    // Library search paths. On a Windows host these are the standard
-    // MSVC/WinSDK install locations; for a cross link from another host
-    // point them at a splatted lib tree (e.g. xwin output) via the
-    // WITH_WINDOWS_* env vars.
-    args.push("/libpath:" ++ link_stage_windows_libpath("WITH_WINDOWS_UM_LIBDIR", "C:/Program Files (x86)/Windows Kits/10/Lib/10.0.19041.0/um/x64"))
-    args.push("/libpath:" ++ link_stage_windows_libpath("WITH_WINDOWS_UCRT_LIBDIR", "C:/Program Files (x86)/Windows Kits/10/Lib/10.0.19041.0/ucrt/x64"))
-    args.push("/libpath:" ++ link_stage_windows_libpath("WITH_WINDOWS_MSVC_LIBDIR", "C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Tools/MSVC/14.29.30133/lib/x64"))
+    if link_stage_verbose():
+        args.push("/verbose")
+    if sdk_libc:
+        // mingw-w64's startup code (crt2.o) is the entry point, and it reads
+        // what lld synthesizes only in MinGW mode: the __CTOR_LIST__ /
+        // __DTOR_LIST__ bounds and the runtime pseudo-relocation list.
+        args.push("-lldmingw")
+        args.push("/entry:mainCRTStartup")
+        args.push("/libpath:" ++ libc_dir)
+    else:
+        // The compiler's own link (and windows-aarch64): Visual Studio's
+        // import libraries and CRT, from WITH_WINDOWS_*_LIBDIR.
+        args.push("/libpath:" ++ link_stage_windows_libpath("WITH_WINDOWS_UM_LIBDIR", "C:/Program Files (x86)/Windows Kits/10/Lib/10.0.19041.0/um/x64"))
+        args.push("/libpath:" ++ link_stage_windows_libpath("WITH_WINDOWS_UCRT_LIBDIR", "C:/Program Files (x86)/Windows Kits/10/Lib/10.0.19041.0/ucrt/x64"))
+        args.push("/libpath:" ++ link_stage_windows_libpath("WITH_WINDOWS_MSVC_LIBDIR", "C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Tools/MSVC/14.29.30133/lib/x64"))
     args.push("/out:" ++ bin_path)
     outputs.push(with_str_clone_ref(bin_path))
     args.push(with_str_clone_ref(obj_path))
@@ -672,48 +785,58 @@ fn link_stage_make_windows_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_
             args.push(lib ++ ".lib")
         // else: `m` (libm) and `c` (libc) are Unix-only spellings — Windows has
         // no `m.lib`/`c.lib`, and their symbols (cos, abs, strlen, …) resolve
-        // from the UCRT/CRT already linked below (libucrt via libcmt). Emitting a
-        // bare `<name>.lib` would make lld-link fail to open a nonexistent import
+        // from the C runtime already linked below. Emitting a bare
+        // `<name>.lib` would make lld-link fail to open a nonexistent import
         // lib, so drop it. Any other name still becomes `<name>.lib` so a
-        // genuinely missing library fails loudly rather than silently vanishing.
+        // genuinely missing library fails loudly rather than silently
+        // vanishing: an application's own libraries (opengl32, gdi32, ...)
+        // come from `with get` or its own link settings, never the SDK.
     for i in 0..link_args.len() as i32:
         args.push(with_str_clone_ref(link_args[i]))
-    // The C runtime. A program links the DLL runtime (msvcrt + ucrt +
-    // vcruntime import libs, MSVC's own /MD default and Rust's on
-    // *-pc-windows-msvc) because that is the runtime every prebuilt Windows
-    // library expects: ConanCenter ships msvc binaries only as
-    // compiler.runtime=dynamic, and such a library's `__imp_realloc` /
-    // `__imp_fopen` references cannot resolve against the static libcmt
-    // (release-raylib-spiral-uat, and every `with get c.*` package, on
-    // Windows). The static runtime remains for a self-contained binary that
-    // links no such library, the compiler above all: see
-    // link_stage_windows_crt_static, the one place that decides.
-    if link_stage_windows_crt_static(extras):
-        args.push("libcpmt.lib")
-        args.push("libcmt.lib")
-    else:
-        args.push("msvcprt.lib")
-        args.push("msvcrt.lib")
+    if sdk_libc:
+        // The C runtime: mingw-w64's UCRT startup and support code, compiler-rt's
+        // builtins under it, and the UCRT itself (ucrtbase and the
+        // api-ms-win-crt-* API sets, in the box since Windows 10). No
+        // vcruntime140 or msvcp140: those are redistributables.
+        args.push(libc_dir ++ "/crt2.o")
+        inputs.push(libc_dir ++ "/crt2.o")
+        args.push("mingw32.lib")
+        args.push(with_str_clone_ref(builtins))
+        inputs.push(with_str_clone_ref(builtins))
+        args.push("mingwex.lib")
         args.push("ucrt.lib")
-        args.push("vcruntime.lib")
-    // UCRT exports printf/scanf-family functions such as sprintf and
-    // vfprintf only through this archive (they are inline in the headers
-    // since VS 2015); Darwin-migrated C (pcre2test.w) calls them by name.
-    args.push("legacy_stdio_definitions.lib")
-    args.push("oldnames.lib")
-    args.push("kernel32.lib")
-    args.push("advapi32.lib")
-    args.push("bcrypt.lib")
-    args.push("shell32.lib")
-    args.push("user32.lib")
-    args.push("ole32.lib")
-    args.push("oleaut32.lib")
-    args.push("uuid.lib")
-    args.push("ws2_32.lib")
-    args.push("version.lib")
-    args.push("psapi.lib")
-    args.push("dbghelp.lib")
-    args.push("ntdll.lib")
+        let system = link_stage_windows_system_libs()
+        for i in 0..system.len() as i32:
+            args.push(with_str_clone_ref(system[i]))
+    else:
+        // Visual Studio's C runtime: static for the compiler (its LLVM
+        // archives are MultiThreaded), the DLL runtime otherwise.
+        if compiler_link:
+            args.push("libcpmt.lib")
+            args.push("libcmt.lib")
+        else:
+            args.push("msvcprt.lib")
+            args.push("msvcrt.lib")
+            args.push("ucrt.lib")
+            args.push("vcruntime.lib")
+        // UCRT exports printf/scanf-family functions such as sprintf and
+        // vfprintf only through this archive (they are inline in the headers
+        // since VS 2015); Darwin-migrated C (pcre2test.w) calls them by name.
+        args.push("legacy_stdio_definitions.lib")
+        args.push("oldnames.lib")
+        args.push("kernel32.lib")
+        args.push("advapi32.lib")
+        args.push("bcrypt.lib")
+        args.push("shell32.lib")
+        args.push("user32.lib")
+        args.push("ole32.lib")
+        args.push("oleaut32.lib")
+        args.push("uuid.lib")
+        args.push("ws2_32.lib")
+        args.push("version.lib")
+        args.push("psapi.lib")
+        args.push("dbghelp.lib")
+        args.push("ntdll.lib")
     let cleanup_files = link_stage_collect_cleanup_files(extras)
     LinkStageCommand { linker: with_str_clone_ref(llvm_ld), args, cwd: "", env, inputs, outputs, cleanup_files }
 

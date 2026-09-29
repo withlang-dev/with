@@ -238,6 +238,9 @@ pub fn ci_set_include_paths(paths: &Vec[str]):
     for i in 0..paths.len() as i32:
         with_cimport_add_include_path(paths[i])
 
+pub fn ci_set_windows_target(triple: &str, sysroot: &str):
+    with_cimport_set_windows_target(triple, sysroot)
+
 pub fn ci_add_windows_system_includes():
     with_cimport_add_windows_system_includes()
 

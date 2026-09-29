@@ -712,6 +712,12 @@ var sdk_path_resolved: i32 = 0
 var resource_dir_buf: [1024]u8 = [0 as u8; 1024]
 var resource_dir_resolved: i32 = 0
 
+// A Windows c_import's C target and sysroot (#1915): the SDK's mingw-w64
+// libc, set by the frontend from the SDK the link reads. Empty (NUL first
+// byte) when the target is not Windows or the SDK carries no libc.
+var g_cimport_target_buf: [128]u8 = [0 as u8; 128]
+var g_cimport_sysroot_arg_buf: [1100]u8 = [0 as u8; 1100]
+
 let DARWIN_DIRENT_NAME_OFFSET: i64 = 21
 let LINUX_DIRENT_NAME_OFFSET: i64 = 19
 
@@ -1965,12 +1971,56 @@ fn with_cimport_add_windows_incdir(var_name: &str) -> i32:
         with_cimport_add_include_path(dir)
     0
 
-// c_import on a native Windows build: libclang has no default system-header
-// search path, so `c_import("stdlib.h")` fails with 'file not found'. Add the
-// MSVC CRT + Windows SDK include dirs — the include-side analog of the
-// WITH_WINDOWS_*_LIBDIR link wiring in Link.w. Read from WITH_WINDOWS_*_INCDIR
-// (set by the build/CI toolchain step); no-op off Windows / when unset. Order
-// mirrors the vcvars INCLUDE search order: MSVC, then Kit ucrt/shared/um.
+// c_import for Windows x86_64 parses against the SDK's libc (#1915):
+// mingw-w64's headers, for the <arch>-w64-windows-gnu target, with that libc
+// as clang's sysroot — so clang searches the sysroot's include/ and nothing
+// of the host (no gcc install on PATH, no Visual Studio, no Windows Kit).
+// `triple` "" clears it (not a Windows target). `sysroot` "" with a triple
+// means the SDK carries no libc: the parse then finds no system header, and
+// with_cimport_windows_libc_missing names the cause.
+pub fn with_cimport_set_windows_target(triple: &str, sysroot: &str) -> Unit:
+    unsafe:
+        g_cimport_target_buf[0] = 0
+        g_cimport_sysroot_arg_buf[0] = 0
+        if triple.len() == 0 or triple.len() >= 127:
+            return
+        with_memcpy(&raw mut g_cimport_target_buf as *mut [128]u8 as *mut u8, *(triple as *const str as *const *const u8), triple.len())
+        g_cimport_target_buf[triple.len()] = 0
+        let prefix = "--sysroot="
+        if sysroot.len() == 0 or sysroot.len() + prefix.len() >= 1099:
+            return
+        with_memcpy(&raw mut g_cimport_sysroot_arg_buf as *mut [1100]u8 as *mut u8, *(prefix as *const str as *const *const u8), prefix.len())
+        with_memcpy((&raw mut g_cimport_sysroot_arg_buf as *mut [1100]u8 as i64 + prefix.len()) as *mut u8, *(sysroot as *const str as *const *const u8), sysroot.len())
+        g_cimport_sysroot_arg_buf[prefix.len() + sysroot.len()] = 0
+
+// 1 when this c_import targets Windows and the SDK carries no libc — the
+// hint a header-parse failure adds.
+pub fn with_cimport_windows_libc_missing() -> i32:
+    unsafe:
+        if g_cimport_target_buf[0] != 0 and g_cimport_sysroot_arg_buf[0] == 0:
+            return 1
+    0
+
+// Appends the Windows target and sysroot (when set) to a parse's argv.
+unsafe fn cimport_push_target_args(args: *mut *const u8, nargs: i32) -> i32:
+    var n = nargs
+    if g_cimport_target_buf[0] != 0:
+        *((args as i64 + n as i64 * 8) as *mut *const u8) = "-target\0" as *const u8
+        n = n + 1
+        *((args as i64 + n as i64 * 8) as *mut *const u8) = &g_cimport_target_buf as *const [128]u8 as *const u8
+        n = n + 1
+        if g_cimport_sysroot_arg_buf[0] != 0:
+            *((args as i64 + n as i64 * 8) as *mut *const u8) = &g_cimport_sysroot_arg_buf as *const [1100]u8 as *const u8
+            n = n + 1
+    n
+
+// c_import for a Windows target the SDK's libc does not cover yet
+// (windows-aarch64): libclang has no default system-header search path, so
+// `c_import("stdlib.h")` fails with 'file not found' unless the MSVC CRT +
+// Windows SDK include dirs are named in WITH_WINDOWS_*_INCDIR — the
+// include-side analog of Link.w's WITH_WINDOWS_*_LIBDIR for that target.
+// No-op off Windows / when unset. Order mirrors the vcvars INCLUDE search
+// order: MSVC, then Kit ucrt/shared/um.
 pub fn with_cimport_add_windows_system_includes() -> i32:
     if with_sysinfo_os() != "Windows": return 0
     with_cimport_add_windows_incdir("WITH_WINDOWS_MSVC_INCDIR")
@@ -2056,6 +2106,7 @@ pub fn with_cimport_parse(header_code: &str) -> i64:
             nargs = nargs + 1
             args[nargs] = sysroot
             nargs = nargs + 1
+        nargs = cimport_push_target_args(&raw mut args as *mut [64]*const u8 as *mut *const u8, nargs)
         let resdir = get_clang_resource_dir()
         if resdir as i64 != 0:
             args[nargs] = "-resource-dir\0" as *const u8
@@ -3191,6 +3242,7 @@ unsafe fn cimport_collect_macros_from_libclang(ms: *mut MacroSession, header_cod
         nargs = nargs + 1
         args[nargs] = sysroot
         nargs = nargs + 1
+    nargs = cimport_push_target_args(&raw mut args as *mut [64]*const u8 as *mut *const u8, nargs)
     let resdir = get_clang_resource_dir()
     if resdir as i64 != 0:
         args[nargs] = "-resource-dir\0" as *const u8
@@ -3287,6 +3339,7 @@ pub fn with_cimport_collect_object_macro_types(header_code: &str, macro_names: &
             nargs = nargs + 1
             args[nargs] = sysroot
             nargs = nargs + 1
+        nargs = cimport_push_target_args(&raw mut args as *mut [64]*const u8 as *mut *const u8, nargs)
         let resdir = get_clang_resource_dir()
         if resdir as i64 != 0:
             args[nargs] = "-resource-dir\0" as *const u8
@@ -3388,6 +3441,7 @@ pub fn with_cimport_parse_macro_probe(header_code: &str, macro_names: &str) -> i
             nargs = nargs + 1
             args[nargs] = sysroot
             nargs = nargs + 1
+        nargs = cimport_push_target_args(&raw mut args as *mut [64]*const u8 as *mut *const u8, nargs)
         let resdir = get_clang_resource_dir()
         if resdir as i64 != 0:
             args[nargs] = "-resource-dir\0" as *const u8
