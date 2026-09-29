@@ -1180,7 +1180,14 @@ fn link_stage_select_embedded_bundles(undef: &str) -> Vec[str]:
             continue
         let name = embedded_bundle_name(bi)
         let bundle_abi = link_stage_bundle_manifest_field(manifest, "abi-sha")
-        if bundle_abi != compiler_abi_sha():
+        // An unstamped image — linked as a program (`with build main.w`,
+        // the failure-diagnostics probe), not by build.w's compiler link,
+        // which stamps the slot post-link — has no ABI identity to compare:
+        // it links the bundles it embeds as it links an explicit
+        // --link-bundle (Compilation.load_link_bundles) and as a hand-linked
+        // compiler keeps no generation (#1815). It refused them against the
+        // slot's placeholder (#1330).
+        if compiler_abi_sha_is_stamped() and bundle_abi != compiler_abi_sha():
             with_eprint("error: embedded bundle '" ++ name ++ "' was built for ABI " ++ bundle_abi ++ " but this compiler is " ++ compiler_abi_sha() ++ " (a .wo never links across ABI identities; rebuild the bundle)")
             let failed: Vec[str] = Vec.new()
             failed.push(LINK_BUNDLE_FAILED())

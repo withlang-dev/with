@@ -320,7 +320,11 @@ its own `abi_sha` in at link time (a second post-link sentinel beside the
 version stamp; `with version --abi-sha` prints it), so a bundle built by
 compiler X carries X's ABI identity, and a compiler that links a bundle
 checks the manifest's `abi_sha` against its own — a mismatch is a hard
-error, never a silent link (#761).
+error, never a silent link (#761). An unstamped image — linked as a
+program (`with build main.w`), so `with version --abi-sha` prints the
+placeholder — has no identity to compare and links its embedded bundles
+and an explicit `--link-bundle` unchecked, as a hand-linked compiler keeps
+no generation (#1815, #1330).
 
 **Who builds a bundle.** The compiler whose baked `abi_sha` equals the
 key's. In the bootstrap chain that is stage1 (the first compiler carrying

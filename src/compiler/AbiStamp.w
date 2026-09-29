@@ -15,6 +15,10 @@ pub fn compiler_abi_sha() -> str:
 
 // True once the slot has been patched (an unstamped binary still carries the
 // sentinel). Bundle keys must never be computed from an unstamped compiler.
+// An unstamped image — linked as a program (`with build main.w`), not by
+// build.w's compiler link — has no identity to compare, so the link stage
+// links its embedded bundles and an explicit --link-bundle unchecked (#1330),
+// as a hand-linked compiler keeps no generation (#1815).
 pub fn compiler_abi_sha_is_stamped() -> bool:
     not compiler_abi_sha().starts_with("WITHABISHASTAMP")
 
