@@ -135,7 +135,11 @@ pub fn build_graph_run_external_test_file(root: &str, target: &BuildGraphTarget,
     0
 
 fn build_graph_wait_external_test_job(target: &BuildGraphTarget, job: &BuildGraphExternalTestJob) -> i32:
-    let rc = build_graph_rt_exec_wait(job.pid, 300000)
+    build_graph_finish_external_test_job(target, job, build_graph_rt_exec_wait(job.pid, 300000))
+
+// A test child's exit code is its verdict: report a failure with its
+// captured tail, drop a pass's captures. 124 is the timeout.
+fn build_graph_finish_external_test_job(target: &BuildGraphTarget, job: &BuildGraphExternalTestJob, rc: i32) -> i32:
     if rc == 124:
         build_graph_rt_eprint("error: build.w test target '" ++ target.name ++ "' timed out in '" ++ job.test_path ++ "'; stdout=" ++ job.stdout_path ++ " stderr=" ++ job.stderr_path)
         return 124
@@ -185,14 +189,18 @@ pub fn build_graph_run_external_test_files(root: &str, target: &BuildGraphTarget
     var failed_paths: Vec[str] = Vec.new()
     var first_failure = 0
     var next = 0
-    var oldest = 0
+    var finished = 0
     let active: Vec[BuildGraphExternalTestJob] = Vec.new()
     let active_keys: Vec[str] = Vec.new()
-    // Sliding window: keep jobs_limit children in flight, retiring the oldest
-    // to open each slot (no batch barrier — one slow file no longer idles the
-    // rest of the window).
-    while oldest < run_files.len() as i32:
-        if next < run_files.len() as i32 and next - oldest < jobs_limit:
+    let started_ns: Vec[i64] = Vec.new()
+    // Indices into `active` of the children still running (at most jobs_limit).
+    var live: Vec[i32] = Vec.new()
+    // Sliding window: keep jobs_limit children in flight and refill a slot the
+    // moment ANY child exits. Retiring only the oldest held the window behind
+    // one slow file: a lane's 43 s test near the front of the alphabet let the
+    // other slots drain and idle. Verdicts are a set, so finish order is moot.
+    while finished < run_files.len() as i32:
+        if next < run_files.len() as i32 and live.len() as i32 < jobs_limit:
             let test_path = run_files[next]
             let base = build_graph_path_basename(test_path)
             let stdout_path = resolve_join(capture_dir, base ++ ".stdout")
@@ -204,18 +212,36 @@ pub fn build_graph_run_external_test_files(root: &str, target: &BuildGraphTarget
                 return 1
             active.push(build_graph_external_test_job_new(test_path, stdout_path, stderr_path, pid))
             active_keys.push(with_str_clone_ref(run_keys[next]))
+            started_ns.push(build_graph_rt_clock_nanos())
+            live.push(next)
             next = next + 1
             continue
-        let job_path = active[oldest].test_path
-        let rc = build_graph_wait_external_test_job(target, active[oldest])
-        if rc == 0:
-            pass_keys.push(with_str_clone_ref(active_keys[oldest]))
-            pass_paths.push(build_cache_project_relative_path(root, job_path))
-        else:
-            failed_paths.push(with_str_clone_ref(job_path))
-            if first_failure == 0:
-                first_failure = rc
-        oldest = oldest + 1
+        var reaped = false
+        var li = 0
+        while li < live.len() as i32:
+            let idx = live[li]
+            var rc = build_graph_rt_exec_try_wait(active[idx].pid)
+            if rc == -2:
+                // Still running: the same 300 s budget the blocking wait had,
+                // counted from spawn; expiry kills the child (rc 124).
+                if build_graph_rt_clock_nanos() - started_ns[idx] < 300000 as i64 * 1000000:
+                    li = li + 1
+                    continue
+                rc = build_graph_rt_exec_wait(active[idx].pid, 1)
+            let verdict = build_graph_finish_external_test_job(target, active[idx], rc)
+            if verdict == 0:
+                pass_keys.push(with_str_clone_ref(active_keys[idx]))
+                pass_paths.push(build_cache_project_relative_path(root, active[idx].test_path))
+            else:
+                failed_paths.push(with_str_clone_ref(active[idx].test_path))
+                if first_failure == 0:
+                    first_failure = verdict
+            live[li] = live[live.len() as i32 - 1]
+            let _ = live.pop()
+            finished = finished + 1
+            reaped = true
+        if not reaped and live.len() as i32 > 0:
+            let _ = build_graph_rt_usleep(2000)
 
     // Persist the passing set even when the target is red (compaction:
     // the file is rewritten with exactly the keys proven this run plus
