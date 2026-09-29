@@ -47,7 +47,9 @@ fn shout(s: &str) -> str: s.clone() ++ "!"
 fn pick(c: bool, a: &str, b: &str) -> &str: if c: a else: b
 fn call0(f: fn() -> str) -> str: f()
 fn len2(r: &&str) -> i64: r.len()
-fn name_text(n: &Name) -> str: n as str
+// §4.5 (D75): a cast through a reference borrows, so `n as str` is a
+// `&str` view of the Name's bytes — the function returns that view.
+fn name_text(n: &Name) -> &str: n as str
 
 type Named { name: str, n: i32 }
 impl Named:
