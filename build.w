@@ -3029,9 +3029,14 @@ pub fn build(ctx: BuildCtx) -> Build:
     emit_c_roundtrip = emit_c_roundtrip.dep("compiler-version-sources")
     out = out.add_target(emit_c_roundtrip)
 
+    // The file lanes (behavior, compile-error, spec, phase, codegen) are not
+    // pooled. A pooled test lane gets cores / pool width children (2 of 18
+    // here), so the lane left last in a wave, behavior-tests with 1486 files,
+    // ran 2 wide for minutes on an idle machine: 243 s pooled against 45 s at
+    // full width. Unpooled, each runs alone with the full core window, one
+    // after another; their children are 57-300 MB, so full width is safe.
     var behavior_tests = target_new(.Test, "behavior-tests", "test/behavior/*.w")
     behavior_tests = behavior_tests.arg("compiler=" ++ release_compiler_bin("with"))
-    behavior_tests = behavior_tests.allow_parallel()
     behavior_tests = behavior_tests.dep("build")
     out = out.add_target(behavior_tests)
 
@@ -3136,21 +3141,18 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(abi_hash_check)
 
     var native_compile_error_tests = target_new(.Test, "native-compile-error-tests", "test/compile_errors/*.w")
-    native_compile_error_tests = native_compile_error_tests.allow_parallel()
     native_compile_error_tests = native_compile_error_tests.arg("compiler=" ++ release_compiler_bin("with"))
     native_compile_error_tests = native_compile_error_tests.dep("build")
     native_compile_error_tests = native_compile_error_tests.dep("selfcheck")
     out = out.add_target(native_compile_error_tests)
 
     var native_codegen_tests = target_new(.Test, "native-codegen-tests", "test/codegen/*.w")
-    native_codegen_tests = native_codegen_tests.allow_parallel()
     native_codegen_tests = native_codegen_tests.arg("compiler=" ++ release_compiler_bin("with"))
     native_codegen_tests = native_codegen_tests.dep("build")
     native_codegen_tests = native_codegen_tests.dep("selfcheck")
     out = out.add_target(native_codegen_tests)
 
     var native_spec_tests = target_new(.Test, "native-spec-tests", "test/spec/*.w")
-    native_spec_tests = native_spec_tests.allow_parallel()
     native_spec_tests = native_spec_tests.arg("compiler=" ++ release_compiler_bin("with"))
     native_spec_tests = native_spec_tests.dep("build")
     native_spec_tests = native_spec_tests.dep("selfcheck")
@@ -3176,7 +3178,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(wasm_tests)
 
     var native_phase_tests = target_new(.Test, "native-phase-tests", "test/phase/*.w")
-    native_phase_tests = native_phase_tests.allow_parallel()
     native_phase_tests = native_phase_tests.arg("compiler=" ++ release_compiler_bin("with"))
     native_phase_tests = native_phase_tests.dep("build")
     native_phase_tests = native_phase_tests.dep("selfcheck")
