@@ -10,6 +10,9 @@
 use CiIR
 use CiPrint
 use CImport
+use Lexer
+use Token
+use Parser
 use std.string.StringBuilder
 
 extern fn with_write_stdout(s: &str) -> Unit
@@ -536,6 +539,7 @@ fn ci_migrate_write_shared_defs(output_dir: &str):
     if rc != 0:
         eprint("migrate: failed to write shared defs: " ++ defs_path)
     else:
+        ci_migrate_writes_note_path(defs_path)
         eprint("migrate: wrote shared defs: " ++ defs_path)
 
 fn ci_migrate_write_shared_fragment(path: &str):
@@ -1239,6 +1243,8 @@ fn ci_migrate_file_body(input_path: &str, output_path: &str, project_active: boo
 
     // Write output
     let write_result = with_fs_write_file(output_path, output)
+    if write_result == 0:
+        ci_migrate_writes_note_path(output_path)
     if write_result != 0:
         eprint("migrate: failed to write " ++ output_path)
         g_migrate_macro_values = HashMap.new()
@@ -1259,7 +1265,10 @@ pub fn migrate_c_file(input_path_arg: &str, output_path_arg: &str) -> i32:
     let input_path = ci_migrate_fs_path(input_path_arg)
     let output_path = ci_migrate_fs_path(output_path_arg)
     var project = CiProject.new()
-    ci_migrate_file_inner(input_path, output_path, false, &project)
+    ci_migrate_writes_reset()
+    let rc = ci_migrate_file_inner(input_path, output_path, false, &project)
+    if rc != 0: return rc
+    ci_migrate_apply_writes_clauses()
 
 // Every path the migrator handles is spelled with `/`: the Clang bridge
 // rewrites every location and file name it hands up (its path boundary),
@@ -1473,7 +1482,7 @@ fn ci_migrate_directory_filewise(input_dir: &str, output_dir: &str, files: &Vec[
         i = i + 1
     ci_migrate_merge_shared_fragment_texts(output_dir, fragments)
     eprint(f"migrate: {migrated}/{files.len() as i32} files translated from {input_dir} -> {output_dir}")
-    if migrated == 0: 1 else: 0
+    if migrated == 0: 1 else: ci_migrate_apply_writes_clauses()
 
 // Translate a directory of .c files to .w files.
 pub fn migrate_c_directory(input_dir_arg: &str, output_dir_arg: &str, exclude_basenames: &str) -> i32:
@@ -1481,6 +1490,7 @@ pub fn migrate_c_directory(input_dir_arg: &str, output_dir_arg: &str, exclude_ba
     let output_dir = ci_migrate_fs_path(output_dir_arg)
     g_migrate_fn_translated_total = 0
     g_migrate_directory_input_dir = with_str_clone_ref(input_dir)
+    ci_migrate_writes_reset()
     if ci_migrate_shared_defs_active():
         ci_migrate_shared_defs_reset()
     // Create output directory
@@ -1543,7 +1553,165 @@ pub fn migrate_c_directory(input_dir_arg: &str, output_dir_arg: &str, exclude_ba
         eprint(f"migrate: {files_migrated}/{files_scanned} files, {g_migrate_fn_translated_total}/{fn_total} functions translated{file_note}")
         return 1
     eprint(f"migrate: {files_migrated}/{files_scanned} files, {fn_total} functions translated from {input_dir} -> {output_dir}")
-    if files_migrated == 0: 1 else: 0
+    if files_migrated == 0: 1 else: ci_migrate_apply_writes_clauses()
+
+// ── `writes` clauses (§21.1 rule 1, Eric 2026-09-29) ────────────
+//
+// An exported function's writes of exported globals are its declared,
+// checked contract: `pub fn f() -> T writes G {`, the declaration's last
+// clause, and a bundle build refuses one whose body writes an exported
+// global its clause omits. The migrator writes that clause for every
+// exported function that writes an exported global, itself or through the
+// corpus functions it calls. Whether it does is known only once the whole
+// corpus is printed (a caller's file may come first), so each exported
+// signature carries a marker, and ci_migrate_apply_writes_clauses replaces
+// it once every file is written. The facts come from the migrator's own
+// output, read with the compiler's Lexer: a write is an exported global
+// (`pub var` in the output) that roots an assignment's target
+// (`G = …`, `G.f[i] += …`; parser_compound_assign_op) or is taken by
+// `&raw mut` — what Sema counts as a write of the forms the migrator prints;
+// migrated locals and parameters are prefixed (`__local_`, `__param_`), so
+// no local shadows a global. A write the scan misses is no hazard: the
+// bundle build refuses the function with the literal fix-it. A
+// one-file migration (migrate_one) sees only that file's callees.
+var g_migrate_writes_fn_names: Vec[str] = Vec.new()
+var g_migrate_writes_fn_bodies: Vec[str] = Vec.new()
+var g_migrate_writes_paths: Vec[str] = Vec.new()
+
+fn ci_migrate_writes_mark(name: &str) -> str: "@@with-writes:" ++ name ++ "@@"
+
+fn ci_migrate_writes_reset():
+    g_migrate_writes_fn_names = Vec.new()
+    g_migrate_writes_fn_bodies = Vec.new()
+    g_migrate_writes_paths = Vec.new()
+
+fn ci_migrate_writes_note_path(path: &str):
+    if not g_migrate_writes_paths.contains(path):
+        g_migrate_writes_paths.push(with_str_clone_ref(path))
+
+fn ci_migrate_token_text(text: &str, tokens: &TokenList, i: i32) -> str:
+    text.slice(tokens.get_start(i) as i64, tokens.get_end(i) as i64)
+
+// The token after a place's projections from `k` (`.f`, `.F`, `[…]`).
+fn ci_migrate_skip_place_projections(tokens: &TokenList, k0: i32) -> i32:
+    var k = k0
+    let n = tokens.len()
+    while k < n:
+        let tag = tokens.get_tag(k)
+        if tag == TokenKind.TK_DOT_IDENT:
+            k = k + 1
+        else if tag == TokenKind.TK_DOT and k + 1 < n and tokens.get_tag(k + 1) == TokenKind.TK_IDENT:
+            k = k + 2
+        else if tag == TokenKind.TK_L_BRACKET:
+            var depth = 0
+            while k < n:
+                let t = tokens.get_tag(k)
+                if t == TokenKind.TK_L_BRACKET: depth = depth + 1
+                if t == TokenKind.TK_R_BRACKET:
+                    depth = depth - 1
+                    if depth == 0:
+                        break
+                k = k + 1
+            k = k + 1
+        else:
+            break
+    k
+
+// Whether token `i` (a global's name) is taken by `&raw mut`, through
+// grouping parentheses.
+fn ci_migrate_taken_raw_mut(text: &str, tokens: &TokenList, i: i32) -> bool:
+    var j = i - 1
+    while j >= 0 and tokens.get_tag(j) == TokenKind.TK_L_PAREN:
+        j = j - 1
+    j >= 2 and tokens.get_tag(j) == TokenKind.TK_KW_MUT and tokens.get_tag(j - 1) == TokenKind.TK_IDENT and ci_migrate_token_text(text, tokens, j - 1) == "raw" and tokens.get_tag(j - 2) == TokenKind.TK_AMPERSAND
+
+// Replace every exported signature's marker with its `writes` clause (or
+// nothing), over every file this migration wrote. 0 on success.
+fn ci_migrate_apply_writes_clauses() -> i32:
+    // The exported globals: `pub var` in the output.
+    var globals: HashMap[str, i32] = HashMap.new()
+    for pi in 0..g_migrate_writes_paths.len() as i32:
+        let text = with_fs_read_file(g_migrate_writes_paths[pi])
+        var lexer = Lexer.init(text, 0)
+        let tokens = lexer.tokenize()
+        for i in 0..tokens.len() - 2:
+            if tokens.get_tag(i) == TokenKind.TK_KW_PUB and tokens.get_tag(i + 1) == TokenKind.TK_KW_VAR and tokens.get_tag(i + 2) == TokenKind.TK_IDENT:
+                globals.insert(ci_migrate_token_text(text, &tokens, i + 2), 1)
+    var fn_index: HashMap[str, i32] = HashMap.new()
+    for fi in 0..g_migrate_writes_fn_names.len() as i32:
+        fn_index.insert(with_str_clone_ref(g_migrate_writes_fn_names[fi]), fi)
+    // Each function's direct writes and corpus callees, "|a|b|" sets.
+    var writes: Vec[str] = Vec.new()
+    var callees: Vec[str] = Vec.new()
+    for fi in 0..g_migrate_writes_fn_bodies.len() as i32:
+        let body = g_migrate_writes_fn_bodies[fi]
+        var lexer = Lexer.init(body, 0)
+        let tokens = lexer.tokenize()
+        var w = "|"
+        var c = "|"
+        for i in 0..tokens.len():
+            if tokens.get_tag(i) != TokenKind.TK_IDENT or (i > 0 and tokens.get_tag(i - 1) == TokenKind.TK_DOT):
+                continue
+            let name = ci_migrate_token_text(body, &tokens, i)
+            if globals.contains(name):
+                let after = ci_migrate_skip_place_projections(&tokens, i + 1)
+                let assigned = after < tokens.len() and (tokens.get_tag(after) == TokenKind.TK_EQ or parser_compound_assign_op(tokens.get_tag(after)) >= 0)
+                if (assigned or ci_migrate_taken_raw_mut(body, &tokens, i)) and ci_find_str(w, "|" ++ name ++ "|") < 0:
+                    w = w ++ name ++ "|"
+            else if fn_index.contains(name) and i + 1 < tokens.len() and tokens.get_tag(i + 1) == TokenKind.TK_L_PAREN and ci_find_str(c, "|" ++ name ++ "|") < 0:
+                c = c ++ name ++ "|"
+        writes.push(w)
+        callees.push(c)
+    // Transitively: a function writes what every corpus callee writes.
+    var changed = true
+    while changed:
+        changed = false
+        for fi in 0..writes.len() as i32:
+            let calls = callees[fi].split("|")
+            for ci in 0..calls.len() as i32:
+                if calls[ci].len() == 0 or not fn_index.contains(calls[ci]):
+                    continue
+                let callee_writes = writes[fn_index.get(calls[ci]).unwrap()].split("|")
+                for wi in 0..callee_writes.len() as i32:
+                    let g = callee_writes[wi]
+                    if g.len() > 0 and ci_find_str(writes[fi], "|" ++ g ++ "|") < 0:
+                        writes[fi] = writes[fi] ++ g ++ "|"
+                        changed = true
+    // The markers, replaced.
+    for pi in 0..g_migrate_writes_paths.len() as i32:
+        let path = g_migrate_writes_paths[pi]
+        var text = with_fs_read_file(path)
+        if ci_find_str(text, "@@with-writes:") < 0:
+            continue
+        for fi in 0..g_migrate_writes_fn_names.len() as i32:
+            let mark = ci_migrate_writes_mark(g_migrate_writes_fn_names[fi])
+            if ci_find_str(text, mark) < 0:
+                continue
+            // Sorted by name, so the clause is deterministic.
+            let parts = writes[fi].split("|")
+            var used: Vec[bool] = Vec.new()
+            for wi in 0..parts.len() as i32:
+                used.push(parts[wi].len() == 0)
+            var clause = ""
+            var printed = 0
+            while true:
+                var pick = -1
+                for wi in 0..parts.len() as i32:
+                    if not used[wi] and (pick < 0 or ci_str_compare(parts[wi], parts[pick]) < 0):
+                        pick = wi
+                if pick < 0:
+                    break
+                used[pick] = true
+                clause = clause ++ (if printed == 0: " writes " else: ", ") ++ parts[pick]
+                printed = printed + 1
+            text = text.replace(mark, clause)
+        if ci_find_str(text, "@@with-writes:") >= 0:
+            eprint("migrate: " ++ path ++ ": a `writes` clause marker has no recorded function (the migrator lost a definition)")
+            return 1
+        if with_fs_write_file(path, text) != 0:
+            eprint("migrate: failed to write " ++ path)
+            return 1
+    0
 
 // Translate a function with body — key difference from ci_translate_function:
 // 1. Translates ALL functions, not just static inline
@@ -1740,9 +1908,16 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: &str, pr
         let body_for_emit = if ret == "Unit" and ci_migrate_text_is_blank(body): "    return\n" else: body
         let visibility = if g_migrate_no_c_export != 0 and (storage != CX_SC_STATIC or header_owner.len() > 0): "pub " else: ""
         let fn_keyword = visibility ++ if ci_migrate_extern_fn_call_requires_unsafe(safe_name): "unsafe fn " else: "fn "
+        // §21.1 rule 1: every function is recorded for the transitive write
+        // scan; an exported one's `writes` clause, its last clause, is
+        // filled in once the whole corpus is printed
+        // (ci_migrate_apply_writes_clauses).
+        g_migrate_writes_fn_names.push(with_str_clone_ref(safe_name))
+        g_migrate_writes_fn_bodies.push(with_str_clone_ref(body_for_emit))
+        let writes_mark = if visibility.len() > 0: ci_migrate_writes_mark(safe_name) else: ""
         if migrate_prefer_brace():
-            return export_prefix ++ fn_keyword ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ " {\n" ++ body_for_emit ++ "}\n\n"
-        return export_prefix ++ fn_keyword ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ ":\n" ++ body_for_emit ++ "\n"
+            return export_prefix ++ fn_keyword ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ writes_mark ++ " {\n" ++ body_for_emit ++ "}\n\n"
+        return export_prefix ++ fn_keyword ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ writes_mark ++ ":\n" ++ body_for_emit ++ "\n"
 
     // Any body translation failure is fatal. Never emit partial output that
     // merely comments out the source function.

@@ -16,10 +16,16 @@ fn main:
     let w = q.into_word()
     let xs: [3]i32 = [1, 2, 3]
     COUNTER = COUNTER + 5
+    // §21.1 rule 1: a call of a bundle function writes exactly its declared
+    // set — `add` declares none, `bump` writes COUNTER — so a view of
+    // COUNTER lives across `add` and ends before `bump`.
+    let seen = &COUNTER
+    let counted = add(p) + *seen
+    bump()
     let packet = Packet { tag: 7, word: 42 }
     // §12.4 (D75): a consuming closure crosses to the `once` parameter the
     // interface records; a plain one takes a closure that consumes nothing.
     let word = "four".clone()
     let once_len = call_once(() => owned_len(word))
     let twice = call_twice(() => 3)
-    print(f"{a} {s} {take(p)} {table_at(2)} {K} {TABLE[1]} {sum_slice(xs)} {level_value(Level.High)} {GREETING.len()} {w} {COUNTER} {packet_word(packet)} {sizeof[Packet]()} {once_len} {twice}")
+    print(f"{a} {s} {take(p)} {table_at(2)} {K} {TABLE[1]} {sum_slice(xs)} {level_value(Level.High)} {GREETING.len()} {w} {COUNTER} {packet_word(packet)} {sizeof[Packet]()} {once_len} {twice} {counted}")

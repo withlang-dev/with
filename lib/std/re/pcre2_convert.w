@@ -29,7 +29,7 @@ use std.re.pcre2_study
 use std.re.pcre2_valid_utf
 use std.re.pcre2_xclass
 
-pub unsafe fn pcre2_pattern_convert_8(__param_pattern: *const u8, __param_plength: c_ulong, __param_options: c_uint, __param_buffptr: *mut *mut u8, __param_bufflenptr: *mut c_ulong, __param_ccontext: *mut pcre2_real_convert_context_8) -> c_int {
+pub unsafe fn pcre2_pattern_convert_8(__param_pattern: *const u8, __param_plength: c_ulong, __param_options: c_uint, __param_buffptr: *mut *mut u8, __param_bufflenptr: *mut c_ulong, __param_ccontext: *mut pcre2_real_convert_context_8) -> c_int writes _pcre2_default_convert_context_8 {
     var __local_pattern = __param_pattern
     var __local_plength = __param_plength
     var __local_ccontext = __param_ccontext

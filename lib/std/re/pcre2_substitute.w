@@ -29,7 +29,7 @@ use std.re.pcre2_study
 use std.re.pcre2_valid_utf
 use std.re.pcre2_xclass
 
-pub unsafe fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *const u8, __param_length: c_ulong, __param_start_offset: c_ulong, __param_options: c_uint, __param_match_data: *mut pcre2_real_match_data_8, __param_mcontext: *mut pcre2_real_match_context_8, __param_replacement: *const u8, __param_rlength: c_ulong, __param_buffer: *mut u8, __param_blength: *mut c_ulong) -> c_int {
+pub unsafe fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *const u8, __param_length: c_ulong, __param_start_offset: c_ulong, __param_options: c_uint, __param_match_data: *mut pcre2_real_match_data_8, __param_mcontext: *mut pcre2_real_match_context_8, __param_replacement: *const u8, __param_rlength: c_ulong, __param_buffer: *mut u8, __param_blength: *mut c_ulong) -> c_int writes _pcre2_default_match_context_8 {
     var __local_subject = __param_subject
     var __local_length = __param_length
     var __local_start_offset = __param_start_offset

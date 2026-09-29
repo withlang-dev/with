@@ -3260,6 +3260,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     bundle_interface_tests = bundle_interface_tests.input("test/bundle_interface/lib/std/wi_refuse_const.w")
     bundle_interface_tests = bundle_interface_tests.input("test/bundle_interface/lib/std/wi_refuse_elision.w")
     bundle_interface_tests = bundle_interface_tests.input("test/bundle_interface/lib/std/wi_refuse_once.w")
+    bundle_interface_tests = bundle_interface_tests.input("test/bundle_interface/lib/std/wi_refuse_writes.w")
     bundle_interface_tests = bundle_interface_tests.input("test/bundle_interface/bad_once.wi")
     bundle_interface_tests = bundle_interface_tests.input("test/bundle_interface/body_in_wi.wi")
     bundle_interface_tests = bundle_interface_tests.input("test/bundle_interface/init_in_wi.wi")

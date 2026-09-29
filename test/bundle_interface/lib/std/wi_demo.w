@@ -34,6 +34,12 @@ pub const GREETING: str = "hi\n"
 pub let TABLE: [4]u8 = [1, 2, 3, 4]
 pub var COUNTER: i32 = 0
 pub fn add(p: &Pair) -> i32: p.a + p.b
+// §21.1 rule 1: an exported function's writes of exported globals are its
+// declared, checked contract (`writes`, the declaration's last clause); the
+// `.wi` prints it as written. `reserve` declares a write its body does not
+// make: a conservative contract, linted, not refused.
+pub fn bump() writes COUNTER: COUNTER = COUNTER + 1
+pub fn reserve() -> i32 writes COUNTER: 0
 pub fn take(p: Pair) -> i32: p.a * p.b
 pub fn table_at(i: i64) -> u8: TABLE[i]
 pub unsafe fn set_first(p: *mut Pair, v: i32) -> Unit: (*p).a = v

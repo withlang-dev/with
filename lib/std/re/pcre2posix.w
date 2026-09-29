@@ -17,7 +17,7 @@ use std.re.pcre2_error
 use std.re.pcre2_maketables
 use std.libc
 
-pub unsafe fn pcre2_regcomp(__param_preg: *mut regex_t, __param_pattern: *const i8, __param_cflags: c_int) -> c_int {
+pub unsafe fn pcre2_regcomp(__param_preg: *mut regex_t, __param_pattern: *const i8, __param_cflags: c_int) -> c_int writes _pcre2_default_compile_context_8 {
     var __local_erroffset: c_ulong
 
     var __local_patlen: c_ulong
@@ -127,7 +127,7 @@ pub unsafe fn pcre2_regcomp(__param_preg: *mut regex_t, __param_pattern: *const 
 
 }
 
-pub unsafe fn pcre2_regexec(__param_preg: *const regex_t, __param_string: *const i8, __param_nmatch: c_ulong, __param_pmatch: *mut regmatch_t, __param_eflags: c_int) -> c_int {
+pub unsafe fn pcre2_regexec(__param_preg: *const regex_t, __param_string: *const i8, __param_nmatch: c_ulong, __param_pmatch: *mut regmatch_t, __param_eflags: c_int) -> c_int writes _pcre2_default_match_context_8 {
     var __local_nmatch = __param_nmatch
     var __local_rc: c_int
 

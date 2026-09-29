@@ -1086,6 +1086,61 @@ impl Parser:
         self.pending_effect_params = Vec.new()
         self.pending_effect_bits = Vec.new()
 
+    // §21.1 rule 1 (D39, Eric 2026-09-29): `writes COUNTER, other.TOTAL`,
+    // a function's declared global write set — a checked contract, the same
+    // spelling in source and in a `.wi`, and always the declaration's last
+    // clause (after the return type and the where clause); the list ends at
+    // the body's `:` (or `{`, or the end of an interface declaration).
+    // `writes` is a contextual keyword, reserved only here: it opens the
+    // clause only when a name follows, so a `writes` identifier stays legal
+    // everywhere. Each entry is a global's name, optionally qualified by a
+    // namespace (`other.TOTAL`); Sema resolves it and refuses a field path
+    // (`CONFIG.limit`: whole globals only). Entries go onto
+    // The entries return as (qualifier sym or 0, name sym) pairs, held by
+    // the declaration's parse until its node exists (attach_global_writes):
+    // a nested `fn` in the body parses clauses of its own in between.
+    mut fn parse_optional_writes_clause() -> Vec[i32]:
+        var out: Vec[i32] = Vec.new()
+        if not self.is_ident_named("writes"):
+            return out
+        if self.pos + 1 >= self.tokens.len() or self.tokens.get_tag(self.pos + 1) != TokenKind.TK_IDENT:
+            return out
+        self.advance()
+        while true:
+            if self.peek() != TokenKind.TK_IDENT:
+                self.emit_error("expected a global's name in the `writes` clause")
+                return out
+            var segments: Vec[str] = Vec.new()
+            segments.push(self.source.slice(self.current_start() as i64, self.current_end() as i64))
+            self.advance()
+            while true:
+                if self.peek() == TokenKind.TK_DOT_IDENT:
+                    segments.push(self.source.slice((self.current_start() + 1) as i64, self.current_end() as i64))
+                    self.advance()
+                else if self.peek() == TokenKind.TK_DOT and self.pos + 1 < self.tokens.len() and self.tokens.get_tag(self.pos + 1) == TokenKind.TK_IDENT:
+                    self.advance()
+                    segments.push(self.source.slice(self.current_start() as i64, self.current_end() as i64))
+                    self.advance()
+                else:
+                    break
+            var qualifier = ""
+            for si in 0..segments.len() as i32 - 1:
+                qualifier = qualifier ++ (if si == 0: "" else: ".") ++ segments[si]
+            out.push(if qualifier.len() == 0: 0 else: self.intern.intern(qualifier))
+            out.push(self.intern.intern(segments[segments.len() as i32 - 1]))
+            if self.peek() != TokenKind.TK_COMMA:
+                return out
+            self.advance()
+        out
+
+    // The clause's entries onto the declaration (Ast.add_fn_global_write),
+    // read by Sema (resolve_declared_global_writes) and the bundle emitter.
+    mut fn attach_global_writes(fn_node: NodeId, writes: &Vec[i32]):
+        var wi = 0
+        while wi + 1 < writes.len() as i32:
+            self.pool.add_fn_global_write(fn_node, writes[wi], writes[wi + 1])
+            wi = wi + 2
+
     mut fn parse_decl() -> NodeId:
         var is_pub = Visibility.Private
         let start = self.current_start()
@@ -1412,6 +1467,8 @@ impl Parser:
 
         // Where clause
         self.parse_optional_where_clause()
+        // §21.1 rule 1: the declared global write set, the last clause
+        let global_writes = self.parse_optional_writes_clause()
 
         // Body (D39: an interface declaration's slot holds NK_INTERFACE_BODY)
         let body = if self.interface_mode != 0: self.parse_interface_body(tp_count, is_async, is_gen, is_comptime) else: self.parse_body()
@@ -1486,6 +1543,7 @@ impl Parser:
             self.pool.mark_no_alloc_fn(fn_node)
             self.pending_no_alloc = 0
         self.attach_pending_effect_pins(fn_node)
+        self.attach_global_writes(fn_node, &global_writes)
         if self.pending_compiler_hook_phase != 0:
             self.pool.mark_compiler_hook_fn(fn_node, self.pending_compiler_hook_phase)
             self.pending_compiler_hook_phase = 0
@@ -1538,6 +1596,10 @@ impl Parser:
         if self.peek() == TokenKind.TK_ARROW:
             self.advance()
             ret_type = self.parse_type_expr()
+        // §21.1 rule 1: a `writes` clause states a body's writes; an extern
+        // fn's body is foreign, and its effects are modeled C's (D51).
+        if self.parse_optional_writes_clause().len() > 0:
+            self.emit_error("an extern fn has no With body to write globals: a `writes` clause belongs to a With function (§21.1 rule 1)")
 
         // Store: d0=name, d1=extra_start, d2=flags(bit0=variadic)
         // Extra already has [param_name, param_type, param_flags]* from parse_param_list
@@ -3491,6 +3553,8 @@ impl Parser:
                 ret_type = self.parse_type_expr()
 
             self.parse_optional_where_clause()
+            // §21.1 rule 1: the declared global write set, the last clause
+            let method_global_writes = self.parse_optional_writes_clause()
 
             var body: NodeId = 0 as NodeId
             if self.interface_mode != 0:
@@ -3523,6 +3587,7 @@ impl Parser:
             let meta_flags = flags + required_param_count * FN_META_REQUIRED_UNIT
             let final_m_tp_start = if m_tp_count > 0: m_tp_start else: 0
             self.pool.add_fn_meta(fn_node, meta_flags, ret_type, m_params_start, param_count, final_m_tp_start, m_tp_count)
+            self.attach_global_writes(fn_node, &method_global_writes)
             if self.pending_iter_of_self != 0:
                 self.pool.mark_iter_of_self_fn(fn_node)
                 self.pending_iter_of_self = 0
@@ -3583,25 +3648,7 @@ impl Parser:
 
         lhs
 
-    fn compound_assign_op() -> i32:
-        let t = self.peek()
-        if t == TokenKind.TK_PLUS_EQ: return BinaryOp.OP_ADD
-        if t == TokenKind.TK_MINUS_EQ: return BinaryOp.OP_SUB
-        if t == TokenKind.TK_STAR_EQ: return BinaryOp.OP_MUL
-        if t == TokenKind.TK_SLASH_EQ: return BinaryOp.OP_DIV
-        if t == TokenKind.TK_PERCENT_EQ: return BinaryOp.OP_MOD
-        if t == TokenKind.TK_AMP_EQ: return BinaryOp.OP_BIT_AND
-        if t == TokenKind.TK_PIPE_EQ: return BinaryOp.OP_BIT_OR
-        if t == TokenKind.TK_CARET_EQ: return BinaryOp.OP_BIT_XOR
-        if t == TokenKind.TK_LT_LT_EQ: return BinaryOp.OP_SHL
-        if t == TokenKind.TK_GT_GT_EQ: return BinaryOp.OP_SHR
-        if t == TokenKind.TK_PLUS_WRAP_EQ: return BinaryOp.OP_ADD_WRAP
-        if t == TokenKind.TK_MINUS_WRAP_EQ: return BinaryOp.OP_SUB_WRAP
-        if t == TokenKind.TK_STAR_WRAP_EQ: return BinaryOp.OP_MUL_WRAP
-        if t == TokenKind.TK_PLUS_SAT_EQ: return BinaryOp.OP_ADD_SAT
-        if t == TokenKind.TK_MINUS_SAT_EQ: return BinaryOp.OP_SUB_SAT
-        if t == TokenKind.TK_STAR_SAT_EQ: return BinaryOp.OP_MUL_SAT
-        -1
+    fn compound_assign_op() -> i32: parser_compound_assign_op(self.peek())
 
     // ── Pratt precedence climbing ────────────────────────────────────
 
@@ -9238,3 +9285,25 @@ fn parse_i64(text: &str) -> i64:
             clean = clean ++ str_from_byte(ch)
         i = i + 1
     with_parse_i64_ref(clean)
+
+// The binary operator a compound assignment token applies (`+=` is
+// OP_ADD), -1 for a token that is none. The one table: the parser's
+// assignment grammar and the C migrator's write scan (CiMigrate) read it.
+pub fn parser_compound_assign_op(t: i32) -> i32:
+    if t == TokenKind.TK_PLUS_EQ: return BinaryOp.OP_ADD
+    if t == TokenKind.TK_MINUS_EQ: return BinaryOp.OP_SUB
+    if t == TokenKind.TK_STAR_EQ: return BinaryOp.OP_MUL
+    if t == TokenKind.TK_SLASH_EQ: return BinaryOp.OP_DIV
+    if t == TokenKind.TK_PERCENT_EQ: return BinaryOp.OP_MOD
+    if t == TokenKind.TK_AMP_EQ: return BinaryOp.OP_BIT_AND
+    if t == TokenKind.TK_PIPE_EQ: return BinaryOp.OP_BIT_OR
+    if t == TokenKind.TK_CARET_EQ: return BinaryOp.OP_BIT_XOR
+    if t == TokenKind.TK_LT_LT_EQ: return BinaryOp.OP_SHL
+    if t == TokenKind.TK_GT_GT_EQ: return BinaryOp.OP_SHR
+    if t == TokenKind.TK_PLUS_WRAP_EQ: return BinaryOp.OP_ADD_WRAP
+    if t == TokenKind.TK_MINUS_WRAP_EQ: return BinaryOp.OP_SUB_WRAP
+    if t == TokenKind.TK_STAR_WRAP_EQ: return BinaryOp.OP_MUL_WRAP
+    if t == TokenKind.TK_PLUS_SAT_EQ: return BinaryOp.OP_ADD_SAT
+    if t == TokenKind.TK_MINUS_SAT_EQ: return BinaryOp.OP_SUB_SAT
+    if t == TokenKind.TK_STAR_SAT_EQ: return BinaryOp.OP_MUL_SAT
+    -1

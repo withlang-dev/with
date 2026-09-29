@@ -82,7 +82,7 @@ fn tommy_haszero_u32(__param_value: c_uint) -> c_int {
 
 }
 
-pub unsafe fn compare(__param_void_a: *const c_void, __param_void_b: *const c_void) -> c_int {
+pub unsafe fn compare(__param_void_a: *const c_void, __param_void_b: *const c_void) -> c_int writes compare_counter {
     var __local_a: *const object = ((__param_void_a as *const object))
 
     var __local_b: *const object = ((__param_void_b as *const object))
@@ -101,7 +101,7 @@ pub unsafe fn compare(__param_void_a: *const c_void, __param_void_b: *const c_vo
 
 }
 
-pub unsafe fn compare_vector(__param_void_a: *const c_void, __param_void_b: *const c_void) -> c_int {
+pub unsafe fn compare_vector(__param_void_a: *const c_void, __param_void_b: *const c_void) -> c_int writes compare_counter {
     var __local_a: *const object_vector = ((__param_void_a as *const object_vector))
 
     var __local_b: *const object_vector = ((__param_void_b as *const object_vector))
@@ -149,7 +149,7 @@ fn nano() -> c_ulonglong {
 
 }
 
-pub fn rnd(__param_max: c_uint) -> c_uint {
+pub fn rnd(__param_max: c_uint) -> c_uint writes SEED {
     var __local_r__goto_208_11: c_uint = 0
 
     var __local_divider__goto_209_17: c_ulonglong = 0
@@ -234,7 +234,7 @@ pub fn cache_clear() -> Unit {
 
 }
 
-pub unsafe fn start(__param_str: *const i8) -> Unit {
+pub unsafe fn start(__param_str: *const i8) -> Unit writes compare_counter {
     cache_clear()
 
     (compare_counter = ((0 as c_uint)))
@@ -273,7 +273,7 @@ unsafe fn search_callback(__param_arg: *const c_void, __param_obj: *const c_void
 
 }
 
-pub fn test_hash() -> Unit {
+pub fn test_hash() -> Unit writes compare_counter {
     var __local_i: c_uint
 
     var __local_buffer: [16]u8
@@ -430,7 +430,7 @@ pub fn test_hash() -> Unit {
 
 }
 
-pub fn test_alloc() -> Unit {
+pub fn test_alloc() -> Unit writes compare_counter {
     var __local_size: c_uint = ((10000000 as c_uint))
 
     var __local_i: c_uint
@@ -537,7 +537,7 @@ pub unsafe fn test_list_order(__param_list: *mut tommy_node_struct) -> Unit {
 
 }
 
-pub fn test_list() -> Unit {
+pub fn test_list() -> Unit writes SEED, compare_counter {
     var __local_LIST: *mut object
 
     var __local_VECTOR: *mut object_vector
@@ -761,7 +761,7 @@ pub fn test_list() -> Unit {
 
 }
 
-pub fn test_tree() -> Unit {
+pub fn test_tree() -> Unit writes compare_counter {
     var __local_tree: tommy_tree_struct
 
     var __local_OBJ: *mut object_tree
@@ -975,7 +975,7 @@ pub fn test_tree() -> Unit {
 
 }
 
-pub fn test_array() -> Unit {
+pub fn test_array() -> Unit writes compare_counter {
     var __local_array: tommy_array_struct
 
     var __local_i: c_ulong
@@ -1045,7 +1045,7 @@ pub fn test_array() -> Unit {
 
 }
 
-pub fn test_arrayof() -> Unit {
+pub fn test_arrayof() -> Unit writes compare_counter {
     var __local_arrayof: tommy_arrayof_struct
 
     var __local_i: c_uint
@@ -1121,7 +1121,7 @@ pub fn test_arrayof() -> Unit {
 
 }
 
-pub fn test_arrayblk() -> Unit {
+pub fn test_arrayblk() -> Unit writes compare_counter {
     var __local_arrayblk: tommy_arrayblk_struct
 
     var __local_i: c_ulong
@@ -1191,7 +1191,7 @@ pub fn test_arrayblk() -> Unit {
 
 }
 
-pub fn test_arrayblkof() -> Unit {
+pub fn test_arrayblkof() -> Unit writes compare_counter {
     var __local_arrayblkof: tommy_arrayblkof_struct
 
     var __local_i: c_uint
@@ -1267,7 +1267,7 @@ pub fn test_arrayblkof() -> Unit {
 
 }
 
-pub fn test_hashtable() -> Unit {
+pub fn test_hashtable() -> Unit writes compare_counter {
     var __local_hashtable: tommy_hashtable_struct
 
     var __local_HASH: *mut object_hash
@@ -1462,7 +1462,7 @@ pub fn test_hashtable() -> Unit {
 
 }
 
-pub fn test_hashdyn() -> Unit {
+pub fn test_hashdyn() -> Unit writes compare_counter {
     var __local_hashdyn: tommy_hashdyn_struct
 
     var __local_HASH: *mut object_hash
@@ -1649,7 +1649,7 @@ pub fn test_hashdyn() -> Unit {
 
 }
 
-pub fn test_hashlin() -> Unit {
+pub fn test_hashlin() -> Unit writes compare_counter {
     var __local_hashlin: tommy_hashlin_struct
 
     var __local_HASH: *mut object_hash
@@ -1858,7 +1858,7 @@ pub fn test_hashlin() -> Unit {
 
 }
 
-pub fn test_trie() -> Unit {
+pub fn test_trie() -> Unit writes compare_counter {
     var __local_trie: tommy_trie_struct
 
     var __local_alloc: tommy_allocator_struct
@@ -2000,7 +2000,7 @@ pub fn test_trie() -> Unit {
 
 }
 
-pub fn test_trie_inplace() -> Unit {
+pub fn test_trie_inplace() -> Unit writes compare_counter {
     var __local_trie_inplace: tommy_trie_inplace_struct
 
     var __local_OBJ: *mut object_trie_inplace
@@ -2124,7 +2124,7 @@ pub fn test_trie_inplace() -> Unit {
 
 }
 
-pub fn main() -> c_int {
+pub fn main() -> c_int writes SEED, compare_counter {
     nano_init()
 
     printf(c"Tommy check program.\n".ptr)

@@ -20,6 +20,7 @@
 // are not part of a declaration's contract and are not printed.
 use Ast
 use Sema
+use SemaCheck
 use SemaDecl
 use FnAbi
 use compiler.BundleInterfaces
@@ -110,6 +111,12 @@ type BundleEmitter {
     // the fingerprint row of the method fn_text last printed for an impl
     last_fn_row: str,
     omitted: Vec[str],
+    // Sema's call graph by caller, for each function's global effects
+    // (fn_global_effects; D39 / §21.1 rule 1)
+    call_index: SemaGlobalCallIndex,
+    // every global the corpus declares, exported or private, by name
+    // (check_declared_global_writes)
+    corpus_global_names: HashMap[str, i32],
 }
 
 pub type BundleInterfaceText {
@@ -141,6 +148,8 @@ fn bx_new_emitter(corpus: &str, unlowered_globals: &Vec[str]) -> BundleEmitter:
         failed: false,
         last_fn_row: "",
         omitted: Vec.new(),
+        call_index: SemaGlobalCallIndex { head: HashMap.new(), next: Vec.new() },
+        corpus_global_names: HashMap.new(),
     }
 
 fn bx_str_less(a: &str, b: &str) -> bool: with_str_cmp_ref(a, b) < 0
@@ -603,6 +612,26 @@ impl BundleEmitter:
         if is_variadic:
             params = params ++ (if printed > 0: ", ..." else: "...")
             params_row = params_row ++ "...;"
+        // §21.1 rule 1 (D39, Eric 2026-09-29): an exported function's writes
+        // of exported globals are a declared, checked contract — never an
+        // inferred fact in the interface. The declared set is the function's
+        // `writes` clause (declared_global_writes); no clause declares none.
+        // From a source body the bundle build checks it against Sema's
+        // transitive write set (check_declared_global_writes). The `.wi`
+        // prints the clause exactly as written; its twin reprints the parsed
+        // clause, and the fingerprint carries the resolved set, so the two
+        // agree only when the printed contract is the declared one.
+        let declared = self.declared_global_writes(sema, node)
+        if self.failed:
+            return ""
+        let written_clause = self.written_writes_clause(sema, node)
+        if not ast.fn_decl_body_is_interface(node):
+            self.check_declared_global_writes(sema, sig, &declared, full, written_clause.len() > 0)
+            if self.failed:
+                return ""
+        var writes_row = ""
+        for wi in 0..declared.len() as i32:
+            writes_row = writes_row ++ declared[wi] ++ ";"
         let ret = self.spell(sema, sema.sig_return_type(sig))
         if self.failed:
             return ""
@@ -616,12 +645,14 @@ impl BundleEmitter:
             let dot = sema_str_find_char(full, '.')
             if dot >= 0:
                 printed_name = with_str_clone_ref(full.slice((dot + 1) as i64, full.len()))
+        // The `writes` clause is the declaration's last clause (§21.1 rule 1).
+        let writes_text = if written_clause.len() > 0: " " ++ written_clause else: ""
         var head = if must_use: "@[must_use]\n" else: ""
-        head = head ++ (if is_pub: "pub " else: "") ++ (if is_unsafe: "unsafe " else: "") ++ receiver ++ "fn " ++ printed_name ++ "(" ++ params ++ ") -> " ++ ret ++ "\n"
+        head = head ++ (if is_pub: "pub " else: "") ++ (if is_unsafe: "unsafe " else: "") ++ receiver ++ "fn " ++ printed_name ++ "(" ++ params ++ ") -> " ++ ret ++ writes_text ++ "\n"
         let vis = if is_pub: "pub" else: "priv"
         let unsafe_text = if is_unsafe: "1" else: "0"
         let must_use_text = if must_use: "must_use" else: "-"
-        let row = "fn\t" ++ mod_path ++ "\t" ++ full ++ "\t" ++ unsafe_text ++ "\t" ++ receiver_row ++ "\t" ++ must_use_text ++ "\tparams:" ++ params_row ++ "\tret:" ++ ret ++ f"\torigin:{origin}\tvis:" ++ vis ++ "\n"
+        let row = "fn\t" ++ mod_path ++ "\t" ++ full ++ "\t" ++ unsafe_text ++ "\t" ++ receiver_row ++ "\t" ++ must_use_text ++ "\tparams:" ++ params_row ++ "\tret:" ++ ret ++ f"\torigin:{origin}\tvis:" ++ vis ++ "\twrites:" ++ writes_row ++ "\n"
         if in_impl:
             self.last_fn_row = row
         else:
@@ -646,6 +677,88 @@ impl BundleEmitter:
         if (declared_full & EFF_CONSUME) == 0 or (inferred & (EFF_CONSUME | EFF_ESCAPE_VALUE)) != 0:
             return
         self.warnings.push(self.context ++ ": parameter '" ++ pname ++ "' declares [" ++ sema_effect_bits_text(declared_full) ++ "] but its body only [" ++ sema_effect_bits_text(inferred) ++ "]; declare it `&T` — the declaration is the contract (D39)")
+
+    // §21.1 rule 1 (Eric 2026-09-29): the exported globals a function's
+    // `writes` clause declares (Sema.resolve_declared_global_writes), as
+    // sorted "<module>#<name>" entries — empty for no clause. A clause
+    // naming a global that is no bundle export is refused: only exported
+    // globals are part of the interface, and a consumer could not resolve it.
+    mut fn declared_global_writes(sema: &Sema, node: i32) -> Vec[str]:
+        var out: Vec[str] = Vec.new()
+        let syms = sema.declared_global_write_syms(node)
+        for si in 0..syms.len() as i32:
+            let entries = self.exported_global_entries(sema, syms[si])
+            if entries.len() == 0:
+                self.refuse("`writes " ++ sema.pool_resolve(syms[si]) ++ "` names a global that is no bundle export: only a bundle's exported globals are part of its interface (§21.1 rule 1)")
+            for ei in 0..entries.len() as i32:
+                if not out.contains(entries[ei]):
+                    out.push(with_str_clone_ref(entries[ei]))
+        bx_sorted_strings(&out)
+
+    // The clause as its author wrote it (`writes COUNTER, other.TOTAL`), in
+    // source order, "" for none: the `.wi` prints exactly that spelling.
+    fn written_writes_clause(sema: &Sema, node: i32) -> str:
+        let ast = sema.ast
+        var out = ""
+        for wi in 0..ast.fn_global_write_count(node):
+            let qualifier = ast.fn_global_write_path(node, wi)
+            let name = with_str_clone_ref(sema.pool_resolve(ast.fn_global_write_name(node, wi)))
+            let entry = if qualifier != 0: sema.pool_resolve(qualifier) ++ "." ++ name else: name
+            out = out ++ (if wi == 0: "writes " else: ", ") ++ entry
+        out
+
+    // The exported globals `sym` names, as "<module>#<name>": this corpus's
+    // exports of that name (a write record names a global by its symbol,
+    // so every export of the name is listed — over-requiring a declaration
+    // only fails the build loudly, never lets a view dangle), else another
+    // bundle's interface global a `use` brought in (§21.1 rule 1, D39: a
+    // call of that bundle's function wrote it through its declared set).
+    fn exported_global_entries(sema: &Sema, sym: i32) -> Vec[str]:
+        let name = with_str_clone_ref(sema.pool_resolve(sym))
+        var out: Vec[str] = Vec.new()
+        for xi in 0..self.exports.len() as i32:
+            let export = self.exports[xi]
+            if export.kind == BX_GLOBAL and export.name == name:
+                out.push(export.mod_path ++ "#" ++ name)
+        if out.len() == 0 and sema.interface_global_index.contains(sym):
+            out.push(sema.interface_global_paths.get(sym).unwrap() ++ "#" ++ name)
+        out
+
+    // §21.1 rule 1 (D39, Eric 2026-09-29): an exported function's
+    // transitive writes of exported globals — this bundle's, and another
+    // bundle's through its functions' declared sets — must be a subset of
+    // its declared set, and no clause declares none: a write outside it
+    // fails the bundle build, naming the function, the global and the call
+    // path that writes it. A declared global the body does not write is a
+    // lint (a conservative contract reserving a future write). A private
+    // global is not part of the interface.
+    // The refusal offers the literal fix: "add 'writes COUNTER' to bump's
+    // declaration", or the name to append to an existing clause.
+    mut fn check_declared_global_writes(sema: &Sema, sig: i32, declared: &Vec[str], fn_name: &str, has_clause: bool):
+        let written = sema.fn_global_effects(sig, &self.call_index)
+        var actual: Vec[str] = Vec.new()
+        for wi in 0..written.len() as i32:
+            let sym = written[wi]
+            let name = with_str_clone_ref(sema.pool_resolve(sym))
+            let entries = self.exported_global_entries(sema, sym)
+            if entries.len() == 0:
+                // Neither an export of this bundle nor of another: a private
+                // corpus global, or a global of a module compiled from source
+                // beside the bundle — named, since a consumer can view it.
+                if not self.corpus_global_names.contains(name):
+                    self.warnings.push(self.context ++ ": writes `" ++ name ++ "` (" ++ sema.fn_global_write_chain(sig, sym, &self.call_index) ++ "), a global outside this bundle that is no bundle export: the write contract covers only exported globals (§21.1 rule 1)")
+                continue
+            for ei in 0..entries.len() as i32:
+                if actual.contains(entries[ei]):
+                    continue
+                actual.push(with_str_clone_ref(entries[ei]))
+                if not declared.contains(entries[ei]):
+                    let fix = if has_clause: "add '" ++ name ++ "' to " ++ fn_name ++ "'s `writes` clause" else: "add 'writes " ++ name ++ "' to " ++ fn_name ++ "'s declaration"
+                    self.refuse("writes exported global `" ++ name ++ "` (" ++ sema.fn_global_write_chain(sig, sym, &self.call_index) ++ ") but its declaration does not say so: a bundle function's global writes are a declared, checked contract, and no clause declares none (§21.1 rule 1, D39); " ++ fix)
+        for di in 0..declared.len() as i32:
+            if not actual.contains(declared[di]):
+                self.warnings.push(self.context ++ ": declares a write of `" ++ declared[di] ++ "` its body never makes (a conservative contract: every caller treats it as written)")
+
 
     mut fn emit_extern(sema: &Sema, di: i32, node: i32):
         let ast = sema.ast
@@ -1000,6 +1113,17 @@ impl BundleEmitter:
         if self.modules.len() == 0:
             self.refuse_global("bundle interface: no module under corpus '" ++ self.corpus ++ "' in this compilation (--bundle-corpus names a path under the embedded std tree, e.g. std/re)")
             return
+        // The storage first: a function's write contract is checked against
+        // the exported globals (check_declared_global_writes), so every
+        // global export is known before the first function prints.
+        self.call_index = sema.global_call_index()
+        for di in 0..dc:
+            let mod_path = with_str_clone_ref(self.decl_modules[di])
+            let decl = ast.get_decl(di) as i32
+            if mod_path.len() > 0 and ast.kind(decl) == NodeKind.NK_LET_DECL:
+                self.corpus_global_names.insert(with_str_clone_ref(sema.pool_resolve(ast.get_data0(decl))), 1)
+                self.current_module = with_str_clone_ref(mod_path)
+                self.emit_let(sema, di, decl)
         for di in 0..dc:
             let mod_path = with_str_clone_ref(self.decl_modules[di])
             if mod_path.len() == 0:
@@ -1013,7 +1137,6 @@ impl BundleEmitter:
                     self.refuse("is a selector import (`use a.b.{x}`); no interface spelling (Level 0)")
                 continue
             if kind == NodeKind.NK_LET_DECL:
-                self.emit_let(sema, di, decl)
                 continue
             if kind == NodeKind.NK_FN_DECL:
                 if sema.impl_node_for_method_decl(decl) != 0:

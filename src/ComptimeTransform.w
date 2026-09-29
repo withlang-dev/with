@@ -209,6 +209,9 @@ fn astpool_clone_deep(src: AstPool) -> AstPool:
         let effect_pin_count = src.fn_effect_pin_count(node)
         for pi in 0..effect_pin_count:
             out.add_fn_effect_pin(node, src.fn_effect_pin_param(node, pi), src.fn_effect_pin_bits(node, pi))
+        // §21.1 rule 1: a function's declared global write set.
+        for wi in 0..src.fn_global_write_count(node):
+            out.add_fn_global_write(node, src.fn_global_write_path(node, wi), src.fn_global_write_name(node, wi))
         // `in`/`not in` argument slots (#234). The extra array is copied verbatim
         // above, so the slot index remains valid in the cloned pool.
         let membership_slot = src.find_membership_arg(node)

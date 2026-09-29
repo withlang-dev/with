@@ -8188,6 +8188,9 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     let emitted_wi = ctx.fs().read_text(wi_path)
     if emitted_wi != expected_wi:
         return bs_fail(ctx, "emitted wi_demo.wi differs from test/bundle_interface/wi_demo.wi: " ++ bs_first_differing_line(expected_wi, emitted_wi))
+    // §21.1 rule 1: a declared write the body never makes is a lint.
+    rc = bs_assert_contains(ctx, built_bundle.stderr, "fn reserve: declares a write of `<embedded-std>/std/wi_demo.w#COUNTER` its body never makes", "superset `writes` clause linted")
+    if rc != 0: return rc
     let source_sha = bs_fingerprint_sha(ctx, source_fp)
     if source_sha.len() == 0: return bs_fail(ctx, "no source fingerprint written to " ++ source_fp)
     let obj_nm = bs_nm_output(ctx, nm_tool, obj_path, "bundle-interface-object")
@@ -8272,7 +8275,18 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     if built.rc != 0: return bs_fail(ctx, f"consumer build against the bundle interface failed with exit code {built.rc}")
     let ran = bs_run_binary_capture(ctx, consumer, "bundle-interface-consumer-run", 120000)
     if ran.rc != 0: return bs_fail(ctx, f"consumer linked against the bundle failed with exit code {ran.rc}")
-    rc = bs_assert_stdout_exact(ctx, ran, "18 7 80 3 7 2 6 200 3 3 5 42 5 4 6", "bundle interface consumer")
+    rc = bs_assert_stdout_exact(ctx, ran, "18 7 80 3 7 2 6 200 3 3 6 42 5 4 6 23", "bundle interface consumer")
+    if rc != 0: return rc
+
+    // §21.1 rule 1: a call of a bundle function writes exactly its declared
+    // set, read from the interface alone — a view of COUNTER live across
+    // `bump`, which declares `writes COUNTER`, is refused.
+    let bump_src = bs_join(case_dir, "view_across_bump.w")
+    rc = bs_write_fixture(ctx, bump_src, "use std.wi_demo\nfn main:\n    let r = &COUNTER\n    bump()\n    print(*r)\n", "view of a bundle global across a bundle function that declares writing it")
+    if rc != 0: return rc
+    let bump_build = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-writes-refused", bs_bundle_build_args(bump_src, bundle, bs_join(case_dir, "view_across_bump"), false), 120000)
+    if bump_build.rc == 0: return bs_fail(ctx, "a view of COUNTER live across `bump`, which declares `writes COUNTER`, was accepted")
+    rc = bs_assert_contains(ctx, bump_build.stderr, "call to `bump` mutates global `COUNTER` while `r` is a live view into it", "view refused across a bundle function that declares writing the global")
     if rc != 0: return rc
 
     // §12.4 (D75): across the boundary a consuming closure may reach only a
@@ -8320,6 +8334,14 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     rc = bs_expect_bundle_refusal(ctx, compiler_path, case_dir, "wi_refuse_elision", "fn choose: returns a reference with no unambiguous origin")
     if rc != 0: return rc
     rc = bs_expect_bundle_refusal(ctx, compiler_path, case_dir, "wi_refuse_once", "is declared `once`, but this body may invoke it more than once")
+    if rc != 0: return rc
+    // §21.1 rule 1 (D39): an exported function's global writes are a
+    // declared, checked contract; `bump` writes the exported COUNT through
+    // `step` and declares none, so the bundle build names the function, the
+    // global and the call path.
+    rc = bs_expect_bundle_refusal(ctx, compiler_path, case_dir, "wi_refuse_writes", "fn bump: writes exported global `COUNT` (`bump`, which calls `step`, which writes it) but its declaration does not say so")
+    if rc != 0: return rc
+    rc = bs_expect_bundle_refusal(ctx, compiler_path, case_dir, "wi_refuse_writes", "add 'writes COUNT' to bump's declaration")
     if rc != 0: return rc
 
     // Declaration only: the consumer's object references the bundle's

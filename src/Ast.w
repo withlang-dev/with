@@ -708,6 +708,13 @@ type AstPoolState {
     fn_effect_pin_counts: HashMap[i32, i32],   // fn_node → entry count
     fn_effect_pin_params: Vec[i32],            // param_name_sym
     fn_effect_pin_bits: Vec[i32],              // effect bitmask
+    // §21.1 rule 1 (D39): a function's declared global write set, its
+    // checked contract — (module path sym, 0 when the clause names the
+    // global in scope; name sym) pairs (Parser.attach_pending_global_writes).
+    fn_global_write_starts: HashMap[i32, i32],  // fn_node → first entry in fn_global_write_*
+    fn_global_write_counts: HashMap[i32, i32],  // fn_node → entry count
+    fn_global_write_paths: Vec[i32],            // module path sym
+    fn_global_write_names: Vec[i32],            // global name sym
     // NK_COPY_ARG nodes that require a .clone() call (type is Clone-only, not Copy)
     copy_arg_needs_clone: HashMap[i32, i32],   // node → 1
     // D61: type symbols whose Debug impl the compiler generated (a derive,
@@ -812,6 +819,10 @@ fn AstPool.new -> AstPool:
             fn_effect_pin_counts: HashMap.new(),
             fn_effect_pin_params: Vec.new(),
             fn_effect_pin_bits: Vec.new(),
+            fn_global_write_starts: HashMap.new(),
+            fn_global_write_counts: HashMap.new(),
+            fn_global_write_paths: Vec.new(),
+            fn_global_write_names: Vec.new(),
             copy_arg_needs_clone: HashMap.new(),
             generated_debug_type_syms: Vec.new(),
             frozen: 0,
@@ -1530,6 +1541,25 @@ impl AstPool:
             return 0
         let start = self.state.fn_effect_pin_starts.get(n).unwrap()
         self.state.fn_effect_pin_bits[(start + idx)]
+
+    // §21.1 rule 1: one global a function's write clause declares.
+    fn add_fn_global_write(node: NodeId, path_sym: i32, name_sym: i32):
+        let n = node as i32
+        if not self.state.fn_global_write_starts.contains(n):
+            self.state.fn_global_write_starts.insert(n, self.state.fn_global_write_paths.len() as i32)
+            self.state.fn_global_write_counts.insert(n, 0)
+        self.state.fn_global_write_paths.push(path_sym)
+        self.state.fn_global_write_names.push(name_sym)
+        let count: i32 = self.state.fn_global_write_counts.get(n).unwrap()
+        self.state.fn_global_write_counts.insert(n, count + 1)
+
+    fn fn_global_write_count(node: NodeId) -> i32: self.state.fn_global_write_counts.get(node as i32) ?? 0
+
+    fn fn_global_write_path(node: NodeId, idx: i32) -> i32:
+        self.state.fn_global_write_paths[self.state.fn_global_write_starts.get(node as i32).unwrap() + idx]
+
+    fn fn_global_write_name(node: NodeId, idx: i32) -> i32:
+        self.state.fn_global_write_names[self.state.fn_global_write_starts.get(node as i32).unwrap() + idx]
 
     // Record the extra-array slot holding the `contains` argument for an `in` node.
     fn set_membership_arg(node: NodeId, slot: i32):

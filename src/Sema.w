@@ -1039,10 +1039,14 @@ pub type Sema {
     // A function named as a value (`apply(change)`), keyed by the ident
     // node, to the signature Sema resolved it to (check_ident).
     fn_value_ident_sigs: HashMap[i32, i32],
-    // #1827: a function with no body in this compilation (a bundle interface
-    // declaration, D39), as [signature, declaration node, file]: it writes
-    // every global its bundle's interface exports.
-    global_interface_fns: Vec[i32],
+    // #1827: how many of global_dispatchers expand_global_dispatchers has
+    // given their call records; the rest are expanded on the next call.
+    global_dispatchers_expanded: i32,
+    // §21.1 rule 1: each declaration's resolved `writes` clause, keyed by
+    // its node, as an index into declared_write_syms_flat holding the count
+    // then the global symbols (resolve_declared_global_writes).
+    declared_write_starts: HashMap[i32, i32],
+    declared_write_syms_flat: Vec[i32],
     // #1827: bodies a call runs that the running program chooses — every
     // impl of a dyn method, every callable of a callable type, every drop a
     // type's drop runs — as [kind, a, b]; chained by `a` for lookup.
@@ -2773,7 +2777,9 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         global_view_call_checks: Vec.new(),
         current_effect_body: -1,
         fn_value_ident_sigs: sema_new_map_i32_i32(),
-        global_interface_fns: Vec.new(),
+        global_dispatchers_expanded: 0,
+        declared_write_starts: sema_new_map_i32_i32(),
+        declared_write_syms_flat: Vec.new(),
         global_dispatchers: Vec.new(),
         global_dispatcher_heads: sema_new_map_i32_i32(),
         global_dispatcher_next: Vec.new(),

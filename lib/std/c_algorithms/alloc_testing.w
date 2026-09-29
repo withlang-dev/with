@@ -2,7 +2,7 @@
 use std.c_algorithms.defs
 use std.libc
 
-pub fn alloc_test_malloc(__param_bytes: c_ulong) -> *mut c_void {
+pub fn alloc_test_malloc(__param_bytes: c_ulong) -> *mut c_void writes allocation_limit {
     var __local_header: *mut _BlockHeader
 
     var __local_ptr: *mut c_void
@@ -68,7 +68,7 @@ pub unsafe fn alloc_test_free(__param_ptr: *mut c_void) -> Unit {
 
 }
 
-pub unsafe fn alloc_test_realloc(__param_ptr: *mut c_void, __param_bytes: c_ulong) -> *mut c_void {
+pub unsafe fn alloc_test_realloc(__param_ptr: *mut c_void, __param_bytes: c_ulong) -> *mut c_void writes allocation_limit {
     var __local_header: *mut _BlockHeader
 
     var __local_new_ptr: *mut c_void
@@ -102,7 +102,7 @@ pub unsafe fn alloc_test_realloc(__param_ptr: *mut c_void, __param_bytes: c_ulon
 
 }
 
-pub fn alloc_test_calloc(__param_nmemb: c_ulong, __param_bytes: c_ulong) -> *mut c_void {
+pub fn alloc_test_calloc(__param_nmemb: c_ulong, __param_bytes: c_ulong) -> *mut c_void writes allocation_limit {
     var __local_result: *mut c_void
 
     var __local_total_bytes: c_ulong = ((((__param_nmemb as c_ulong) *% (__param_bytes as c_ulong)) as c_ulong))
@@ -120,7 +120,7 @@ pub fn alloc_test_calloc(__param_nmemb: c_ulong, __param_bytes: c_ulong) -> *mut
 
 }
 
-pub unsafe fn alloc_test_strdup(__param_string: *const i8) -> *mut i8 {
+pub unsafe fn alloc_test_strdup(__param_string: *const i8) -> *mut i8 writes allocation_limit {
     var __local_result: *mut c_char
 
     (__local_result = ((alloc_test_malloc((((strlen(__param_string) as c_ulong) +% (1 as c_ulong)) as c_ulong)) as *mut c_char)))
@@ -136,7 +136,7 @@ pub unsafe fn alloc_test_strdup(__param_string: *const i8) -> *mut i8 {
 
 }
 
-pub fn alloc_test_set_limit(__param_alloc_count: c_int) -> Unit {
+pub fn alloc_test_set_limit(__param_alloc_count: c_int) -> Unit writes allocation_limit {
     (allocation_limit = __param_alloc_count)
 
 }

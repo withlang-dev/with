@@ -23974,7 +23974,7 @@ fn display_modifiers() -> Unit {
 
 }
 
-pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
+pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int writes _pcre2_default_compile_context_8, _pcre2_default_convert_context_8, _pcre2_default_match_context_8 {
     var __local_argc = __param_argc
     var __local_yield___goto_3644_10: c_uint = 0
 
