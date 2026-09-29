@@ -1,7 +1,11 @@
-// D30 R2c: audit every `extern fn with_*` decl against the rt definition of
-// the same name. #761's corruption class is exactly this — one symbol whose
-// ABI contract is derived twice — so the rt def is truth and any decl that
-// disagrees is a live divergence.
+// D30 R2c: audit every `extern fn with_*` and `extern fn rt_*` decl against
+// the rt definition of the same name. #761's corruption class is exactly
+// this — one symbol whose ABI contract is derived twice — so the rt def is
+// truth and any decl that disagrees is a live divergence. The rt_* platform
+// seams count too: rt_core.w declares what darwin_aarch64.w & co. define,
+// and each is its own object, so nothing but this audit and the in-unit
+// check lane ever sees the two spellings side by side (rt_mmap's `u64`
+// against the platforms' `i64` sat silent until §4.2.6 refused it in-unit).
 //
 //   with run tools/rt_decl_audit.w        # from the repo root; exits 1 on any divergence
 //
@@ -40,10 +44,13 @@ fn scan(path: &str, want_extern: bool, aliases: &Vec[str]) -> Vec[str]:
     for i in 0..n:
         if toks.get_tag(i) != TokenKind.TK_KW_FN: continue
         if i + 1 >= n or toks.get_tag(i + 1) != TokenKind.TK_IDENT: continue
+        // A `c facade` row (`fn rt_libc_read` under a domain, no parameter
+        // list) describes a foreign extern; it is not a definition.
+        if i + 2 >= n or toks.get_tag(i + 2) != TokenKind.TK_L_PAREN: continue
         let is_extern = i > 0 and toks.get_tag(i - 1) == TokenKind.TK_KW_EXTERN
         if is_extern != want_extern: continue
         let name = text.slice(toks.get_start(i + 1) as i64, toks.get_end(i + 1) as i64)
-        if not name.starts_with("with_"): continue
+        if not (name.starts_with("with_") or name.starts_with("rt_")): continue
 
         var sig = "("
         var k = i + 2
@@ -153,17 +160,19 @@ for ri in 0..roots.len() as i32:
     for r in collect(roots[ri], true, &aliases):
         decls.push(owned(r))
 
+// One report per divergent decl: a platform seam such as rt_mmap has one
+// definition per backend, and a decl that disagrees with the contract
+// disagrees with all of them.
 var bad = 0
-for di in 0..defs.len() as i32:
-    let dname = field(defs[di], 0)
-    let dsig = field(defs[di], 1)
-    let dat = field(defs[di], 2)
-    for ei in 0..decls.len() as i32:
-        let ename = field(decls[ei], 0)
-        if ename != dname: continue
-        let esig = field(decls[ei], 1)
+for ei in 0..decls.len() as i32:
+    let ename = field(decls[ei], 0)
+    let esig = field(decls[ei], 1)
+    for di in 0..defs.len() as i32:
+        if field(defs[di], 0) != ename: continue
+        let dsig = field(defs[di], 1)
         if esig == dsig: continue
-        print(f"{dname}\n  def  {dsig}   [{dat}]\n  decl {esig}   [{field(decls[ei], 2)}]")
+        print(f"{ename}\n  def  {dsig}   [{field(defs[di], 2)}]\n  decl {esig}   [{field(decls[ei], 2)}]")
         bad = bad + 1
-print(f"-- {bad} divergent decls / {defs.len()} rt defs / {decls.len()} extern with_* decls")
+        break
+print(f"-- {bad} divergent decls / {defs.len()} rt defs / {decls.len()} extern with_*/rt_* decls")
 exit_code(if bad > 0: 1 else: 0)
