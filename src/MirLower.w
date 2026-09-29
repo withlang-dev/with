@@ -11,6 +11,7 @@ use Overflow
 use MathBuiltins
 use MirCore
 use SemaTypes
+use MirVector
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_eprint(s: &str) -> Unit
 
@@ -209,6 +210,9 @@ pub type MirBuilder = ephemeral {
     // the adjusted expression. While materializing that adjustment, lower the
     // same node once at its exact reference type without re-entering it.
     contextual_copy_raw_node: i32,
+    // §4.3d: the node whose own value a vector splat or lane conversion is
+    // being built from (MirVector.lower_vector_node).
+    vector_raw_node: i32,
     // D22 sidecars belong to a concrete checked signature, not merely to the
     // shared generic AST node. lower_fn_with_sig installs this identity before
     // any expression is lowered.
@@ -330,6 +334,7 @@ fn MirBuilder.init(sema: &Sema, ast: AstPool, pool: InternPool, fn_sym: i32) -> 
         cur_node: 0,
         expected_type: 0,
         contextual_copy_raw_node: 0,
+        vector_raw_node: 0,
         contextual_fact_sig_idx: -1,
         pipeline_receiver_override_node: 0,
         pipeline_receiver_override_place: -1,
@@ -2267,7 +2272,8 @@ impl MirBuilder:
     fn indexed_element_type(collection_tid: i32) -> i32:
         let resolved = self.sema.resolve_alias(collection_tid) as i32
         let tk = self.sema.get_type_kind(resolved)
-        if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE:
+        // §4.3d: a vector's lane.
+        if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE or tk == TypeKind.TY_VECTOR:
             return self.sema.get_type_d0(resolved)
         if tk == TypeKind.TY_STR:
             // A str is a byte buffer (§9120) and `s[i]` its element place
@@ -6073,6 +6079,9 @@ impl MirBuilder:
             return self.lower_expr_place(node)
         if kind == NodeKind.NK_CALL:
             return self.lower_call_place(node)
+        // §4.3d: a vector component or swizzle names no place.
+        if kind == NodeKind.NK_FIELD_ACCESS and self.sema.vector_ops.contains(node):
+            return -1
         if kind == NodeKind.NK_FIELD_ACCESS:
             let base_expr = self.ast.get_data0(node)
             let field_sym = self.ast.get_data1(node)
@@ -6808,6 +6817,11 @@ impl MirBuilder:
         // `S.A` is a variant value, not the field `A` of a place named `S`
         // (#1310: `S.A.tag()` projected off a type name and failed to
         // lower); the value falls through to the temporary below.
+        // §4.3d: a vector component or swizzle is a value, not a field.
+        if kind == NodeKind.NK_FIELD_ACCESS and self.sema.vector_ops.contains(node):
+            let sw_op = self.lower_expr(node)
+            let sw_ty = self.expr_type(node)
+            return self.materialize_operand(sw_op, sw_ty, self.ast.get_start(node))
         if kind == NodeKind.NK_FIELD_ACCESS and not self.is_enum_variant_path(node):
             return self.lower_field_access(node)
 
@@ -15876,6 +15890,11 @@ impl MirBuilder:
     mut fn lower_expr(node: i32) -> i32:
         if node == 0:
             return self.unit_operand()
+
+        // §4.3d: a splat, lane conversion or vector operation Sema decided.
+        let vector_operand = self.lower_vector_node(node)
+        if vector_operand >= 0:
+            return vector_operand
 
         if node != self.contextual_copy_raw_node and self.has_contextual_copy_adjustment(node) != 0:
             return self.lower_contextual_copy_adjustment(node)

@@ -27,8 +27,45 @@ pub enum TypeKind: i32:
     // struct on AAPCS64 Linux. Opaque to With code; Copy; passed to a
     // callee the way the target's C passes va_list (TypeLayout, FnAbi).
     TY_VA_LIST = 21
+    // §4.3d (D78): a SIMD vector, `Vector[N, T]`: d0 = the lane type, d1 = N.
+    // Copy; laid out as the target's vector of that shape (TypeLayout) and
+    // lowered to LLVM `<N x T>`.
+    TY_VECTOR = 22
+    // §4.3d: `Mask[N, W]`, N lanes of a W-bit boolean (all ones or zero):
+    // d0 = W (8, 16, 32 or 64), d1 = N. What a lane-wise comparison yields.
+    TY_MASK = 23
 
 pub type TypeId = i32
+
+// §4.3d (D78): the vector operation Sema decided for a node
+// (Sema.vector_ops); MirLower lowers it and never re-derives it.
+pub enum VectorOp: i32:
+    // `f32x4(a, b, c, d)` / `Vector[N, T](...)`: the call's arguments are
+    // the lanes, in order.
+    CONSTRUCT = 1
+    // `f32x4.splat(s)`: the one argument in every lane.
+    SPLAT = 2
+    // `Vector[N, T].from_bits(u)` and `v.bits()`: the same bytes as the
+    // other lane type.
+    FROM_BITS = 3
+    BITS = 4
+    // `select(m, a, b)`: a's lane where m's is set, else b's.
+    SELECT = 5
+    // `m.all()` / `m.any()`.
+    ALL = 6
+    ANY = 7
+    // `v.reduce_add()` … `v.reduce_xor()`.
+    REDUCE_ADD = 8
+    REDUCE_MUL = 9
+    REDUCE_MIN = 10
+    REDUCE_MAX = 11
+    REDUCE_AND = 12
+    REDUCE_OR = 13
+    REDUCE_XOR = 14
+    // `v.x`, `v.wzyx`: the lanes Sema.vector_swizzles names.
+    SWIZZLE = 15
+
+impl Copy for VectorOp
 
 pub enum BorrowKind: i32:
     SHARED = 0

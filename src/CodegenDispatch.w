@@ -12,6 +12,8 @@ use MathBuiltins
 use std.builtins.int_to_string
 use MirCore
 use SemaTypes
+use CodegenVector
+use TypeLayout
 
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_eprint(s: &str) -> Unit
@@ -211,6 +213,11 @@ impl Codegen:
             return wl_i1_type(self.context)
         if tk == TypeKind.TY_VA_LIST:
             return self.c_va_list_llvm_type()
+        // §4.3d: `<N x T>`; a mask is `<N x iW>`.
+        if tk == TypeKind.TY_VECTOR:
+            return wl_vector_type(self.mir_sema_type_to_llvm(self.mir_type_d0_at(resolved)), self.mir_type_d1_at(resolved))
+        if tk == TypeKind.TY_MASK:
+            return wl_vector_type(wl_int_type_n(self.context, self.mir_type_d0_at(resolved)), self.mir_type_d1_at(resolved))
         if tk == TypeKind.TY_STR:
             let str_sym = self.intern.intern("str")
             return self.resolve_named_type(str_sym)
@@ -1575,7 +1582,13 @@ impl Codegen:
                 let index_base_sema_ty = cur_sema_ty
                 let elem_llvm = self.mir_index_elem_llvm_type(index_base_sema_ty, cur_ty)
                 let elem_sema = self.mir_index_elem_sema_type(index_base_sema_ty)
-                if wl_get_type_kind(cur_ty) == wl_array_type_kind():
+                if wl_get_type_kind(cur_ty) == wl_vector_type_kind():
+                    // §4.3d: lane i of a vector place.
+                    cur_ptr = self.mir_vector_lane_ptr(cur_ptr, cur_ty, idx_val)
+                    cur_ty = elem_llvm
+                    if elem_sema > 0:
+                        cur_sema_ty = elem_sema
+                else if wl_get_type_kind(cur_ty) == wl_array_type_kind():
                     self.mir_emit_debug_index_bounds_check(idx_val, idx_sema_ty, self.mir_index_len_value(index_base_sema_ty, cur_ty, cur_ptr))
                     let indices: Vec[i64] = Vec.new()
                     indices.push(idx_val)
@@ -3554,6 +3567,9 @@ impl Codegen:
             let rhs = self.mir_eval_operand(body, d2, 0)
             let lhs_sema = self.mir_operand_sema_type(body, d1)
             let rhs_sema = self.mir_operand_sema_type(body, d2)
+            // §4.3d: a lane-wise operator (Sema made both operands vectors).
+            if self.cg_sema_is_vector(lhs_sema):
+                return self.mir_build_vector_bin_op(d0, lhs, rhs, lhs_sema)
             let lhs_resolved = if lhs_sema > 0: self.mir_resolve_alias_at(lhs_sema) else: 0
             let rhs_resolved = if rhs_sema > 0: self.mir_resolve_alias_at(rhs_sema) else: 0
             let lhs_tk = if lhs_resolved > 0: self.mir_type_kind_at(lhs_resolved) else: 0
@@ -3586,6 +3602,9 @@ impl Codegen:
 
         if rk == RvalueKind.RK_UN_OP:
             let arg = self.mir_eval_operand(body, d1, dest_ty)
+            let un_sema = self.mir_operand_sema_type(body, d1)
+            if self.cg_sema_is_vector(un_sema):
+                return self.mir_build_vector_un_op(d0, arg, un_sema)
             if d0 == UnaryOp.UOP_NEGATE:
                 let ak = wl_get_type_kind(wl_type_of(arg))
                 if ak == wl_float_type_kind() or ak == wl_double_type_kind():
@@ -3668,6 +3687,10 @@ impl Codegen:
             return wl_const_int(wl_i32_type(self.context), 0, 0)
 
         if rk == RvalueKind.RK_AGGREGATE:
+            // §4.3d: a vector's lanes, in order.
+            if dest_sema_ty > 0 and self.cg_sema_is_vector(dest_sema_ty) and d1 >= 0 and d1 < body.agg_field_starts.len() as i32:
+                let agg_vec_ty = self.mir_sema_type_to_llvm(dest_sema_ty)
+                return self.mir_build_vector_aggregate(body, body.agg_field_starts[d1], body.agg_field_counts[d1], agg_vec_ty)
             // d1 = fields_id — index into agg_field_starts/counts/operands
             let agg_fields_id = d1
             if agg_fields_id >= 0 and agg_fields_id < body.agg_field_starts.len() as i32:
@@ -3875,6 +3898,11 @@ impl Codegen:
             return wl_get_undef(fallback_ty)
 
         if rk == RvalueKind.RK_CAST:
+            // §4.3d: a lane-wise conversion between vectors.
+            if d1 > 0 and self.cg_sema_is_vector(d1):
+                let vec_src = self.mir_eval_operand(body, d0, 0)
+                let vec_src_sema = if d2 > 0: d2 else: self.mir_operand_sema_type(body, d0)
+                return self.mir_build_vector_cast(vec_src, vec_src_sema, d1)
             // d1 = sema target type id
             var cast_ty = dest_ty
             if d1 > 0:
@@ -6906,7 +6934,7 @@ impl Codegen:
             return 0
         let resolved = self.mir_resolve_alias_at(sema_ty)
         let tk = self.mir_type_kind_at(resolved)
-        if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE:
+        if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE or tk == TypeKind.TY_VECTOR:
             return self.mir_type_d0_at(resolved)
         if tk == TypeKind.TY_STR:
             // `s[i]` is the byte, u8 — Sema types it so and the value is an
@@ -6925,7 +6953,7 @@ impl Codegen:
         0
 
     mut fn mir_index_elem_llvm_type(sema_ty: i32, cur_ty: i64) -> i64:
-        if cur_ty != 0 and wl_get_type_kind(cur_ty) == wl_array_type_kind():
+        if cur_ty != 0 and (wl_get_type_kind(cur_ty) == wl_array_type_kind() or wl_get_type_kind(cur_ty) == wl_vector_type_kind()):
             return wl_get_element_type(cur_ty)
         if sema_ty > 0:
             let resolved = self.mir_resolve_alias_at(sema_ty)
@@ -11054,6 +11082,8 @@ impl Codegen:
         true
 
     mut fn mir_emit_intrinsic_call(body: &MirBody, intrinsic: MirIntrinsic, args_id: i32, dest_place: i32, next_bb: i32) -> bool:
+        if self.mir_emit_vector_intrinsic_call(body, intrinsic, args_id, dest_place, next_bb):
+            return true
         if self.mir_emit_collection_literal_intrinsic_call(body, intrinsic, args_id, dest_place, next_bb):
             return true
         if self.mir_emit_vec_core_intrinsic_call(body, intrinsic, args_id, dest_place, next_bb):
@@ -19244,6 +19274,22 @@ impl Codegen:
             self.pool.get_extra(tp_start)
         else:
             self.pool.get_data1(callee_node)
+        // §4.3d: a vector's size and alignment are Sema's layout facts
+        // (TypeLayout), which on AArch64 differ from LLVM's `<N x T>`
+        // alignment for vectors over 16 bytes.
+        let tp_arg_kind = self.pool.kind(tp_node)
+        var tp_base_sym = 0
+        if tp_arg_kind == NodeKind.NK_TYPE_GENERIC:
+            tp_base_sym = self.pool.get_data0(tp_node)
+        else if tp_arg_kind == NodeKind.NK_INDEX and self.pool.kind(self.pool.get_data0(tp_node)) == NodeKind.NK_IDENT:
+            tp_base_sym = self.pool.get_data0(self.pool.get_data0(tp_node))
+        let tp_base_text = if tp_base_sym != 0: self.intern.resolve(tp_base_sym).clone() else: ""
+        let tp_names_type = tp_arg_kind == NodeKind.NK_IDENT or tp_arg_kind == NodeKind.NK_TYPE_NAMED or tp_base_text == "Vector" or tp_base_text == "Mask"
+        let vector_tid = if tp_names_type: self.sema.resolve_type_level_arg_expr_frozen(tp_node) else: 0
+        if vector_tid > 0 and self.cg_sema_is_vector_or_mask(vector_tid):
+            let vector_size = self.sema.type_layout_vector_size_of(self.sema.resolve_alias(vector_tid as TypeId) as i32)
+            let vector_value = if name_sym == self.sym_sizeof or name_sym == self.sym_size_of: vector_size else: type_layout_vector_align(vector_size)
+            return wl_const_int(wl_i64_type(self.context), vector_value, 0)
         let type_val = self.resolve_type(tp_node)
         if type_val == 0:
             with_eprint(f"error: sizeof/alignof type argument did not resolve (node={tp_node}, fn={self.intern.resolve(self.current_function_name_sym)})")

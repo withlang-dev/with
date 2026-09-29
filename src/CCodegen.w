@@ -1998,6 +1998,11 @@ impl CCodegen:
             return "bool"
         if tk == TypeKind.TY_VA_LIST:
             return "va_list"
+        // §4.3d: the C emitter has no vector lowering yet; say so rather
+        // than emit a type that is not the program's.
+        if tk == TypeKind.TY_VECTOR or tk == TypeKind.TY_MASK:
+            self.fail("--emit-c does not support SIMD vector types (§4.3d) yet: " ++ self.sema.type_name(resolved as i32))
+            return "int32_t"
         if tk == TypeKind.TY_INT:
             let bits = self.sema.get_type_d0(resolved)
             let signed = self.sema.get_type_d1(resolved)

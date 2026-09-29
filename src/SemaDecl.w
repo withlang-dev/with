@@ -11,6 +11,7 @@ use SemaCheck
 use std.collections.HashMap
 use compiler.BundleInterfaces
 use SemaTypes
+use SemaVector
 
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_eprint(s: &str) -> Unit
@@ -3125,6 +3126,18 @@ impl Sema:
             let elem_count = self.ast.get_data1(node)
             for ei in 0..elem_count:
                 self.validate_type_expr_with_impl_type_params(self.ast.get_extra(extra_start + ei), tp_start, tp_count, impl_node)
+            return
+
+        if kind == NodeKind.NK_TYPE_GENERIC and (self.is_vector_symbol(self.ast.get_data0(node)) or self.is_mask_symbol(self.ast.get_data0(node))) and self.type_param_exists_in_impl_context(tp_start, tp_count, impl_node, self.ast.get_data0(node)) == 0:
+            // §4.3d: `Vector[N, T]` / `Mask[N, W]` — N (and W) a compile-time
+            // integer; T may be a type parameter.
+            let vec_extra = self.ast.get_data1(node)
+            if self.ast.get_data2(node) >= 1:
+                let count_node = self.ast.get_extra(vec_extra)
+                if self.int_literal_i64_value(count_node).ok == 0:
+                    self.emit_error("a vector's lane count must be a compile-time integer constant (§4.3d); a type parameter as the lane count (`fn dot[N](a: Vector[N, f32])`) is not supported: the language has no value generic parameters to bind it", count_node)
+            if self.ast.get_data2(node) == 2 and self.is_vector_symbol(self.ast.get_data0(node)):
+                self.validate_type_expr_with_impl_type_params(self.ast.get_extra(vec_extra + 1), tp_start, tp_count, impl_node)
             return
 
         if kind == NodeKind.NK_TYPE_GENERIC:

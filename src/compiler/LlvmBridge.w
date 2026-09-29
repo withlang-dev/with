@@ -32,6 +32,7 @@ let LLVM_FunctionTypeKind: i32 = 9
 let LLVM_StructTypeKind: i32 = 10
 let LLVM_ArrayTypeKind: i32 = 11
 let LLVM_PointerTypeKind: i32 = 12
+let LLVM_VectorTypeKind: i32 = 13
 let LLVM_FunctionValueKind: i32 = 5
 let LLVM_GlobalAliasValueKind: i32 = 6
 let LLVM_GlobalIFuncValueKind: i32 = 7
@@ -164,6 +165,11 @@ extern fn LLVMIsPackedStruct(ty: *mut u8) -> i32
 extern fn LLVMIsOpaqueStruct(ty: *mut u8) -> i32
 extern fn LLVMGetElementType(ty: *mut u8) -> *mut u8
 extern fn LLVMGetArrayLength2(ty: *mut u8) -> u64
+extern fn LLVMVectorType(elem: *mut u8, count: u32) -> *mut u8
+extern fn LLVMGetVectorSize(ty: *mut u8) -> u32
+extern fn LLVMBuildInsertElement(b: *mut u8, vec: *mut u8, elt: *mut u8, idx: *mut u8, name: *const u8) -> *mut u8
+extern fn LLVMBuildExtractElement(b: *mut u8, vec: *mut u8, idx: *mut u8, name: *const u8) -> *mut u8
+extern fn LLVMConstVector(vals: *const *mut u8, count: u32) -> *mut u8
 
 // Type queries
 extern fn LLVMTypeOf(v: *mut u8) -> *mut u8
@@ -677,6 +683,14 @@ pub fn wl_is_packed_struct(ty: i64) -> bool: unsafe { LLVMIsPackedStruct(ty as *
 pub fn wl_is_opaque_struct(ty: i64) -> bool: unsafe { LLVMIsOpaqueStruct(ty as *mut u8) != 0 }
 pub fn wl_get_element_type(ty: i64) -> i64: unsafe { LLVMGetElementType(ty as *mut u8) as i64 }
 pub fn wl_get_array_length(ty: i64) -> i64: unsafe { LLVMGetArrayLength2(ty as *mut u8) as i64 }
+// §4.3d: SIMD vectors, `<N x T>`.
+pub fn wl_vector_type(elem: i64, count: i32) -> i64: unsafe { LLVMVectorType(elem as *mut u8, count as u32) as i64 }
+pub fn wl_get_vector_size(ty: i64) -> i32: unsafe { LLVMGetVectorSize(ty as *mut u8) as i32 }
+pub fn wl_build_insert_element(b: i64, vec: i64, elt: i64, idx: i64) -> i64:
+    unsafe { LLVMBuildInsertElement(b as *mut u8, vec as *mut u8, elt as *mut u8, idx as *mut u8, empty_cstr()) as i64 }
+pub fn wl_build_extract_element(b: i64, vec: i64, idx: i64) -> i64:
+    unsafe { LLVMBuildExtractElement(b as *mut u8, vec as *mut u8, idx as *mut u8, empty_cstr()) as i64 }
+pub fn wl_const_vector(vals_ptr: i64, count: i32) -> i64: unsafe { LLVMConstVector(vals_ptr as *const *mut u8, count as u32) as i64 }
 
 // ── Type queries ────────────────────────────────────────────────
 
@@ -712,6 +726,7 @@ pub fn wl_function_type_kind() -> i32: LLVM_FunctionTypeKind
 pub fn wl_struct_type_kind() -> i32: LLVM_StructTypeKind
 pub fn wl_array_type_kind() -> i32: LLVM_ArrayTypeKind
 pub fn wl_pointer_type_kind() -> i32: LLVM_PointerTypeKind
+pub fn wl_vector_type_kind() -> i32: LLVM_VectorTypeKind
 pub fn wl_function_value_kind() -> i32: LLVM_FunctionValueKind
 
 // ── Constants ───────────────────────────────────────────────────
