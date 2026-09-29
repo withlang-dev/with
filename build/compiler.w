@@ -489,14 +489,158 @@ fn comp_require_linkable_host_sdk(ctx: &ActionCtx, llvm_ld: &str, sdk_path: &str
         message = message ++ "\n  Neither default SDK is readable by this linker; set SDKROOT to an SDK it reads (an older one under /Library/Developer/CommandLineTools/SDKs)."
     comp_fail(ctx, message)
 
+// The SDK archives a compiler links, in the order the response files name
+// them: libclang, then the clang archives, then the LLVM ones, each set
+// sorted by path. Empty when the lib directory cannot be listed.
+fn comp_sdk_link_archives(fs: &ToolFs, llvm_lib_dir: &str, libclang: &str) -> Vec[str]:
+    var archives: Vec[str] = Vec.new()
+    let lib_files = fs.host_list_files(llvm_lib_dir)
+    if lib_files.len() == 0:
+        return archives
+    var clang_archives: Vec[str] = Vec.new()
+    var llvm_archives: Vec[str] = Vec.new()
+    for i in 0..lib_files.len() as i32:
+        let path = lib_files[i]
+        let name = comp_path_basename(path)
+        if name.ends_with(".a") or name.ends_with(".lib"):
+            if (name.starts_with("libclang") or (os() == "Windows" and name.starts_with("clang"))) and path != libclang:
+                clang_archives.push(compiler_owned_text(path))
+            else:
+                if (name.starts_with("libLLVM") or name.starts_with("LLVM")) and name != "LLVM-C.lib":
+                    llvm_archives.push(compiler_owned_text(path))
+    archives.push(compiler_owned_text(libclang))
+    let sorted_clang_archives = comp_sort_strings(clang_archives)
+    for i in 0..sorted_clang_archives.len() as i32:
+        archives.push(compiler_owned_text(sorted_clang_archives[i]))
+    let sorted_llvm_archives = comp_sort_strings(llvm_archives)
+    for i in 0..sorted_llvm_archives.len() as i32:
+        archives.push(compiler_owned_text(sorted_llvm_archives[i]))
+    archives
+
+// #1886: the Windows SDK's static archives were compiled against one MSVC
+// STL, and call its vectorized algorithm helpers (`__std_rotate`,
+// `__std_unique_4`, …), which that STL's libcpmt.lib defines; an older
+// toolset's libcpmt.lib lacks the newer ones, and the stage1 link ends with
+// them undefined. The archives are asked what they reference (llvm-nm), and
+// the linker whether the toolset the stage links read defines each: an empty
+// DLL linked with lld-link against the static CRT Link.w's compiler link
+// uses, with every helper required (/include). The build keeps no list of
+// helpers or of toolset versions; the SDK names the toolset it was built
+// with (`msvc-toolset`, written by build/sdk.w) for the diagnostic.
+fn comp_llvm_nm_tool(llvm_prefix: &str) -> str:
+    comp_tool_from_env("WITH_LLVM_NM", "LLVM_NM", llvm_prefix ++ (if os() == "Windows": "/bin/llvm-nm.exe" else: "/bin/llvm-nm"))
+
+fn comp_windows_libdir(var_name: &str, fallback: &str) -> str:
+    let dir = env(compiler_owned_text(var_name))
+    if dir.len() > 0: dir else: compiler_owned_text(fallback)
+
+fn comp_windows_msvc_libdir() -> str:
+    comp_windows_libdir("WITH_WINDOWS_MSVC_LIBDIR", "C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Tools/MSVC/14.29.30133/lib/x64")
+
+fn comp_windows_ucrt_libdir() -> str:
+    comp_windows_libdir("WITH_WINDOWS_UCRT_LIBDIR", "C:/Program Files (x86)/Windows Kits/10/Lib/10.0.19041.0/ucrt/x64")
+
+fn comp_windows_um_libdir() -> str:
+    comp_windows_libdir("WITH_WINDOWS_UM_LIBDIR", "C:/Program Files (x86)/Windows Kits/10/Lib/10.0.19041.0/um/x64")
+
+// The `__std_*` symbols the archives reference and do not define: one
+// llvm-nm run over all of them, `U <name>` lines.
+fn comp_sdk_stl_helpers(ctx: &ActionCtx, llvm_nm: &str, archives: &Vec[str], capture_dir: &str) -> Vec[str]:
+    var argv: Vec[str] = Vec.new()
+    argv.push(compiler_owned_text(llvm_nm))
+    argv.push("--undefined-only")
+    argv.push("--quiet")
+    for i in 0..archives.len() as i32:
+        argv.push(compiler_owned_text(archives[i]))
+    let nm = ctx.process_runner().run_capture(argv, comp_join(capture_dir, "stl-helpers.stdout"), comp_join(capture_dir, "stl-helpers.stderr"), 300000)
+    var names: Vec[str] = Vec.new()
+    if nm.rc != 0:
+        return names
+    for line in nm.stdout.split("\n"):
+        let at = line.find(" U __std_")
+        if at < 0:
+            continue
+        let name = comp_trim(line.slice(at + 3, line.len()))
+        if not comp_vec_contains(names, name):
+            names.push(name)
+    comp_sort_strings(names)
+
+// The helpers of `needed` the toolset does not define: the probe link's
+// `undefined symbol: <name>` lines, in `needed`'s order.
+fn comp_stl_probe_undefined(stderr: &str, needed: &Vec[str]) -> Vec[str]:
+    var missing: Vec[str] = Vec.new()
+    for i in 0..needed.len() as i32:
+        if stderr.contains("undefined symbol: " ++ needed[i]):
+            missing.push(compiler_owned_text(needed[i]))
+    missing
+
+fn comp_sdk_msvc_toolset(fs: &ToolFs, llvm_prefix: &str) -> str:
+    let path = llvm_prefix ++ "/msvc-toolset"
+    if not fs.host_exists(path):
+        return ""
+    comp_trim(fs.host_read_text(path))
+
+fn comp_require_windows_stl(ctx: &ActionCtx, llvm_prefix: &str, llvm_ld: &str, archives: &Vec[str]) -> i32:
+    let fs = ctx.fs()
+    let capture_dir = comp_join("out/command", ctx.target_name())
+    if fs.mkdir_all(capture_dir) != 0:
+        return comp_fail(ctx, "could not create capture directory: " ++ capture_dir)
+    let llvm_nm = comp_llvm_nm_tool(llvm_prefix)
+    if not fs.host_exists(llvm_nm):
+        return comp_fail(ctx, "missing llvm-nm: " ++ llvm_nm ++ " (the SDK's archives are asked which STL helpers they reference, #1886)")
+    let needed = comp_sdk_stl_helpers(ctx, llvm_nm, archives, capture_dir)
+    if needed.len() == 0:
+        return comp_fail(ctx, "llvm-nm found no `__std_*` reference in the SDK's archives, which every MSVC STL build has; see " ++ comp_join(capture_dir, "stl-helpers.stderr") ++ " (#1886)")
+    var argv: Vec[str] = Vec.new()
+    argv.push(compiler_owned_text(llvm_ld))
+    argv.push("/nologo")
+    argv.push("/dll")
+    argv.push("/noentry")
+    argv.push("/out:" ++ comp_abs(ctx.project_info().project_root(), comp_join(capture_dir, "stl-probe.dll")))
+    argv.push("/libpath:" ++ comp_windows_um_libdir())
+    argv.push("/libpath:" ++ comp_windows_ucrt_libdir())
+    argv.push("/libpath:" ++ comp_windows_msvc_libdir())
+    // The static CRT of a compiler link (Link.w link_stage_windows_crt_static),
+    // spelled out: nothing here carries a /defaultlib directive.
+    argv.push("libcpmt.lib")
+    argv.push("libcmt.lib")
+    argv.push("libvcruntime.lib")
+    argv.push("libucrt.lib")
+    argv.push("kernel32.lib")
+    for i in 0..needed.len() as i32:
+        argv.push("/include:" ++ needed[i])
+    let probe = ctx.process_runner().run_capture(argv, comp_join(capture_dir, "stl-probe.stdout"), comp_join(capture_dir, "stl-probe.stderr"), 120000)
+    if probe.rc == 0:
+        return 0
+    let toolset = comp_sdk_msvc_toolset(fs, llvm_prefix)
+    let explicit = env("WITH_WINDOWS_MSVC_LIBDIR").len() > 0
+    let libdir_note = if explicit: " (WITH_WINDOWS_MSVC_LIBDIR)" else if fs.host_exists(comp_windows_msvc_libdir()): " (the default; WITH_WINDOWS_MSVC_LIBDIR is unset)" else: " does not exist, so lld-link searched the Visual Studio it found itself (WITH_WINDOWS_MSVC_LIBDIR is unset)"
+    let missing = comp_stl_probe_undefined(probe.stderr, needed)
+    var message = "this build's MSVC toolset predates the STL the LLVM SDK was built with (#1886)"
+    message = message ++ "\n  SDK:     " ++ llvm_prefix ++ (if toolset.len() > 0: " (built with MSVC " ++ toolset ++ ")" else: " (its msvc-toolset file is absent: an SDK published before build/sdk.w recorded it)")
+    message = message ++ "\n  toolset: " ++ comp_windows_msvc_libdir() ++ libdir_note
+    message = message ++ "\n  linker:  " ++ llvm_ld ++ " (LLVM " ++ COMPILER_LLVM_VERSION ++ ")"
+    if missing.len() > 0:
+        message = message ++ f"\n  its libcpmt.lib defines none of these {missing.len()} of the {needed.len()} vectorized STL helpers the SDK's archives reference:"
+        for i in 0..missing.len() as i32:
+            message = message ++ (if i == 0: "\n    " else: " ") ++ missing[i]
+        message = message ++ "\n  The stage links would end with each undefined."
+    else if probe.timed_out:
+        message = message ++ "\n  the probe link timed out"
+    else:
+        message = message ++ "\n  lld-link (exit " ++ f"{probe.rc}" ++ "):" ++ comp_lld_error_lines(probe.stderr)
+    let wanted = if toolset.len() > 0: "MSVC " ++ toolset ++ " or newer" else: "the toolset the SDK's release notes name, or newer"
+    message = message ++ "\n  Install Visual Studio Build Tools with " ++ wanted ++ " (its `VC/Tools/MSVC/<version>/lib/x64`), or point WITH_WINDOWS_MSVC_LIBDIR at one."
+    comp_fail(ctx, message)
+
 // The pre-stage SDK check on its own (`with build :sdk-host-link-check`):
 // the canary lane (.github/workflows/sdk-canary.yml) points SDKROOT at the
 // newest Xcode's SDK on the runner and runs this, so a slice this LLVM's
 // TextAPI cannot parse is known before that SDK reaches every developer's
 // shell, with the rejected stub target named (#1826).
 pub fn run_sdk_host_link_check_action(ctx: ActionCtx) -> i32:
-    if os() != "Macos":
-        return comp_fail(ctx, "a macOS check: the stage links read the macOS SDK's .tbd stubs")
+    if os() != "Macos" and os() != "Windows":
+        return comp_fail(ctx, "a macOS or Windows check: the stage links read the macOS SDK's .tbd stubs, or the MSVC toolset's STL")
     let fs = ctx.fs()
     let output_path = ctx.output()
     if output_path.len() == 0:
@@ -504,9 +648,25 @@ pub fn run_sdk_host_link_check_action(ctx: ActionCtx) -> i32:
     // LLVM_PREFIX is this action's env_input: the check is about one linker,
     // and a different SDK re-runs it.
     let _llvm_prefix = ctx.env_input("LLVM_PREFIX")
-    let llvm_ld = comp_llvm_lld_tool(comp_llvm_prefix_for_root(ctx.project_info().project_root()))
+    let llvm_prefix = comp_llvm_prefix_for_root(ctx.project_info().project_root())
+    let llvm_ld = comp_llvm_lld_tool(llvm_prefix)
     if not fs.host_exists(llvm_ld):
         return comp_fail(ctx, "missing LLVM linker: " ++ llvm_ld)
+    if os() == "Windows":
+        // The toolset is this action's input too (#1886).
+        let _msvc_libdir = ctx.env_input("WITH_WINDOWS_MSVC_LIBDIR")
+        let libclang = comp_select_libclang_path(fs, llvm_prefix)
+        let archives = comp_sdk_link_archives(fs, llvm_prefix ++ "/lib", libclang)
+        if libclang.len() == 0 or archives.len() == 0:
+            return comp_fail(ctx, "missing static LLVM SDK archives under " ++ llvm_prefix ++ "/lib")
+        let stl_rc = comp_require_windows_stl(ctx, llvm_prefix, llvm_ld, archives)
+        if stl_rc != 0:
+            return stl_rc
+        let toolset = comp_sdk_msvc_toolset(fs, llvm_prefix)
+        let windows_verdict = llvm_ld ++ " (LLVM " ++ COMPILER_LLVM_VERSION ++ ") links the SDK's STL helpers against " ++ comp_windows_msvc_libdir() ++ (if toolset.len() > 0: " (SDK built with MSVC " ++ toolset ++ ")" else: "") ++ "\n"
+        if fs.write_text(output_path, windows_verdict) != 0:
+            return comp_fail(ctx, "could not write: " ++ output_path)
+        return 0
     let sdk_path = comp_host_sdk_path(ctx)
     let rc = comp_require_linkable_host_sdk(ctx, llvm_ld, sdk_path)
     if rc != 0:
@@ -2583,32 +2743,13 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     if not fs.host_exists(libclang):
         return comp_fail(ctx, "missing static libclang archive: " ++ libclang)
     let llvm_lib_dir = llvm_prefix ++ "/lib"
-    let lib_files = fs.host_list_files(llvm_lib_dir)
-    if lib_files.len() == 0:
+    let archives = comp_sdk_link_archives(fs, llvm_lib_dir, libclang)
+    if archives.len() == 0:
         return comp_fail(ctx, "could not list: " ++ llvm_lib_dir)
-    var clang_archives: Vec[str] = Vec.new()
-    var llvm_archives: Vec[str] = Vec.new()
-    for i in 0..lib_files.len() as i32:
-        let path = lib_files[i]
-        let name = comp_path_basename(path)
-        if name.ends_with(".a") or name.ends_with(".lib"):
-            if (name.starts_with("libclang") or (os() == "Windows" and name.starts_with("clang"))) and path != libclang:
-                clang_archives.push(compiler_owned_text(path))
-            else:
-                if (name.starts_with("libLLVM") or name.starts_with("LLVM")) and name != "LLVM-C.lib":
-                    llvm_archives.push(compiler_owned_text(path))
     var rsp = ""
     var ld_rsp = ""
-    rsp = rsp ++ comp_rsp_path(libclang) ++ "\n"
-    ld_rsp = ld_rsp ++ comp_rsp_path(libclang) ++ "\n"
-    let sorted_clang_archives = comp_sort_strings(clang_archives)
-    for i in 0..sorted_clang_archives.len() as i32:
-        let path = sorted_clang_archives[i]
-        rsp = rsp ++ comp_rsp_path(path) ++ "\n"
-        ld_rsp = ld_rsp ++ comp_rsp_path(path) ++ "\n"
-    let sorted_llvm_archives = comp_sort_strings(llvm_archives)
-    for i in 0..sorted_llvm_archives.len() as i32:
-        let path = sorted_llvm_archives[i]
+    for i in 0..archives.len() as i32:
+        let path = archives[i]
         rsp = rsp ++ comp_rsp_path(path) ++ "\n"
         ld_rsp = ld_rsp ++ comp_rsp_path(path) ++ "\n"
     // `with cc` (src/compiler/ClangDriver.w) calls clang's driver entry point,
@@ -2671,6 +2812,9 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
         ld_rsp = ld_rsp ++ comp_linux_system_lib_arg(fs, "zstd") ++ "\n"
         ld_rsp = ld_rsp ++ comp_linux_system_lib_arg(fs, "xml2") ++ "\n"
     else if os() == "Windows":
+        let stl_rc = comp_require_windows_stl(ctx, llvm_prefix, llvm_ld, archives)
+        if stl_rc != 0:
+            return stl_rc
         rsp = rsp ++ comp_windows_msvc_lib("libcpmt.lib") ++ "\n"
         rsp = rsp ++ comp_windows_msvc_lib("libcmt.lib") ++ "\n"
         rsp = rsp ++ comp_windows_msvc_lib("oldnames.lib") ++ "\n"

@@ -282,6 +282,31 @@ lib\LLVM*.lib
 lib\clang\<v>\include\
 ```
 
+**Toolset.** The SDK's static archives were compiled against one MSVC STL and
+call its vectorized algorithm helpers (`__std_rotate`, `__std_unique_4`, …),
+which that STL's `libcpmt.lib` defines; an older toolset's `libcpmt.lib` lacks
+the newer ones, and the stage1 link would end with them undefined (#1886). The
+SDK names the toolset it was built with in `msvc-toolset` at its root (written
+by `build/sdk.w` when it packages; `nightly-20260926-local-1-2e8defaa18ef` was
+built with VS 2026 Build Tools, MSVC 14.51). Building needs Visual Studio Build
+Tools with that MSVC toolset or newer. Before any stage links, the
+`llvm-link-metadata` action (and `with build :sdk-host-link-check` on its own)
+asks the archives which helpers they reference (`llvm-nm`) and `lld-link`
+whether the toolset defines each, and refuses with the toolset, the SDK's and
+the helpers named.
+
+The stage links read the toolset and Windows Kit import libraries from
+`WITH_WINDOWS_MSVC_LIBDIR` (`…/VC/Tools/MSVC/<version>/lib/x64`),
+`WITH_WINDOWS_UCRT_LIBDIR` and `WITH_WINDOWS_UM_LIBDIR` (`…/Windows Kits/10/Lib/
+<version>/{ucrt,um}/x64`); `c_import` of a system header reads the matching
+include directories from `WITH_WINDOWS_MSVC_INCDIR`, `WITH_WINDOWS_UCRT_INCDIR`,
+`WITH_WINDOWS_SHARED_INCDIR` and `WITH_WINDOWS_UM_INCDIR`. Unset, the build
+names the VS 2019 Build Tools and Windows Kit 10.0.19041 paths, and where those
+do not exist `lld-link` searches the Visual Studio it finds itself. The
+`selfhost-windows.yml` workflow's "Configure native toolchain env" step derives
+all of them from `vswhere` and the newest installed versions; do the same in a
+local shell.
+
 If no Windows static SDK release asset exists yet, build it once from source:
 
 ```powershell

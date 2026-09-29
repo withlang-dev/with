@@ -3,6 +3,7 @@ module build.sdk
 use std.build
 use std.string.StringBuilder
 use std.sysinfo
+use std.process
 use build.compiler
 fn sdk_owned_text(s: &str): s ++ ""
 
@@ -577,6 +578,27 @@ fn sdk_archive_manifest(entries: &Vec[ArchiveEntry]) -> str:
         out = out ++ entry.archive_path ++ "\n"
     out
 
+// The MSVC toolset version a Windows SDK build compiles against: vcvars's
+// VCToolsVersion, else the version segment of WITH_WINDOWS_MSVC_LIBDIR
+// (`…/VC/Tools/MSVC/14.51.36231/lib/x64`, as sdk-release.yml spells it).
+fn sdk_msvc_toolset_version() -> str:
+    let explicit = env("VCToolsVersion")
+    if explicit.len() > 0:
+        return explicit
+    sdk_msvc_toolset_from_libdir(env("WITH_WINDOWS_MSVC_LIBDIR"))
+
+pub fn sdk_msvc_toolset_from_libdir(libdir: &str) -> str:
+    let normalized = libdir.replace("\\", "/")
+    let marker = "/MSVC/"
+    let at = normalized.find(marker)
+    if at < 0:
+        return ""
+    let start = at + marker.len()
+    var end = start
+    while end < normalized.len() and normalized[end] != '/':
+        end = end + 1
+    normalized.slice(start, end)
+
 pub fn run_package_llvm_sdk_action(ctx: ActionCtx) -> i32:
     let args = ctx.args()
     if args.len() < 5:
@@ -590,9 +612,23 @@ pub fn run_package_llvm_sdk_action(ctx: ActionCtx) -> i32:
     if rc != 0:
         return rc
     let output_path = sdk_join("out/release", asset)
-    let entries = sdk_package_entries(ctx, prefix, sdk_base, platform)
+    var entries = sdk_package_entries(ctx, prefix, sdk_base, platform)
     if entries.len() == 0:
         return sdk_fail(ctx, "SDK package would be empty")
+    if sdk_platform_is_windows(platform):
+        // #1886: the archives call the vectorized helpers of the MSVC STL
+        // they were compiled against, which an older toolset's libcpmt.lib
+        // lacks. The SDK names that toolset, so the build's check
+        // (build/compiler.w comp_require_windows_stl) can name what to
+        // install; a package that cannot say is not published.
+        let toolset = sdk_msvc_toolset_version()
+        if toolset.len() == 0:
+            return sdk_fail(ctx, "the MSVC toolset this SDK was built with is unknown: set VCToolsVersion (vcvars does) or WITH_WINDOWS_MSVC_LIBDIR (…/VC/Tools/MSVC/<version>/lib/x64) so the package can record it (#1886)")
+        let toolset_path = sdk_join(prefix, "msvc-toolset")
+        rc = sdk_write_text(ctx, toolset_path, toolset ++ "\n")
+        if rc != 0:
+            return rc
+        entries.push(archive_file_entry(toolset_path, sdk_base ++ "/msvc-toolset", 0o644))
     // Validate what will actually be written, not just the source prefix.
     // In particular, linker aliases alone do not make a usable SDK.
     let selected = sdk_archive_manifest(entries)
@@ -1037,6 +1073,12 @@ pub fn run_sdk_contract_tests_action(ctx: ActionCtx) -> i32:
             else:
                 assert(item.starts_with(sdk_cmake_data_prefix()))
     assert(sdk_host_tag_for_platform("windows-aarch64") == "windows-aarch64-msvc")
+    // #1886: the toolset a Windows SDK records comes from the lib dir the
+    // release lane spells, either separator, or is "" and refuses to package.
+    assert(sdk_msvc_toolset_from_libdir("C:/Program Files (x86)/Microsoft Visual Studio/18/BuildTools/VC/Tools/MSVC/14.51.36231/lib/x64") == "14.51.36231")
+    assert(sdk_msvc_toolset_from_libdir("C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.44.35207\\lib\\x64") == "14.44.35207")
+    assert(sdk_msvc_toolset_from_libdir("") == "")
+    assert(sdk_msvc_toolset_from_libdir("C:/kits/lib/x64") == "")
     // Cross the input-buffer boundary and include every byte value, an
     // empty file, executable mode, USTAR prefix paths for CMake modules,
     // and (on Unix) a relative linker alias.
