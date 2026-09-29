@@ -4,6 +4,8 @@ use std.build
 use std.string.StringBuilder
 use std.sysinfo
 use build.compiler
+use build.par
+use std.io.print_str
 fn sdk_owned_text(s: &str): s ++ ""
 
 const SDK_NINJA_VERSION: str = "1.13.1"
@@ -1681,3 +1683,1111 @@ pub fn run_sdk_build_tools_pack_action(ctx: ActionCtx) -> i32:
     if count < 100:
         return sdk_fail(ctx, f"only {count} CMake module files under " ++ share)
     sdk_write_text(ctx, pack_path, pack.to_str())
+// ── The Windows C runtime the SDK carries (#1915) ─────────────────────────
+//
+// A With program and the With compiler link on Windows against nothing but
+// this SDK and the DLLs Windows ships in the box (Eric, 2026-09-29): no
+// Visual Studio, no Windows Kits. The C runtime underneath is mingw-w64's,
+// built the way Zig builds it (.reference/zig/src/libs/mingw.zig) and the way
+// mingw-w64's own mingw-w64-crt/Makefile.am does: the headers, the UCRT
+// startup objects and support libraries compiled from source by the SDK's
+// clang, and the import libraries of the in-box DLLs generated from
+// mingw-w64's .def files by the SDK's llvm-dlltool. The sources are fetched
+// at SDK build time from the pinned release tag, exactly like LLVM's; nothing
+// of them is checked into this repository. Programs run against ucrtbase and
+// the api-ms-win-crt-* API sets (in the box since Windows 10), never
+// vcruntime140/msvcp140.
+//
+// Layout, under <sdk>/libc/windows (the sysroot clang's MinGW driver reads
+// with --sysroot):
+//   include/                      the headers, shared by every architecture
+//   <arch>-w64-mingw32/lib/       crt2.o crtbegin.o crtend.o, mingw32.lib
+//                                 mingwex.lib moldname.lib ucrt.lib msvcrt.lib,
+//                                 and one <dll>.lib per in-box DLL below
+//   COPYING* DISCLAIMER* PROVENANCE
+// compiler-rt's builtins for the target go where clang looks for them:
+// <sdk>/lib/clang/<major>/lib/windows/libclang_rt.builtins-<arch>.a.
+
+const SDK_MINGW_W64_VERSION: str = "14.0.0"
+const SDK_MINGW_W64_SHA256: str = "d71cc644cd5a37c337f2719f3e0c79d89e8d8d5fb9e2952a62d3fa23623dc137"
+
+pub fn sdk_mingw_source_url() -> str:
+    "https://github.com/mingw-w64/mingw-w64/archive/refs/tags/v" ++ SDK_MINGW_W64_VERSION ++ ".tar.gz"
+
+pub fn sdk_mingw_source_sha256() -> str: SDK_MINGW_W64_SHA256
+
+pub fn sdk_mingw_archive() -> str: sdk_source_root() ++ "/mingw-w64-v" ++ SDK_MINGW_W64_VERSION ++ ".tar.gz"
+
+pub fn sdk_mingw_source_dir() -> str: sdk_source_root() ++ "/mingw-w64-" ++ SDK_MINGW_W64_VERSION
+
+pub fn sdk_mingw_source_marker() -> str: sdk_mingw_source_dir() ++ "/.with-source-ready"
+
+pub fn sdk_windows_libc_root(prefix: &str) -> str: sdk_join(prefix, "libc/windows")
+
+pub fn sdk_windows_libc_triple_dir(arch_name: &str) -> str: arch_name ++ "-w64-mingw32"
+
+pub fn sdk_windows_libc_lib_dir(prefix: &str, arch_name: &str) -> str:
+    sdk_windows_libc_root(prefix) ++ "/" ++ sdk_windows_libc_triple_dir(arch_name) ++ "/lib"
+
+// The marker a finished libc build leaves: the startup object every program
+// links first.
+pub fn sdk_windows_libc_marker(prefix: &str, arch_name: &str) -> str:
+    sdk_windows_libc_lib_dir(prefix, arch_name) ++ "/crt2.o"
+
+pub fn sdk_compiler_rt_builtins(prefix: &str, arch_name: &str) -> str:
+    sdk_join(prefix, "lib/clang/" ++ sdk_llvm_major() ++ "/lib/windows/libclang_rt.builtins-" ++ arch_name ++ ".a")
+
+// The in-box DLLs whose import libraries the SDK carries: what the With
+// runtime and the compiler import (dbghelp for backtraces, ws2_32 for
+// std.net, advapi32/bcrypt for randomness, the COM and shell pieces LLVM's
+// Support library calls), plus the libraries clang's MinGW driver names on
+// every link (advapi32 shell32 user32 kernel32). A library an application
+// pulls in (opengl32, gdi32, winmm, ...) is that application's dependency,
+// fetched by `with get` or linked by hand; it is not here.
+fn sdk_windows_import_libs() -> Vec[str]:
+    // Pushed one by one: the build layer runs on the pinned seed (#1122).
+    var names: Vec[str] = Vec.new()
+    names.push("kernel32")
+    names.push("ntdll")
+    names.push("advapi32")
+    names.push("bcrypt")
+    names.push("dbghelp")
+    names.push("ws2_32")
+    names.push("shell32")
+    names.push("user32")
+    names.push("ole32")
+    names.push("oleaut32")
+    names.push("version")
+    names.push("psapi")
+    names
+
+fn sdk_windows_triple(arch_name: &str) -> str: arch_name ++ "-w64-windows-gnu"
+
+// mingw-w64-crt/Makefile.am names each architecture's libraries under its
+// own directory prefix (lib64_libmingw32_a_SOURCES, libarm64_...).
+fn sdk_mingw_makefile_prefix(arch_name: &str) -> str:
+    if arch_name == "x86_64": return "lib64"
+    if arch_name == "aarch64": return "libarm64"
+    ""
+
+fn sdk_dlltool_machine(arch_name: &str) -> str:
+    if arch_name == "x86_64": return "i386:x86-64"
+    if arch_name == "aarch64": return "arm64"
+    ""
+
+// ── mingw-w64-crt/Makefile.am, read rather than transcribed ─────────────
+//
+// The source lists and per-library flags come from the Makefile.am of the
+// pinned release, so a version bump brings its own lists. Only what the
+// build below reads is understood: `name = value` and `name += value`
+// assignments (with `\` continuations), `$(name)` references, `if COND` /
+// `else` / `endif` over the configure conditionals, and `include`. Every
+// configure substitution (`@NAME@`) this build reads has its value named in
+// sdk_mingw_subst; one it does not know fails the build.
+
+pub type SdkMakeVar {
+    name: str,
+    value: str,
+}
+
+fn sdk_make_var_get(vars: &Vec[SdkMakeVar], name: &str) -> str:
+    for i in 0..vars.len() as i32:
+        if vars[i].name == name:
+            return sdk_owned_text(vars[i].value)
+    ""
+
+fn sdk_make_var_has(vars: &Vec[SdkMakeVar], name: &str) -> bool:
+    for i in 0..vars.len() as i32:
+        if vars[i].name == name:
+            return true
+    false
+
+fn sdk_make_var_set(vars: Vec[SdkMakeVar], name: &str, value: &str, append: bool) -> Vec[SdkMakeVar]:
+    var out: Vec[SdkMakeVar] = Vec.new()
+    var found = false
+    for i in 0..vars.len() as i32:
+        if vars[i].name == name:
+            found = true
+            let joined = if append and vars[i].value.len() > 0: vars[i].value ++ " " ++ value else: sdk_owned_text(value)
+            out.push(SdkMakeVar { name: sdk_owned_text(name), value: joined })
+        else:
+            out.push(SdkMakeVar { name: sdk_owned_text(vars[i].name), value: sdk_owned_text(vars[i].value) })
+    if not found:
+        out.push(SdkMakeVar { name: sdk_owned_text(name), value: sdk_owned_text(value) })
+    out
+
+// The automake conditionals of a configure run for `arch_name` with the
+// defaults: no w32api package, no ARM64EC, no DFP, no sysroot, no delay-import
+// libraries. A conditional not named here is false.
+fn sdk_mingw_condition(cond: &str, arch_name: &str) -> bool:
+    if cond.starts_with("!"):
+        return not sdk_mingw_condition(cond.slice(1, cond.len()), arch_name)
+    if cond == "LIB64": return arch_name == "x86_64"
+    if cond == "LIBARM64": return arch_name == "aarch64"
+    false
+
+fn sdk_is_ident_char(ch: i32) -> bool:
+    (ch >= 48 and ch <= 57) or (ch >= 65 and ch <= 90) or (ch >= 97 and ch <= 122) or ch == 95
+
+// Logical lines: a line ending in `\` continues on the next.
+fn sdk_make_logical_lines(text: &str) -> Vec[str]:
+    let raw = sdk_split_lines(text)
+    var out: Vec[str] = Vec.new()
+    var pending = ""
+    for i in 0..raw.len() as i32:
+        var line: str = raw[i].clone()
+        if line.ends_with("\r"):
+            line = line.slice(0, line.len() - 1)
+        if line.ends_with("\\"):
+            pending = pending ++ line.slice(0, line.len() - 1) ++ " "
+            continue
+        out.push(pending ++ line)
+        pending = ""
+    if pending.len() > 0:
+        out.push(pending)
+    out
+
+fn sdk_mingw_parse_makefile(ctx: &ActionCtx, path: &str, reldir: &str, arch_name: &str, vars: Vec[SdkMakeVar]) -> Vec[SdkMakeVar]:
+    var out = vars
+    let lines = sdk_make_logical_lines(ctx.fs().read_text(path))
+    // One character per open `if`: '1' when its branch is live, '0' when not
+    // (a string, not a Vec[bool]: the build layer also runs in the seed's
+    // comptime evaluator).
+    var live = ""
+    for i in 0..lines.len() as i32:
+        let line = lines[i]
+        if line.starts_with("\t") or line.starts_with("#"):
+            continue
+        let trimmed = sdk_trim(line)
+        let active = not live.contains("0")
+        if trimmed.starts_with("if "):
+            live = live ++ (if sdk_mingw_condition(sdk_trim(trimmed.slice(3, trimmed.len())), arch_name): "1" else: "0")
+            continue
+        if trimmed == "else":
+            if live.len() > 0:
+                let flipped = if live.ends_with("1"): "0" else: "1"
+                live = live.slice(0, live.len() - 1) ++ flipped
+            continue
+        if trimmed == "endif" or trimmed.starts_with("endif "):
+            if live.len() > 0:
+                live = live.slice(0, live.len() - 1)
+            continue
+        if not active:
+            continue
+        if trimmed.starts_with("include "):
+            let inc = sdk_trim(trimmed.slice(8, trimmed.len()))
+            let inc_dir = sdk_dirname(inc)
+            out = sdk_mingw_parse_makefile(ctx, sdk_join(sdk_dirname(path), inc), inc_dir, arch_name, move out)
+            continue
+        // An assignment: an identifier, then `=` or `+=`.
+        var k = 0
+        while k < trimmed.len() as i32 and sdk_is_ident_char(trimmed[k] as i32):
+            k = k + 1
+        if k == 0:
+            continue
+        let name = trimmed.slice(0, k as i64)
+        var rest = sdk_trim(trimmed.slice(k as i64, trimmed.len()))
+        var append = false
+        if rest.starts_with("+="):
+            append = true
+            rest = rest.slice(2, rest.len())
+        else if rest.starts_with("="):
+            rest = rest.slice(1, rest.len())
+        else:
+            continue
+        let value = sdk_trim(rest).replace("%reldir%", reldir)
+        out = sdk_make_var_set(move out, name, value, append)
+    out
+
+// Configure substitutions this build reads, with the values configure
+// computes for a clang/lld toolchain with default options: lld provides
+// __ImageBase, so no IMAGEBASE_CFLAGS; no control-flow guard; warnings are
+// not part of the artifact.
+fn sdk_mingw_subst_known(name: &str) -> bool:
+    name == "IMAGEBASE_CFLAGS" or name == "CFGUARD_CFLAGS" or name == "ADD_C_CXX_WARNING_FLAGS" or name == "ADD_C_ONLY_WARNING_FLAGS" or name == "ADD_CXX_ONLY_WARNING_FLAGS"
+
+// A step that can fail after reporting why (sdk_fail): its text, or its
+// list, when ok. (Plain structs, not Option: the build layer runs on the
+// pinned seed's evaluator.)
+pub type SdkText {
+    ok: bool,
+    text: str,
+}
+
+pub type SdkList {
+    ok: bool,
+    items: Vec[str],
+}
+
+fn sdk_text_fail(): SdkText { ok: false, text: "" }
+
+fn sdk_list_fail() -> SdkList:
+    let items: Vec[str] = Vec.new()
+    SdkList { ok: false, items }
+
+// `$(name)` references expanded recursively; `@NAME@` substituted.
+fn sdk_make_expand(ctx: &ActionCtx, vars: &Vec[SdkMakeVar], text: &str, top_srcdir: &str, depth: i32) -> SdkText:
+    if depth > 32:
+        let _ = sdk_fail(ctx, "Makefile.am variable expansion too deep: " ++ text)
+        return sdk_text_fail()
+    var out = ""
+    var i = 0
+    let n = text.len() as i32
+    while i < n:
+        let ch = text[i] as i32
+        if ch == 36 and i + 1 < n and text[i + 1] as i32 == 40:
+            var j = i + 2
+            while j < n and text[j] as i32 != 41:
+                j = j + 1
+            let name = text.slice((i + 2) as i64, j as i64)
+            if name == "top_srcdir" or name == "srcdir":
+                out = out ++ top_srcdir
+            else if sdk_make_var_has(vars, name):
+                let inner = sdk_make_expand(ctx, vars, sdk_make_var_get(vars, name), top_srcdir, depth + 1)
+                if not inner.ok:
+                    return sdk_text_fail()
+                out = out ++ inner.text
+            else:
+                let _ = sdk_fail(ctx, "mingw-w64-crt/Makefile.am references $(" ++ name ++ "), which it does not define")
+                return sdk_text_fail()
+            i = j + 1
+            continue
+        if ch == 64:
+            var j = i + 1
+            while j < n and sdk_is_ident_char(text[j] as i32):
+                j = j + 1
+            if j < n and j > i + 1 and text[j] as i32 == 64:
+                // Every substitution this build reads is empty for the
+                // default configure (sdk_mingw_subst_known).
+                let name = text.slice((i + 1) as i64, j as i64)
+                if not sdk_mingw_subst_known(name):
+                    let _ = sdk_fail(ctx, "mingw-w64-crt/Makefile.am needs configure substitution @" ++ name ++ "@, which this build does not define (sdk_mingw_subst_known)")
+                    return sdk_text_fail()
+                i = j + 1
+                continue
+        out = out ++ text.slice(i as i64, (i + 1) as i64)
+        i = i + 1
+    SdkText { ok: true, text: out }
+
+// Leading and trailing spaces, tabs and CRs removed. (Written out, with
+// sdk_llvm_major and sdk_read_or_empty: the build layer also runs in the
+// pinned seed's comptime evaluator, which has no str.trim.)
+fn sdk_trim(text: &str) -> str:
+    var start = 0
+    var end = text.len() as i32
+    while start < end and (text[start] as i32 == 32 or text[start] as i32 == 9 or text[start] as i32 == 13):
+        start = start + 1
+    while end > start and (text[end - 1] as i32 == 32 or text[end - 1] as i32 == 9 or text[end - 1] as i32 == 13):
+        end = end - 1
+    text.slice(start as i64, end as i64)
+
+// The clang resource directory's name: LLVM's major version.
+fn sdk_llvm_major() -> str:
+    let version = compiler_llvm_version()
+    var end = 0
+    while end < version.len() as i32 and version[end] as i32 != 46:
+        end = end + 1
+    version.slice(0, end as i64)
+
+fn sdk_read_or_empty(ctx: &ActionCtx, path: &str) -> str:
+    if ctx.fs().exists(path): ctx.fs().read_text(path) else: ""
+
+// The index of the last `ch` in `text`, or -1.
+fn sdk_last_index(text: &str, ch: i32) -> i32:
+    var at = -1
+    for i in 0..text.len() as i32:
+        if text[i] as i32 == ch:
+            at = i
+    at
+
+fn sdk_words(text: &str) -> Vec[str]:
+    var out: Vec[str] = Vec.new()
+    let parts = text.replace("\t", " ").split(" ")
+    for i in 0..parts.len() as i32:
+        let word = sdk_trim(parts[i])
+        if word.len() > 0:
+            out.push(sdk_owned_text(word))
+    out
+
+// A library's compiled members: its `_SOURCES` minus headers and .def inputs.
+fn sdk_mingw_compiled_sources(ctx: &ActionCtx, vars: &Vec[SdkMakeVar], var_name: &str, top_srcdir: &str) -> SdkList:
+    if not sdk_make_var_has(vars, var_name):
+        let _ = sdk_fail(ctx, "mingw-w64-crt/Makefile.am defines no " ++ var_name)
+        return sdk_list_fail()
+    let expanded = sdk_make_expand(ctx, vars, sdk_make_var_get(vars, var_name), top_srcdir, 0)
+    if not expanded.ok:
+        return sdk_list_fail()
+    var out: Vec[str] = Vec.new()
+    let words = sdk_words(expanded.text)
+    for i in 0..words.len() as i32:
+        let w = words[i]
+        if w.ends_with(".c") or w.ends_with(".S"):
+            out.push(sdk_owned_text(w))
+        else if not (w.ends_with(".h") or w.ends_with(".def") or w.ends_with(".def.in")):
+            let _ = sdk_fail(ctx, var_name ++ " lists " ++ w ++ ", which this build does not know how to compile")
+            return sdk_list_fail()
+    SdkList { ok: true, items: out }
+
+// ── Headers ──────────────────────────────────────────────────────────────
+
+// Where mingw-w64-headers installs a file (mingw-w64-headers/configure.ac's
+// *HEAD_LIST and Makefile.am), relative to include/, or "" for a file it
+// does not install: the .idl sources, ChangeLogs, the test cases.
+fn sdk_mingw_header_dest(rel: &str) -> str:
+    let parts = rel.split("/")
+    let base = parts[parts.len() as i32 - 1]
+    let dot = sdk_last_index(base, 46)
+    let ext = if dot >= 0: base.slice((dot + 1) as i64, base.len()) else: ""
+    if parts.len() == 2 and parts[0] == "include":
+        if ext == "h" or ext == "c" or ext == "inl" or ext == "dlg" or ext == "h16" or ext == "hxx" or ext == "rh" or ext == "ver":
+            return sdk_owned_text(base)
+        return ""
+    if parts.len() == 3 and parts[0] == "include" and ext == "h":
+        let sub = parts[1]
+        if sub == "gdiplus" or sub == "wrl" or sub == "GL" or sub == "KHR" or sub == "psdk_inc":
+            return sub ++ "/" ++ base
+        return ""
+    if parts.len() == 4 and parts[0] == "include" and parts[1] == "wrl" and parts[2] == "wrappers" and ext == "h":
+        return "wrl/wrappers/" ++ base
+    if parts.len() == 2 and parts[0] == "crt":
+        if ext == "h" or ext == "inl":
+            return sdk_owned_text(base)
+        return ""
+    if parts.len() == 3 and parts[0] == "crt" and ext == "h":
+        if parts[1] == "sys" or parts[1] == "sec_api":
+            return parts[1] ++ "/" ++ base
+        return ""
+    if parts.len() == 4 and parts[0] == "crt" and parts[1] == "sec_api" and parts[2] == "sys" and ext == "h":
+        return "sec_api/sys/" ++ base
+    if parts.len() == 4 and parts[0] == "ddk" and parts[1] == "include" and parts[2] == "ddk" and ext == "h":
+        return "ddk/" ++ base
+    ""
+
+// _mingw.h is configure output: the two defaults configure computes with no
+// options (--with-default-msvcrt=ucrt, --with-default-win32-winnt=0xa00).
+fn sdk_mingw_h(template: &str) -> str:
+    template.replace("@DEFAULT_MSVCRT_VERSION@", "0xE00").replace("@DEFAULT_WIN32_WINNT@", "0xa00")
+
+fn sdk_install_mingw_headers(ctx: &ActionCtx, source_dir: &str, include_dir: &str) -> i32:
+    let fs = ctx.fs()
+    let headers = sdk_join(source_dir, "mingw-w64-headers")
+    let files = fs.list_files(headers)
+    var installed = 0
+    for i in 0..files.len() as i32:
+        let rel = sdk_rel_path(headers, files[i])
+        if rel == "crt/_mingw.h.in":
+            let text = sdk_mingw_h(fs.read_text(files[i]))
+            // A substitution left over is one configure makes and this build
+            // does not: fail rather than ship a header with @NAME@ in it.
+            if text.contains("@DEFAULT_"):
+                return sdk_fail(ctx, "crt/_mingw.h.in has a configure substitution sdk_mingw_h does not make")
+            if fs.write_text(sdk_join(include_dir, "_mingw.h"), text) != 0:
+                return sdk_fail(ctx, "could not write " ++ sdk_join(include_dir, "_mingw.h"))
+            installed = installed + 1
+            continue
+        let dest = sdk_mingw_header_dest(rel)
+        if dest.len() == 0:
+            continue
+        if fs.copy_file(files[i], sdk_join(include_dir, dest)) != 0:
+            return sdk_fail(ctx, "could not install header " ++ rel)
+        installed = installed + 1
+    if not fs.exists(sdk_join(include_dir, "windows.h")) or not fs.exists(sdk_join(include_dir, "stdio.h")) or not fs.exists(sdk_join(include_dir, "_mingw.h")):
+        return sdk_fail(ctx, "mingw-w64 header install is missing windows.h, stdio.h or _mingw.h under " ++ include_dir)
+    print_str("windows libc: headers -> " ++ include_dir ++ "\n")
+    0
+
+// ── Tools ────────────────────────────────────────────────────────────────
+
+// llvm-ar, llvm-lib, llvm-ranlib and llvm-dlltool are one binary that acts on
+// the name it is run as, as lld is for ld.lld, lld-link, ld64.lld and
+// wasm-ld. A tool the SDK does not ship under the needed name (the
+// windows-x86_64 SDKs before #1915 carry llvm-lib.exe and lld-link.exe only)
+// is that same binary, copied into this build's tool directory under the name
+// that selects the behavior. The SDK package ships every name from #1915 on.
+fn sdk_multicall_family(name: &str) -> Vec[str]:
+    var names: Vec[str] = Vec.new()
+    if name == "llvm-ar" or name == "llvm-lib" or name == "llvm-ranlib" or name == "llvm-dlltool":
+        names.push("llvm-ar")
+        names.push("llvm-lib")
+        names.push("llvm-ranlib")
+        names.push("llvm-dlltool")
+    else if name == "ld.lld" or name == "lld-link" or name == "ld64.lld" or name == "wasm-ld" or name == "lld":
+        names.push("lld")
+        names.push("lld-link")
+        names.push("ld.lld")
+        names.push("ld64.lld")
+        names.push("wasm-ld")
+    names
+
+// The absolute path of `name` from the SDK at `tools_prefix`, or "" after
+// reporting why there is none.
+fn sdk_llvm_tool(ctx: &ActionCtx, tools_prefix: &str, tool_dir: &str, name: &str) -> str:
+    let fs = ctx.fs()
+    let root = ctx.project_info().project_root()
+    let direct = sdk_tool(tools_prefix, name)
+    if fs.exists(direct):
+        return sdk_abs(root, direct)
+    let staged = sdk_join(tool_dir, sdk_exe_name(name))
+    if fs.exists(staged):
+        return sdk_abs(root, staged)
+    let family = sdk_multicall_family(name)
+    for i in 0..family.len() as i32:
+        let sibling = sdk_tool(tools_prefix, family[i])
+        if fs.exists(sibling):
+            if fs.copy_file(sibling, staged) != 0:
+                let _ = sdk_fail(ctx, "could not stage " ++ name ++ " from " ++ sibling)
+                return ""
+            let _chmod = fs.chmod(staged, 0o755)
+            return sdk_abs(root, staged)
+    let _ = sdk_fail(ctx, "the SDK at " ++ tools_prefix ++ " has no " ++ name ++ " (nor any binary of its multicall family)")
+    ""
+
+// The compile flags every mingw-w64 source gets here beyond Makefile.am's:
+// the target, and the SDK's own headers only — clang's builtin headers first,
+// as the driver orders them, then the libc headers just installed. -w: the
+// warnings are not part of the artifact. -O2 is configure's default CFLAGS
+// without -g, so the objects carry no build-machine paths.
+fn sdk_mingw_toolchain_flags(root: &str, tools_prefix: &str, include_dir: &str, arch_name: &str) -> Vec[str]:
+    var flags: Vec[str] = Vec.new()
+    flags.push("--target=" ++ sdk_windows_triple(arch_name))
+    flags.push("-nostdinc")
+    flags.push("-isystem")
+    flags.push(sdk_abs(root, sdk_join(tools_prefix, "lib/clang/" ++ sdk_llvm_major() ++ "/include")))
+    flags.push("-isystem")
+    flags.push(sdk_abs(root, include_dir))
+    flags.push("-O2")
+    flags.push("-w")
+    flags
+
+fn sdk_object_name(source: &str) -> str:
+    let dot = sdk_last_index(source, 46)
+    let stem = if dot >= 0: source.slice(0, dot as i64) else: sdk_owned_text(source)
+    stem.replace("/", "_") ++ ".o"
+
+// Compiles `sources` (relative to the crt dir) with `flags` into `obj_dir`,
+// at most `width` at a time; returns the objects in source order, or not ok
+// after reporting every failure.
+fn sdk_compile_all(ctx: &ActionCtx, clang: &str, crt_dir: &str, sources: &Vec[str], flags: &Vec[str], obj_dir: &str, width: i32) -> SdkList:
+    let root = ctx.project_info().project_root()
+    if ctx.fs().mkdir_all(obj_dir) != 0:
+        let _ = sdk_fail(ctx, "could not create " ++ obj_dir)
+        return sdk_list_fail()
+    var jobs: Vec[ParJob] = Vec.new()
+    var objects: Vec[str] = Vec.new()
+    for i in 0..sources.len() as i32:
+        let object = sdk_join(obj_dir, sdk_object_name(sources[i]))
+        var argv: Vec[str] = Vec.new()
+        argv.push(sdk_owned_text(clang))
+        for j in 0..flags.len() as i32:
+            argv.push(sdk_owned_text(flags[j]))
+        argv.push("-c")
+        argv.push(sdk_abs(root, sdk_join(crt_dir, sources[i])))
+        argv.push("-o")
+        argv.push(sdk_abs(root, object))
+        jobs.push(par_job(argv, sdk_abs(root, object ++ ".stdout"), sdk_abs(root, object ++ ".stderr"), 600000))
+        objects.push(object)
+    let rcs = par_run(ctx, &jobs, width)
+    var failed = false
+    for i in 0..rcs.len() as i32:
+        if rcs[i] != 0:
+            failed = true
+            let _ = sdk_fail(ctx, f"compiling {sources[i]} failed with exit code {rcs[i]}: " ++ sdk_read_or_empty(ctx, objects[i] ++ ".stderr"))
+    if failed:
+        return sdk_list_fail()
+    SdkList { ok: true, items: objects }
+
+// One archive of `members` (objects and archives, whose members it takes).
+fn sdk_archive(ctx: &ActionCtx, ar: &str, output: &str, members: &Vec[str]) -> i32:
+    let root = ctx.project_info().project_root()
+    let _rm = ctx.fs().remove_file(output)
+    if members.len() == 0:
+        // An archive with no members is its magic alone (moldname: mingw's
+        // is a placeholder too, the aliases live in the UCRT import library).
+        if ctx.fs().write_text(output, "!<arch>\n") != 0:
+            return sdk_fail(ctx, "could not write " ++ output)
+        return 0
+    // The members go through a response file: libmingwex has hundreds, past
+    // Windows' 32 KiB command line (and the runner's argv limit, #1916).
+    var rsp = ""
+    for i in 0..members.len() as i32:
+        rsp = rsp ++ sdk_abs(root, members[i]) ++ "\n"
+    let rsp_path = output ++ ".members.rsp"
+    if ctx.fs().write_text(rsp_path, rsp) != 0:
+        return sdk_fail(ctx, "could not write " ++ rsp_path)
+    var argv: Vec[str] = Vec.new()
+    argv.push(sdk_owned_text(ar))
+    argv.push("--format=coff")
+    argv.push("qcsL")
+    argv.push(sdk_abs(root, output))
+    argv.push("@" ++ sdk_abs(root, rsp_path))
+    let rc = sdk_run_capture(ctx, "archive-" ++ sdk_basename(output), argv, 600000)
+    let _rm_rsp = ctx.fs().remove_file(rsp_path)
+    rc
+
+// The .def of `name` as mingw-w64-crt's Makefile.am finds it for the
+// architecture: its own directory first, then lib-common; a .def.in is run
+// through the preprocessor, and a lib-common one has the i386 `@N`
+// decorations removed from its export names (the Makefile's sed).
+fn sdk_mingw_def(ctx: &ActionCtx, clang: &str, crt_dir: &str, arch_name: &str, name: &str, work_dir: &str) -> str:
+    let fs = ctx.fs()
+    let root = ctx.project_info().project_root()
+    let arch_dir = sdk_mingw_makefile_prefix(arch_name)
+    let plain_arch = sdk_join(crt_dir, arch_dir ++ "/" ++ name ++ ".def")
+    if fs.exists(plain_arch):
+        return plain_arch
+    let plain_common = sdk_join(crt_dir, "lib-common/" ++ name ++ ".def")
+    var input = sdk_join(crt_dir, arch_dir ++ "/" ++ name ++ ".def.in")
+    var common = false
+    if not fs.exists(input):
+        if fs.exists(plain_common):
+            return plain_common
+        input = sdk_join(crt_dir, "lib-common/" ++ name ++ ".def.in")
+        common = true
+        if not fs.exists(input):
+            return ""
+    let pre = sdk_join(work_dir, name ++ ".pre.def")
+    var argv: Vec[str] = Vec.new()
+    argv.push(sdk_owned_text(clang))
+    argv.push("--target=" ++ sdk_windows_triple(arch_name))
+    argv.push("-E")
+    argv.push("-P")
+    argv.push("-x")
+    argv.push("c")
+    argv.push("-w")
+    argv.push("-I")
+    argv.push(sdk_abs(root, sdk_join(crt_dir, "def-include")))
+    argv.push(sdk_abs(root, input))
+    argv.push("-o")
+    argv.push(sdk_abs(root, pre))
+    if sdk_run_capture(ctx, "def-" ++ name, argv, 120000) != 0:
+        return ""
+    if not common:
+        return pre
+    let lines = sdk_split_lines(fs.read_text(pre))
+    var out = ""
+    for i in 0..lines.len() as i32:
+        out = out ++ sdk_strip_stdcall_suffix(lines[i]) ++ "\n"
+    let def = sdk_join(work_dir, name ++ ".def")
+    if fs.write_text(def, out) != 0:
+        let _ = sdk_fail(ctx, "could not write " ++ def)
+        return ""
+    def
+
+// `Name@12 rest` -> `Name rest`: the first word loses an `@<digits>` tail.
+fn sdk_strip_stdcall_suffix(line: &str) -> str:
+    var end = 0
+    while end < line.len() as i32 and line[end] as i32 != 32:
+        end = end + 1
+    let word = line.slice(0, end as i64)
+    let at = sdk_last_index(word, 64)
+    if at <= 0 or at == word.len() as i32 - 1:
+        return sdk_owned_text(line)
+    for i in (at + 1)..word.len() as i32:
+        let ch = word[i] as i32
+        if ch < 48 or ch > 57:
+            return sdk_owned_text(line)
+    word.slice(0, at as i64) ++ line.slice(end as i64, line.len())
+
+fn sdk_import_lib(ctx: &ActionCtx, dlltool: &str, arch_name: &str, def: &str, output: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    var argv: Vec[str] = Vec.new()
+    argv.push(sdk_owned_text(dlltool))
+    argv.push("-m")
+    argv.push(sdk_dlltool_machine(arch_name))
+    argv.push("-k")
+    argv.push("-d")
+    argv.push(sdk_abs(root, def))
+    argv.push("-l")
+    argv.push(sdk_abs(root, output))
+    sdk_run_capture(ctx, "dlltool-" ++ sdk_basename(output), argv, 120000)
+
+// The compile flags Makefile.am gives a library's sources: its
+// <prefix>_lib<name>_a_CPPFLAGS (else AM_CPPFLAGS), then AM_CFLAGS, or
+// AM_CCASFLAGS for assembly.
+fn sdk_mingw_lib_flags(ctx: &ActionCtx, vars: &Vec[SdkMakeVar], crt_dir_abs: &str, lib_var: &str, base: &Vec[str], assembler: bool) -> SdkList:
+    let cpp_name = lib_var ++ "_CPPFLAGS"
+    let cpp = if sdk_make_var_has(vars, cpp_name): sdk_make_var_get(vars, cpp_name) else: "$(AM_CPPFLAGS)"
+    let cflags = if assembler: "$(AM_CCASFLAGS)" else: "$(AM_CFLAGS)"
+    let expanded = sdk_make_expand(ctx, vars, cpp ++ " " ++ cflags, crt_dir_abs, 0)
+    if not expanded.ok:
+        return sdk_list_fail()
+    var flags: Vec[str] = Vec.new()
+    for i in 0..base.len() as i32:
+        flags.push(sdk_owned_text(base[i]))
+    let words = sdk_words(expanded.text)
+    for i in 0..words.len() as i32:
+        flags.push(sdk_owned_text(words[i]))
+    SdkList { ok: true, items: flags }
+
+// `base` followed by the words of a Makefile.am flag expression.
+fn sdk_mingw_flags_for(ctx: &ActionCtx, vars: &Vec[SdkMakeVar], crt_dir_abs: &str, expr: &str, base: &Vec[str]) -> SdkList:
+    let expanded = sdk_make_expand(ctx, vars, expr, crt_dir_abs, 0)
+    if not expanded.ok:
+        return sdk_list_fail()
+    var flags: Vec[str] = Vec.new()
+    for i in 0..base.len() as i32:
+        flags.push(sdk_owned_text(base[i]))
+    let words = sdk_words(expanded.text)
+    for i in 0..words.len() as i32:
+        flags.push(sdk_owned_text(words[i]))
+    SdkList { ok: true, items: flags }
+
+// Compiles one Makefile.am library's C and assembly sources.
+fn sdk_mingw_lib_objects(ctx: &ActionCtx, vars: &Vec[SdkMakeVar], clang: &str, crt_dir: &str, lib_var: &str, base: &Vec[str], obj_dir: &str, width: i32) -> SdkList:
+    let root = ctx.project_info().project_root()
+    let crt_abs = sdk_abs(root, crt_dir)
+    let all = sdk_mingw_compiled_sources(ctx, vars, lib_var ++ "_SOURCES", crt_abs)
+    if not all.ok:
+        return sdk_list_fail()
+    var c_sources: Vec[str] = Vec.new()
+    var s_sources: Vec[str] = Vec.new()
+    for i in 0..all.items.len() as i32:
+        let source = sdk_rel_path(crt_abs, all.items[i])
+        let rel = if source.len() > 0: source else: sdk_owned_text(all.items[i])
+        if rel.ends_with(".S"):
+            s_sources.push(rel)
+        else:
+            c_sources.push(rel)
+    var objects: Vec[str] = Vec.new()
+    let c_flags = sdk_mingw_lib_flags(ctx, vars, crt_abs, lib_var, base, false)
+    if not c_flags.ok:
+        return sdk_list_fail()
+    let c_objs = sdk_compile_all(ctx, clang, crt_dir, &c_sources, &c_flags.items, obj_dir, width)
+    if not c_objs.ok:
+        return sdk_list_fail()
+    for i in 0..c_objs.items.len() as i32:
+        objects.push(sdk_owned_text(c_objs.items[i]))
+    if s_sources.len() > 0:
+        let s_flags = sdk_mingw_lib_flags(ctx, vars, crt_abs, lib_var, base, true)
+        if not s_flags.ok:
+            return sdk_list_fail()
+        let s_objs = sdk_compile_all(ctx, clang, crt_dir, &s_sources, &s_flags.items, obj_dir, width)
+        if not s_objs.ok:
+            return sdk_list_fail()
+        for i in 0..s_objs.items.len() as i32:
+            objects.push(sdk_owned_text(s_objs.items[i]))
+    SdkList { ok: true, items: objects }
+
+// ── The libc action ──────────────────────────────────────────────────────
+
+// Toolchain variables clang itself reads from the environment (header
+// search paths). The build compiles against the SDK's headers only; one set
+// in the environment would add a host directory to every compile.
+fn sdk_clang_env_leaks(ctx: &ActionCtx) -> str:
+    var names: Vec[str] = Vec.new()
+    names.push("CPATH")
+    names.push("C_INCLUDE_PATH")
+    names.push("CPLUS_INCLUDE_PATH")
+    names.push("OBJC_INCLUDE_PATH")
+    var set = ""
+    for i in 0..names.len() as i32:
+        if ctx.env_input(names[i]).len() > 0:
+            set = set ++ " " ++ names[i]
+    set
+
+// args: tools-prefix (the SDK whose clang and LLVM tools build this),
+// output-prefix (the SDK this installs into; it may be the same one — the
+// libc is added beside what is there, nothing is replaced), mingw-w64 source
+// dir, architecture (x86_64 | aarch64), build dir. Output: the marker.
+pub fn run_sdk_windows_libc_action(ctx: ActionCtx) -> i32:
+    let args = ctx.args()
+    if args.len() < 5:
+        return sdk_fail(ctx, "requires tools-prefix, output-prefix, mingw-w64 source dir, arch, and build-dir args")
+    let tools_prefix = args.get(0)
+    let output_prefix = args.get(1)
+    let source_dir = args.get(2)
+    let arch_name = args.get(3)
+    let build_dir = args.get(4)
+    if sdk_mingw_makefile_prefix(arch_name).len() == 0:
+        return sdk_fail(ctx, "unsupported Windows libc architecture: " ++ arch_name)
+    let leaks = sdk_clang_env_leaks(&ctx)
+    if leaks.len() > 0:
+        return sdk_fail(ctx, "the environment sets" ++ leaks ++ ", which clang would add to every compile of the SDK's C runtime; unset it")
+    let fs = ctx.fs()
+    let root = ctx.project_info().project_root()
+    let clang = sdk_abs(root, sdk_tool(tools_prefix, "clang"))
+    if not fs.exists(sdk_tool(tools_prefix, "clang")):
+        return sdk_fail(ctx, "missing SDK clang: " ++ sdk_tool(tools_prefix, "clang"))
+    let tool_dir = sdk_join(build_dir, "tools")
+    if fs.mkdir_all(tool_dir) != 0:
+        return sdk_fail(ctx, "could not create " ++ tool_dir)
+    let ar = sdk_llvm_tool(ctx, tools_prefix, tool_dir, "llvm-ar")
+    if ar.len() == 0: return 1
+    let dlltool = sdk_llvm_tool(ctx, tools_prefix, tool_dir, "llvm-dlltool")
+    if dlltool.len() == 0: return 1
+    let crt_dir = sdk_join(source_dir, "mingw-w64-crt")
+    let libc_root = sdk_windows_libc_root(output_prefix)
+    let include_dir = sdk_join(libc_root, "include")
+    let lib_dir = sdk_windows_libc_lib_dir(output_prefix, arch_name)
+    let work = sdk_join(build_dir, arch_name)
+    if fs.mkdir_all(include_dir) != 0 or fs.mkdir_all(lib_dir) != 0 or fs.mkdir_all(work) != 0:
+        return sdk_fail(ctx, "could not create the Windows libc directories under " ++ libc_root)
+    var rc = sdk_install_mingw_headers(ctx, source_dir, include_dir)
+    if rc != 0: return rc
+    let width = 16
+    let base = sdk_mingw_toolchain_flags(root, tools_prefix, include_dir, arch_name)
+    var empty: Vec[SdkMakeVar] = Vec.new()
+    let vars = sdk_mingw_parse_makefile(ctx, sdk_join(crt_dir, "Makefile.am"), ".", arch_name, move empty)
+    let p = sdk_mingw_makefile_prefix(arch_name)
+    let crt_abs = sdk_abs(root, crt_dir)
+    let cpp_arch = if arch_name == "x86_64": "$(CPPFLAGS64)" else: "$(CPPFLAGSARM64)"
+
+    // The startup objects: crt2.o is crtexe.c under COMPILE64 (Makefile.am
+    // `lib64/crt1.o`, copied to crt2.o); crtbegin.o/crtend.o are the
+    // `lib64/%.o: crt/%.c` rule, which clang's MinGW driver links on every
+    // executable.
+    var startup: Vec[str] = Vec.new()
+    startup.push("crt/crtexe.c")
+    let startup_flags = sdk_mingw_flags_for(ctx, &vars, crt_abs, cpp_arch ++ " $(extra_include) -D_SYSCRT=1 $(AM_CFLAGS)", &base)
+    if not startup_flags.ok: return 1
+    let startup_objs = sdk_compile_all(ctx, clang, crt_dir, &startup, &startup_flags.items, sdk_join(work, "crt"), width)
+    if not startup_objs.ok: return 1
+    if fs.copy_file(startup_objs.items[0], sdk_join(lib_dir, "crt2.o")) != 0:
+        return sdk_fail(ctx, "could not install crt2.o")
+    var begin_end: Vec[str] = Vec.new()
+    begin_end.push("crt/crtbegin.c")
+    begin_end.push("crt/crtend.c")
+    let be_flags = sdk_mingw_flags_for(ctx, &vars, crt_abs, cpp_arch ++ " $(AM_CFLAGS)", &base)
+    if not be_flags.ok: return 1
+    let be_objs = sdk_compile_all(ctx, clang, crt_dir, &begin_end, &be_flags.items, sdk_join(work, "crtbeginend"), width)
+    if not be_objs.ok: return 1
+    if fs.copy_file(be_objs.items[0], sdk_join(lib_dir, "crtbegin.o")) != 0 or fs.copy_file(be_objs.items[1], sdk_join(lib_dir, "crtend.o")) != 0:
+        return sdk_fail(ctx, "could not install crtbegin.o/crtend.o")
+
+    // The static support libraries, each from its own Makefile.am source
+    // list and flags. moldname's only source is the Makefile's generated
+    // placeholder (_libm_dummy.c, one unused static): with the UCRT the old
+    // names are aliases in the import library, so its archive is empty.
+    var statics: Vec[str] = Vec.new()
+    statics.push("mingw32")
+    statics.push("mingwex")
+    statics.push("uuid")
+    for i in 0..statics.len() as i32:
+        let name = statics[i]
+        let objs = sdk_mingw_lib_objects(ctx, &vars, clang, crt_dir, p ++ "_lib" ++ name ++ "_a", &base, sdk_join(work, name), width)
+        if not objs.ok: return 1
+        rc = sdk_archive(ctx, ar, sdk_join(lib_dir, name ++ ".lib"), &objs.items)
+        if rc != 0: return rc
+    let no_members: Vec[str] = Vec.new()
+    rc = sdk_archive(ctx, ar, sdk_join(lib_dir, "moldname.lib"), &no_members)
+    if rc != 0: return rc
+
+    // The UCRT: lib-common/ucrt.mri's members, the api-ms-win-crt-* import
+    // libraries and libucrt_extra's wrappers. msvcrt.lib is the same archive
+    // (Makefile.am copies @MSVCRT_LIB@, libucrt.a by default): clang's MinGW
+    // driver asks for -lmsvcrt.
+    let mri = sdk_split_lines(fs.read_text(sdk_join(crt_dir, "lib-common/ucrt.mri")))
+    var ucrt_members: Vec[str] = Vec.new()
+    for i in 0..mri.len() as i32:
+        let line = sdk_trim(mri[i])
+        if not line.starts_with("ADDLIB "):
+            continue
+        let file = sdk_trim(line.slice(7, line.len()))
+        if not file.starts_with("lib") or not file.ends_with(".a"):
+            return sdk_fail(ctx, "lib-common/ucrt.mri: unexpected member " ++ file)
+        let member = file.slice(3, file.len() - 2)
+        if member == "ucrt_extra":
+            let objs = sdk_mingw_lib_objects(ctx, &vars, clang, crt_dir, p ++ "_libucrt_extra_a", &base, sdk_join(work, "ucrt_extra"), width)
+            if not objs.ok: return 1
+            for j in 0..objs.items.len() as i32:
+                ucrt_members.push(sdk_owned_text(objs.items[j]))
+            continue
+        let def = sdk_mingw_def(ctx, clang, crt_dir, arch_name, member, work)
+        if def.len() == 0:
+            return sdk_fail(ctx, "no .def for " ++ member ++ " in " ++ crt_dir)
+        let implib = sdk_join(work, member ++ ".implib.lib")
+        rc = sdk_import_lib(ctx, dlltool, arch_name, def, implib)
+        if rc != 0: return rc
+        ucrt_members.push(implib)
+    rc = sdk_archive(ctx, ar, sdk_join(lib_dir, "ucrt.lib"), &ucrt_members)
+    if rc != 0: return rc
+    if fs.copy_file(sdk_join(lib_dir, "ucrt.lib"), sdk_join(lib_dir, "msvcrt.lib")) != 0:
+        return sdk_fail(ctx, "could not install msvcrt.lib")
+
+    // The in-box DLLs' import libraries, each with the objects Makefile.am
+    // puts in the same archive (kernel32's out-of-line intrinsics, ws2_32's
+    // in6addr helpers, ...).
+    let dlls = sdk_windows_import_libs()
+    for i in 0..dlls.len() as i32:
+        let name = dlls[i]
+        let def = sdk_mingw_def(ctx, clang, crt_dir, arch_name, name, work)
+        if def.len() == 0:
+            return sdk_fail(ctx, "no .def for " ++ name ++ " in " ++ crt_dir)
+        let implib = sdk_join(work, name ++ ".implib.lib")
+        rc = sdk_import_lib(ctx, dlltool, arch_name, def, implib)
+        if rc != 0: return rc
+        var members: Vec[str] = Vec.new()
+        members.push(implib)
+        let lib_var = p ++ "_lib" ++ name ++ "_a"
+        if sdk_make_var_has(&vars, lib_var ++ "_SOURCES"):
+            let objs = sdk_mingw_lib_objects(ctx, &vars, clang, crt_dir, lib_var, &base, sdk_join(work, name), width)
+            if not objs.ok: return 1
+            for j in 0..objs.items.len() as i32:
+                members.push(sdk_owned_text(objs.items[j]))
+        rc = sdk_archive(ctx, ar, sdk_join(lib_dir, name ++ ".lib"), &members)
+        if rc != 0: return rc
+
+    // Licenses and provenance travel with the binaries.
+    let notices: Vec[str] = Vec.new()
+    notices.push("COPYING")
+    notices.push("COPYING.MinGW-w64/COPYING.MinGW-w64.txt")
+    notices.push("COPYING.MinGW-w64-runtime/COPYING.MinGW-w64-runtime.txt")
+    notices.push("DISCLAIMER")
+    notices.push("DISCLAIMER.PD")
+    for i in 0..notices.len() as i32:
+        let src = sdk_join(source_dir, notices[i])
+        if not fs.exists(src):
+            return sdk_fail(ctx, "mingw-w64 source has no " ++ notices[i])
+        if fs.copy_file(src, sdk_join(libc_root, sdk_basename(notices[i]))) != 0:
+            return sdk_fail(ctx, "could not install " ++ notices[i])
+    let provenance = "mingw-w64 " ++ SDK_MINGW_W64_VERSION ++ "\n" ++
+        "source: " ++ sdk_mingw_source_url() ++ "\n" ++
+        "sha256: " ++ SDK_MINGW_W64_SHA256 ++ "\n" ++
+        "license: ZPL 2.1 with public-domain and BSD-style parts; see COPYING, COPYING.MinGW-w64.txt, COPYING.MinGW-w64-runtime.txt, DISCLAIMER, DISCLAIMER.PD\n" ++
+        "built by: with build :sdk-windows-libc (build/sdk.w run_sdk_windows_libc_action), with the SDK's own clang and llvm-dlltool\n" ++
+        "include/: mingw-w64-headers, installed as its configure --with-default-msvcrt=ucrt --with-default-win32-winnt=0xa00 would\n" ++
+        "<arch>-w64-mingw32/lib/: crt2.o crtbegin.o crtend.o, mingw32 mingwex moldname uuid, ucrt (= msvcrt), and the import libraries of the in-box DLLs, from mingw-w64-crt/Makefile.am\n"
+    rc = sdk_write_text(ctx, sdk_join(libc_root, "PROVENANCE"), provenance)
+    if rc != 0: return rc
+    if not fs.exists(sdk_windows_libc_marker(output_prefix, arch_name)):
+        return sdk_fail(ctx, "the Windows libc build did not leave " ++ sdk_windows_libc_marker(output_prefix, arch_name))
+    0
+
+// ── compiler-rt's builtins for Windows ─────────────────────────────────────
+//
+// The mingw-w64 runtime is GNU-ABI code: its stack probes call
+// ___chkstk_ms, its math the soft-float and 128-bit helpers, which libgcc
+// supplies to a GCC toolchain and compiler-rt's builtins to this one. They
+// are built from the LLVM source the SDK is built from, by compiler-rt's own
+// standalone CMake project (as llvm-mingw builds them), with the SDK's clang
+// against the libc just installed, into the clang resource directory where
+// clang's MinGW driver looks for them.
+//
+// args: tools-prefix, output-prefix, LLVM source dir, arch, build dir.
+pub fn run_sdk_compiler_rt_builtins_action(ctx: ActionCtx) -> i32:
+    let args = ctx.args()
+    if args.len() < 5:
+        return sdk_fail(ctx, "requires tools-prefix, output-prefix, LLVM source dir, arch, and build-dir args")
+    let tools_prefix = args.get(0)
+    let output_prefix = args.get(1)
+    let source_dir = args.get(2)
+    let arch_name = args.get(3)
+    let build_dir = args.get(4)
+    if sdk_mingw_makefile_prefix(arch_name).len() == 0:
+        return sdk_fail(ctx, "unsupported Windows architecture: " ++ arch_name)
+    let leaks = sdk_clang_env_leaks(&ctx)
+    if leaks.len() > 0:
+        return sdk_fail(ctx, "the environment sets" ++ leaks ++ ", which clang would add to every compile; unset it")
+    let fs = ctx.fs()
+    let root = ctx.project_info().project_root()
+    if not fs.exists(sdk_windows_libc_marker(output_prefix, arch_name)):
+        return sdk_fail(ctx, "the Windows libc is not installed in " ++ output_prefix ++ " (run :sdk-windows-libc)")
+    let tool_dir = sdk_join(build_dir, "tools")
+    let cmake_build = sdk_join(build_dir, arch_name)
+    if fs.mkdir_all(tool_dir) != 0 or fs.mkdir_all(cmake_build) != 0:
+        return sdk_fail(ctx, "could not create " ++ build_dir)
+    let ar = sdk_llvm_tool(ctx, tools_prefix, tool_dir, "llvm-ar")
+    if ar.len() == 0: return 1
+    let ranlib = sdk_llvm_tool(ctx, tools_prefix, tool_dir, "llvm-ranlib")
+    if ranlib.len() == 0: return 1
+    let clang = sdk_abs(root, sdk_tool(tools_prefix, "clang"))
+    let cmake = sdk_abs(root, sdk_tool(tools_prefix, "cmake"))
+    let ninja = sdk_abs(root, sdk_tool(tools_prefix, "ninja"))
+    let triple = sdk_windows_triple(arch_name)
+    let sysroot = sdk_abs(root, sdk_windows_libc_root(output_prefix))
+    let resource = sdk_abs(root, sdk_join(output_prefix, "lib/clang/" ++ sdk_llvm_major()))
+    let configure: Vec[str] = Vec.new()
+    configure.push(sdk_owned_text(cmake))
+    configure.push("-G")
+    configure.push("Ninja")
+    configure.push("-S")
+    configure.push(sdk_abs(root, sdk_join(source_dir, "compiler-rt/lib/builtins")))
+    configure.push("-B")
+    configure.push(sdk_abs(root, cmake_build))
+    configure.push("-DCMAKE_BUILD_TYPE=Release")
+    configure.push("-DCMAKE_MAKE_PROGRAM=" ++ ninja)
+    configure.push("-DCMAKE_INSTALL_PREFIX=" ++ resource)
+    configure.push("-DCMAKE_SYSTEM_NAME=Windows")
+    configure.push("-DCMAKE_SYSTEM_PROCESSOR=" ++ (if arch_name == "x86_64": "AMD64" else: "ARM64"))
+    configure.push("-DCMAKE_C_COMPILER=" ++ clang)
+    configure.push("-DCMAKE_ASM_COMPILER=" ++ clang)
+    configure.push("-DCMAKE_C_COMPILER_TARGET=" ++ triple)
+    configure.push("-DCMAKE_ASM_COMPILER_TARGET=" ++ triple)
+    // Every language the project enables names the SDK compiler and target:
+    // a C++ compiler left to CMake is whatever clang++ PATH offers, for the
+    // host (MSVC) target, and CMake then does not set MINGW, so compiler-rt
+    // names the archive clang_rt.builtins-<arch>.lib, where clang's MinGW
+    // driver does not look.
+    configure.push("-DCMAKE_CXX_COMPILER=" ++ sdk_abs(root, sdk_tool(tools_prefix, "clang++")))
+    configure.push("-DCMAKE_CXX_COMPILER_TARGET=" ++ triple)
+    configure.push("-DCMAKE_CXX_COMPILER_WORKS=ON")
+    configure.push("-DCMAKE_SYSROOT=" ++ sysroot)
+    configure.push("-DCMAKE_AR=" ++ ar)
+    configure.push("-DCMAKE_RANLIB=" ++ ranlib)
+    configure.push("-DCMAKE_C_COMPILER_WORKS=ON")
+    configure.push("-DCMAKE_ASM_COMPILER_WORKS=ON")
+    configure.push("-DCMAKE_FIND_ROOT_PATH=" ++ sysroot)
+    configure.push("-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY")
+    configure.push("-DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY")
+    configure.push("-DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON")
+    configure.push("-DCOMPILER_RT_BUILD_BUILTINS=ON")
+    configure.push("-DCOMPILER_RT_EXCLUDE_ATOMIC_BUILTIN=OFF")
+    configure.push("-DLLVM_ENABLE_PER_TARGET_RUNTIME_DIR=OFF")
+    configure.push("-DLLVM_CONFIG_PATH=")
+    var rc = sdk_run_capture(ctx, "builtins-configure-" ++ arch_name, configure, 600000)
+    if rc != 0: return rc
+    var build: Vec[str] = Vec.new()
+    build.push(sdk_owned_text(cmake))
+    build.push("--build")
+    build.push(sdk_abs(root, cmake_build))
+    build.push("--target")
+    build.push("install")
+    rc = sdk_run_capture(ctx, "builtins-build-" ++ arch_name, build, 1800000)
+    if rc != 0: return rc
+    let installed = sdk_compiler_rt_builtins(output_prefix, arch_name)
+    if not fs.exists(installed):
+        return sdk_fail(ctx, "compiler-rt's builtins did not install to " ++ installed)
+    // From here on the output SDK's clang resource dir is complete, and every
+    // Windows-target compile below names it (-resource-dir): its builtins are
+    // these, its headers the tools SDK's own — the same LLVM release, which
+    // the LLVM install later rewrites with identical files.
+    let out_include = sdk_join(output_prefix, "lib/clang/" ++ sdk_llvm_major() ++ "/include")
+    if not fs.exists(sdk_join(out_include, "stddef.h")):
+        let tools_include = sdk_join(tools_prefix, "lib/clang/" ++ sdk_llvm_major() ++ "/include")
+        if fs.copy_tree(tools_include, out_include) != 0:
+            return sdk_fail(ctx, "could not stage clang's builtin headers into " ++ out_include)
+    0
+
+// ── The Windows GNU-ABI toolchain the SDK's own C++ is built with ─────────
+//
+// The compiler links LLVM's and clang's C++ archives. Built by clang-cl
+// against Visual Studio's STL they need Visual Studio's C++ runtime
+// (libcpmt, libcmt, vcruntime) at every compiler link; built for
+// <arch>-w64-windows-gnu against the SDK's own libc++ they need nothing but
+// the SDK (#1915). These are the CMake arguments every such build shares:
+// the tools SDK's clang for the target, the SDK's libc as its sysroot, the
+// output SDK's resource dir (compiler-rt's builtins), libc++/libunwind, and
+// lld as the linker, all named, nothing found on PATH.
+fn sdk_windows_gnu_cmake_args(ctx: &ActionCtx, tools_prefix: &str, output_prefix: &str, arch_name: &str, tool_dir: &str) -> SdkList:
+    let root = ctx.project_info().project_root()
+    let ar = sdk_llvm_tool(ctx, tools_prefix, tool_dir, "llvm-ar")
+    let ranlib = sdk_llvm_tool(ctx, tools_prefix, tool_dir, "llvm-ranlib")
+    let ld = sdk_llvm_tool(ctx, tools_prefix, tool_dir, "ld.lld")
+    if ar.len() == 0 or ranlib.len() == 0 or ld.len() == 0:
+        return sdk_list_fail()
+    let triple = sdk_windows_triple(arch_name)
+    let clang = sdk_abs(root, sdk_tool(tools_prefix, "clang"))
+    let clangxx = sdk_abs(root, sdk_tool(tools_prefix, "clang++"))
+    let resource = sdk_abs(root, sdk_join(output_prefix, "lib/clang/" ++ sdk_llvm_major()))
+    let sysroot = sdk_abs(root, sdk_windows_libc_root(output_prefix))
+    let compile_flags = "-resource-dir=" ++ resource
+    let link_flags = "-resource-dir=" ++ resource ++ " --ld-path=" ++ ld ++ " -rtlib=compiler-rt -unwindlib=libunwind -stdlib=libc++ -static"
+    var out: Vec[str] = Vec.new()
+    out.push("-DCMAKE_SYSTEM_NAME=Windows")
+    out.push("-DCMAKE_SYSTEM_PROCESSOR=" ++ (if arch_name == "x86_64": "AMD64" else: "ARM64"))
+    out.push("-DCMAKE_C_COMPILER=" ++ clang)
+    out.push("-DCMAKE_CXX_COMPILER=" ++ clangxx)
+    out.push("-DCMAKE_ASM_COMPILER=" ++ clang)
+    out.push("-DCMAKE_C_COMPILER_TARGET=" ++ triple)
+    out.push("-DCMAKE_CXX_COMPILER_TARGET=" ++ triple)
+    out.push("-DCMAKE_ASM_COMPILER_TARGET=" ++ triple)
+    out.push("-DCMAKE_SYSROOT=" ++ sysroot)
+    out.push("-DCMAKE_FIND_ROOT_PATH=" ++ sysroot)
+    out.push("-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY")
+    out.push("-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY")
+    out.push("-DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY")
+    out.push("-DCMAKE_AR=" ++ ar)
+    out.push("-DCMAKE_RANLIB=" ++ ranlib)
+    out.push("-DCMAKE_C_FLAGS_INIT=" ++ compile_flags)
+    out.push("-DCMAKE_CXX_FLAGS_INIT=" ++ compile_flags ++ " -stdlib=libc++")
+    out.push("-DCMAKE_ASM_FLAGS_INIT=" ++ compile_flags)
+    out.push("-DCMAKE_EXE_LINKER_FLAGS_INIT=" ++ link_flags)
+    out.push("-DCMAKE_SHARED_LINKER_FLAGS_INIT=" ++ link_flags)
+    out.push("-DCMAKE_MODULE_LINKER_FLAGS_INIT=" ++ link_flags)
+    SdkList { ok: true, items: out }
+
+// libunwind, libc++abi and libc++, static, for the Windows target: the C++
+// runtime of the SDK's LLVM and clang archives, and so of the compiler's own
+// link. The runtimes' own CMake project with llvm-mingw's configuration
+// (build-libcxx.sh), installed into the libc's <arch>-w64-mingw32 dir, where
+// clang's MinGW driver finds the headers (include/c++/v1) and archives.
+//
+// args: tools-prefix, output-prefix, LLVM source dir, arch, build dir.
+pub fn run_sdk_libcxx_action(ctx: ActionCtx) -> i32:
+    let args = ctx.args()
+    if args.len() < 5:
+        return sdk_fail(ctx, "requires tools-prefix, output-prefix, LLVM source dir, arch, and build-dir args")
+    let tools_prefix = args.get(0)
+    let output_prefix = args.get(1)
+    let source_dir = args.get(2)
+    let arch_name = args.get(3)
+    let build_dir = args.get(4)
+    let leaks = sdk_clang_env_leaks(&ctx)
+    if leaks.len() > 0:
+        return sdk_fail(ctx, "the environment sets" ++ leaks ++ ", which clang would add to every compile; unset it")
+    let fs = ctx.fs()
+    let root = ctx.project_info().project_root()
+    if not fs.exists(sdk_compiler_rt_builtins(output_prefix, arch_name)):
+        return sdk_fail(ctx, "compiler-rt's builtins are not installed in " ++ output_prefix ++ " (run :sdk-compiler-rt-builtins)")
+    let tool_dir = sdk_join(build_dir, "tools")
+    let cmake_build = sdk_join(build_dir, arch_name)
+    if fs.mkdir_all(tool_dir) != 0 or fs.mkdir_all(cmake_build) != 0:
+        return sdk_fail(ctx, "could not create " ++ build_dir)
+    let common = sdk_windows_gnu_cmake_args(ctx, tools_prefix, output_prefix, arch_name, tool_dir)
+    if not common.ok: return 1
+    let cmake = sdk_abs(root, sdk_tool(tools_prefix, "cmake"))
+    let prefix = sdk_abs(root, sdk_windows_libc_root(output_prefix) ++ "/" ++ sdk_windows_libc_triple_dir(arch_name))
+    let configure: Vec[str] = Vec.new()
+    configure.push(sdk_owned_text(cmake))
+    configure.push("-G")
+    configure.push("Ninja")
+    configure.push("-S")
+    configure.push(sdk_abs(root, sdk_join(source_dir, "runtimes")))
+    configure.push("-B")
+    configure.push(sdk_abs(root, cmake_build))
+    configure.push("-DCMAKE_BUILD_TYPE=Release")
+    configure.push("-DCMAKE_MAKE_PROGRAM=" ++ sdk_abs(root, sdk_tool(tools_prefix, "ninja")))
+    configure.push("-DCMAKE_INSTALL_PREFIX=" ++ prefix)
+    for i in 0..common.items.len() as i32:
+        configure.push(sdk_owned_text(common.items[i]))
+    configure.push("-DCMAKE_C_COMPILER_WORKS=ON")
+    configure.push("-DCMAKE_CXX_COMPILER_WORKS=ON")
+    configure.push("-DCMAKE_ASM_COMPILER_WORKS=ON")
+    configure.push("-DLLVM_ENABLE_RUNTIMES=libunwind;libcxxabi;libcxx")
+    configure.push("-DLIBUNWIND_USE_COMPILER_RT=ON")
+    configure.push("-DLIBUNWIND_ENABLE_SHARED=OFF")
+    configure.push("-DLIBUNWIND_ENABLE_STATIC=ON")
+    configure.push("-DLIBCXX_USE_COMPILER_RT=ON")
+    configure.push("-DLIBCXX_ENABLE_SHARED=OFF")
+    configure.push("-DLIBCXX_ENABLE_STATIC=ON")
+    configure.push("-DLIBCXX_ENABLE_STATIC_ABI_LIBRARY=ON")
+    configure.push("-DLIBCXX_CXX_ABI=libcxxabi")
+    configure.push("-DLIBCXX_LIBDIR_SUFFIX=")
+    configure.push("-DLIBCXX_INCLUDE_TESTS=OFF")
+    configure.push("-DLIBCXX_INCLUDE_BENCHMARKS=OFF")
+    configure.push("-DLIBCXX_INSTALL_MODULES=OFF")
+    configure.push("-DLIBCXX_ENABLE_ABI_LINKER_SCRIPT=OFF")
+    configure.push("-DLIBCXXABI_USE_COMPILER_RT=ON")
+    configure.push("-DLIBCXXABI_USE_LLVM_UNWINDER=ON")
+    configure.push("-DLIBCXXABI_ENABLE_SHARED=OFF")
+    configure.push("-DLIBCXXABI_LIBDIR_SUFFIX=")
+    var rc = sdk_run_capture(ctx, "libcxx-configure-" ++ arch_name, configure, 900000)
+    if rc != 0: return rc
+    var build: Vec[str] = Vec.new()
+    build.push(sdk_owned_text(cmake))
+    build.push("--build")
+    build.push(sdk_abs(root, cmake_build))
+    build.push("--target")
+    build.push("install")
+    rc = sdk_run_capture(ctx, "libcxx-build-" ++ arch_name, build, 3600000)
+    if rc != 0: return rc
+    let names: Vec[str] = Vec.new()
+    names.push("libc++.a")
+    names.push("libunwind.a")
+    for i in 0..names.len() as i32:
+        let lib = sdk_join(sdk_windows_libc_lib_dir(output_prefix, arch_name), names[i])
+        if not fs.exists(lib):
+            return sdk_fail(ctx, "the C++ runtime did not install " ++ lib)
+    if not fs.exists(sdk_join(sdk_windows_libc_root(output_prefix), sdk_windows_libc_triple_dir(arch_name) ++ "/include/c++/v1/vector")):
+        return sdk_fail(ctx, "libc++'s headers did not install under " ++ prefix ++ "/include/c++/v1")
+    0
