@@ -10,6 +10,7 @@ use CiMigrate
 use std.cfg.stackify
 use compiler.ClangBridge.*
 use compiler.EmbeddedClangResource
+use compiler.EmbeddedSysroot
 use std.string.StringBuilder
 use TargetSpec
 use MathBuiltins
@@ -228,6 +229,9 @@ pub fn ci_prepare_clang_resource_dir():
     let dir = ensure_clang_resource_dir()
     if dir.len() > 0:
         with_cimport_set_resource_dir(dir)
+    // #1915: the macOS headers are the embedded sysroot's unless an SDK is
+    // named (compiler.EmbeddedSysroot decides which).
+    with_cimport_set_sdk_path(host_darwin_sdk_root())
 
 pub fn ci_set_include_paths(paths: &Vec[str]):
     with_cimport_clear_include_paths()
@@ -238,7 +242,7 @@ pub fn ci_add_windows_system_includes():
     with_cimport_add_windows_system_includes()
 
 pub fn ci_set_sdk_path(path: &str):
-    with_cimport_set_sdk_path(path)
+    darwin_sdk_set_configured(path)
 
 fn ci_build_define_prefix(defines: &Vec[str]) -> str:
     var out = StringBuilder.new()

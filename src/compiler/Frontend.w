@@ -1045,7 +1045,7 @@ impl Zcu:
         // §16.1: if the target macOS SDK could not be resolved, name the missing
         // target input and the remedies (never a host tool — none is used).
         if with_cimport_macos_sdk_missing() != 0:
-            full_msg = full_msg ++ "; no macOS SDK found for target headers — set SDKROOT/WITH_SDKROOT, configure [c_import] sdk_path in with.toml, or install the Command Line Tools"
+            full_msg = full_msg ++ "; no macOS SDK for target headers: this compiler carries no darwin sysroot (#1915) — set WITH_SDKROOT or SDKROOT, or configure [c_import] sdk_path in with.toml"
         self.diagnostics.emit(Diagnostic.err(full_msg, span))
 
     mut fn c_import_emit_header_error_frontend(decl: i32, header_spec: &str):

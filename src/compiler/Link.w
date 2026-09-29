@@ -5,6 +5,9 @@ use compiler.EmbeddedBundles
 use compiler.BundleInterfaces
 use compiler.AbiStamp
 use compiler.WasmHost
+use compiler.LldDriver
+use compiler.EmbeddedSysroot
+use std.string.StringBuilder
 use std.collections.Atomic
 use TargetSpec
 
@@ -319,7 +322,10 @@ impl LinkStageCommand:
             argv = link_stage_argv_append(argv, self.args[i])
         let saved = link_stage_apply_env(&self.env)
         let linux_target = if target_spec_is_native(): runtime_sysinfo_os() == "Linux" else: target_spec_active_kind() == 1 or target_spec_active_kind() == 2
-        let rc = if linux_target:
+        // #1915: a failed macOS link says why (lld's own diagnostics, or the
+        // exit status), never a bare "build failed".
+        let darwin_native = target_spec_is_native() and runtime_sysinfo_os() == "Macos"
+        let rc = if linux_target or darwin_native:
             link_run_with_diagnostics(argv, self.cwd)
         else if self.cwd.len() > 0:
             runtime_exec_argv_cwd(argv, self.cwd)
@@ -953,7 +959,33 @@ fn link_stage_link_with_extras_libs_args_plan(obj_path: &str, bin_path: &str, ex
                 with_eprint("error: cross-target link requires LLVM linker metadata (" ++ root ++ "/llvm_ld)")
             return link_stage_plan_fail()
         return link_stage_link_with_llvm_args_plan(obj_path, bin_path, extras, link_libs, link_args, ld_path)
+    if runtime_sysinfo_os() == "Macos":
+        return link_stage_darwin_native_link_plan(obj_path, bin_path, extras, link_libs, link_args)
     let command = link_stage_make_link_command("cc", obj_path, bin_path, extras, link_libs, link_args)
+    link_stage_plan_for_command(move command)
+
+// #1915: a native macOS link is this binary's own lld (`with __ld`, src/
+// compiler/LldDriver.w) over the darwin sysroot (compiler.EmbeddedSysroot):
+// no cc, no ld, no Xcode or Command Line Tools, no Apple SDK. A framework is
+// found only on the -F paths the program's dependencies give; lld names the
+// one it cannot find.
+fn link_stage_darwin_native_link_plan(obj_path: &str, bin_path: &str, extras: &Vec[str], link_libs: &Vec[str], link_args: &Vec[str]) -> LinkStagePlan:
+    let self_exe = with_self_exe()
+    if self_exe.len() == 0:
+        with_eprint("error: link: cannot find this compiler's own executable to run its linker (argv[0] is '" ++ runtime_arg_at(0) ++ "')")
+        return link_stage_plan_fail()
+    let sysroot = darwin_sdk_root()
+    if sysroot.len() == 0:
+        with_eprint("error: link: no darwin sysroot: this compiler carries none, and WITH_SDKROOT / SDKROOT name none")
+        return link_stage_plan_fail()
+    var command = link_stage_make_darwin_llvm_link_command(self_exe, obj_path, bin_path, extras, link_libs, link_args)
+    let args: Vec[str] = Vec.new()
+    args.push("__ld")
+    args.push("-syslibroot")
+    args.push(sysroot)
+    for i in 0..command.args.len() as i32:
+        args.push(with_str_clone_ref(command.args[i]))
+    command.args = args
     link_stage_plan_for_command(move command)
 
 // The native-Windows lld-link path, resolved from the environment when the
@@ -1015,7 +1047,60 @@ fn link_stage_undef_contains_symbol(undef: &str, name: &str) -> bool:
         return true
     link_stage_str_contains(undef, name)
 
+// #1915: `nm -u` for a 64-bit Mach-O object, read here rather than from a
+// host `nm`: each undefined external symbol of LC_SYMTAB, one per line, as
+// nm prints them (with Mach-O's leading underscore). "<probe-failed>" when
+// the file is not a 64-bit little-endian Mach-O object this can read.
+pub fn link_stage_macho_undefined_symbols(path: &str) -> str:
+    let data = runtime_read_file(path)
+    if data.len() < 32 or link_stage_read_u32_le(data, 0) != 0xfeedfacf:
+        return "<probe-failed>"
+    let size = data.len() as i32
+    let ncmds = link_stage_read_u32_le(data, 16) as i32
+    var offset = 32
+    for _ in 0..ncmds:
+        if offset + 8 > size:
+            return "<probe-failed>"
+        let cmd = link_stage_read_u32_le(data, offset)
+        let cmdsize = link_stage_read_u32_le(data, offset + 4) as i32
+        if cmdsize < 8 or offset + cmdsize > size:
+            return "<probe-failed>"
+        // LC_SYMTAB: symoff, nsyms, stroff, strsize.
+        if cmd == 0x2 and cmdsize >= 24:
+            let symoff = link_stage_read_u32_le(data, offset + 8) as i32
+            let nsyms = link_stage_read_u32_le(data, offset + 12) as i32
+            let stroff = link_stage_read_u32_le(data, offset + 16) as i32
+            let strsize = link_stage_read_u32_le(data, offset + 20) as i32
+            if symoff + nsyms * 16 > size or stroff + strsize > size:
+                return "<probe-failed>"
+            var out = StringBuilder.new()
+            for s in 0..nsyms:
+                // nlist_64: n_strx u32, n_type u8, n_sect u8, n_desc u16, n_value u64.
+                let entry = symoff + s * 16
+                let n_type = data[(entry + 4)] as i32
+                let n_value = link_stage_read_u32_le(data, entry + 8) + link_stage_read_u32_le(data, entry + 12)
+                // External (N_EXT), not a debugging entry (N_STAB), N_UNDF,
+                // and not a common symbol (an undefined one with a size).
+                if (n_type & 0xe0) == 0 and (n_type & 0x01) != 0 and (n_type & 0x0e) == 0 and n_value == 0:
+                    let strx = link_stage_read_u32_le(data, entry) as i32
+                    if strx <= 0 or strx >= strsize:
+                        return "<probe-failed>"
+                    var end = stroff + strx
+                    while end < stroff + strsize and data[end] != 0:
+                        end = end + 1
+                    out.push_str(data.slice((stroff + strx) as i64, end as i64))
+                    out.push_str("\n")
+            return out.to_str()
+        offset = offset + cmdsize
+    ""
+
 fn link_stage_undefined_symbols_for_object(obj_path: &str) -> str:
+    // A native macOS object is read in-process: no host nm (#1915).
+    if runtime_sysinfo_os() == "Macos" and target_spec_is_native():
+        let symbols = link_stage_macho_undefined_symbols(obj_path)
+        if symbols == "<probe-failed>":
+            with_eprint(f"warning: link: {obj_path} is not a 64-bit Mach-O object this compiler can read for undefined symbols; linking every embedded bundle\n")
+        return symbols
     let report_path = obj_path ++ ".undef"
     let null_path = if runtime_sysinfo_os() == "Windows": "NUL" else: "/dev/null"
     var argv = ""

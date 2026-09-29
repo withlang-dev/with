@@ -88,7 +88,10 @@ pub fn link_run_with_diagnostics(argv: &str, cwd: &str) -> i32:
     if output.len() > 0: print(output)
     if errors.len() > 0: runtime_eprint(errors)
     if rc != 0:
-        if errors.len() == 0: runtime_eprint(f"error: linker exited with status {rc} without diagnostics")
+        if errors.len() == 0:
+            let nul = argv.find("\0")
+            let linker = if nul > 0: argv.slice(0, nul) else: argv.to_owned()
+            runtime_eprint(f"error: linker `{linker}` exited with status {rc} without diagnostics")
         let help = link_missing_library_help(errors)
         if help.len() > 0: runtime_eprint(help)
     runtime_remove_tree(scratch)

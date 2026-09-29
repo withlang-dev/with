@@ -691,11 +691,16 @@ var g_emitted_cap: i32 = 0
 
 var g_cimport_include_paths: [32]*mut u8 = [0 as *mut u8; 32]
 var g_cimport_include_count: i32 = 0
-// §16.1: target SDK sysroot from with.toml [c_import] sdk_path (empty = none).
+// The macOS SDK c_import parses against (empty = none), resolved by
+// compiler.EmbeddedSysroot's darwin_sdk_root (#1915): WITH_SDKROOT, SDKROOT,
+// with.toml [c_import] sdk_path (§16.1), else the embedded sysroot. This
+// object stays import-free, so the caller hands the answer in.
 var g_cimport_sdk_path: str = ""
 
 pub fn with_cimport_set_sdk_path(path: &str) -> Unit:
     g_cimport_sdk_path = with_str_clone_ref(path)
+    sdk_path_resolved = 0
+    sdk_path_buf[0] = 0
 
 var sdk_path_buf: [1024]u8 = [0 as u8; 1024]
 var sdk_path_resolved: i32 = 0
@@ -762,27 +767,8 @@ unsafe fn get_sdk_path() -> *const u8:
         return &sdk_path_buf as *const [1024]u8 as *const u8
     0 as *const u8
 
-// The macOS SDK c_import parses against, for `with cc` to compile against.
-pub fn with_cimport_sdk_path() -> str:
-    if with_sysinfo_os() != "Macos": return ""
-    unsafe { resolve_target_sdk_path() }
-
-unsafe fn resolve_target_sdk_path() -> str:
-    let with_sdkroot = with_getenv_str("WITH_SDKROOT")
-    if with_sdkroot.len() > 0:
-        return with_sdkroot
-    let sdkroot = with_getenv_str("SDKROOT")
-    if sdkroot.len() > 0:
-        return sdkroot
-    if g_cimport_sdk_path.len() > 0:
-        return with_str_clone_ref(g_cimport_sdk_path)
-    let clt = "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk"
-    if with_fs_file_exists(clt) != 0:
-        return clt
-    let xcode = "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
-    if with_fs_file_exists(xcode) != 0:
-        return xcode
-    ""
+// Never an installed Apple SDK (#1915): only what the caller resolved.
+unsafe fn resolve_target_sdk_path() -> str: with_str_clone_ref(g_cimport_sdk_path)
 
 // 1 when this is macOS and no target SDK could be resolved — used to add a
 // directional hint to a c_import header-parse failure (§16.1).
