@@ -5,13 +5,16 @@ module build.tools_lane
 // instead of rotting until someone reaches for it. Tools are compiled,
 // never run (they rewrite sources, sweep corpora or drive batteries). A
 // `build.w` for a scratch project (it defines `pub fn build(ctx:
-// BuildCtx)` and no program) is checked; every other file is built. The
-// list is the directory itself, so a new tool is covered on arrival.
+// BuildCtx)` and no program) is checked; every other file is built — a
+// link catches the missing symbol a check cannot. The list is the
+// directory itself, so a new tool is covered on arrival. The tools are
+// independent, so they compile in a core-wide window (build/par.w), and
+// every failure is reported after every child is reaped.
 
 use std.build
+use build.par
 
-fn tl_join(left: &str, right: &str) -> str:
-    if left.ends_with("/"): left ++ right else: left ++ "/" ++ right
+fn tl_join(left: &str, right: &str): if left.ends_with("/"): left ++ right else: left ++ "/" ++ right
 
 fn tl_abs(root: &str, path: &str) -> str:
     if path.len() > 0 and path[0] == '/': return path.clone()
@@ -25,22 +28,7 @@ fn tl_error_lines(text: &str) -> str:
             out = out ++ line ++ "\n"
     out
 
-fn tl_slug(path: &str) -> str:
-    path.replace("/", "_").replace(".w", "")
-
-fn tl_run(ctx: &ActionCtx, args: Vec[str], label: &str, timeout_ms: i32) -> i32:
-    let root = ctx.project_info().project_root()
-    let out_dir = ctx.output()
-    let stdout_rel = tl_join(out_dir, label ++ ".stdout")
-    let stderr_rel = tl_join(out_dir, label ++ ".stderr")
-    let result = ctx.process_runner().run_capture_cwd(args, tl_abs(root, stdout_rel), tl_abs(root, stderr_rel), timeout_ms, root)
-    if result.rc != 0:
-        let stderr = ctx.fs().read_text(stderr_rel)
-        let detail = tl_error_lines(stderr)
-        print(f"tools-tests: {label} failed with exit code {result.rc}")
-        if detail.len() > 0: print(detail) else: print(stderr)
-        return 1
-    0
+fn tl_slug(path: &str): path.replace("/", "_").replace(".w", "")
 
 pub fn run_tools_tests_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()
@@ -55,27 +43,42 @@ pub fn run_tools_tests_action(ctx: ActionCtx) -> i32:
     if fs.mkdir_all(out_dir) != 0:
         ctx.diagnostics().error("tools-tests: could not create output directory: " ++ out_dir)
     let root = ctx.project_info().project_root()
-    if not fs.exists(inputs.get(0)):
-        ctx.diagnostics().error("tools-tests: missing compiler: " ++ inputs.get(0))
-    let compiler = tl_abs(root, inputs.get(0))
-    var failures = 0
-    var total = 0
+    if not fs.exists(inputs[0]):
+        ctx.diagnostics().error("tools-tests: missing compiler: " ++ inputs[0])
+    let compiler = tl_abs(root, inputs[0])
+    var jobs: Vec[ParJob] = Vec.new()
+    var labels: Vec[str] = Vec.new()
     for source in fs.glob("tools/*.w"):
-        total += 1
         let slug = tl_slug(source)
-        let text = fs.read_text(source)
         var args: Vec[str] = Vec.new()
         args.push(compiler.clone())
-        if text.contains("\npub fn build(ctx: BuildCtx)"):
+        var label = ""
+        var timeout_ms = 600000
+        if fs.read_text(source).contains("\npub fn build(ctx: BuildCtx)"):
             args.push("check")
             args.push(tl_abs(root, source))
-            failures += tl_run(ctx, args, slug ++ ".check", 300000)
+            label = slug ++ ".check"
+            timeout_ms = 300000
         else:
             args.push("build")
             args.push(tl_abs(root, source))
             args.push("-o")
             args.push(tl_abs(root, tl_join(out_dir, slug)))
-            failures += tl_run(ctx, args, slug ++ ".build", 600000)
+            label = slug ++ ".build"
+        let stdout = tl_abs(root, tl_join(out_dir, label ++ ".stdout"))
+        let stderr = tl_abs(root, tl_join(out_dir, label ++ ".stderr"))
+        jobs.push(par_job(args, stdout, stderr, timeout_ms))
+        labels.push(label)
+    let rcs = par_run(&ctx, &jobs, par_width())
+    var failures = 0
+    for i in 0..rcs.len() as i32:
+        if rcs[i] == 0: continue
+        failures += 1
+        print(f"tools-tests: {labels[i]} failed with exit code {rcs[i]}")
+        let stderr = fs.read_text_opt(jobs[i].stderr).unwrap_or("")
+        let detail = tl_error_lines(stderr)
+        if detail.len() > 0: print(detail) else: print(stderr)
+    let total = jobs.len() as i32
     if failures > 0:
         ctx.diagnostics().error(f"tools-tests: {failures} of {total} tool(s) failed to compile; a tool tracks the current language like any program (#1335)")
     let _ = fs.write_text(tl_join(out_dir, ".stamp"), f"ok: {total} tools\n")
