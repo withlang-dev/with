@@ -15,5 +15,9 @@ fn main:
     accepts_unit(explicit_unit_return())
     accepts_c_void_ptr(null as *mut c_void)
     let _noop: extern "C" fn() -> Unit = with_issue546_noop
-    let _identity: extern "C" fn(*mut c_void) -> *mut c_void = with_issue546_identity
+    // §16.11: a raw c_import function with a pointer parameter is unsafe to
+    // call, so as a value it is an unsafe callable and binds only to an
+    // `unsafe extern "C" fn` type (#1829); `with_issue546_noop` has no
+    // pointer contract and stays a safe callable.
+    let _identity: unsafe extern "C" fn(*mut c_void) -> *mut c_void = with_issue546_identity
     print("ok")
