@@ -1680,7 +1680,6 @@ pub fn ToolFs.extract_tar(self: &Self, archive_path: &str, output_dir: &str) -> 
 
 pub fn ToolFs.copy_file(self: &Self, src: &str, dst: &str) -> i32:
     if tool_fs_writes_suppressed(): return 0
-    tool_path_require_project_relative(src)
     self.require_write_file_allowed(dst)
     let source_path = self.resolve_path(src)
     var status: i32 = 0
@@ -1721,13 +1720,11 @@ pub fn ToolFs.remove_tree(self: &Self, path: &str) -> i32:
 
 pub fn ToolFs.copy_tree(self: &Self, src: &str, dst: &str) -> i32:
     if tool_fs_writes_suppressed(): return 0
-    tool_path_require_project_relative(src)
     self.require_write_file_allowed(dst)
     with_fs_copy_tree(self.resolve_path(src), self.resolve_path(dst))
 
 pub fn ToolFs.symlink(self: &Self, target: &str, link_path: &str) -> i32:
     if tool_fs_writes_suppressed(): return 0
-    tool_path_require_project_relative(target)
     self.require_write_file_allowed(link_path)
     with_fs_symlink(self.resolve_path(target), self.resolve_path(link_path))
 
