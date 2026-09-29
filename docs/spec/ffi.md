@@ -125,9 +125,11 @@ header-import mechanism.
 
 **Target C headers are inputs.** Platform libc headers, operating
 system SDKs, vendor headers, and package headers are part of the
-target environment being imported. They may be supplied by the host
-platform SDK, by package metadata such as `with get c.*`, by
-`with.toml`, or by build target include paths. Those headers are
+target environment being imported. The C headers `c_import` reads for
+the C standard library are those of the target's sysroot, which the
+compiler carries; a program's other C headers come from its dependencies
+(`with get`, or paths the program names). No host SDK is consulted
+unless the program names one. Those headers are
 target inputs, not a dependency on an arbitrary host LLVM/Clang
 installation.
 

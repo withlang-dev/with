@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.14
+# The With Programming Language — Specification v7.15
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,10 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.15:** §16.1: the C standard library headers `c_import`
+reads come from the target's sysroot, which the compiler carries; other C
+headers come from the program's dependencies; no host SDK is consulted
+unless the program names one (D81).
 **Changelog v7.14:** SIMD masks and lane selection (D80): `m.select(a, b)`
 replaces `select(m, a, b)`, so `select` stays the `select await` keyword
 alone; a scalar broadcasts on either side of every lane-wise operator;
