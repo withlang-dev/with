@@ -770,19 +770,13 @@ pub fn ci_migrate_c_function_name(name: &str) -> str:
         return "__with_cabi_" ++ safe_name
     safe_name
 
-// Pre-D5 emitted C flattened borrowed str parameters to by-value with_str.
-// The current runtime's canonical signatures borrow those places, so linking
-// the old C declaration directly would pass {ptr,len} where FnAbi expects one
-// place address. This is the single compatibility descriptor for that ABI
-// transition; each bit is a canonical borrowed-with_str parameter index.
-fn ci_migrate_runtime_borrowed_str_param_mask(name: &str) -> i32:
-    if name == "with_str_len" or name == "with_println_str" or name == "with_eprint" or
-       name == "with_write" or name == "with_ewrite":
-        return 1
-    0
-
-fn ci_migrate_runtime_param_is_borrowed_str(mask: i32, param_index: i32) -> bool:
-    mask != 0 and param_index >= 0 and (mask & (1 << (param_index as u32))) != 0
+// A runtime function's borrowed `&str` parameter (with_str_len,
+// with_println_str, with_eprint, with_write, with_ewrite) is a `{ptr, len}`
+// view passed by value (ABI v8, D71 §4.8a, #1810): the same physical shape
+// as the emitted C's by-value `with_str`, so the C declaration links to the
+// runtime's symbol directly. The pre-v8 bridge that re-declared the symbol
+// with a `&with_str` (one place address) and wrapped it passed a pointer
+// where the callee now reads the view's two words.
 
 // ── Migrate entry points (moved from CImport.w in D3) ─────────
 // D43: the then arm can fall through as Unit, while the else assignment
@@ -1751,7 +1745,6 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: &str, pr
     let safe_name = ci_migrate_c_function_name(name)
     let param_count = with_cimport_fn_param_count(session, idx)
     let is_variadic = with_cimport_fn_is_variadic(session, idx)
-    let runtime_borrow_mask = ci_migrate_runtime_borrowed_str_param_mask(name)
 
     // Build parameter list — use cursor API for real param names
     // (the old decl API returns "" for many PCRE2 functions)
@@ -1788,16 +1781,12 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: &str, pr
             let msg = f"migrate: untranslatable function '{name}': setjmp/longjmp (call to '{sj_name}') is not supported{loc_suffix}"
             return ci_migrate_fail_function(msg)
     var params = ""
-    var physical_params = ""
-    var call_args = ""
     var has_unsupported = false
     var unsupported_reason = ""
 
     for pi in 0..param_count:
         if pi > 0:
             params = params ++ ", "
-            physical_params = physical_params ++ ", "
-            call_args = call_args ++ ", "
         let raw_ptype = with_cimport_fn_param_type_translated(session, idx, pi)
         var ptype = ci_pointer_type_explicit_mut(raw_ptype)
 
@@ -1816,14 +1805,6 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: &str, pr
         let escaped_pname = if pname.len() > 0: ci_escape_reserved(pname) else: ""
         let sig_pname = ci_param_signature_name(escaped_pname, pi)
         params = params ++ sig_pname ++ ": " ++ ci_unsafe_fn_ptr_type(ptype)
-        if ci_migrate_runtime_param_is_borrowed_str(runtime_borrow_mask, pi):
-            if ptype != "with_str":
-                has_unsupported = true
-                unsupported_reason = f"runtime borrow bridge expected with_str parameter {pi}, found {ptype}"
-            physical_params = physical_params ++ sig_pname ++ ": &with_str"
-        else:
-            physical_params = physical_params ++ sig_pname ++ ": " ++ ci_unsafe_fn_ptr_type(ptype)
-        call_args = call_args ++ sig_pname
 
     if is_variadic != 0:
         if param_count > 0:
@@ -1868,7 +1849,6 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: &str, pr
             if shape.len() == 0:
                 return ""
             params = ci_migrate_unprototyped_params(shape)
-            physical_params = params.clone()
         let owner_path = ci_migrate_project_fn_owner_path(project_active, project, name)
         if ci_migrate_shared_defs_active() and g_migrate_no_c_export != 0 and owner_path.len() > 0:
             return ""
@@ -1877,10 +1857,6 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: &str, pr
         let cc = with_cimport_fn_calling_conv(session, idx)
         let cc_prefix = if cc != "c" and cc.len() > 0: "@[callconv(\"" ++ cc ++ "\")]\n" else: ""
         let ret_render = ci_unsafe_fn_ptr_type(ret)
-        if runtime_borrow_mask != 0:
-            let physical_name = "__with_cabi_physical_" ++ ci_escape_reserved(name)
-            return "@[link_name(\"" ++ name ++ "\")]\n" ++ cc_prefix ++ "extern fn " ++ physical_name ++ "(" ++ physical_params ++ ") -> " ++ ret_render ++ "\n" ++
-                "unsafe fn " ++ safe_name ++ "(" ++ params ++ ") -> " ++ ret_render ++ ":\n    " ++ physical_name ++ "(" ++ call_args ++ ")\n"
         // A renamed extern (keyword or prelude collision) keeps its C
         // linkage through the original symbol.
         let link_prefix = if safe_name != name: "@[link_name(\"" ++ name ++ "\")]\n" else: ""

@@ -5141,9 +5141,12 @@ fn bs_check_migrate_runtime_cabi_aliases(ctx: &ActionCtx, compiler_path: &str, c
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "@[link_name(\"str_from_byte\")]\nextern fn __with_cabi_str_from_byte", "runtime_cabi_legacy_byte_alias")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "@[link_name(\"with_str_len\")]\nextern fn __with_cabi_physical_with_str_len(__param_text: &with_str)", "runtime_cabi_argument_physical_alias")
+    // ABI v8 (D71 §4.8a, #1810): the runtime's `&str` is a `{ptr, len}` view
+    // passed by value, the shape of C's by-value with_str, so the C
+    // declaration binds the symbol directly — no `&with_str` bridge.
+    rc = bs_assert_contains(ctx, out_text, "@[link_name(\"with_str_len\")]\nextern fn __with_cabi_with_str_len(__param_text: with_str) -> c_longlong", "runtime_cabi_argument_alias")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "unsafe fn __with_cabi_with_str_len(__param_text: with_str)", "runtime_cabi_argument_bridge")
+    rc = bs_assert_not_contains(ctx, out_text, "__with_cabi_physical_", "runtime_cabi_no_physical_bridge")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "__with_cabi_with_i64_to_str((42 as c_longlong))", "runtime_cabi_call_alias")
     if rc != 0: return rc
