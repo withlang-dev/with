@@ -20,6 +20,7 @@ use compiler.ModuleSource
 use FnAbi
 use SemaCheck
 use SemaDecl
+use SemaVector
 use std.collections.HashMap
 use std.collections.HashSet
 use compiler.Runtime
@@ -1254,6 +1255,18 @@ pub type Sema {
     // A free math builtin call (`cos(x)`), keyed by the call node, to its
     // MathBuiltins row id. Sema decides once; MirLower reads, never re-derives.
     math_builtin_calls: HashMap[i32, i32],
+    // §4.3d (D78): the SIMD vector facts Sema decides and MirLower
+    // materializes (SemaVector.w). vector_ops: a construction, splat,
+    // `select`, reduction, `.bits()`/`from_bits` or swizzle node → its
+    // VectorOp. vector_swizzles: a swizzle/component node → its lane indices
+    // (one decimal digit per lane, "3210" for `.wzyx`). vector_splats: a
+    // scalar operand or literal broadcast to every lane → the vector type.
+    // vector_conversions: a vector value an owned demand widens lane-wise
+    // (§4.2.6) → the demanded vector type.
+    vector_ops: HashMap[i32, i32],
+    vector_swizzles: HashMap[i32, str],
+    vector_splats: HashMap[i32, i32],
+    vector_conversions: HashMap[i32, i32],
     // D75 (§16.2b.5): a `va_start()` call node (→ 1) and an `ap.arg[T]()`
     // call node (→ T), decided here; MirLower lowers them to VA_START and
     // VA_ARG and ends each started list with its binding scope.
@@ -2942,6 +2955,10 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         resolved_call_sigs: sema_new_map_i32_i32(),
         resolved_call_mono_syms: sema_new_map_i32_i32(),
         math_builtin_calls: sema_new_map_i32_i32(),
+        vector_ops: sema_new_map_i32_i32(),
+        vector_swizzles: sema_new_map_i32_str(),
+        vector_splats: sema_new_map_i32_i32(),
+        vector_conversions: sema_new_map_i32_i32(),
         va_start_calls: sema_new_map_i32_i32(),
         va_arg_calls: sema_new_map_i32_i32(),
         va_start_binding_value: 0,
@@ -3454,6 +3471,7 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
     s.register_prim("isize", s.ty_isize)
     s.register_prim("c_va_list", s.ty_c_va_list)
     s.init_builtin_reflection_types()
+    s.register_vector_aliases()
     s.discard_sym = s.pool_intern("_")
 
     // Push root scope marker
@@ -5133,6 +5151,11 @@ impl Sema:
         // An integer's width and signedness; a float's width.
         if kind == TypeKind.TY_INT or kind == TypeKind.TY_FLOAT:
             return a0 == b0 and a1 == b1
+        // A mask's lane width and count; a vector's lane type and count.
+        if kind == TypeKind.TY_MASK:
+            return a0 == b0 and a1 == b1
+        if kind == TypeKind.TY_VECTOR:
+            return a1 == b1 and self.types_identical(a0, b0)
         if kind == TypeKind.TY_STRUCT or kind == TypeKind.TY_ENUM or kind == TypeKind.TY_TRAIT_OBJ:
             return a0 == b0
         // The pointee or element, and the mutability, length or inclusivity.
@@ -5477,6 +5500,12 @@ impl Sema:
 
     mut fn resolve_generic_type(node: i32) -> i32:
         var gi_base_sym = self.ast.get_data0(node)
+        if self.is_vector_symbol(gi_base_sym) or self.is_mask_symbol(gi_base_sym):
+            let vg_count = self.ast.get_data2(node)
+            let vg_start = self.ast.get_data1(node)
+            let vg_a0 = if vg_count > 0: self.ast.get_extra(vg_start) else: 0
+            let vg_a1 = if vg_count > 1: self.ast.get_extra(vg_start + 1) else: 0
+            return self.resolve_vector_generic(gi_base_sym, vg_count, vg_a0, vg_a1, node)
         if self.is_fixed_string_symbol(gi_base_sym) != 0:
             let gi_arg_count = self.ast.get_data2(node)
             if gi_arg_count != 1:
@@ -8858,6 +8887,17 @@ impl Sema:
             if self.callable_unsafe_coercion_ok(exp_r as i32, act_r as i32) == 0:
                 return 0
             return self.fn_types_compatible(exp_r, act_r)
+        // §4.3d: a vector converts lane-wise under §4.2.6, so its lanes are
+        // assignable as scalars are (reject_implicit_numeric_narrowing
+        // refuses the narrowings); the lane counts agree. A mask is exact.
+        if exp_k == TypeKind.TY_VECTOR and act_k == TypeKind.TY_VECTOR:
+            if self.get_type_d1(exp_r) != self.get_type_d1(act_r):
+                return 0
+            let exp_lane_k = self.get_type_kind(self.resolve_alias(self.get_type_d0(exp_r) as TypeId))
+            let act_lane_k = self.get_type_kind(self.resolve_alias(self.get_type_d0(act_r) as TypeId))
+            return if exp_lane_k == act_lane_k: 1 else: 0
+        if exp_k == TypeKind.TY_MASK and act_k == TypeKind.TY_MASK:
+            return if self.get_type_d0(exp_r) == self.get_type_d0(act_r) and self.get_type_d1(exp_r) == self.get_type_d1(act_r): 1 else: 0
         if (exp_k == TypeKind.TY_PTR or exp_k == TypeKind.TY_REF) and act_k == TypeKind.TY_FN:
             return 1
         if exp_k == TypeKind.TY_FN and (act_k == TypeKind.TY_PTR or act_k == TypeKind.TY_REF):
@@ -9110,6 +9150,15 @@ impl Sema:
             if self.callable_unsafe_coercion_ok(exp_r as i32, act_r as i32) == 0:
                 return 0
             return self.fn_types_compatible_frozen(exp_r, act_r)
+        // §4.3d: the twin of types_compatible_fast's vector and mask rule.
+        if exp_k == TypeKind.TY_VECTOR and act_k == TypeKind.TY_VECTOR:
+            if self.get_type_d1(exp_r) != self.get_type_d1(act_r):
+                return 0
+            let exp_lane_k = self.get_type_kind(self.resolve_alias(self.get_type_d0(exp_r) as TypeId))
+            let act_lane_k = self.get_type_kind(self.resolve_alias(self.get_type_d0(act_r) as TypeId))
+            return if exp_lane_k == act_lane_k: 1 else: 0
+        if exp_k == TypeKind.TY_MASK and act_k == TypeKind.TY_MASK:
+            return if self.get_type_d0(exp_r) == self.get_type_d0(act_r) and self.get_type_d1(exp_r) == self.get_type_d1(act_r): 1 else: 0
         if (exp_k == TypeKind.TY_PTR or exp_k == TypeKind.TY_REF) and act_k == TypeKind.TY_FN:
             return 1
         if exp_k == TypeKind.TY_FN and (act_k == TypeKind.TY_PTR or act_k == TypeKind.TY_REF):
@@ -9364,6 +9413,9 @@ impl Sema:
         // c_va_list is C's va_list: opaque bytes a migrated body hands on
         // (gzprintf passes it to gzvprintf, then va_ends it) — Copy, as in C.
         if tk == TypeKind.TY_VA_LIST:
+            return 1
+        // §4.3d: Vector and Mask are Copy.
+        if tk == TypeKind.TY_VECTOR or tk == TypeKind.TY_MASK:
             return 1
         if tk == TypeKind.TY_STRUCT:
             let name = self.get_type_d0(resolved)

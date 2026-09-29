@@ -334,6 +334,22 @@ pub enum MirIntrinsic: i32:
     VA_START
     VA_ARG
     VA_END
+    // §4.3d (D78): vector operations Sema decided (Sema.vector_ops).
+    // SIMD_BITCAST: `.bits()` / `from_bits` — arg 0 reinterpreted as the
+    // destination vector type. SIMD_SELECT: (mask, a, b) -> a lane where the
+    // mask lane is set, else b. SIMD_ALL / SIMD_ANY: (mask) -> bool.
+    // SIMD_REDUCE_*: (vector) -> the lane type.
+    SIMD_BITCAST
+    SIMD_SELECT
+    SIMD_ALL
+    SIMD_ANY
+    SIMD_REDUCE_ADD
+    SIMD_REDUCE_MUL
+    SIMD_REDUCE_MIN
+    SIMD_REDUCE_MAX
+    SIMD_REDUCE_AND
+    SIMD_REDUCE_OR
+    SIMD_REDUCE_XOR
 
 // Copy: MirIntrinsic is a lightweight integer tag passed by value, stored in
 // Vec/HashMap, and compared throughout MIR lowering and codegen.

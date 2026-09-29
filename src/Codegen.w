@@ -1581,6 +1581,10 @@ impl Codegen:
             let declared = self.struct_declared_align.get(ty)
             if declared.is_some():
                 return declared.unwrap()
+        // §4.3d: a vector field sits at the target's vector alignment
+        // (TypeLayout), which on AArch64 is below LLVM's for `<8 x float>`.
+        if kind == wl_vector_type_kind():
+            return type_layout_vector_align(self.abi_size_of(ty))
         self.abi_align_of(ty)
 
     // Whether `ty` is, or is an array of, a record with a declared alignment
@@ -1591,6 +1595,9 @@ impl Codegen:
         let kind = wl_get_type_kind(ty)
         if kind == wl_array_type_kind():
             return self.holds_declared_align(wl_get_element_type(ty))
+        if kind == wl_vector_type_kind():
+            let dl = wl_get_module_data_layout(self.llmod)
+            return dl != 0 and type_layout_vector_align(wl_abi_size_of(dl, ty)) < wl_abi_align_of(dl, ty) as i64
         kind == wl_struct_type_kind() and self.struct_declared_align.get(ty).is_some()
 
     mut fn abi_align_of(ty: i64) -> i64:
@@ -2683,7 +2690,7 @@ impl Codegen:
             return wl_const_null(ty)
         if kind == wl_array_type_kind():
             return wl_const_null(ty)
-        if kind == wl_struct_type_kind():
+        if kind == wl_struct_type_kind() or kind == wl_vector_type_kind():
             return wl_const_null(ty)
         wl_const_int(wl_i32_type(self.context), 0, 0)
 
@@ -3878,6 +3885,12 @@ impl Codegen:
             return wl_void_type(self.context)
         if tk == TypeKind.TY_VA_LIST:
             return self.c_va_list_llvm_type()
+        // §4.3d: `<N x T>`; a mask is `<N x iW>`.
+        if tk == TypeKind.TY_VECTOR:
+            let lane_ty = self.sema_type_to_llvm(self.sema.get_type_d0(resolved_tid))
+            return wl_vector_type(lane_ty, self.sema.get_type_d1(resolved_tid))
+        if tk == TypeKind.TY_MASK:
+            return wl_vector_type(wl_int_type_n(self.context, self.sema.get_type_d0(resolved_tid)), self.sema.get_type_d1(resolved_tid))
         if tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ENUM:
             let sym = self.sema.get_type_d0(resolved_tid)
             // Distinct types are transparent: same LLVM type as inner type
@@ -4577,6 +4590,11 @@ impl Codegen:
 
                 // If explicit alignment is less than natural, LLVM struct must be packed
                 if explicit_align > 0 and explicit_align < natural_align:
+                    use_packed = true
+                // A field whose declared alignment is below LLVM's (a
+                // vector on AArch64) needs the packed body, or LLVM pads it
+                // to its own.
+                if field_align < self.abi_align_of(f_ty):
                     use_packed = true
 
                 // Insert padding to reach aligned offset
@@ -5363,6 +5381,8 @@ impl Codegen:
         var ret = ArgAbi { source_ty: ret_ty, llvm_ty: ret_ty, pass: PM_DIRECT, reference: false, owned_place: false }
         var indirect_return = false
         if convention == FN_ABI_C:
+            if wl_get_type_kind(ret_ty) == wl_vector_type_kind():
+                indirect_return = fn_abi_c_vector_return_indirect(target_spec_arch(), self.abi_size_of(ret_ty))
             if wl_get_type_kind(ret_ty) == wl_struct_type_kind():
                 let packed = self.c_abi_direct_struct_return_type(ret_ty)
                 if packed != 0:
@@ -5390,6 +5410,8 @@ impl Codegen:
             var arg = ArgAbi { source_ty: source_ty, llvm_ty: source_ty, pass: PM_DIRECT, reference: (places[pi] & 2) != 0, owned_place }
             var indirect = false
             if convention == FN_ABI_C:
+                if kind == wl_vector_type_kind():
+                    indirect = fn_abi_c_vector_param_indirect(target_spec_arch(), target_spec_os(), self.abi_size_of(source_ty))
                 if wl_get_type_kind(source_ty) == wl_struct_type_kind():
                     let packed = self.c_abi_direct_struct_param_type(source_ty)
                     let cost = if sysv and packed != 0: self.c_abi_sysv_register_cost(packed) else: 0
@@ -6033,7 +6055,8 @@ impl Codegen:
             for fi in 0..wl_count_struct_elem_types(abi_ty):
                 cost = cost + self.c_abi_sysv_register_cost(wl_struct_get_type_at(abi_ty, fi))
             return cost
-        if kind == wl_float_type_kind() or kind == wl_double_type_kind(): return 1
+        // A vector of up to 16 bytes is one SSE register (§3.2.3: SSE, SSEUP).
+        if kind == wl_float_type_kind() or kind == wl_double_type_kind() or kind == wl_vector_type_kind(): return 1
         if kind == wl_integer_type_kind() or kind == wl_pointer_type_kind(): return 16
         0
 

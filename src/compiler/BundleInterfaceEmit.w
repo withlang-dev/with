@@ -275,6 +275,11 @@ impl BundleEmitter:
             return "str"
         if tk == TypeKind.TY_VA_LIST:
             return "c_va_list"
+        // §4.3d: the parameterized spelling, which every shape has.
+        if tk == TypeKind.TY_VECTOR:
+            return f"Vector[{sema.get_type_d1(resolved)}, " ++ self.spell(sema, sema.get_type_d0(resolved)) ++ "]"
+        if tk == TypeKind.TY_MASK:
+            return f"Mask[{sema.get_type_d1(resolved)}, {sema.get_type_d0(resolved)}]"
         if tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ENUM:
             let name_sym = sema.get_type_d0(resolved)
             let name = with_str_clone_ref(sema.pool_resolve(name_sym))

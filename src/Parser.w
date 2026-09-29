@@ -3913,7 +3913,16 @@ impl Parser:
         if t == TokenKind.TK_KW_ASYNC: return self.parse_async_expr()
         if t == TokenKind.TK_KW_YIELD: return self.parse_yield()
         if t == TokenKind.TK_KW_COMPTIME: return self.parse_comptime_expr()
-        if t == TokenKind.TK_KW_SELECT: return self.parse_select_await()
+        if t == TokenKind.TK_KW_SELECT:
+            // §4.3d: `select(m, a, b)` picks lanes by a mask; `select await`
+            // races tasks (§14.10). The token after the keyword decides.
+            if self.pos + 1 < self.tokens.len() and self.tokens.get_tag(self.pos + 1) == TokenKind.TK_L_PAREN:
+                let select_start = self.current_start()
+                let select_end = self.current_end()
+                self.advance()
+                let select_fn = self.pool.add_node(NodeKind.NK_IDENT, select_start, select_end, self.intern.intern("select"), 0, 0)
+                return self.parse_postfix(select_fn)
+            return self.parse_select_await()
         if t == TokenKind.TK_L_BRACKET:
             let arr = self.parse_array_literal()
             return self.parse_postfix(arr)
@@ -8761,7 +8770,10 @@ impl Parser:
                 var args: Vec[i32] = Vec.new()
                 if self.peek() != TokenKind.TK_R_BRACKET:
                     while self.peek() != TokenKind.TK_R_BRACKET and self.peek() != TokenKind.TK_EOF:
-                        let arg = if self.intern.resolve(sym) == "FixedString":
+                        // A length argument is a value, not a type:
+                        // `FixedString[N]`, and §4.3d's `Vector[4, f32]` /
+                        // `Mask[4, 32]`.
+                        let arg = if self.intern.resolve(sym) == "FixedString" or self.peek() == TokenKind.TK_INT_LIT:
                             self.parse_expr()
                         else:
                             self.parse_type_expr()

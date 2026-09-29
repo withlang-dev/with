@@ -2269,6 +2269,11 @@ impl Codegen:
         if tk == TypeKind.TY_STRUCT:
             return self.try_eval_const_struct_llvm(cur, resolved as i32)
 
+        // §4.3d: a constant vector — Sema's splat of a literal, or a
+        // construction from constant lanes.
+        if tk == TypeKind.TY_VECTOR:
+            return self.try_eval_const_vector_llvm(cur, resolved as i32)
+
         if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
             return self.try_eval_const_pointer_llvm(cur, resolved as i32)
 
@@ -2407,6 +2412,20 @@ impl Codegen:
                 if global_ty != 0:
                     let _ = self.record_module_binding_global(name_sym, global_ty, wl_const_null(global_ty), is_mut)
                     return
+        // §4.3d: a vector global is its constant vector when Sema's splat or
+        // construction folds, else storage the main wrapper initializes —
+        // never the scalar a literal initializer names.
+        if const_binding_ty != 0 and (self.sema.get_type_kind(const_binding_ty) == TypeKind.TY_VECTOR or self.sema.get_type_kind(const_binding_ty) == TypeKind.TY_MASK):
+            let vector_init = self.try_eval_const_llvm(value_node, const_binding_ty as i32)
+            if vector_init != 0:
+                let vector_global_ty = self.sema_type_to_llvm(const_binding_ty)
+                let _ = self.record_module_binding_global(name_sym, vector_global_ty, vector_init, is_mut)
+                return
+            if self.queue_module_runtime_init(name_sym, value_node, const_binding_ty as i32, is_mut):
+                return
+            with_eprint("error: global '" ++ self.intern.resolve(name_sym) ++ "' has no initializer codegen can lower (" ++ self.current_decl_source_file ++ ")")
+            self.had_error = 1
+            return
         let eval = self.try_eval_const_int(value_node)
         if eval.ok:
             let val = eval.value

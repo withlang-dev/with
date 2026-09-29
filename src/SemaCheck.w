@@ -16,6 +16,7 @@ use std.builtins.int_to_string
 use std.regex.Regex
 use SemaTypes
 use SemaDecl
+use SemaVector
 use FnAbi
 use TargetSpec
 
@@ -1153,6 +1154,10 @@ impl Sema:
     // i32 and computed the sum at i32, truncating the pointee).
     mut fn literal_peer_type(ty: i32) -> i32:
         let pointee = self.shared_copy_pointee(ty)
+        // §4.3d: a literal beside a vector is a lane value (it broadcasts).
+        let value = if pointee != 0: pointee else: ty
+        if self.is_vector_type(value):
+            return self.vector_lane_type(value)
         if pointee != 0 and self.is_numeric_type(pointee): pointee else: ty
 
     // Called only after exact-type operator/method resolution has declined a
@@ -1623,6 +1628,9 @@ impl Sema:
                     self.emit_error("FixedString expects exactly one length argument", node)
                     return 0
                 return self.fixed_string_type_from_length_node(self.ast.get_data1(node))
+            if self.is_vector_symbol(base_sym) or self.is_mask_symbol(base_sym):
+                let vi_count = if self.ast.get_data2(node) != 0: 2 else: 1
+                return self.resolve_vector_generic(base_sym, vi_count, self.ast.get_data1(node), self.ast.get_data2(node), node)
             var base_tid = self.lookup_named_type_visible(base_sym)
             if base_tid == 0:
                 let canonical_base = self.canonical_symbol_by_text(base_sym)
@@ -1663,6 +1671,9 @@ impl Sema:
 
     fn resolve_generic_type_frozen(node: i32) -> i32:
         var gi_base_sym = self.ast.get_data0(node)
+        if (self.is_vector_symbol(gi_base_sym) or self.is_mask_symbol(gi_base_sym)) and self.ast.get_data2(node) == 2:
+            let vg_start = self.ast.get_data1(node)
+            return self.resolve_vector_generic_frozen(gi_base_sym, self.ast.get_extra(vg_start), self.ast.get_extra(vg_start + 1))
         if self.is_fixed_string_symbol(gi_base_sym) != 0:
             let gi_arg_count = self.ast.get_data2(node)
             if gi_arg_count != 1:
@@ -1846,6 +1857,8 @@ impl Sema:
                 if self.ast.get_data2(node) != 0:
                     sema_phase_bug("BUG: frozen FixedString index has wrong arg count")
                 return self.fixed_string_type_from_length_node_frozen(self.ast.get_data1(node))
+            if (self.is_vector_symbol(base_sym) or self.is_mask_symbol(base_sym)) and self.ast.get_data2(node) != 0:
+                return self.resolve_vector_generic_frozen(base_sym, self.ast.get_data1(node), self.ast.get_data2(node))
             var base_tid = self.lookup_named_type_visible(base_sym)
             if base_tid == 0:
                 let canonical_base = self.canonical_symbol_by_text(base_sym)
@@ -8269,6 +8282,18 @@ impl Sema:
 
         let kind = self.ast.kind(node)
 
+        // §4.3d: a literal in a vector context is a lane value broadcast to
+        // every lane (`let v: f32x4 = 0`).
+        if kind == NodeKind.NK_INT_LIT or kind == NodeKind.NK_FLOAT_LIT:
+            let splat_lane = self.vector_literal_context_lane(node)
+            if splat_lane != 0:
+                let splat_vec = self.expected_expr_type as i32
+                let lane_ty = self.check_expr_with_expected(node, splat_lane as TypeId) as i32
+                if lane_ty == 0 or self.reject_implicit_numeric_narrowing(node, splat_lane, lane_ty):
+                    return 0 as TypeId
+                self.vector_splats.insert(node, splat_vec)
+                return splat_vec as TypeId
+
         if kind == NodeKind.NK_INT_LIT:
             let suffix_ty = self.literal_suffix_type(self.ast.literal_suffix(node))
             if suffix_ty != 0:
@@ -8666,6 +8691,10 @@ impl Sema:
                 let cast_resolved = self.resolve_alias(cast_tid)
                 let src_kind = self.get_type_kind(src_resolved)
                 let cast_kind = self.get_type_kind(cast_resolved)
+                let vector_src = self.vector_value_type(src_node, src_tid as i32)
+                let vector_cast = self.check_vector_cast(node, vector_src, cast_tid as i32)
+                if vector_cast >= 0:
+                    return vector_cast as TypeId
                 if src_kind == TypeKind.TY_ARRAY and cast_kind == TypeKind.TY_PTR:
                     self.emit_error("arrays do not decay to pointers; use &array[0] as *T", node)
                     return 0 as TypeId
@@ -10213,6 +10242,14 @@ impl Sema:
             for ei in 0..elem_count:
                 elems.push(self.resolve_type_node_with_subst(self.ast.get_extra(extra_start + ei), self_ty, subst_names, subst_types))
             return self.ensure_tuple_type(elems, elem_count) as i32
+        if kind == NodeKind.NK_TYPE_GENERIC and (self.is_vector_symbol(self.ast.get_data0(type_node)) or self.is_mask_symbol(self.ast.get_data0(type_node))) and self.ast.get_data2(type_node) == 2:
+            let vs_start = self.ast.get_data1(type_node)
+            let vs_a0 = self.ast.get_extra(vs_start)
+            let vs_a1 = self.ast.get_extra(vs_start + 1)
+            if self.is_mask_symbol(self.ast.get_data0(type_node)):
+                return self.mask_type_from_args(vs_a0, vs_a1)
+            let vs_lane = self.resolve_type_node_with_subst(vs_a1, self_ty, subst_names, subst_types)
+            return self.vector_type_from_args(vs_a0, vs_lane, vs_a1)
         if kind == NodeKind.NK_TYPE_GENERIC:
             let base_sym = self.canonical_symbol_by_text(self.ast.get_data0(type_node))
             let extra_start2 = self.ast.get_data1(type_node)
@@ -10256,6 +10293,16 @@ impl Sema:
             for ei in 0..elem_count:
                 elems.push(self.resolve_type_node_with_subst_frozen(self.ast.get_extra(extra_start + ei), self_ty, subst_names, subst_types))
             return self.find_tuple_type(elems, elem_count) as i32
+        if kind == NodeKind.NK_TYPE_GENERIC and (self.is_vector_symbol(self.ast.get_data0(type_node)) or self.is_mask_symbol(self.ast.get_data0(type_node))) and self.ast.get_data2(type_node) == 2:
+            let vs_start = self.ast.get_data1(type_node)
+            let vs_count = self.int_literal_i64_value(self.ast.get_extra(vs_start))
+            if vs_count.ok == 0:
+                return 0
+            if self.is_mask_symbol(self.ast.get_data0(type_node)):
+                let vs_w = self.int_literal_i64_value(self.ast.get_extra(vs_start + 1))
+                return self.find_exact_type(TypeKind.TY_MASK, vs_w.value as i32, vs_count.value as i32, 0) as i32
+            let vs_lane = self.resolve_type_node_with_subst_frozen(self.ast.get_extra(vs_start + 1), self_ty, subst_names, subst_types)
+            return self.find_exact_type(TypeKind.TY_VECTOR, vs_lane, vs_count.value as i32, 0) as i32
         if kind == NodeKind.NK_TYPE_GENERIC:
             let base_sym = self.canonical_symbol_by_text(self.ast.get_data0(type_node))
             let extra_start2 = self.ast.get_data1(type_node)
@@ -10635,7 +10682,7 @@ fn sema_operator_method_name(op: i32) -> str:
     if op == BinaryOp.OP_MATMUL: return "matmul"
     ""
 
-fn sema_operator_symbol_text(op: i32) -> str:
+pub fn sema_operator_symbol_text(op: i32) -> str:
     if op == BinaryOp.OP_ADD: return "+"
     if op == BinaryOp.OP_SUB: return "-"
     if op == BinaryOp.OP_MUL: return "*"
@@ -11325,6 +11372,11 @@ impl Sema:
         if lhs == 0 or rhs == 0:
             return 0
 
+        // §4.3d: operators on vectors are lane-wise.
+        let vector_result = self.check_vector_binary(node, op, lhs_node, rhs_node, lhs as i32, rhs as i32)
+        if vector_result >= 0:
+            return vector_result
+
         if op == BinaryOp.OP_IN or op == BinaryOp.OP_NOT_IN:
             return self.check_membership_operator(node, lhs_node, rhs_node, lhs as i32, rhs as i32)
 
@@ -11559,7 +11611,7 @@ impl Sema:
         // to its operand so `~1` adapts like the bare literal would.
         if op == UnaryOp.UOP_BIT_NOT and self.has_expected_type != 0 and self.expected_expr_type != 0:
             let expected_bitnot = self.numeric_operand_type(self.expected_expr_type as i32)
-            if self.get_type_kind(self.resolve_alias(expected_bitnot as TypeId)) == TypeKind.TY_INT:
+            if self.get_type_kind(self.resolve_alias(expected_bitnot as TypeId)) == TypeKind.TY_INT or self.is_vector_type(self.expected_expr_type as i32):
                 expected_operand = self.expected_expr_type as i32
         // #943 / #914 D2: `-` is width-transparent for signed integers the way
         // `~` is above, and its operand is a magnitude rather than a value.
@@ -11577,6 +11629,9 @@ impl Sema:
                 let neg_kind = self.get_type_kind(resolved_neg)
                 if (neg_kind == TypeKind.TY_INT and self.get_type_d1(resolved_neg) != 0) or neg_kind == TypeKind.TY_FLOAT:
                     expected_operand = self.expected_expr_type as i32
+                // §4.3d: `let v: f32x4 = -1` negates the broadcast literal.
+                if self.is_vector_type(self.expected_expr_type as i32):
+                    expected_operand = self.expected_expr_type as i32
         let saved_negated: i32 = self.in_negated_literal_context
         if negated_literal != 0:
             self.in_negated_literal_context = self.in_negated_literal_context + 1
@@ -11584,6 +11639,11 @@ impl Sema:
         self.in_negated_literal_context = saved_negated
         if operand == 0:
             return 0
+
+        // §4.3d: `-v` and `~v` are lane-wise.
+        let vector_unary = self.check_vector_unary(node, op, operand_node, operand as i32)
+        if vector_unary >= 0:
+            return vector_unary
 
         if op == UnaryOp.UOP_NEGATE:
             if self.is_unsigned_int_type(operand as i32):
@@ -12294,7 +12354,10 @@ impl Sema:
         if val_type == 0 or self.int_narrowing_requires_cast(ann_type, val_type) != 0:
             return
         if self.types_compatible(ann_type as i32, val_type as i32) == 0 and self.has_contextual_copy_adjustment(value) == 0:
-            if self.arithmetic_result_type(ann_type, val_type) == 0:
+            let vector_help = self.vector_scalar_binding_help(ann_type as i32, val_type as i32)
+            if vector_help.len() > 0:
+                self.emit_error("type mismatch in binding: " ++ vector_help, node)
+            else if self.arithmetic_result_type(ann_type, val_type) == 0:
                 self.emit_error("type mismatch in binding", node)
         else if self.aggregate_repr_differs(ann_type, val_type, 0) != 0:
             self.emit_error("type mismatch in binding: the annotation is `" ++ self.type_name(ann_type as i32) ++ "` but the value is `" ++ self.type_name(val_type as i32) ++ "`; an aggregate's elements do not convert", node)
@@ -12534,6 +12597,9 @@ impl Sema:
         // materializes its pointee the way `let b: bool = v[i]` does.
         if self.record_contextual_copy_adjustment(cond, self.ty_bool as i32, t as i32) != 0:
             return self.ty_bool
+        if self.is_mask_type(t as i32):
+            self.emit_error(f"{what} condition must be bool: a comparison of vectors yields a mask (`{self.type_name(t as i32)}`); reduce it with `.all()` or `.any()` (§4.3d)", cond)
+            return t
         self.emit_error(f"{what} condition must be bool", cond)
         t
 
@@ -14081,6 +14147,11 @@ impl Sema:
         let target_exact_type = self.check_expr(target)
         self.union_in_assign_target = self.union_in_assign_target - 1
         self.assign_target_revive_sym = assign_revive_saved
+        // §4.3d names a lane place only as `v[i]`; a component or swizzle is
+        // a value.
+        if self.ast.kind(target) == NodeKind.NK_FIELD_ACCESS and self.vector_ops.contains(target):
+            self.emit_error("a vector component or swizzle is read, not assigned; write lane i with `v[i] = x` (§4.3d)", target)
+            return 0
         let target_type = self.assignment_target_value_type(target, target_exact_type as i32)
         let value_type = if target_type != 0: self.check_expr_with_owned_demand(value, target_type) else: self.check_expr(value)
         self.reject_owned_demand_from_view_projection(value, target_type as i32, "assignment")
@@ -15477,6 +15548,10 @@ impl Sema:
                 return self.ty_str as i32
 
         var obj_type = self.check_expr(expr)
+        // §4.3d: `.x`, `.xy`, `.wzyx` on a vector.
+        let swizzle = self.check_vector_swizzle(node, expr, obj_type as i32, field)
+        if swizzle >= 0:
+            return swizzle
         // move-sites: sequence this use on its (root, field) path for the
         // field-shaped transfer-site liveness verdict.
         self.note_field_use(node, field)
@@ -15693,6 +15768,13 @@ impl Sema:
             self.typed_expr_types.insert(node, elem_view)
             self.record_view_producer_origins(node, expr)
             return elem_view
+        // §4.3d: `v[i]` reads (and, as a target, writes) lane i.
+        if container_tk == TypeKind.TY_VECTOR:
+            return self.check_vector_index(node, container_tid as i32, index)
+        if container_tk == TypeKind.TY_MASK:
+            self.check_expr(index)
+            self.emit_error("a mask is read with `select`, `.all()` and `.any()`, not by lane (§4.3d)", node)
+            return 0
         if container_tk == TypeKind.TY_SLICE:
             self.check_runtime_index_operand(index)
             let elem_ty = self.get_type_d0(container_tid)
@@ -21129,6 +21211,11 @@ impl Sema:
         // method or a qualified extension call.
         if self.rewrite_namespace_access(callee, true) < 0:
             return 0
+        // §4.3d: `f32x4(...)`, `Vector[N, T](...)`, `f32x4.splat(s)`,
+        // `from_bits`, `select(m, a, b)`.
+        let vector_call = self.check_vector_call(node, callee, extra_start, arg_count)
+        if vector_call >= 0:
+            return vector_call
 
         // sizeof[T]() / alignof[T]() / transmute[T]() / nameof[T]() builtins
         if self.is_sizeof_or_alignof(callee) != 0:
@@ -21184,6 +21271,9 @@ impl Sema:
                 return qualified_extension_ret
             let checked_recv = self.check_expr(recv_expr) as i32
             let recv_ty = self.adjust_static_receiver_type(recv_expr, checked_recv)
+            let vector_method = self.check_vector_method(node, recv_expr, recv_ty, recv_field, arg_count)
+            if vector_method >= 0:
+                return vector_method
             let callable_tid = self.callable_any_fn_type(self.field_access_type_from_obj(recv_ty, recv_field) as TypeId)
             if callable_tid != 0:
                 // D65: this call invokes the stored callable — the one fact
@@ -22229,6 +22319,9 @@ impl Sema:
             return false
         let er = self.resolve_alias(expected as TypeId)
         let ek = self.get_type_kind(er)
+        // §4.3d: a vector converts under §4.2.6 lane by lane.
+        if ek == TypeKind.TY_VECTOR:
+            return self.reject_vector_narrowing(node, expected, actual)
         if ek != TypeKind.TY_INT and ek != TypeKind.TY_FLOAT:
             return false
         let pointee = self.shared_copy_pointee(actual)
@@ -23118,6 +23211,11 @@ impl Sema:
         if kind == NodeKind.NK_TYPE_GENERIC:
             let base_sym = self.ast.get_data0(type_node)
             let resolved = self.resolve_alias(arg_tid)
+            // §4.3d: `Vector[4, T]` binds T from the argument's lane type.
+            if self.is_vector_symbol(base_sym) and self.ast.get_data2(type_node) == 2:
+                if self.get_type_kind(resolved) == TypeKind.TY_VECTOR:
+                    self.bind_type_params_from_type_expr(self.ast.get_extra(self.ast.get_data1(type_node) + 1), self.get_type_d0(resolved), tp_start, tp_count, err_node)
+                return
             if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
                 return
             if self.get_generic_inst_base(resolved as i32) != base_sym:
@@ -30495,7 +30593,8 @@ impl Sema:
         while tk == TypeKind.TY_REF:
             resolved = self.resolve_alias(self.get_type_d0(resolved) as TypeId)
             tk = self.get_type_kind(resolved)
-        if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE:
+        // §4.3d: `v[i] = x` writes lane i.
+        if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE or tk == TypeKind.TY_VECTOR:
             return 1
         if tk == TypeKind.TY_GENERIC_INST:
             let base_sym = self.get_type_d0(resolved)

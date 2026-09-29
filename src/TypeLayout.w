@@ -42,7 +42,31 @@ fn type_layout_int_bytes(bits: i32) -> i64:
         return 1
     bytes as i64
 
+// §4.3d (D78): a vector or mask of `n` lanes of `lane_bits` each occupies
+// N × size(T) rounded up to a power of two — LLVM's `<N x T>` allocation and
+// clang's `vector_size` / `ext_vector_type(N)` on every supported target
+// (`Vector[3, f32]` is 16 bytes, 16-aligned).
+pub fn type_layout_vector_bytes(n: i32, lane_bits: i32) -> i64:
+    let raw = n as i64 * type_layout_int_bytes(lane_bits)
+    var size: i64 = 1
+    while size < raw:
+        size = size * 2
+    size
+
+// Its alignment is the target's for that shape, as clang lays it out: its
+// size on x86_64 and wasm, at most 16 bytes on AArch64 (clang's AArch64
+// MaxVectorAlign is 128 bits: `vector_size(32)` is 16-aligned there).
+pub fn type_layout_vector_align(size: i64) -> i64:
+    if target_spec_arch() == "aarch64" and size > 16: 16 else: size
+
 impl Sema:
+    // A Vector's or Mask's byte size (= its alignment).
+    fn type_layout_vector_size_of(resolved: i32) -> i64:
+        let n = self.get_type_d1(resolved as TypeId)
+        let d0 = self.get_type_d0(resolved as TypeId)
+        let lane_bits = if self.get_type_kind(resolved as TypeId) == TypeKind.TY_MASK: d0 else: self.get_type_d0(self.resolve_alias(d0 as TypeId))
+        type_layout_vector_bytes(n, lane_bits)
+
     fn type_layout_struct_sub_kind(name_sym: i32) -> i32:
         if name_sym != 0 and self.type_decl_nodes.contains(name_sym):
             let decl = self.type_decl_nodes.get(name_sym).unwrap()
@@ -391,6 +415,8 @@ impl Sema:
             return target_spec_ptr_bytes()
         if tk == TypeKind.TY_VA_LIST:
             return if type_layout_c_va_list_kind() == C_VA_LIST_POINTER: target_spec_ptr_bytes() else: 8
+        if tk == TypeKind.TY_VECTOR or tk == TypeKind.TY_MASK:
+            return type_layout_vector_align(self.type_layout_vector_size_of(resolved as i32))
         if tk == TypeKind.TY_ARRAY:
             return self.type_layout_align_of(self.get_type_d0(resolved))
         if tk == TypeKind.TY_SLICE:
@@ -446,6 +472,8 @@ impl Sema:
             return target_spec_ptr_bytes()
         if tk == TypeKind.TY_VA_LIST:
             return type_layout_c_va_list_size()
+        if tk == TypeKind.TY_VECTOR or tk == TypeKind.TY_MASK:
+            return self.type_layout_vector_size_of(resolved as i32)
         if tk == TypeKind.TY_ARRAY:
             return self.type_layout_size_of(self.get_type_d0(resolved)) * self.get_type_d1(resolved) as i64
         if tk == TypeKind.TY_TUPLE:
