@@ -16,6 +16,7 @@ use build.sdk
 use build.wo
 use build.examples
 use build.tools_lane
+use build.host_toolchain
 use std.sysinfo
 fn build_owned_text(s: &str): s ++ ""
 
@@ -760,7 +761,7 @@ fn gate_fixed_targets() -> Vec[str]:
     // Built by push: the pinned seed evaluating build.w cannot take .len() of a
     // collection literal (the #1122 class).
     var fixed: Vec[str] = Vec.new()
-    for name in "build selfcheck reseed-check-build-w abi-hash-check unit-return-review spec-inventory-check examples-tests c-migrator-basic-tests deep-debug-tool-tests user-programs-safe".split(" "): fixed.push(name.clone())
+    for name in "build selfcheck reseed-check-build-w abi-hash-check unit-return-review spec-inventory-check examples-tests c-migrator-basic-tests deep-debug-tool-tests user-programs-safe no-host-toolchain".split(" "): fixed.push(name.clone())
     fixed
 
 fn gate_times_ledger_path() -> str: "out/.build-state/battery-times.tsv"
@@ -2504,6 +2505,20 @@ pub fn build(ctx: BuildCtx) -> Build:
     user_programs_safe = user_programs_safe.input("uat/fixtures").input("examples")
     out = out.add_target(user_programs_safe)
 
+    // #1915: the build reads no host toolchain (build/host_toolchain.w).
+    var no_host_toolchain = target_new(.Action, "no-host-toolchain", "").output("out/.build-state/no-host-toolchain.txt")
+    no_host_toolchain.action = run_no_host_toolchain_action
+    no_host_toolchain = no_host_toolchain.input(release_compiler_bin("with"))
+    no_host_toolchain = no_host_toolchain.input("test/host_toolchain")
+    no_host_toolchain = no_host_toolchain.input("build/host_toolchain.w")
+    for rec in "out/bootstrap-lib out/bootstrap/lib out/lib".split(" "):
+        for name in "llvm_ld.rsp llvm_link.rsp llvm_ld llvm_cc".split(" "):
+            no_host_toolchain = no_host_toolchain.input(rec ++ "/" ++ name)
+    no_host_toolchain = no_host_toolchain.dep("build")
+    no_host_toolchain = no_host_toolchain.write_scope("out/.build-state")
+    no_host_toolchain = no_host_toolchain.write_scope("out/command/no-host-toolchain")
+    out = out.add_target(no_host_toolchain)
+
     var libc_surface = target_new(.Action, "libc-surface-check", "").output("out/.build-state/libc-surface-check.txt")
     libc_surface.action = run_check_libc_surface_action
     libc_surface = libc_surface.write_scope("out/.build-state")
@@ -3805,6 +3820,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     battery_checks = battery_checks.dep("fixpoint")
     battery_checks = battery_checks.dep("test-with-audits")
     battery_checks = battery_checks.dep("user-programs-safe")
+    battery_checks = battery_checks.dep("no-host-toolchain")
     battery_checks = battery_checks.dep("last-green")
     out = out.add_target(battery_checks)
 
