@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.10
+# The With Programming Language — Specification v7.11
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,10 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.11:** SIMD vectors: `Vector[N, T]` with the aliases `f32x4`…,
+`Mask[N, W]` with `m32x4`…, lane-wise operators, splat in the two
+one-meaning positions, swizzles, `.bits()`; c_import maps C vector types
+onto them (§4.3d, §16.1, D78; #1874, retires #1872's omission).
 **Changelog v7.10:** a match on a `&dyn T` subject downcasts with the typed
 binding pattern `name: C`, which binds `&C` observing the same object; a
 `@[sealed]` trait's implementors are the exhaustiveness domain; mutation is

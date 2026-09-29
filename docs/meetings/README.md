@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D78 — SIMD vectors: `Vector[N, T]` with one-token aliases, `Mask[N, W]`, splat only where one meaning is forced](2026-09-29-D78-simd-vectors-vector-n-t-with-one-token-aliases-mask-n-w-splat-where-one-meaning.md)
 - [D77 — Matching on a borrowed trait object: `name: C` binds `&C`; sealed implementors are the domain](2026-09-29-D77-matching-on-a-borrowed-trait-object-binds-a-view-sealed-implementors-are-the-domain.md)
 - [D76 — Modeled-C Amendment 2: effects without views; callback arguments and user data](2026-09-28-D76-modeled-c-amendment-2-effects-without-views-callback-arguments.md)
 - [D75 — `once` parameters, fills, distinct casts, payload discriminants, variadic definitions](2026-09-28-D75-once-parameters-fills-distinct-casts-payload-discriminants-variadic-definitions.md)

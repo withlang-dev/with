@@ -1053,6 +1053,71 @@ Unit variants (no data) generate only `.is_variant()`.
 These methods are generated unconditionally for all enums — no
 `@[derive]` needed. They are always available.
 
+### 4.3d Vector Types
+
+`Vector[N, T]` is a SIMD vector: `N` lanes of `T`, computed lane-wise.
+`N ≥ 1` is a compile-time constant and `T` is a primitive integer or
+floating type (§4.1). `Mask[N, W]` is `N` lanes of a lane-wide boolean
+`W` bits wide (`W` ∈ 8, 16, 32, 64); a lane-wise comparison of
+`Vector[N, T]` yields `Mask[N, width(T)]`, which is what `select` and the
+hardware produce.
+
+**Aliases.** `f32x4`, `i32x8`, `u8x16`, … name `Vector[N, T]`, and
+`m32x4`, `m8x16`, … name `Mask[N, W]`, for the native widths
+(`N × width(T)` ∈ 128, 256, 512 bits). An alias is presentation: it
+denotes the same type, it is what `c_import` prints for a C vector type
+(§16.1), and it is the everyday spelling. Generic code spells the
+parameterized form:
+
+```
+fn dot[N](a: Vector[N, f32], b: Vector[N, f32]) -> f32:
+    (a * b).reduce_add()
+
+let v = f32x4(1, 2, 3, 4)       // f32x4 is Vector[4, f32]
+```
+
+**Layout.** A vector has the target's representation for that shape,
+recorded in the ABI document (`docs/spec/abi/with-abi.md`). On every
+supported target `N × size(T)` rounds up to a power of two, so a
+non-power-of-two `N` is legal in the generic (`Vector[3, f32]` is 16
+bytes and 16-aligned, as clang's `ext_vector_type(3)` is) but has no
+alias. A shape the target has no register for is still a value; the
+compiler lowers it. `Vector` and `Mask` are `Copy`.
+
+**Construction and splat.** `f32x4(1, 2, 3, 4)` and
+`Vector[4, f32](1, 2, 3, 4)` take exactly `N` values of `T`. A scalar
+broadcasts to every lane in the two places that have one meaning:
+
+- a literal in a vector context: `let v: f32x4 = 0`;
+- a scalar operand, literal or variable, in arithmetic with a vector:
+  `v * 2.0`, `v * s`.
+
+A scalar variable bound alone as a vector is refused: `let v: f32x4 = s`
+is spelled `f32x4.splat(s)`, because that is the one place where a type
+mistake (a vector was meant) would silently become a broadcast.
+
+**Lanes.** `v[i]` reads lane `i` and `v[i] = x` writes it (§4.3a's array
+rules: a constant index is checked at compile time, a runtime index
+panics out of range). For `N ≤ 4` the components are `.x .y .z .w`, and
+a swizzle names lanes in any order and count: `v.xy`, `v.wzyx`, `v.xxxx`
+yield `Vector[len, T]`. This is clang's `ext_vector_type` swizzle
+(Clang Language Extensions, "Vectors and Extended Vectors"), which that
+half of the C world already writes; it is not an invention.
+
+**Operators.** `+ - * / %`, and for integer lanes `& | ^ << >>` and `~`,
+are lane-wise and follow §4.2 per lane. `== != < <= > >=` are lane-wise
+and yield a `Mask`. `select(m, a, b)` picks per lane; `m.all()` and
+`m.any()` reduce a mask; `reduce_add`, `reduce_mul`, `reduce_min`,
+`reduce_max`, `reduce_and`, `reduce_or` and `reduce_xor` reduce a
+vector.
+
+**Casts.** `v as i32x4` converts lane-wise, under §4.2.6 for each lane
+(an implicit narrowing is refused as it is for a scalar). `v.bits()`
+reinterprets the bytes as the unsigned integer vector of the same lane
+width (`f32x4.bits(): u32x4`) and `Vector[N, T].from_bits(u)` reverses
+it: a change of representation is a default, a change of meaning is
+spelled (§2).
+
 ### 4.4a Discriminant Enums
 
 Enums can specify an integer representation type and explicit discriminant
