@@ -1215,6 +1215,92 @@ fn sdk_llvm_target(ctx: &BuildCtx) -> Target:
     target = target.dep("sdk-llvm-source")
     target.timeout(21600000)
 
+// The Windows C runtime of the SDK (#1915; build/sdk.w): mingw-w64's headers,
+// UCRT startup and support libraries, and the in-box DLLs' import libraries,
+// built with the SDK's own clang into <SDK_OUTPUT_PREFIX>/libc/windows. The
+// tools are the bootstrap SDK's; the output may be that same SDK
+// (SDK_OUTPUT_PREFIX=SDK_BOOTSTRAP_PREFIX adds the libc to an installed
+// SDK). SDK_WINDOWS_LIBC_ARCH picks x86_64 or aarch64 (default: this host's
+// Windows architecture, else x86_64).
+fn sdk_windows_libc_arch(ctx: &BuildCtx) -> str:
+    let explicit = ctx.env_input("SDK_WINDOWS_LIBC_ARCH")
+    if explicit.len() > 0:
+        return explicit
+    if sdk_current_platform() == "windows-aarch64": "aarch64" else: "x86_64"
+
+fn sdk_windows_libc_target(ctx: &BuildCtx) -> Target:
+    let platform = sdk_current_platform()
+    let tools_prefix = sdk_bootstrap_prefix_arg(ctx, platform)
+    let output_prefix = sdk_output_prefix_arg(ctx, platform)
+    let build_root = sdk_build_root_arg(ctx, platform)
+    let arch_name = sdk_windows_libc_arch(ctx)
+    var target = target_new(.Action, "sdk-windows-libc", "").output(sdk_windows_libc_marker(output_prefix, arch_name))
+    target.action = run_sdk_windows_libc_action
+    target = target.arg(build_owned_text(tools_prefix))
+    target = target.arg(build_owned_text(output_prefix))
+    target = target.arg(sdk_mingw_source_dir())
+    target = target.arg(build_owned_text(arch_name))
+    target = target.arg(build_root ++ "/windows-libc")
+    target = target.input(sdk_mingw_source_marker())
+    target = target.input("build/sdk.w")
+    target = target.input("build/par.w")
+    target = target.write_scope(sdk_windows_libc_root(output_prefix))
+    target = target.write_scope(build_root ++ "/windows-libc")
+    target = target.write_scope("out/command/sdk-windows-libc")
+    target = target.dep("sdk-mingw-source")
+    target.timeout(3600000)
+
+// compiler-rt's builtins for the same Windows target, built by the tools SDK's
+// cmake/ninja/clang against the libc above, into
+// <SDK_OUTPUT_PREFIX>/lib/clang/<major>/lib/windows.
+fn sdk_compiler_rt_builtins_target(ctx: &BuildCtx) -> Target:
+    let platform = sdk_current_platform()
+    let tools_prefix = sdk_bootstrap_prefix_arg(ctx, platform)
+    let output_prefix = sdk_output_prefix_arg(ctx, platform)
+    let build_root = sdk_build_root_arg(ctx, platform)
+    let arch_name = sdk_windows_libc_arch(ctx)
+    var target = target_new(.Action, "sdk-compiler-rt-builtins", "").output(sdk_compiler_rt_builtins(output_prefix, arch_name))
+    target.action = run_sdk_compiler_rt_builtins_action
+    target = target.arg(build_owned_text(tools_prefix))
+    target = target.arg(build_owned_text(output_prefix))
+    target = target.arg(sdk_llvm_source_dir())
+    target = target.arg(build_owned_text(arch_name))
+    target = target.arg(build_root ++ "/compiler-rt-builtins")
+    target = target.input(sdk_llvm_source_marker())
+    target = target.input(sdk_windows_libc_marker(output_prefix, arch_name))
+    target = target.input("build/sdk.w")
+    target = target.write_scope(output_prefix ++ "/lib/clang")
+    target = target.write_scope(build_root ++ "/compiler-rt-builtins")
+    target = target.write_scope("out/command/sdk-compiler-rt-builtins")
+    target = target.dep("sdk-llvm-source")
+    target = target.dep("sdk-windows-libc")
+    target.timeout(3600000)
+
+// libunwind, libc++abi and libc++ for the same Windows target, into the
+// libc's <arch>-w64-mingw32 dir: the C++ runtime the SDK's LLVM is built
+// against, so the compiler's own link needs nothing outside the SDK.
+fn sdk_libcxx_target(ctx: &BuildCtx) -> Target:
+    let platform = sdk_current_platform()
+    let tools_prefix = sdk_bootstrap_prefix_arg(ctx, platform)
+    let output_prefix = sdk_output_prefix_arg(ctx, platform)
+    let build_root = sdk_build_root_arg(ctx, platform)
+    let arch_name = sdk_windows_libc_arch(ctx)
+    var target = target_new(.Action, "sdk-libcxx", "").output(sdk_windows_libc_lib_dir(output_prefix, arch_name) ++ "/libc++.a")
+    target.action = run_sdk_libcxx_action
+    target = target.arg(build_owned_text(tools_prefix))
+    target = target.arg(build_owned_text(output_prefix))
+    target = target.arg(sdk_llvm_source_dir())
+    target = target.arg(build_owned_text(arch_name))
+    target = target.arg(build_root ++ "/libcxx")
+    target = target.input(sdk_llvm_source_marker())
+    target = target.input(sdk_compiler_rt_builtins(output_prefix, arch_name))
+    target = target.input("build/sdk.w")
+    target = target.write_scope(sdk_windows_libc_root(output_prefix))
+    target = target.write_scope(build_root ++ "/libcxx")
+    target = target.write_scope("out/command/sdk-libcxx")
+    target = target.dep("sdk-compiler-rt-builtins")
+    target.timeout(3600000)
+
 fn sdk_group_target() -> Target:
     var target = target_new(.Group, "sdk", "")
     target = target.dep("sdk-ninja")
@@ -2398,6 +2484,10 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(sdk_source_target("sdk-ninja-source", sdk_ninja_source_url(), sdk_ninja_source_sha256(), sdk_ninja_archive(), sdk_source_root(), sdk_ninja_source_dir(), sdk_ninja_source_marker()))
     out = out.add_target(sdk_source_target("sdk-cmake-source", sdk_cmake_source_url(), sdk_cmake_source_sha256(), sdk_cmake_archive(), sdk_source_root(), sdk_cmake_source_dir(), sdk_cmake_source_marker()))
     out = out.add_target(sdk_source_target("sdk-llvm-source", sdk_llvm_source_url(), sdk_llvm_source_sha256(), sdk_llvm_archive(), sdk_source_root(), sdk_llvm_source_dir(), sdk_llvm_source_marker()))
+    out = out.add_target(sdk_source_target("sdk-mingw-source", sdk_mingw_source_url(), sdk_mingw_source_sha256(), sdk_mingw_archive(), sdk_source_root(), sdk_mingw_source_dir(), sdk_mingw_source_marker()))
+    out = out.add_target(sdk_windows_libc_target(ctx))
+    out = out.add_target(sdk_compiler_rt_builtins_target(ctx))
+    out = out.add_target(sdk_libcxx_target(ctx))
     out = out.add_target(sdk_ninja_target(ctx))
     out = out.add_target(sdk_cmake_target(ctx))
     out = out.add_target(sdk_llvm_target(ctx))
