@@ -429,7 +429,7 @@ fn win_alloc_fd(handle: i64) -> i32:
 // _configure_wide_argv runs the parser that built the narrow one (the UCRT's
 // argv_parsing.cpp: one parse_command_line template for both) over the
 // UTF-16 command line, in the mode the startup code used
-// (_get_startup_argv_mode), so quoting and backslashes read exactly as they
+// (rt_crt_startup_argv_mode below), so quoting and backslashes read exactly as they
 // did. The UCRT keeps that argv for the life of the process.
 @[link_name("_configure_wide_argv")]
 extern fn rt_ucrt_configure_wide_argv(mode: i32) -> i32
@@ -437,8 +437,12 @@ extern fn rt_ucrt_configure_wide_argv(mode: i32) -> i32
 extern fn rt_ucrt_argc_ptr() -> *mut i32
 @[link_name("__p___wargv")]
 extern fn rt_ucrt_wargv_ptr() -> *mut *const *const u16
-@[link_name("_get_startup_argv_mode")]
-extern fn rt_crt_startup_argv_mode() -> i32
+// The argv mode both startups this runtime links under use: mingw-w64's
+// (the SDK's, #1915), whose wildcard.c is built with globbing off, and
+// Visual Studio's without setargv.obj. _get_startup_argv_mode, which
+// answers the same, is Visual Studio's startup code only.
+const RT_CRT_ARGV_UNEXPANDED: i32 = 1
+fn rt_crt_startup_argv_mode(): RT_CRT_ARGV_UNEXPANDED
 
 fn win_wide_arg(wargv: *const *const u16, i: i32) -> *const u16:
     unsafe *((wargv as i64 + i * 8) as *const *const u16)
@@ -1880,7 +1884,6 @@ c facade win32:
     fn rt_ucrt_configure_wide_argv
     fn rt_ucrt_argc_ptr
     fn rt_ucrt_wargv_ptr
-    fn rt_crt_startup_argv_mode
     fn WSAStartup
     fn socket
     fn connect
