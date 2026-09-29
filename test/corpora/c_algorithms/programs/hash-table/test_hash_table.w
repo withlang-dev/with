@@ -46,7 +46,7 @@ pub fn test_hash_table_new_free() -> Unit {
 
     (__local_hash_table = hash_table_new(int_hash, int_equal))
 
-    if ((((if not ((if __local_hash_table != null: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if __local_hash_table != null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_table_new_free".ptr, c"test-hash-table.c".ptr, (77 as c_int), c"hash_table != NULL".ptr)
     } else {
         0
@@ -66,13 +66,13 @@ pub fn test_hash_table_new_free() -> Unit {
 
     (__local_hash_table = hash_table_new(int_hash, int_equal))
 
-    if ((((if not ((if __local_hash_table == null: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if __local_hash_table == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_table_new_free".ptr, c"test-hash-table.c".ptr, (91 as c_int), c"hash_table == NULL".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if alloc_test_get_allocated() == 0: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if alloc_test_get_allocated() == 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_table_new_free".ptr, c"test-hash-table.c".ptr, (92 as c_int), c"alloc_test_get_allocated() == 0".ptr)
     } else {
         0
@@ -82,13 +82,13 @@ pub fn test_hash_table_new_free() -> Unit {
 
     (__local_hash_table = hash_table_new(int_hash, int_equal))
 
-    if ((((if not ((if __local_hash_table == null: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if __local_hash_table == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_table_new_free".ptr, c"test-hash-table.c".ptr, (96 as c_int), c"hash_table == NULL".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if alloc_test_get_allocated() == 0: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if alloc_test_get_allocated() == 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_table_new_free".ptr, c"test-hash-table.c".ptr, (97 as c_int), c"alloc_test_get_allocated() == 0".ptr)
     } else {
         0
@@ -107,7 +107,7 @@ pub fn test_hash_table_insert_lookup() -> Unit {
 
     (__local_hash_table = generate_hash_table())
 
-    if ((((if not ((if unsafe { hash_table_num_entries(__local_hash_table) } == 10000: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if unsafe { hash_table_num_entries(__local_hash_table) } == 10000: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_table_insert_lookup".ptr, c"test-hash-table.c".ptr, (111 as c_int), c"hash_table_num_entries(hash_table) == NUM_TEST_VALUES".ptr)
     } else {
         0
@@ -120,7 +120,7 @@ pub fn test_hash_table_insert_lookup() -> Unit {
 
         (__local_value = ((unsafe { hash_table_lookup(__local_hash_table, (&__local_buf[0] as *mut c_char)) } as *mut c_char)))
 
-        if ((((if not ((if strcmp((__local_value as *const i8), (&__local_buf[0] as *mut c_char)) == 0: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+        if (((if not ((if strcmp((__local_value as *const i8), (&__local_buf[0] as *mut c_char)) == 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
             __assert_rtn(c"test_hash_table_insert_lookup".ptr, c"test-hash-table.c".ptr, (118 as c_int), c"strcmp(value, buf) == 0".ptr)
         } else {
             0
@@ -134,7 +134,7 @@ pub fn test_hash_table_insert_lookup() -> Unit {
 
     sprintf((&__local_buf[0] as *mut c_char), c"%i".ptr, -1)
 
-    if ((((if not ((if unsafe { hash_table_lookup(__local_hash_table, (&__local_buf[0] as *mut c_char)) } == null: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if unsafe { hash_table_lookup(__local_hash_table, (&__local_buf[0] as *mut c_char)) } == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_table_insert_lookup".ptr, c"test-hash-table.c".ptr, (123 as c_int), c"hash_table_lookup(hash_table, buf) == NULL".ptr)
     } else {
         0
@@ -142,7 +142,7 @@ pub fn test_hash_table_insert_lookup() -> Unit {
 
     sprintf((&__local_buf[0] as *mut c_char), c"%i".ptr, 10000)
 
-    if ((((if not ((if unsafe { hash_table_lookup(__local_hash_table, (&__local_buf[0] as *mut c_char)) } == null: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if unsafe { hash_table_lookup(__local_hash_table, (&__local_buf[0] as *mut c_char)) } == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_table_insert_lookup".ptr, c"test-hash-table.c".ptr, (125 as c_int), c"hash_table_lookup(hash_table, buf) == NULL".ptr)
     } else {
         0
@@ -154,7 +154,7 @@ pub fn test_hash_table_insert_lookup() -> Unit {
 
     (__local_value = ((unsafe { hash_table_lookup(__local_hash_table, (&__local_buf[0] as *mut c_char)) } as *mut c_char)))
 
-    if ((((if not ((if strcmp((__local_value as *const i8), c"hello world".ptr) == 0: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if strcmp((__local_value as *const i8), c"hello world".ptr) == 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_table_insert_lookup".ptr, c"test-hash-table.c".ptr, (131 as c_int), c"strcmp(value, \"hello world\") == 0".ptr)
     } else {
         0
@@ -171,7 +171,7 @@ pub fn test_hash_table_remove() -> Unit {
 
     (__local_hash_table = generate_hash_table())
 
-    if ((((if not ((if unsafe { hash_table_num_entries(__local_hash_table) } == 10000: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if unsafe { hash_table_num_entries(__local_hash_table) } == 10000: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_table_remove".ptr, c"test-hash-table.c".ptr, (143 as c_int), c"hash_table_num_entries(hash_table) == NUM_TEST_VALUES".ptr)
     } else {
         0
@@ -179,7 +179,7 @@ pub fn test_hash_table_remove() -> Unit {
 
     sprintf((&__local_buf[0] as *mut c_char), c"%i".ptr, 5000)
 
-    if ((((if not ((if unsafe { hash_table_lookup(__local_hash_table, (&__local_buf[0] as *mut c_char)) } != null: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if unsafe { hash_table_lookup(__local_hash_table, (&__local_buf[0] as *mut c_char)) } != null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_table_remove".ptr, c"test-hash-table.c".ptr, (145 as c_int), c"hash_table_lookup(hash_table, buf) != NULL".ptr)
     } else {
         0
@@ -187,13 +187,13 @@ pub fn test_hash_table_remove() -> Unit {
 
     unsafe { hash_table_remove(__local_hash_table, (&__local_buf[0] as *mut c_char)) }
 
-    if ((((if not ((if unsafe { hash_table_num_entries(__local_hash_table) } == 9999: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if unsafe { hash_table_num_entries(__local_hash_table) } == 9999: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_table_remove".ptr, c"test-hash-table.c".ptr, (151 as c_int), c"hash_table_num_entries(hash_table) == 9999".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if unsafe { hash_table_lookup(__local_hash_table, (&__local_buf[0] as *mut c_char)) } == null: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if unsafe { hash_table_lookup(__local_hash_table, (&__local_buf[0] as *mut c_char)) } == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_table_remove".ptr, c"test-hash-table.c".ptr, (154 as c_int), c"hash_table_lookup(hash_table, buf) == NULL".ptr)
     } else {
         0
@@ -203,7 +203,7 @@ pub fn test_hash_table_remove() -> Unit {
 
     unsafe { hash_table_remove(__local_hash_table, (&__local_buf[0] as *mut c_char)) }
 
-    if ((((if not ((if unsafe { hash_table_num_entries(__local_hash_table) } == 9999: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if unsafe { hash_table_num_entries(__local_hash_table) } == 9999: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_table_remove".ptr, c"test-hash-table.c".ptr, (160 as c_int), c"hash_table_num_entries(hash_table) == 9999".ptr)
     } else {
         0
@@ -235,7 +235,7 @@ pub fn test_hash_table_iterating() -> Unit {
 
     }
 
-    if ((((if not ((if __local_count == 10000: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if __local_count == 10000: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_table_iterating".ptr, c"test-hash-table.c".ptr, (185 as c_int), c"count == NUM_TEST_VALUES".ptr)
     } else {
         0
@@ -243,7 +243,7 @@ pub fn test_hash_table_iterating() -> Unit {
 
     unsafe { with_memcpy((&raw mut __local_pair as *mut u8), (&raw const unsafe { hash_table_iter_next((&raw mut __local_iterator as *mut _HashTableIterator)) } as *const u8), sizeof[_HashTablePair]()) }
 
-    if ((((if not ((if (unsafe *(&raw const __local_pair as *const _HashTablePair)).value == null: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if (unsafe *(&raw const __local_pair as *const _HashTablePair)).value == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_table_iterating".ptr, c"test-hash-table.c".ptr, (189 as c_int), c"pair.value == HASH_TABLE_NULL".ptr)
     } else {
         0
@@ -255,7 +255,7 @@ pub fn test_hash_table_iterating() -> Unit {
 
     unsafe { hash_table_iterate(__local_hash_table, (&raw mut __local_iterator as *mut _HashTableIterator)) }
 
-    if ((((if not ((if unsafe { hash_table_iter_has_more((&raw mut __local_iterator as *mut _HashTableIterator)) } == 0: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if unsafe { hash_table_iter_has_more((&raw mut __local_iterator as *mut _HashTableIterator)) } == 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_table_iterating".ptr, c"test-hash-table.c".ptr, (198 as c_int), c"hash_table_iter_has_more(&iterator) == 0".ptr)
     } else {
         0
@@ -306,19 +306,19 @@ pub fn test_hash_table_iterating_remove() -> Unit {
 
     }
 
-    if ((((if not ((if __local_removed == 100: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if __local_removed == 100: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_table_iterating_remove".ptr, c"test-hash-table.c".ptr, (241 as c_int), c"removed == 100".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if __local_count == 10000: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if __local_count == 10000: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_table_iterating_remove".ptr, c"test-hash-table.c".ptr, (242 as c_int), c"count == NUM_TEST_VALUES".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if unsafe { hash_table_num_entries(__local_hash_table) } == ((10000 as c_uint) -% (__local_removed as c_uint)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if unsafe { hash_table_num_entries(__local_hash_table) } == ((10000 as c_uint) -% (__local_removed as c_uint)): 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_table_iterating_remove".ptr, c"test-hash-table.c".ptr, (244 as c_int), c"hash_table_num_entries(hash_table) == NUM_TEST_VALUES - removed".ptr)
     } else {
         0
@@ -330,14 +330,14 @@ pub fn test_hash_table_iterating_remove() -> Unit {
         sprintf((&__local_buf[0] as *mut c_char), c"%i".ptr, __local_i)
 
         if ((if (__local_i % 100) == 0: 1 else: 0) != 0) {
-            if ((((if not ((if unsafe { hash_table_lookup(__local_hash_table, (&__local_buf[0] as *mut c_char)) } == null: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+            if (((if not ((if unsafe { hash_table_lookup(__local_hash_table, (&__local_buf[0] as *mut c_char)) } == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
                 __assert_rtn(c"test_hash_table_iterating_remove".ptr, c"test-hash-table.c".ptr, (251 as c_int), c"hash_table_lookup(hash_table, buf) == NULL".ptr)
             } else {
                 0
             }
 
         } else {
-            if ((((if not ((if unsafe { hash_table_lookup(__local_hash_table, (&__local_buf[0] as *mut c_char)) } != null: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+            if (((if not ((if unsafe { hash_table_lookup(__local_hash_table, (&__local_buf[0] as *mut c_char)) } != null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
                 __assert_rtn(c"test_hash_table_iterating_remove".ptr, c"test-hash-table.c".ptr, (253 as c_int), c"hash_table_lookup(hash_table, buf) != NULL".ptr)
             } else {
                 0
@@ -425,13 +425,13 @@ pub fn test_hash_table_free_functions() -> Unit {
     }
 
 
-    if ((((if not ((if allocated_keys == 10000: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if allocated_keys == 10000: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_table_free_functions".ptr, c"test-hash-table.c".ptr, (324 as c_int), c"allocated_keys == NUM_TEST_VALUES".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if allocated_values == 10000: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if allocated_values == 10000: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_table_free_functions".ptr, c"test-hash-table.c".ptr, (325 as c_int), c"allocated_values == NUM_TEST_VALUES".ptr)
     } else {
         0
@@ -441,13 +441,13 @@ pub fn test_hash_table_free_functions() -> Unit {
 
     unsafe { hash_table_remove(__local_hash_table, ((&raw mut __local_i as *mut c_int) as *mut c_void)) }
 
-    if ((((if not ((if allocated_keys == (10000 - 1): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if allocated_keys == (10000 - 1): 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_table_free_functions".ptr, c"test-hash-table.c".ptr, (331 as c_int), c"allocated_keys == NUM_TEST_VALUES - 1".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if allocated_values == (10000 - 1): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if allocated_values == (10000 - 1): 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_table_free_functions".ptr, c"test-hash-table.c".ptr, (332 as c_int), c"allocated_values == NUM_TEST_VALUES - 1".ptr)
     } else {
         0
@@ -457,13 +457,13 @@ pub fn test_hash_table_free_functions() -> Unit {
 
     (__local_value = new_value((999 as c_int)))
 
-    if ((((if not ((if allocated_keys == 10000: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if allocated_keys == 10000: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_table_free_functions".ptr, c"test-hash-table.c".ptr, (338 as c_int), c"allocated_keys == NUM_TEST_VALUES".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if allocated_values == 10000: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if allocated_values == 10000: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_table_free_functions".ptr, c"test-hash-table.c".ptr, (339 as c_int), c"allocated_values == NUM_TEST_VALUES".ptr)
     } else {
         0
@@ -471,13 +471,13 @@ pub fn test_hash_table_free_functions() -> Unit {
 
     unsafe { hash_table_insert(__local_hash_table, (__local_key as *mut c_void), (__local_value as *mut c_void)) }
 
-    if ((((if not ((if allocated_keys == (10000 - 1): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if allocated_keys == (10000 - 1): 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_table_free_functions".ptr, c"test-hash-table.c".ptr, (343 as c_int), c"allocated_keys == NUM_TEST_VALUES - 1".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if allocated_values == (10000 - 1): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if allocated_values == (10000 - 1): 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_table_free_functions".ptr, c"test-hash-table.c".ptr, (344 as c_int), c"allocated_values == NUM_TEST_VALUES - 1".ptr)
     } else {
         0
@@ -485,13 +485,13 @@ pub fn test_hash_table_free_functions() -> Unit {
 
     unsafe { hash_table_free(__local_hash_table) }
 
-    if ((((if not ((if allocated_keys == 0: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if allocated_keys == 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_table_free_functions".ptr, c"test-hash-table.c".ptr, (349 as c_int), c"allocated_keys == 0".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if allocated_values == 0: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if allocated_values == 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_table_free_functions".ptr, c"test-hash-table.c".ptr, (350 as c_int), c"allocated_values == 0".ptr)
     } else {
         0
@@ -512,13 +512,13 @@ pub fn test_hash_table_out_of_memory() -> Unit {
 
     (__local_values[0] = ((0 as c_int)))
 
-    if ((((if not ((if unsafe { hash_table_insert(__local_hash_table, (((&raw const __local_values[0] as *const c_int) as *mut c_int) as *mut c_void), (((&raw const __local_values[0] as *const c_int) as *mut c_int) as *mut c_void)) } == 0: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if unsafe { hash_table_insert(__local_hash_table, (((&raw const __local_values[0] as *const c_int) as *mut c_int) as *mut c_void), (((&raw const __local_values[0] as *const c_int) as *mut c_int) as *mut c_void)) } == 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_table_out_of_memory".ptr, c"test-hash-table.c".ptr, (365 as c_int), c"hash_table_insert(hash_table, &values[0], &values[0]) == 0".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if unsafe { hash_table_num_entries(__local_hash_table) } == 0: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if unsafe { hash_table_num_entries(__local_hash_table) } == 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_table_out_of_memory".ptr, c"test-hash-table.c".ptr, (366 as c_int), c"hash_table_num_entries(hash_table) == 0".ptr)
     } else {
         0
@@ -531,13 +531,13 @@ pub fn test_hash_table_out_of_memory() -> Unit {
     while ((if __local_i < 65: 1 else: 0) != 0) {
         (__local_values[__local_i] = ((__local_i as c_int)))
 
-        if ((((if not ((if unsafe { hash_table_insert(__local_hash_table, (((&raw const __local_values[__local_i] as *const c_int) as *mut c_int) as *mut c_void), (((&raw const __local_values[__local_i] as *const c_int) as *mut c_int) as *mut c_void)) } != 0: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+        if (((if not ((if unsafe { hash_table_insert(__local_hash_table, (((&raw const __local_values[__local_i] as *const c_int) as *mut c_int) as *mut c_void), (((&raw const __local_values[__local_i] as *const c_int) as *mut c_int) as *mut c_void)) } != 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
             __assert_rtn(c"test_hash_table_out_of_memory".ptr, c"test-hash-table.c".ptr, (379 as c_int), c"hash_table_insert(hash_table, &values[i], &values[i]) != 0".ptr)
         } else {
             0
         }
 
-        if ((((if not ((if unsafe { hash_table_num_entries(__local_hash_table) } == ((__local_i as c_uint) +% (1 as c_uint)): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+        if (((if not ((if unsafe { hash_table_num_entries(__local_hash_table) } == ((__local_i as c_uint) +% (1 as c_uint)): 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
             __assert_rtn(c"test_hash_table_out_of_memory".ptr, c"test-hash-table.c".ptr, (380 as c_int), c"hash_table_num_entries(hash_table) == i + 1".ptr)
         } else {
             0
@@ -549,7 +549,7 @@ pub fn test_hash_table_out_of_memory() -> Unit {
     }
 
 
-    if ((((if not ((if unsafe { hash_table_num_entries(__local_hash_table) } == 65: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if unsafe { hash_table_num_entries(__local_hash_table) } == 65: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_table_out_of_memory".ptr, c"test-hash-table.c".ptr, (383 as c_int), c"hash_table_num_entries(hash_table) == 65".ptr)
     } else {
         0
@@ -559,13 +559,13 @@ pub fn test_hash_table_out_of_memory() -> Unit {
 
     (__local_values[65] = ((65 as c_int)))
 
-    if ((((if not ((if unsafe { hash_table_insert(__local_hash_table, (((&raw const __local_values[65] as *const c_int) as *mut c_int) as *mut c_void), (((&raw const __local_values[65] as *const c_int) as *mut c_int) as *mut c_void)) } == 0: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if unsafe { hash_table_insert(__local_hash_table, (((&raw const __local_values[65] as *const c_int) as *mut c_int) as *mut c_void), (((&raw const __local_values[65] as *const c_int) as *mut c_int) as *mut c_void)) } == 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_table_out_of_memory".ptr, c"test-hash-table.c".ptr, (390 as c_int), c"hash_table_insert(hash_table, &values[65], &values[65]) == 0".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if unsafe { hash_table_num_entries(__local_hash_table) } == 65: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if unsafe { hash_table_num_entries(__local_hash_table) } == 65: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_table_out_of_memory".ptr, c"test-hash-table.c".ptr, (391 as c_int), c"hash_table_num_entries(hash_table) == 65".ptr)
     } else {
         0
@@ -602,7 +602,7 @@ pub fn test_hash_iterator_key_pair() -> Unit {
 
         (__local_val = (((unsafe *(&raw const __local_pair as *const _HashTablePair)).value as *mut c_int)))
 
-        if ((((if not ((if (unsafe *__local_key) == (unsafe *__local_val): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+        if (((if not ((if (unsafe *__local_key) == (unsafe *__local_val): 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
             __assert_rtn(c"test_hash_iterator_key_pair".ptr, c"test-hash-table.c".ptr, (419 as c_int), c"*key == *val".ptr)
         } else {
             0

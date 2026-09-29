@@ -269,8 +269,6 @@ pub extern fn with_memcpy(dst: *mut u8, src: *const u8, n: i64) -> *mut u8
 pub extern fn with_memmove(dst: *mut u8, src: *const u8, n: i64) -> *mut u8
 pub extern fn with_memset(dst: *mut u8, c: i32, n: i64) -> *mut u8
 pub extern fn with_memcmp(a: *const u8, b: *const u8, n: i64) -> i32
-pub extern fn with_va_start(ap: *mut i8) -> Unit
-pub extern fn with_va_end(ap: *mut i8) -> Unit
 
 
 pub type BlockHeader = _BlockHeader

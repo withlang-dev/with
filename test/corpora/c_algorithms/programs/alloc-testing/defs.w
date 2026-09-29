@@ -269,8 +269,6 @@ pub extern fn with_memcpy(dst: *mut u8, src: *const u8, n: i64) -> *mut u8
 pub extern fn with_memmove(dst: *mut u8, src: *const u8, n: i64) -> *mut u8
 pub extern fn with_memset(dst: *mut u8, c: i32, n: i64) -> *mut u8
 pub extern fn with_memcmp(a: *const u8, b: *const u8, n: i64) -> i32
-pub extern fn with_va_start(ap: *mut i8) -> Unit
-pub extern fn with_va_end(ap: *mut i8) -> Unit
 
 
 pub type BlockHeader = _BlockHeader
@@ -304,8 +302,8 @@ pub type AVLTreeNode = _AVLTreeNode
 
 pub type AVLTreeNodeSide = c_uint
 
-pub let AVL_TREE_NODE_LEFT: c_uint = 0
-pub let AVL_TREE_NODE_RIGHT: c_uint = 1
+pub let AVL_TREE_NODE_LEFT: c_int = 0
+pub let AVL_TREE_NODE_RIGHT: c_int = 1
 pub type AVLTreeCompareFunc = unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int
 
 pub type _AVLTreeNode { children: [2]*mut _AVLTreeNode = [null as *mut _AVLTreeNode; 2], parent: *mut _AVLTreeNode = null, key: *mut c_void = null, value: *mut c_void = null, height: c_int = 0 }
@@ -317,8 +315,8 @@ impl Copy for _AVLTree
 pub let AVL_TREE_NULL: *mut c_void = null
 pub type BinaryHeapType = c_uint
 
-pub let BINARY_HEAP_TYPE_MIN: c_uint = 0
-pub let BINARY_HEAP_TYPE_MAX: c_uint = 1
+pub let BINARY_HEAP_TYPE_MIN: c_int = 0
+pub let BINARY_HEAP_TYPE_MAX: c_int = 1
 pub type BinaryHeapValue = *mut c_void
 
 pub type BinaryHeapCompareFunc = unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int
@@ -331,8 +329,8 @@ impl Copy for _BinaryHeap
 pub let BINARY_HEAP_NULL: *mut c_void = null
 pub type BinomialHeapType = c_uint
 
-pub let BINOMIAL_HEAP_TYPE_MIN: c_uint = 0
-pub let BINOMIAL_HEAP_TYPE_MAX: c_uint = 1
+pub let BINOMIAL_HEAP_TYPE_MIN: c_int = 0
+pub let BINOMIAL_HEAP_TYPE_MAX: c_int = 1
 pub type BinomialHeapValue = *mut c_void
 
 pub type BinomialHeapCompareFunc = unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int
@@ -435,12 +433,12 @@ pub type RBTreeCompareFunc = unsafe extern "C" fn(*mut c_void, *mut c_void) -> c
 
 pub type RBTreeNodeColor = c_uint
 
-pub let RB_TREE_NODE_RED: c_uint = 0
-pub let RB_TREE_NODE_BLACK: c_uint = 1
+pub let RB_TREE_NODE_RED: c_int = 0
+pub let RB_TREE_NODE_BLACK: c_int = 1
 pub type RBTreeNodeSide = c_uint
 
-pub let RB_TREE_NODE_LEFT: c_uint = 0
-pub let RB_TREE_NODE_RIGHT: c_uint = 1
+pub let RB_TREE_NODE_LEFT: c_int = 0
+pub let RB_TREE_NODE_RIGHT: c_int = 1
 pub type _RBTreeNode { color: i32 = 0, key: *mut c_void = null, value: *mut c_void = null, parent: *mut _RBTreeNode = null, children: [2]*mut _RBTreeNode = [null as *mut _RBTreeNode; 2] }
 impl Copy for _RBTreeNode
 

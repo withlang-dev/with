@@ -72,19 +72,19 @@ pub fn test_rb_tree_new() -> Unit {
 
     (__local_tree = rb_tree_new(int_compare))
 
-    if ((((if not ((if __local_tree != null: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if __local_tree != null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_rb_tree_new".ptr, c"test-rb-tree.c".ptr, (107 as c_int), c"tree != NULL".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if unsafe { rb_tree_root_node(__local_tree) } == null: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if unsafe { rb_tree_root_node(__local_tree) } == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_rb_tree_new".ptr, c"test-rb-tree.c".ptr, (108 as c_int), c"rb_tree_root_node(tree) == NULL".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if unsafe { rb_tree_num_entries(__local_tree) } == 0: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if unsafe { rb_tree_num_entries(__local_tree) } == 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_rb_tree_new".ptr, c"test-rb-tree.c".ptr, (109 as c_int), c"rb_tree_num_entries(tree) == 0".ptr)
     } else {
         0
@@ -96,7 +96,7 @@ pub fn test_rb_tree_new() -> Unit {
 
     (__local_tree = rb_tree_new(int_compare))
 
-    if ((((if not ((if __local_tree == null: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if __local_tree == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_rb_tree_new".ptr, c"test-rb-tree.c".ptr, (118 as c_int), c"tree == NULL".ptr)
     } else {
         0
@@ -122,7 +122,7 @@ pub fn test_rb_tree_insert_lookup() -> Unit {
 
         unsafe { rb_tree_insert(__local_tree, (((&raw const test_array[__local_i] as *const c_int) as *mut c_int) as *mut c_void), (((&raw const test_array[__local_i] as *const c_int) as *mut c_int) as *mut c_void)) }
 
-        if ((((if not ((if unsafe { rb_tree_num_entries(__local_tree) } == (__local_i + 1): 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+        if (((if not ((if unsafe { rb_tree_num_entries(__local_tree) } == (__local_i + 1): 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
             __assert_rtn(c"test_rb_tree_insert_lookup".ptr, c"test-rb-tree.c".ptr, (136 as c_int), c"rb_tree_num_entries(tree) == i + 1".ptr)
         } else {
             0
@@ -136,7 +136,7 @@ pub fn test_rb_tree_insert_lookup() -> Unit {
     }
 
 
-    if ((((if not ((if unsafe { rb_tree_root_node(__local_tree) } != null: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if unsafe { rb_tree_root_node(__local_tree) } != null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_rb_tree_insert_lookup".ptr, c"test-rb-tree.c".ptr, (140 as c_int), c"rb_tree_root_node(tree) != NULL".ptr)
     } else {
         0
@@ -147,7 +147,7 @@ pub fn test_rb_tree_insert_lookup() -> Unit {
     while ((if __local_i < 1000: 1 else: 0) != 0) {
         (__local_node = unsafe { rb_tree_lookup_node(__local_tree, ((&raw mut __local_i as *mut c_int) as *mut c_void)) })
 
-        if ((((if not ((if __local_node != null: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+        if (((if not ((if __local_node != null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
             __assert_rtn(c"test_rb_tree_insert_lookup".ptr, c"test-rb-tree.c".ptr, (145 as c_int), c"node != NULL".ptr)
         } else {
             0
@@ -155,7 +155,7 @@ pub fn test_rb_tree_insert_lookup() -> Unit {
 
         (__local_value = ((unsafe { rb_tree_node_key(__local_node) } as *mut c_int)))
 
-        if ((((if not ((if (unsafe *__local_value) == __local_i: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+        if (((if not ((if (unsafe *__local_value) == __local_i: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
             __assert_rtn(c"test_rb_tree_insert_lookup".ptr, c"test-rb-tree.c".ptr, (147 as c_int), c"*value == i".ptr)
         } else {
             0
@@ -163,7 +163,7 @@ pub fn test_rb_tree_insert_lookup() -> Unit {
 
         (__local_value = ((unsafe { rb_tree_node_value(__local_node) } as *mut c_int)))
 
-        if ((((if not ((if (unsafe *__local_value) == __local_i: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+        if (((if not ((if (unsafe *__local_value) == __local_i: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
             __assert_rtn(c"test_rb_tree_insert_lookup".ptr, c"test-rb-tree.c".ptr, (149 as c_int), c"*value == i".ptr)
         } else {
             0
@@ -177,7 +177,7 @@ pub fn test_rb_tree_insert_lookup() -> Unit {
 
     (__local_i = ((-1 as c_int)))
 
-    if ((((if not ((if unsafe { rb_tree_lookup_node(__local_tree, ((&raw mut __local_i as *mut c_int) as *mut c_void)) } == null: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if unsafe { rb_tree_lookup_node(__local_tree, ((&raw mut __local_i as *mut c_int) as *mut c_void)) } == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_rb_tree_insert_lookup".ptr, c"test-rb-tree.c".ptr, (154 as c_int), c"rb_tree_lookup_node(tree, &i) == NULL".ptr)
     } else {
         0
@@ -185,7 +185,7 @@ pub fn test_rb_tree_insert_lookup() -> Unit {
 
     (__local_i = (((1000 + 100) as c_int)))
 
-    if ((((if not ((if unsafe { rb_tree_lookup_node(__local_tree, ((&raw mut __local_i as *mut c_int) as *mut c_void)) } == null: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if unsafe { rb_tree_lookup_node(__local_tree, ((&raw mut __local_i as *mut c_int) as *mut c_void)) } == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_rb_tree_insert_lookup".ptr, c"test-rb-tree.c".ptr, (156 as c_int), c"rb_tree_lookup_node(tree, &i) == NULL".ptr)
     } else {
         0
@@ -227,7 +227,7 @@ pub fn test_rb_tree_child() -> Unit {
 
     (__local_p = ((unsafe { rb_tree_node_value(__local_root) } as *mut c_int)))
 
-    if ((((if not ((if (unsafe *__local_p) == 2: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if (unsafe *__local_p) == 2: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_rb_tree_child".ptr, c"test-rb-tree.c".ptr, (182 as c_int), c"*p == 2".ptr)
     } else {
         0
@@ -237,7 +237,7 @@ pub fn test_rb_tree_child() -> Unit {
 
     (__local_p = ((unsafe { rb_tree_node_value(__local_left) } as *mut c_int)))
 
-    if ((((if not ((if (unsafe *__local_p) == 1: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if (unsafe *__local_p) == 1: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_rb_tree_child".ptr, c"test-rb-tree.c".ptr, (186 as c_int), c"*p == 1".ptr)
     } else {
         0
@@ -247,19 +247,19 @@ pub fn test_rb_tree_child() -> Unit {
 
     (__local_p = ((unsafe { rb_tree_node_value(__local_right) } as *mut c_int)))
 
-    if ((((if not ((if (unsafe *__local_p) == 3: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if (unsafe *__local_p) == 3: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_rb_tree_child".ptr, c"test-rb-tree.c".ptr, (190 as c_int), c"*p == 3".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if unsafe { rb_tree_node_child(__local_root, (10000 as i32)) } == null: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if unsafe { rb_tree_node_child(__local_root, (10000 as i32)) } == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_rb_tree_child".ptr, c"test-rb-tree.c".ptr, (193 as c_int), c"rb_tree_node_child(root, 10000) == NULL".ptr)
     } else {
         0
     }
 
-    if ((((if not ((if unsafe { rb_tree_node_child(__local_root, (2 as i32)) } == null: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if unsafe { rb_tree_node_child(__local_root, (2 as i32)) } == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_rb_tree_child".ptr, c"test-rb-tree.c".ptr, (194 as c_int), c"rb_tree_node_child(root, 2) == NULL".ptr)
     } else {
         0
@@ -285,7 +285,7 @@ pub fn test_out_of_memory() -> Unit {
     while ((if __local_i < 20000: 1 else: 0) != 0) {
         (__local_node = unsafe { rb_tree_insert(__local_tree, ((&raw mut __local_i as *mut c_int) as *mut c_void), ((&raw mut __local_i as *mut c_int) as *mut c_void)) })
 
-        if ((((if not ((if __local_node == null: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+        if (((if not ((if __local_node == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
             __assert_rtn(c"test_out_of_memory".ptr, c"test-rb-tree.c".ptr, (214 as c_int), c"node == NULL".ptr)
         } else {
             0
@@ -330,13 +330,13 @@ pub fn test_rb_tree_lookup() -> Unit {
     while ((if __local_i < 1000: 1 else: 0) != 0) {
         (__local_value = ((unsafe { rb_tree_lookup(__local_tree, ((&raw mut __local_i as *mut c_int) as *mut c_void)) } as *mut c_int)))
 
-        if ((((if not ((if __local_value != null: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+        if (((if not ((if __local_value != null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
             __assert_rtn(c"test_rb_tree_lookup".ptr, c"test-rb-tree.c".ptr, (246 as c_int), c"value != NULL".ptr)
         } else {
             0
         }
 
-        if ((((if not ((if (unsafe *__local_value) == __local_i: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+        if (((if not ((if (unsafe *__local_value) == __local_i: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
             __assert_rtn(c"test_rb_tree_lookup".ptr, c"test-rb-tree.c".ptr, (247 as c_int), c"*value == i".ptr)
         } else {
             0
@@ -350,7 +350,7 @@ pub fn test_rb_tree_lookup() -> Unit {
 
     (__local_i = ((-1 as c_int)))
 
-    if ((((if not ((if unsafe { rb_tree_lookup(__local_tree, ((&raw mut __local_i as *mut c_int) as *mut c_void)) } == null: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if unsafe { rb_tree_lookup(__local_tree, ((&raw mut __local_i as *mut c_int) as *mut c_void)) } == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_rb_tree_lookup".ptr, c"test-rb-tree.c".ptr, (252 as c_int), c"rb_tree_lookup(tree, &i) == NULL".ptr)
     } else {
         0
@@ -358,7 +358,7 @@ pub fn test_rb_tree_lookup() -> Unit {
 
     (__local_i = (((1000 + 1) as c_int)))
 
-    if ((((if not ((if unsafe { rb_tree_lookup(__local_tree, ((&raw mut __local_i as *mut c_int) as *mut c_void)) } == null: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if unsafe { rb_tree_lookup(__local_tree, ((&raw mut __local_i as *mut c_int) as *mut c_void)) } == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_rb_tree_lookup".ptr, c"test-rb-tree.c".ptr, (254 as c_int), c"rb_tree_lookup(tree, &i) == NULL".ptr)
     } else {
         0
@@ -366,7 +366,7 @@ pub fn test_rb_tree_lookup() -> Unit {
 
     (__local_i = ((8724897 as c_int)))
 
-    if ((((if not ((if unsafe { rb_tree_lookup(__local_tree, ((&raw mut __local_i as *mut c_int) as *mut c_void)) } == null: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if unsafe { rb_tree_lookup(__local_tree, ((&raw mut __local_i as *mut c_int) as *mut c_void)) } == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_rb_tree_lookup".ptr, c"test-rb-tree.c".ptr, (256 as c_int), c"rb_tree_lookup(tree, &i) == NULL".ptr)
     } else {
         0
@@ -396,7 +396,7 @@ pub fn test_rb_tree_remove() -> Unit {
 
     (__local_i = (((1000 + 100) as c_int)))
 
-    if ((((if not ((if unsafe { rb_tree_remove(__local_tree, ((&raw mut __local_i as *mut c_int) as *mut c_void)) } == 0: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if unsafe { rb_tree_remove(__local_tree, ((&raw mut __local_i as *mut c_int) as *mut c_void)) } == 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_rb_tree_remove".ptr, c"test-rb-tree.c".ptr, (273 as c_int), c"rb_tree_remove(tree, &i) == 0".ptr)
     } else {
         0
@@ -404,7 +404,7 @@ pub fn test_rb_tree_remove() -> Unit {
 
     (__local_i = ((-1 as c_int)))
 
-    if ((((if not ((if unsafe { rb_tree_remove(__local_tree, ((&raw mut __local_i as *mut c_int) as *mut c_void)) } == 0: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if unsafe { rb_tree_remove(__local_tree, ((&raw mut __local_i as *mut c_int) as *mut c_void)) } == 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_rb_tree_remove".ptr, c"test-rb-tree.c".ptr, (275 as c_int), c"rb_tree_remove(tree, &i) == 0".ptr)
     } else {
         0
@@ -423,7 +423,7 @@ pub fn test_rb_tree_remove() -> Unit {
             while ((if __local_z < 10: 1 else: 0) != 0) {
                 (__local_value = (((((__local_z * 100) + ((9 - __local_y) * 10)) + __local_x) as c_int)))
 
-                if ((((if not ((if unsafe { rb_tree_remove(__local_tree, ((&raw mut __local_value as *mut c_int) as *mut c_void)) } != 0: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+                if (((if not ((if unsafe { rb_tree_remove(__local_tree, ((&raw mut __local_value as *mut c_int) as *mut c_void)) } != 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
                     __assert_rtn(c"test_rb_tree_remove".ptr, c"test-rb-tree.c".ptr, (286 as c_int), c"rb_tree_remove(tree, &value) != 0".ptr)
                 } else {
                     0
@@ -433,7 +433,7 @@ pub fn test_rb_tree_remove() -> Unit {
 
                 (__local_expected_entries = __local_expected_entries - 1)
 
-                if ((((if not ((if unsafe { rb_tree_num_entries(__local_tree) } == __local_expected_entries: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+                if (((if not ((if unsafe { rb_tree_num_entries(__local_tree) } == __local_expected_entries: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
                     __assert_rtn(c"test_rb_tree_remove".ptr, c"test-rb-tree.c".ptr, (290 as c_int), c"rb_tree_num_entries(tree) == expected_entries".ptr)
                 } else {
                     0
@@ -457,7 +457,7 @@ pub fn test_rb_tree_remove() -> Unit {
     }
 
 
-    if ((((if not ((if unsafe { rb_tree_root_node(__local_tree) } == null: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if unsafe { rb_tree_root_node(__local_tree) } == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_rb_tree_remove".ptr, c"test-rb-tree.c".ptr, (296 as c_int), c"rb_tree_root_node(tree) == NULL".ptr)
     } else {
         0
@@ -493,7 +493,7 @@ pub fn test_rb_tree_to_array() -> Unit {
     }
 
 
-    if ((((if not ((if unsafe { rb_tree_num_entries(__local_tree) } == __local_num_entries: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if unsafe { rb_tree_num_entries(__local_tree) } == __local_num_entries: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_rb_tree_to_array".ptr, c"test-rb-tree.c".ptr, (317 as c_int), c"rb_tree_num_entries(tree) == num_entries".ptr)
     } else {
         0
@@ -504,7 +504,7 @@ pub fn test_rb_tree_to_array() -> Unit {
     (__local_i = ((0 as c_int)))
 
     while ((if __local_i < __local_num_entries: 1 else: 0) != 0) {
-        if ((((if not ((if (unsafe *((__local_array[__local_i]) as *mut c_int)) == __local_sorted[__local_i]: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+        if (((if not ((if (unsafe *((__local_array[__local_i]) as *mut c_int)) == __local_sorted[__local_i]: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
             __assert_rtn(c"test_rb_tree_to_array".ptr, c"test-rb-tree.c".ptr, (323 as c_int), c"*array[i] == sorted[i]".ptr)
         } else {
             0
@@ -522,7 +522,7 @@ pub fn test_rb_tree_to_array() -> Unit {
 
     (__local_array = ((unsafe { rb_tree_to_array(__local_tree) } as *mut *mut c_int)))
 
-    if ((((if not ((if __local_array == null: 1 else: 0) != 0): 1 else: 0) as c_long) as c_long) != 0) {
+    if (((if not ((if __local_array == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_rb_tree_to_array".ptr, c"test-rb-tree.c".ptr, (332 as c_int), c"array == NULL".ptr)
     } else {
         0

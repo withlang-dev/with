@@ -269,8 +269,6 @@ pub extern fn with_memcpy(dst: *mut u8, src: *const u8, n: i64) -> *mut u8
 pub extern fn with_memmove(dst: *mut u8, src: *const u8, n: i64) -> *mut u8
 pub extern fn with_memset(dst: *mut u8, c: i32, n: i64) -> *mut u8
 pub extern fn with_memcmp(a: *const u8, b: *const u8, n: i64) -> i32
-pub extern fn with_va_start(ap: *mut i8) -> Unit
-pub extern fn with_va_end(ap: *mut i8) -> Unit
 
 
 pub type BlockHeader = _BlockHeader
@@ -280,9 +278,6 @@ impl Copy for _BlockHeader
 
 pub var allocation_limit: c_int = -1
 
-pub let ALLOC_TEST_MAGIC: c_int = 0x72ec82d2
-pub let MALLOC_PATTERN: c_uint = 0xBAADF00D
-pub let FREE_PATTERN: c_uint = 0xDEADBEEF
 pub type ArrayListValue = *mut c_void
 
 pub type ArrayList = _ArrayList
@@ -304,8 +299,8 @@ pub type AVLTreeNode = _AVLTreeNode
 
 pub type AVLTreeNodeSide = c_uint
 
-pub let AVL_TREE_NODE_LEFT: c_uint = 0
-pub let AVL_TREE_NODE_RIGHT: c_uint = 1
+pub let AVL_TREE_NODE_LEFT: c_int = 0
+pub let AVL_TREE_NODE_RIGHT: c_int = 1
 pub type AVLTreeCompareFunc = unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int
 
 pub type _AVLTreeNode { children: [2]*mut _AVLTreeNode = [null as *mut _AVLTreeNode; 2], parent: *mut _AVLTreeNode = null, key: *mut c_void = null, value: *mut c_void = null, height: c_int = 0 }
@@ -314,11 +309,10 @@ impl Copy for _AVLTreeNode
 pub type _AVLTree { root_node: *mut _AVLTreeNode = null, compare_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int, num_nodes: c_uint = 0 }
 impl Copy for _AVLTree
 
-pub let AVL_TREE_NULL: *mut c_void = null
 pub type BinaryHeapType = c_uint
 
-pub let BINARY_HEAP_TYPE_MIN: c_uint = 0
-pub let BINARY_HEAP_TYPE_MAX: c_uint = 1
+pub let BINARY_HEAP_TYPE_MIN: c_int = 0
+pub let BINARY_HEAP_TYPE_MAX: c_int = 1
 pub type BinaryHeapValue = *mut c_void
 
 pub type BinaryHeapCompareFunc = unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int
@@ -328,11 +322,10 @@ pub type BinaryHeap = _BinaryHeap
 pub type _BinaryHeap { heap_type: i32 = 0, values: *mut *mut c_void = null, num_values: c_uint = 0, alloced_size: c_uint = 0, compare_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int }
 impl Copy for _BinaryHeap
 
-pub let BINARY_HEAP_NULL: *mut c_void = null
 pub type BinomialHeapType = c_uint
 
-pub let BINOMIAL_HEAP_TYPE_MIN: c_uint = 0
-pub let BINOMIAL_HEAP_TYPE_MAX: c_uint = 1
+pub let BINOMIAL_HEAP_TYPE_MIN: c_int = 0
+pub let BINOMIAL_HEAP_TYPE_MAX: c_int = 1
 pub type BinomialHeapValue = *mut c_void
 
 pub type BinomialHeapCompareFunc = unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int
@@ -347,7 +340,6 @@ impl Copy for _BinomialTree
 pub type _BinomialHeap { heap_type: i32 = 0, compare_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int, num_values: c_uint = 0, roots: *mut *mut _BinomialTree = null, roots_length: c_uint = 0 }
 impl Copy for _BinomialHeap
 
-pub let BINOMIAL_HEAP_NULL: *mut c_void = null
 pub type BloomFilter = _BloomFilter
 
 pub type BloomFilterValue = *mut c_void
@@ -391,8 +383,6 @@ impl Copy for _HashTableEntry
 pub type _HashTable { table: *mut *mut _HashTableEntry = null, table_size: c_uint = 0, hash_func: unsafe extern "C" fn(*mut c_void) -> c_uint, equal_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int, key_free_func: unsafe extern "C" fn(*mut c_void) -> Unit, value_free_func: unsafe extern "C" fn(*mut c_void) -> Unit, entries: c_uint = 0, prime_index: c_uint = 0 }
 impl Copy for _HashTable
 
-pub let HASH_TABLE_KEY_NULL: *mut c_void = null
-pub let HASH_TABLE_NULL: *mut c_void = null
 pub type ListEntry = _ListEntry
 
 pub type ListIterator = _ListIterator
@@ -409,7 +399,6 @@ pub type ListEqualFunc = unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int
 pub type _ListEntry { data: *mut c_void = null, prev: *mut _ListEntry = null, next: *mut _ListEntry = null }
 impl Copy for _ListEntry
 
-pub let LIST_NULL: *mut c_void = null
 pub type Queue = _Queue
 
 pub type QueueValue = *mut c_void
@@ -422,7 +411,6 @@ impl Copy for _QueueEntry
 pub type _Queue { head: *mut _QueueEntry = null, tail: *mut _QueueEntry = null }
 impl Copy for _Queue
 
-pub let QUEUE_NULL: *mut c_void = null
 pub type RBTree = _RBTree
 
 pub type RBTreeKey = *mut c_void
@@ -435,19 +423,18 @@ pub type RBTreeCompareFunc = unsafe extern "C" fn(*mut c_void, *mut c_void) -> c
 
 pub type RBTreeNodeColor = c_uint
 
-pub let RB_TREE_NODE_RED: c_uint = 0
-pub let RB_TREE_NODE_BLACK: c_uint = 1
+pub let RB_TREE_NODE_RED: c_int = 0
+pub let RB_TREE_NODE_BLACK: c_int = 1
 pub type RBTreeNodeSide = c_uint
 
-pub let RB_TREE_NODE_LEFT: c_uint = 0
-pub let RB_TREE_NODE_RIGHT: c_uint = 1
+pub let RB_TREE_NODE_LEFT: c_int = 0
+pub let RB_TREE_NODE_RIGHT: c_int = 1
 pub type _RBTreeNode { color: i32 = 0, key: *mut c_void = null, value: *mut c_void = null, parent: *mut _RBTreeNode = null, children: [2]*mut _RBTreeNode = [null as *mut _RBTreeNode; 2] }
 impl Copy for _RBTreeNode
 
 pub type _RBTree { root_node: *mut _RBTreeNode = null, compare_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int, num_nodes: c_int = 0 }
 impl Copy for _RBTree
 
-pub let RB_TREE_NULL: *mut c_void = null
 pub type Set = _Set
 
 pub type SetIterator = _SetIterator
@@ -471,7 +458,6 @@ impl Copy for _SetEntry
 pub type _Set { table: *mut *mut _SetEntry = null, entries: c_uint = 0, table_size: c_uint = 0, prime_index: c_uint = 0, hash_func: unsafe extern "C" fn(*mut c_void) -> c_uint, equal_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int, free_func: unsafe extern "C" fn(*mut c_void) -> Unit }
 impl Copy for _Set
 
-pub let SET_NULL: *mut c_void = null
 pub type SListEntry = _SListEntry
 
 pub type SListIterator = _SListIterator
@@ -488,7 +474,6 @@ pub type SListEqualFunc = unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_in
 pub type _SListEntry { data: *mut c_void = null, next: *mut _SListEntry = null }
 impl Copy for _SListEntry
 
-pub let SLIST_NULL: *mut c_void = null
 pub type SortedArrayValue = *mut c_void
 
 pub type SortedArray = _SortedArray
@@ -498,7 +483,6 @@ pub type SortedArrayCompareFunc = unsafe extern "C" fn(*mut c_void, *mut c_void)
 pub type _SortedArray { data: *mut *mut c_void = null, length: c_uint = 0, _alloced: c_uint = 0, cmp_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int }
 impl Copy for _SortedArray
 
-pub let SORTED_ARRAY_NULL: *mut c_void = null
 pub var variable1: c_int = 50
 
 pub var variable2: c_int = 0
@@ -518,5 +502,3 @@ impl Copy for _TrieNode
 
 pub type _Trie { root_node: *mut _TrieNode = null }
 impl Copy for _Trie
-
-pub let TRIE_NULL: *mut c_void = null

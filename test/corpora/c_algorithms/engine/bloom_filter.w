@@ -5,7 +5,7 @@ use std.calg_testing.alloc_testing
 pub fn bloom_filter_new(__param_table_size: c_uint, __param_hash_func: unsafe extern "C" fn(*mut c_void) -> c_uint, __param_num_functions: c_uint) -> *mut _BloomFilter {
     var __local_filter: *mut _BloomFilter
 
-    if ((if __param_num_functions > (((64 * sizeof[c_uint]()) as c_ulong) / (sizeof[c_uint]() as c_ulong)): 1 else: 0) != 0) {
+    if ((if __param_num_functions > (((64 * (sizeof[c_uint]() as usize)) as c_ulong) / (sizeof[c_uint]() as c_ulong)): 1 else: 0) != 0) {
         return ((null as *mut _BloomFilter))
 
     }
@@ -101,7 +101,7 @@ pub unsafe fn bloom_filter_query(__param_bloomfilter: *mut _BloomFilter, __param
 
         (__local_bit = ((((1 as c_int) << (((__local_index as c_uint) % (8 as c_uint)) as c_uint)) as c_int)))
 
-        if ((if (((__local_b as c_int) as c_int) & (__local_bit as c_int)) == 0: 1 else: 0) != 0) {
+        if ((if ((__local_b as c_int) & (__local_bit as c_int)) == 0: 1 else: 0) != 0) {
             return 0
 
         }
@@ -175,7 +175,7 @@ pub unsafe fn bloom_filter_union(__param_filter1: *mut _BloomFilter, __param_fil
     (__local_i = ((0 as c_uint)))
 
     while ((if __local_i < __local_array_size: 1 else: 0) != 0) {
-        (((*__local_result).table[__local_i]) = (((((((*__param_filter1).table[__local_i]) as c_int) as c_int) | ((((*__param_filter2).table[__local_i]) as c_int) as c_int)) as u8)))
+        (((*__local_result).table[__local_i]) = ((((((*__param_filter1).table[__local_i]) as c_int) | (((*__param_filter2).table[__local_i]) as c_int)) as u8)))
 
 
         (__local_i = (__local_i +% 1))
@@ -228,7 +228,7 @@ pub unsafe fn bloom_filter_intersection(__param_filter1: *mut _BloomFilter, __pa
     (__local_i = ((0 as c_uint)))
 
     while ((if __local_i < __local_array_size: 1 else: 0) != 0) {
-        (((*__local_result).table[__local_i]) = (((((((*__param_filter1).table[__local_i]) as c_int) as c_int) & ((((*__param_filter2).table[__local_i]) as c_int) as c_int)) as u8)))
+        (((*__local_result).table[__local_i]) = ((((((*__param_filter1).table[__local_i]) as c_int) & (((*__param_filter2).table[__local_i]) as c_int)) as u8)))
 
 
         (__local_i = (__local_i +% 1))
