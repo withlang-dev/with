@@ -535,6 +535,13 @@ impl Zcu:
                 if only_count > 0:
                     let dname = self.c_import_decl_bound_name_frontend(out, dnode)
                     include = frontend_is_cimport_support_name(dname) or self.c_import_only_matches_frontend(out, decl, dname)
+                if not include:
+                    // A name the header provides but `only:` left out: a use
+                    // names the list, not a misspelling (§16.2).
+                    let dropped = self.c_import_decl_bound_name_frontend(out, dnode)
+                    ci_forget_filtered_name(dropped)
+                    if not self.c_import_omitted_symbols.contains(dropped):
+                        self.c_import_omitted_symbols.insert(dropped, "|selective|not in this import's only: list")
                 if include:
                     ordered.push(dnode as i32)
                     ordered_paths.push(frontend_owned_text(ci_owner_path))

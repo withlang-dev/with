@@ -1854,6 +1854,29 @@ pub fn with_cimport_reset_names() -> i32:
         g_emitted_cap = 0
         0
 
+// `only:` can discard a translated declaration. It has not been imported,
+// so a later header must be allowed to emit it. Reinsert the following
+// cluster after removing its slot so colliding names remain reachable.
+pub fn cimport_forget_emitted_name(name: &str):
+    if name.len() == 0 or g_emitted_count == 0: return
+    unsafe:
+        let c_name = str_to_cstr(name)
+        let slot = emitted_name_slot(g_emitted_names, g_emitted_cap, c_name)
+        with_free(c_name)
+        let entry = *(slot as *const *mut u8)
+        if entry as i64 == 0: return
+        with_free(entry)
+        *(slot as *mut *mut u8) = 0 as *mut u8
+        g_emitted_count = g_emitted_count - 1
+        var i = ((slot - g_emitted_names as i64) / 8 + 1) % g_emitted_cap
+        while true:
+            let next = (g_emitted_names as i64 + i * 8) as *mut *mut u8
+            let displaced = *next
+            if displaced as i64 == 0: break
+            *next = 0 as *mut u8
+            *(emitted_name_slot(g_emitted_names, g_emitted_cap, displaced) as *mut *mut u8) = displaced
+            i = (i + 1) % g_emitted_cap
+
 pub fn with_cimport_add_include_path(path: &str) -> i32:
     unsafe:
         if g_cimport_include_count >= 32 or path.len() <= 0: return 0
