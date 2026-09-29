@@ -10249,7 +10249,10 @@ impl Sema:
             if self.is_mask_symbol(self.ast.get_data0(type_node)):
                 return self.mask_type_from_args(vs_a0, vs_a1)
             let vs_lane = self.resolve_type_node_with_subst(vs_a1, self_ty, subst_names, subst_types)
-            return self.vector_type_from_args(vs_a0, vs_lane, vs_a1)
+            let vs_count_kind = self.ast.kind(vs_a0)
+            let vs_vec_subst = if vs_count_kind == NodeKind.NK_TYPE_NAMED or vs_count_kind == NodeKind.NK_IDENT: self.subst_vec_lookup(subst_names, subst_types, self.ast.get_data0(vs_a0)) else: 0
+            let vs_count_subst = if vs_vec_subst != 0: vs_vec_subst else: self.vector_count_subst(vs_a0)
+            return self.vector_type_from_args(vs_a0, vs_lane, vs_a1, vs_count_subst)
         if kind == NodeKind.NK_TYPE_GENERIC:
             let base_sym = self.canonical_symbol_by_text(self.ast.get_data0(type_node))
             let extra_start2 = self.ast.get_data1(type_node)
@@ -10295,14 +10298,17 @@ impl Sema:
             return self.find_tuple_type(elems, elem_count) as i32
         if kind == NodeKind.NK_TYPE_GENERIC and (self.is_vector_symbol(self.ast.get_data0(type_node)) or self.is_mask_symbol(self.ast.get_data0(type_node))) and self.ast.get_data2(type_node) == 2:
             let vs_start = self.ast.get_data1(type_node)
-            let vs_count = self.int_literal_i64_value(self.ast.get_extra(vs_start))
-            if vs_count.ok == 0:
+            let vs_a0 = self.ast.get_extra(vs_start)
+            let vs_count_kind = self.ast.kind(vs_a0)
+            let vs_vec_subst = if vs_count_kind == NodeKind.NK_TYPE_NAMED or vs_count_kind == NodeKind.NK_IDENT: self.subst_vec_lookup(subst_names, subst_types, self.ast.get_data0(vs_a0)) else: 0
+            let vs_count = self.vector_count_node_value(vs_a0, if vs_vec_subst != 0: vs_vec_subst else: self.vector_count_subst(vs_a0))
+            if vs_count < 1:
                 return 0
             if self.is_mask_symbol(self.ast.get_data0(type_node)):
                 let vs_w = self.int_literal_i64_value(self.ast.get_extra(vs_start + 1))
-                return self.find_exact_type(TypeKind.TY_MASK, vs_w.value as i32, vs_count.value as i32, 0) as i32
+                return self.find_exact_type(TypeKind.TY_MASK, vs_w.value as i32, vs_count as i32, 0) as i32
             let vs_lane = self.resolve_type_node_with_subst_frozen(self.ast.get_extra(vs_start + 1), self_ty, subst_names, subst_types)
-            return self.find_exact_type(TypeKind.TY_VECTOR, vs_lane, vs_count.value as i32, 0) as i32
+            return self.find_exact_type(TypeKind.TY_VECTOR, vs_lane, vs_count as i32, 0) as i32
         if kind == NodeKind.NK_TYPE_GENERIC:
             let base_sym = self.canonical_symbol_by_text(self.ast.get_data0(type_node))
             let extra_start2 = self.ast.get_data1(type_node)
@@ -14147,10 +14153,10 @@ impl Sema:
         let target_exact_type = self.check_expr(target)
         self.union_in_assign_target = self.union_in_assign_target - 1
         self.assign_target_revive_sym = assign_revive_saved
-        // §4.3d names a lane place only as `v[i]`; a component or swizzle is
-        // a value.
-        if self.ast.kind(target) == NodeKind.NK_FIELD_ACCESS and self.vector_ops.contains(target):
-            self.emit_error("a vector component or swizzle is read, not assigned; write lane i with `v[i] = x` (§4.3d)", target)
+        // §4.3d: a component `.x` is lane 0 and is written as `v[0]` is; a
+        // multi-lane swizzle write is not specified.
+        if self.ast.kind(target) == NodeKind.NK_FIELD_ACCESS and self.vector_ops.contains(target) and self.vector_swizzle_width(target) != 1:
+            self.emit_error("a multi-lane swizzle is read, not assigned; write each lane (`v.x = a`, `v[i] = x`) (§4.3d)", target)
             return 0
         let target_type = self.assignment_target_value_type(target, target_exact_type as i32)
         let value_type = if target_type != 0: self.check_expr_with_owned_demand(value, target_type) else: self.check_expr(value)
@@ -23211,9 +23217,19 @@ impl Sema:
         if kind == NodeKind.NK_TYPE_GENERIC:
             let base_sym = self.ast.get_data0(type_node)
             let resolved = self.resolve_alias(arg_tid)
-            // §4.3d: `Vector[4, T]` binds T from the argument's lane type.
+            // §4.3d: `Vector[N, T]` binds T from the argument's lane type
+            // and a generic N from its lane count.
             if self.is_vector_symbol(base_sym) and self.ast.get_data2(type_node) == 2:
                 if self.get_type_kind(resolved) == TypeKind.TY_VECTOR:
+                    let count_node = self.ast.get_extra(self.ast.get_data1(type_node))
+                    let count_kind = self.ast.kind(count_node)
+                    if (count_kind == NodeKind.NK_TYPE_NAMED or count_kind == NodeKind.NK_IDENT) and self.type_param_exists(tp_start, tp_count, self.ast.get_data0(count_node)) != 0:
+                        let count_ty = self.const_int_type(self.get_type_d1(resolved))
+                        let bound_before = self.lookup_generic_subst(self.ast.get_data0(count_node))
+                        if bound_before != 0 and bound_before != count_ty:
+                            self.emit_error(f"cannot infer one lane count for '{self.pool_resolve(self.ast.get_data0(count_node))}': saw {self.const_int_value(bound_before)} and {self.get_type_d1(resolved)} (§4.3d)", err_node)
+                            return
+                        self.put_generic_subst(self.ast.get_data0(count_node), count_ty, err_node)
                     self.bind_type_params_from_type_expr(self.ast.get_extra(self.ast.get_data1(type_node) + 1), self.get_type_d0(resolved), tp_start, tp_count, err_node)
                 return
             if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:

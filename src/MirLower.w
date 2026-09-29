@@ -6819,6 +6819,10 @@ impl MirBuilder:
         // lower); the value falls through to the temporary below.
         // §4.3d: a vector component or swizzle is a value, not a field.
         if kind == NodeKind.NK_FIELD_ACCESS and self.sema.vector_ops.contains(node):
+            // A single component is the lane's own place (read or written).
+            let component_place = self.lower_vector_component_place(node)
+            if component_place >= 0:
+                return component_place
             let sw_op = self.lower_expr(node)
             let sw_ty = self.expr_type(node)
             return self.materialize_operand(sw_op, sw_ty, self.ast.get_start(node))
