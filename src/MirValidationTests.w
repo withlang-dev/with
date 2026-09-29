@@ -589,7 +589,11 @@ pub fn mir_test_move_of_moved_place() -> Unit:
     assert(moved_twice_verdict(0, true).contains("move of _2, which a path reaching it already moved out (MaybeMoved)"))
     assert(moved_twice_verdict(1, true) == "")
     assert(moved_twice_verdict(2, true).contains("move of _2, which a path reaching it already moved out (Moved)"))
-    assert(moved_twice_verdict(3, true) == "")
+    // Shape 3 initializes `_2` on one path only: the move at the join is not
+    // a second move, it reads a place a path never initialized (#1860).
+    let uninit = moved_twice_verdict(3, true)
+    assert(not uninit.contains("already moved out"))
+    assert(uninit.contains("read of _2 reaches a path that never initialized it (Maybe)"))
     assert(moved_twice_verdict(4, true).contains("bb3: move of _2, which a path reaching it already moved out (MaybeMoved)"))
     assert(moved_twice_verdict(4, false) == "")
     // A value with no drop glue is not freed twice.
