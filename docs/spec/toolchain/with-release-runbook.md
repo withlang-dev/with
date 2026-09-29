@@ -229,11 +229,15 @@ linux-x86_64, linux-aarch64, windows-x86_64, windows-aarch64) after fixpoint
 and before packaging, so a red UAT blocks that platform's asset. The gate
 needs the last-green manifest (`with build :last-green`, which requires the
 test-green evidence `with build :test` records, so each job runs the battery
-first) and a display with OpenGL 3.3 for the spiral: the macOS runner's
-session has one; Linux runs under `xvfb-run` with Mesa's llvmpipe
-(`LIBGL_ALWAYS_SOFTWARE=1`); Windows names a Mesa llvmpipe `opengl32.dll`
-in `WITH_UAT_OPENGL32_DLL`, which the spiral UAT places beside the program
-it builds. A pass on one platform says nothing about another: the Windows
+first) and a display the spiral can draw on: the macOS runner's session
+has a WindowServer but no GPU (NSGL finds no OpenGL 3.3 pixel format,
+#1375), so the macOS leg sets
+`WITH_GET_CMAKE_RAYLIB=PLATFORM=RGFW;OPENGL_VERSION=Software;USE_EXTERNAL_GLFW=OFF` and `with get
+c.raylib` builds raylib from source on rlsw, raylib's software rasterizer,
+drawing into a real window without a GPU; Linux runs under `xvfb-run` with
+Mesa's llvmpipe (`LIBGL_ALWAYS_SOFTWARE=1`); Windows names a Mesa llvmpipe
+`opengl32.dll` in `WITH_UAT_OPENGL32_DLL`, which the spiral UAT places
+beside the program it builds. A pass on one platform says nothing about another: the Windows
 gate found a C-runtime mismatch (prebuilt Conan libraries expect the DLL
 runtime) that macOS could never show.
 
@@ -268,9 +272,10 @@ lists. The scenarios:
 - `install_layout`: the platform asset copied into a local install-style
   `bin/with` layout and run from there.
 - `raylib_spiral` (darwin, linux) and `raylib_spiral_windows`, which need a
-  display with OpenGL 3.3 (a headed host, or the software GL provisions
-  above; the Windows scenario copies `WITH_UAT_OPENGL32_DLL` beside the
-  program `with run` builds). They validate the user-facing C interop path
+  display and either OpenGL 3.3 or the software provisions above (a
+  GPU-less macOS host builds raylib on rlsw through `WITH_GET_CMAKE_RAYLIB`;
+  the Windows scenario copies `WITH_UAT_OPENGL32_DLL` beside the program
+  `with run` builds). They validate the user-facing C interop path
   end to end: `with init`, `with get c.raylib`, writing the spiral program
   to the initialized project's `src/main.w`, and `with run`. The generated
   raylib app renders a deterministic spiral, reads back the rendered

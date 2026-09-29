@@ -370,7 +370,13 @@ jobs:
         run: xvfb-run -a -s "-screen 0 1280x800x24" ./out/release/bin/with build :release-uat
 
       - name: Release UAT (macOS)
-        # The runner's session has a WindowServer; the spiral opens a real window.
+        # The runner's session has a WindowServer but no GPU: NSGL finds no
+        # pixel format for the OpenGL 3.3 context raylib's GLFW backend wants
+        # (#1375). Drawing a spiral does not require a GPU: `with get` builds
+        # raylib from source on its RGFW window backend with rlsw, raylib's
+        # software rasterizer, and the spiral draws into a real window.
+        env:
+          WITH_GET_CMAKE_RAYLIB: "PLATFORM=RGFW;OPENGL_VERSION=Software;USE_EXTERNAL_GLFW=OFF"
         if: runner.os == 'macOS'
         run: ./out/release/bin/with build :release-uat
 
@@ -555,7 +561,13 @@ jobs:
         run: echo "WITH=$GITHUB_WORKSPACE/out/release/bin/with" >> "$GITHUB_ENV"
 
       - name: Release UAT (macOS)
-        # The runner's session has a WindowServer; the spiral opens a real window.
+        # The runner's session has a WindowServer but no GPU: NSGL finds no
+        # pixel format for the OpenGL 3.3 context raylib's GLFW backend wants
+        # (#1375). Drawing a spiral does not require a GPU: `with get` builds
+        # raylib from source on its RGFW window backend with rlsw, raylib's
+        # software rasterizer, and the spiral draws into a real window.
+        env:
+          WITH_GET_CMAKE_RAYLIB: "PLATFORM=RGFW;OPENGL_VERSION=Software;USE_EXTERNAL_GLFW=OFF"
         run: ./out/release/bin/with build :release-uat
 
       - name: Package fixpoint-verified release asset
