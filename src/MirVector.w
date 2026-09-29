@@ -4,7 +4,8 @@
 // vector_splats, vector_conversions; SemaVector.w). This lowers each to
 // ordinary MIR: a construction, a splat or a swizzle is an RK_AGGREGATE of
 // the vector type (one operand per lane), a lane-wise conversion an RK_CAST,
-// and the operations with no rvalue (`select`, the reductions, `.bits()`)
+// and the operations with no rvalue (`m.select`, `m[i]`, the reductions,
+// `.bits()`)
 // intrinsic calls. Codegen decides how each lowers to LLVM.
 
 use Ast
@@ -57,7 +58,7 @@ impl MirBuilder:
 
     // Every lane of a `vec_ty` holding `scalar`.
     mut fn lower_vector_splat(scalar: i32, vec_ty: i32, span: i32) -> i32:
-        let lane = self.sema.vector_lane_type(vec_ty)
+        let lane = self.sema.vector_element_type(vec_ty)
         let lane_op = self.lower_vector_lane_operand(scalar, lane, span)
         let lane_place = self.materialize_operand(lane_op, lane, span)
         let lanes: Vec[i32] = Vec.new()
@@ -111,7 +112,7 @@ impl MirBuilder:
         let extra_start = self.ast.get_data1(node)
         let arg_count = self.ast.get_data2(node)
         if op == VectorOp.CONSTRUCT as i32:
-            let lane = self.sema.vector_lane_type(ty)
+            let lane = self.sema.vector_element_type(ty)
             let lanes: Vec[i32] = Vec.new()
             for ai in 0..arg_count:
                 let arg = self.lower_expr(self.ast.get_extra(extra_start + ai))
@@ -126,9 +127,16 @@ impl MirBuilder:
             args.push(self.lower_expr(self.ast.get_extra(extra_start)))
             kind = MirIntrinsic.SIMD_BITCAST
         else if op == VectorOp.SELECT as i32:
+            // `m.select(a, b)`: the mask, then a and b.
+            args.push(self.lower_vector_receiver(node))
             for ai in 0..arg_count:
                 args.push(self.lower_expr(self.ast.get_extra(extra_start + ai)))
             kind = MirIntrinsic.SIMD_SELECT
+        else if op == VectorOp.MASK_LANE as i32:
+            // `m[i]`: the mask (node d0) and the index (node d1).
+            args.push(self.lower_expr(self.ast.get_data0(node)))
+            args.push(self.lower_expr(self.ast.get_data1(node)))
+            kind = MirIntrinsic.SIMD_MASK_LANE
         else:
             args.push(self.lower_vector_receiver(node))
             if op == VectorOp.BITS as i32: kind = MirIntrinsic.SIMD_BITCAST

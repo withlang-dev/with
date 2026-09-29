@@ -3570,6 +3570,8 @@ impl Codegen:
             // §4.3d: a lane-wise operator (Sema made both operands vectors).
             if self.cg_sema_is_vector(lhs_sema):
                 return self.mir_build_vector_bin_op(d0, lhs, rhs, lhs_sema)
+            if self.cg_sema_is_vector_or_mask(lhs_sema):
+                return self.mir_build_mask_bin_op(d0, lhs, rhs)
             let lhs_resolved = if lhs_sema > 0: self.mir_resolve_alias_at(lhs_sema) else: 0
             let rhs_resolved = if rhs_sema > 0: self.mir_resolve_alias_at(rhs_sema) else: 0
             let lhs_tk = if lhs_resolved > 0: self.mir_type_kind_at(lhs_resolved) else: 0
@@ -3605,6 +3607,9 @@ impl Codegen:
             let un_sema = self.mir_operand_sema_type(body, d1)
             if self.cg_sema_is_vector(un_sema):
                 return self.mir_build_vector_un_op(d0, arg, un_sema)
+            // `not m` negates each mask lane (D80).
+            if self.cg_sema_is_vector_or_mask(un_sema) and d0 == UnaryOp.UOP_NOT:
+                return wl_build_not(self.builder, arg)
             if d0 == UnaryOp.UOP_NEGATE:
                 let ak = wl_get_type_kind(wl_type_of(arg))
                 if ak == wl_float_type_kind() or ak == wl_double_type_kind():
@@ -3688,7 +3693,7 @@ impl Codegen:
 
         if rk == RvalueKind.RK_AGGREGATE:
             // §4.3d: a vector's lanes, in order.
-            if dest_sema_ty > 0 and self.cg_sema_is_vector(dest_sema_ty) and d1 >= 0 and d1 < body.agg_field_starts.len() as i32:
+            if dest_sema_ty > 0 and self.cg_sema_is_vector_or_mask(dest_sema_ty) and d1 >= 0 and d1 < body.agg_field_starts.len() as i32:
                 let agg_vec_ty = self.mir_sema_type_to_llvm(dest_sema_ty)
                 return self.mir_build_vector_aggregate(body, body.agg_field_starts[d1], body.agg_field_counts[d1], agg_vec_ty)
             // d1 = fields_id — index into agg_field_starts/counts/operands
@@ -3903,6 +3908,10 @@ impl Codegen:
                 let vec_src = self.mir_eval_operand(body, d0, 0)
                 let vec_src_sema = if d2 > 0: d2 else: self.mir_operand_sema_type(body, d0)
                 return self.mir_build_vector_cast(vec_src, vec_src_sema, d1)
+            if d1 > 0 and self.cg_sema_is_vector_or_mask(d1):
+                let mask_src = self.mir_eval_operand(body, d0, 0)
+                let mask_dst_ty = self.mir_sema_type_to_llvm(d1)
+                return self.mir_build_mask_cast(mask_src, mask_dst_ty)
             // d1 = sema target type id
             var cast_ty = dest_ty
             if d1 > 0:

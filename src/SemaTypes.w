@@ -54,7 +54,7 @@ pub enum VectorOp: i32:
     // other lane type.
     FROM_BITS = 3
     BITS = 4
-    // `select(m, a, b)`: a's lane where m's is set, else b's.
+    // `m.select(a, b)`: a's lane where m's is set, else b's.
     SELECT = 5
     // `m.all()` / `m.any()`.
     ALL = 6
@@ -69,6 +69,8 @@ pub enum VectorOp: i32:
     REDUCE_XOR = 14
     // `v.x`, `v.wzyx`: the lanes Sema.vector_swizzles names.
     SWIZZLE = 15
+    // `m[i]`: a mask lane read as a bool (D80).
+    MASK_LANE = 16
 
 impl Copy for VectorOp
 

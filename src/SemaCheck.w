@@ -14158,6 +14158,11 @@ impl Sema:
         if self.ast.kind(target) == NodeKind.NK_FIELD_ACCESS and self.vector_ops.contains(target) and self.vector_swizzle_width(target) != 1:
             self.emit_error("a multi-lane swizzle is read, not assigned; write each lane (`v.x = a`, `v[i] = x`) (§4.3d)", target)
             return 0
+        // D80 reads a mask lane (`m[i]` is a bool); writing one is not
+        // specified.
+        if self.ast.kind(target) == NodeKind.NK_INDEX and (self.vector_ops.get(target) ?? 0) == VectorOp.MASK_LANE as i32:
+            self.emit_error("a mask lane is read with `m[i]`; writing one is not specified (§4.3d) — build the mask from a comparison or `Mask(...)`", target)
+            return 0
         let target_type = self.assignment_target_value_type(target, target_exact_type as i32)
         let value_type = if target_type != 0: self.check_expr_with_owned_demand(value, target_type) else: self.check_expr(value)
         self.reject_owned_demand_from_view_projection(value, target_type as i32, "assignment")
@@ -15778,9 +15783,7 @@ impl Sema:
         if container_tk == TypeKind.TY_VECTOR:
             return self.check_vector_index(node, container_tid as i32, index)
         if container_tk == TypeKind.TY_MASK:
-            self.check_expr(index)
-            self.emit_error("a mask is read with `select`, `.all()` and `.any()`, not by lane (§4.3d)", node)
-            return 0
+            return self.check_vector_index(node, container_tid as i32, index)
         if container_tk == TypeKind.TY_SLICE:
             self.check_runtime_index_operand(index)
             let elem_ty = self.get_type_d0(container_tid)
@@ -21217,8 +21220,8 @@ impl Sema:
         // method or a qualified extension call.
         if self.rewrite_namespace_access(callee, true) < 0:
             return 0
-        // §4.3d: `f32x4(...)`, `Vector[N, T](...)`, `f32x4.splat(s)`,
-        // `from_bits`, `select(m, a, b)`.
+        // §4.3d: `f32x4(...)`, `m32x4(...)`, `Vector[N, T](...)`,
+        // `f32x4.splat(s)`, `from_bits`.
         let vector_call = self.check_vector_call(node, callee, extra_start, arg_count)
         if vector_call >= 0:
             return vector_call
