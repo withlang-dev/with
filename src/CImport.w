@@ -1796,6 +1796,22 @@ fn ci_cursor_calls_raw_function(session: i64, cursor: i32, depth: i32) -> bool:
             return true
     false
 
+// The first function a body calls that this import omitted, or "". A body
+// that calls it cannot be emitted either: the call would name a symbol the
+// import does not declare (mingw-w64's winbase.h InitializeThreadpoolEnvironment
+// calls winnt.h's TpInitializeCallbackEnviron, omitted over an opaque record).
+fn ci_cursor_calls_omitted_function(session: i64, cursor: i32) -> str:
+    if with_ci_cursor_kind(session, cursor) == CXK_CALL_EXPR and with_ci_num_children(session, cursor) > 0:
+        let callee_ref = with_ci_child(session, cursor, 0)
+        let callee = ci_call_callee_name(session, callee_ref)
+        if callee.len() > 0 and not with_ci_cursor_references_parameter(session, callee_ref) and ci_omitted_symbol_recorded(callee):
+            return callee
+    for ci in 0..with_ci_num_children(session, cursor):
+        let found = ci_cursor_calls_omitted_function(session, with_ci_child(session, cursor, ci))
+        if found.len() > 0:
+            return found
+    ""
+
 fn ci_translate_function(session: i64, idx: i32, known_structs: &str, demoted_types: &str) -> str:
     // B9: fresh per-function temp counter.
     ci_temp_reset()
@@ -1859,6 +1875,11 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: &str, demoted_ty
                 opaque_record = ci_cursor_needs_demoted_layout(session, definition, demoted_types)
             if opaque_record.len() > 0:
                 ci_record_omitted_symbol_cat(name, ci_get_decl_location(session, name), "inexpressible", "inline body needs the layout of '" ++ opaque_record ++ "', which c_import imports opaque (§16.9)")
+                return ""
+            let omitted_callee = ci_cursor_calls_omitted_function(session, definition)
+            if omitted_callee.len() > 0:
+                let callee_category = if storage == CX_SC_STATIC: "inexpressible" else: "raw-modelable"
+                ci_record_omitted_symbol_cat(name, ci_get_decl_location(session, name), callee_category, ci_omitted_chain_reason("inline body calls '" ++ omitted_callee ++ "'"))
                 return ""
             // D51 (#1830): a body that calls a raw C function is raw
             // itself. The wrapper does not become safe by inference: it is
@@ -2429,7 +2450,18 @@ pub fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs
             // Emit accessor method (D7: impl-block method with keyword mode;
             // the legacy top-level explicit-self form fails receiver-mode
             // enforcement).
-            let accessor_expr = "((&self._" ++ ci_escape_reserved(accessor_name) ++ ") as *" ++ elem_type ++ ")"
+            // A packed record's field may sit below its natural alignment, so
+            // no reference to it may exist (§16.4), and its address is not
+            // taken either: the accessor offsets the record's own address by
+            // the field's clang offset (mingw-w64's mmeapi.h and winioctl.h
+            // records under #pragma pack(1), whose flexible array follows a
+            // narrower field).
+            let is_packed_record = is_really_packed or pack_cap > 0
+            let flex_offset = with_cimport_struct_field_offset(session, idx, field_count - 1)
+            let accessor_expr = if is_packed_record and flex_offset >= 0:
+                f"(((&raw const *self) as *const u8 + {flex_offset}u64) as *" ++ elem_type ++ ")"
+            else:
+                "((&self._" ++ ci_escape_reserved(accessor_name) ++ ") as *" ++ elem_type ++ ")"
             let accessor_method = ci_render_generated_fn_body("    unsafe fn " ++ ci_escape_reserved(accessor_name) ++ "() -> *" ++ elem_type, "        " ++ accessor_expr)
             flex_accessor = if migrate_prefer_brace():
                 "impl " ++ safe_name ++ " {\n" ++ accessor_method ++ "\n}\n"
@@ -15764,40 +15796,36 @@ pub fn ci_dump_raw_fallback_stats():
 
 // Check if a function body assigns to a variable with the given name.
 // Used to detect which function parameters need var rebinding.
+// Whether `cursor` (an assignment's left side, or an increment's operand)
+// names the parameter `name`, through parentheses: mingw-w64's
+// UNREFERENCED_PARAMETER(P) is `{(P) = (P);}`.
+fn ci_lvalue_names(session: i64, cursor: i32, name: &str) -> bool:
+    var c = cursor
+    while with_ci_cursor_kind(session, c) == CXK_PAREN_EXPR and with_ci_num_children(session, c) == 1:
+        c = with_ci_child(session, c, 0)
+    if with_ci_cursor_kind(session, c) != CXK_DECL_REF:
+        return false
+    let spelled = with_ci_cursor_spelling(session, c)
+    spelled == name or ci_escape_reserved(spelled) == name
+
 fn ci_body_assigns_to(session: i64, cursor: i32, name: &str) -> bool:
     let kind = with_ci_cursor_kind(session, cursor)
     // Binary assignment: lhs = rhs (kind 114 = BinaryOp)
     if kind == CXK_BINARY_OP:
         let op = with_ci_binary_op(session, cursor)
-        if op >= BO_ASSIGN:  // BO_ASSIGN or compound assign
-            let nc = with_ci_num_children(session, cursor)
-            if nc >= 1:
-                let lhs = with_ci_child(session, cursor, 0)
-                // Check if LHS is a DeclRefExpr with the param name
-                if with_ci_cursor_kind(session, lhs) == CXK_DECL_REF:
-                    let lhs_name = with_ci_cursor_spelling(session, lhs)
-                    if lhs_name == name or ci_escape_reserved(lhs_name) == name:
-                        return true
+        if op >= BO_ASSIGN and with_ci_num_children(session, cursor) >= 1:  // BO_ASSIGN or compound assign
+            if ci_lvalue_names(session, with_ci_child(session, cursor, 0), name):
+                return true
     // Compound assignment (kind 115)
-    if kind == CXK_COMPOUND_ASSIGN_OP:
-        let nc = with_ci_num_children(session, cursor)
-        if nc >= 1:
-            let lhs = with_ci_child(session, cursor, 0)
-            if with_ci_cursor_kind(session, lhs) == CXK_DECL_REF:
-                let lhs_name = with_ci_cursor_spelling(session, lhs)
-                if lhs_name == name or ci_escape_reserved(lhs_name) == name:
-                    return true
+    if kind == CXK_COMPOUND_ASSIGN_OP and with_ci_num_children(session, cursor) >= 1:
+        if ci_lvalue_names(session, with_ci_child(session, cursor, 0), name):
+            return true
     // Unary increment/decrement (pre/post)
     if kind == CXK_UNARY_OP:
         let op = with_ci_unary_op(session, cursor)
-        if op >= UO_PRE_INC and op <= UO_POST_DEC:
-            let nc = with_ci_num_children(session, cursor)
-            if nc >= 1:
-                let operand = with_ci_child(session, cursor, 0)
-                if with_ci_cursor_kind(session, operand) == CXK_DECL_REF:
-                    let operand_name = with_ci_cursor_spelling(session, operand)
-                    if operand_name == name or ci_escape_reserved(operand_name) == name:
-                        return true
+        if op >= UO_PRE_INC and op <= UO_POST_DEC and with_ci_num_children(session, cursor) >= 1:
+            if ci_lvalue_names(session, with_ci_child(session, cursor, 0), name):
+                return true
     // Recurse into children
     let nc = with_ci_num_children(session, cursor)
     var i = 0
