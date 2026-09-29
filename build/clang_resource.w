@@ -245,6 +245,10 @@ fn cr_generate(ctx: &ActionCtx, include_dir: &str, files: &Vec[str], version: &s
     for i in 0..lld_flavors.len() as i32:
         lld_text = lld_text ++ (if i > 0: " " else: "") ++ lld_flavors[i]
     out = out ++ "pub fn embedded_lld_flavors() -> str:\n    return " ++ cr_raw_string_literal(lld_text) ++ ".clone()\n\n"
+    // #1915: whether this compiler links dsymutil (build/compiler.w
+    // comp_dsymutil_link_lines).
+    let dsymutil_linked = comp_sdk_has_dsymutil(ctx.fs(), lib_dir, os())
+    out = out ++ "pub fn embedded_dsymutil_linked() -> bool:\n    return " ++ (if dsymutil_linked: "true" else: "false") ++ "\n\n"
     out = out ++ "pub fn embedded_clang_resource_data(name: &str) -> str:\n"
     for i in 0..files.len() as i32:
         let rel = cr_relpath(files[i], include_dir)

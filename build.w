@@ -385,6 +385,7 @@ fn run_cross_linux_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     // #1915: the cross SDK's lld drivers, as the host link takes its own.
     let cross_lld = comp_sdk_lld_flavors(fs, lib_dir, "Linux")
     ld_rsp = ld_rsp ++ comp_lld_archive_lines(&cross_lld, lib_dir) ++ comp_lld_alias_lines(&cross_lld, "Linux", false)
+    ld_rsp = ld_rsp ++ comp_dsymutil_link_lines(false, lib_dir, "Linux", false)
     if fs.write_text(output_path, ld_rsp) != 0:
         ctx.diagnostics().error("cross-llvm-link-metadata: could not write: " ++ output_path)
     0
@@ -447,6 +448,7 @@ fn run_cross_windows_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     ld_rsp = ld_rsp ++ comp_wasm_backend_alias_lines(comp_sdk_has_wasm_backend(fs, lib_dir), "Windows", false)
     // #1915: no `with ld` on Windows yet; its names are stand-ins.
     ld_rsp = ld_rsp ++ comp_lld_alias_lines(&comp_sdk_lld_flavors(fs, lib_dir, "Windows"), "Windows", false)
+    ld_rsp = ld_rsp ++ comp_dsymutil_link_lines(false, lib_dir, "Windows", false)
     if fs.write_text(output_path, ld_rsp) != 0:
         ctx.diagnostics().error("cross-windows-llvm-link-metadata: could not write: " ++ output_path)
     0
@@ -506,6 +508,7 @@ fn run_cross_windows_aarch64_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     ld_rsp = ld_rsp ++ comp_wasm_backend_alias_lines(comp_sdk_has_wasm_backend(fs, lib_dir), "Windows", false)
     // #1915: no `with ld` on Windows yet; its names are stand-ins.
     ld_rsp = ld_rsp ++ comp_lld_alias_lines(&comp_sdk_lld_flavors(fs, lib_dir, "Windows"), "Windows", false)
+    ld_rsp = ld_rsp ++ comp_dsymutil_link_lines(false, lib_dir, "Windows", false)
     if fs.write_text(output_path, ld_rsp) != 0:
         ctx.diagnostics().error("cross-windows-aarch64-llvm-link-metadata: could not write: " ++ output_path)
     0
@@ -2449,6 +2452,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     for li in 0..sdk_lld_flavors.len() as i32:
         sdk_lld_text = sdk_lld_text ++ " " ++ sdk_lld_flavors[li]
     clang_resource = clang_resource.arg("lld=" ++ sdk_lld_text)
+    clang_resource = clang_resource.arg("dsymutil=" ++ (if comp_sdk_has_dsymutil(ctx.fs(), sdk_lib_dir, os()): "yes" else: "no"))
     clang_resource.action = generate_embedded_clang_resource_action
     out = out.add_target(clang_resource)
 

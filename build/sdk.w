@@ -352,6 +352,9 @@ fn sdk_validate_package_prefix(ctx: &ActionCtx, platform: &str, prefix: &str, bu
             if rc != 0: return rc
     rc = sdk_check_file(ctx, sdk_clang_main_archive(prefix), "clang driver archive (with cc)")
     if rc != 0: return rc
+    if platform == "darwin-aarch64":
+        rc = sdk_check_file(ctx, sdk_dsymutil_main_archive(prefix), "dsymutil archive (with __dsymutil, #1915)")
+        if rc != 0: return rc
     rc = sdk_validate_wasm_install(ctx, prefix)
     if rc != 0: return rc
     rc = sdk_check_file(ctx, sdk_join(prefix, sdk_cmake_data_prefix() ++ "Modules/CMake.cmake"), "CMake runtime modules")
@@ -753,9 +756,47 @@ fn sdk_patch_llvm_source(ctx: &ActionCtx, source_dir: &str) -> i32:
         "ARCHINFO(arm64e, arm64e, MachO::CPU_TYPE_ARM64, MachO::CPU_SUBTYPE_ARM64E, 64)",
         "ARCHINFO(arm64e_x1, arm64e.x1, MachO::CPU_TYPE_ARM64, MachO::CPU_SUBTYPE_ARM64E_X1, 64)")
     if rc != 0: return rc
-    sdk_insert_line_after(ctx, sdk_join(source_dir, "llvm/include/llvm/BinaryFormat/MachO.h"),
+    rc = sdk_insert_line_after(ctx, sdk_join(source_dir, "llvm/include/llvm/BinaryFormat/MachO.h"),
         "  CPU_SUBTYPE_ARM64E = 2,",
         "  CPU_SUBTYPE_ARM64E_X1 = 12,")
+    if rc != 0: return rc
+    sdk_patch_dsymutil_cfbundle(ctx, source_dir)
+
+// #1915: dsymutil is linked into the compiler (`with __dsymutil`), and the
+// compiler links no Apple framework. dsymutil's CFBundle.cpp reads an app
+// bundle's Info.plist through CoreFoundation, under `#ifdef __APPLE__`; its
+// three guards become `#if 0`, so dsymutil takes the path it takes on every
+// other host (no bundle version strings in a dSYM's Info.plist, which a
+// plain executable has none of). Exactly three guards, or the patch refuses.
+const SDK_DSYMUTIL_CFBUNDLE_GUARD: str = "#if 0 // With (#1915): no CoreFoundation in the compiler"
+
+fn sdk_patch_dsymutil_cfbundle(ctx: &ActionCtx, source_dir: &str) -> i32:
+    let path = sdk_join(source_dir, "llvm/tools/dsymutil/CFBundle.cpp")
+    let fs = ctx.fs()
+    let text = fs.read_text(path)
+    if text.len() == 0:
+        return sdk_fail(ctx, "dsymutil CoreFoundation patch (#1915): could not read " ++ path)
+    var out = StringBuilder.with_capacity(text.len() + 256)
+    var guards = 0
+    var patched = 0
+    let pieces = text.split("\n")
+    for i in 0..pieces.len() as i32:
+        if i > 0:
+            out.push_str("\n")
+        if pieces[i] == "#ifdef __APPLE__":
+            guards = guards + 1
+            out.push_str(SDK_DSYMUTIL_CFBUNDLE_GUARD)
+        else:
+            if pieces[i] == SDK_DSYMUTIL_CFBUNDLE_GUARD:
+                patched = patched + 1
+            out.push_str(pieces[i])
+    if guards == 0 and patched == 3:
+        return 0
+    if guards != 3 or patched != 0:
+        return sdk_fail(ctx, "dsymutil CoreFoundation patch (#1915): expected three `#ifdef __APPLE__` lines in " ++ path ++ f", found {guards} (and {patched} patched): re-anchor it for this LLVM")
+    if fs.write_text(path, out.to_str()) != 0:
+        return sdk_fail(ctx, "dsymutil CoreFoundation patch (#1915): could not write " ++ path)
+    0
 
 // Insert `line` after the one line equal to `anchor`; already present is ok.
 fn sdk_insert_line_after(ctx: &ActionCtx, path: &str, anchor: &str, line: &str) -> i32:
@@ -1194,7 +1235,48 @@ pub fn run_sdk_llvm_action(ctx: ActionCtx) -> i32:
         return sdk_fail(ctx, "llvm-nm was not installed: " ++ sdk_tool(output_prefix, "llvm-nm"))
     rc = sdk_validate_wasm_install(ctx, output_prefix)
     if rc != 0: return rc
-    sdk_archive_clang_main(ctx, root, sdk_abs(root, build_dir) ++ "/tools/clang/tools/driver/CMakeFiles/clang.dir", output_prefix)
+    let clang_rc = sdk_archive_clang_main(ctx, root, sdk_abs(root, build_dir) ++ "/tools/clang/tools/driver/CMakeFiles/clang.dir", output_prefix)
+    if clang_rc != 0: return clang_rc
+    if os() != "Macos": return 0
+    sdk_archive_dsymutil_main(ctx, root, sdk_abs(root, build_dir) ++ "/tools/dsymutil/CMakeFiles/dsymutil.dir", output_prefix)
+
+// #1915: `with __dsymutil` is LLVM's dsymutil linked into the compiler, as
+// `with cc` is clang's driver: a macOS debug build collects its DWARF into a
+// .dSYM without Xcode's dsymutil. LLVM installs dsymutil only as bin/dsymutil;
+// its objects (dsymutil_main in dsymutil.cpp; not the generated driver with
+// main) are archived next to the other libraries. macOS only: dsymutil reads
+// Mach-O debug maps.
+pub fn sdk_dsymutil_main_archive(prefix: &str) -> str: sdk_join(prefix, "lib/libdsymutilMain.a")
+
+fn sdk_archive_dsymutil_main(ctx: &ActionCtx, root: &str, objects_dir: &str, output_prefix: &str) -> i32:
+    let archive = sdk_abs(root, sdk_dsymutil_main_archive(output_prefix))
+    let _stale = ctx.fs().remove_file(archive)
+    var argv: Vec[str] = Vec.new()
+    argv.push(sdk_abs(root, sdk_tool(output_prefix, "llvm-ar")))
+    argv.push("rcs")
+    argv.push(archive.clone())
+    // Pushed one by one: the build layer runs on the pinned seed (#1122).
+    let names: Vec[str] = Vec.new()
+    names.push("BinaryHolder")
+    names.push("CFBundle")
+    names.push("DebugMap")
+    names.push("dsymutil")
+    names.push("DwarfLinkerForBinary")
+    names.push("MachODebugMapParser")
+    names.push("MachOUtils")
+    names.push("RelocationMap")
+    names.push("Reproducer")
+    names.push("SwiftModule")
+    for i in 0..names.len() as i32:
+        let object = objects_dir ++ "/" ++ names[i] ++ ".cpp.o"
+        if not ctx.fs().host_exists(object):
+            return sdk_fail(ctx, "dsymutil object was not built: " ++ object)
+        argv.push(object)
+    let rc = sdk_run_capture(ctx, "dsymutil-main-archive", argv, 120000)
+    if rc != 0: return rc
+    if not ctx.fs().host_exists(archive):
+        return sdk_fail(ctx, "dsymutil archive was not written: " ++ sdk_dsymutil_main_archive(output_prefix))
+    0
 
 // `with cc` is clang's driver linked into the compiler (src/compiler/
 // ClangDriver.w). LLVM installs that driver only as the bin/clang executable;

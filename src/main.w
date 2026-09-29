@@ -32,6 +32,7 @@ use BuildGraphCache
 use compiler.ClangDriver
 use compiler.LldDriver
 use compiler.FrameworkStubs
+use compiler.DsymutilDriver
 use compiler.GreenEvidence
 use compiler.DriverOptions
 use compiler.AbiStamp
@@ -769,6 +770,9 @@ fn run_cli(argc: i32) -> i32:
     // native link, as `__ar` is for an archive. Not user CLI surface until
     // the specification lists a `with ld`.
     if cli_command(argc) == "__ld": return with_ld_main()
+    // `with __dsymutil ...` is LLVM's dsymutil (#1915), for a debug build's
+    // .dSYM: the compiler invoking itself.
+    if cli_command(argc) == "__dsymutil": return with_dsymutil_cli_main()
     // `with __framework-stubs <dir> <Name>...`: the framework stubs `with get`
     // writes for a package that links Apple frameworks (#1915).
     if cli_command(argc) == "__framework-stubs":

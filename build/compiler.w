@@ -2663,6 +2663,29 @@ pub fn comp_lld_alias_lines(flavors: &Vec[str], target_os: &str, driver_form: bo
             out = out ++ (if driver_form: "-Wl,--defsym=" else: "--defsym=") ++ name ++ "=" ++ target ++ "\n"
     out
 
+// #1915: `with __dsymutil` (src/compiler/DsymutilDriver.w) is LLVM's dsymutil
+// linked into a macOS compiler: `int dsymutil_main(int, char **, const
+// llvm::ToolContext &)` from the SDK's lib/libdsymutilMain.a (build/sdk.w
+// sdk_archive_dsymutil_main), aliased to with_dsymutil_main as
+// with_clang_main is. An SDK without the archive, and every other host,
+// alias it to a stand-in the generated embedded_dsymutil_linked() fact says
+// not to call.
+pub fn comp_sdk_has_dsymutil(fs: &ToolFs, llvm_lib_dir: &str, target_os: &str) -> bool:
+    target_os == "Macos" and fs.host_exists(llvm_lib_dir ++ "/libdsymutilMain.a")
+
+pub fn comp_dsymutil_link_lines(has_dsymutil: bool, llvm_lib_dir: &str, target_os: &str, driver_form: bool) -> str:
+    let target = if has_dsymutil: "_Z13dsymutil_mainiPPcRKN4llvm11ToolContextE" else: "with_alloc"
+    var out = if has_dsymutil: comp_rsp_path(llvm_lib_dir ++ "/libdsymutilMain.a") ++ "\n" else: ""
+    if target_os == "Macos":
+        if has_dsymutil:
+            out = out ++ (if driver_form: "-Wl,-u,_" ++ target ++ "\n" else: "-u\n_" ++ target ++ "\n")
+        out = out ++ (if driver_form: "-Wl,-alias,_" ++ target ++ ",_with_dsymutil_main\n" else: "-alias\n_" ++ target ++ "\n_with_dsymutil_main\n")
+    else if target_os == "Windows":
+        out = out ++ (if driver_form: "-Wl,/alternatename:" else: "/alternatename:") ++ "with_dsymutil_main=" ++ target ++ "\n"
+    else:
+        out = out ++ (if driver_form: "-Wl,--defsym=" else: "--defsym=") ++ "with_dsymutil_main=" ++ target ++ "\n"
+    out
+
 fn comp_is_sha256_hex(text: &str) -> bool:
     if text.len() != 64:
         return false
@@ -2801,6 +2824,9 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     let lld_flavors = comp_sdk_lld_flavors(fs, llvm_lib_dir, os())
     rsp = rsp ++ comp_lld_archive_lines(&lld_flavors, llvm_lib_dir) ++ comp_lld_alias_lines(&lld_flavors, os(), true)
     ld_rsp = ld_rsp ++ comp_lld_archive_lines(&lld_flavors, llvm_lib_dir) ++ comp_lld_alias_lines(&lld_flavors, os(), false)
+    let has_dsymutil = comp_sdk_has_dsymutil(fs, llvm_lib_dir, os())
+    rsp = rsp ++ comp_dsymutil_link_lines(has_dsymutil, llvm_lib_dir, os(), true)
+    ld_rsp = ld_rsp ++ comp_dsymutil_link_lines(has_dsymutil, llvm_lib_dir, os(), false)
     if os() == "Macos":
         // #1915: the compiler links against our darwin sysroot (build/sdk.w
         // run_darwin_sysroot_action), never an Apple SDK: libSystem and

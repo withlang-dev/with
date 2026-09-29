@@ -27,6 +27,8 @@ use compiler.EmbeddedBundles
 use FnAbi
 use compiler.Zcu
 use compiler.Runtime
+use compiler.DsymutilDriver
+use compiler.LldDriver
 use Overflow
 use Analysis
 use TargetSpec
@@ -102,11 +104,22 @@ fn compilation_remove_dsym_best_effort(bin_path: &str):
 fn compilation_argv_append(argv: &str, arg: &str) -> str:
     argv ++ arg ++ "\0"
 
+// #1915: this compiler's own dsymutil (`with __dsymutil`, compiler.
+// DsymutilDriver) when its SDK carries it; until the SDK is republished with
+// lib/libdsymutilMain.a, the host's dsymutil from PATH. A dsymutil that
+// cannot run is a warning: the binary is linked, but its debug info stays in
+// objects this build removes, so lldb will not find it.
 fn compilation_run_dsymutil_best_effort(bin_path: &str):
     if bin_path.len() == 0:
         return
+    let own = with_dsymutil_available()
+    let self_exe = if own: with_self_exe() else: ""
     var argv = ""
-    argv = compilation_argv_append(argv, "dsymutil")
+    if own and self_exe.len() > 0:
+        argv = compilation_argv_append(argv, self_exe)
+        argv = compilation_argv_append(argv, "__dsymutil")
+    else:
+        argv = compilation_argv_append(argv, "dsymutil")
     // The linker dropped this root from the debug map's object paths
     // (-oso_prefix, Link.w); dsymutil puts it back to find the objects.
     let oso_root = link_stage_file_prefix_map_root()
@@ -114,7 +127,10 @@ fn compilation_run_dsymutil_best_effort(bin_path: &str):
         argv = compilation_argv_append(argv, "-oso-prepend-path")
         argv = compilation_argv_append(argv, oso_root)
     argv = compilation_argv_append(argv, bin_path)
-    let _ = runtime_exec_argv_capture(argv, "/dev/null", "/dev/null", 0)
+    let rc = runtime_exec_argv_capture(argv, "/dev/null", "/dev/null", 0)
+    if rc != 0:
+        let which = if own and self_exe.len() > 0: "this compiler's dsymutil" else: "no dsymutil of its own (its LLVM SDK predates it, #1915) and the host's `dsymutil`"
+        runtime_eprint(f"warning: no .dSYM for {bin_path}: {which} exited {rc}; its debug info is not collected")
 
 fn compilation_debug_type_names_enabled() -> i32:
     let raw = runtime_getenv("WITH_DEBUG_TYPE_NAMES")
