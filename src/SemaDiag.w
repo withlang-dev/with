@@ -13,6 +13,31 @@ extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_eprint(s: &str) -> Unit
 extern fn with_getenv_str(name: &str) -> str
 
+// Split a structured omission record "location|category|reason" into fields.
+// Field 0 = location, 1 = category, 2 = reason (the remainder, so a reason may
+// contain '|'). A record with fewer than two '|' is treated as a bare reason.
+fn ci_omitted_field(record: &str, idx: i32) -> str:
+    var first = -1
+    var second = -1
+    var i = 0
+    let n = record.len() as i32
+    while i < n:
+        if record[i] == 124:
+            if first < 0:
+                first = i
+            else if second < 0:
+                second = i
+                break
+        i = i + 1
+    if second < 0:
+        // Not a structured record — whole string is the reason.
+        if idx == 2: return with_str_clone_ref(record)
+        return ""
+    if idx == 0: return record.slice(0, first as i64)
+    if idx == 1: return record.slice((first + 1) as i64, second as i64)
+    record.slice((second + 1) as i64, n as i64)
+
+
 fn d22_join_arm_kind_name(kind: i32) -> str:
     if kind == 1: return "owned-anchor"
     if kind == 2: return "materialized-ref"
@@ -134,6 +159,28 @@ impl Sema:
             return "unknown type 'void'; With uses Unit for no value and c_void for C void pointers"
         "unknown type '" ++ name ++ "'"
 
+    // An omitted c_import symbol, in value or type position, names the import
+    // gap (§16.2 structured manifest: "location|category|reason") instead of
+    // reading as a misspelled local name. True when the error was emitted.
+    mut fn emit_ci_omitted_symbol_error(sym: i32, node: i32) -> bool:
+        let target_name: str = self.pool_resolve(sym)
+        if not self.ci_omitted_symbols.contains(target_name):
+            return false
+        let record: str = with_str_clone_ref(self.ci_omitted_symbols.get(target_name).unwrap())
+        let loc = ci_omitted_field(record, 0)
+        let category = ci_omitted_field(record, 1)
+        let reason_raw = ci_omitted_field(record, 2)
+        let detail = if reason_raw.len() > 0: reason_raw else: "untranslated C construct"
+        let at = if loc.len() > 0: f" (at {loc})" else: ""
+        let direction = if category == "raw-modelable":
+            "; this contract can be used via the raw surface — declare a manual extern \"C\" binding and call it under unsafe (§16.1)"
+        else if category == "selective":
+            "; add it to the only: list of the import that provides it (§16.2)"
+        else:
+            "; this C construct has no With representation — wrap it in a C shim or use allow_untranslated to acknowledge the omission (§16.2)"
+        self.emit_error(f"c_import symbol '{target_name}' was omitted: {detail}{at}{direction}", node)
+        true
+
     mut fn emit_unknown_type_error(sym: i32, node: i32):
         if with_getenv_str("WITH_DEBUG_SUBST").len() > 0:
             let ut_named = if self.named_types.contains(sym): 1 else: 0
@@ -146,6 +193,8 @@ impl Sema:
         let gate_note = self.std_gated_import_note(sym)
         if gate_note.len() > 0:
             self.emit_error("'" ++ self.pool_resolve(sym) ++ "' requires an explicit import (§18.1)" ++ gate_note, node)
+            return
+        if self.emit_ci_omitted_symbol_error(sym, node):
             return
         let target_name = self.pool_resolve(sym)
         let suggestion = self.suggest_type_name(target_name, node)
