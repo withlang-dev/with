@@ -187,7 +187,11 @@ jobs:
             timeout 900 ./out/bootstrap/bin/with-stage1.exe check src/main.w > out/probe-check.stdout 2> out/probe-check.stderr; echo "check rc=$?"
             tail -20 out/probe-check.stderr
             echo "== probe: stage1 build out/gen/main.w with one codegen unit (1500 s)"
-            WITH_CODEGEN_UNITS=1 WITH_PROFILE=1 timeout 1500 ./out/bootstrap/bin/with-stage1.exe build out/gen/main.w -O1 -o out/probe-single.exe > out/probe-single.stdout 2> out/probe-single.stderr; echo "single-unit build rc=$?"
+            # A compiler links the embedding object its stage link would
+            # (build.w passes stage2 embedded-object=out/stage/lib/...); a
+            # stage1 probe without it stops at "missing or empty compiler
+            # embedding object" before the link (#1267).
+            WITH_COMPILER_EMBEDDED_OBJECT=out/stage/lib/embedded_objects.o WITH_CODEGEN_UNITS=1 WITH_PROFILE=1 timeout 1500 ./out/bootstrap/bin/with-stage1.exe build out/gen/main.w -O1 -o out/probe-single.exe > out/probe-single.stdout 2> out/probe-single.stderr; echo "single-unit build rc=$?"
             tail -40 out/probe-single.stderr
           fi
 
