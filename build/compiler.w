@@ -120,6 +120,14 @@ pub fn comp_home_dir(ctx: &BuildCtx) -> str:
             return comp_replace_all(profile, "\\", "/")
     ""
 
+// Whether comp_home_dir came from HOME itself. Only then does a plan spell a
+// destination `$HOME/…`: every driver expands `$HOME` from HOME, and one
+// predating #1884 (the pinned seed) resolves it with HOME unset into the
+// project, as a directory literally named `$HOME`. A home that came from
+// USERPROFILE is spelled absolute, which such a driver refuses as escaping
+// the project (loudly) and a current one accepts as under the home.
+pub fn comp_home_is_home_var(ctx: &BuildCtx) -> bool: ctx.env_input("HOME").len() > 0
+
 // comp_home_dir for an action, which reads the environment directly.
 pub fn comp_home_dir_env() -> str:
     let home = env("HOME")

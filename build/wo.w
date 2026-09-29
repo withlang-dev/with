@@ -145,13 +145,14 @@ pub fn wo_store_dir(ctx: &BuildCtx) -> str:
 
 // The store as an .Install destination: the kind writes outside the project
 // only under `$HOME/`, so a store beneath the home directory is spelled
-// that way (the compiler expands `$HOME/` by the same rule, runtime_home_dir);
+// that way when HOME names it (comp_home_is_home_var: a home from
+// USERPROFILE is spelled absolute, for drivers predating #1884);
 // WITH_WO_DIR is otherwise inside the project (a test's scratch store under
 // out/, relative or absolute).
 fn wo_store_install_dir(ctx: &BuildCtx) -> str:
     let store = wo_store_dir(ctx)
     let home = comp_home_dir(ctx)
-    if home.len() > 0 and store.starts_with(home ++ "/"):
+    if comp_home_is_home_var(ctx) and store.starts_with(home ++ "/"):
         return "$HOME/" ++ store.slice(home.len() + 1, store.len())
     store
 

@@ -237,7 +237,19 @@ pub fn build_graph_validate_target_containment(root: &str, target: &BuildGraphTa
         return 0
     if target.output.len() > 0:
         if is_install:
-            if not build_graph_path_is_install_dest(target.output) and not build_graph_output_contained(root, target.output):
+            // `$HOME/` is the home directory (runtime_home_dir: HOME, else
+            // USERPROFILE on Windows); with neither there is nowhere to
+            // expand it to, and the path would resolve inside the project as
+            // a directory literally named `$HOME` (#1884, #970).
+            if target.output.starts_with("$HOME/") and runtime_home_dir().len() == 0:
+                let vars = if runtime_sysinfo_os() == "Windows": "neither HOME nor USERPROFILE is set" else: "HOME is unset"
+                build_graph_rt_eprint("error: install target '" ++ target.name ++ "' installs under $HOME/, but " ++ vars ++ " (#1884): " ++ target.output)
+                return 1
+            // An absolute destination under the home directory is what
+            // `$HOME/` names; a plan spells it so when the home came from
+            // USERPROFILE, which a driver predating #1884 does not expand.
+            let under_home = build_graph_path_within_root(runtime_home_dir(), target.output)
+            if not build_graph_path_is_install_dest(target.output) and not under_home and not build_graph_output_contained(root, target.output):
                 build_graph_rt_eprint("error: install target '" ++ target.name ++ "' output escapes project root without install prefix: " ++ target.output)
                 return 1
         else if is_promote:

@@ -1207,7 +1207,7 @@ fn green_store_install_path(ctx: &BuildCtx) -> str:
     let explicit = ctx.env_input("WITH_GREEN_DIR")
     let home = comp_home_dir(ctx)
     let dir = if explicit.len() > 0: explicit else: home ++ "/.local/with-green"
-    if home.len() > 0 and dir.starts_with(home ++ "/"):
+    if comp_home_is_home_var(ctx) and dir.starts_with(home ++ "/"):
         return "$HOME/" ++ dir.slice(home.len() + 1, dir.len()) ++ "/green.tsv"
     dir ++ "/green.tsv"
 
