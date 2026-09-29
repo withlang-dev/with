@@ -9,7 +9,7 @@ module build.par
 // every failure, not the first.
 
 use std.build
-use std.sys
+
 
 pub type ParJob {
     argv: Vec[str],
@@ -20,7 +20,11 @@ pub type ParJob {
 
 pub fn par_job(argv: Vec[str], stdout: str, stderr: str, timeout_ms: i32): ParJob { argv, stdout, stderr, timeout_ms }
 
-pub fn par_width(): cpu_count()
+// The window is the job count, capped at 32 like the test lanes' own window
+// (build_graph_test_jobs): an action may run in the comptime evaluator,
+// which cannot read the host core count, and every lane using this holds
+// fewer cases than that cap, so the kernel spreads them over the cores.
+pub fn par_width(jobs: &Vec[ParJob]) -> i32: if jobs.len() as i32 > 32: 32 else: jobs.len() as i32
 
 /// Runs every job with at most `width` children alive, reaping the oldest
 /// to open each slot. Returns each job's exit code in job order; -1 means

@@ -3431,7 +3431,7 @@ fn ec_read(ctx: &ActionCtx, path: &str): ctx.fs().read_text_opt(path).unwrap_or(
 fn ec_run_cases(ctx: &ActionCtx, compiler_path: &str, platform_obj: &str, cases: &Vec[EcCase]) -> (i32, str):
     let root = ctx.project_info().project_root()
     let fs = ctx.fs()
-    let width = par_width()
+
     var jobs: Vec[ParJob] = Vec.new()
     var native_job: Vec[i32] = Vec.new()
     var emit_job: Vec[i32] = Vec.new()
@@ -3456,7 +3456,7 @@ fn ec_run_cases(ctx: &ActionCtx, compiler_path: &str, platform_obj: &str, cases:
         argv.push(bs_abs(root, ec_c_path(c)))
         emit_job.push(jobs.len() as i32)
         jobs.push(par_job(argv, bs_capture_path(root, c.dir, "emit", "stdout"), bs_capture_path(root, c.dir, "emit", "stderr"), c.emit_timeout_ms))
-    let rcs = par_run(ctx, &jobs, width)
+    let rcs = par_run(ctx, &jobs, par_width(&jobs))
 
     var failed = 0
     var report = ""
@@ -3485,7 +3485,7 @@ fn ec_run_cases(ctx: &ActionCtx, compiler_path: &str, platform_obj: &str, cases:
             continue
         cc_case.push(i)
         cc_jobs.push(par_job(bs_emit_c_cc_args(root, c_path, ec_bin(c), platform_obj, c.libm), bs_capture_path(root, c.dir, "compile", "stdout"), bs_capture_path(root, c.dir, "compile", "stderr"), 120000))
-    let cc_rcs = par_run(ctx, &cc_jobs, width)
+    let cc_rcs = par_run(ctx, &cc_jobs, par_width(&cc_jobs))
 
     for k in 0..cc_case.len() as i32:
         let c = &cases[cc_case[k]]

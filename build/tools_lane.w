@@ -69,7 +69,7 @@ pub fn run_tools_tests_action(ctx: ActionCtx) -> i32:
         let stderr = tl_abs(root, tl_join(out_dir, label ++ ".stderr"))
         jobs.push(par_job(args, stdout, stderr, timeout_ms))
         labels.push(label)
-    let rcs = par_run(&ctx, &jobs, par_width())
+    let rcs = par_run(&ctx, &jobs, par_width(&jobs))
     var failures = 0
     for i in 0..rcs.len() as i32:
         if rcs[i] == 0: continue
