@@ -2,7 +2,7 @@
 //
 // Sema decided each fact and MIR placed it (SemaVector.w, MirVector.w);
 // this decides how: a Vector[N, T] is LLVM `<N x T>`, a Mask[N, W] is
-// `<N x iW>` holding all-ones or zero per lane (what `select` and the
+// `<N x iW>` holding all-ones or zero per lane (what `m.select` and the
 // hardware compare produce). Integer lanes follow §4.2 per lane: checked
 // arithmetic panics when any lane overflows, unless the build's overflow
 // mode or the operator (`+%`, `+|`) says otherwise.
@@ -233,6 +233,22 @@ impl Codegen:
         let clamped = wl_build_select(self.builder, wl_build_icmp(self.builder, wl_int_slt(), hi, min_s), min_s, hi)
         wl_build_trunc(self.builder, clamped, vec_ty)
 
+    // `m & n`, `m | n`, `m ^ n` on masks of one shape (D80); a bool operand
+    // arrives splatted.
+    mut fn mir_build_mask_bin_op(op: i32, l: i64, r: i64) -> i64:
+        if op == BinaryOp.OP_BIT_AND: return wl_build_and(self.builder, l, r)
+        if op == BinaryOp.OP_BIT_OR: return wl_build_or(self.builder, l, r)
+        if op == BinaryOp.OP_BIT_XOR: return wl_build_xor(self.builder, l, r)
+        self.cg_vector_unsupported("mask operator")
+
+    // `m as m8x4`: every lane's all-ones or zero at the new width.
+    fn mir_build_mask_cast(val: i64, dst_ty: i64) -> i64:
+        let src_w = wl_get_int_type_width(wl_get_element_type(wl_type_of(val)))
+        let dst_w = wl_get_int_type_width(wl_get_element_type(dst_ty))
+        if dst_w == src_w: return val
+        if dst_w < src_w: return wl_build_trunc(self.builder, val, dst_ty)
+        wl_build_sext(self.builder, val, dst_ty)
+
     // `-v` and `~v` over a vector of `vec_sema`.
     mut fn mir_build_vector_un_op(op: i32, arg: i64, vec_sema: i32) -> i64:
         let lane = self.cg_vector_lane_sema(vec_sema)
@@ -305,7 +321,10 @@ impl Codegen:
         let i32_ty = wl_i32_type(self.context)
         var out = wl_get_undef(vec_ty)
         for i in 0..count:
-            let lane = self.mir_eval_operand(body, body.agg_field_operands[(start + i)], elem_ty)
+            var lane = self.mir_eval_operand(body, body.agg_field_operands[(start + i)], elem_ty)
+            // A mask lane is a bool; it is stored all-ones or zero (D80).
+            if wl_type_of(lane) != elem_ty and wl_get_type_kind(wl_type_of(lane)) == wl_integer_type_kind() and wl_get_int_type_width(wl_type_of(lane)) == 1:
+                lane = wl_build_sext(self.builder, lane, elem_ty)
             if wl_type_of(lane) != elem_ty:
                 return self.cg_vector_unsupported("a vector lane operand of another type")
             out = wl_build_insert_element(self.builder, out, lane, wl_const_int(i32_ty, i as i64, 0))
@@ -338,7 +357,7 @@ impl Codegen:
 
     // The SIMD_* intrinsic calls MirVector emits. False for any other.
     mut fn mir_emit_vector_intrinsic_call(body: &MirBody, intrinsic: MirIntrinsic, args_id: i32, dest_place: i32, next_bb: i32) -> bool:
-        let is_simd = intrinsic == MirIntrinsic.SIMD_BITCAST or intrinsic == MirIntrinsic.SIMD_SELECT or intrinsic == MirIntrinsic.SIMD_ALL or intrinsic == MirIntrinsic.SIMD_ANY or
+        let is_simd = intrinsic == MirIntrinsic.SIMD_BITCAST or intrinsic == MirIntrinsic.SIMD_SELECT or intrinsic == MirIntrinsic.SIMD_ALL or intrinsic == MirIntrinsic.SIMD_ANY or intrinsic == MirIntrinsic.SIMD_MASK_LANE or
             intrinsic == MirIntrinsic.SIMD_REDUCE_ADD or intrinsic == MirIntrinsic.SIMD_REDUCE_MUL or intrinsic == MirIntrinsic.SIMD_REDUCE_MIN or intrinsic == MirIntrinsic.SIMD_REDUCE_MAX or
             intrinsic == MirIntrinsic.SIMD_REDUCE_AND or intrinsic == MirIntrinsic.SIMD_REDUCE_OR or intrinsic == MirIntrinsic.SIMD_REDUCE_XOR
         if not is_simd: return false
@@ -352,6 +371,20 @@ impl Codegen:
             let on = self.mir_intrinsic_arg(body, args_id, 1)
             let off = self.mir_intrinsic_arg(body, args_id, 2)
             result = wl_build_select(self.builder, self.cg_mask_to_bits(a), on, off)
+        else if intrinsic == MirIntrinsic.SIMD_MASK_LANE:
+            let idx = self.mir_intrinsic_arg(body, args_id, 1)
+            let i64_ty = wl_i64_type(self.context)
+            let idx64 = if wl_get_int_type_width(wl_type_of(idx)) < 64: wl_build_sext(self.builder, idx, i64_ty) else: idx
+            if wl_is_constant(idx64) == 0:
+                let bad = wl_build_icmp(self.builder, wl_int_uge(), idx64, wl_const_int(i64_ty, wl_get_vector_size(a_ty) as i64, 0))
+                let panic_bb = wl_append_bb(self.context, self.current_function, "lane.bounds.panic")
+                let ok_bb = wl_append_bb(self.context, self.current_function, "lane.bounds.ok")
+                wl_build_cond_br(self.builder, bad, panic_bb, ok_bb)
+                wl_position_at_end(self.builder, panic_bb)
+                self.emit_runtime_panic("index out of bounds")
+                wl_position_at_end(self.builder, ok_bb)
+            let lane = wl_build_extract_element(self.builder, a, idx64)
+            result = wl_build_icmp(self.builder, wl_int_ne(), lane, wl_const_int(wl_type_of(lane), 0, 0))
         else if intrinsic == MirIntrinsic.SIMD_ALL or intrinsic == MirIntrinsic.SIMD_ANY:
             let bits = self.cg_mask_to_bits(a)
             let overloads: Vec[i64] = Vec.new()

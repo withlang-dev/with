@@ -65,9 +65,9 @@ fn main:
     print(f"bits {and_[0]} {or_[1]} {xor_[3] + 1} {not_[3]} | {lanes4(shl)} | {lanes4(shr)}")
 
     let lt: m32x4 = a > i32x4(15, 25, 25, 45)
-    let picked = select(lt, b, a)
+    let picked = lt.select(b, a)
     let eq_all = a == a
-    print(f"select {lanes4(select(a < 25, a, b))} | all {lt.all()} any {lt.any()} | all {eq_all.all()}")
+    print(f"select {lanes4((a < 25).select(a, b))} | all {lt.all()} any {lt.any()} | all {eq_all.all()}")
     let _ = picked
 
     let r = i32x4(1, 2, 3, 4)

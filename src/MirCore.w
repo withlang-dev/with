@@ -350,6 +350,8 @@ pub enum MirIntrinsic: i32:
     SIMD_REDUCE_AND
     SIMD_REDUCE_OR
     SIMD_REDUCE_XOR
+    // (mask, index) -> the lane as a bool, the index range-checked.
+    SIMD_MASK_LANE
 
 // Copy: MirIntrinsic is a lightweight integer tag passed by value, stored in
 // Vec/HashMap, and compared throughout MIR lowering and codegen.

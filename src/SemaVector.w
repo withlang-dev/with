@@ -29,6 +29,8 @@ impl Sema:
         lanes.push(self.ty_u16 as i32)
         lanes.push(self.ty_u32 as i32)
         lanes.push(self.ty_u64 as i32)
+        lanes.push(self.ty_i128 as i32)
+        lanes.push(self.ty_u128 as i32)
         lanes.push(self.ty_f32 as i32)
         lanes.push(self.ty_f64 as i32)
         for li in 0..lanes.len() as i32:
@@ -38,7 +40,7 @@ impl Sema:
                 let n = total / bits
                 let tid = self.vector_type(lane, n)
                 self.register_prim(self.type_name(lane) ++ f"x{n}", tid)
-        for w in [8, 16, 32, 64]:
+        for w in [8, 16, 32, 64, 128]:
             for total in [128, 256, 512]:
                 let n = total / w
                 self.register_prim(f"m{w}x{n}", self.mask_type(w, n))
@@ -59,6 +61,12 @@ impl Sema:
     fn vector_lane_type(tid: i32) -> i32:
         if not self.is_vector_type(tid): return 0
         self.get_type_d0(self.resolve_alias(tid as TypeId))
+
+    // What one lane holds: a Vector's lane type, a Mask's `bool` (§4.3d
+    // Masks: constructed and indexed as bools); 0 for anything else.
+    fn vector_element_type(tid: i32) -> i32:
+        if self.is_mask_type(tid): return self.ty_bool as i32
+        self.vector_lane_type(tid)
 
     // A Vector's or Mask's lane count; 0 for anything else.
     fn vector_lane_count(tid: i32) -> i32:
@@ -175,8 +183,8 @@ impl Sema:
         let n = self.vector_count_arg(count_node, "Mask")
         if n < 0: return 0
         let w = self.int_literal_i64_value(width_node)
-        if w.ok == 0 or (w.value != 8 and w.value != 16 and w.value != 32 and w.value != 64):
-            self.emit_error("a mask's lane width is 8, 16, 32 or 64 bits (§4.3d)", width_node)
+        if w.ok == 0 or (w.value != 8 and w.value != 16 and w.value != 32 and w.value != 64 and w.value != 128):
+            self.emit_error("a mask's lane width is 8, 16, 32, 64 or 128 bits (§4.3d)", width_node)
             return 0
         self.mask_type(w.value as i32, n)
 
@@ -229,12 +237,10 @@ impl Sema:
             return self.resolve_generic_type(node)
         0
 
-    // A call Sema lowers as a vector operation: construction, `splat`,
-    // `from_bits`, or `select`. -1 when `callee` is none of them.
+    // A call Sema lowers as a vector or mask construction, `splat` or
+    // `from_bits`. -1 when `callee` is none of them.
     mut fn check_vector_call(node: i32, callee: i32, extra_start: i32, arg_count: i32) -> i32:
         let ck = self.ast.kind(callee)
-        if ck == NodeKind.NK_IDENT and self.pool_resolve_symbol(self.ast.get_data0(callee)) == "select" and self.scope_lookup(self.ast.get_data0(callee)) < 0:
-            return self.check_vector_select(node, extra_start, arg_count)
         if ck == NodeKind.NK_IDENT or ck == NodeKind.NK_INDEX or ck == NodeKind.NK_TYPE_GENERIC:
             let ctor_ty = self.vector_type_named_by(callee)
             if ctor_ty == 0: return -1
@@ -247,15 +253,15 @@ impl Sema:
             if base_ty == 0: return -1
             let method = self.pool_resolve_symbol(self.ast.get_data1(callee)).clone()
             let type_text = self.type_name(base_ty)
-            if not self.is_vector_type(base_ty):
-                self.emit_error(f"`{type_text}` has no `{method}`: a mask is what a lane-wise comparison yields (§4.3d)", callee)
-                return 0
             if method == "splat":
                 if arg_count != 1:
                     self.emit_error(f"{type_text}.splat takes one value", node)
                     return 0
-                let _ = self.check_expr_with_owned_demand(self.ast.get_extra(extra_start), self.vector_lane_type(base_ty) as TypeId)
+                let _ = self.check_expr_with_owned_demand(self.ast.get_extra(extra_start), self.vector_element_type(base_ty) as TypeId)
                 return self.record_vector_op(node, VectorOp.SPLAT, base_ty)
+            if not self.is_vector_type(base_ty):
+                self.emit_error(f"`{type_text}` has no associated function `{method}`; a mask is built with `{type_text}(...)` or `{type_text}.splat(b)` (§4.3d)", callee)
+                return 0
             if method == "from_bits":
                 if arg_count != 1:
                     self.emit_error(f"{type_text}.from_bits takes one value", node)
@@ -290,34 +296,29 @@ impl Sema:
 
     mut fn check_vector_construct(node: i32, vec_ty: i32, extra_start: i32, arg_count: i32) -> i32:
         let type_text = self.type_name(vec_ty)
-        if not self.is_vector_type(vec_ty):
-            self.emit_error(f"`{type_text}` is not constructed from lanes: a mask is what a lane-wise comparison yields (§4.3d)", node)
-            return 0
         let n = self.vector_lane_count(vec_ty)
         if arg_count != n:
             for ai in 0..arg_count:
                 let _ = self.check_expr_value_context(self.ast.get_extra(extra_start + ai))
             self.emit_error(f"{type_text} takes exactly {n} lane values, not {arg_count} (§4.3d); `{type_text}.splat(s)` puts one value in every lane", node)
             return 0
-        let lane = self.vector_lane_type(vec_ty)
+        let lane = self.vector_element_type(vec_ty)
         for ai in 0..arg_count:
             let _ = self.check_expr_with_owned_demand(self.ast.get_extra(extra_start + ai), lane as TypeId)
         self.record_vector_op(node, VectorOp.CONSTRUCT, vec_ty)
 
-    // `select(m, a, b)`: `a` and `b` share one vector type and `m` is the
-    // mask its comparison yields.
-    mut fn check_vector_select(node: i32, extra_start: i32, arg_count: i32) -> i32:
-        if arg_count != 3:
-            self.emit_error("select takes a mask and two vectors: `select(m, a, b)` (§4.3d)", node)
+    // `m.select(a, b)` (D80): `a`'s lane where `m` is true, `b`'s where it
+    // is false; `a` and `b` share one vector type and `m` is the mask its
+    // comparison yields.
+    mut fn check_vector_select(node: i32, m_ty: i32, extra_start: i32, arg_count: i32) -> i32:
+        if arg_count != 2:
+            self.emit_error("select takes two vectors: `m.select(a, b)` (§4.3d)", node)
             return 0
-        let m_node = self.ast.get_extra(extra_start)
-        let a_node = self.ast.get_extra(extra_start + 1)
-        let b_node = self.ast.get_extra(extra_start + 2)
-        let m_exact = self.check_expr_value_context(m_node) as i32
-        let m_ty = self.vector_value_type(m_node, m_exact)
+        let a_node = self.ast.get_extra(extra_start)
+        let b_node = self.ast.get_extra(extra_start + 1)
         let a_exact = self.check_expr_value_context(a_node) as i32
         let a_ty = self.vector_value_type(a_node, a_exact)
-        if m_ty == 0 or a_ty == 0: return 0
+        if a_ty == 0: return 0
         if not self.is_vector_type(a_ty):
             self.emit_error(f"select picks between two vectors, not `{self.type_name(a_ty)}` (§4.3d)", a_node)
             return 0
@@ -327,12 +328,9 @@ impl Sema:
         if not self.types_identical(a_ty, b_ty):
             self.emit_error(f"select picks between two vectors of one type, not `{self.type_name(a_ty)}` and `{self.type_name(b_ty)}` (§4.3d)", b_node)
             return 0
-        if self.vector_lane_bits(self.vector_lane_type(a_ty)) == 128:
-            self.emit_error(f"select over 128-bit lanes has no mask yet: Mask[N, W] has W of 8, 16, 32 or 64 bits (§4.3d)", node)
-            return 0
         let want_mask = self.vector_compare_mask_type(a_ty)
         if not self.types_identical(m_ty, want_mask):
-            self.emit_error(f"select over `{self.type_name(a_ty)}` takes a `{self.type_name(want_mask)}` mask, not `{self.type_name(m_ty)}` (§4.3d)", m_node)
+            self.emit_error(f"select over `{self.type_name(a_ty)}` takes a `{self.type_name(want_mask)}` mask, not `{self.type_name(m_ty)}` (§4.3d)", node)
             return 0
         self.record_vector_op(node, VectorOp.SELECT, a_ty)
 
@@ -345,6 +343,7 @@ impl Sema:
         let type_text = self.type_name(recv_ty)
         var op = 0
         if self.is_mask_type(recv_ty):
+            if name == "select": return self.check_vector_select(node, recv_ty, self.ast.get_data1(node), arg_count)
             if name == "all": op = VectorOp.ALL as i32
             else if name == "any": op = VectorOp.ANY as i32
             else: return -1
@@ -416,7 +415,11 @@ impl Sema:
         if k.ok != 0 and (k.value < 0 or k.value >= n as i64):
             self.emit_error(f"lane index {k.value} is out of range for {self.type_name(vec_ty)} ({n} lanes, §4.3d)", index)
             return 0
-        let lane = self.vector_lane_type(vec_ty)
+        let lane = self.vector_element_type(vec_ty)
+        // `m[i]` reads a mask lane as a bool (D80); its storage is W bits, so
+        // it is a value, not a place.
+        if self.is_mask_type(vec_ty):
+            return self.record_vector_op(node, VectorOp.MASK_LANE, lane)
         self.typed_expr_types.insert(node, lane)
         lane
 
@@ -428,8 +431,7 @@ impl Sema:
         let lv = self.is_vector_type(lhs)
         let rv = self.is_vector_type(rhs)
         if self.is_mask_type(lhs) or self.is_mask_type(rhs):
-            self.emit_error(f"operator '{sema_operator_symbol_text(op)}' is not defined on a mask; `select`, `.all()` and `.any()` read one (§4.3d)", node)
-            return 0
+            return self.check_mask_binary(node, op, lhs_node, rhs_node, lhs, rhs)
         if not lv and not rv: return -1
         var vec_ty = if lv: lhs else: rhs
         if lv and rv and not self.types_identical(lhs, rhs):
@@ -459,9 +461,6 @@ impl Sema:
         if is_int_only and self.vector_lane_is_float(vec_ty):
             self.emit_error(f"operator '{sema_operator_symbol_text(op)}' needs integer lanes; `{type_text}` has float lanes (§4.3d)", node)
             return 0
-        if is_cmp and self.vector_lane_bits(self.vector_lane_type(vec_ty)) == 128:
-            self.emit_error(f"a comparison of 128-bit lanes has no mask yet: Mask[N, W] has W of 8, 16, 32 or 64 bits (§4.3d); compare the lanes one by one", node)
-            return 0
         if not (lv and rv):
             // §4.3d: a scalar operand beside a vector broadcasts to every lane.
             if is_shift and not lv:
@@ -475,6 +474,36 @@ impl Sema:
         let result = if is_cmp: self.vector_compare_mask_type(vec_ty) else: vec_ty
         self.typed_expr_types.insert(node, result)
         result
+
+    // `&`, `|`, `^` on masks of one shape, a `bool` operand broadcasting
+    // (D80). `and`/`or` short-circuit, which lanes cannot; nothing else is
+    // defined on a mask.
+    mut fn check_mask_binary(node: i32, op: i32, lhs_node: i32, rhs_node: i32, lhs: i32, rhs: i32) -> i32:
+        let mask_ty = if self.is_mask_type(lhs): lhs else: rhs
+        let type_text = self.type_name(mask_ty)
+        if op == BinaryOp.OP_AND or op == BinaryOp.OP_OR:
+            self.emit_error(f"`{sema_operator_symbol_text(op)}` short-circuits, and the lanes of `{type_text}` cannot; combine masks with `&` or `|` (§4.3d)", node)
+            return 0
+        if op != BinaryOp.OP_BIT_AND and op != BinaryOp.OP_BIT_OR and op != BinaryOp.OP_BIT_XOR:
+            self.emit_error(f"operator '{sema_operator_symbol_text(op)}' is not defined on a mask; masks combine with `&`, `|`, `^` and `not`, and `.select`, `.all()` and `.any()` read one (§4.3d)", node)
+            return 0
+        if self.is_mask_type(lhs) and self.is_mask_type(rhs):
+            if not self.types_identical(lhs, rhs):
+                self.emit_error(f"masks of different widths do not combine: `{self.type_name(lhs)}` and `{self.type_name(rhs)}`; convert one with `as` (§4.3d)", node)
+                return 0
+        else:
+            let other_node = if self.is_mask_type(lhs): rhs_node else: lhs_node
+            let other_ty0 = if self.is_mask_type(lhs): rhs else: lhs
+            let pointee = self.shared_copy_pointee(other_ty0)
+            let other_ty = if pointee == self.ty_bool as i32: pointee else: other_ty0
+            if other_ty != self.ty_bool as i32:
+                self.emit_error(f"`{self.type_name(other_ty0)}` does not combine with the mask `{type_text}`: a mask's other operand is a mask of its shape or a `bool` (§4.3d)", node)
+                return 0
+            if pointee == self.ty_bool as i32:
+                let _ = self.record_contextual_copy_adjustment(other_node, pointee, other_ty0)
+            self.vector_splats.insert(other_node, mask_ty)
+        self.typed_expr_types.insert(node, mask_ty)
+        mask_ty
 
     // The vector two lane-wise operands meet at (§4.2 per lane): the same
     // lane count and lane kind, one signedness, the wider lane; 0 if none.
@@ -510,9 +539,16 @@ impl Sema:
     mut fn check_vector_unary(node: i32, op: i32, operand_node: i32, operand0: i32) -> i32:
         let operand = self.vector_value_type(operand_node, operand0)
         if self.is_mask_type(operand):
-            self.emit_error("a mask has no lane-wise operators; `select`, `.all()` and `.any()` read one (§4.3d)", node)
-            return 0
+            // `not m` negates each lane (D80); nothing else is unary on a mask.
+            if op != UnaryOp.UOP_NOT:
+                self.emit_error("a mask is negated with `not m`; no other unary operator is defined on it (§4.3d)", node)
+                return 0
+            self.typed_expr_types.insert(node, operand)
+            return operand
         if not self.is_vector_type(operand): return -1
+        if op == UnaryOp.UOP_NOT:
+            self.emit_error(f"`not` negates a mask or a bool, not `{self.type_name(operand)}`; `~v` flips integer lanes' bits (§4.3d)", node)
+            return 0
         let lane = self.vector_lane_type(operand)
         if op == UnaryOp.UOP_NEGATE and self.is_unsigned_int_type(lane):
             self.emit_error("cannot negate an unsigned value", node)
@@ -566,6 +602,9 @@ impl Sema:
     mut fn check_vector_cast(node: i32, src: i32, target: i32) -> i32:
         if not self.is_vector_or_mask_type(src) and not self.is_vector_or_mask_type(target): return -1
         if self.is_vector_type(src) and self.is_vector_type(target) and self.vector_lane_count(src) == self.vector_lane_count(target):
+            return target
+        // `m as m8x4` converts a mask's width (D80).
+        if self.is_mask_type(src) and self.is_mask_type(target) and self.vector_lane_count(src) == self.vector_lane_count(target):
             return target
         self.emit_error(f"`as` converts a vector lane-wise to a vector of the same lane count, not `{self.type_name(src)}` to `{self.type_name(target)}`; `.bits()` reinterprets the bytes (§4.3d)", node)
         0
