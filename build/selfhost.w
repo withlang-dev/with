@@ -1,6 +1,7 @@
 module build.selfhost
 
 use build.compiler
+use build.par
 use pcre2
 use std.build
 use std.process
@@ -3199,35 +3200,37 @@ fn bs_compile_emit_c_output(ctx: &ActionCtx, root: &str, case_dir: &str, c_path:
         return 0
     ctx.diagnostics().error(ctx.target_name() ++ f": {label} C compile failed with exit code {cc_result.rc}\n" ++ cc_result.stderr)
 
+// The host C compiler's arguments over one emitted unit and the runtime
+// objects. `libm` links libm on Linux (hello, with no prelude, never has).
+fn bs_emit_c_cc_args(root: &str, c_path: &str, bin: &str, platform_obj: &str, libm: bool) -> Vec[str]:
+    var cc_args: Vec[str] = Vec.new()
+    cc_args.push(bs_c_compiler())
+    cc_args.push("-O1")
+    // Mirror the real link path: dead-strip removes unreferenced runtime
+    // code so its undefs never reach resolution.
+    if os() == "Linux":
+        cc_args.push("-no-pie")
+        cc_args.push("-Wl,--gc-sections")
+    else:
+        cc_args.push("-Wl,-dead_strip")
+    cc_args.push("-o")
+    cc_args.push(bs_abs(root, bin))
+    cc_args.push(bs_abs(root, c_path))
+    cc_args.push(bs_abs(root, "out/lib/rt_core.o"))
+    cc_args.push(bs_abs(root, "out/lib/" ++ platform_obj))
+    for obj in ["compat_runtime.o", "panic_runtime.o", "fiber_stubs.o", "cimport_stubs.o", "embedded_objects.o"]:
+        cc_args.push(bs_abs(root, "out/lib/" ++ obj))
+    cc_args.push("-I")
+    cc_args.push(bs_abs(root, "runtime"))
+    if libm and os() == "Linux":
+        cc_args.push("-lm")
+    cc_args
+
 // The host C compiler over one emitted unit and the runtime objects.
 fn bs_run_emit_c_compile(ctx: &ActionCtx, root: &str, case_dir: &str, c_path: &str, bin: &str, label: &str, platform_obj: &str) -> ToolProcessResult:
     let stdout_path = bs_capture_path(root, case_dir, label ++ "-compile", "stdout")
     let stderr_path = bs_capture_path(root, case_dir, label ++ "-compile", "stderr")
-    var cc_args: Vec[str] = Vec.new()
-    cc_args = bs_push_c_compiler(move cc_args)
-    cc_args |> push("-O1")
-    // Mirror the real link path: dead-strip removes unreferenced runtime
-    // code so its undefs never reach resolution.
-    if os() == "Linux":
-        cc_args |> push("-no-pie")
-        cc_args |> push("-Wl,--gc-sections")
-    else:
-        cc_args |> push("-Wl,-dead_strip")
-    cc_args |> push("-o")
-    cc_args |> push(bs_abs(root, bin))
-    cc_args |> push(bs_abs(root, c_path))
-    cc_args |> push(bs_abs(root, "out/lib/rt_core.o"))
-    cc_args |> push(bs_abs(root, "out/lib/" ++ platform_obj))
-    cc_args |> push(bs_abs(root, "out/lib/compat_runtime.o"))
-    cc_args |> push(bs_abs(root, "out/lib/panic_runtime.o"))
-    cc_args |> push(bs_abs(root, "out/lib/fiber_stubs.o"))
-    cc_args |> push(bs_abs(root, "out/lib/cimport_stubs.o"))
-    cc_args |> push(bs_abs(root, "out/lib/embedded_objects.o"))
-    cc_args |> push("-I")
-    cc_args |> push(bs_abs(root, "runtime"))
-    if os() == "Linux":
-        cc_args |> push("-lm")
-    ctx.process_runner().run_capture(cc_args, stdout_path, stderr_path, 120000)
+    ctx.process_runner().run_capture(bs_emit_c_cc_args(root, c_path, bin, platform_obj, true), stdout_path, stderr_path, 120000)
 
 fn bs_check_emit_c_receiver_abi(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let root = ctx.project_info().project_root()
@@ -3267,16 +3270,12 @@ fn bs_check_emit_c_receiver_abi(ctx: &ActionCtx, compiler_path: &str, case_dir: 
     if run_result.rc != 0: return run_result.rc
     bs_edge_assert_exact(ctx, run_result.stdout, "ok", "emit_c_receiver_abi", "stdout")
 
-fn bs_check_emit_c_collections(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
-    // #668: HashSet one-arg insert, receiver-canonical key sizes, and
-    // tuple index/destructure projections through emit -> cc -> run.
-    // D27: Vec.get returns an element address and borrowed Option/Result
-    // eliminators return payload addresses rather than fabricated pointers.
-    let root = ctx.project_info().project_root()
-    let src = bs_join(case_dir, "collections.w")
-    let c_path = bs_join(case_dir, "collections.c")
-    let bin = bs_join(case_dir, "collections")
-    let source = "use std.collections.HashSet\n" ++
+// #668: HashSet one-arg insert, receiver-canonical key sizes, and
+// tuple index/destructure projections through emit -> cc -> run.
+// D27: Vec.get returns an element address and borrowed Option/Result
+// eliminators return payload addresses rather than fabricated pointers.
+fn bs_emit_c_collections_source() -> str:
+    "use std.collections.HashSet\n" ++
         "use std.collections.HashMap\n\n" ++
         "fn pair() -> (i32, str): (42, \"x\")\n\n" ++
         "fn main:\n" ++
@@ -3307,21 +3306,6 @@ fn bs_check_emit_c_collections(ctx: &ActionCtx, compiler_path: &str, case_dir: &
         "    let (a, b) = t\n" ++
         "    good = good and a == 42 and b == \"x\"\n" ++
         "    print(if good: \"ok\" else: \"bad\")\n"
-    var rc = bs_write_fixture(ctx, src, source, "emit-c collections source")
-    if rc != 0: return rc
-    var emit_args: Vec[str] = Vec.new()
-    emit_args |> push("build")
-    emit_args |> push(bs_abs(root, src))
-    emit_args |> push("--emit-c")
-    emit_args |> push("-o")
-    emit_args |> push(bs_abs(root, c_path))
-    let emit_result = bs_edge_expect_success(ctx, compiler_path, case_dir, "emit-c-collections", emit_args)
-    if emit_result.rc != 0: return emit_result.rc
-    rc = bs_compile_emit_c_output(ctx, root, case_dir, c_path, bin, "emit-c-collections")
-    if rc != 0: return rc
-    let run_result = bs_run_binary_capture(ctx, bin, "emit-c-collections-run", 120000)
-    if run_result.rc != 0: return run_result.rc
-    bs_edge_assert_exact(ctx, bs_trim_trailing_line_endings(run_result.stdout), "ok", "emit_c_collections", "stdout")
 
 // The `//! expect-stdout:` lines of a fixture, joined as the program prints
 // them.
@@ -3336,76 +3320,11 @@ fn bs_emit_c_expected_stdout(text: &str) -> str:
             first = false
     out
 
-// The emit-C behavior corpus, test/emit_c/*.w. Each program runs twice
-// under the compiler under test: `with test` (the LLVM backend, against the
-// program's `//! expect-stdout:` lines), then `--emit-c`, the host C
-// compiler over the runtime objects, and a run whose stdout must be the
-// same lines — a difference is a backend divergence, which a program that
-// merely compiles as C never shows (#1484: globals read zero). Every
-// fixture is surveyed before the verdict.
-fn bs_check_emit_c_fixtures(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
-    let root = ctx.project_info().project_root()
-    let fs = ctx.fs()
-    if fs.mkdir_all(case_dir) != 0:
-        return bs_fail(ctx, "could not create output directory: " ++ case_dir)
-    let platform_obj = bs_host_platform_runtime_object()
-    if platform_obj.len() == 0:
-        return bs_fail(ctx, "unsupported host runtime object for emit-c C compile: " ++ os() ++ "/" ++ arch())
-    var fixtures = 0
-    var failed = 0
-    var report = ""
-    for path in fs.list_files("test/emit_c"):
-        if not path.ends_with(".w"): continue
-        fixtures = fixtures + 1
-        let base = bs_basename(path)
-        let name = base.slice(0, base.len() - 2)
-        let expected = bs_emit_c_expected_stdout(fs.read_text(path))
-        var test_args: Vec[str] = Vec.new()
-        test_args |> push("test")
-        test_args |> push(bs_abs(root, path))
-        let native = bs_run_cli_capture_cwd(ctx, compiler_path, "emit-c-native-" ++ name, &test_args, 300000, root)
-        if native.rc != 0:
-            report = report ++ "\n" ++ path ++ ": the LLVM backend disagrees with the fixture:\n" ++ native.stderr
-            failed = failed + 1
-            continue
-        let c_path = bs_join(case_dir, name ++ ".c")
-        let bin = bs_join(case_dir, name)
-        var emit_args: Vec[str] = Vec.new()
-        emit_args |> push("build")
-        emit_args |> push(bs_abs(root, path))
-        emit_args |> push("--emit-c")
-        emit_args |> push("-o")
-        emit_args |> push(bs_abs(root, c_path))
-        let emitted = bs_run_cli_capture_cwd(ctx, compiler_path, "emit-c-" ++ name, &emit_args, 300000, root)
-        if emitted.rc != 0:
-            report = report ++ "\n" ++ path ++ ": C emission failed:\n" ++ emitted.stderr
-            failed = failed + 1
-            continue
-        let compiled = bs_run_emit_c_compile(ctx, root, case_dir, c_path, bin, "emit-c-" ++ name, platform_obj)
-        if compiled.rc != 0:
-            report = report ++ "\n" ++ path ++ f": the emitted C does not compile (exit {compiled.rc}):\n" ++ compiled.stderr
-            failed = failed + 1
-            continue
-        let run = bs_run_binary_capture(ctx, bin, "emit-c-" ++ name ++ "-run", 120000)
-        let actual = bs_trim_trailing_line_endings(run.stdout)
-        if run.rc != 0 or actual != expected:
-            report = report ++ "\n" ++ path ++ f": the emitted C program exited {run.rc}\nexpected: '" ++ expected ++ "'\nactual: '" ++ actual ++ "'\n" ++ run.stderr
-            failed = failed + 1
-    if fixtures == 0:
-        return bs_fail(ctx, "test/emit_c: no fixtures; the corpus cannot prove the C backend runs")
-    if failed > 0:
-        return bs_fail(ctx, f"{failed} of {fixtures} emit-C fixtures failed:" ++ report)
-    0
-
-fn bs_check_emit_c_generic_intrinsics(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
-    // #740 roundtrip: sizeof/alignof/transmute lower to real C rather than
-    // generic-call abort placeholders, and spawn_os's fn-value transmute is
-    // bit-correct under the fat {fn_ptr, ctx} representation.
-    let root = ctx.project_info().project_root()
-    let src = bs_join(case_dir, "generic_intrinsics.w")
-    let c_path = bs_join(case_dir, "generic_intrinsics.c")
-    let bin = bs_join(case_dir, "generic_intrinsics")
-    let source = "use std.thread\n\n" ++
+// #740 roundtrip: sizeof/alignof/transmute lower to real C rather than
+// generic-call abort placeholders, and spawn_os's fn-value transmute is
+// bit-correct under the fat {fn_ptr, ctx} representation.
+fn bs_emit_c_generic_intrinsics_source() -> str:
+    "use std.thread\n\n" ++
         "type PairI32 {\n" ++
         "    first: i32,\n" ++
         "    second: i32,\n" ++
@@ -3428,31 +3347,9 @@ fn bs_check_emit_c_generic_intrinsics(ctx: &ActionCtx, compiler_path: &str, case
         "    let handle = spawn_os(worker)\n" ++
         "    if join(handle) != 29: return 7\n" ++
         "    print(\"ok\")\n"
-    var rc = bs_write_fixture(ctx, src, source, "emit-c generic intrinsics source")
-    if rc != 0: return rc
-    var emit_args: Vec[str] = Vec.new()
-    emit_args |> push("build")
-    emit_args |> push(bs_abs(root, src))
-    emit_args |> push("--emit-c")
-    emit_args |> push("-o")
-    emit_args |> push(bs_abs(root, c_path))
-    let emit_result = bs_edge_expect_success(ctx, compiler_path, case_dir, "emit-c-generic-intrinsics", emit_args)
-    if emit_result.rc != 0: return emit_result.rc
-    let c_text = ctx.fs().read_text(c_path)
-    rc = bs_assert_not_contains(ctx, c_text, "generic_call: should be resolved", "emit_c_generic_intrinsics_no_placeholder")
-    if rc != 0: return rc
-    rc = bs_compile_emit_c_output(ctx, root, case_dir, c_path, bin, "emit-c-generic-intrinsics")
-    if rc != 0: return rc
-    let run_result = bs_run_binary_capture(ctx, bin, "emit-c-generic-intrinsics-run", 120000)
-    if run_result.rc != 0: return run_result.rc
-    bs_edge_assert_exact(ctx, bs_trim_trailing_line_endings(run_result.stdout), "ok", "emit_c_generic_intrinsics", "stdout")
 
-fn bs_check_emit_c_hashmap_new_field(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
-    let root = ctx.project_info().project_root()
-    let src = bs_join(case_dir, "hashmap_new_field.w")
-    let c_path = bs_join(case_dir, "hashmap_new_field.c")
-    let bin = bs_join(case_dir, "hashmap_new_field")
-    let source = "use std.prelude_alloc\n" ++
+fn bs_emit_c_hashmap_new_field_source() -> str:
+    "use std.prelude_alloc\n" ++
         "use std.collections.HashMap\n\n" ++
         "extern fn with_print_str(s: &str) -> Unit\n\n" ++
         "type Registry {\n" ++
@@ -3486,22 +3383,137 @@ fn bs_check_emit_c_hashmap_new_field(ctx: &ActionCtx, compiler_path: &str, case_
         "        return 77\n" ++
         "    unsafe { with_print_str(\"ok\") }\n" ++
         "    0\n"
-    var rc = bs_write_fixture(ctx, src, source, "emit-c hashmap aggregate field source")
-    if rc != 0: return rc
-    var emit_args: Vec[str] = Vec.new()
-    emit_args |> push("build")
-    emit_args |> push(bs_abs(root, src))
-    emit_args |> push("--emit-c")
-    emit_args |> push("--no-prelude")
-    emit_args |> push("-o")
-    emit_args |> push(bs_abs(root, c_path))
-    let emit_result = bs_edge_expect_success(ctx, compiler_path, case_dir, "emit-c-hashmap-new-field", emit_args)
-    if emit_result.rc != 0: return emit_result.rc
-    rc = bs_compile_emit_c_output(ctx, root, case_dir, c_path, bin, "emit-c-hashmap-new-field")
-    if rc != 0: return rc
-    let run_result = bs_run_binary_capture(ctx, bin, "emit-c-hashmap-new-field-run", 120000)
-    if run_result.rc != 0: return run_result.rc
-    bs_edge_assert_exact(ctx, run_result.stdout, "ok", "emit_c_hashmap_new_field", "stdout")
+
+// ── emit-c-smoke cases ─────────────────────────────────────────────
+//
+// One emit-C case: the program is emitted as C by the compiler under test,
+// compiled by the host C compiler over the runtime objects, and run. A
+// fixture from test/emit_c first runs under `with test` (the LLVM backend,
+// against its `//! expect-stdout:` lines), and its C program must print
+// the same lines: a difference is a backend divergence, which a program
+// that merely compiles as C never shows (#1484: globals read zero).
+type EcCase {
+    name: str,
+    // the case's directory: its captures, C file and binary
+    dir: str,
+    src: str,
+    native: bool,
+    // flags between `--emit-c` and `-o`
+    emit_flags: Vec[str],
+    emit_timeout_ms: i32,
+    libm: bool,
+    // text the emitted C must not contain ("" for none)
+    forbid_in_c: str,
+    expect_rc: i32,
+    check_stdout: bool,
+    expect_stdout: str,
+    trim_stdout: bool,
+    stderr_needles: Vec[str],
+}
+
+fn ec_case(name: &str, dir: &str, src: &str) -> EcCase:
+    EcCase {
+        name: name.clone(), dir: dir.clone(), src: src.clone(), native: false,
+        emit_flags: Vec.new(), emit_timeout_ms: 120000, libm: true, forbid_in_c: "",
+        expect_rc: 0, check_stdout: true, expect_stdout: "ok", trim_stdout: true, stderr_needles: Vec.new(),
+    }
+
+fn ec_c_path(c: &EcCase): bs_join(c.dir, "program.c")
+
+fn ec_bin(c: &EcCase): bs_join(c.dir, "program")
+
+fn ec_read(ctx: &ActionCtx, path: &str): ctx.fs().read_text_opt(path).unwrap_or("")
+
+// Every case's emit steps, then every compile step, each in a core-wide
+// window (build/par.w); within a case emit precedes compile precedes run.
+// Returns the report of every failing case ("" when all pass) with the
+// number that failed, after every child is reaped.
+fn ec_run_cases(ctx: &ActionCtx, compiler_path: &str, platform_obj: &str, cases: &Vec[EcCase]) -> (i32, str):
+    let root = ctx.project_info().project_root()
+    let fs = ctx.fs()
+    let width = par_width()
+    var jobs: Vec[ParJob] = Vec.new()
+    var native_job: Vec[i32] = Vec.new()
+    var emit_job: Vec[i32] = Vec.new()
+    for i in 0..cases.len() as i32:
+        let c = &cases[i]
+        if c.native:
+            var argv: Vec[str] = Vec.new()
+            argv.push(compiler_path.clone())
+            argv.push("test")
+            argv.push(bs_abs(root, c.src))
+            native_job.push(jobs.len() as i32)
+            jobs.push(par_job(argv, bs_capture_path(root, c.dir, "native", "stdout"), bs_capture_path(root, c.dir, "native", "stderr"), 300000))
+        else:
+            native_job.push(-1)
+        var argv: Vec[str] = Vec.new()
+        argv.push(compiler_path.clone())
+        argv.push("build")
+        argv.push(bs_abs(root, c.src))
+        argv.push("--emit-c")
+        for flag in c.emit_flags: argv.push(flag.clone())
+        argv.push("-o")
+        argv.push(bs_abs(root, ec_c_path(c)))
+        emit_job.push(jobs.len() as i32)
+        jobs.push(par_job(argv, bs_capture_path(root, c.dir, "emit", "stdout"), bs_capture_path(root, c.dir, "emit", "stderr"), c.emit_timeout_ms))
+    let rcs = par_run(ctx, &jobs, width)
+
+    var failed = 0
+    var report = ""
+    var cc_jobs: Vec[ParJob] = Vec.new()
+    var cc_case: Vec[i32] = Vec.new()
+    for i in 0..cases.len() as i32:
+        let c = &cases[i]
+        let ni = native_job[i]
+        if ni >= 0 and rcs[ni] != 0:
+            failed += 1
+            report = report ++ "\n" ++ c.name ++ f": the LLVM backend disagrees with the fixture (exit {rcs[ni]}):\n" ++ ec_read(ctx, jobs[ni].stderr)
+            continue
+        let ei = emit_job[i]
+        if rcs[ei] != 0:
+            failed += 1
+            report = report ++ "\n" ++ c.name ++ f": C emission failed (exit {rcs[ei]}):\n" ++ ec_read(ctx, jobs[ei].stderr)
+            continue
+        let c_path = ec_c_path(c)
+        if not fs.exists(c_path):
+            failed += 1
+            report = report ++ "\n" ++ c.name ++ ": emit-c did not produce " ++ c_path
+            continue
+        if c.forbid_in_c.len() > 0 and fs.read_text(c_path).contains(c.forbid_in_c):
+            failed += 1
+            report = report ++ "\n" ++ c.name ++ ": the emitted C contains forbidden text: " ++ c.forbid_in_c
+            continue
+        cc_case.push(i)
+        cc_jobs.push(par_job(bs_emit_c_cc_args(root, c_path, ec_bin(c), platform_obj, c.libm), bs_capture_path(root, c.dir, "compile", "stdout"), bs_capture_path(root, c.dir, "compile", "stderr"), 120000))
+    let cc_rcs = par_run(ctx, &cc_jobs, width)
+
+    for k in 0..cc_case.len() as i32:
+        let c = &cases[cc_case[k]]
+        if cc_rcs[k] != 0:
+            failed += 1
+            report = report ++ "\n" ++ c.name ++ f": the emitted C does not compile (exit {cc_rcs[k]}):\n" ++ ec_read(ctx, cc_jobs[k].stderr)
+            continue
+        let bin = ec_bin(c)
+        if not fs.exists(bin):
+            failed += 1
+            report = report ++ "\n" ++ c.name ++ ": the C compiler did not produce " ++ bin
+            continue
+        var argv: Vec[str] = Vec.new()
+        argv.push(bs_abs(root, bin))
+        let run = ctx.process_runner().run_capture(argv, bs_capture_path(root, c.dir, "run", "stdout"), bs_capture_path(root, c.dir, "run", "stderr"), 120000)
+        let actual = if c.trim_stdout: bs_trim_trailing_line_endings(run.stdout) else: run.stdout.clone()
+        if run.rc != c.expect_rc or (c.check_stdout and actual != c.expect_stdout):
+            failed += 1
+            report = report ++ "\n" ++ c.name ++ f": the emitted C program exited {run.rc} (expected {c.expect_rc})"
+            if c.check_stdout: report = report ++ "\nexpected: '" ++ c.expect_stdout ++ "'\nactual: '" ++ actual ++ "'"
+            report = report ++ "\n" ++ run.stderr
+            continue
+        for needle in c.stderr_needles:
+            if not run.stderr.contains(needle):
+                failed += 1
+                report = report ++ "\n" ++ c.name ++ ": missing expected stderr: " ++ needle ++ bs_actual_excerpt(run.stderr)
+                break
+    (failed, report)
 
 fn bs_check_emit_c_array_fill_rvalue(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let root = ctx.project_info().project_root()
@@ -3662,6 +3674,13 @@ fn bs_check_darwin_arm64_c_abi_direct_aggregates(ctx: &ActionCtx, compiler_path:
     if run_result.rc != 0: return run_result.rc
     bs_edge_assert_exact(ctx, bs_trim_trailing_line_endings(run_result.stdout), "", "darwin_arm64_c_abi_direct_aggregates", "stdout")
 
+// `emit-c-smoke`: hello with no prelude, the prelude runtime, a panicking
+// expect, three named programs and the test/emit_c corpus, each through
+// emit -> cc -> run (ec_run_cases). The emits run the FRESH compiler as a
+// subprocess: a comptime workspace.compile() would run in-process inside
+// the build driver — the SEED — and exercise the seed's C emitter, not the
+// binary under test (the #761 mixed-world class; the stale decl surface
+// broke the cc step in battery take 27).
 pub fn run_emit_c_smoke_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()
     if inputs.len() < 2:
@@ -3680,143 +3699,77 @@ pub fn run_emit_c_smoke_action(ctx: ActionCtx) -> i32:
         return 0
 
     let root = ctx.project_info().project_root()
-    let compiler_input = inputs.get(0)
-    let source_input = inputs.get(1)
-    if not fs.exists(compiler_input):
-        return bs_fail(ctx, "missing compiler: " ++ compiler_input)
-    if not fs.exists(source_input):
-        return bs_fail(ctx, "missing source: " ++ source_input)
-    let compiler_path = bs_abs(root, compiler_input)
-    let c_path = bs_join(output_dir, "hello.c")
-    let bin_path = bs_join(output_dir, "hello")
-
-    // Emit with the FRESH compiler as a subprocess. A comptime
-    // workspace.compile() here runs in-process inside the build driver —
-    // the SEED — so until a reseed the smoke would exercise the seed's C
-    // emitter, not the binary under test (the #761 mixed-world class; the
-    // stale decl surface broke the cc step in battery take 27).
-    let emit_stdout = bs_capture_path(root, output_dir, "emit-c-smoke-emit", "stdout")
-    let emit_stderr = bs_capture_path(root, output_dir, "emit-c-smoke-emit", "stderr")
-    var em_args: Vec[str] = Vec.new()
-    em_args |> push(selfhost_owned_text(compiler_path))
-    em_args |> push("build")
-    em_args |> push(bs_abs(root, source_input))
-    em_args |> push("--emit-c")
-    em_args |> push("--no-prelude")
-    em_args |> push("-o")
-    em_args |> push(bs_abs(root, c_path))
-    let emit_result = ctx.process_runner().run_capture(em_args, emit_stdout, emit_stderr, 600000)
-    if emit_result.rc != 0:
-        return bs_fail(ctx, f"emit-c compile failed with exit code {emit_result.rc}: " ++ emit_result.stderr)
-    if not fs.exists(c_path):
-        return bs_fail(ctx, "emit-c did not produce " ++ c_path)
-
-    let compile_stdout = bs_capture_path(root, output_dir, "emit-c-smoke-compile", "stdout")
-    let compile_stderr = bs_capture_path(root, output_dir, "emit-c-smoke-compile", "stderr")
+    if not fs.exists(inputs[0]):
+        return bs_fail(ctx, "missing compiler: " ++ inputs[0])
+    if not fs.exists(inputs[1]):
+        return bs_fail(ctx, "missing source: " ++ inputs[1])
+    let compiler_path = bs_abs(root, inputs[0])
     let platform_obj = bs_host_platform_runtime_object()
     if platform_obj.len() == 0:
-        return bs_fail(ctx, "unsupported host runtime object for emit-c smoke C compile: " ++ os() ++ "/" ++ arch())
-    var cc_args: Vec[str] = Vec.new()
-    cc_args = bs_push_c_compiler(move cc_args)
-    cc_args |> push("-O1")
-    // Mirror the real link path: dead-strip removes unreferenced runtime
-    // code so its undefs never reach resolution.
-    if os() == "Linux":
-        cc_args |> push("-no-pie")
-        cc_args |> push("-Wl,--gc-sections")
-    else:
-        cc_args |> push("-Wl,-dead_strip")
-    cc_args |> push("-o")
-    cc_args |> push(bs_abs(root, bin_path))
-    cc_args |> push(bs_abs(root, c_path))
-    cc_args |> push(bs_abs(root, "out/lib/rt_core.o"))
-    cc_args |> push(bs_abs(root, "out/lib/" ++ platform_obj))
-    cc_args |> push(bs_abs(root, "out/lib/compat_runtime.o"))
-    cc_args |> push(bs_abs(root, "out/lib/panic_runtime.o"))
-    cc_args |> push(bs_abs(root, "out/lib/fiber_stubs.o"))
-    cc_args |> push(bs_abs(root, "out/lib/cimport_stubs.o"))
-    cc_args |> push(bs_abs(root, "out/lib/embedded_objects.o"))
-    cc_args |> push("-I")
-    cc_args |> push(bs_abs(root, "runtime"))
-    let compile_result = ctx.process_runner().run_capture(cc_args, compile_stdout, compile_stderr, 120000)
-    if compile_result.rc != 0:
-        return bs_fail(ctx, f"C compiler failed with exit code {compile_result.rc}; stdout=" ++ compile_stdout ++ " stderr=" ++ compile_stderr)
-    if not fs.exists(bin_path):
-        return bs_fail(ctx, "C compiler did not produce " ++ bin_path)
+        return bs_fail(ctx, "unsupported host runtime object for emit-c C compile: " ++ os() ++ "/" ++ arch())
+    var cases: Vec[EcCase] = Vec.new()
 
-    let run_result = bs_run_binary_capture(ctx, bin_path, "emit-c-smoke-run", 120000)
-    if run_result.rc != 0:
-        return bs_fail(ctx, f"emitted C binary failed with exit code {run_result.rc}: " ++ run_result.stderr)
-    let output = bs_trim_trailing_line_endings(run_result.stdout)
-    if output != "hello":
-        return bs_fail(ctx, "emitted C binary output mismatch: " ++ output)
+    var hello = ec_case("hello", bs_join(output_dir, "hello"), inputs[1])
+    hello.emit_flags.push("--no-prelude")
+    hello.emit_timeout_ms = 600000
+    hello.libm = false
+    hello.expect_stdout = "hello"
+    if fs.mkdir_all(hello.dir) != 0: return bs_fail(ctx, "could not create " ++ hello.dir)
+    cases.push(hello)
 
-    let prelude_c_path = bs_join(output_dir, "prelude_runtime.c")
-    let prelude_bin_path = bs_join(output_dir, "prelude_runtime")
-    let prelude_src = bs_join(output_dir, "prelude_runtime.w")
-    var rc = bs_write_fixture(ctx, prelude_src, "fn main:\n    print(\"hello\")\n", "emit-c prelude runtime source")
-    if rc != 0: return rc
-    // Same as the hello case above: emit with the compiler under test as a
-    // subprocess, not an in-process (seed-driver) workspace compile.
-    let prelude_emit_stdout = bs_capture_path(root, output_dir, "emit-c-prelude-emit", "stdout")
-    let prelude_emit_stderr = bs_capture_path(root, output_dir, "emit-c-prelude-emit", "stderr")
-    var pr_args: Vec[str] = Vec.new()
-    pr_args |> push(selfhost_owned_text(compiler_path))
-    pr_args |> push("build")
-    pr_args |> push(bs_abs(root, prelude_src))
-    pr_args |> push("--emit-c")
-    pr_args |> push("-o")
-    pr_args |> push(bs_abs(root, prelude_c_path))
-    let prelude_emit_result = ctx.process_runner().run_capture(pr_args, prelude_emit_stdout, prelude_emit_stderr, 600000)
-    if prelude_emit_result.rc != 0:
-        return bs_fail(ctx, f"prelude emit-c compile failed with exit code {prelude_emit_result.rc}: " ++ prelude_emit_result.stderr)
-    if not fs.exists(prelude_c_path):
-        return bs_fail(ctx, "prelude emit-c did not produce " ++ prelude_c_path)
-    rc = bs_compile_emit_c_output(ctx, root, output_dir, prelude_c_path, prelude_bin_path, "emit-c-prelude-runtime")
-    if rc != 0: return rc
-    if not fs.exists(prelude_bin_path):
-        return bs_fail(ctx, "prelude emitted C compiler did not produce " ++ prelude_bin_path)
-    let prelude_run_result = bs_run_binary_capture(ctx, prelude_bin_path, "emit-c-prelude-runtime-run", 120000)
-    if prelude_run_result.rc != 0:
-        return bs_fail(ctx, f"prelude emitted C binary failed with exit code {prelude_run_result.rc}: " ++ prelude_run_result.stderr)
-    let prelude_output = bs_trim_trailing_line_endings(prelude_run_result.stdout)
-    if prelude_output != "hello":
-        return bs_fail(ctx, "prelude emitted C binary output mismatch: " ++ prelude_output)
+    let prelude_dir = bs_join(output_dir, "prelude_runtime")
+    var prelude = ec_case("prelude runtime", prelude_dir, bs_join(prelude_dir, "prelude_runtime.w"))
+    if bs_write_fixture(ctx, prelude.src, "fn main:\n    print(\"hello\")\n", "emit-c prelude runtime source") != 0: return 1
+    prelude.emit_timeout_ms = 600000
+    prelude.expect_stdout = "hello"
+    cases.push(prelude)
 
-    let expect_src = bs_join(output_dir, "emit_c_expect_panic.w")
-    let expect_c_path = bs_join(output_dir, "emit_c_expect_panic.c")
-    let expect_bin_path = bs_join(output_dir, "emit_c_expect_panic")
-    rc = bs_write_fixture(ctx, expect_src, "fn main:\n    let r: Result[i32, str] = Err(\"emit-c bad\")\n    let _ = r.expect(\"emit-c expect failed\")\n", "emit-c expect panic source")
-    if rc != 0: return rc
-    var expect_emit_args: Vec[str] = Vec.new()
-    expect_emit_args |> push("build")
-    expect_emit_args |> push(bs_abs(root, expect_src))
-    expect_emit_args |> push("--emit-c")
-    expect_emit_args |> push("-o")
-    expect_emit_args |> push(bs_abs(root, expect_c_path))
-    let expect_emit_result = bs_edge_expect_success(ctx, compiler_path, output_dir, "emit-c-expect-panic", expect_emit_args)
-    if expect_emit_result.rc != 0: return expect_emit_result.rc
-    if not fs.exists(expect_c_path):
-        return bs_fail(ctx, "expect-panic emit-c did not produce " ++ expect_c_path)
-    rc = bs_compile_emit_c_output(ctx, root, output_dir, expect_c_path, expect_bin_path, "emit-c-expect-panic")
-    if rc != 0: return rc
-    let expect_run_result = bs_run_binary_capture(ctx, expect_bin_path, "emit-c-expect-panic-run", 120000)
-    if expect_run_result.rc != 134:
-        return bs_fail(ctx, f"emit-c expect panic exited {expect_run_result.rc}, expected 134: " ++ expect_run_result.stderr)
-    rc = bs_assert_contains(ctx, expect_run_result.stderr, "emit-c expect failed", "emit_c_expect_panic_message")
-    if rc != 0: return rc
-    rc = bs_assert_contains(ctx, expect_run_result.stderr, "\"emit-c bad\"", "emit_c_expect_panic_debug")
-    if rc != 0: return rc
+    let panic_dir = bs_join(output_dir, "expect_panic")
+    var expect_panic = ec_case("expect panic", panic_dir, bs_join(panic_dir, "emit_c_expect_panic.w"))
+    if bs_write_fixture(ctx, expect_panic.src, "fn main:\n    let r: Result[i32, str] = Err(\"emit-c bad\")\n    let _ = r.expect(\"emit-c expect failed\")\n", "emit-c expect panic source") != 0: return 1
+    expect_panic.expect_rc = 134
+    expect_panic.check_stdout = false
+    expect_panic.stderr_needles.push("emit-c expect failed")
+    expect_panic.stderr_needles.push("\"emit-c bad\"")
+    cases.push(expect_panic)
 
-    rc = bs_check_emit_c_hashmap_new_field(ctx, compiler_path, bs_join(output_dir, "emit_c_hashmap_new_field_case"))
-    if rc != 0: return rc
-    rc = bs_check_emit_c_collections(ctx, compiler_path, bs_join(output_dir, "emit_c_collections_case"))
-    if rc != 0: return rc
-    rc = bs_check_emit_c_generic_intrinsics(ctx, compiler_path, bs_join(output_dir, "emit_c_generic_intrinsics_case"))
-    if rc != 0: return rc
-    rc = bs_check_emit_c_fixtures(ctx, compiler_path, bs_join(output_dir, "emit_c_fixtures"))
-    if rc != 0: return rc
-    print("EMIT-C SMOKE OK")
+    let hashmap_dir = bs_join(output_dir, "hashmap_new_field")
+    var hashmap = ec_case("hashmap aggregate field", hashmap_dir, bs_join(hashmap_dir, "hashmap_new_field.w"))
+    if bs_write_fixture(ctx, hashmap.src, bs_emit_c_hashmap_new_field_source(), "emit-c hashmap aggregate field source") != 0: return 1
+    hashmap.emit_flags.push("--no-prelude")
+    hashmap.trim_stdout = false
+    cases.push(hashmap)
+
+    let collections_dir = bs_join(output_dir, "collections")
+    let collections = ec_case("collections", collections_dir, bs_join(collections_dir, "collections.w"))
+    if bs_write_fixture(ctx, collections.src, bs_emit_c_collections_source(), "emit-c collections source") != 0: return 1
+    cases.push(collections)
+
+    let intrinsics_dir = bs_join(output_dir, "generic_intrinsics")
+    var intrinsics = ec_case("generic intrinsics", intrinsics_dir, bs_join(intrinsics_dir, "generic_intrinsics.w"))
+    if bs_write_fixture(ctx, intrinsics.src, bs_emit_c_generic_intrinsics_source(), "emit-c generic intrinsics source") != 0: return 1
+    intrinsics.forbid_in_c = "generic_call: should be resolved"
+    cases.push(intrinsics)
+
+    var fixtures = 0
+    for path in fs.list_files("test/emit_c"):
+        if not path.ends_with(".w"): continue
+        fixtures += 1
+        let base = bs_basename(path)
+        let dir = bs_join(bs_join(output_dir, "emit_c_fixtures"), base.slice(0, base.len() - 2))
+        if fs.mkdir_all(dir) != 0: return bs_fail(ctx, "could not create " ++ dir)
+        var fixture = ec_case(path, dir, path)
+        fixture.native = true
+        fixture.emit_timeout_ms = 300000
+        fixture.expect_stdout = bs_emit_c_expected_stdout(fs.read_text(path))
+        cases.push(fixture)
+    if fixtures == 0:
+        return bs_fail(ctx, "test/emit_c: no fixtures; the corpus cannot prove the C backend runs")
+
+    let (failed, report) = ec_run_cases(&ctx, compiler_path, platform_obj, &cases)
+    if failed > 0:
+        return bs_fail(ctx, f"{failed} of {cases.len()} emit-C cases failed:" ++ report)
+    print(f"EMIT-C SMOKE OK ({cases.len()} cases)")
     0
 
 pub fn run_cli_selfhost_edge_action(ctx: ActionCtx) -> i32:
