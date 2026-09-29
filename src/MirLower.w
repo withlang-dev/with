@@ -150,6 +150,9 @@ pub type MirBuilder = ephemeral {
     // (an observed place, see observed_pattern_subject_place): `_` and `..`
     // must not move payloads into drop locals — nothing is being consumed.
     pattern_subject_observed: i32,
+    // The Never-typed call being lowered (lower_expr's NK_CALL hook), so
+    // the hook runs once per call.
+    never_call_node: i32,
     // 1 while lowering a `var PATTERN` let: its binding locals are mutable (#1354).
     pattern_bind_mut: i32,
     // Pairs (binding local, subject place) of every value a pattern binding
@@ -289,6 +292,7 @@ fn MirBuilder.init(sema: &Sema, ast: AstPool, pool: InternPool, fn_sym: i32) -> 
         pending_move_temp_locals: Vec.new(),
         field_move_in_branch: 0,
         pattern_subject_observed: 0,
+        never_call_node: 0,
         pattern_bind_mut: 0,
         pattern_move_log: Vec.new(),
         with_cleanup_guard_locals: Vec.new(),
@@ -16240,6 +16244,19 @@ impl MirBuilder:
 
         if kind == NodeKind.NK_MATCH:
             return self.lower_match(self.ast.get_data0(node), self.ast.get_data1(node), self.ast.get_data2(node), node, 1)
+
+        // A call Sema typed Never (`todo(..)`, `unreachable(..)`, a `-> Never`
+        // function) does not return: its continuation is no path. It flowed
+        // on into the join (`bb4: goto -> bb3`), where the result an arm
+        // never wrote was read (#1883 found it; the ownership validator now
+        // judges that read).
+        if kind == NodeKind.NK_CALL and self.never_call_node != node and self.expr_type(node) == self.sema.ty_never as i32:
+            let saved_never = self.never_call_node
+            self.never_call_node = node
+            let never_op = self.lower_expr(node)
+            self.never_call_node = saved_never
+            let _ = self.lower_unreachable()
+            return never_op
 
         if kind == NodeKind.NK_CALL:
             let callee = self.ast.get_data0(node)
