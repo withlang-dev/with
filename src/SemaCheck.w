@@ -745,9 +745,14 @@ impl Sema:
         let rhs_resolved = self.resolve_alias(rhs as TypeId)
         if lhs_resolved == rhs_resolved:
             return lhs_resolved as i32
-        let arithmetic = self.arithmetic_result_type(lhs as TypeId, rhs as TypeId)
-        if arithmetic != 0:
-            return arithmetic as i32
+        // Two numeric arms meet where an operator's operands meet (§4.2.6,
+        // implicit_numeric_join): the type one widens into losslessly, and
+        // none for i32 beside u32 or an integer beside a float.
+        // arithmetic_result_type took the left arm at equal width, so
+        // `if c: 0 else: n as u32` was i32 and the u32 arm changed sign
+        // silently, while the arms the other way round joined at u32.
+        if self.is_numeric_type(lhs) and self.is_numeric_type(rhs):
+            return self.implicit_numeric_join(lhs as TypeId, rhs as TypeId) as i32
         let lhs_kind = self.get_type_kind(lhs_resolved)
         let rhs_kind = self.get_type_kind(rhs_resolved)
         if lhs_kind == TypeKind.TY_GENERIC_INST and (rhs_kind == TypeKind.TY_STRUCT or rhs_kind == TypeKind.TY_ENUM) and self.get_generic_inst_base(lhs_resolved as i32) == self.get_type_d0(rhs_resolved):
@@ -836,6 +841,26 @@ impl Sema:
         var owned_candidate = 0
         var reference_candidate = 0
 
+        // §4.2.1, as at an operator (contextualize the literal to its peer):
+        // with no enclosing demand, an untyped literal arm — a bare unsuffixed
+        // literal or arithmetic of them — takes its type from the typed
+        // numeric arms, in either arm order, and anchors the join only when
+        // every arm is one. Checked in value context it was i32 and joined
+        // as an i32 arm: `if c: 0 else: n as u32` was i32 with the u32 arm
+        // changed sign silently, and `Sleep(ms)` then refused the i32.
+        var literal_arm_count = 0
+        var typed_numeric_arm = 0
+        if expected == 0:
+            for ai in 0..arm_count:
+                let arm_ty = resolved_arm_types[ai]
+                if arm_ty == 0 or arm_nodes[ai] <= 0 or self.is_numeric_type(arm_ty) == 0:
+                    continue
+                if self.expr_is_untyped_literal_arith(arm_nodes[ai]):
+                    literal_arm_count = literal_arm_count + 1
+                else if self.body_can_fall_through(arm_nodes[ai]) != 0:
+                    typed_numeric_arm = 1
+        let literal_arms_adapt = literal_arm_count > 0 and typed_numeric_arm != 0
+
         for ai in 0..arm_count:
             let arm_ty = resolved_arm_types[ai]
             if arm_ty == 0:
@@ -850,6 +875,8 @@ impl Sema:
             if reach_node > 0 and self.body_can_fall_through(reach_node) == 0:
                 continue
             reaching_count = reaching_count + 1
+            if literal_arms_adapt and self.expr_is_untyped_literal_arith(reach_node):
+                continue
             if self.get_type_kind(resolved) == TypeKind.TY_REF:
                 let prior_reference = reference_candidate
                 reference_candidate = self.merge_contextual_reference_join_types(reference_candidate, arm_ty)
@@ -877,6 +904,8 @@ impl Sema:
                         self.emit_error("cannot infer return type: " ++ join_name ++ " arms have types " ++ lhs_name ++ " and " ++ rhs_name ++ "; " ++ remedy, report_node)
                     else if report_node == self.display_join_node:
                         self.emit_display_join_mismatch(join_name, prior_candidate, arm_ty, arm_nodes[ai], report_node)
+                    else if self.is_numeric_type(prior_candidate) != 0 and self.is_numeric_type(arm_ty) != 0:
+                        self.emit_error(join_name ++ " arms have types `" ++ self.type_name(prior_candidate) ++ "` and `" ++ self.type_name(arm_ty) ++ "`; no implicit conversion joins them (§4.2.6), so spell one arm with `as`", report_node)
                     else:
                         self.emit_error(join_name ++ " expressions do not establish one compatible owned result type", report_node)
                     return 0
@@ -919,6 +948,17 @@ impl Sema:
         if final_type == 0:
             self.emit_error(join_name ++ " expressions do not establish one compatible result type", report_node)
             return 0
+
+        // The untyped literal arms take the typed arms' type, checked again
+        // under that demand so their recorded type and constant fold agree
+        // with the join (a literal that does not fit reports here).
+        if literal_arms_adapt and self.is_numeric_type(final_type) != 0:
+            for ai in 0..arm_count:
+                let arm_node = arm_nodes[ai]
+                if resolved_arm_types[ai] != 0 and arm_node > 0 and self.expr_is_untyped_literal_arith(arm_node):
+                    let retyped = self.check_expr_with_expected(arm_node, final_type as TypeId)
+                    if retyped != 0:
+                        resolved_arm_types[ai] = retyped as i32
 
         // Complete context-dependent variant shorthands only after the final
         // candidate is known. This preserves `Some(x) / None` ergonomics in
