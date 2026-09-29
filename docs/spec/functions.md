@@ -1072,6 +1072,26 @@ reference bindings to match the actual type. This is critical for
 ergonomic iteration, since `for` loops with implicit `.iter()`
 always yield references.
 
+**Trait-object downcast patterns.** In a match whose subject has type
+`&dyn T`, the pattern `name: C` tests whether the object has concrete type
+`C`. `C` must be visible and implement `T`. On a successful match, `name`
+has type `&C` and observes the same object; it preserves the subject's
+view origin and does not copy or take ownership of the object. This pattern
+is rejected for a subject whose type is not `&dyn T`.
+
+If `T` is `@[sealed]`, its closed set of implementors is the domain for
+exhaustiveness. An exhaustive match covers every implementor with an
+unguarded typed binding pattern or a wildcard. A non-sealed trait requires
+a wildcard arm to establish exhaustiveness because its implementor set is
+open. A guarded arm alone does not establish coverage. The ordinary rules
+above determine when a non-exhaustive match is an error or a warning.
+
+The binding remains an observing view when the trait-object place is
+mutable. Mutation uses the trait's `mut fn` methods under the ordinary
+receiver rules; the downcast pattern does not grant write access through
+`&C`. With has no `&mut T` spelling (§15.1). Owned by-value trait-object
+matching is not defined.
+
 ### 9.8 Pipeline DSL Patterns
 
 The `|>` operator plus extension blocks plus closures is sufficient

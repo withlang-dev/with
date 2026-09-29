@@ -105,6 +105,10 @@ let d: &dyn Drawable = &circle    // OK: all methods are object-safe
 let c: &dyn Consumable = &item    // ERROR: consume() takes self by value
 ```
 
+A parameter cannot take a bare `dyn Trait` by value. Use `&dyn Trait` to
+borrow an object or `Box[dyn Trait]` to transfer ownership. Typed downcast
+patterns over borrowed trait objects are defined in §9.7.
+
 **Consuming `self` behind `Box`:** To call a consuming method through
 a trait object, wrap it in `Box[dyn Trait]`. The compiler generates
 a shim that moves the value out of the box (which has a known
