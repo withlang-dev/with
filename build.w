@@ -222,6 +222,8 @@ fn add_cross_rt_targets(out0: Build, ctx: &BuildCtx, tag: &str, p: &str, group_n
     for pi in 0..plans.len() as i32:
         out = wo_bundle_targets(move out, ctx, plans[pi], release_compiler_bin("with"), "build")
         cross_embedded = target_with_wo_blobs(move cross_embedded, plans[pi])
+    out = add_empty_darwin_sysroot_blob_target(move out, p, dir)
+    cross_embedded = target_with_empty_darwin_sysroot_blob(move cross_embedded, p, dir)
     let cross_embedded_obj = embedded_objects_object(p ++ "embedded-objects-object", &cross_embedded, triple)
     out = out.add_target(cross_embedded)
     out = out.add_target(cross_embedded_obj)
@@ -283,6 +285,9 @@ fn add_stage1_runtime_targets(out0: Build, host_runtime: &HostRuntimeSpec, corpu
     metadata = metadata.dep("sdk-clang-main")
     metadata = metadata.input("out/command/sdk-clang-main/done")
     metadata = metadata.input("sdk.lock")
+    // #1915: the rsp names the darwin sysroot as -syslibroot.
+    metadata = metadata.dep("darwin-sysroot")
+    metadata = metadata.input(sdk_darwin_sysroot_pack())
     metadata = metadata.input(dir ++ "/llvm_bridge.o")
     metadata = metadata.input(dir ++ "/clang_bridge.o")
     metadata = metadata.extra_output(dir ++ "/llvm_link.rsp")
@@ -328,6 +333,7 @@ fn add_stage1_runtime_targets(out0: Build, host_runtime: &HostRuntimeSpec, corpu
         embedded = embedded.dep(build_owned_text(objects[oi]))
     for pi in 0..corpus_plans.len() as i32:
         embedded = target_with_wo_blobs(move embedded, corpus_plans[pi])
+    embedded = target_with_darwin_sysroot_blob(move embedded)
     let embedded_obj = embedded_objects_object("stage-embedded-objects-object", &embedded, "")
     out = out.add_target(embedded)
     out = out.add_target(embedded_obj)
@@ -375,6 +381,9 @@ fn run_cross_linux_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
         ld_rsp = ld_rsp ++ comp_rsp_path(sorted_llvm[i]) ++ "\n"
     ld_rsp = ld_rsp ++ "-Bstatic\n-lstdc++\n-lgcc\n-lgcc_eh\n-Bdynamic\n-lpthread\n-ldl\n-lm\n-lz\n-lzstd\n-lxml2\n"
     ld_rsp = ld_rsp ++ comp_wasm_backend_alias_lines(comp_sdk_has_wasm_backend(fs, lib_dir), "Linux", false)
+    // #1915: the cross SDK's lld drivers, as the host link takes its own.
+    let cross_lld = comp_sdk_lld_flavors(fs, lib_dir, "Linux")
+    ld_rsp = ld_rsp ++ comp_lld_archive_lines(&cross_lld, lib_dir) ++ comp_lld_alias_lines(&cross_lld, "Linux", false)
     if fs.write_text(output_path, ld_rsp) != 0:
         ctx.diagnostics().error("cross-llvm-link-metadata: could not write: " ++ output_path)
     0
@@ -435,6 +444,8 @@ fn run_cross_windows_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     for i in 0..sorted_llvm.len() as i32:
         ld_rsp = ld_rsp ++ comp_rsp_path(sorted_llvm[i]) ++ "\n"
     ld_rsp = ld_rsp ++ comp_wasm_backend_alias_lines(comp_sdk_has_wasm_backend(fs, lib_dir), "Windows", false)
+    // #1915: no `with ld` on Windows yet; its names are stand-ins.
+    ld_rsp = ld_rsp ++ comp_lld_alias_lines(&comp_sdk_lld_flavors(fs, lib_dir, "Windows"), "Windows", false)
     if fs.write_text(output_path, ld_rsp) != 0:
         ctx.diagnostics().error("cross-windows-llvm-link-metadata: could not write: " ++ output_path)
     0
@@ -492,6 +503,8 @@ fn run_cross_windows_aarch64_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     for i in 0..sorted_llvm.len() as i32:
         ld_rsp = ld_rsp ++ comp_rsp_path(sorted_llvm[i]) ++ "\n"
     ld_rsp = ld_rsp ++ comp_wasm_backend_alias_lines(comp_sdk_has_wasm_backend(fs, lib_dir), "Windows", false)
+    // #1915: no `with ld` on Windows yet; its names are stand-ins.
+    ld_rsp = ld_rsp ++ comp_lld_alias_lines(&comp_sdk_lld_flavors(fs, lib_dir, "Windows"), "Windows", false)
     if fs.write_text(output_path, ld_rsp) != 0:
         ctx.diagnostics().error("cross-windows-aarch64-llvm-link-metadata: could not write: " ++ output_path)
     0
@@ -529,6 +542,24 @@ fn embedded_platform_symbols() -> Vec[str]:
     out.push("rt_windows_x86_64_o")
     out.push("rt_windows_aarch64_o")
     out
+
+// #1915: the darwin sysroot (build/sdk.w run_darwin_sysroot_action) is a
+// blob of every compiler binary, as the runtime objects are:
+// src/compiler/EmbeddedSysroot.w declares with_embedded_darwin_sysroot_*, so
+// every embedding defines it. A host compiler embeds the pack, which is
+// empty off macOS; a cross compiler carries a zero-length blob.
+fn target_with_darwin_sysroot_blob(target: Target) -> Target:
+    var out = target.input(sdk_darwin_sysroot_pack())
+    out = out.arg("darwin_sysroot")
+    out.dep("darwin-sysroot")
+
+fn target_with_empty_darwin_sysroot_blob(target: Target, prefix: &str, dir: &str) -> Target:
+    var out = target.input(dir ++ "/empty_darwin_sysroot.bin")
+    out = out.arg("darwin_sysroot")
+    out.dep(prefix ++ "empty-darwin-sysroot")
+
+fn add_empty_darwin_sysroot_blob_target(out: Build, prefix: &str, dir: &str) -> Build:
+    out.add_target(empty_file_target(prefix ++ "empty-darwin-sysroot", dir ++ "/empty_darwin_sysroot.bin"))
 
 // "rt_linux_aarch64_o" -> "<dir>/empty_rt_linux_aarch64.bin"
 fn empty_platform_blob_path(dir: &str, sym: &str) -> str:
@@ -1035,6 +1066,10 @@ fn package_llvm_sdk_platform_target(name: &str, platform: &str, prefix: &str, bu
     target = target.input(build_owned_text(prefix))
     target = target.input(build_owned_text(build_cache))
     target = target.input("build/sdk.w")
+    // #1915: the darwin SDK carries the darwin sysroot (sysroot/).
+    if platform == "darwin-aarch64":
+        target = target.dep("darwin-sysroot")
+        target = target.input(sdk_darwin_sysroot_pack())
     target = target.extra_output("out/release/" ++ asset)
     target = target.extra_output("out/release/" ++ asset ++ ".sha256")
     target = target.extra_output("out/release/" ++ asset ++ ".manifest")
@@ -2408,8 +2443,31 @@ pub fn build(ctx: BuildCtx) -> Build:
     clang_resource = clang_resource.arg("wasm-backend=" ++ (if comp_sdk_has_wasm_backend(ctx.fs(), sdk_lib_dir): "yes" else: "no"))
     let sdk_driver = ctx.fs().host_exists(sdk_lib_dir ++ "/libclangMain.a") or ctx.fs().host_exists(sdk_lib_dir ++ "/clangMain.lib")
     clang_resource = clang_resource.arg("clang-driver=" ++ (if sdk_driver: "yes" else: "no"))
+    let sdk_lld_flavors = comp_sdk_lld_flavors(ctx.fs(), sdk_lib_dir, os())
+    var sdk_lld_text = ""
+    for li in 0..sdk_lld_flavors.len() as i32:
+        sdk_lld_text = sdk_lld_text ++ " " ++ sdk_lld_flavors[li]
+    clang_resource = clang_resource.arg("lld=" ++ sdk_lld_text)
     clang_resource.action = generate_embedded_clang_resource_action
     out = out.add_target(clang_resource)
+
+    // #1915: the darwin sysroot every macOS link and c_import reads, built
+    // from pinned sources (build/sdk.w). Off macOS the pack is empty and
+    // nothing is fetched.
+    var darwin_sysroot = target_new(.Action, "darwin-sysroot", "").output(sdk_darwin_sysroot_pack())
+    darwin_sysroot.action = run_darwin_sysroot_action
+    darwin_sysroot = darwin_sysroot.input("build/sdk.w")
+    if os() == "Macos":
+        out = out.add_target(sdk_source_target("darwin-sysroot-zig-source", sdk_zig_source_url(), sdk_zig_source_sha256(), sdk_zig_archive(), sdk_zig_source_root(), sdk_zig_source_dir(), sdk_zig_source_marker()))
+        darwin_sysroot = darwin_sysroot.dep("darwin-sysroot-zig-source")
+        darwin_sysroot = darwin_sysroot.input(sdk_zig_source_marker())
+        darwin_sysroot = darwin_sysroot.input("build/https_fetch.w")
+        darwin_sysroot = darwin_sysroot.allow_network()
+    darwin_sysroot = darwin_sysroot.write_scope(sdk_darwin_sysroot_dir())
+    darwin_sysroot = darwin_sysroot.write_scope(sdk_source_root())
+    darwin_sysroot = darwin_sysroot.write_scope("out/command/darwin-sysroot")
+    darwin_sysroot = darwin_sysroot.timeout(600000)
+    out = out.add_target(darwin_sysroot)
 
     var compiler_no_c_export = target_new(.Action, "compiler-no-c-export", "").output("out/.build-state/compiler-no-c-export.txt")
     compiler_no_c_export.action = run_check_compiler_no_new_c_export_action
@@ -2476,6 +2534,9 @@ pub fn build(ctx: BuildCtx) -> Build:
     bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.dep("sdk-clang-main")
     bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.input("out/command/sdk-clang-main/done")
     bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.input("sdk.lock")
+    // #1915: the rsp names the darwin sysroot as -syslibroot.
+    bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.dep("darwin-sysroot")
+    bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.input(sdk_darwin_sysroot_pack())
     bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.input("out/bootstrap-lib/llvm_bridge.o")
     bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.input("out/bootstrap-lib/clang_bridge.o")
     bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.extra_output("out/bootstrap-lib/llvm_link.rsp")
@@ -2551,6 +2612,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     for pi in 0..corpus_plans.len() as i32:
         out = add_empty_wo_blob_targets(move out, "bootstrap-", "out/bootstrap-lib", corpus_plans[pi].name)
         bootstrap_embedded_objects = target_with_empty_wo_blobs(move bootstrap_embedded_objects, "bootstrap-", "out/bootstrap-lib", corpus_plans[pi].name)
+    // stage1 links programs (the stage1 tests, `:dev`): it carries the sysroot.
+    bootstrap_embedded_objects = target_with_darwin_sysroot_blob(move bootstrap_embedded_objects)
     let bootstrap_embedded_objects_obj = embedded_objects_object("bootstrap-embedded-objects-object", &bootstrap_embedded_objects, "")
     out = out.add_target(bootstrap_embedded_objects)
     out = out.add_target(bootstrap_embedded_objects_obj)
@@ -2613,6 +2676,9 @@ pub fn build(ctx: BuildCtx) -> Build:
     llvm_link_metadata = llvm_link_metadata.dep("sdk-clang-main")
     llvm_link_metadata = llvm_link_metadata.input("out/command/sdk-clang-main/done")
     llvm_link_metadata = llvm_link_metadata.input("sdk.lock")
+    // #1915: the rsp names the darwin sysroot as -syslibroot.
+    llvm_link_metadata = llvm_link_metadata.dep("darwin-sysroot")
+    llvm_link_metadata = llvm_link_metadata.input(sdk_darwin_sysroot_pack())
     llvm_link_metadata = llvm_link_metadata.input("out/lib/llvm_bridge.o")
     llvm_link_metadata = llvm_link_metadata.input("out/lib/clang_bridge.o")
     llvm_link_metadata = llvm_link_metadata.extra_output("out/lib/llvm_link.rsp")
@@ -2903,6 +2969,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     // The release binary embeds the tree's bundles (D38).
     for pi in 0..corpus_plans.len() as i32:
         embedded_objects = target_with_wo_blobs(move embedded_objects, corpus_plans[pi])
+    embedded_objects = target_with_darwin_sysroot_blob(move embedded_objects)
     // Every consumed object's producer, declared (#680 edge audit).
     embedded_objects = embedded_objects.dep("cimport-stubs-object")
     embedded_objects = embedded_objects.dep("compat-runtime-object")
@@ -3017,6 +3084,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     for pi in 0..corpus_plans_windows_x86_64.len() as i32:
         out = wo_bundle_targets(move out, ctx, corpus_plans_windows_x86_64[pi], release_compiler_bin("with"), "build")
         cross_win_embedded = target_with_wo_blobs(move cross_win_embedded, corpus_plans_windows_x86_64[pi])
+    out = add_empty_darwin_sysroot_blob_target(move out, "cross-win-", cross_windows_dir())
+    cross_win_embedded = target_with_empty_darwin_sysroot_blob(move cross_win_embedded, "cross-win-", cross_windows_dir())
     let cross_win_embedded_obj = embedded_objects_object("cross-win-embedded-objects-object", &cross_win_embedded, cross_windows_triple())
     out = out.add_target(cross_win_embedded)
     out = out.add_target(cross_win_embedded_obj)
@@ -3094,6 +3163,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     for pi in 0..corpus_plans_windows_aarch64.len() as i32:
         out = wo_bundle_targets(move out, ctx, corpus_plans_windows_aarch64[pi], release_compiler_bin("with"), "build")
         cross_winarm_embedded = target_with_wo_blobs(move cross_winarm_embedded, corpus_plans_windows_aarch64[pi])
+    out = add_empty_darwin_sysroot_blob_target(move out, "cross-winarm-", cross_windows_aarch64_dir())
+    cross_winarm_embedded = target_with_empty_darwin_sysroot_blob(move cross_winarm_embedded, "cross-winarm-", cross_windows_aarch64_dir())
     let cross_winarm_embedded_obj = embedded_objects_object("cross-winarm-embedded-objects-object", &cross_winarm_embedded, cross_windows_aarch64_triple())
     out = out.add_target(cross_winarm_embedded)
     out = out.add_target(cross_winarm_embedded_obj)

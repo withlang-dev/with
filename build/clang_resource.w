@@ -12,6 +12,7 @@ module build.clang_resource
 use std.build
 use build.compiler
 use std.sysinfo.arch
+use std.sysinfo.os
 fn clang_resource_owned_text(s: &str): s ++ ""
 
 fn cr_fail(ctx: &ActionCtx, message: &str) -> i32:
@@ -236,6 +237,14 @@ fn cr_generate(ctx: &ActionCtx, include_dir: &str, files: &Vec[str], version: &s
     // wasm build from this fact before codegen starts.
     let wasm_backend_linked = comp_sdk_has_wasm_backend(ctx.fs(), lib_dir)
     out = out ++ "pub fn embedded_llvm_wasm_backend_linked() -> bool:\n    return " ++ (if wasm_backend_linked: "true" else: "false") ++ "\n\n"
+    // #1915: the lld flavors this compiler links (`with __ld`); the rest are
+    // aliased to a stand-in (build/compiler.w comp_lld_alias_lines). The
+    // same SDK, by the same test, as the compiler link.
+    let lld_flavors = comp_sdk_lld_flavors(ctx.fs(), lib_dir, os())
+    var lld_text = ""
+    for i in 0..lld_flavors.len() as i32:
+        lld_text = lld_text ++ (if i > 0: " " else: "") ++ lld_flavors[i]
+    out = out ++ "pub fn embedded_lld_flavors() -> str:\n    return " ++ cr_raw_string_literal(lld_text) ++ ".clone()\n\n"
     out = out ++ "pub fn embedded_clang_resource_data(name: &str) -> str:\n"
     for i in 0..files.len() as i32:
         let rel = cr_relpath(files[i], include_dir)

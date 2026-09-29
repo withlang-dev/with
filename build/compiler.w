@@ -2564,6 +2564,105 @@ pub fn comp_wasm_backend_alias_lines(has_wasm_backend: bool, target_os: &str, dr
             out = out ++ (if driver_form: "-Wl,--defsym=" else: "--defsym=") ++ name ++ "=" ++ stand_in ++ "\n"
     out
 
+// #1915: the darwin sysroot tree (build/sdk.w run_darwin_sysroot_action),
+// project-relative and as the absolute path a linker is given.
+pub fn comp_darwin_sysroot_dir() -> str: "out/gen/darwin-sysroot"
+pub fn comp_darwin_sysroot_abs(root: &str) -> str: comp_join(root, comp_darwin_sysroot_dir())
+
+// #1915: `with __ld` (src/compiler/LldDriver.w) is lld's drivers linked into
+// the compiler, so no link reads a linker from the host. The flavors whose
+// driver archive this SDK has; the compiler link pulls those archives in and
+// aliases each driver's entry point, `bool lld::<ns>::link(ArrayRef<const
+// char *>, raw_ostream &, raw_ostream &, bool, bool)`, to a plain name.
+// Windows is empty until its MSVC spellings are wired (the Itanium ones are
+// what this build can check against an SDK here).
+pub fn comp_sdk_lld_flavors(fs: &ToolFs, llvm_lib_dir: &str, target_os: &str) -> Vec[str]:
+    let out: Vec[str] = Vec.new()
+    if target_os == "Windows" or not fs.host_exists(llvm_lib_dir ++ "/liblldCommon.a"):
+        return out
+    let flavors = comp_lld_all_flavors()
+    for i in 0..flavors.len() as i32:
+        // lld-link's manifest merging (libLLVMWindowsManifest) calls libxml2,
+        // which the darwin sysroot does not stub: a macOS compiler links
+        // Mach-O, ELF and WebAssembly, and a Windows link from macOS runs the
+        // SDK's lld-link as before.
+        let coff_like = flavors[i] == "coff" or flavors[i] == "mingw"
+        if target_os == "Macos" and coff_like:
+            continue
+        if fs.host_exists(llvm_lib_dir ++ "/" ++ comp_lld_flavor_archive(flavors[i])):
+            out.push(compiler_owned_text(flavors[i]))
+    out
+
+// Pushed one by one: the build layer runs on the pinned seed (#1122).
+fn comp_lld_all_flavors() -> Vec[str]:
+    let out: Vec[str] = Vec.new()
+    out.push("macho")
+    out.push("elf")
+    out.push("coff")
+    out.push("mingw")
+    out.push("wasm")
+    out
+
+fn comp_lld_flavor_archive(flavor: &str) -> str:
+    if flavor == "macho": return "liblldMachO.a"
+    if flavor == "elf": return "liblldELF.a"
+    if flavor == "coff": return "liblldCOFF.a"
+    if flavor == "mingw": return "liblldMinGW.a"
+    "liblldWasm.a"
+
+// lld::<flavor>::link, Itanium-mangled (no Mach-O leading underscore).
+fn comp_lld_link_itanium(flavor: &str) -> str:
+    let ns = if flavor == "macho": "5macho" else if flavor == "elf": "3elf" else if flavor == "coff": "4coff" else if flavor == "mingw": "5mingw" else: "4wasm"
+    "_ZN3lld" ++ ns ++ "4linkEN4llvm8ArrayRefIPKcEERNS1_11raw_ostreamES7_bb"
+
+fn comp_contains(items: &Vec[str], item: &str) -> bool:
+    for i in 0..items.len() as i32:
+        if items[i] == item:
+            return true
+    false
+
+// The archives the lld flavors need, for the compiler link's response file.
+pub fn comp_lld_archive_lines(flavors: &Vec[str], llvm_lib_dir: &str) -> str:
+    if flavors.len() == 0:
+        return ""
+    var out = comp_rsp_path(llvm_lib_dir ++ "/liblldCommon.a") ++ "\n"
+    for i in 0..flavors.len() as i32:
+        out = out ++ comp_rsp_path(llvm_lib_dir ++ "/" ++ comp_lld_flavor_archive(flavors[i])) ++ "\n"
+    out
+
+// One alias line per plain name LldDriver.w calls: with_lld_<flavor>_link,
+// with_llvm_outs and with_llvm_errs. A flavor the SDK lacks is aliased to a
+// runtime symbol the link already has, as with_clang_main is, and the
+// generated embedded_lld_flavors() fact (build/clang_resource.w) tells the
+// driver not to call it. `driver_form` spells the lines for a C driver.
+pub fn comp_lld_alias_lines(flavors: &Vec[str], target_os: &str, driver_form: bool) -> str:
+    let stand_in = "with_alloc"
+    let plain: Vec[str] = Vec.new()
+    let real: Vec[str] = Vec.new()
+    let all = comp_lld_all_flavors()
+    for i in 0..all.len() as i32:
+        plain.push("with_lld_" ++ all[i] ++ "_link")
+        real.push(if comp_contains(flavors, all[i]): comp_lld_link_itanium(all[i]) else: compiler_owned_text(stand_in))
+    plain.push("with_llvm_outs")
+    real.push(if flavors.len() > 0: "_ZN4llvm4outsEv" else: compiler_owned_text(stand_in))
+    plain.push("with_llvm_errs")
+    real.push(if flavors.len() > 0: "_ZN4llvm4errsEv" else: compiler_owned_text(stand_in))
+    var out = ""
+    for i in 0..plain.len() as i32:
+        let name = plain[i]
+        let target = real[i]
+        if target_os == "Macos":
+            if target != stand_in:
+                out = out ++ (if driver_form: "-Wl,-u,_" ++ target ++ "\n" else: "-u\n_" ++ target ++ "\n")
+            out = out ++ (if driver_form: "-Wl,-alias,_" ++ target ++ ",_" ++ name ++ "\n" else: "-alias\n_" ++ target ++ "\n_" ++ name ++ "\n")
+        else if target_os == "Windows":
+            out = out ++ (if driver_form: "-Wl,/alternatename:" else: "/alternatename:") ++ name ++ "=" ++ target ++ "\n"
+        else:
+            if target != stand_in:
+                out = out ++ (if driver_form: "-Wl,-u," ++ target ++ "\n" else: "-u\n" ++ target ++ "\n")
+            out = out ++ (if driver_form: "-Wl,--defsym=" else: "--defsym=") ++ name ++ "=" ++ target ++ "\n"
+    out
+
 fn comp_is_sha256_hex(text: &str) -> bool:
     if text.len() != 64:
         return false
@@ -2699,16 +2798,20 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     // LlvmBridge.w tells the two apart by address and refuses a wasm build.
     rsp = rsp ++ comp_wasm_backend_alias_lines(comp_sdk_has_wasm_backend(fs, llvm_lib_dir), os(), true)
     ld_rsp = ld_rsp ++ comp_wasm_backend_alias_lines(comp_sdk_has_wasm_backend(fs, llvm_lib_dir), os(), false)
+    let lld_flavors = comp_sdk_lld_flavors(fs, llvm_lib_dir, os())
+    rsp = rsp ++ comp_lld_archive_lines(&lld_flavors, llvm_lib_dir) ++ comp_lld_alias_lines(&lld_flavors, os(), true)
+    ld_rsp = ld_rsp ++ comp_lld_archive_lines(&lld_flavors, llvm_lib_dir) ++ comp_lld_alias_lines(&lld_flavors, os(), false)
     if os() == "Macos":
-        let sdk_path = comp_host_sdk_path(ctx)
-        let sdk_rc = comp_require_linkable_host_sdk(ctx, llvm_ld, sdk_path)
-        if sdk_rc != 0:
-            return sdk_rc
-        rsp = rsp ++ "-isysroot\n" ++ sdk_path ++ "\n"
-        ld_rsp = ld_rsp ++ "-syslibroot\n" ++ sdk_path ++ "\n"
-        rsp = rsp ++ "-lm\n"
+        // #1915: the compiler links against our darwin sysroot (build/sdk.w
+        // run_darwin_sysroot_action), never an Apple SDK: libSystem and
+        // libc++ are the OS's dylibs, named by our stubs. libm is libSystem.
+        let sysroot = comp_darwin_sysroot_abs(root)
+        if not fs.exists(comp_darwin_sysroot_dir() ++ "/usr/lib/libSystem.tbd") or not fs.exists(comp_darwin_sysroot_dir() ++ "/usr/lib/libc++.tbd"):
+            return comp_fail(ctx, "the darwin sysroot is missing its link stubs: " ++ comp_darwin_sysroot_dir() ++ "/usr/lib/{libSystem,libc++}.tbd (run `with build :darwin-sysroot`)")
+        rsp = rsp ++ "-isysroot\n" ++ comp_rsp_path(sysroot) ++ "\n"
+        rsp = rsp ++ "-fuse-ld=lld\n"
+        ld_rsp = ld_rsp ++ "-syslibroot\n" ++ comp_rsp_path(sysroot) ++ "\n"
         rsp = rsp ++ "-lc++\n"
-        ld_rsp = ld_rsp ++ "-lm\n"
         ld_rsp = ld_rsp ++ "-lc++\n"
     else if os() == "Linux":
         rsp = rsp ++ "-lpthread\n"

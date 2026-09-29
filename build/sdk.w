@@ -536,6 +536,11 @@ fn sdk_package_entries(ctx: &ActionCtx, prefix: &str, sdk_base: &str, platform: 
             if fs.exists(sdk_join(prefix, "bin/" ++ alias)):
                 dirs = sdk_add_parent_dirs(move dirs, sdk_base, "bin/" ++ alias)
     dirs = sdk_sort_strings(dirs)
+    // #1915: the darwin SDK carries the darwin sysroot, as its sysroot/.
+    let sysroot_files = if platform == "darwin-aarch64": sdk_merge_sort_strings(fs.list_files(sdk_darwin_sysroot_dir())) else: Vec.new()
+    for i in 0..sysroot_files.len() as i32:
+        dirs = sdk_add_parent_dirs(move dirs, sdk_base, "sysroot/" ++ sdk_rel_path(sdk_darwin_sysroot_dir(), sysroot_files[i]))
+    dirs = sdk_sort_strings(dirs)
     let entries: Vec[ArchiveEntry] = Vec.new()
     for i in 0..dirs.len() as i32:
         entries.push(archive_dir_entry(sdk_owned_text(dirs[i]), 0o755))
@@ -543,6 +548,9 @@ fn sdk_package_entries(ctx: &ActionCtx, prefix: &str, sdk_base: &str, platform: 
         let path = files[i]
         let rel = sdk_rel_path(prefix, path)
         entries.push(archive_file_entry(sdk_owned_text(path), sdk_base ++ "/" ++ rel, sdk_file_mode(rel)))
+    for i in 0..sysroot_files.len() as i32:
+        let rel = "sysroot/" ++ sdk_rel_path(sdk_darwin_sysroot_dir(), sysroot_files[i])
+        entries.push(archive_file_entry(sdk_owned_text(sysroot_files[i]), sdk_base ++ "/" ++ rel, 0o644))
     if not sdk_platform_is_windows(platform):
         let aliases: Vec[str] = Vec.new()
         aliases.push("ld.lld")
@@ -603,6 +611,9 @@ pub fn run_package_llvm_sdk_action(ctx: ActionCtx) -> i32:
         return sdk_fail(ctx, "SDK archive selection omitted required libraries or linkers")
     if not selected.contains(sdk_base ++ "/" ++ sdk_cmake_data_prefix() ++ "Modules/CMake.cmake\n"):
         return sdk_fail(ctx, "SDK archive selection omitted CMake runtime modules")
+    if platform == "darwin-aarch64":
+        if not selected.contains(sdk_base ++ "/sysroot/usr/lib/libSystem.tbd\n") or not selected.contains(sdk_base ++ "/sysroot/usr/lib/libc++.tbd\n") or not selected.contains(sdk_base ++ "/sysroot/usr/include/stdio.h\n"):
+            return sdk_fail(ctx, "the darwin SDK archive omitted its sysroot (#1915): run `with build :darwin-sysroot`")
     // The archive is the next build's bootstrap; a package that cannot
     // bootstrap is not an SDK, whatever else it contains.
     let bootstrap = sdk_bootstrap_set(platform)
@@ -1314,3 +1325,224 @@ fn sdk_ensure_clang_main(ctx: &ActionCtx) -> i32:
         rc = sdk_run_capture(ctx, "clang-main-" ++ names[i], argv, 600000)
         if rc != 0: return rc
     sdk_archive_clang_main(ctx, root, sdk_abs(root, scratch), prefix)
+
+// ── The darwin sysroot (#1915) ─────────────────────────────────────────
+//
+// Linking a With program on macOS reads nothing but what ships in our SDK
+// and the `with` binary: no Xcode, no Command Line Tools, no Apple SDK
+// (Eric, 2026-09-29: "zero dependencies in all platforms ... except our own
+// SDK and system calls"). What a link against libSystem needs, and what
+// c_import of libc needs, is this sysroot:
+//
+//   usr/lib/libSystem.tbd    the text stub of /usr/lib/libSystem.B.dylib
+//   usr/lib/lib{c,m,pthread,dl}.tbd   the same stub, as the Apple SDK aliases it
+//   usr/lib/libc++.tbd       /usr/lib/libc++.1.dylib, for the compiler's own
+//                            link (the LLVM archives are C++)
+//   usr/include/**           the macOS libc headers
+//   SDKSettings.json         the SDK version clang's driver reads
+//   PROVENANCE               where every byte came from, and its license
+//
+// Sources, both pinned by sha256 and fetched at build time (nothing C is
+// committed to this repository):
+//   - Zig 0.16.0's source archive (MIT, Copyright (c) Zig contributors):
+//     lib/libc/darwin/libSystem.tbd and SDKSettings.json (the stub Zig
+//     generates from the macOS 26.4 SDK), lib/libc/include/any-darwin-any
+//     (Apple's Libc/xnu/libpthread/libmalloc... headers, APSL-2.0 and BSD
+//     licensed per file, as Zig redistributes them). Zig's own releases
+//     ship exactly this tree to link for macOS from any host.
+//   - LLVM's libc++ ABI list for arm64-apple-darwin at the SDK's LLVM tag
+//     (Apache-2.0 WITH LLVM-exception): every symbol libc++.1.dylib exports,
+//     including the libc++abi symbols it re-exports. libc++.tbd is generated
+//     from it here; the dylib itself is part of every macOS since 10.7.
+// Framework stubs are not here: an application that links Cocoa or Metal
+// gets them from its dependencies (`with get`), never from this sysroot.
+const SDK_ZIG_VERSION: str = "0.16.0"
+const SDK_ZIG_TAR_GZ_SHA256: str = "966f170284ac8a1757dd55a092275b2d2a032ef40878f70d84f6a45a3f85f3ae"
+const SDK_LIBCXX_ABILIST_NAME: str = "arm64-apple-darwin.libcxxabi.v1.stable.exceptions.nonew.abilist"
+const SDK_LIBCXX_ABILIST_SHA256: str = "15f185e6248890bfd4ddce53740b9437cbe5307b1916755d84e4dd96122c3638"
+
+// A merge sort: the sysroot sorts thousands of names (libc++'s symbols), and
+// sdk_sort_strings rebuilds its whole list for every insertion.
+fn sdk_merge_sort_strings(items: Vec[str]) -> Vec[str]:
+    if items.len() <= 1:
+        return items
+    let mid = items.len() as i32 / 2
+    let left: Vec[str] = Vec.new()
+    let right: Vec[str] = Vec.new()
+    for i in 0..items.len() as i32:
+        if i < mid: left.push(sdk_owned_text(items[i])) else: right.push(sdk_owned_text(items[i]))
+    let a = sdk_merge_sort_strings(left)
+    let b = sdk_merge_sort_strings(right)
+    let out: Vec[str] = Vec.new()
+    var i = 0
+    var j = 0
+    while i < a.len() as i32 or j < b.len() as i32:
+        if j >= b.len() as i32 or (i < a.len() as i32 and sdk_str_compare(a[i], b[j]) <= 0):
+            out.push(sdk_owned_text(a[i]))
+            i = i + 1
+        else:
+            out.push(sdk_owned_text(b[j]))
+            j = j + 1
+    out
+
+pub fn sdk_zig_source_url() -> str: "https://codeberg.org/ziglang/zig/archive/" ++ SDK_ZIG_VERSION ++ ".tar.gz"
+pub fn sdk_zig_source_sha256() -> str: SDK_ZIG_TAR_GZ_SHA256
+pub fn sdk_zig_archive() -> str: sdk_source_root() ++ "/zig-" ++ SDK_ZIG_VERSION ++ ".tar.gz"
+pub fn sdk_zig_source_root() -> str: sdk_source_root() ++ "/zig-" ++ SDK_ZIG_VERSION
+// The archive's top directory is `zig/`.
+pub fn sdk_zig_source_dir() -> str: sdk_zig_source_root() ++ "/zig"
+pub fn sdk_zig_source_marker() -> str: sdk_zig_source_dir() ++ "/.with-source-ready"
+
+fn sdk_libcxx_abilist_url() -> str:
+    "https://raw.githubusercontent.com/llvm/llvm-project/llvmorg-" ++ compiler_llvm_version() ++ "/libcxx/lib/abi/" ++ SDK_LIBCXX_ABILIST_NAME
+
+fn sdk_libcxx_abilist_path() -> str:
+    sdk_source_root() ++ "/libcxx-" ++ compiler_llvm_version() ++ "-" ++ SDK_LIBCXX_ABILIST_NAME
+
+// The tree the compiler's own link reads as -syslibroot, and the packed
+// form the compiler embeds (src/compiler/EmbeddedSysroot.w reads it).
+pub fn sdk_darwin_sysroot_dir() -> str: comp_darwin_sysroot_dir()
+pub fn sdk_darwin_sysroot_pack() -> str: "out/gen/darwin-sysroot.pack"
+
+// The symbols libc++.1.dylib defines, from an LLVM ABI list: one Python dict
+// per line, `{'is_defined': True, 'name': '__Znwm', 'type': 'I'}`. 'FUNC' and
+// 'OBJECT' are the dylib's own, 'I' the libc++abi symbols it re-exports, and
+// an undefined entry ('U') is an import, not an export.
+pub fn sdk_libcxx_tbd_from_abilist(abilist: &str) -> str:
+    var symbols: Vec[str] = Vec.new()
+    let key = "'name': '"
+    for line in abilist.split("\n"):
+        if line.find("'is_defined': True") < 0:
+            continue
+        let at = line.find(key)
+        if at < 0:
+            continue
+        let rest = line.slice(at + key.len(), line.len())
+        let end = rest.find("'")
+        if end <= 0:
+            continue
+        symbols.push(rest.slice(0, end))
+    if symbols.len() == 0:
+        return ""
+    let sorted = sdk_merge_sort_strings(symbols)
+    var out = StringBuilder.with_capacity(abilist.len())
+    out.push_str("--- !tapi-tbd\n")
+    out.push_str("tbd-version:     4\n")
+    out.push_str("targets:         [ arm64-macos, arm64e-macos ]\n")
+    out.push_str("install-name:    '/usr/lib/libc++.1.dylib'\n")
+    out.push_str("current-version: 1.0\n")
+    out.push_str("exports:\n")
+    out.push_str("  - targets:         [ arm64-macos, arm64e-macos ]\n")
+    out.push_str("    symbols:         [ ")
+    for i in 0..sorted.len() as i32:
+        if i > 0:
+            out.push_str(",\n                       ")
+        out.push_str("'")
+        out.push_str(sorted[i])
+        out.push_str("'")
+    out.push_str(" ]\n...\n")
+    out.to_str()
+
+fn sdk_darwin_sysroot_provenance() -> str:
+    var out = "The With darwin sysroot (#1915): what linking a With program and c_import\n"
+    out = out ++ "of libc read on macOS. Generated by `with build :darwin-sysroot`.\n\n"
+    out = out ++ "usr/lib/libSystem.tbd, usr/include/**, and the SDK version in SDKSettings.json:\n"
+    out = out ++ "  Zig " ++ SDK_ZIG_VERSION ++ " source archive " ++ sdk_zig_source_url() ++ "\n"
+    out = out ++ "  sha256 " ++ SDK_ZIG_TAR_GZ_SHA256 ++ "\n"
+    out = out ++ "  lib/libc/darwin/{libSystem.tbd,SDKSettings.json}, lib/libc/include/any-darwin-any\n"
+    out = out ++ "  Zig: MIT (Copyright (c) Zig contributors). The headers are Apple's open\n"
+    out = out ++ "  source Libc/xnu/libpthread/libmalloc headers, APSL-2.0 or BSD licensed as\n"
+    out = out ++ "  each file states.\n\n"
+    out = out ++ "usr/lib/lib{c,m,pthread,dl}.tbd: copies of libSystem.tbd (the Apple SDK's aliases).\n\n"
+    out = out ++ "usr/lib/libc++.tbd: generated from LLVM " ++ compiler_llvm_version() ++ "'s libc++ ABI list\n"
+    out = out ++ "  " ++ sdk_libcxx_abilist_url() ++ "\n"
+    out = out ++ "  sha256 " ++ SDK_LIBCXX_ABILIST_SHA256 ++ "\n"
+    out = out ++ "  LLVM: Apache-2.0 WITH LLVM-exception.\n"
+    out
+
+fn sdk_sysroot_path_ok(rel: &str) -> bool:
+    if rel.len() == 0 or rel.starts_with("/") or rel.find("..") >= 0:
+        return false
+    rel.find(" ") < 0 and rel.find("\n") < 0
+
+pub fn run_darwin_sysroot_action(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    let pack_path = ctx.output()
+    if pack_path.len() == 0:
+        return sdk_fail(ctx, "requires an output path")
+    // Only a macOS compiler embeds the darwin sysroot; every other host's
+    // compiler carries a zero-length blob (and fetches nothing).
+    if os() != "Macos":
+        return sdk_write_text(ctx, pack_path, "")
+    let scratch = sdk_join("out/command", ctx.target_name())
+    if fs.mkdir_all(scratch) != 0:
+        return sdk_fail(ctx, "could not create " ++ scratch)
+    let abilist_path = sdk_libcxx_abilist_path()
+    if not fs.exists(abilist_path) or fs.sha256_file(abilist_path) != SDK_LIBCXX_ABILIST_SHA256:
+        let _stale = fs.remove_file(abilist_path)
+        let rc = sdk_fetch(ctx, scratch, "libcxx-abilist", sdk_libcxx_abilist_url(), abilist_path, 300000)
+        if rc != 0:
+            return rc
+    let abilist_sha = fs.sha256_file(abilist_path)
+    if abilist_sha != SDK_LIBCXX_ABILIST_SHA256:
+        return sdk_fail(ctx, sdk_libcxx_abilist_url() ++ " has sha256 " ++ abilist_sha ++ ", expected " ++ SDK_LIBCXX_ABILIST_SHA256)
+    let libcxx_tbd = sdk_libcxx_tbd_from_abilist(fs.read_text(abilist_path))
+    if libcxx_tbd.len() == 0:
+        return sdk_fail(ctx, "no defined symbols in " ++ abilist_path)
+    let zig_libc = sdk_join(sdk_zig_source_dir(), "lib/libc")
+    let libsystem = fs.read_text(sdk_join(zig_libc, "darwin/libSystem.tbd"))
+    let settings = fs.read_text(sdk_join(zig_libc, "darwin/SDKSettings.json"))
+    if libsystem.len() == 0 or settings.len() == 0:
+        return sdk_fail(ctx, "the Zig " ++ SDK_ZIG_VERSION ++ " source at " ++ sdk_zig_source_dir() ++ " has no lib/libc/darwin/{libSystem.tbd,SDKSettings.json}")
+    let include_root = sdk_join(zig_libc, "include/any-darwin-any")
+    let headers = sdk_merge_sort_strings(fs.list_files(include_root))
+    if headers.len() == 0:
+        return sdk_fail(ctx, "no macOS libc headers under " ++ include_root)
+    // The tree is rebuilt whole: a header dropped by a newer pin must not
+    // linger in it.
+    let tree = sdk_darwin_sysroot_dir()
+    let _old = fs.remove_tree(tree)
+    let rel_paths: Vec[str] = Vec.new()
+    let contents: Vec[str] = Vec.new()
+    rel_paths.push("PROVENANCE")
+    contents.push(sdk_darwin_sysroot_provenance())
+    // clang's driver reads the SDK version from SDKSettings.json and needs
+    // Version and MaximumDeploymentTarget; Zig's names the version only.
+    let version_key = "\"MinimalDisplayName\":\""
+    let version_at = settings.find(version_key)
+    if version_at < 0:
+        return sdk_fail(ctx, "no MinimalDisplayName in Zig's darwin SDKSettings.json: " ++ settings)
+    let version_rest = settings.slice(version_at + version_key.len(), settings.len())
+    let sdk_version = version_rest.slice(0, version_rest.find("\""))
+    rel_paths.push("SDKSettings.json")
+    contents.push("{\"CanonicalName\":\"macosx" ++ sdk_version ++ "\",\"Version\":\"" ++ sdk_version ++ "\",\"MaximumDeploymentTarget\":\"" ++ sdk_version ++ ".99\"}\n")
+    rel_paths.push("usr/lib/libSystem.tbd")
+    contents.push(libsystem.clone())
+    rel_paths.push("usr/lib/libc++.tbd")
+    contents.push(libcxx_tbd)
+    for i in 0..headers.len() as i32:
+        let rel = sdk_rel_path(include_root, sdk_normalize(headers[i]))
+        if not sdk_sysroot_path_ok(rel):
+            return sdk_fail(ctx, "a header path the sysroot pack cannot carry: " ++ headers[i])
+        rel_paths.push("usr/include/" ++ rel)
+        contents.push(fs.read_text(headers[i]))
+    let aliases: Vec[str] = Vec.new()
+    aliases.push("usr/lib/libc.tbd")
+    aliases.push("usr/lib/libm.tbd")
+    aliases.push("usr/lib/libpthread.tbd")
+    aliases.push("usr/lib/libdl.tbd")
+    // "F <path> <size>\n<bytes>" per file, "A <path> <target>\n" per alias.
+    var pack = StringBuilder.with_capacity(12000000)
+    pack.push_str("WITH-SYSROOT 1\n")
+    for i in 0..rel_paths.len() as i32:
+        let rc = sdk_write_text(ctx, sdk_join(tree, rel_paths[i]), contents[i])
+        if rc != 0:
+            return rc
+        pack.push_str("F " ++ rel_paths[i] ++ " " ++ f"{contents[i].len()}" ++ "\n")
+        pack.push_str(contents[i])
+    for i in 0..aliases.len() as i32:
+        let rc = sdk_write_text(ctx, sdk_join(tree, aliases[i]), libsystem)
+        if rc != 0:
+            return rc
+        pack.push_str("A " ++ aliases[i] ++ " usr/lib/libSystem.tbd\n")
+    sdk_write_text(ctx, pack_path, pack.to_str())
