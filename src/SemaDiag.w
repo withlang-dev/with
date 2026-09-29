@@ -1414,6 +1414,7 @@ impl Sema:
             return "str"
         if tk == TypeKind.TY_VA_LIST: return "c_va_list"
         if tk == TypeKind.TY_VECTOR or tk == TypeKind.TY_MASK: return self.vector_type_name(resolved as i32)
+        if tk == TypeKind.TY_CONST_INT: return f"{self.get_type_d0(resolved)}"
         if tk == TypeKind.TY_STRUCT:
             return self.safe_symbol_text(self.get_type_d0(resolved))
         if tk == TypeKind.TY_ENUM:

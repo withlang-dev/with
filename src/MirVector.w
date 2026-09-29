@@ -147,6 +147,24 @@ impl MirBuilder:
             return self.unit_operand()
         self.lower_vector_intrinsic(kind, args, ty, node)
 
+    // The place of a single component (`v.x` is lane 0 of the place `v`
+    // names, through any views), or -1 for a multi-lane swizzle.
+    mut fn lower_vector_component_place(node: i32) -> i32:
+        let lanes_text = if self.sema.vector_swizzles.contains(node): self.sema.vector_swizzles.get(node).unwrap().clone() else: ""
+        if lanes_text.len() != 1:
+            return -1
+        let base_expr = self.ast.get_data0(node)
+        var base = self.lower_expr_place(base_expr)
+        var base_ty = self.expr_type(base_expr)
+        let physical_ty = self.place_local_type(base)
+        if physical_ty != 0 and physical_ty != self.sema.ty_void as i32:
+            base_ty = physical_ty
+        while base_ty > 0 and self.sema.get_type_kind(self.sema.resolve_alias(base_ty as TypeId)) == TypeKind.TY_REF:
+            base = self.new_deref_place(base)
+            base_ty = self.sema.get_type_d0(self.sema.resolve_alias(base_ty as TypeId))
+        let lane = (lanes_text[0] - '0') as i32
+        self.vector_lane_place(base, lane, self.sema.vector_lane_type(base_ty), self.ast.get_start(node))
+
     // `v.x` reads lane 0; `v.wzyx` builds the vector of the named lanes.
     mut fn lower_vector_swizzle(node: i32, ty: i32, span: i32) -> i32:
         let lanes_text = self.sema.vector_swizzles.get(node).unwrap().clone()

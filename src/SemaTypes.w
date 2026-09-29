@@ -34,6 +34,11 @@ pub enum TypeKind: i32:
     // §4.3d: `Mask[N, W]`, N lanes of a W-bit boolean (all ones or zero):
     // d0 = W (8, 16, 32 or 64), d1 = N. What a lane-wise comparison yields.
     TY_MASK = 23
+    // §4.3d: a compile-time integer bound to a generic parameter — the lane
+    // count `N` of `fn dot[N](a: Vector[N, f32])`, inferred from the
+    // arguments (d0 = the value). Only ever a generic substitution, never
+    // the type of a value.
+    TY_CONST_INT = 24
 
 pub type TypeId = i32
 

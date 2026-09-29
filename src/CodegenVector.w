@@ -45,6 +45,23 @@ impl Codegen:
             vals.push(elem)
         wl_const_vector(vec_data_i64(&vals), n)
 
+    // The signed minimum and maximum and the unsigned maximum of a `bits`-bit
+    // integer as constants of the integer type `ty` (bits <= width(ty)), at
+    // any width — Overflow's i64 helpers stop at 64 bits, and a vector lane
+    // may be 128 (or 256 inside the saturating multiply).
+    fn cg_int_top_bit(ty: i64, bits: i32) -> i64:
+        wl_build_shl(self.builder, wl_const_int(ty, 1, 0), wl_const_int(ty, (bits - 1) as i64, 0))
+
+    fn cg_int_signed_min(ty: i64, bits: i32) -> i64:
+        wl_build_sub(self.builder, wl_const_int(ty, 0, 0), self.cg_int_top_bit(ty, bits))
+
+    fn cg_int_signed_max(ty: i64, bits: i32) -> i64:
+        wl_build_sub(self.builder, self.cg_int_top_bit(ty, bits), wl_const_int(ty, 1, 0))
+
+    fn cg_int_unsigned_max(ty: i64, bits: i32) -> i64:
+        if bits >= wl_get_int_type_width(ty): return wl_const_int(ty, -1, 1)
+        wl_build_sub(self.builder, wl_build_shl(self.builder, wl_const_int(ty, 1, 0), wl_const_int(ty, bits as i64, 0)), wl_const_int(ty, 1, 0))
+
     // `value` in every lane of `vec_ty`.
     fn cg_splat_value(value: i64, vec_ty: i64) -> i64:
         let n = wl_get_vector_size(vec_ty)
@@ -173,7 +190,7 @@ impl Codegen:
             self.cg_panic_if_any_lane(wl_build_icmp(self.builder, wl_int_eq(), r, wl_const_null(vec_ty)), "division by zero")
             if unsigned:
                 return if op == BinaryOp.OP_DIV: wl_build_udiv(self.builder, l, r) else: wl_build_urem(self.builder, l, r)
-            let min_v = self.cg_splat_const(wl_const_int(elem_ty, int_signed_min(width), 1), n)
+            let min_v = self.cg_splat_const(self.cg_int_signed_min(elem_ty, width), n)
             let neg_one = self.cg_splat_const(wl_const_int(elem_ty, -1, 1), n)
             let ov = wl_build_and(self.builder, wl_build_icmp(self.builder, wl_int_eq(), l, min_v), wl_build_icmp(self.builder, wl_int_eq(), r, neg_one))
             if self.overflow_mode != OVERFLOW_MODE_WRAP() and self.overflow_mode != OVERFLOW_MODE_SATURATE():
@@ -183,7 +200,7 @@ impl Codegen:
             // undefined MIN / -1 division.
             let safe_r = wl_build_select(self.builder, ov, self.cg_splat_const(wl_const_int(elem_ty, 1, 0), n), r)
             let raw = if op == BinaryOp.OP_DIV: wl_build_sdiv(self.builder, l, safe_r) else: wl_build_srem(self.builder, l, safe_r)
-            let ov_value = if op == BinaryOp.OP_MOD: wl_const_null(vec_ty) else if self.overflow_mode == OVERFLOW_MODE_SATURATE(): self.cg_splat_const(wl_const_int(elem_ty, int_signed_max(width), 0), n) else: min_v
+            let ov_value = if op == BinaryOp.OP_MOD: wl_const_null(vec_ty) else if self.overflow_mode == OVERFLOW_MODE_SATURATE(): self.cg_splat_const(self.cg_int_signed_max(elem_ty, width), n) else: min_v
             return wl_build_select(self.builder, ov, ov_value, raw)
         self.cg_vector_unsupported("integer vector operator")
 
@@ -207,11 +224,11 @@ impl Codegen:
         let wr2 = if unsigned: wl_build_zext(self.builder, r, wide_ty) else: wl_build_sext(self.builder, r, wide_ty)
         let product = wl_build_mul(self.builder, wl2, wr2)
         if unsigned:
-            let max_v = self.cg_splat_const(wl_const_int(wide_elem, int_unsigned_max(width), 0), n)
+            let max_v = self.cg_splat_const(self.cg_int_unsigned_max(wide_elem, width), n)
             let over = wl_build_icmp(self.builder, wl_int_ugt(), product, max_v)
             return wl_build_trunc(self.builder, wl_build_select(self.builder, over, max_v, product), vec_ty)
-        let max_s = self.cg_splat_const(wl_const_int(wide_elem, int_signed_max(width), 0), n)
-        let min_s = self.cg_splat_const(wl_const_int(wide_elem, int_signed_min(width), 1), n)
+        let max_s = self.cg_splat_const(self.cg_int_signed_max(wide_elem, width), n)
+        let min_s = self.cg_splat_const(self.cg_int_signed_min(wide_elem, width), n)
         let hi = wl_build_select(self.builder, wl_build_icmp(self.builder, wl_int_sgt(), product, max_s), max_s, product)
         let clamped = wl_build_select(self.builder, wl_build_icmp(self.builder, wl_int_slt(), hi, min_s), min_s, hi)
         wl_build_trunc(self.builder, clamped, vec_ty)
@@ -231,10 +248,10 @@ impl Codegen:
         let elem_ty = wl_get_element_type(vec_ty)
         let width = wl_get_int_type_width(elem_ty)
         let n = wl_get_vector_size(vec_ty)
-        let min_v = self.cg_splat_const(wl_const_int(elem_ty, int_signed_min(width), 1), n)
+        let min_v = self.cg_splat_const(self.cg_int_signed_min(elem_ty, width), n)
         let is_min = wl_build_icmp(self.builder, wl_int_eq(), arg, min_v)
         if self.overflow_mode == OVERFLOW_MODE_SATURATE():
-            return wl_build_select(self.builder, is_min, self.cg_splat_const(wl_const_int(elem_ty, int_signed_max(width), 0), n), wl_build_neg(self.builder, arg))
+            return wl_build_select(self.builder, is_min, self.cg_splat_const(self.cg_int_signed_max(elem_ty, width), n), wl_build_neg(self.builder, arg))
         self.cg_panic_if_any_lane(is_min, f"integer overflow: negating i{width} minimum value in a vector lane")
         wl_build_neg(self.builder, arg)
 

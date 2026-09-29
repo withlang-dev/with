@@ -85,19 +85,44 @@ impl Sema:
     // §4.3d: `.bits()` — the unsigned integer vector of the same lane width.
     fn vector_bits_type(tid: i32) -> i32:
         let bits = self.vector_lane_bits(self.vector_lane_type(tid))
-        let lane = if bits == 8: self.ty_u8 else if bits == 16: self.ty_u16 else if bits == 32: self.ty_u32 else: self.ty_u64
+        let lane = if bits == 8: self.ty_u8 else if bits == 16: self.ty_u16 else if bits == 32: self.ty_u32 else if bits == 64: self.ty_u64 else: self.ty_u128
         self.vector_type(lane as i32, self.vector_lane_count(tid))
 
-    // §4.3d: T is a primitive integer or floating type whose lanes a Mask
-    // can describe (W ∈ 8, 16, 32, 64).
+    // §4.3d: T is a primitive integer (§4.1: i8…i128, u8…u128) or floating
+    // type.
     fn vector_lane_type_is_valid(lane: i32) -> bool:
         if lane <= 0: return false
         let resolved = self.resolve_alias(lane as TypeId)
         let kind = self.get_type_kind(resolved)
         let bits = self.get_type_d0(resolved)
         if kind == TypeKind.TY_FLOAT: return bits == 32 or bits == 64
-        if kind == TypeKind.TY_INT: return bits == 8 or bits == 16 or bits == 32 or bits == 64
+        if kind == TypeKind.TY_INT: return bits == 8 or bits == 16 or bits == 32 or bits == 64 or bits == 128
         false
+
+    // §4.3d: the compile-time integer a generic lane count `N` is bound to
+    // (`fn dot[N](a: Vector[N, f32])`), as a generic substitution.
+    fn const_int_type(value: i32) -> i32: self.ensure_exact_type(TypeKind.TY_CONST_INT, value, 0, 0) as i32
+
+    fn const_int_value(tid: i32) -> i32:
+        if tid <= 0 or self.get_type_kind(self.resolve_alias(tid as TypeId)) != TypeKind.TY_CONST_INT: return -1
+        self.get_type_d0(self.resolve_alias(tid as TypeId))
+
+    // The value of a lane-count node: an integer literal, or a generic
+    // parameter bound to one (`subst` resolves a bare name; -1 if neither).
+    fn vector_count_node_value(node: i32, subst: i32) -> i64:
+        let value = self.int_literal_i64_value(node)
+        if value.ok != 0: return value.value
+        let kind = self.ast.kind(node)
+        if subst != 0 and (kind == NodeKind.NK_TYPE_NAMED or kind == NodeKind.NK_IDENT):
+            let bound = self.const_int_value(subst)
+            if bound >= 0: return bound as i64
+        -1
+
+    // The generic substitution a bare lane-count name has in scope, or 0.
+    fn vector_count_subst(node: i32) -> i32:
+        let kind = self.ast.kind(node)
+        if kind != NodeKind.NK_TYPE_NAMED and kind != NodeKind.NK_IDENT: return 0
+        self.lookup_generic_subst(self.ast.get_data0(node))
 
     // The name a diagnostic prints: the alias where one exists.
     fn vector_type_name(tid: i32) -> str:
@@ -121,21 +146,24 @@ impl Sema:
     // The lane count argument of `Vector[N, T]` / `Mask[N, W]`: a
     // compile-time integer constant ≥ 1, or -1 after a diagnostic.
     mut fn vector_count_arg(node: i32, what: &str) -> i32:
-        let value = self.int_literal_i64_value(node)
-        if value.ok == 0:
-            self.emit_error(f"{what}'s lane count must be a compile-time integer constant (§4.3d)", node)
+        self.vector_count_arg_with(node, what, self.vector_count_subst(node))
+
+    mut fn vector_count_arg_with(node: i32, what: &str, subst: i32) -> i32:
+        let value = self.vector_count_node_value(node, subst)
+        if value == -1:
+            self.emit_error(f"{what}'s lane count must be a compile-time integer constant or a generic parameter the arguments bind (§4.3d)", node)
             return -1
-        if value.value < 1:
+        if value < 1:
             self.emit_error("a vector has at least one lane (§4.3d: N ≥ 1)", node)
             return -1
-        if value.value > 2147483647:
+        if value > 2147483647:
             self.emit_error(f"{what}'s lane count is too large", node)
             return -1
-        value.value as i32
+        value as i32
 
     // `Vector[N, T]` from its two argument nodes; `lane` is the resolved T.
-    mut fn vector_type_from_args(count_node: i32, lane: i32, lane_node: i32) -> i32:
-        let n = self.vector_count_arg(count_node, "Vector")
+    mut fn vector_type_from_args(count_node: i32, lane: i32, lane_node: i32, count_subst: i32) -> i32:
+        let n = self.vector_count_arg_with(count_node, "Vector", count_subst)
         if n < 0 or lane == 0: return 0
         if not self.vector_lane_type_is_valid(lane):
             self.emit_error(f"a vector lane is a primitive integer or floating type of 8, 16, 32 or 64 bits, not `{self.type_name(lane)}` (§4.3d)", lane_node)
@@ -161,19 +189,19 @@ impl Sema:
             return 0
         if name == "Mask": return self.mask_type_from_args(a0, a1)
         let lane = self.resolve_type_level_arg_expr(a1)
-        self.vector_type_from_args(a0, lane, a1)
+        self.vector_type_from_args(a0, lane, a1, self.vector_count_subst(a0))
 
     // The frozen twin: every Vector/Mask type a MIR-era consumer names was
     // registered while checking.
     fn resolve_vector_generic_frozen(base_sym: i32, a0: i32, a1: i32) -> i32:
-        let n = self.int_literal_i64_value(a0)
-        if n.ok == 0: return 0
+        let n = self.vector_count_node_value(a0, self.vector_count_subst(a0))
+        if n < 1: return 0
         if self.pool_resolve_symbol(base_sym) == "Mask":
             let w = self.int_literal_i64_value(a1)
             if w.ok == 0: return 0
-            return self.find_exact_type(TypeKind.TY_MASK, w.value as i32, n.value as i32, 0) as i32
+            return self.find_exact_type(TypeKind.TY_MASK, w.value as i32, n as i32, 0) as i32
         let lane = self.resolve_type_level_arg_expr_frozen(a1)
-        self.find_exact_type(TypeKind.TY_VECTOR, lane, n.value as i32, 0) as i32
+        self.find_exact_type(TypeKind.TY_VECTOR, lane, n as i32, 0) as i32
 
     // ── Expressions ─────────────────────────────────────────────────
 
@@ -299,6 +327,9 @@ impl Sema:
         if not self.types_identical(a_ty, b_ty):
             self.emit_error(f"select picks between two vectors of one type, not `{self.type_name(a_ty)}` and `{self.type_name(b_ty)}` (§4.3d)", b_node)
             return 0
+        if self.vector_lane_bits(self.vector_lane_type(a_ty)) == 128:
+            self.emit_error(f"select over 128-bit lanes has no mask yet: Mask[N, W] has W of 8, 16, 32 or 64 bits (§4.3d)", node)
+            return 0
         let want_mask = self.vector_compare_mask_type(a_ty)
         if not self.types_identical(m_ty, want_mask):
             self.emit_error(f"select over `{self.type_name(a_ty)}` takes a `{self.type_name(want_mask)}` mask, not `{self.type_name(m_ty)}` (§4.3d)", m_node)
@@ -371,6 +402,11 @@ impl Sema:
         let out = if name.len() == 1: lane_ty else: self.vector_type(lane_ty, name.len() as i32)
         self.record_vector_op(node, VectorOp.SWIZZLE, out)
 
+    // How many lanes the swizzle at `node` names (0 when none).
+    fn vector_swizzle_width(node: i32) -> i32:
+        if not self.vector_swizzles.contains(node): return 0
+        self.vector_swizzles.get(node).unwrap().len() as i32
+
     // `v[i]`: lane i, a value of the lane type. A constant index is checked
     // here (§4.3a's array rule); a runtime one panics out of range.
     mut fn check_vector_index(node: i32, vec_ty: i32, index: i32) -> i32:
@@ -395,7 +431,22 @@ impl Sema:
             self.emit_error(f"operator '{sema_operator_symbol_text(op)}' is not defined on a mask; `select`, `.all()` and `.any()` read one (§4.3d)", node)
             return 0
         if not lv and not rv: return -1
-        let vec_ty = if lv: lhs else: rhs
+        var vec_ty = if lv: lhs else: rhs
+        if lv and rv and not self.types_identical(lhs, rhs):
+            // §4.2 per lane: lanes of one kind and signedness widen
+            // losslessly to the wider (§4.2.4 rule 2, §4.2.6).
+            let common = self.vector_common_type(lhs, rhs)
+            if common == 0:
+                if self.vector_lane_count(lhs) == self.vector_lane_count(rhs) and not self.vector_lane_is_float(lhs) and not self.vector_lane_is_float(rhs):
+                    self.emit_error(f"lane-wise operator needs vectors of one lane signedness, not `{self.type_name(lhs)}` and `{self.type_name(rhs)}`; convert one with `as` (§4.2.4, §4.3d)", node)
+                else:
+                    self.emit_error(f"lane-wise operator needs vectors of the same shape, not `{self.type_name(lhs)}` and `{self.type_name(rhs)}` (§4.3d); convert one with `as`", node)
+                return 0
+            if not self.types_identical(lhs, common):
+                self.vector_conversions.insert(lhs_node, common)
+            if not self.types_identical(rhs, common):
+                self.vector_conversions.insert(rhs_node, common)
+            vec_ty = common
         let type_text = self.type_name(vec_ty)
         let is_cmp = op == BinaryOp.OP_EQ or op == BinaryOp.OP_NEQ or op == BinaryOp.OP_LT or op == BinaryOp.OP_GT or op == BinaryOp.OP_LTE or op == BinaryOp.OP_GTE
         let is_shift = op == BinaryOp.OP_SHL or op == BinaryOp.OP_SHR
@@ -408,11 +459,10 @@ impl Sema:
         if is_int_only and self.vector_lane_is_float(vec_ty):
             self.emit_error(f"operator '{sema_operator_symbol_text(op)}' needs integer lanes; `{type_text}` has float lanes (§4.3d)", node)
             return 0
-        if lv and rv:
-            if not self.types_identical(lhs, rhs):
-                self.emit_error(f"lane-wise operator needs vectors of the same shape, not `{self.type_name(lhs)}` and `{self.type_name(rhs)}` (§4.3d); convert one with `as`", node)
-                return 0
-        else:
+        if is_cmp and self.vector_lane_bits(self.vector_lane_type(vec_ty)) == 128:
+            self.emit_error(f"a comparison of 128-bit lanes has no mask yet: Mask[N, W] has W of 8, 16, 32 or 64 bits (§4.3d); compare the lanes one by one", node)
+            return 0
+        if not (lv and rv):
             // §4.3d: a scalar operand beside a vector broadcasts to every lane.
             if is_shift and not lv:
                 self.emit_error(f"a shift's left operand is the value shifted; `{type_text}` shifts a vector (§4.3d)", node)
@@ -425,6 +475,17 @@ impl Sema:
         let result = if is_cmp: self.vector_compare_mask_type(vec_ty) else: vec_ty
         self.typed_expr_types.insert(node, result)
         result
+
+    // The vector two lane-wise operands meet at (§4.2 per lane): the same
+    // lane count and lane kind, one signedness, the wider lane; 0 if none.
+    fn vector_common_type(a: i32, b: i32) -> i32:
+        if self.vector_lane_count(a) != self.vector_lane_count(b): return 0
+        let al = self.resolve_alias(self.vector_lane_type(a) as TypeId)
+        let bl = self.resolve_alias(self.vector_lane_type(b) as TypeId)
+        let ak = self.get_type_kind(al)
+        if ak != self.get_type_kind(bl): return 0
+        if ak == TypeKind.TY_INT and self.get_type_d1(al) != self.get_type_d1(bl): return 0
+        if self.get_type_d0(al) >= self.get_type_d0(bl): a else: b
 
     // A scalar operand of a lane-wise operator: a number of the lane's kind
     // that the lane holds without loss (§4.2.6); a shift amount is any
