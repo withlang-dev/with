@@ -22,15 +22,38 @@
 // or receiver modes (CLAUDE.md gate).
 
 use std.process
+use std.sys
 
-extern fn with_exec_argv_capture(argv: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32) -> i32
+extern fn with_exec_argv_capture_spawn(argv: &str, stdout_path: &str, stderr_path: &str) -> i32
+extern fn with_exec_try_wait(pid: i32) -> i32
+extern fn with_exec_wait(pid: i32, timeout_ms: i32) -> i32
+extern fn with_usleep(usecs: i32) -> i32
+extern fn with_clock_nanos() -> i64
 extern fn with_fs_read_file(path: &str) -> str
 extern fn with_fs_write_file(path: &str, data: &str) -> i32
 extern fn with_fs_mkdir_p(path: &str) -> i32
 
-fn exec_capture(argv: &str, outp: &str, errp: &str, timeout: i32) -> i32:
+fn spawn_capture(argv: &str, outp: &str, errp: &str) -> i32:
     unsafe:
-        with_exec_argv_capture(argv, outp, errp, timeout)
+        with_exec_argv_capture_spawn(argv, outp, errp)
+
+// The child's exit code, or -2 while it runs.
+fn try_wait(pid: i32) -> i32:
+    unsafe:
+        with_exec_try_wait(pid)
+
+// Waits up to `timeout_ms`; expiry kills the child.
+fn wait_or_kill(pid: i32, timeout_ms: i32) -> i32:
+    unsafe:
+        with_exec_wait(pid, timeout_ms)
+
+fn nap_us(us: i32):
+    unsafe:
+        let _ = with_usleep(us)
+
+fn clock_ns() -> i64:
+    unsafe:
+        with_clock_nanos()
 
 fn read_file(path: &str) -> str:
     unsafe:
@@ -722,12 +745,16 @@ fn last_int_line(s: str) -> str:
         i = i - 1
     ""
 
-fn run_cell(with_bin: &str, dir: &str, idx: i32, source: &str, expect_sum: i32, expect_clean: bool) -> str:
+// Writes the cell's program and starts `with run --debug-alloc` on it; the
+// verdict is read by classify_cell once the child exits.
+fn start_cell(with_bin: &str, dir: &str, idx: i32, source: &str) -> i32:
     let path = dir ++ f"/cell_{idx}.w"
     let _ = write_file(path, source)
+    spawn_capture(argv4(with_bin, "run", "--debug-alloc", path), dir ++ f"/cell_{idx}.out", dir ++ f"/cell_{idx}.err")
+
+fn classify_cell(dir: &str, idx: i32, rc: i32, expect_sum: i32, expect_clean: bool) -> str:
     let outp = dir ++ f"/cell_{idx}.out"
     let errp = dir ++ f"/cell_{idx}.err"
-    let rc = exec_capture(argv4(with_bin, "run", "--debug-alloc", path), outp, errp, 60000)
     let err = read_file(errp)
     let out = read_file(outp)
     if find_sub(err, "error:") >= 0:
@@ -764,15 +791,57 @@ fn main:
         eprint("drop-audit: could not create probe directories: " ++ dir)
         exit_code(1)
     let cells = build_cells()
+    // Every cell runs under the candidate and (with a baseline) the baseline:
+    // independent programs, so all of them go through one window as wide as
+    // the host's cores, refilled the moment any child exits. Run one after
+    // another they took 263 s; the table below is printed in cell order.
+    let sides = if baseline.len() > 0: 2 else: 1
+    let total = cells.len() as i32 * sides
+    var verdicts: Vec[str] = Vec.new()
+    for _ in 0..total: verdicts.push("")
+    var pids: Vec[i32] = Vec.new()
+    var started: Vec[i64] = Vec.new()
+    var live: Vec[i32] = Vec.new()
+    let width = if cpu_count() > 1: cpu_count() else: 1
+    var next = 0
+    var finished = 0
+    while finished < total:
+        if next < total and live.len() as i32 < width:
+            let cell = next / sides
+            let on_baseline = next % sides == 1
+            pids.push(if on_baseline: start_cell(&baseline, &baseline_dir, cell, cells[cell].source) else: start_cell(candidate, &candidate_dir, cell, cells[cell].source))
+            started.push(clock_ns())
+            live.push(next)
+            next = next + 1
+            continue
+        var reaped = false
+        var li = 0
+        while li < live.len() as i32:
+            let job = live[li]
+            var rc = if pids[job] <= 0: 127 else: try_wait(pids[job])
+            if rc == -2:
+                // The 60 s budget each run always had, counted from spawn.
+                if clock_ns() - started[job] < 60000 as i64 * 1000000:
+                    li = li + 1
+                    continue
+                rc = wait_or_kill(pids[job], 1)
+            let cell = job / sides
+            verdicts[job] = if job % sides == 1: classify_cell(&baseline_dir, cell, rc, cells[cell].expect_sum, cells[cell].expect_clean) else: classify_cell(&candidate_dir, cell, rc, cells[cell].expect_sum, cells[cell].expect_clean)
+            live[li] = live[live.len() as i32 - 1]
+            let _ = live.pop()
+            finished = finished + 1
+            reaped = true
+        if not reaped and live.len() as i32 > 0:
+            nap_us(2000)
     var failures = 0
     var regressions = 0
     print("cell\tcandidate" ++ (if baseline.len() > 0: "\tbaseline\tclass" else: ""))
     for i in 0..cells.len():
         let c = cells[i]
-        let cv = run_cell(candidate, candidate_dir, i, c.source, c.expect_sum, c.expect_clean)
+        let cv = verdicts[i * sides].clone()
         var row = c.name ++ "\t" ++ cv
         if baseline.len() > 0:
-            let bv = run_cell(baseline, baseline_dir, i, c.source, c.expect_sum, c.expect_clean)
+            let bv = verdicts[i * sides + 1].clone()
             let klass = if cv == bv: "same" else if cv == "PASS": "FIXED" else: "REGRESSION"
             if klass == "REGRESSION":
                 regressions = regressions + 1
