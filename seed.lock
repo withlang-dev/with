@@ -8,14 +8,13 @@
 #
 # `<asset>.version=` pins one platform to another release while it cannot
 # bootstrap the newest seed; say which issue, and remove it when fixed.
-version=nightly-20260929-local-1-2fa54a7197df
-with-darwin-aarch64=0a02266d9cbfffa9c0c4fcb32eb434d79813da0366f5501ff69d4bc93c03ad64
-# The darwin seed is cut from main 2fa54a71 (#1909): its driver carries the
-# build-speed work (test lanes refill on any exit, the compiler self-id so a
-# build never re-hashes the compiler, the machine-wide test verdict cache) and
-# #1908 (the runner's link root is re-prepared before every runner
-# recompile). Verified: it builds main from a fresh checkout to a stage2 ==
-# stage3 fixpoint. The previous seed (99939352) is #1795's.
+version=nightly-20260929-local-2-c95ae12d9f64
+with-darwin-aarch64=8c5a151d11ef16047f84628db7ee230d23fcf3c30f0a164d4b2a8f7cb65c8cf9
+# The darwin seed is cut from main c95ae12d (stack #1898 merged): its
+# comptime evaluator evaluates generic calls without type arguments and
+# str.trim/index_of (#1866), so build-layer actions may `print` and trim
+# again. Verified: it builds main from a fresh checkout to a stage2 ==
+# stage3 fixpoint over all 16 units. The previous seed (2fa54a71) is #1909's.
 # linux-x86_64 is main 2e8defaa, published from a local bootstrap: v0.15.2.1
 # cannot build this tree, so it was laddered through 8c859a7d, 37f3a99f,
 # 8e55d67b, fb6753b4 + the 4f004956 field-move fix, 8db10d1a, and the
