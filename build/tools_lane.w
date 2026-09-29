@@ -6,7 +6,11 @@ module build.tools_lane
 // never run (they rewrite sources, sweep corpora or drive batteries). A
 // `build.w` for a scratch project (it defines `pub fn build(ctx:
 // BuildCtx)` and no program) is checked; every other file is built — a
-// link catches the missing symbol a check cannot. The list is the
+// link catches the missing symbol a check cannot. A tool that imports
+// compiler.Compilation (the whole compiler pipeline) is checked too: its
+// build recompiled most of the compiler, ~360 CPU-s each, 1,800 CPU-s for
+// the five, and every module it links is linked by every stage build; only
+// its own code's codegen goes unexercised (Eric, 2026-09-29). The list is the
 // directory itself, so a new tool is covered on arrival. The tools are
 // independent, so they compile in a core-wide window (build/par.w), and
 // every failure is reported after every child is reaped.
@@ -29,6 +33,12 @@ fn tl_error_lines(text: &str) -> str:
     out
 
 fn tl_slug(path: &str): path.replace("/", "_").replace(".w", "")
+
+// A scratch project's build.w, or a tool that imports the whole compiler
+// pipeline (see above): checked, not built.
+fn tl_checked_only(fs: &ToolFs, source: &str) -> bool:
+    let text = fs.read_text(source)
+    text.contains("\npub fn build(ctx: BuildCtx)") or text.contains("\nuse compiler.Compilation")
 
 pub fn run_tools_tests_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()
@@ -54,7 +64,7 @@ pub fn run_tools_tests_action(ctx: ActionCtx) -> i32:
         args.push(compiler.clone())
         var label = ""
         var timeout_ms = 600000
-        if fs.read_text(source).contains("\npub fn build(ctx: BuildCtx)"):
+        if tl_checked_only(fs, source):
             args.push("check")
             args.push(tl_abs(root, source))
             label = slug ++ ".check"
