@@ -72,7 +72,8 @@ the first token of the statement and has no trailing colon of its own.
 **Function declaration** (§9.1):
 
 ```
-FN_DECL     := [ PUB ] 'fn' IDENT [ TYPE_PARAMS ] [ '(' PARAMS ')' ] [ '->' TYPE ] BODY
+FN_DECL     := [ PUB ] 'fn' IDENT [ TYPE_PARAMS ] [ '(' PARAMS ')' ] [ '->' TYPE ] [ WRITES_CLAUSE ] BODY
+WRITES_CLAUSE := 'writes' PATH { ',' PATH }
 PARAMS      := PARAM { ',' PARAM } [ ',' ]
 PARAM       := IDENT ':' [ 'once' ] TYPE [ '=' EXPR ]
 TYPE_PARAMS := '[' IDENT { ',' IDENT } [ ':' BOUND ] ']'
