@@ -2406,6 +2406,13 @@ impl Zcu:
             else if kind == NodeKind.NK_FN_DECL:
                 let name = pool.get_data0(node)
                 self.iface_mentioned.insert(name, 1)
+                // A `writes` clause names its globals in side tables, not
+                // identifier nodes; the globals it names are uses too (D79).
+                // Unnoted, a program built against a bundle never merged the
+                // .wi line of a global only its clause names, and the clause
+                // reported the global as none (pcre2-wo-drift).
+                for wi in 0..pool.fn_global_write_count(node):
+                    self.iface_mentioned.insert(pool.fn_global_write_name(node, wi), 1)
                 let text = self.pool.resolve(name)
                 let dot = text.find(".")
                 if dot > 0:

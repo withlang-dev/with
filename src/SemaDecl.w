@@ -262,6 +262,12 @@ impl Sema:
             let owner = self.method_decl_owner_symbol(node, name)
             if owner != 0:
                 self.iface_mentioned.insert(owner, 1)
+            // A `writes` clause names its globals in side tables, not
+            // identifier nodes; they are mentions too (D79). Unnoted, a
+            // bundle global only a clause names was never collected, and the
+            // clause reported it as no global (pcre2-wo-drift).
+            for wi in 0..self.ast.fn_global_write_count(node):
+                self.iface_mentioned.insert(self.ast.fn_global_write_name(node, wi), 1)
             return
         if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_OPTIONAL_CHAIN:
             self.iface_mentioned.insert(self.ast.get_data1(node), 1)
