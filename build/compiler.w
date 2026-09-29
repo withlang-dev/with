@@ -272,6 +272,73 @@ fn comp_default_llvm_prefix() -> str:
         return ".deps/llvm-" ++ COMPILER_LLVM_VERSION ++ "-windows-aarch64-msvc"
     COMPILER_FALLBACK_LLVM_PREFIX
 
+// ── sdk.lock: the pinned LLVM SDK (#1826) ───────────────────────────────────
+// The static LLVM SDK a build links is a release asset pinned in sdk.lock
+// (`<asset>.version=` its release, `<asset>=` its sha256), as seed.lock pins
+// the seed. `with build :deps` installs the pin into .deps/llvm-<ver>-<host>
+// and stamps it, and a compiler link refuses a .deps SDK that is not the
+// pinned one. Before this, `:deps` kept whatever SDK a checkout once
+// fetched: a host still linked a May SDK whose lld cannot read Xcode 27's
+// stubs after the fix shipped in a republished one.
+
+/// One `key=value` line of a lock file (seed.lock, sdk.lock); "" when the
+/// key is absent. Lines are matched as written: the link-metadata actions
+/// read it at comptime, where the pinned seed evaluates neither `trim` nor
+/// `index_of`.
+pub fn lock_value(lock: &str, key: &str) -> str:
+    let prefix = key ++ "="
+    for line in lock.split("\n"):
+        if line.starts_with(prefix): return line.slice(prefix.len(), line.len())
+    ""
+
+/// The text of sdk.lock; "" when the tree has none.
+pub fn sdk_lock_read(fs: &ToolFs) -> str:
+    if fs.exists("sdk.lock"): fs.read_text("sdk.lock") else: ""
+
+/// This host's LLVM SDK release asset; "" on a host with none.
+pub fn llvm_sdk_host_asset() -> str:
+    let host_os = os()
+    let host_arch = arch()
+    var tag = ""
+    if host_os == "Macos" and comp_arch_is_aarch64(host_arch): tag = "darwin-aarch64"
+    else if host_os == "Linux" and host_arch == "x86_64": tag = "linux-x86_64"
+    else if host_os == "Linux" and comp_arch_is_aarch64(host_arch): tag = "linux-aarch64"
+    else if host_os == "Windows" and host_arch == "x86_64": tag = "windows-x86_64"
+    else if host_os == "Windows" and (host_arch == "armv8" or host_arch == "aarch64"): tag = "windows-aarch64"
+    if tag.len() == 0: return ""
+    "with-llvm-sdk-" ++ COMPILER_LLVM_VERSION ++ "-" ++ tag ++ ".tar.gz"
+
+/// "<release> <sha256>" of the SDK sdk.lock pins for `asset`; "" when the
+/// lock does not pin it. This is what the stamp of an installed pin holds.
+pub fn llvm_sdk_pin(lock: &str, asset: &str) -> str:
+    let release = lock_value(lock, asset ++ ".version")
+    let digest = lock_value(lock, asset)
+    if release.len() == 0 or digest.len() == 0: return ""
+    release ++ " " ++ digest
+
+/// The stamp `:deps` writes into an SDK directory it installed from the pin.
+pub fn llvm_sdk_pin_stamp_path(sdk_dir: &str): sdk_dir ++ "/.with-sdk-pin"
+
+// A compiler link reads the default .deps SDK only when it is the one
+// sdk.lock pins. LLVM_PREFIX names an SDK its setter installed and verified
+// (every CI lane checks the workflow pin, which seed-driver holds equal to
+// sdk.lock), so it is not second-guessed here.
+fn comp_require_pinned_llvm_sdk(ctx: &ActionCtx, root: &str) -> i32:
+    if env("LLVM_PREFIX").len() > 0: return 0
+    let pin = llvm_sdk_pin(sdk_lock_read(ctx.fs()), llvm_sdk_host_asset())
+    if pin.len() == 0: return 0
+    let sdk_dir = comp_default_llvm_prefix()
+    let stamp_path = comp_abs(root, llvm_sdk_pin_stamp_path(sdk_dir))
+    var installed = "unknown (no " ++ llvm_sdk_pin_stamp_path(sdk_dir) ++ ")"
+    if ctx.fs().host_exists(stamp_path):
+        installed = ctx.fs().host_read_text(stamp_path)
+        if installed == pin ++ "\n": return 0
+    var message = sdk_dir ++ " is not the LLVM SDK sdk.lock pins (#1826)"
+    message = message ++ "\n  pinned:    " ++ pin
+    message = message ++ "\n  installed: " ++ installed
+    message = message ++ "\n  `with build :deps` installs the pinned SDK."
+    comp_fail(ctx, message)
+
 fn comp_llvm_prefix() -> str:
     let prefix = env("LLVM_PREFIX")
     if prefix.len() > 0:
@@ -2556,6 +2623,9 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
         let input_path = inputs[ii]
         if not fs.exists(input_path):
             return comp_fail(ctx, "missing input: " ++ input_path)
+    let pinned_rc = comp_require_pinned_llvm_sdk(ctx, root)
+    if pinned_rc != 0:
+        return pinned_rc
     let llvm_prefix = comp_llvm_prefix_for_root(root)
     let llvm_clang = comp_llvm_clang_tool(llvm_prefix)
     let llvm_ld = comp_llvm_lld_tool(llvm_prefix)

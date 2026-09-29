@@ -785,7 +785,12 @@ pub fn run_seed_driver_action(ctx: ActionCtx) -> i32:
         var message = "these workflow seed pins disagree with seed.lock (" ++ seed_lock_version_for(lock, asset) ++ "); `with run tools/bump_seed_pins.w` rewrites them:"
         for i in 0..drift.len() as i32: message = message ++ "\n  " ++ drift.get(i)
         return ret_fail(ctx, message)
-    print("[seed-driver] the driver is the pinned seed " ++ seed_lock_version_for(lock, asset) ++ "; workflow pins agree with seed.lock")
+    let sdk_drift = sdk_lock_workflow_drift(ctx.fs(), sdk_lock_read(ctx.fs()))
+    if sdk_drift.len() > 0:
+        var message = "these workflow LLVM SDK pins disagree with sdk.lock (#1826):"
+        for i in 0..sdk_drift.len() as i32: message = message ++ "\n  " ++ sdk_drift.get(i)
+        return ret_fail(ctx, message)
+    print("[seed-driver] the driver is the pinned seed " ++ seed_lock_version_for(lock, asset) ++ "; workflow pins agree with seed.lock and sdk.lock")
     ret_write_output_stamp(ctx)
 
 pub fn run_test_green_action(ctx: ActionCtx) -> i32:

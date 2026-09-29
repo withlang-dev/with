@@ -3,6 +3,7 @@ module build.seed
 use std.build
 use std.process
 use build.compiler
+use std.io.print_str
 fn seed_owned_text(s: &str): s ++ ""
 
 fn seed_join(left: &str, right: &str) -> str:
@@ -283,16 +284,35 @@ pub fn run_deps_download_action(ctx: ActionCtx) -> i32:
     let repo = args.get(0)
     let asset_name = args.get(1)
     let sdk_base = args.get(2)
+    let sdk_dir = seed_join(".deps", sdk_base)
+    // sdk.lock pins the SDK (#1826): a present SDK is kept only when its
+    // stamp says it is the pinned release and digest, so a bump of the lock
+    // refetches and an SDK fetched before the pin existed is replaced.
+    // WITH_LLVM_SDK_VERSION asks for another release by hand and keeps the
+    // unpinned behavior.
+    let lock = sdk_lock_read(fs)
+    let pin = llvm_sdk_pin(lock, asset_name)
+    let override_tag = env("WITH_LLVM_SDK_VERSION")
+    let pinned = pin.len() > 0 and override_tag.len() == 0
+    let stamp_path = llvm_sdk_pin_stamp_path(sdk_dir)
     if fs.exists(marker):
-        print("static LLVM SDK already present: " ++ seed_join(".deps", sdk_base))
-        return 0
+        if not pinned:
+            print_str("static LLVM SDK already present: " ++ sdk_dir ++ "\n")
+            return 0
+        if fs.exists(stamp_path) and fs.read_text(stamp_path) == pin ++ "\n":
+            print_str(sdk_dir ++ " is the pinned SDK " ++ pin ++ "\n")
+            return 0
+        print_str(sdk_dir ++ " is not the pinned SDK " ++ pin ++ " (sdk.lock); refetching\n")
 
-    var tag = env("WITH_LLVM_SDK_VERSION")
+    var tag = override_tag.clone()
+    if pinned:
+        tag = lock_value(lock, asset_name ++ ".version")
+        print_str("pinned SDK release (sdk.lock): " ++ tag ++ "\n")
     if tag.len() == 0:
         tag = seed_release_from_api(ctx, repo, asset_name)
         if tag.len() == 0:
             ctx.diagnostics().error("deps: could not find a release containing asset '" ++ asset_name ++ "'\nset WITH_LLVM_SDK_VERSION to a release tag, or build it from source: tools/build-static-llvm.sh")
-        print("latest SDK release: " ++ tag)
+        print_str("latest SDK release: " ++ tag ++ "\n")
 
     let url = "https://github.com/" ++ repo ++ "/releases/download/" ++ tag ++ "/" ++ asset_name
     let tmp_dir = seed_join("out/tmp", "deps-download")
@@ -300,13 +320,22 @@ pub fn run_deps_download_action(ctx: ActionCtx) -> i32:
         return seed_fail(ctx, "could not create temp directory: " ++ tmp_dir)
     let archive_path = seed_join(tmp_dir, asset_name)
     let _remove_archive = fs.remove_file(archive_path)
-    print("downloading static LLVM SDK from: " ++ url)
+    print_str("downloading static LLVM SDK from: " ++ url ++ "\n")
     let fetch_rc = seed_fetch_to_file(ctx, tmp_dir, "deps-asset", url, archive_path, 900000)
     if fetch_rc != 0:
         return fetch_rc
     let verify_rc = seed_verify_download_sha256(ctx, tmp_dir, "deps-asset", url, archive_path)
     if verify_rc != 0:
         return verify_rc
+    // The release's own sidecar says the upload is intact; the lock says it
+    // is the SDK this tree was verified with. A release asset replaced in
+    // place passes the first and fails here.
+    if pinned:
+        let actual = fs.sha256_file(archive_path)
+        let expected = lock_value(lock, asset_name)
+        if actual != expected:
+            let _remove_unpinned = fs.remove_file(archive_path)
+            return seed_fail(ctx, "sha256 of " ++ url ++ " is " ++ actual ++ ", not the " ++ expected ++ " sdk.lock pins: the release asset was replaced; pin the new digest only after verifying it")
 
     if not asset_name.ends_with(".tar.gz"):
         return seed_fail(ctx, "unsupported SDK archive format (expected .tar.gz): " ++ asset_name)
@@ -338,7 +367,9 @@ pub fn run_deps_download_action(ctx: ActionCtx) -> i32:
     let _cleanup_extract = fs.remove_tree(extract_dir)
     if not fs.exists(marker):
         return seed_fail(ctx, "SDK installed but missing expected archive: " ++ marker)
-    print("static LLVM SDK installed: " ++ target_dir)
+    if pinned and fs.write_text(stamp_path, pin ++ "\n") != 0:
+        return seed_fail(ctx, "could not write " ++ stamp_path)
+    print_str("static LLVM SDK installed: " ++ target_dir ++ "\n")
     0
 
 // ── seed.lock and the pinned driver ─────────────────────────────────────────
@@ -359,13 +390,7 @@ pub fn seed_lock_read(fs: &ToolFs) -> str:
     if fs.exists("seed.lock"): fs.read_text("seed.lock") else: ""
 
 /// One `key=value` line of seed.lock; "" when the key is absent.
-pub fn seed_lock_value(lock: &str, key: &str) -> str:
-    for line in lock.split("\n"):
-        let l = line.trim()
-        if l.starts_with("#") or l.len() == 0: continue
-        let eq = l.index_of("=")
-        if eq > 0 and l.slice(0, eq) == key: return l.slice(eq + 1, l.len())
-    ""
+pub fn seed_lock_value(lock: &str, key: &str) -> str: lock_value(lock, key)
 
 /// The seed version an asset is pinned to: `<asset>.version=` when the lock
 /// carries one (a platform that cannot bootstrap the newest seed yet — say
@@ -420,3 +445,50 @@ pub fn seed_lock_workflow_drift(fs: &ToolFs, lock: &str) -> Vec[str]:
                 if at >= 0 and line.slice(at + skey.len(), line.len()).trim() != seed_lock_value(lock, pending_asset):
                     drift.push(f"{path}:{nr}: {line}")
     drift
+
+/// The workflow LLVM SDK pins that disagree with sdk.lock ("file:line:
+/// <line>"), empty when all agree (#1826). A release line is checked against
+/// the asset its block names; the archive, sidecar and manifest digests
+/// against `<asset>=`, `<asset>.sha256=` and `<asset>.manifest=` of the
+/// asset named since. An asset a workflow pins that the lock does not is
+/// drift too: the lock names every SDK the tree is verified with.
+pub fn sdk_lock_workflow_drift(fs: &ToolFs, lock: &str) -> Vec[str]:
+    var drift: Vec[str] = Vec.new()
+    for path in fs.list_files(".github/workflows"):
+        if not path.ends_with(".yml"): continue
+        let lines = fs.read_text(path).split("\n")
+        var pending_asset = ""
+        for i in 0..lines.len():
+            let line = lines.get(i)
+            let nr = i + 1
+            if line.contains("${{"): continue
+            for akey in ["sdk_asset:", "WITH_SDK_ASSET:"]:
+                let at = line.index_of(akey)
+                if at >= 0: pending_asset = line.slice(at + akey.len(), line.len()).trim()
+            for vkey in ["sdk_version:", "WITH_SDK_VERSION:"]:
+                let at = line.index_of(vkey)
+                if at >= 0:
+                    var asset = sdk_lock_block_asset(&lines, i)
+                    if asset.len() == 0: asset = pending_asset ++ ""
+                    if line.slice(at + vkey.len(), line.len()).trim() != lock_value(lock, asset ++ ".version"):
+                        drift.push(f"{path}:{nr}: {line}")
+            for dkey in ["sdk_sha256:", "WITH_SDK_SHA256:", "sdk_sidecar_sha256:", "WITH_SDK_SIDECAR_SHA256:", "sdk_manifest_sha256:", "WITH_SDK_MANIFEST_SHA256:"]:
+                let at = line.index_of(dkey)
+                if at < 0: continue
+                var key = pending_asset ++ ""
+                if dkey.contains("SIDECAR") or dkey.contains("sidecar"): key = pending_asset ++ ".sha256"
+                if dkey.contains("MANIFEST") or dkey.contains("manifest"): key = pending_asset ++ ".manifest"
+                if line.slice(at + dkey.len(), line.len()).trim() != lock_value(lock, key):
+                    drift.push(f"{path}:{nr}: {line}")
+    drift
+
+/// The SDK asset named within the few lines after a release line.
+fn sdk_lock_block_asset(lines: &Vec[str], i: i64) -> str:
+    var j = i + 1
+    while j < lines.len() and j <= i + 4:
+        let line = lines.get(j)
+        for akey in ["sdk_asset:", "WITH_SDK_ASSET:"]:
+            let at = line.index_of(akey)
+            if at >= 0: return line.slice(at + akey.len(), line.len()).trim()
+        j = j + 1
+    ""

@@ -282,6 +282,7 @@ fn add_stage1_runtime_targets(out0: Build, host_runtime: &HostRuntimeSpec, corpu
     metadata.action = run_generate_llvm_link_metadata_action
     metadata = metadata.dep("sdk-clang-main")
     metadata = metadata.input("out/command/sdk-clang-main/done")
+    metadata = metadata.input("sdk.lock")
     metadata = metadata.input(dir ++ "/llvm_bridge.o")
     metadata = metadata.input(dir ++ "/clang_bridge.o")
     metadata = metadata.extra_output(dir ++ "/llvm_link.rsp")
@@ -964,9 +965,6 @@ fn llvm_sdk_dir_basename() -> str:
     if prefix.starts_with(".deps/"):
         return prefix.slice(6, prefix.len())
     prefix
-
-fn llvm_sdk_asset_for_host() -> str:
-    "with-llvm-sdk-" ++ compiler_llvm_version() ++ "-" ++ release_platform_tag() ++ ".tar.gz"
 
 fn release_package_asset_for_platform(platform: &str) -> str:
     if platform == "darwin-aarch64":
@@ -2477,6 +2475,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     // from the same marker, so the two cannot disagree.
     bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.dep("sdk-clang-main")
     bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.input("out/command/sdk-clang-main/done")
+    bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.input("sdk.lock")
     bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.input("out/bootstrap-lib/llvm_bridge.o")
     bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.input("out/bootstrap-lib/clang_bridge.o")
     bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.extra_output("out/bootstrap-lib/llvm_link.rsp")
@@ -2613,6 +2612,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     llvm_link_metadata.action = run_generate_llvm_link_metadata_action
     llvm_link_metadata = llvm_link_metadata.dep("sdk-clang-main")
     llvm_link_metadata = llvm_link_metadata.input("out/command/sdk-clang-main/done")
+    llvm_link_metadata = llvm_link_metadata.input("sdk.lock")
     llvm_link_metadata = llvm_link_metadata.input("out/lib/llvm_bridge.o")
     llvm_link_metadata = llvm_link_metadata.input("out/lib/clang_bridge.o")
     llvm_link_metadata = llvm_link_metadata.extra_output("out/lib/llvm_link.rsp")
@@ -3493,6 +3493,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     var seed_driver = target_new(.Action, "seed-driver", "").output("out/command/seed-driver/ok")
     seed_driver.action = run_seed_driver_action
     seed_driver = seed_driver.input("seed.lock")
+    seed_driver = seed_driver.input("sdk.lock")
     seed_driver = seed_driver.input(host_bin("out/bin/with-sha256"))
     for workflow in ctx.fs().list_files(".github/workflows"):
         if workflow.ends_with(".yml"): seed_driver = seed_driver.input(workflow.clone())
@@ -3855,7 +3856,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     deps = deps.write_scope(".deps")
     deps = deps.allow_network()
     deps = deps.arg("withlang-dev/with")
-    deps = deps.arg(llvm_sdk_asset_for_host())
+    deps = deps.input("sdk.lock")
+    deps = deps.arg(llvm_sdk_host_asset())
     deps = deps.arg(llvm_sdk_dir_basename())
     out = out.add_target(deps)
 

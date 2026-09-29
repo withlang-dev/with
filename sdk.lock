@@ -1,0 +1,43 @@
+# The pinned static LLVM SDKs: the release assets this tree is built and
+# verified with, as seed.lock pins the seed (#1826). `with build :deps`
+# installs this host's pin into .deps/llvm-<ver>-<host> and stamps it; a
+# compiler link refuses a .deps SDK whose stamp is not the pin (LLVM_PREFIX,
+# which CI sets after checking the workflow pin, is taken as named); and
+# `with build :seed-driver` refuses while any workflow SDK pin disagrees
+# with this file.
+#
+# `<asset>.version=` is the release, `<asset>=` the archive's sha256, and
+# `.sha256=`/`.manifest=` the digests of its sidecar and manifest where a
+# workflow pins those. A release asset replaced in place is a new SDK: pin
+# its digest only after verifying it builds this tree.
+
+# darwin-aarch64: 3ae5c9ec with the arm64e.x1 backport, so its ld64.lld reads
+# Xcode 27's .tbd stubs (#1826, #1880).
+with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz.version=nightly-sdk-20260928-3ae5c9ec0b31
+with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz=dd824534e89fe9570558036a69fcddfecb6075b0fcad1bfa7f502c67272de7a4
+with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz.sha256=66258ada1ca04f6bfa4ff1f55753fa890b75a2cc3b7fb978f6d9979ae24179f1
+with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz.manifest=9623c66f4f03265c64f2cda63ddc20be0eac9b690d0fab1155fb30f47c3b781e
+
+# linux-x86_64: the asset in this release was replaced on 2026-09-27 04:18
+# UTC; the nightly's old pin (c7747403…) no longer matches any download and
+# failed every linux-x86_64 leg since. These are the current asset's digests.
+with-llvm-sdk-22.1.6-linux-x86_64.tar.gz.version=nightly-20260926-local-1-2e8defaa18ef
+with-llvm-sdk-22.1.6-linux-x86_64.tar.gz=25b49ef5520cf2e94e1b80eebf019174cb313cadfee881cd6d4c9752e97aad0d
+with-llvm-sdk-22.1.6-linux-x86_64.tar.gz.sha256=e90d057082559132f7a6f192e1c58325401602c223125e81ed6184d4fcd63bdf
+with-llvm-sdk-22.1.6-linux-x86_64.tar.gz.manifest=6b218dbcfdfaf0c728c400a062171f6fa6c23e9a74ca2db587c5a0255c0af49b
+
+with-llvm-sdk-22.1.6-linux-aarch64.tar.gz.version=sdk-linux-aarch64
+with-llvm-sdk-22.1.6-linux-aarch64.tar.gz=b1597fe5281c760f594235a0d5b01fe3360b8303f7615b9f87c3ff87a2740926
+
+with-llvm-sdk-22.1.6-windows-x86_64.tar.gz.version=nightly-20260926-local-1-2e8defaa18ef
+with-llvm-sdk-22.1.6-windows-x86_64.tar.gz=8eb0ec5de7a338e777fa85a33b366aa632498d6b20e9d12ab831d5b3085be945
+
+with-llvm-sdk-22.1.6-windows-aarch64.tar.gz.version=sdk-windows-aarch64
+with-llvm-sdk-22.1.6-windows-aarch64.tar.gz=ad13e07af474d683c699f041c52cd98697df9781b581dda913d39d92be186743
+
+# The v0.15.1 .tar.zst SDKs are the bootstrap inputs sdk-release.yml and the
+# windows legs read.
+with-llvm-sdk-22.1.6-linux-x86_64.tar.zst.version=v0.15.1
+with-llvm-sdk-22.1.6-linux-x86_64.tar.zst=f978cae85045617ce9f8e426e64bb05c667cd15d47e0e39adc541e9575b4b387
+with-llvm-sdk-22.1.6-windows-x86_64.tar.zst.version=v0.15.1
+with-llvm-sdk-22.1.6-windows-x86_64.tar.zst=0c4f9860cf528b3821781d89e5b42947ef8ee2249327cffa64fb9fb5eac09a4a
