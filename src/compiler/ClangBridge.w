@@ -1116,12 +1116,11 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
         if sz <= 4: return session_strdup(s, "Complex32\0" as *const u8)
         return session_strdup(s, "Complex64\0" as *const u8)
 
-    // With has no SIMD vector type. A vector is passed in vector registers, so
-    // no array spelling is ABI-correct: a typedef of one is omitted, a record
-    // holding one is opaque, and a function using one is omitted (MSVC's
-    // <intrin.h> declares several, e.g. AMX's `_tile1024i`).
+    // §16.1 (D78): a `vector_size` / `ext_vector_type` type is `Vector[N, T]`,
+    // printed as the alias the typedef already says (`__m128` → `f32x4`,
+    // `__m128i` → `i64x2`) for the native widths.
     if kind == CXType_Vector or kind == CXType_ExtVector:
-        return session_strdup(s, "__UNSUPPORTED:vector type\0" as *const u8)
+        return translate_vector_type(s, canonical)
 
     if kind == CXType_VariableArray:
         return session_strdup(s, "__UNSUPPORTED:variable-length array\0" as *const u8)
@@ -1140,6 +1139,33 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
 
     // Default: unsupported — must produce a loud compile error
     session_strdup(s, "__UNSUPPORTED:unknown_type_kind\0" as *const u8)
+
+// §16.1 (D78): a C vector lane as the With primitive of its exact width and
+// signedness ("" when With has no vector of it: bool, half, long double).
+fn c_vector_lane_name(kind: i32, bytes: i64) -> str:
+    if kind == CXType_Float: return "f32"
+    if kind == CXType_Double: return "f64"
+    let signed = kind == CXType_Char_S or kind == CXType_SChar or kind == CXType_Short or kind == CXType_Int or kind == CXType_Long or kind == CXType_LongLong
+    let unsigned = kind == CXType_Char_U or kind == CXType_UChar or kind == CXType_UShort or kind == CXType_UInt or kind == CXType_ULong or kind == CXType_ULongLong
+    if not signed and not unsigned: return ""
+    if bytes != 1 and bytes != 2 and bytes != 4 and bytes != 8: return ""
+    (if signed: "i" else: "u") ++ f"{bytes * 8}"
+
+// §16.1 (D78): the With spelling of a C vector type: the alias for the
+// native widths (N × width ∈ 128, 256, 512 bits), else `Vector[N, T]`.
+unsafe fn translate_vector_type(s: *mut CImportSession, canonical: CXType) -> *mut u8:
+    let n = clang_getNumElements(canonical)
+    let elem = clang_getCanonicalType(clang_getElementType(canonical))
+    let bytes = clang_Type_getSizeOf(elem)
+    let lane = c_vector_lane_name(elem.kind, bytes)
+    if lane.len() == 0 or n < 1:
+        return session_strdup(s, "__UNSUPPORTED:vector of a lane type With has no vector of (§4.3d: integer or float lanes of 8 to 64 bits)\0" as *const u8)
+    let total = n * bytes * 8
+    let text = if total == 128 or total == 256 or total == 512: f"{lane}x{n}" else: f"Vector[{n}, {lane}]"
+    var buf: [64]u8 = [0 as u8; 64]
+    for i in 0..text.len() as i32:
+        buf[i] = text[i]
+    session_strdup(s, &buf as *const [64]u8 as *const u8)
 
 /// A canonical record type whose tag is reserved-spelled (`_X`, `__x`) and
 /// whose declaration lives in a system header.
