@@ -12,8 +12,8 @@ use std.builtins.c_void
 
 // ── rt_* platform interface (provided by darwin_aarch64.o) ─────────
 
-extern fn rt_write(fd: i32, buf: *const u8, len: u64) -> i64
-extern fn rt_read(fd: i32, buf: *mut u8, len: u64) -> i64
+extern fn rt_write(fd: i32, buf: *const u8, len: i64) -> i64
+extern fn rt_read(fd: i32, buf: *mut u8, len: i64) -> i64
 extern fn rt_open(path: *const u8, flags: i32, mode: i32) -> i32
 extern fn rt_close(fd: i32) -> i32
 extern fn rt_seek(fd: i32, offset: i64, whence: i32) -> i64
@@ -31,13 +31,13 @@ extern fn rt_getrlimit(resource: i32, lim: *mut u8) -> i32
 extern fn rt_setrlimit(resource: i32, lim: *const u8) -> i32
 extern fn rt_mkstemp(template_path: *mut u8) -> i32
 extern fn rt_realpath(path: *const u8, resolved_path: *mut u8) -> *mut u8
-extern fn rt_mmap(size: u64) -> *mut u8
-extern fn rt_munmap(ptr: *mut u8, size: u64)
+extern fn rt_mmap(size: i64) -> *mut u8
+extern fn rt_munmap(ptr: *mut u8, size: i64)
 @[link_name("malloc")]
 extern fn rt_libc_malloc(size: i64) -> *mut u8
 @[link_name("free")]
 extern fn rt_libc_free(ptr: *mut u8) -> Unit
-extern fn rt_exit(code: i32)
+extern fn rt_exit(code: i32) -> Never
 extern fn rt_clock_ns() -> i64
 extern fn rt_wall_clock_sec() -> i64
 extern fn rt_getenv(name: *const u8) -> *const u8
@@ -682,7 +682,7 @@ fn rt_owned_record_slab(start: i64, size: i64):
         var new_cap = if rt_owned_cap == 0: RT_OWNED_TABLE_MIN else: rt_owned_cap * 2
         while (rt_owned_count + pages) * 2 > new_cap:
             new_cap = new_cap * 2
-        let new_base = rt_mmap((new_cap * 16) as u64) as i64
+        let new_base = rt_mmap(new_cap * 16) as i64
         if new_base == 0:
             rt_alloc_report_out_of_memory(new_cap * 16)
         var i: i64 = 0
@@ -692,7 +692,7 @@ fn rt_owned_record_slab(start: i64, size: i64):
                 rt_owned_put(new_base, new_cap, key, rt_owned_start_at(rt_owned_base, i))
             i = i + 1
         if rt_owned_base != 0:
-            rt_munmap(rt_owned_base as *mut u8, (rt_owned_cap * 16) as u64)
+            rt_munmap(rt_owned_base as *mut u8, rt_owned_cap * 16)
         rt_owned_base = new_base
         rt_owned_cap = new_cap
     var page: i64 = 0
@@ -734,13 +734,13 @@ fn rt_range_store(base: i64, cap: i64, i: i32, start: i64, end: i64):
 // base and writes the new capacity through `cap_out`.
 fn rt_range_table_grow(base: i64, cap: i64, count: i32, cap_out: *mut i64) -> i64:
     let new_cap = if cap == 0: RT_ALLOC_RANGE_CAP as i64 else: cap * 2
-    let p = rt_mmap((new_cap * 16) as u64)
+    let p = rt_mmap(new_cap * 16)
     if p as i64 == 0:
         rt_alloc_report_out_of_memory(new_cap * 16)
     if base != 0:
         rt_memcpy(p, base as *const u8, (count as i64) * 8)
         rt_memcpy((p as i64 + new_cap * 8) as *mut u8, (base + cap * 8) as *const u8, (count as i64) * 8)
-        rt_munmap(base as *mut u8, (cap * 16) as u64)
+        rt_munmap(base as *mut u8, cap * 16)
     unsafe *cap_out = new_cap
     p as i64
 
@@ -1144,12 +1144,12 @@ fn dbg_filter_mode() -> i32:
     dbg_filter_state
 
 fn dbg_puts(s: *const u8, n: i64):
-    let _ = rt_write(2, s, n as u64)
+    let _ = rt_write(2, s, n)
 
 fn dbg_put_i64(v: i64):
     var buf: [24]u8 = [0 as u8; 24]
     let len = i64_to_buf(v, &buf as *mut u8)
-    let _ = rt_write(2, &buf as *const u8, len as u64)
+    let _ = rt_write(2, &buf as *const u8, len)
 
 fn rt_parse_limit_cstr(p: *const u8) -> i64:
     if p as i64 == 0:
@@ -1331,7 +1331,7 @@ fn dbg_ledger_init():
     if dbg_base != 0:
         return
     let bytes = DBG_CAP * DBG_ENTRY_WORDS * 8
-    let p = rt_mmap(bytes as u64)
+    let p = rt_mmap(bytes)
     if p as i64 == 0:
         dbg_state = 1                // mmap failed: disable rather than crash
         return
@@ -1617,7 +1617,7 @@ fn rt_alloc_unlocked(size_arg: i64) -> *mut u8:
         // Large allocation: direct rt_mmap with 16-byte header storing size
         let total = size + RT_ALLOC_HEADER_SIZE
         rt_alloc_reserve_mmap_bytes(total)
-        let p = rt_mmap(total as u64)
+        let p = rt_mmap(total)
         if p as i64 == 0:
             rt_alloc_release_mmap_bytes(total)
             rt_alloc_report_out_of_memory(total)
@@ -1644,7 +1644,7 @@ fn rt_alloc_unlocked(size_arg: i64) -> *mut u8:
     // Carve from slab
     if slab_remaining < block_size:
         rt_alloc_reserve_mmap_bytes(RT_PAGE_SIZE)
-        let new_slab = rt_mmap(RT_PAGE_SIZE as u64)
+        let new_slab = rt_mmap(RT_PAGE_SIZE)
         if new_slab as i64 == 0:
             rt_alloc_release_mmap_bytes(RT_PAGE_SIZE)
             rt_alloc_report_out_of_memory(RT_PAGE_SIZE)
@@ -1714,7 +1714,7 @@ fn rt_free_unlocked_with_drop_origin(ptr: *mut u8, drop_origin_ptr: i64, drop_or
     if size > RT_LARGE_THRESHOLD:
         let total = size + RT_ALLOC_HEADER_SIZE
         rt_forget_large_range(block)
-        rt_munmap(block as *mut u8, total as u64)
+        rt_munmap(block as *mut u8, total)
         rt_alloc_release_mmap_bytes(total)
         return
     let idx = size_class_index(size)
@@ -1894,9 +1894,9 @@ fn cstr_lend_class_for(need: i64) -> i32:
 // A fresh block of `size` bytes: carved from the current slab when it fits,
 // else mapped by itself. rt_mmap memory is zero, so the guard byte is set.
 fn cstr_lend_map(size: i64) -> *mut u8:
-    if size > CSTR_LEND_SLAB / 4: return rt_mmap(size as u64)
+    if size > CSTR_LEND_SLAB / 4: return rt_mmap(size)
     if cstr_lend_slab_left < size:
-        cstr_lend_slab_at = rt_mmap(CSTR_LEND_SLAB as u64) as i64
+        cstr_lend_slab_at = rt_mmap(CSTR_LEND_SLAB) as i64
         cstr_lend_slab_left = if cstr_lend_slab_at == 0: 0 else: CSTR_LEND_SLAB
     if cstr_lend_slab_left < size: return 0 as *mut u8
     let block = cstr_lend_slab_at as *mut u8
@@ -2000,7 +2000,7 @@ fn alloc_str(buf: *const u8, len: i64) -> str:
 fn write_all(fd: i32, buf: *const u8, len: i64):
     var written: i64 = 0
     while written < len:
-        let r = rt_write(fd, (buf as i64 + written) as *const u8, (len - written) as u64)
+        let r = rt_write(fd, (buf as i64 + written) as *const u8, len - written)
         if r <= 0:
             break
         written = written + r
@@ -3916,7 +3916,7 @@ fn fs_read_file_status_c(cpath: *const u8, status: *mut i32) -> str:
     let buf = rt_alloc(size + 1)
     var total: i64 = 0
     while total < size:
-        let r = rt_read(fd, (buf as i64 + total) as *mut u8, (size - total) as u64)
+        let r = rt_read(fd, (buf as i64 + total) as *mut u8, size - total)
         if r < 0:
             let _ = rt_close(fd)
             rt_free(buf)
@@ -3954,7 +3954,7 @@ fn fs_write_file_c(cpath: *const u8, data: &str) -> i32:
     let dl = str_length(data)
     var written: i64 = 0
     while written < dl:
-        let r = rt_write(fd, (dp as i64 + written) as *const u8, (dl - written) as u64)
+        let r = rt_write(fd, (dp as i64 + written) as *const u8, dl - written)
         if r <= 0: break
         written = written + r
     let _ = rt_close(fd)
@@ -4010,11 +4010,11 @@ pub fn with_libc_open(path: *const i8, flags: i32, mode: i32) -> i32:
     if r < 0: -1 else: r
 
 pub fn with_libc_read(fd: i32, buf: *mut u8, count: u64) -> i64:
-    let r = rt_read(fd, buf, count)
+    let r = rt_read(fd, buf, count as i64)
     if r < 0: -1 else: r
 
 pub fn with_libc_write(fd: i32, buf: *const u8, count: u64) -> i64:
-    let r = rt_write(fd, buf, count)
+    let r = rt_write(fd, buf, count as i64)
     if r < 0: -1 else: r
 
 pub fn with_libc_close(fd: i32) -> i32:
@@ -4146,7 +4146,7 @@ pub fn with_read_bytes_stdin(count: i32) -> str:
     let buf = rt_alloc(count as i64 + 1)
     var total: i64 = 0
     while total < count as i64:
-        let r = rt_read(0, (buf as i64 + total) as *mut u8, (count as i64 - total) as u64)
+        let r = rt_read(0, (buf as i64 + total) as *mut u8, count as i64 - total)
         if r <= 0: break
         total = total + r
     unsafe *((buf as i64 + total) as *mut u8) = 0

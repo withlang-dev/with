@@ -6,4 +6,4 @@
 @[link_name("getenv")]
 extern fn rt_libc_getenv(name: *const u8) -> *const u8
 extern fn abort() -> Unit
-extern fn rt_write(fd: i32, buf: *const u8, len: u64) -> i64
+extern fn rt_write(fd: i32, buf: *const u8, len: i64) -> i64

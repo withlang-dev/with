@@ -66,8 +66,8 @@ extern fn with_alloc(size: i64) -> *mut u8
 extern fn with_free(ptr: *mut u8) -> Unit
 extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> *mut u8
 extern fn rt_open(path: *const u8, flags: i32, mode: i32) -> i32
-extern fn rt_read(fd: i32, buf: *mut u8, len: u64) -> i64
-extern fn rt_write(fd: i32, buf: *const u8, len: u64) -> i64
+extern fn rt_read(fd: i32, buf: *mut u8, len: i64) -> i64
+extern fn rt_write(fd: i32, buf: *const u8, len: i64) -> i64
 extern fn rt_close(fd: i32) -> i32
 extern fn rt_seek(fd: i32, offset: i64, whence: i32) -> i64
 extern fn with_println_str(s: &str) -> Unit
@@ -926,7 +926,7 @@ unsafe fn comptime_open_path(path: &str, flags: i32, mode: i32) -> i32:
 unsafe fn comptime_read_exact(fd: i32, buf: *mut u8, len: i64) -> bool:
     var total: i64 = 0
     while total < len:
-        let r = rt_read(fd, (buf as i64 + total) as *mut u8, (len - total) as u64)
+        let r = rt_read(fd, (buf as i64 + total) as *mut u8, len - total)
         if r <= 0:
             return false
         total = total + r
@@ -935,7 +935,7 @@ unsafe fn comptime_read_exact(fd: i32, buf: *mut u8, len: i64) -> bool:
 unsafe fn comptime_write_exact(fd: i32, buf: *const u8, len: i64) -> bool:
     var total: i64 = 0
     while total < len:
-        let r = rt_write(fd, (buf as i64 + total) as *const u8, (len - total) as u64)
+        let r = rt_write(fd, (buf as i64 + total) as *const u8, len - total)
         if r <= 0:
             return false
         total = total + r

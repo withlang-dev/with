@@ -8,7 +8,7 @@
 // Enum constants hardcoded from LLVM 22 headers (stable C API contract).
 
 // ── Runtime helpers (from rt_core.w) ────────────────────────────
-extern fn rt_write(fd: i32, buf: *const u8, len: u64) -> i64
+extern fn rt_write(fd: i32, buf: *const u8, len: i64) -> i64
 extern fn with_str_from_bytes(s: *const u8, len: i64) -> str
 extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> *mut u8
 extern fn with_nanosleep(ns: i64) -> i32
@@ -612,7 +612,7 @@ pub fn wl_init_target_machine(mod_ref: i64, level: i32) -> i64:
             if err as i64 != 0:
                 let err_len = c_strlen(err as *const u8)
                 if err_len > 0:
-                    let _ = rt_write(2, err as *const u8, err_len as u64)
+                    let _ = rt_write(2, err as *const u8, err_len)
                     let _ = rt_write(2, "\n" as *const u8, 1)
                 LLVMDisposeMessage(err)
             LLVMDisposeMessage(default_triple)
@@ -1045,7 +1045,7 @@ pub fn wl_parse_bitcode_in_context(ctx: i64, path: &str) -> i64:
             if err as i64 != 0:
                 let err_len = c_strlen(err as *const u8)
                 if err_len > 0:
-                    let _ = rt_write(2, err as *const u8, err_len as u64)
+                    let _ = rt_write(2, err as *const u8, err_len)
                     let _ = rt_write(2, "\n" as *const u8, 1)
                 LLVMDisposeMessage(err)
             return 0
@@ -1057,7 +1057,7 @@ pub fn wl_parse_bitcode_in_context(ctx: i64, path: &str) -> i64:
             if parse_err as i64 != 0:
                 let perr_len = c_strlen(parse_err as *const u8)
                 if perr_len > 0:
-                    let _ = rt_write(2, parse_err as *const u8, perr_len as u64)
+                    let _ = rt_write(2, parse_err as *const u8, perr_len)
                     let _ = rt_write(2, "\n" as *const u8, 1)
                 LLVMDisposeMessage(parse_err)
             return 0
@@ -1388,7 +1388,7 @@ pub fn wl_verify_module(m: i64) -> i32:
                 let _ = rt_write(2, msg as *const u8, 18)
                 let err_len = c_strlen(err as *const u8)
                 if err_len > 0:
-                    let _ = rt_write(2, err as *const u8, err_len as u64)
+                    let _ = rt_write(2, err as *const u8, err_len)
                     let _ = rt_write(2, "\n" as *const u8, 1)
             LLVMDisposeMessage(err)
         result
@@ -1456,7 +1456,7 @@ pub fn wl_run_function_passes(fn_val: i64, tm: i64, passes: &str) -> i32:
             if msg as i64 != 0:
                 let len = c_strlen(msg as *const u8)
                 if len > 0:
-                    let _ = rt_write(2, msg as *const u8, len as u64)
+                    let _ = rt_write(2, msg as *const u8, len)
                     let _ = rt_write(2, "\n" as *const u8, 1)
                 LLVMDisposeErrorMessage(msg)
             LLVMDisposePassBuilderOptions(opts)
@@ -1477,7 +1477,7 @@ pub fn wl_print_ir(m: i64):
         let ir = LLVMPrintModuleToString(m as *mut u8)
         if ir as i64 != 0:
             let len = c_strlen(ir as *const u8)
-            let _ = rt_write(1, ir as *const u8, len as u64)
+            let _ = rt_write(1, ir as *const u8, len)
             LLVMDisposeMessage(ir)
 
 // The textual LLVM type (`{ ptr, i64 }`, `%Option_i32`), for diagnostics.

@@ -13,7 +13,7 @@ extern fn rt_libc_error() -> *mut i32
 @[link_name("llvm.wasm.memory.size.i32")]
 extern fn wasm_memory_size(mem: i32) -> i32
 extern fn abort() -> Unit
-extern fn rt_write(fd: i32, buf: *const u8, len: u64) -> i64
+extern fn rt_write(fd: i32, buf: *const u8, len: i64) -> i64
 extern fn with_alloc(size: i64) -> *mut u8
 
 c facade libc:

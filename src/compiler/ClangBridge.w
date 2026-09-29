@@ -10,7 +10,7 @@ extern fn with_alloc(size: i64) -> *mut u8
 extern fn with_free(ptr: *mut u8) -> Unit
 extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> *mut u8
 extern fn with_memset(dst: *mut u8, val: i32, len: i64) -> *mut u8
-extern fn rt_write(fd: i32, buf: *const u8, len: u64) -> i64
+extern fn rt_write(fd: i32, buf: *const u8, len: i64) -> i64
 extern fn rt_close(fd: i32) -> i32
 
 // ── libSystem extern fns ────────────────────────────────────────
@@ -1981,8 +1981,8 @@ pub fn with_cimport_parse(header_code: &str) -> i64:
             return s as i64
 
         let src_ptr = *(header_code as *const str as *const *const u8)
-        let _ = rt_write(fd, src_ptr, header_code.len() as u64)
-        let _ = rt_write(fd, "\n\0" as *const u8, 1 as u64)
+        let _ = rt_write(fd, src_ptr, header_code.len())
+        let _ = rt_write(fd, "\n\0" as *const u8, 1)
         let _ = rt_close(fd)
         (*s).tmp_path = c_strdup(&template_path as *const [4096]u8 as *const u8)
 
@@ -3117,8 +3117,8 @@ unsafe fn cimport_collect_macros_from_libclang(ms: *mut MacroSession, header_cod
         with_cimport_dispose(s as i64)
         return 0
     let src_ptr = *(header_code as *const str as *const *const u8)
-    let _ = rt_write(fd, src_ptr, header_code.len() as u64)
-    let _ = rt_write(fd, "\n\0" as *const u8, 1 as u64)
+    let _ = rt_write(fd, src_ptr, header_code.len())
+    let _ = rt_write(fd, "\n\0" as *const u8, 1)
     let _ = rt_close(fd)
     (*s).tmp_path = c_strdup(&template_path as *const [4096]u8 as *const u8)
 
@@ -3200,8 +3200,8 @@ pub fn with_cimport_collect_object_macro_types(header_code: &str, macro_names: &
             return ""
 
         let src_ptr = *(header_code as *const str as *const *const u8)
-        let _ = rt_write(fd, src_ptr, header_code.len() as u64)
-        let _ = rt_write(fd, "\n\0" as *const u8, 1 as u64)
+        let _ = rt_write(fd, src_ptr, header_code.len())
+        let _ = rt_write(fd, "\n\0" as *const u8, 1)
 
         var pos: i32 = 0
         while pos < macro_names.len() as i32:
@@ -3214,7 +3214,7 @@ pub fn with_cimport_collect_object_macro_types(header_code: &str, macro_names: &
                 let name = macro_names.slice(start as i64, pos as i64)
                 let probe_line = "__typeof__(" ++ name ++ ") __with_macro_probe_" ++ name ++ ";\n"
                 let probe_ptr = *(&probe_line as *const *const u8)
-                let _ = rt_write(fd, probe_ptr, probe_line.len() as u64)
+                let _ = rt_write(fd, probe_ptr, probe_line.len())
         let _ = rt_close(fd)
         (*s).tmp_path = c_strdup(&template_path as *const [4096]u8 as *const u8)
 
@@ -3309,13 +3309,13 @@ pub fn with_cimport_parse_macro_probe(header_code: &str, macro_names: &str) -> i
             return 0
 
         let src_ptr = *(header_code as *const str as *const *const u8)
-        let _ = rt_write(fd, src_ptr, header_code.len() as u64)
-        let _ = rt_write(fd, "\n\0" as *const u8, 1 as u64)
+        let _ = rt_write(fd, src_ptr, header_code.len())
+        let _ = rt_write(fd, "\n\0" as *const u8, 1)
         for name in macro_names.split("|"):
             if name.len() == 0: continue
             let probe_line = "__typeof__(" ++ name ++ ") __with_macro_probe_" ++ name ++ " = " ++ name ++ ";\n"
             let probe_ptr = *(&probe_line as *const *const u8)
-            let _ = rt_write(fd, probe_ptr, probe_line.len() as u64)
+            let _ = rt_write(fd, probe_ptr, probe_line.len())
         let _ = rt_close(fd)
         (*s).tmp_path = c_strdup(&template_path as *const [4096]u8 as *const u8)
 
