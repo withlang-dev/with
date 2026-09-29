@@ -969,6 +969,18 @@ fn ci_type_name_is_emitted(name: &str) -> bool:
 fn ci_mark_type_name_emitted(name: &str):
     with_cimport_mark_name_emitted(ci_type_emitted_key(name))
 
+// Frontend owns `only:` selection. A discarded declaration must not reserve
+// either its value name or its type name in the translator's dedup table.
+pub fn ci_forget_filtered_name(name: &str):
+    cimport_forget_emitted_name(name)
+    cimport_forget_emitted_name(ci_type_emitted_key(name))
+    // The AST carries the escaped With name; the bridge carries the C name.
+    if name.ends_with("_"):
+        let raw_name = name.slice(0, name.len() - 1)
+        if ci_escape_reserved(raw_name) == name:
+            cimport_forget_emitted_name(raw_name)
+            cimport_forget_emitted_name(ci_type_emitted_key(raw_name))
+
 fn ci_type_decl_name_exists(session: i64, name: &str) -> bool: ci_decl_name_has(session, name, CI_NAME_TYPE)
 
 fn ci_translated_builtin_type_name(name: &str) -> bool:
@@ -3376,13 +3388,27 @@ pub fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) 
             if not ci_migrate_shared_decl_add("let", safe_name, let_line):
                 output = output ++ let_line ++ "\n"
         else:
-            if ci_object_macro_value_is_type_like(stripped):
-                continue
             // A macro naming a declared type is a type alias, not a value:
             // MSVC's <stdlib.h> `#define onexit_t _onexit_t` must not become
-            // `let onexit_t = _onexit_t`.
+            // `let onexit_t = _onexit_t`. One meaning is forced, so the alias
+            // is emitted as `type X = T` when this import emits T; a target
+            // it does not emit (dropped by `only:`, omitted as opaque) makes
+            // the macro untranslated, so a use names the omission. This runs
+            // before the type-like skip below, which would otherwise swallow
+            // every typedef-named target (`g_macro_type_names`).
             let alias_target = ci_trim(stripped)
             if ci_is_c_ident(alias_target) and (ci_type_name_is_emitted(alias_target) or ci_type_decl_name_exists(type_session, alias_target)):
+                if ci_type_name_is_emitted(alias_target):
+                    let safe_name = ci_escape_reserved(name)
+                    let type_line = "type " ++ safe_name ++ " = " ++ ci_escape_reserved(alias_target)
+                    if not ci_migrate_shared_decl_add("type", safe_name, type_line):
+                        output = output ++ type_line ++ "\n"
+                    with_cimport_mark_name_emitted(name)
+                    ci_mark_type_name_emitted(name)
+                else:
+                    ci_record_untranslated_object_macro(name, macro_is_system)
+                continue
+            if ci_object_macro_value_is_type_like(stripped):
                 continue
             // A comma-list object macro (e.g. `#define OP_NAME_LIST "End",
             // "\\A", ...`) is only meaningful expanded inline inside an array
