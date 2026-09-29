@@ -4459,10 +4459,19 @@ impl Sema:
     // Stage 7's call effects for a callback method's concrete signature
     // (a generic method has none until a call specializes it): the call
     // touches the receiver's views unless the item preserves it (§38).
+    // The userdata is what C hands the callback, and C may invoke the
+    // callback any number of times — no facade clause states a count, and
+    // one inferred would make a call-once closure run twice (§12.4; D51:
+    // never infer what can create unsafety). The rendered body only passes
+    // the userdata to C, so the call-once proof reads this fact instead
+    // (sig_param_may_invoke_many).
     mut fn facade_note_callback_method_sig(fn_sym: i32, sig: i32):
         let mi = self.facade_callback_method_for(fn_sym)
         if mi < 0 or sig < 0:
             return
+        let ud = self.facade_callback_methods[mi].userdata_param
+        if ud >= 0:
+            self.facade_c_invoked_userdata.insert(sig, ud + self.facade_callback_methods[mi].receiver_params)
         let ci = self.facade_callback_methods[mi].contract
         let c_fn = self.foreign_contracts[ci].fn_sym
         let domains = self.facade_domains_touched(self.facade_fn_file(c_fn), ci)

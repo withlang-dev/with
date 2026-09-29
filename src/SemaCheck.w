@@ -17269,9 +17269,18 @@ impl Sema:
 
     // §12.4: a callee may invoke parameter `pi` more than once when its body
     // does (sig_param_invoke_many, forwarding included), or when it has no
-    // body in this compilation and its declaration does not say `once`.
+    // body in this compilation and its declaration does not say `once`, or
+    // when it is a facade callback's userdata, which C invokes through the
+    // callback.
     fn sig_param_may_invoke_many(sig_idx: i32, pi: i32) -> bool:
-        self.sig_param_invoke_many_at(sig_idx, pi) != 0 or (self.sig_is_bodiless(sig_idx) and not self.sig_param_is_once(sig_idx, pi))
+        self.sig_param_invoke_many_at(sig_idx, pi) != 0 or (self.sig_is_bodiless(sig_idx) and not self.sig_param_is_once(sig_idx, pi)) or self.sig_param_is_c_invoked_userdata(sig_idx, pi)
+
+    // §16.2b.9: parameter `pi` of a facade callback method's concrete
+    // signature is the userdata C passes back to the callback — invoked, when
+    // it is callable, as often as C calls the callback: any number of times
+    // (facade_note_callback_method_sig).
+    fn sig_param_is_c_invoked_userdata(sig_idx: i32, pi: i32) -> bool:
+        pi >= 0 and (self.facade_c_invoked_userdata.get(sig_idx) ?? -1) == pi
 
     // D63 (§12.4 "The callable type"), checked where a closure literal is
     // handed to a parameter: a non-move closure is a view of this frame and
@@ -17319,6 +17328,7 @@ impl Sema:
     // judged against its callee's final parameter facts.
     mut fn finalize_closure_arg_checks():
         let n = self.deferred_closure_arg_checks.len() as i32
+        let saved_file_id: i32 = self.local_file_id
         var i = 0
         while i + 5 < n:
             let closure_node: i32 = self.deferred_closure_arg_checks[i]
@@ -17328,7 +17338,10 @@ impl Sema:
             let consumes: i32 = self.deferred_closure_arg_checks[(i + 4)]
             let by_place_sym: i32 = self.deferred_closure_arg_checks[(i + 5)]
             i = i + 6
-            let callee_name: str = with_str_clone_ref(self.pool_resolve(callee_sym))
+            let callee_name = self.call_once_callee_name(callee_sym)
+            // Judged after every body: the diagnostic names the closure's own
+            // file, not the one checked last.
+            self.local_file_id = self.ast.file(closure_node as NodeId) as i32
             if by_place_sym != 0 and (self.sig_param_effect(sig_idx, param_i) & EFF_ESCAPE_VALUE) != 0:
                 let cap_name: str = with_str_clone_ref(self.pool_resolve(by_place_sym))
                 self.emit_error("closure argument holds `" ++ cap_name ++ "` by place — a view of this frame — and `" ++ callee_name ++ "` stores or returns its parameter (§12.4); pass an owning closure: `move () => ...`", closure_node)
@@ -17336,8 +17349,20 @@ impl Sema:
             if consumes != 0:
                 if self.sig_param_invoke_many_at(sig_idx, param_i) != 0:
                     self.emit_error("this closure consumes its capture and may be invoked once, but `" ++ callee_name ++ "` invokes its parameter more than once (§12.4)", closure_node)
+                else if self.sig_param_is_c_invoked_userdata(sig_idx, param_i):
+                    self.emit_error("this closure consumes its capture and may be invoked once, but `" ++ callee_name ++ "` hands it to C as a callback's userdata, and C may call that callback any number of times (§12.4, §16.2b.9)", closure_node)
                 else if self.sig_is_bodiless(sig_idx) and not self.sig_param_is_once(sig_idx, param_i):
                     self.emit_error("this closure consumes its capture and may be invoked once, but `" ++ callee_name ++ "` has no body in this compilation (a bundle boundary) and its parameter is not declared `once` (`f: once fn(A) -> R`), so it may invoke it any number of times (§12.4)", closure_node)
+        self.local_file_id = saved_file_id
+
+    // The name a call-once diagnostic gives a callee: a facade's free
+    // callback bridge under the name the program calls it by, not the
+    // rendered `__with_facade_<name>`.
+    fn call_once_callee_name(callee_sym: i32) -> str:
+        let mi = self.facade_callback_method_for(callee_sym)
+        if mi >= 0 and self.facade_callback_methods[mi].receiver_params == 0:
+            return self.facade_presented_free_name(self.facade_callback_methods[mi].contract)
+        with_str_clone_ref(self.pool_resolve(callee_sym))
 
     // Whether a binding's recorded origins name a stack local of this frame
     // (a non-move closure over `xs`, a value holding one).
@@ -17397,8 +17422,11 @@ impl Sema:
                 changed = true
                 if self.sig_param_is_once(caller_sig, caller_pi):
                     let param_name: str = with_str_clone_ref(self.pool_resolve(self.ast.get_data0(arg_node)))
-                    let callee_name: str = with_str_clone_ref(self.pool_resolve(callee_sym))
+                    let callee_name = self.call_once_callee_name(callee_sym)
+                    let saved_file_id: i32 = self.local_file_id
+                    self.local_file_id = self.ast.file(arg_node as NodeId) as i32
                     self.emit_error("`" ++ param_name ++ "` is declared `once`, but `" ++ callee_name ++ "` may invoke its parameter more than once (§12.4)", arg_node)
+                    self.local_file_id = saved_file_id
 
     // A non-move closure that captures a non-Copy local holds a view of that
     // local's place (§12.4); the binding that holds the closure carries those
@@ -22512,6 +22540,16 @@ impl Sema:
         // (§16.2b.7) through its concrete signature (SemaFacade.w).
         self.facade_note_callback_method_sig(method_fn_sym, concrete_sig)
         self.facade_note_pair_op_sig(method_fn_sym, concrete_sig)
+        // D63 (§12.4): the specialization is the proof a closure argument
+        // needs, as for a generic free call (check_selected_generic_call_args).
+        // The argument loop ran before it existed (sig -1), so a consuming
+        // closure reached a generic method — a facade callback method's
+        // userdata among them — unjudged.
+        if concrete_sig >= 0:
+            let resolved_args = self.has_resolved_call_args(node) != 0
+            for ai4 in 0..arg_count:
+                let arg = if resolved_args: self.get_resolved_call_arg(node, ai4) else: self.ast.get_extra(extra_start + ai4)
+                self.check_closure_arg_against_param(arg, method_fn_sym, concrete_sig, ai4 + param_offset, node)
         let ret_ty = if concrete_sig >= 0:
             self.sig_return_type(concrete_sig)
         else:

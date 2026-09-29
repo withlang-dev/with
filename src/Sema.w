@@ -1390,6 +1390,7 @@ pub type Sema {
     // call sites).
     facade_callback_methods: Vec[FacadeCallbackMethod],
     facade_callback_method_index: HashMap[i32, i32],   // the method's generic fn node -> facade_callback_methods index
+    facade_c_invoked_userdata: HashMap[i32, i32],      // §12.4/§16.2b.9: a callback method's concrete signature -> its userdata parameter (signature index), which C invokes through the callback any number of times
     facade_pair_ops: Vec[FacadePairOp],                // D66 #1652: per concrete signature (facade_pair_op_by_sig)
     facade_pair_op_by_sig: HashMap[i32, i32],
     facade_pair_setter_contract: HashMap[i32, i32],    // a pair setter's generic fn node -> foreign_contracts index …
@@ -2903,6 +2904,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         facade_convention_nodes: Vec.new(),
         facade_callback_methods: Vec.new(),
         facade_callback_method_index: sema_new_map_i32_i32(),
+        facade_c_invoked_userdata: sema_new_map_i32_i32(),
         facade_pair_ops: Vec.new(),
         facade_pair_op_by_sig: sema_new_map_i32_i32(),
         facade_pair_setter_contract: sema_new_map_i32_i32(),
