@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.13
+# The With Programming Language — Specification v7.14
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,12 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.14:** SIMD masks and lane selection (D80): `m.select(a, b)`
+replaces `select(m, a, b)`, so `select` stays the `select await` keyword
+alone; a scalar broadcasts on either side of every lane-wise operator;
+masks construct, index, combine with `& | ^` and `not`, broadcast a
+`bool`, and cast between widths; `W` includes 128, so `i128`/`u128` lanes
+compare.
 **Changelog v7.13:** a bundle's `pub` function declares the exported
 globals it writes with a trailing `writes` clause; absent means none,
 verified by the bundle build; a superset warns; transitivity is checked

@@ -1058,9 +1058,9 @@ These methods are generated unconditionally for all enums — no
 `Vector[N, T]` is a SIMD vector: `N` lanes of `T`, computed lane-wise.
 `N ≥ 1` is a compile-time constant and `T` is a primitive integer or
 floating type (§4.1). `Mask[N, W]` is `N` lanes of a lane-wide boolean
-`W` bits wide (`W` ∈ 8, 16, 32, 64); a lane-wise comparison of
-`Vector[N, T]` yields `Mask[N, width(T)]`, which is what `select` and the
-hardware produce.
+`W` bits wide (`W` ∈ 8, 16, 32, 64, 128); a lane-wise comparison of
+`Vector[N, T]` yields `Mask[N, width(T)]`, which is what `m.select(a, b)`
+and the hardware take.
 
 **Aliases.** `f32x4`, `i32x8`, `u8x16`, … name `Vector[N, T]`, and
 `m32x4`, `m8x16`, … name `Mask[N, W]`, for the native widths
@@ -1089,8 +1089,9 @@ compiler lowers it. `Vector` and `Mask` are `Copy`.
 broadcasts to every lane in the two places that have one meaning:
 
 - a literal in a vector context: `let v: f32x4 = 0`;
-- a scalar operand, literal or variable, in arithmetic with a vector:
-  `v * 2.0`, `v * s`.
+- a scalar operand, literal or variable, on either side of a lane-wise
+  operator with a vector — arithmetic, comparison, bitwise, or a shift
+  amount: `v * 2.0`, `s * v`, `0.0 < v`, `0xff & v`, `v >> 2`.
 
 A scalar variable bound alone as a vector is refused: `let v: f32x4 = s`
 is spelled `f32x4.splat(s)`, because that is the one place where a type
@@ -1106,10 +1107,20 @@ half of the C world already writes; it is not an invention.
 
 **Operators.** `+ - * / %`, and for integer lanes `& | ^ << >>` and `~`,
 are lane-wise and follow §4.2 per lane. `== != < <= > >=` are lane-wise
-and yield a `Mask`. `select(m, a, b)` picks per lane; `m.all()` and
-`m.any()` reduce a mask; `reduce_add`, `reduce_mul`, `reduce_min`,
-`reduce_max`, `reduce_and`, `reduce_or` and `reduce_xor` reduce a
-vector.
+and yield a `Mask`. `m.select(a, b)` picks per lane: `a`'s lane where
+`m` is true, `b`'s where it is false. `m.all()` and `m.any()` reduce a
+mask; `reduce_add`, `reduce_mul`, `reduce_min`, `reduce_max`,
+`reduce_and`, `reduce_or` and `reduce_xor` reduce a vector.
+
+**Masks.** `m32x4(true, false, true, true)` and `m32x4.splat(true)`
+construct a mask as a vector is constructed, and `m[i]` reads lane `i`
+as a `bool`. `&`, `|` and `^` combine masks of the same shape lane-wise,
+a `bool` operand broadcasting as a scalar does (#Construction and
+splat), and `not m` negates each lane. `and` and `or` are refused on a
+mask: they short-circuit, and lanes cannot. Masks of different widths do
+not combine; `m as m8x4` converts the width. The width is
+representation, not meaning: every width holds the same lane booleans,
+which is why `W` reaches 128 for 128-bit lanes.
 
 **Casts.** `v as i32x4` converts lane-wise, under §4.2.6 for each lane
 (an implicit narrowing is refused as it is for a scalar). `v.bits()`

@@ -21,6 +21,10 @@ clang's `ext_vector_type` swizzles, not an invention. `as` is lane-wise;
 meanings. `c_import` prints the aliases, because they are what the C
 typedefs already say.
 
+**Amended by D80** (2026-09-29): lane selection is `m.select(a, b)`, a
+scalar broadcasts on either side of every lane-wise operator, masks gain
+construction, indexing and `& | ^`/`not`, and `W` includes 128.
+
 **Why.** Generic code needs the parameterized form
 (`fn dot[N](a: Vector[N, f32], …)`); everyone else needs the one-token
 name; the aliases are presentation and cost nothing semantically. This
