@@ -16123,7 +16123,10 @@ impl Sema:
             result_type = self.resolve_contextual_join(match_anchor as i32, &join_expr_nodes, &join_origin_nodes, &arm_types, &join_roles, node, "match") as TypeId
             self.infer_tail_join = saved_infer_join
             self.d32_check_owned_join_arms(result_type as i32, &join_expr_nodes, "match arm")
-        else if stmt_arms_mixed:
+        else if is_infer_tail or stmt_arms_mixed:
+            // D43: a missing arm made this inferred tail a statement above.
+            // Even equal written-arm types cannot supply the absent arm's
+            // value; keeping that type made MIR read an unwritten join temp.
             result_type = self.ty_void
 
         // Exhaustiveness checking for enum and bool subjects.
