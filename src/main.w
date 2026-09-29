@@ -5967,6 +5967,7 @@ fn get_command_usage():
     with_eprint("  c.<package>     C dependency via Conan Center")
     with_eprint("  <package>       With package (registry not yet available)")
     with_eprint("  (no arguments)  restore dependencies from lock file")
+    with_eprint("  WITH_GET_CMAKE_<PACKAGE>=NAME=VALUE;...  CMake variables for the package's source build (builds it from source)")
 
 fn get_command_registry_unavailable(name: &str):
     with_eprint("error: the With package registry is not available yet; cannot fetch With package '" ++ name ++ "'")

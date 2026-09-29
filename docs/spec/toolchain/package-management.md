@@ -73,6 +73,16 @@ link = ["custom"]
 | `with update` | Update all deps to latest compatible |
 | `with get` (no args) | Restore deps from lock file |
 
+**Build variables for a source build.** `WITH_GET_CMAKE_<PACKAGE>` (the
+package name uppercased, `-` as `_`) carries CMake cache variables into that
+package's source build: `NAME=VALUE` entries separated by `;`, applied after
+the recipe's own so they win. A Conan Center binary cannot honor a build
+variable, so a set variable builds the package from source, as
+`--from-source` does. It is a host provision, like `LIBGL_ALWAYS_SOFTWARE`:
+a GPU-less macOS host draws raylib through its software rasterizer with
+`WITH_GET_CMAKE_RAYLIB="PLATFORM=RGFW;OPENGL_VERSION=Software;USE_EXTERNAL_GLFW=OFF"`. An entry
+that is not `NAME=VALUE` is an error, never ignored.
+
 **Directory structure:**
 
 ```

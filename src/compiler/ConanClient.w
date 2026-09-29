@@ -9,6 +9,7 @@ use compiler.ConanPatch
 use compiler.ClangDriver
 use std.crypto.sha256
 extern fn with_str_clone_ref(s: &str) -> str
+extern fn str_from_byte(b: i32) -> str
 
 fn CONAN_CENTER_URL -> str: "https://center2.conan.io"
 fn CONAN_INDEX_RAW -> str: "https://raw.githubusercontent.com/conan-io/conan-center-index/master/recipes"
@@ -1112,6 +1113,41 @@ var g_conan_from_source: bool = false
 pub fn conan_set_from_source(enabled: bool) -> Unit:
     g_conan_from_source = enabled
 
+// `WITH_GET_CMAKE_<PACKAGE>` (the name uppercased, `-` as `_`): CMake cache
+// variables for the package's source build, `NAME=VALUE` entries separated by
+// `;`, appended after the recipe's own so they win. A Conan Center binary
+// cannot honor a build variable, so a set variable means the package builds
+// from source. A host provision, like LIBGL_ALWAYS_SOFTWARE: the darwin
+// release lane renders raylib through its software rasterizer (rlsw) with
+// `WITH_GET_CMAKE_RAYLIB=PLATFORM=RGFW;OPENGL_VERSION=Software;USE_EXTERNAL_GLFW=OFF`
+// (#1375; the RGFW window backend has no GLFW to import).
+pub fn conan_package_cmake_env_name(name: &str) -> str:
+    var out = "WITH_GET_CMAKE_"
+    for i in 0..name.len() as i32:
+        let c = name[i]
+        if c == '-': out = out ++ "_"
+        else if c >= 'a' and c <= 'z': out = out ++ str_from_byte(c - 32)
+        else: out = out ++ name.slice(i, i + 1)
+    out
+
+pub type ConanCMakeEnv {
+    defines: Vec[str],   // `-DNAME=VALUE`, in the order written
+    problem: str,        // "" or the entry that is not `NAME=VALUE`
+}
+
+pub fn conan_cmake_env_parse(text: &str) -> ConanCMakeEnv:
+    var defines: Vec[str] = Vec.new()
+    for raw in text.split(";"):
+        let entry = raw.trim()
+        if entry.len() == 0: continue
+        let eq = entry.find("=")
+        if eq <= 0: return ConanCMakeEnv { defines: Vec.new(), problem: entry.to_owned() }
+        defines.push("-D" ++ entry)
+    ConanCMakeEnv { defines, problem: "" }
+
+fn conan_package_cmake_env(name: &str) -> ConanCMakeEnv:
+    conan_cmake_env_parse(runtime_getenv(conan_package_cmake_env_name(name)))
+
 // No linkable binary on Conan Center: build the package from source.
 //
 // Nothing here knows any package. The recipe Conan Center publishes is read as
@@ -1220,7 +1256,11 @@ fn conan_recipe_build_system(recipe: &str) -> str:
 
 fn conan_install_from_source(name: &str, version: &str, project_root: &str, depth: i32) -> str:
     let platform = conan_detect_os() ++ "/" ++ conan_detect_arch()
-    let why = if g_conan_from_source: "--from-source" else: "Conan Center has no binary for " ++ platform ++ " that this toolchain can link"
+    let cmake_env_name = conan_package_cmake_env_name(name)
+    let cmake_env = conan_package_cmake_env(name)
+    if cmake_env.problem.len() > 0:
+        return conan_source_fail("", cmake_env_name ++ " entry '" ++ cmake_env.problem ++ "' is not NAME=VALUE (entries are separated by `;`)")
+    let why = if g_conan_from_source: "--from-source" else: if cmake_env.defines.len() > 0: cmake_env_name ++ " is set" else: "Conan Center has no binary for " ++ platform ++ " that this toolchain can link"
     runtime_eprint("  " ++ why ++ "; building " ++ name ++ "/" ++ version ++ " from source")
     let folder = conan_recipe_folder(name, version)
     let data = if folder.len() > 0: conan_http_get(conan_recipe_file_url(name, folder, "conandata.yml")) else: ""
@@ -1317,6 +1357,9 @@ fn conan_install_from_source(name: &str, version: &str, project_root: &str, dept
     configure = conan_argv_append(configure, "-DCMAKE_INSTALL_LIBDIR=lib")
     if prefix_path.len() > 0: configure = conan_argv_append(configure, "-DCMAKE_PREFIX_PATH=" ++ prefix_path)
     for define in variables.defines: configure = conan_argv_append(configure, define)
+    for define in cmake_env.defines:
+        runtime_eprint("  " ++ cmake_env_name ++ ": " ++ define)
+        configure = conan_argv_append(configure, define)
     runtime_eprint("  configuring...")
     if conan_run_tool(configure, 900000) != 0:
         for unknown in variables.unknown: runtime_eprint("  note: the recipe also sets " ++ unknown ++ ", which could not be evaluated")
@@ -1377,7 +1420,9 @@ fn conan_install_internal(name: &str, version_hint: &str, project_root: &str, de
         runtime_eprint("error: could not resolve recipe for " ++ name ++ "/" ++ version ++ " on Conan Center")
         return ""
     runtime_eprint("  revision: " ++ recipe_rev.slice(0, if recipe_rev.len() > 12: 12 else: recipe_rev.len()))
-    if g_conan_from_source: return conan_install_from_source(name, version, project_root, depth)
+    let cmake_env = conan_package_cmake_env(name)
+    if g_conan_from_source or cmake_env.defines.len() > 0 or cmake_env.problem.len() > 0:
+        return conan_install_from_source(name, version, project_root, depth)
     let installed_binary = conan_install_binary(name, version, recipe_rev, project_root, depth, force_reinstall)
     if installed_binary.len() > 0:
         return installed_binary
