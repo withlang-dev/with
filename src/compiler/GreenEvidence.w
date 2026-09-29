@@ -95,7 +95,7 @@ pub fn green_by_source_identity(root: &str) -> str:
     if tree.len() < 40: return ""
     let identity = tree ++ "-" ++ seeded_by ++ "-" ++ with_sysinfo_os() ++ "_" ++ with_sysinfo_arch()
     let explicit = runtime_getenv("WITH_GREEN_DIR")
-    let store_dir = if explicit.len() > 0: explicit else: runtime_getenv("HOME") ++ "/.local/with-green"
+    let store_dir = if explicit.len() > 0: explicit else: runtime_home_dir() ++ "/.local/with-green"
     let store_lines = runtime_read_file(green_join(store_dir, "green.tsv")).split("\n")
     for i in 0..store_lines.len() as i32:
         let line = store_lines.get(i)

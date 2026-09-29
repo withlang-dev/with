@@ -1205,7 +1205,7 @@ fn install_file_target(name: &str, source: &str, dest: &str, mode: &str, dep: &s
 // two). The kind writes outside the project only under `$HOME/`.
 fn green_store_install_path(ctx: &BuildCtx) -> str:
     let explicit = ctx.env_input("WITH_GREEN_DIR")
-    let home = ctx.env_input("HOME")
+    let home = comp_home_dir(ctx)
     let dir = if explicit.len() > 0: explicit else: home ++ "/.local/with-green"
     if home.len() > 0 and dir.starts_with(home ++ "/"):
         return "$HOME/" ++ dir.slice(home.len() + 1, dir.len()) ++ "/green.tsv"

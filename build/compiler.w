@@ -102,6 +102,40 @@ pub fn comp_rsp_path(path: &str) -> str:
         return "\"" ++ normalized ++ "\""
     normalized
 
+// The home directory as a graph input: HOME, else on Windows USERPROFILE,
+// which cmd and PowerShell set where they set no HOME (#1884: with HOME
+// unset the .wo store became `/.local/with-wo`). Backslashes are spelled
+// forward so a path built on it joins with "/". "" when the host names
+// none; the caller says what it needed a home for. The compiler's
+// runtime_home_dir (src/compiler/Runtime.w) applies the same rule, so the
+// `$HOME/` install destination a plan spells expands to the directory the
+// plan meant; the two must agree.
+pub fn comp_home_dir(ctx: &BuildCtx) -> str:
+    let home = ctx.env_input("HOME")
+    if home.len() > 0:
+        return comp_replace_all(home, "\\", "/")
+    if os() == "Windows":
+        let profile = ctx.env_input("USERPROFILE")
+        if profile.len() > 0:
+            return comp_replace_all(profile, "\\", "/")
+    ""
+
+// comp_home_dir for an action, which reads the environment directly.
+pub fn comp_home_dir_env() -> str:
+    let home = env("HOME")
+    if home.len() > 0:
+        return comp_replace_all(home, "\\", "/")
+    if os() == "Windows":
+        let profile = env("USERPROFILE")
+        if profile.len() > 0:
+            return comp_replace_all(profile, "\\", "/")
+    ""
+
+// What a build says when it needs a home directory and the host names none.
+pub fn comp_no_home_message(purpose: &str) -> str:
+    let vars = if os() == "Windows": "neither HOME nor USERPROFILE is set" else: "HOME is unset"
+    purpose ++ ": " ++ vars ++ " (#1884)"
+
 // Windows import-library paths for the LLVM link-metadata rsp. Honour the
 // explicit libdir env override (set by the runner / cross-build SDK) before the
 // baked-in VS2019/Windows-Kit paths, which do not exist on a clean runner or a

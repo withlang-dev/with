@@ -87,6 +87,23 @@ pub fn runtime_getenv(name: &str) -> str:
 pub fn runtime_setenv(name: &str, value: &str) -> i32:
     with_setenv_str(name, value)
 
+// The home directory: HOME, else on Windows USERPROFILE, which cmd and
+// PowerShell set where they set no HOME (#1884: with HOME unset the .wo
+// store became `/.local/with-wo`). Backslashes are spelled forward so a
+// path built on it joins with "/". "" when the host names none. The build
+// layer's comp_home_dir (build/compiler.w) applies the same rule, so the
+// `$HOME/` install destination a plan spells expands here to the directory
+// the plan meant; the two must agree.
+pub fn runtime_home_dir() -> str:
+    let home = with_getenv_str("HOME")
+    if home.len() > 0:
+        return home.replace("\\", "/")
+    if runtime_sysinfo_os() == "Windows":
+        let profile = with_getenv_str("USERPROFILE")
+        if profile.len() > 0:
+            return profile.replace("\\", "/")
+    ""
+
 pub fn runtime_clock_nanos() -> i64:
     with_clock_nanos()
 

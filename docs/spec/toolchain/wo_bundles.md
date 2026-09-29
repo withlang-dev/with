@@ -338,7 +338,9 @@ __with_mod_<hash>__` line per module in the bundle. The prefixes are the
 on-demand predicate and the link-time interface check: an undefined
 symbol starting with a bundle's prefix means that bundle links.
 
-**Store.** `$WITH_WO_DIR`, default `~/.local/with-wo/`, outside `out/`.
+**Store.** `$WITH_WO_DIR`, default `~/.local/with-wo/` (`~` is `HOME`, or
+`USERPROFILE` on Windows where cmd and PowerShell set no `HOME`; a host that
+names neither is refused), outside `out/`.
 Release assets per corpus version later; source always in the tree.
 
 **Link.** `Link.w` gains: `--link-object <path>` (repeatable; a plain

@@ -196,7 +196,7 @@ fn build_graph_install_libdir() -> str:
 pub fn build_graph_path_is_install_dest(path: &str) -> bool:
     path.starts_with("$HOME/") or path.starts_with("$INSTALL_BINDIR/") or path.starts_with("$INSTALL_LIBDIR/")
 
-pub fn build_graph_validate_target_containment(target: &BuildGraphTarget) -> i32:
+pub fn build_graph_validate_target_containment(root: &str, target: &BuildGraphTarget) -> i32:
     let kind = target.kind
     let is_install = kind == 8
     let is_promote = kind == 20

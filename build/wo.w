@@ -126,21 +126,31 @@ pub fn wo_manifest_field(manifest: &str, key: &str) -> str:
         start = end + 1
     ""
 
-// The store directory: $WITH_WO_DIR, else ~/.local/with-wo. Both are
-// graph inputs (env_input), so a change re-plans.
+// The store directory: $WITH_WO_DIR, else <home>/.local/with-wo, the home
+// being comp_home_dir's (HOME, else USERPROFILE on Windows; #1884). All
+// are graph inputs (env_input), and the evaluated-graph cache is served only
+// while each keeps the value it was planned under (#1885), so setting,
+// changing or unsetting one re-plans. A host that names no home directory
+// is refused here, before any target: the store would otherwise be
+// `/.local/with-wo`, and the install targets would refuse that as escaping
+// the project.
 pub fn wo_store_dir(ctx: &BuildCtx) -> str:
     let explicit = ctx.env_input("WITH_WO_DIR")
     if explicit.len() > 0:
         return explicit
-    ctx.env_input("HOME") ++ "/.local/with-wo"
+    let home = comp_home_dir(ctx)
+    if home.len() == 0:
+        ctx.diagnostics().error(comp_no_home_message("the .wo store defaults to <home>/.local/with-wo; set WITH_WO_DIR, or HOME"))
+    home ++ "/.local/with-wo"
 
 // The store as an .Install destination: the kind writes outside the project
 // only under `$HOME/`, so a store beneath the home directory is spelled
-// that way; WITH_WO_DIR is otherwise project-relative (a test's scratch
-// store under out/).
+// that way (the compiler expands `$HOME/` by the same rule, runtime_home_dir);
+// WITH_WO_DIR is otherwise inside the project (a test's scratch store under
+// out/, relative or absolute).
 fn wo_store_install_dir(ctx: &BuildCtx) -> str:
     let store = wo_store_dir(ctx)
-    let home = ctx.env_input("HOME")
+    let home = comp_home_dir(ctx)
     if home.len() > 0 and store.starts_with(home ++ "/"):
         return "$HOME/" ++ store.slice(home.len() + 1, store.len())
     store

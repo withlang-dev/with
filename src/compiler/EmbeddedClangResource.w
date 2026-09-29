@@ -14,6 +14,7 @@
 // libclang bridge.
 
 use compiler.EmbeddedClangResourceData
+use compiler.Runtime
 
 extern fn with_fs_write_file(path: &str, data: &str) -> i32
 extern fn with_fs_file_exists(path: &str) -> i32
@@ -42,7 +43,7 @@ fn ecr_identity_text() -> str:
 fn ecr_cache_root() -> str:
     var base = with_getenv_str("XDG_CACHE_HOME")
     if base.len() == 0:
-        let home = with_getenv_str("HOME")
+        let home = runtime_home_dir()
         base = if home.len() == 0: "/tmp/with-cache" else: home ++ "/.cache"
     base ++ "/with/clang-resource/" ++ embedded_clang_resource_version() ++ "-" ++ f"{with_str_hash(ecr_identity_text())}"
 

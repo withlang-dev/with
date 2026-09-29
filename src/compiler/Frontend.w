@@ -835,7 +835,7 @@ fn c_import_header_content_fingerprint_line(header_spec: &str) -> str:
     "\n#header-path:" ++ path ++ "\n#header-len:" ++ f"{text.len()}" ++ "\n#header-hash:" ++ f"{runtime_str_hash(text)}"
 
 fn c_import_fs_cache_dir() -> str:
-    let home = runtime_getenv("HOME")
+    let home = runtime_home_dir()
     if home.len() == 0:
         return ""
     home ++ "/.cache/with/c_import"
