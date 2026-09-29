@@ -1384,6 +1384,12 @@ The operations that require an unsafe context are:
   required provenance
 - Other operations explicitly marked as unsafe in their definition
 
+An unsafe callable's type is spelled `unsafe fn(A) -> R`, or
+`unsafe extern "C" fn(A) -> R` for a C contract; a value of that type is
+called only in an unsafe context, and it never coerces to the safe `fn` /
+`extern "C" fn` type of the same signature. The variadic type (§16.2b.5)
+is the one spelling where `unsafe` is implied.
+
 For the common raw-memory access case, `unsafe` may be used as a
 narrow prefix over one contiguous raw access chain:
 
