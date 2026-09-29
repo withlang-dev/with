@@ -30,6 +30,7 @@ use compiler.ProjectConfig
 use compiler.Runtime
 use compiler.TrackedInputs
 use compiler.Zcu
+use compiler.Link
 use InternPool
 // Frontend pipeline: lex -> parse -> import resolution -> sema.
 
@@ -392,11 +393,15 @@ impl Zcu:
         // list (clear+set) so a prior compile in the same process — `with test`
         // runs many — cannot leak stale include dirs.
         ci_set_include_paths(self.project_config.c_import_include_paths)
-        // Native Windows: libclang has no default system-header search path, so
-        // add the MSVC CRT + Windows SDK include dirs (WITH_WINDOWS_*_INCDIR).
-        // No-op off Windows / when unset; include-side analog of the
-        // WITH_WINDOWS_*_LIBDIR link wiring.
-        ci_add_windows_system_includes()
+        // Windows x86_64: parse against the SDK's libc, the one the link
+        // reads (#1915, Link.w link_stage_windows_libc_root). A Windows target
+        // the SDK's libc does not cover yet (aarch64) keeps the explicit
+        // WITH_WINDOWS_*_INCDIR dirs; both are no-ops off Windows.
+        if link_stage_windows_c_target_uses_sdk_libc():
+            ci_set_windows_target(link_stage_windows_c_target(), link_stage_windows_libc_root())
+        else:
+            ci_set_windows_target("", "")
+            ci_add_windows_system_includes()
         // §16.1: pass the configured target SDK sysroot (empty resets any prior).
         ci_set_sdk_path(self.project_config.c_import_sdk_path)
 
@@ -1046,6 +1051,9 @@ impl Zcu:
         // target input and the remedies (never a host tool — none is used).
         if with_cimport_macos_sdk_missing() != 0:
             full_msg = full_msg ++ "; no macOS SDK for target headers: this compiler carries no darwin sysroot (#1915) — set WITH_SDKROOT or SDKROOT, or configure [c_import] sdk_path in with.toml"
+        // #1915: a Windows c_import parses the SDK's libc headers only.
+        if with_cimport_windows_libc_missing() != 0:
+            full_msg = full_msg ++ "; the LLVM SDK carries no Windows C runtime (libc/windows) — install an SDK built with `with build :sdk-windows-libc`, or name one with WITH_WINDOWS_LIBC_DIR"
         self.diagnostics.emit(Diagnostic.err(full_msg, span))
 
     mut fn c_import_emit_header_error_frontend(decl: i32, header_spec: &str):
