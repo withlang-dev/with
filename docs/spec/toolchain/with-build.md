@@ -195,6 +195,17 @@ Compiled targets record the `with` compiler binary fingerprint in that state.
 When you install or run a different compiler binary, those targets are stale
 and rebuild automatically.
 
+A `.Test` target records each test file's pass in a machine-wide verdict
+store, `$WITH_TEST_VERDICT_DIR` or else `~/.local/with-test-verdicts`, beside
+the `.wo` bundle store (`~/.local/with-wo`). A pass is keyed on content, never
+on a path outside the project or a timestamp: the test compiler binary, the
+test file and its project-relative path, the test's directory and the `.w`
+sources under `src/` and `lib/`, the target's arguments and harness command,
+and the `SDKROOT`, `DEVELOPER_DIR`, `CC`, `WITH_CLANG_RESOURCE_DIR` and
+`WITH_MEMORY_LIMIT_BYTES` environment. A file whose key matches a recorded
+pass is not re-run, in this worktree or any other on the machine. Failures
+are never recorded, so deleting the directory at any time only costs re-runs.
+
 Project build artifacts are bounded by explicit cleanup targets. `with build
 :prune` reports stale temporary artifacts; `with build :prune-apply` removes
 stale `out/bin/*.tmp.*.dSYM` bundles, temporary archive wrappers in `out/lib/`

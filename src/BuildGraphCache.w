@@ -33,6 +33,7 @@ var build_cache_fp_memo: HashMap[str, str] = HashMap.new()
 
 pub fn build_cache_forget_fingerprints() -> Unit:
     build_cache_fp_memo = HashMap.new()
+    build_cache_tree_fp_memo = HashMap.new()
 
 // #1654: what each running target's inputs looked like when it was
 // dispatched (target name → "path:hash" lines). A record made after the run
@@ -485,16 +486,37 @@ pub fn build_cache_record_test_success(root: &str, target: &BuildGraphTarget, te
 //
 // A test file's PASS verdict is cached under a key that changes when any
 // of these change: the test compiler binary (content fingerprint — the
-// unanimous reference-toolchain design), the test file itself, the
-// target's configuration (args/defines/includes/libs/opt), or the
-// harness-relevant environment. Only PASSES are cached (Go semantics);
-// failures always re-run. The verdict store is rewritten after every
-// target run with exactly the currently-passing key set, so stale keys
-// compact away and a red target still banks the green files it proved —
-// the next run re-executes only failures and changed files.
+// unanimous reference-toolchain design), the test file itself, what the
+// test can read from the tree besides itself (its directory: sibling
+// modules, headers, embedded data; the .w sources under src/ and lib/ it
+// may import), the target's configuration (args/defines/includes/libs/opt
+// and the harness argv), or the environment the compile and link read.
+// Every part is content and project-relative path, never an absolute path
+// or an mtime, so the key means the same thing in every worktree, and the
+// store is machine-wide (#1899): $WITH_TEST_VERDICT_DIR, else
+// ~/.local/with-test-verdicts, beside the .wo store. Only PASSES are cached
+// (Go semantics); failures always re-run. The store keeps one file per
+// compiler fingerprint and target, rewritten after every target run with
+// exactly the currently-passing key set, so stale keys compact away and a
+// red target still banks the green files it proved — the next run
+// re-executes only failures and changed files.
 
-pub fn build_cache_test_verdicts_path(root: &str, target_name: &str) -> str:
-    build_cache_state_dir(root) ++ "/" ++ target_name ++ ".test-verdicts"
+pub fn build_cache_test_verdict_store(root: &str) -> str:
+    let explicit = build_graph_rt_getenv("WITH_TEST_VERDICT_DIR")
+    if explicit.len() > 0: return explicit
+    let home = build_graph_rt_getenv("HOME")
+    if home.len() > 0: return home ++ "/.local/with-test-verdicts"
+    build_cache_state_dir(root) ++ "/test-verdicts"
+
+pub fn build_cache_test_verdicts_path(root: &str, compiler_fp: &str, target_name: &str): build_cache_test_verdict_store(root) ++ "/" ++ compiler_fp ++ "/" ++ target_name ++ ".test-verdicts"
+
+// Environment the test compile, c_import and link read: a pass under one
+// SDK or C compiler is not a pass under another.
+fn build_cache_test_env_sig_text() -> str:
+    var sig = ""
+    for name in ["WITH_MEMORY_LIMIT_BYTES", "SDKROOT", "DEVELOPER_DIR", "CC", "WITH_CLANG_RESOURCE_DIR"]:
+        sig = sig ++ "env:" ++ name ++ "=" ++ build_graph_rt_getenv(name) ++ "\n"
+    sig
 
 fn build_cache_test_target_sig_text(target: &BuildGraphTarget) -> str:
     var sig = f"opt:{target.optimize_mode}\n"
@@ -506,8 +528,7 @@ fn build_cache_test_target_sig_text(target: &BuildGraphTarget) -> str:
         sig = sig ++ "include:" ++ target.include_paths[i] ++ "\n"
     for i in 0..target.system_libs.len() as i32:
         sig = sig ++ "lib:" ++ target.system_libs[i] ++ "\n"
-    sig = sig ++ "env:WITH_MEMORY_LIMIT_BYTES=" ++ build_graph_rt_getenv("WITH_MEMORY_LIMIT_BYTES") ++ "\n"
-    sig
+    sig ++ build_cache_test_env_sig_text()
 
 pub fn build_cache_test_compiler_fingerprint(compiler_path: &str) -> str:
     // The stamped binary differs across commits only in its version slot
@@ -519,15 +540,44 @@ pub fn build_cache_test_compiler_fingerprint(compiler_path: &str) -> str:
         return build_cache_fingerprint_file(unstamped)
     build_cache_fingerprint_file(compiler_path)
 
-pub fn build_cache_test_verdict_key(root: &str, target: &BuildGraphTarget, compiler_fp: &str, test_path: &str) -> str:
+// Per-run memo of tree fingerprints (dir + filter → hash).
+var build_cache_tree_fp_memo: HashMap[str, str] = HashMap.new()
+
+// Every file under `dir` (recursively; only `.w` files when `w_only`) by
+// project-relative path and content fingerprint.
+fn build_cache_tree_fingerprint(root: &str, dir: &str, w_only: bool) -> str:
+    let memo_key = (if w_only: "w:" else: "all:") ++ dir
+    let memoized = build_cache_tree_fp_memo.get(memo_key)
+    if memoized.is_some(): return with_str_clone_ref(memoized.unwrap())
+    let files = build_cache_sorted_strings(build_cache_split_lines(build_graph_rt_list_files(root ++ "/" ++ dir)))
+    var combined = ""
+    for i in 0..files.len() as i32:
+        let file = files[i]
+        if w_only and not file.ends_with(".w"): continue
+        combined = combined ++ build_cache_project_relative(root, file) ++ ":" ++ build_cache_fingerprint_file(file) ++ "\n"
+    let fp = build_cache_sha256_text(combined)
+    build_cache_tree_fp_memo.insert(memo_key, with_str_clone_ref(fp))
+    fp
+
+// What a test can read from the tree besides itself.
+fn build_cache_test_surface_text(root: &str, test_path: &str) -> str:
+    let rel = build_cache_project_relative(root, test_path)
+    var slash = -1
+    for i in 0..rel.len() as i32:
+        if rel[i] == '/': slash = i
+    let dir = if slash > 0: rel.slice(0, slash as i64) else: "."
+    "dir:" ++ dir ++ ":" ++ build_cache_tree_fingerprint(root, dir, false) ++ "\nsrc:" ++ build_cache_tree_fingerprint(root, "src", true) ++ "\nlib:" ++ build_cache_tree_fingerprint(root, "lib", true) ++ "\n"
+
+// `argv_shape` is the harness argv without the compiler and test paths.
+pub fn build_cache_test_verdict_key(root: &str, target: &BuildGraphTarget, compiler_fp: &str, argv_shape: &str, test_path: &str) -> str:
     // The relative path is part of the key: content-identical files are
     // *almost* behavior-identical, but tests resolve siblings (c_import
     // headers) relative to their own location.
-    build_cache_sha256_text("test-verdict\n" ++ build_cache_test_target_sig_text(target) ++ "compiler:" ++ compiler_fp ++ "\npath:" ++ build_cache_project_relative(root, test_path) ++ "\nfile:" ++ build_cache_fingerprint_file(test_path) ++ "\n")
+    build_cache_sha256_text("test-verdict v2\n" ++ build_cache_test_target_sig_text(target) ++ "argv:" ++ argv_shape ++ "\ncompiler:" ++ compiler_fp ++ "\npath:" ++ build_cache_project_relative(root, test_path) ++ "\nfile:" ++ build_cache_fingerprint_file(test_path) ++ "\n" ++ build_cache_test_surface_text(root, test_path))
 
-pub fn build_cache_load_test_verdicts(root: &str, target_name: &str) -> HashMap[str, i32]:
+pub fn build_cache_load_test_verdicts(root: &str, compiler_fp: &str, target_name: &str) -> HashMap[str, i32]:
     let out: HashMap[str, i32] = HashMap.new()
-    let path = build_cache_test_verdicts_path(root, target_name)
+    let path = build_cache_test_verdicts_path(root, compiler_fp, target_name)
     if build_graph_rt_file_exists(path) == 0:
         return out
     let text = build_graph_rt_read_file(path)
@@ -550,13 +600,18 @@ pub fn build_cache_load_test_verdicts(root: &str, target_name: &str) -> HashMap[
         i = i + 1
     out
 
-pub fn build_cache_write_test_verdicts(root: &str, target_name: &str, keys: &Vec[str], rel_paths: &Vec[str]) -> Unit:
-    let state_dir = build_cache_state_dir(root)
-    let _mkdir = build_graph_rt_mkdir_p(state_dir)
-    var text = "v1\n"
+// Written to a sibling and renamed into place: another worktree's run of
+// the same target reads either the old set or the new one, never a torn
+// file.
+pub fn build_cache_write_test_verdicts(root: &str, compiler_fp: &str, target_name: &str, keys: &Vec[str], rel_paths: &Vec[str]):
+    let path = build_cache_test_verdicts_path(root, compiler_fp, target_name)
+    let _mkdir = build_graph_rt_mkdir_p(build_cache_test_verdict_store(root) ++ "/" ++ compiler_fp)
+    var text = "v2\n"
     for i in 0..keys.len() as i32:
         text = text ++ "pass:" ++ keys[i] ++ ":" ++ rel_paths[i] ++ "\n"
-    let _write = build_graph_rt_write_file(build_cache_test_verdicts_path(root, target_name), text)
+    let tmp = path ++ f".tmp.{build_graph_rt_getpid()}"
+    if build_graph_rt_write_file(tmp, text) != 0: return
+    let _rename = build_graph_rt_rename_file(tmp, path)
 
 pub fn build_cache_project_relative_path(root: &str, path: &str) -> str:
     build_cache_project_relative(root, path)

@@ -160,7 +160,8 @@ pub fn build_graph_run_external_test_files(root: &str, target: &BuildGraphTarget
     // re-executes only failures and changed files — never the whole
     // alphabet again.
     let compiler_fp = build_cache_test_compiler_fingerprint(compiler_path)
-    let prior = build_cache_load_test_verdicts(root, target.name)
+    let argv_shape = build_graph_argv_append(build_graph_append_test_args(build_graph_argv_append("", "test"), target), "--quiet")
+    let prior = build_cache_load_test_verdicts(root, compiler_fp, target.name)
     var pass_keys: Vec[str] = Vec.new()
     var pass_paths: Vec[str] = Vec.new()
     var run_files: Vec[str] = Vec.new()
@@ -168,7 +169,7 @@ pub fn build_graph_run_external_test_files(root: &str, target: &BuildGraphTarget
     var cached_count = 0
     for i in 0..test_files.len() as i32:
         let test_path = test_files[i]
-        let key = build_cache_test_verdict_key(root, target, compiler_fp, test_path)
+        let key = build_cache_test_verdict_key(root, target, compiler_fp, argv_shape, test_path)
         if prior.contains(key):
             cached_count = cached_count + 1
             pass_keys.push(key)
@@ -219,7 +220,7 @@ pub fn build_graph_run_external_test_files(root: &str, target: &BuildGraphTarget
     // Persist the passing set even when the target is red (compaction:
     // the file is rewritten with exactly the keys proven this run plus
     // the still-valid cached ones).
-    build_cache_write_test_verdicts(root, target.name, &pass_keys, &pass_paths)
+    build_cache_write_test_verdicts(root, compiler_fp, target.name, &pass_keys, &pass_paths)
 
     if failed_paths.len() as i32 > 0:
         build_graph_rt_eprint(f"error: build.w test target '{target.name}': {failed_paths.len() as i32} of {test_files.len() as i32} files failed ({cached_count} cached, {run_files.len() as i32} ran):")
