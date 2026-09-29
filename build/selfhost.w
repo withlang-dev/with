@@ -5803,10 +5803,15 @@ fn bs_check_build_w_comptime_evaluator(ctx: &ActionCtx, compiler_path: &str, bas
         return bs_fail(ctx, "could not copy build.w into " ++ seed_dir)
     if fs.copy_file(bs_join(root, "seed.lock"), bs_join(seed_dir, "seed.lock")) != 0:
         return bs_fail(ctx, "could not copy seed.lock into " ++ seed_dir)
+    // build.w's graph function reads the release version before any target.
+    if fs.copy_file(bs_join(root, "src/version"), bs_join(seed_dir, "src/version")) != 0:
+        return bs_fail(ctx, "could not copy src/version into " ++ seed_dir)
     if fs.copy_tree(bs_join(root, "build"), bs_join(seed_dir, "build")) != 0:
         return bs_fail(ctx, "could not copy build/ into " ++ seed_dir)
     if fs.copy_tree(bs_join(root, "lib"), bs_join(seed_dir, "lib")) != 0:
         return bs_fail(ctx, "could not copy lib/ into " ++ seed_dir)
+    if fs.mkdir_all(bs_join(seed_dir, ".github")) != 0:
+        return bs_fail(ctx, "could not create " ++ bs_join(seed_dir, ".github"))
     if fs.copy_tree(bs_join(root, ".github/workflows"), bs_join(seed_dir, ".github/workflows")) != 0:
         return bs_fail(ctx, "could not copy .github/workflows into " ++ seed_dir)
     if fs.symlink(bs_join(root, "src/main"), bs_join(seed_dir, "src/main")) != 0:
