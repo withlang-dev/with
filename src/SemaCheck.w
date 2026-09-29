@@ -3457,10 +3457,15 @@ impl Sema:
         // outliving them; the value's temporaries drop there too, and the
         // value itself unless the body returns it (not `-> Unit`, not an
         // entry point's statement tail, D43).
+        // §9.1: a single-statement assignment body is discarded exactly when
+        // check_block discards the body block's assignment tail.
+        let body_discarded = self.discard_body_tail(source_body, body_tail_discards, body_tail_is_statement) != 0
         let body_value = if self.ast.kind(source_body) == NodeKind.NK_BLOCK: self.ast.get_data2(source_body) else: source_body
-        self.note_statement_temporary_drops(body_value, body_expected_ret != self.ty_void as i32 and not body_tail_is_statement, false)
+        self.note_statement_temporary_drops(body_value, body_expected_ret != self.ty_void as i32 and not body_tail_is_statement and not body_discarded, false)
+        // A discarded tail (an assignment under D43's inferred `Unit`, an
+        // entry point's) is no value: nothing of it outlives the drops.
         let body_views: Vec[i32] = Vec.new()
-        if body_value != 0 and self.expr_views_global(body_value):
+        if body_value != 0 and body_expected_ret != self.ty_void as i32 and not body_discarded and not self.tail_value_discarded(body_value) and self.expr_views_global(body_value):
             body_views.push(body_value)
         self.note_scope_exit_drops(source_body, GLOBAL_SITE_SCOPE_DROP, self.current_fn_bind_start, body_views, false)
         self.current_fn_bind_start = saved_fn_bind_start
@@ -3468,9 +3473,7 @@ impl Sema:
         self.body_tail_holder = saved_body_tail_holder
         self.body_tail_discards = saved_body_tail_discards
         self.body_tail_is_statement = saved_body_tail_is_statement
-        // §9.1: a single-statement assignment body is discarded exactly when
-        // check_block discards the body block's assignment tail.
-        let body_ty = if self.discard_body_tail(source_body, body_tail_discards, body_tail_is_statement) != 0: self.ty_void else: checked_body_ty
+        let body_ty = if body_discarded: self.ty_void else: checked_body_ty
         self.infer_tail_node = saved_infer_tail
         self.infer_tail_is_closure = saved_infer_closure
         self.stamp_move_site_liveness(body_site_start)
@@ -7300,6 +7303,21 @@ impl Sema:
         1
 
     fn tail_is_discarded(node: i32): node != 0 and self.discarded_tails.contains(node)
+
+    // #1827: whether a tail's value is discarded, through the wrappers a
+    // body's tail may sit in (body_tail_holder_of: a block's tail, `unsafe:`,
+    // `no_suspend`, groupings) — the holder's tail is what discard_body_tail
+    // recorded. A discarded tail views nothing past the scope's drops.
+    fn tail_value_discarded(node: i32) -> bool:
+        var cur = node
+        while cur != 0:
+            if self.tail_is_discarded(cur):
+                return true
+            let kind = self.ast.kind(cur)
+            cur = if kind == NodeKind.NK_BLOCK: self.ast.get_data2(cur)
+                else if kind == NodeKind.NK_UNSAFE_BLOCK or kind == NodeKind.NK_NO_SUSPEND or kind == NodeKind.NK_GROUPED: self.ast.get_data0(cur)
+                else: 0
+        false
 
     // §9.1 / D73: the node that holds the body's tail. A body block's tail
     // may be a wrapper that yields its own inner tail — `unsafe:` /
@@ -11461,7 +11479,7 @@ impl Sema:
         // #1827 (§2.4): the drops at this block's end, its tail's value
         // outliving them; nothing is used after a function's last block.
         let tail_views: Vec[i32] = Vec.new()
-        if tail != 0 and self.expr_views_global(tail):
+        if tail != 0 and not self.tail_value_discarded(tail) and self.expr_views_global(tail):
             tail_views.push(tail)
         self.note_scope_exit_drops(node, GLOBAL_SITE_SCOPE_DROP, block_scope_start, tail_views, node != self.body_tail_block)
         self.check_unused_task_bindings_since(block_scope_start)
@@ -18698,7 +18716,7 @@ impl Sema:
         let closure_value = if self.ast.kind(body) == NodeKind.NK_BLOCK: self.ast.get_data2(body) else: body
         self.note_statement_temporary_drops(closure_value, body_ty != self.ty_void, false)
         let closure_views: Vec[i32] = Vec.new()
-        if closure_value != 0 and self.expr_views_global(closure_value):
+        if closure_value != 0 and body_ty != self.ty_void and not body_discarded and not self.tail_value_discarded(closure_value) and self.expr_views_global(closure_value):
             closure_views.push(closure_value)
         self.note_scope_exit_drops(body, GLOBAL_SITE_SCOPE_DROP, self.current_fn_bind_start, closure_views, false)
         self.record_returned_tail_reads(body, if expected_ret_ty != 0: expected_ret_ty else: body_ty as i32, body_ty as i32)
