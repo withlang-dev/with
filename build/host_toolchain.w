@@ -130,6 +130,34 @@ fn ht_sandboxed(profile: &str, home: &str, command: Vec[str]) -> Vec[str]:
         argv.push(command[i].clone())
     argv
 
+// Copies test/host_toolchain/framework_project into the scratch directory
+// with the dependency `with get` would have installed: .with/deps/c/cfstub/1.0
+// whose metadata.json links -framework CoreFoundation from its Frameworks/
+// directory, filled by `with __framework-stubs` in the sandbox. The source
+// to build, or "error: <why>".
+fn ht_setup_framework_project(ctx: &ActionCtx, scratch: &str, compiler: &str, profile: &str, home: &str) -> str:
+    let fs = ctx.fs()
+    let root = ctx.project_info().project_root()
+    let dir = ht_join(scratch, "framework_project")
+    let dep = ht_join(dir, ".with/deps/c/cfstub/1.0")
+    if fs.mkdir_all(ht_join(dir, "src")) != 0 or fs.mkdir_all(dep) != 0:
+        return "error: could not create " ++ dep
+    if fs.write_text(ht_join(dir, "with.toml"), fs.read_text("test/host_toolchain/framework_project/with.toml")) != 0 or fs.write_text(ht_join(dir, "src/main.w"), fs.read_text("test/host_toolchain/framework_project/src/main.w")) != 0:
+        return "error: could not copy test/host_toolchain/framework_project into " ++ dir
+    var meta = "{\n  \"name\": \"cfstub\",\n  \"version\": \"1.0\",\n  \"include_paths\": [],\n  \"lib_paths\": [],\n  \"libs\": [],\n  \"defines\": [],\n"
+    meta = meta ++ "  \"link_args\": [\"-framework\", \"CoreFoundation\"],\n  \"framework_paths\": [\"Frameworks\"],\n  \"requires\": []\n}\n"
+    if fs.write_text(ht_join(dep, "metadata.json"), meta) != 0:
+        return "error: could not write " ++ dep ++ "/metadata.json"
+    let stubs: Vec[str] = Vec.new()
+    stubs.push(compiler.to_owned())
+    stubs.push("__framework-stubs")
+    stubs.push(ht_join(root, ht_join(dep, "Frameworks")))
+    stubs.push("CoreFoundation")
+    let made = ctx.process_runner().run_capture(ht_sandboxed(profile, home, stubs), ht_join(root, ht_join(scratch, "framework_stubs.stdout")), ht_join(root, ht_join(scratch, "framework_stubs.stderr")), 300000)
+    if made.rc != 0:
+        return f"error: test/host_toolchain/framework_project: `with __framework-stubs` failed (exit {made.rc}):\n" ++ made.stdout ++ made.stderr
+    ht_join(root, ht_join(dir, "src/main.w"))
+
 pub fn run_no_host_toolchain_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let root = ctx.project_info().project_root()
@@ -162,17 +190,35 @@ pub fn run_no_host_toolchain_action(ctx: ActionCtx) -> i32:
             return ht_fail(ctx, "could not create " ++ scratch ++ "/home/tmp")
         let compiler = ht_join(root, inputs.get(0))
         let profile = ht_sandbox_profile()
+        // Each fixture: the repository file its expect-stdout lines come from,
+        // the source built, and the binary's name.
         let fixtures: Vec[str] = Vec.new()
+        let sources: Vec[str] = Vec.new()
+        let names: Vec[str] = Vec.new()
         fixtures.push("test/host_toolchain/hi.w")
+        sources.push(ht_join(root, "test/host_toolchain/hi.w"))
+        names.push("hi")
         fixtures.push("test/host_toolchain/cimport_stdio.w")
+        sources.push(ht_join(root, "test/host_toolchain/cimport_stdio.w"))
+        names.push("cimport_stdio")
+        // A project whose dependency links CoreFoundation, set up the way
+        // `with get` installs one: metadata.json names the framework and the
+        // stub directory, and the stub is generated from the running OS.
+        let project = ht_setup_framework_project(ctx, scratch, compiler, profile, home)
+        if project.starts_with("error: "):
+            problems.push(project.slice(7, project.len()))
+        else:
+            fixtures.push("test/host_toolchain/framework_project/src/main.w")
+            sources.push(project)
+            names.push("framework_program")
         for i in 0..fixtures.len() as i32:
             let source = fixtures[i]
-            let name = source.slice(source.find("host_toolchain/") + 15, source.len() - 2)
+            let name = names[i].clone()
             let binary = ht_join(root, ht_join(scratch, name))
             let build: Vec[str] = Vec.new()
             build.push(compiler.clone())
             build.push("build")
-            build.push(ht_join(root, source))
+            build.push(sources[i].clone())
             build.push("-o")
             build.push(binary.clone())
             let built = ctx.process_runner().run_capture(ht_sandboxed(profile, home, build), ht_join(root, ht_join(scratch, name ++ ".build.stdout")), ht_join(root, ht_join(scratch, name ++ ".build.stderr")), 600000)

@@ -31,6 +31,7 @@ use BuildGraphRuntime
 use BuildGraphCache
 use compiler.ClangDriver
 use compiler.LldDriver
+use compiler.FrameworkStubs
 use compiler.GreenEvidence
 use compiler.DriverOptions
 use compiler.AbiStamp
@@ -768,6 +769,12 @@ fn run_cli(argc: i32) -> i32:
     // native link, as `__ar` is for an archive. Not user CLI surface until
     // the specification lists a `with ld`.
     if cli_command(argc) == "__ld": return with_ld_main()
+    // `with __framework-stubs <dir> <Name>...`: the framework stubs `with get`
+    // writes for a package that links Apple frameworks (#1915).
+    if cli_command(argc) == "__framework-stubs":
+        let stub_args: Vec[str] = Vec.new()
+        for i in 2..argc: stub_args.push(with_arg_at(i))
+        return with_framework_stubs_main(&stub_args)
     // `with __ar qc lib.a a.o b.o` / `with __ranlib lib.a`: what CMake asks of
     // an archiver, so a source build needs no binutils. They are the compiler
     // invoking itself (the `__` prefix), not commands a user types. The

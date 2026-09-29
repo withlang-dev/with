@@ -1,0 +1,6 @@
+[package]
+name = "framework_project"
+version = "0.1.0"
+
+[deps]
+c.cfstub = "1.0"

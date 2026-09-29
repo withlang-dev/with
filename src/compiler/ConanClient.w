@@ -7,9 +7,13 @@ use compiler.Runtime
 use compiler.ConanRecipe
 use compiler.ConanPatch
 use compiler.ClangDriver
+use compiler.FrameworkStubs
+use compiler.TarExtract
+use std.http
 use std.crypto.sha256
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn str_from_byte(b: i32) -> str
+extern fn with_fs_chmod(path: &str, mode: i32) -> i32
 
 fn CONAN_CENTER_URL -> str: "https://center2.conan.io"
 fn CONAN_INDEX_RAW -> str: "https://raw.githubusercontent.com/conan-io/conan-center-index/master/recipes"
@@ -60,7 +64,7 @@ pub fn conan_http_get(url: &str) -> str:
     let scratch = conan_scratch_dir()
     if scratch.len() == 0: return ""
     let tmp = scratch ++ "/response.json"
-    let rc = conan_curl_to_file(url, tmp, 300000)
+    let rc = conan_https_to_file(url, tmp, 300000)
     if rc != 0:
         runtime_remove_tree(scratch)
         return ""
@@ -69,7 +73,7 @@ pub fn conan_http_get(url: &str) -> str:
     body
 
 fn conan_http_download(url: &str, path: &str) -> i32:
-    conan_curl_to_file(url, path, 300000)
+    conan_https_to_file(url, path, 300000)
 
 fn conan_sha256_file(path: &str) -> str:
     if runtime_file_exists(path) == 0:
@@ -81,42 +85,26 @@ fn conan_sha256_file(path: &str) -> str:
 fn conan_argv_append(argv: &str, arg: &str) -> str:
     argv ++ arg ++ "\0"
 
-fn conan_curl_to_file(url: &str, path: &str, timeout_ms: i32) -> i32:
-    var argv = ""
-    argv = conan_argv_append(argv, "curl")
-    argv = conan_argv_append(argv, "-fsSL")
-    argv = conan_argv_append(argv, "--retry")
-    argv = conan_argv_append(argv, "2")
-    argv = conan_argv_append(argv, "--connect-timeout")
-    argv = conan_argv_append(argv, "20")
-    argv = conan_argv_append(argv, "--max-time")
-    argv = conan_argv_append(argv, "300")
-    argv = conan_argv_append(argv, "-o")
-    argv = conan_argv_append(argv, path)
-    argv = conan_argv_append(argv, url)
-    let rc = conan_run_tool(argv, timeout_ms)
-    if rc != 0:
-        runtime_eprint(f"error: Conan download failed (curl exit {rc}): " ++ url ++ " -> " ++ path)
-    rc
+// #1915: downloads are this compiler's own HTTPS client (std.http over
+// std.tls), not the host's curl. A dropped connection is retried, as
+// build/https_fetch.w does.
+fn conan_https_to_file(url: &str, path: &str, timeout_ms: i32) -> i32:
+    if not url.starts_with("https://"):
+        runtime_eprint("error: Conan download needs an https:// URL: " ++ url)
+        return 1
+    for attempt in 1..4:
+        if https_download(url.to_owned(), path.to_owned()) == 0: return 0
+        if attempt < 3: let _ = runtime_nanosleep(attempt as i64 * 1000000000)
+    runtime_eprint("error: Conan download failed after 3 attempts: " ++ url ++ " -> " ++ path)
+    1
 
+// #1915: a package archive is unpacked in-process (compiler.TarExtract).
 fn conan_extract_tgz(archive: &str, dest: &str) -> i32:
-    var argv = ""
-    argv = conan_argv_append(argv, "tar")
-    argv = conan_argv_append(argv, "xzf")
-    argv = conan_argv_append(argv, archive)
-    argv = conan_argv_append(argv, "-C")
-    argv = conan_argv_append(argv, dest)
-    conan_run_tool(argv, 120000)
-
-fn conan_extract_tgz_strip1(archive: &str, dest: &str) -> i32:
-    var argv = ""
-    argv = conan_argv_append(argv, "tar")
-    argv = conan_argv_append(argv, "xzf")
-    argv = conan_argv_append(argv, archive)
-    argv = conan_argv_append(argv, "-C")
-    argv = conan_argv_append(argv, dest)
-    argv = conan_argv_append(argv, "--strip-components=1")
-    conan_run_tool(argv, 120000)
+    let problem = tar_gz_extract(archive, dest, 0)
+    if problem.len() > 0:
+        runtime_eprint("error: could not unpack " ++ problem)
+        return 1
+    0
 
 fn conan_str_compare(a: &str, b: &str) -> i32:
     let min_len = if a.len() < b.len(): a.len() else: b.len()
@@ -540,6 +528,16 @@ fn conan_write_metadata(dest_dir: &str, name: &str, version: &str, recipe_rev: &
     meta = meta ++ "  " ++ q ++ "libs" ++ q ++ ": " ++ conan_json_array(libs) ++ "," ++ nl
     meta = meta ++ "  " ++ q ++ "defines" ++ q ++ ": " ++ conan_json_array(defines) ++ "," ++ nl
     meta = meta ++ "  " ++ q ++ "link_args" ++ q ++ ": " ++ conan_json_array(link_args) ++ "," ++ nl
+    // #1915: a package that links Apple frameworks gets their link stubs,
+    // written from this machine's dyld shared cache: the toolchain reads no
+    // Apple SDK, so the stubs are the package's (compiler.FrameworkStubs).
+    let frameworks = framework_names_in_link_args(link_args)
+    if runtime_sysinfo_os() == "Macos" and frameworks.len() > 0:
+        let problem = framework_stubs_write(dest_dir ++ "/Frameworks", &frameworks)
+        if problem.len() > 0:
+            runtime_eprint("error: " ++ name ++ "/" ++ version ++ " links Apple frameworks, and their link stubs could not be written: " ++ problem)
+            return 1
+        meta = meta ++ "  " ++ q ++ "framework_paths" ++ q ++ ": [" ++ q ++ "Frameworks" ++ q ++ "]," ++ nl
     meta = meta ++ "  " ++ q ++ "requires" ++ q ++ ": " ++ conan_json_array(requires) ++ nl
     meta = meta ++ "}" ++ nl
     runtime_write_file(dest_dir ++ "/metadata.json", meta)
@@ -1199,32 +1197,41 @@ fn conan_write_launcher(dir: &str, tool: &str, self_exe: &str) -> str:
         return path
     let path = dir ++ "/" ++ tool
     let _w = runtime_write_file(path, "#!/bin/sh\nexec \"" ++ self_exe ++ "\" " ++ tool ++ " \"$@\"\n")
-    var chmod = ""
-    chmod = conan_argv_append(chmod, "chmod")
-    chmod = conan_argv_append(chmod, "+x")
-    chmod = conan_argv_append(chmod, path)
-    let _x = conan_run_tool(chmod, 10000)
+    let _x = with_fs_chmod(path, 0o755)
     path
 
-// tar reads gzip, xz and bzip2 tarballs, and (bsdtar: macOS, Windows) zip; GNU
-// tar does not read zip, so `unzip` is the second try.
+// #1915: gzip tarballs are unpacked in-process (compiler.TarExtract). A zip,
+// xz or bzip2 archive is still unpacked by the host's tar, and the build
+// says so.
 fn conan_extract_any(archive: &str, dest: &str) -> i32:
-    var argv = ""
-    argv = conan_argv_append(argv, "tar")
-    argv = conan_argv_append(argv, "xf")
-    argv = conan_argv_append(argv, archive)
-    argv = conan_argv_append(argv, "-C")
-    argv = conan_argv_append(argv, dest)
-    if conan_run_tool(argv, 300000) == 0: return 0
-    if not archive.ends_with(".zip"): return 1
-    var unzip = ""
-    unzip = conan_argv_append(unzip, "unzip")
-    unzip = conan_argv_append(unzip, "-q")
-    unzip = conan_argv_append(unzip, "-o")
-    unzip = conan_argv_append(unzip, archive)
-    unzip = conan_argv_append(unzip, "-d")
-    unzip = conan_argv_append(unzip, dest)
-    conan_run_tool(unzip, 300000)
+    var problem = ""
+    if archive.ends_with(".tar.gz") or archive.ends_with(".tgz"):
+        problem = tar_gz_extract(archive, dest, 0)
+    else:
+        // xz and bzip2 have no With decompressor yet; std.zip has one for zip,
+        // which the compiler cannot import until #1919 is fixed.
+        runtime_eprint("warning: " ++ archive ++ ": this compiler cannot unpack it itself yet; unpacking it with the host's tar (#1915, #1919)")
+        var argv = ""
+        argv = conan_argv_append(argv, "tar")
+        argv = conan_argv_append(argv, "xf")
+        argv = conan_argv_append(argv, archive)
+        argv = conan_argv_append(argv, "-C")
+        argv = conan_argv_append(argv, dest)
+        if conan_run_tool(argv, 300000) == 0: return 0
+        // GNU tar does not read zip; `unzip` is the second try.
+        if not archive.ends_with(".zip"): return 1
+        var unzip = ""
+        unzip = conan_argv_append(unzip, "unzip")
+        unzip = conan_argv_append(unzip, "-q")
+        unzip = conan_argv_append(unzip, "-o")
+        unzip = conan_argv_append(unzip, archive)
+        unzip = conan_argv_append(unzip, "-d")
+        unzip = conan_argv_append(unzip, dest)
+        return conan_run_tool(unzip, 300000)
+    if problem.len() > 0:
+        runtime_eprint("error: could not unpack " ++ problem)
+        return 1
+    0
 
 // An archive usually holds one top-level directory; the source is inside it.
 fn conan_source_root(raw_dir: &str) -> str:
