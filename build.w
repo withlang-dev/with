@@ -2460,6 +2460,17 @@ pub fn build(ctx: BuildCtx) -> Build:
     prepare_bootstrap_link_root = prepare_bootstrap_link_root.input("rt/rt_core.w")
     prepare_bootstrap_link_root = prepare_bootstrap_link_root.input(build_owned_text(host_runtime.platform_source))
     prepare_bootstrap_link_root = prepare_bootstrap_link_root.input(build_owned_text(host_runtime.compat_source))
+    // #1908: the driver compiles its action runner once this target has
+    // completed in the run, executed OR fresh, and links it against out/lib
+    // whenever out/lib holds the probe objects. So this target must re-run
+    // whenever the runner will be recompiled: the runner is keyed on these
+    // (build_cache_graph_key). Cached across a build/ edit, it left the tree's
+    // own out/lib in place and the seed linked its runner against another
+    // generation's runtime (ABI v8 under a v7 seed: rt_compat_setenv_str read
+    // an address as a length).
+    prepare_bootstrap_link_root = prepare_bootstrap_link_root.input("build.w")
+    prepare_bootstrap_link_root = prepare_bootstrap_link_root.input("build")
+    prepare_bootstrap_link_root = prepare_bootstrap_link_root.input("lib/std/build.w")
     prepare_bootstrap_link_root = prepare_bootstrap_link_root.write_scope("out/lib")
     prepare_bootstrap_link_root = prepare_bootstrap_link_root.write_scope("out/bootstrap-lib")
     prepare_bootstrap_link_root = prepare_bootstrap_link_root.dep("bootstrap-runtime")
