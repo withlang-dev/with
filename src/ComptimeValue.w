@@ -524,7 +524,9 @@ pub fn comptime_value_clone(v: &ComptimeValue) -> ComptimeValue:
 // Deep-cloning a large immutable string there is quadratic (the build.w source
 // hash loop allocated 64 GiB in seconds). A tiny single-threaded refcount keeps
 // the familiar value-shaped evaluator API while making either destruction
-// order safe; retained semantic values still use comptime_value_clone above.
+// order safe. Persistent arena snapshots may share too: they retain managed
+// ComptimeValues. A boundary transferring text into an ordinary owning str
+// must use comptime_value_clone above.
 pub fn comptime_value_share(v: &ComptimeValue) -> ComptimeValue:
     if v.text_refs as i64 != 0:
         unsafe { *v.text_refs = *v.text_refs + 1 }

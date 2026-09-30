@@ -1565,17 +1565,20 @@ fn comptime_action_capability_record(package_name: &str, package_version: &str, 
     }
 
 impl ComptimeEvaluator:
-    // Snapshot read of the value arena. extra_values GROWS during almost
+    // Owned read of the value arena. extra_values GROWS during almost
     // every evaluation step; a `let x = extra_values.get(i)` view dangles
     // as soon as a push reallocates (stage2's map-insert loop read a freed
-    // buffer). The share copies the value struct OUT of the vec buffer
-    // (curing that dangle — str payloads live on the heap and don't move
-    // with the vec) without deep-cloning text on every field read.
+    // buffer). Copy the value struct OUT before any push. Materialization
+    // may transfer its text into an ordinary owning str, so this read is deep.
     fn extra_value_at(index: i64) -> ComptimeValue:
-        // Extra values cross materialization boundaries where `.text` can be
-        // transferred into an ordinary owning str. Keep those reads deep;
-        // only transient identifier reads use the shared representation.
         comptime_value_clone(self.extra_values.get(index))
+
+    // A persistent snapshot retains ComptimeValues, whose Drop keeps shared
+    // immutable text alive. Deep-cloning an unchanged field on every cursor
+    // update retains input_size * update_count bytes (#1944). The copied
+    // header also survives arena reallocation; no view into the vec escapes.
+    fn extra_snapshot_value_at(index: i64) -> ComptimeValue:
+        comptime_value_share(self.extra_values.get(index))
 
     fn cleanup_workspace_pending_links():
         for wi in 0..self.workspace_records.len() as i32:
@@ -2280,7 +2283,7 @@ impl ComptimeEvaluator:
             if fi == field_index:
                 self.extra_values.push(comptime_value_clone(value))
             else:
-                self.extra_values.push(self.extra_value_at((base_value.extra_start + fi) as i64))
+                self.extra_values.push(self.extra_snapshot_value_at((base_value.extra_start + fi) as i64))
         let updated = comptime_value_struct(base_value.type_id, new_start, base_value.extra_count)
         self.update_slot_value(idx, updated)
         comptime_control_value(comptime_value_void(self.sema.ty_void as i32))
@@ -2381,7 +2384,7 @@ impl ComptimeEvaluator:
     fn copy_extra_slice(start: i32, count: i32) -> i32:
         let new_start = self.extra_values.len() as i32
         for i in 0..count:
-            self.extra_values.push(self.extra_value_at((start + i) as i64))
+            self.extra_values.push(self.extra_snapshot_value_at((start + i) as i64))
         new_start
 
     fn copy_vec_snapshot(value: &ComptimeValue) -> i32:
