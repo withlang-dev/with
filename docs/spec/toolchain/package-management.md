@@ -33,10 +33,11 @@ the source archive, its digest and patches, the requirements, and the
 CMake variables. The package's own CMake build runs with `with cc` as
 the C compiler, and the result installs into
 `.with/deps/c/<name>/<version>/` exactly as a binary package does. The
-lock records the source archive's digest. A build that needs a tool
-the machine lacks (`cmake`, `ninja`, or for a package that does not
-build with CMake, whatever its build system needs) names it and stops;
-installing it is the programmer's step.
+lock records the source archive's digest. A CMake build needs nothing
+installed: the compiler carries the `cmake` and `ninja` it runs (D81). A
+package that does not build with CMake names the tool its build system
+needs and stops; installing that tool is the programmer's step, since the
+package is the application's dependency.
 
 **Build integration.** When `with build` encounters
 `use c_import("<glib.h>")`, the compiler reads `with.toml`, finds
