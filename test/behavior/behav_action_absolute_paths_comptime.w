@@ -3,5 +3,5 @@
 use absolute_path_cases
 
 fn main:
-    run_mode("native")
+    run_mode("comptime")
     print("ok")
