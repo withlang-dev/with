@@ -1003,7 +1003,13 @@ fn analysis_audit_storage(report: &AnalysisReport, sema: &Sema):
         for ai in 0..count:
             resolved_args = resolved_args + 1
             let arg_node = sema.call_resolved_args_data[(start + ai)]
-            if arg_node < 0 or arg_node >= node_count:
+            if arg_node < 0:
+                // Sema encodes a resolved implicit binding as -symbol; MIR
+                // lowers it as a local variable rather than an AST node.
+                let implicit_sym = -(arg_node as i64)
+                if implicit_sym > sema.pool.symbol_count() as i64:
+                    report.fail(f"resolved call {node} arg {ai}: implicit symbol {implicit_sym} is out of range")
+            else if arg_node >= node_count:
                 report.fail(f"resolved call {node} arg {ai}: AST node {arg_node} is out of range")
             let key = sema.resolved_call_arg_key(node, ai)
             let expected = (node as i64) * 4294967296 + ai as i64
