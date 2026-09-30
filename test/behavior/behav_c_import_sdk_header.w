@@ -1,6 +1,6 @@
 // §16.1: a system-header c_import resolves the target SDK without spawning
-// xcrun. On macOS this is the SDK sysroot (env SDKROOT/WITH_SDKROOT, with.toml
-// [c_import] sdk_path, or the compiler's embedded darwin sysroot, #1915); on
+// xcrun. On macOS this is the darwin sysroot the compiler carries, or the SDK
+// with.toml [c_import] sdk_path names (§16.1, D81, #1915); on
 // native Windows the MSVC CRT +
 // Windows SDK include dirs (WITH_WINDOWS_*_INCDIR, wired by ClangBridge.w). A
 // successful import with modeled constants proves the include dirs were found.

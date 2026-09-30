@@ -976,7 +976,7 @@ fn link_stage_darwin_native_link_plan(obj_path: &str, bin_path: &str, extras: &V
         return link_stage_plan_fail()
     let sysroot = darwin_sdk_root()
     if sysroot.len() == 0:
-        with_eprint("error: link: no darwin sysroot: this compiler carries none, and WITH_SDKROOT / SDKROOT name none")
+        with_eprint("error: link: no darwin sysroot: this compiler carries none, and with.toml [c_import] sdk_path names none")
         return link_stage_plan_fail()
     var command = link_stage_make_darwin_llvm_link_command(self_exe, obj_path, bin_path, extras, link_libs, link_args)
     let args: Vec[str] = Vec.new()
