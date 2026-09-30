@@ -2002,8 +2002,12 @@ impl Sema:
     mut fn check_bodies():
         let count = self.ast.decl_count()
         self.prepare_body_order(count)
+        // WITH_SEMA_BODY_ORDER=reverse checks top-level bodies last to first
+        // (the callee-first dependencies still apply): a program whose facts
+        // or diagnostics change under it depends on declaration order.
+        let reverse = with_getenv_str("WITH_SEMA_BODY_ORDER") == "reverse"
         for di in 0..count:
-            self.check_decl_body_in_order(di)
+            self.check_decl_body_in_order(if reverse: count - 1 - di else: di)
         // A call typed before its callee's body was: wrong only if that body
         // turned out to produce a value.
         let saved_file_id: i32 = self.local_file_id
