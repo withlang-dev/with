@@ -1,4 +1,3 @@
-//! skip-on: windows #1140: UCRT assert.h expands to _wassert with wide string literals, which the migrator does not lower yet (Darwin/glibc reporters are modeled portably)
 //! expect-stdout: ok
 
 use pre_d_build_runner
