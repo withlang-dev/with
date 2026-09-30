@@ -371,6 +371,8 @@ pub type Compilation {
     // one-liner or a REPL line): its top-level `let`/`var`s are main's locals.
     statements_entry: bool,
     link_objects: Vec[str],
+    link_search_paths: Vec[str],
+    link_rpaths: Vec[str],
     // D39: `--link-bundle` prefixes, loaded once by load_link_bundles before
     // the first frontend entry (the interface registry must be populated
     // before any import resolves).
@@ -414,6 +416,8 @@ pub fn Compilation.init -> Compilation:
         last_link_rc: 0,
         statements_entry: false,
         link_objects: Vec.new(),
+        link_search_paths: Vec.new(),
+        link_rpaths: Vec.new(),
         link_bundles: Vec.new(),
         link_bundles_loaded: false,
         bundle_manifest_path: "",
@@ -438,6 +442,7 @@ impl Compilation:
         self.set_compiler_hooks_enabled(options.compiler_hooks_enabled)
         self.set_target_kind(options.target_kind)
         self.link_objects = driver_clone_str_vec(&options.link_objects)
+        self.set_link_paths(&options.link_search_paths, &options.link_rpaths)
         self.set_link_bundles(&options.link_bundles)
         self.bundle_manifest_path = with_str_clone_ref(options.bundle_manifest_path)
         self.bundle_interface_path = with_str_clone_ref(options.bundle_interface_path)
@@ -655,7 +660,16 @@ impl Compilation:
         out
 
     fn project_config_for_source(source_path: &str) -> ProjectConfig:
-        self.apply_runtime_config(project_config_load_for_source(source_path))
+        var cfg = self.apply_runtime_config(project_config_load_for_source(source_path))
+        for path in self.link_search_paths:
+            cfg.link_search_paths.push(path.clone())
+        for path in self.link_rpaths:
+            cfg.link_rpaths.push(path.clone())
+        cfg
+
+    mut fn set_link_paths(search_paths: &Vec[str], rpaths: &Vec[str]):
+        self.link_search_paths = driver_clone_str_vec(search_paths)
+        self.link_rpaths = driver_clone_str_vec(rpaths)
 
     mut fn set_prelude_mode(mode: i32):
         var cfg = move self.config
@@ -779,6 +793,7 @@ impl Compilation:
         out = out ++ "config c_import_defines=" ++ compilation_join_strings(&cfg.c_import_defines, ",") ++ "\n"
         out = out ++ "config link_libs=" ++ compilation_join_strings(&cfg.link_libs, ",") ++ "\n"
         out = out ++ "config link_search_paths=" ++ compilation_join_strings(&cfg.link_search_paths, ",") ++ "\n"
+        out = out ++ "config link_rpaths=" ++ compilation_join_strings(&cfg.link_rpaths, ",") ++ "\n"
         out = out ++ "config dep_link_libs=" ++ compilation_join_strings(&cfg.dep_link_libs, ",") ++ "\n"
         out = out ++ "config dep_names=" ++ compilation_join_strings(&cfg.dep_names, ",") ++ "\n"
         out = out ++ "config dep_constraints=" ++ compilation_join_strings(&cfg.dep_constraints, ",") ++ "\n"
@@ -1237,6 +1252,9 @@ impl Compilation:
         for dli in 0..self.zcu.project_config.dep_link_libs.len() as i32:
             all_link_libs.push(with_str_clone_ref(self.zcu.project_config.dep_link_libs[dli]))
         var _sp_dla = move self.zcu.project_config.dep_link_args
+        let rpath_args = link_stage_rpath_driver_args(self.zcu.project_config.link_rpaths, target_spec_os())
+        for arg in rpath_args:
+            _sp_dla.push(arg.clone())
         var unit_objects = codegen_unit_extra_objects(obj_path, self.zcu.last_codegen_unit_count)
         // D38: `--link-object` objects (a stage link's .wo bundles) join the
         // link exactly as codegen units do — full linker inputs, probed for

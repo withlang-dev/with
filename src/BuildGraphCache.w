@@ -495,6 +495,10 @@ fn build_cache_test_success_manifest(root: &str, target: &BuildGraphTarget, test
         text = text ++ "include:" ++ target.include_paths[i] ++ "\n"
     for i in 0..target.system_libs.len() as i32:
         text = text ++ "lib:" ++ target.system_libs[i] ++ "\n"
+    for i in 0..target.library_paths.len() as i32:
+        text = text ++ "library-path:" ++ target.library_paths[i] ++ "\n"
+    for i in 0..target.rpaths.len() as i32:
+        text = text ++ "rpath:" ++ target.rpaths[i] ++ "\n"
     let compiler_rel = build_cache_project_relative(root, test_compiler)
     if compiler_rel.len() > 0:
         text = text ++ "compiler:" ++ compiler_rel ++ "\n"
@@ -581,6 +585,10 @@ fn build_cache_test_target_sig_text(target: &BuildGraphTarget) -> str:
         sig = sig ++ "include:" ++ target.include_paths[i] ++ "\n"
     for i in 0..target.system_libs.len() as i32:
         sig = sig ++ "lib:" ++ target.system_libs[i] ++ "\n"
+    for i in 0..target.library_paths.len() as i32:
+        sig = sig ++ "library-path:" ++ target.library_paths[i] ++ "\n"
+    for i in 0..target.rpaths.len() as i32:
+        sig = sig ++ "rpath:" ++ target.rpaths[i] ++ "\n"
     sig ++ build_cache_test_env_sig_text()
 
 pub fn build_cache_test_compiler_fingerprint(compiler_path: &str) -> str:
@@ -693,7 +701,16 @@ fn build_cache_signature_parts(target: &BuildGraphTarget, root: &str) -> Vec[Bui
         shape = shape ++ ":I:" ++ target.include_paths[i]
     for i in 0..target.system_libs.len() as i32:
         shape = shape ++ ":L:" ++ target.system_libs[i]
+    for i in 0..target.library_paths.len() as i32:
+        shape = shape ++ ":library-path:" ++ target.library_paths[i]
+    for i in 0..target.rpaths.len() as i32:
+        shape = shape ++ ":rpath:" ++ target.rpaths[i]
     parts.push(BuildCacheSigPart { name: "target", text: shape })
+    // The manifest changes compilation even when build.w returns the same
+    // graph (for example [link].rpath). A graph-cache miss alone does not
+    // invalidate an already linked target.
+    if target.kind >= 0 and target.kind <= 4:
+        parts.push(BuildCacheSigPart { name: "manifest", text: ":MANIFEST:" ++ build_cache_fingerprint_file(root ++ "/with.toml") })
     if build_cache_target_uses_current_compiler(target):
         parts.push(BuildCacheSigPart { name: "producer", text: ":WITH:" ++ build_cache_producer_fingerprint(target) })
     if target.kind == 23:
@@ -1057,7 +1074,7 @@ fn bcg_put_list(out: &str, items: &Vec[str]) -> str:
 pub fn build_cache_graph_write(root: &str, key: &str, graph: &BuildGraph) -> Unit:
     if not graph.ok:
         return
-    var out = "WGRAPH2\n"
+    var out = "WGRAPH3\n"
     out = bcg_put_str(out, key)
     out = bcg_put_str(out, graph.package_name)
     out = bcg_put_str(out, graph.package_version)
@@ -1072,6 +1089,8 @@ pub fn build_cache_graph_write(root: &str, key: &str, graph: &BuildGraph) -> Uni
         out = bcg_put_str(out, t.output)
         out = bcg_put_str(out, t.cwd)
         out = bcg_put_list(out, &t.system_libs)
+        out = bcg_put_list(out, &t.library_paths)
+        out = bcg_put_list(out, &t.rpaths)
         out = bcg_put_list(out, &t.include_paths)
         out = bcg_put_list(out, &t.defines)
         out = bcg_put_list(out, &t.inputs)
@@ -1154,7 +1173,7 @@ pub fn build_cache_graph_try_read(root: &str, key: &str) -> BuildGraph:
     if text.len() == 0:
         return graph
     var r = BcgReader { text: text, pos: 0, ok: true }
-    if r.read_line() != "WGRAPH2":
+    if r.read_line() != "WGRAPH3":
         return graph
     if r.read_str() != key or not r.ok:
         return graph
@@ -1187,6 +1206,8 @@ pub fn build_cache_graph_try_read(root: &str, key: &str) -> BuildGraph:
         t.output = r.read_str()
         t.cwd = r.read_str()
         t.system_libs = r.read_list()
+        t.library_paths = r.read_list()
+        t.rpaths = r.read_list()
         t.include_paths = r.read_list()
         t.defines = r.read_list()
         t.inputs = r.read_list()

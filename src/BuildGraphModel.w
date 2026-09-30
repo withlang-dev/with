@@ -11,6 +11,8 @@ pub type BuildGraphTarget {
     target_kind: i32,
     optimize_mode: i32,
     system_libs: Vec[str],
+    library_paths: Vec[str],
+    rpaths: Vec[str],
     include_paths: Vec[str],
     defines: Vec[str],
     inputs: Vec[str],
@@ -76,6 +78,8 @@ fn build_graph_target_new(kind: i32, name: &str, entry: &str, target_kind: i32, 
         target_kind,
         optimize_mode,
         system_libs: Vec.new(),
+        library_paths: Vec.new(),
+        rpaths: Vec.new(),
         include_paths: Vec.new(),
         defines: Vec.new(),
         inputs: Vec.new(),
@@ -180,6 +184,10 @@ pub fn build_graph_emit(graph: &BuildGraph) -> str:
             out = out ++ f"arg\t{ti}\trss-limit-bytes={target.rss_limit_bytes}\n"
         for li in 0..target.system_libs.len() as i32:
             out = out ++ "system_lib\t" ++ f"{ti}\t" ++ build_graph_escape(target.system_libs[li]) ++ "\n"
+        for pi in 0..target.library_paths.len() as i32:
+            out = out ++ "library_path\t" ++ f"{ti}\t" ++ build_graph_escape(target.library_paths[pi]) ++ "\n"
+        for ri in 0..target.rpaths.len() as i32:
+            out = out ++ "rpath\t" ++ f"{ti}\t" ++ build_graph_escape(target.rpaths[ri]) ++ "\n"
         for ii in 0..target.include_paths.len() as i32:
             out = out ++ "include_path\t" ++ f"{ti}\t" ++ build_graph_escape(target.include_paths[ii]) ++ "\n"
         for di in 0..target.defines.len() as i32:
@@ -288,6 +296,16 @@ pub fn parse_build_graph(text: &str) -> BuildGraph:
                 graph.error_msg = "invalid include_path line in build graph"
                 return graph
             current.include_paths.push(with_str_clone_ref(fields.get(2)))
+        else if tag == "library_path":
+            if fields.len() != 3 or not has_current:
+                graph.error_msg = "invalid library_path line in build graph"
+                return graph
+            current.library_paths.push(with_str_clone_ref(fields[2]))
+        else if tag == "rpath":
+            if fields.len() != 3 or not has_current:
+                graph.error_msg = "invalid rpath line in build graph"
+                return graph
+            current.rpaths.push(with_str_clone_ref(fields[2]))
         else if tag == "define":
             if fields.len() != 3 or not has_current:
                 graph.error_msg = "invalid define line in build graph"
@@ -400,6 +418,8 @@ fn build_graph_target_deep_copy(t: &BuildGraphTarget) -> BuildGraphTarget:
         target_kind: t.target_kind,
         optimize_mode: t.optimize_mode,
         system_libs: bg_clone_str_vec(&t.system_libs),
+        library_paths: bg_clone_str_vec(&t.library_paths),
+        rpaths: bg_clone_str_vec(&t.rpaths),
         include_paths: bg_clone_str_vec(&t.include_paths),
         defines: bg_clone_str_vec(&t.defines),
         inputs: bg_clone_str_vec(&t.inputs),

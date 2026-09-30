@@ -2313,6 +2313,8 @@ fn build_options_for_graph_target(root: &str, base: &BuildCommandOptions, target
     options.include_paths = build_graph_resolve_paths(root, &target.include_paths)
     options.defines = build_graph_clone_strings(&target.defines)
     options.link_libs = build_graph_clone_strings(&target.system_libs)
+    options.link_search_paths = build_graph_resolve_paths(root, &target.library_paths)
+    options.link_rpaths = build_graph_clone_strings(&target.rpaths)
     if target.kind == 1 or target.kind == 4:
         options.output_kind = BuildOutputKind.Archive
     else if target.kind == 3:
@@ -2710,7 +2712,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                     if survey_target_failed:
                         break
                     let test_path = test_files[fi]
-                    let test_rc = run_test_file_with_build_settings(test_path, target_options.opt_level, target_options.no_std, target_options.alloc_mode, target_options.runtime_available, target_options.prelude_mode, target_options.debug_info, false, false, false, "", target_options.include_paths, target_options.defines, target_options.link_libs)
+                    let test_rc = run_test_file_with_build_settings(test_path, target_options.opt_level, target_options.no_std, target_options.alloc_mode, target_options.runtime_available, target_options.prelude_mode, target_options.debug_info, false, false, false, "", target_options.include_paths, target_options.defines, target_options.link_libs, target_options.link_search_paths, target_options.link_rpaths)
                     if test_rc != 0:
                         with_eprint("error: build.w test target failed: " ++ target.name)
                         if not survey:
@@ -4419,7 +4421,7 @@ fn run_test_binary_checked(bin_path: &str, target: &str, test_name: &str, quiet:
 // known-bug model): the fixture documents an open bug and MUST stay red.
 // Both directions are enforced — a red is tolerated (loudly), and a green
 // fails the file until the directive is removed with the issue's fix.
-fn run_test_file_with_build_settings(target: &str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, keep_binary: bool, filter: &str, include_paths: &Vec[str], defines: &Vec[str], link_libs: &Vec[str]) -> i32:
+fn run_test_file_with_build_settings(target: &str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, keep_binary: bool, filter: &str, include_paths: &Vec[str], defines: &Vec[str], link_libs: &Vec[str], link_search_paths: &Vec[str], link_rpaths: &Vec[str]) -> i32:
     var directives = parse_test_directives_for_target(target)
     // These are directive verdicts, not outcomes of executing a known bug.
     // A skip is neither an unexpected pass nor an expected failure; malformed
@@ -4428,20 +4430,20 @@ fn run_test_file_with_build_settings(target: &str, opt_level: i32, no_std: bool,
         return run_test_directive_command(target, directives, quiet)
     let known_issue = move directives.known_issue
     if known_issue.len() == 0:
-        return run_test_file_with_build_settings_inner(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, keep_binary, filter, include_paths, defines, link_libs)
-    let rc = run_test_file_with_build_settings_inner(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, keep_binary, filter, include_paths, defines, link_libs)
+        return run_test_file_with_build_settings_inner(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, keep_binary, filter, include_paths, defines, link_libs, link_search_paths, link_rpaths)
+    let rc = run_test_file_with_build_settings_inner(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, keep_binary, filter, include_paths, defines, link_libs, link_search_paths, link_rpaths)
     if rc == 0:
         emit_test_stage_error("known-issue " ++ known_issue ++ " expected this test to stay red, but it passed; if the issue is fixed, remove the known-issue directive", target, "known-issue", "")
         return 1
     with_eprint("[known-issue " ++ known_issue ++ "] " ++ target ++ " red as expected")
     0
 
-fn run_test_file_with_build_settings_inner(target: &str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, keep_binary: bool, filter: &str, include_paths: &Vec[str], defines: &Vec[str], link_libs: &Vec[str]) -> i32:
+fn run_test_file_with_build_settings_inner(target: &str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, keep_binary: bool, filter: &str, include_paths: &Vec[str], defines: &Vec[str], link_libs: &Vec[str], link_search_paths: &Vec[str], link_rpaths: &Vec[str]) -> i32:
     // `//! env:` pairs apply to the compile (in-process) and the run
     // (inherited), and restore after so one test cannot poison the next.
     let env_directives = parse_test_directives_for_target(target)
     if env_directives.env_pairs.len() == 0:
-        return run_test_file_env_applied(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, keep_binary, filter, include_paths, defines, link_libs)
+        return run_test_file_env_applied(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, keep_binary, filter, include_paths, defines, link_libs, link_search_paths, link_rpaths)
     let saved: Vec[str] = Vec.new()
     for ei in 0..env_directives.env_pairs.len() as i32:
         let pair = env_directives.env_pairs[ei]
@@ -4452,7 +4454,7 @@ fn run_test_file_with_build_settings_inner(target: &str, opt_level: i32, no_std:
             let _ = with_setenv_str(name, pair.slice(eq + 1, pair.len()))
         else:
             saved.push("")
-    let env_rc = run_test_file_env_applied(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, keep_binary, filter, include_paths, defines, link_libs)
+    let env_rc = run_test_file_env_applied(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, keep_binary, filter, include_paths, defines, link_libs, link_search_paths, link_rpaths)
     for ei in 0..env_directives.env_pairs.len() as i32:
         let pair = env_directives.env_pairs[ei]
         let eq = pair.find("=")
@@ -4460,7 +4462,7 @@ fn run_test_file_with_build_settings_inner(target: &str, opt_level: i32, no_std:
             let _ = with_setenv_str(pair.slice(0, eq), saved[ei])
     env_rc
 
-fn run_test_file_env_applied(target: &str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, keep_binary: bool, filter: &str, include_paths: &Vec[str], defines: &Vec[str], link_libs: &Vec[str]) -> i32:
+fn run_test_file_env_applied(target: &str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, keep_binary: bool, filter: &str, include_paths: &Vec[str], defines: &Vec[str], link_libs: &Vec[str], link_search_paths: &Vec[str], link_rpaths: &Vec[str]) -> i32:
     let directives = parse_test_directives_for_target(target)
     let directive_rc = run_test_directive_command(target, directives, quiet)
     if directive_rc >= 0:
@@ -4482,6 +4484,7 @@ fn run_test_file_env_applied(target: &str, opt_level: i32, no_std: bool, alloc_m
     comp.set_debug_info(debug_info)
     comp.set_target_kind(cli_platform_target_kind)
     let synthetic_source = maybe_synthesize_test_source(target)
+    comp.set_link_paths(link_search_paths, link_rpaths)
     let test_bin_path = test_unique_binary_path(target)
     var bin_path = ""
     if synthetic_source.len() > 0:
@@ -4544,7 +4547,7 @@ fn run_test_file(target: &str, opt_level: i32, no_std: bool, alloc_mode: bool, r
     let include_paths: Vec[str] = Vec.new()
     let defines: Vec[str] = Vec.new()
     let link_libs: Vec[str] = Vec.new()
-    run_test_file_with_build_settings(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, keep_binary, filter, include_paths, defines, link_libs)
+    run_test_file_with_build_settings(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, keep_binary, filter, include_paths, defines, link_libs, include_paths, include_paths)
 
 fn test_command_option_takes_value(arg: &str) -> bool:
     arg == "-f" or arg == "--filter" or cli_option_takes_value(arg)

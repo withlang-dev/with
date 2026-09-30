@@ -74,6 +74,8 @@ fn build_graph_materialized_target(kind: i32, name: &str, entry: &str, target_ki
         target_kind,
         optimize_mode,
         system_libs: Vec.new(),
+        library_paths: Vec.new(),
+        rpaths: Vec.new(),
         include_paths: Vec.new(),
         defines: Vec.new(),
         inputs: Vec.new(),
@@ -134,6 +136,8 @@ impl BuildGraphMaterializer:
             return out
         var target = build_graph_materialized_target(kind, name_value.text, entry_value.text, target_kind, optimize_value.data0 as i32, output_value.text)
         target.system_libs = self.string_vec_field(value, "system_libs")
+        target.library_paths = self.string_vec_field(value, "library_paths")
+        target.rpaths = self.string_vec_field(value, "rpaths")
         target.include_paths = self.string_vec_field(value, "include_paths")
         target.defines = self.string_vec_field(value, "defines")
         target.inputs = self.string_vec_field(value, "inputs")

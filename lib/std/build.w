@@ -454,6 +454,8 @@ pub type Target {
     target_kind: BuildTarget,
     optimize_mode: OptimizeMode,
     system_libs: Vec[str],
+    library_paths: Vec[str],
+    rpaths: Vec[str],
     include_paths: Vec[str],
     defines: Vec[str],
     inputs: Vec[str],
@@ -2210,6 +2212,8 @@ pub fn target_new(kind: BuildKind, name: str, entry: str) -> Target:
         target_kind: BuildTarget.native,
         optimize_mode: OptimizeMode.debug,
         system_libs: Vec.new(),
+        library_paths: Vec.new(),
+        rpaths: Vec.new(),
         include_paths: Vec.new(),
         defines: Vec.new(),
         inputs: Vec.new(),
@@ -2603,6 +2607,18 @@ pub fn Target.link_system_lib(move self: Target, lib: str) -> Target:
 pub fn Target.include_path(move self: Target, path: str) -> Target:
     var out = self
     out.include_paths.push(path)
+    out
+
+// Library paths resolve from the project root; runtime paths belong to the
+// loader and retain literal tokens such as $ORIGIN and @executable_path.
+pub fn Target.library_path(move self: Target, path: str) -> Target:
+    var out = self
+    out.library_paths.push(path)
+    out
+
+pub fn Target.rpath(move self: Target, path: str) -> Target:
+    var out = self
+    out.rpaths.push(path)
     out
 
 pub fn Target.define(move self: Target, define: str) -> Target:
@@ -3234,6 +3250,16 @@ pub fn Build.emit_graph(self: &Self) -> str:
             out.push_str("include_path\t")
             out.push_str(f"{ti}\t")
             out.push_str(build_graph_escape(target.include_paths[ii]))
+            out.push_str("\n")
+        for pi in 0..target.library_paths.len() as i32:
+            out.push_str("library_path\t")
+            out.push_str(f"{ti}\t")
+            out.push_str(build_graph_escape(target.library_paths[pi]))
+            out.push_str("\n")
+        for ri in 0..target.rpaths.len() as i32:
+            out.push_str("rpath\t")
+            out.push_str(f"{ti}\t")
+            out.push_str(build_graph_escape(target.rpaths[ri]))
             out.push_str("\n")
         for di in 0..target.defines.len() as i32:
             out.push_str("define\t")

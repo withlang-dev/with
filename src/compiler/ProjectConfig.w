@@ -15,6 +15,7 @@ pub type ProjectConfig {
     c_import_sdk_path: str,
     link_libs: Vec[str],
     link_search_paths: Vec[str],
+    link_rpaths: Vec[str],
     dep_link_libs: Vec[str],
     dep_link_args: Vec[str],
     dep_names: Vec[str],
@@ -49,6 +50,7 @@ pub fn project_config_default -> ProjectConfig:
         c_import_sdk_path: "",
         link_libs: Vec.new(),
         link_search_paths: Vec.new(),
+        link_rpaths: Vec.new(),
         dep_link_libs: Vec.new(),
         dep_link_args: Vec.new(),
         dep_names: Vec.new(),
@@ -94,6 +96,7 @@ pub fn project_config_clone(cfg: &ProjectConfig) -> ProjectConfig:
         c_import_sdk_path: project_config_clone_str(cfg.c_import_sdk_path),
         link_libs: project_config_clone_str_vec(&cfg.link_libs),
         link_search_paths: project_config_clone_str_vec(&cfg.link_search_paths),
+        link_rpaths: project_config_clone_str_vec(&cfg.link_rpaths),
         dep_link_libs: project_config_clone_str_vec(&cfg.dep_link_libs),
         dep_link_args: project_config_clone_str_vec(&cfg.dep_link_args),
         dep_names: project_config_clone_str_vec(&cfg.dep_names),
@@ -286,6 +289,9 @@ fn project_config_apply_entry(cfg: ProjectConfig, section: &str, key: &str, valu
             out.link_libs = project_config_parse_string_array(value)
     else if section == "link" and key == "search_paths":
         out.link_search_paths = project_config_parse_path_array(value, out.root_dir)
+    else if section == "link" and key == "rpath":
+        // Loader tokens and relative runtime paths are not project paths.
+        out.link_rpaths = project_config_parse_string_array(value)
     else if section == "features" and key == "default":
         out.feature_default = project_config_parse_string_array(value)
     else if section == "features":
@@ -505,6 +511,8 @@ fn project_config_wants_key(section: &str, key: &str) -> bool:
     if section == "link" and key == "libs":
         return true
     if section == "link" and key == "search_paths":
+        return true
+    if section == "link" and key == "rpath":
         return true
     if section == "build" and (key == "overflow" or key == "strict_effects"):
         return true

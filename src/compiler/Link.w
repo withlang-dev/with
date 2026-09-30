@@ -512,8 +512,8 @@ fn link_stage_make_darwin_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_p
         let dw_la = link_stage_lib_args(link_libs[i], 1)
         for j in 0..dw_la.len() as i32:
             args.push(with_str_clone_ref(dw_la[j]))
-    for i in 0..link_args.len() as i32:
-        args.push(with_str_clone_ref(link_args[i]))
+    for arg in link_stage_driver_args_for_ld(link_args):
+        args.push(arg.clone())
     args.push("-lSystem")
     let cleanup_files = link_stage_collect_cleanup_files(extras)
     LinkStageCommand { linker: with_str_clone_ref(llvm_ld), args, cwd: "", env, inputs, outputs, cleanup_files }
@@ -589,8 +589,8 @@ fn link_stage_make_linux_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_pa
             else:
                 args.push("-l" ++ lib)
     if link_libs.len() > 0: args.push(link_stage_archive_group_marker(1, 0, 0))
-    for i in 0..link_args.len() as i32:
-        args.push(with_str_clone_ref(link_args[i]))
+    for arg in link_stage_driver_args_for_ld(link_args):
+        args.push(arg.clone())
     args.push("-lc")
     args.push("-lgcc")
 
@@ -1165,8 +1165,7 @@ fn link_stage_darwin_native_link_plan(obj_path: &str, bin_path: &str, extras: &V
     if sysroot.len() == 0:
         with_eprint("error: link: no darwin sysroot: this compiler carries none, and WITH_SDKROOT / SDKROOT name none")
         return link_stage_plan_fail()
-    let ld_link_args = link_stage_driver_args_for_ld(link_args)
-    var command = link_stage_make_darwin_llvm_link_command(self_exe, obj_path, bin_path, extras, link_libs, &ld_link_args)
+    var command = link_stage_make_darwin_llvm_link_command(self_exe, obj_path, bin_path, extras, link_libs, link_args)
     let args: Vec[str] = Vec.new()
     args.push("__ld")
     args.push("-syslibroot")
@@ -1181,15 +1180,33 @@ fn link_stage_darwin_native_link_plan(obj_path: &str, bin_path: &str, extras: &V
 // to the linker. The native macOS link is lld itself now (#1915), so the
 // driver's wrapper is unwrapped here; every other argument passes as written
 // and lld names one it does not know.
-fn link_stage_driver_args_for_ld(link_args: &Vec[str]) -> Vec[str]:
-    let out: Vec[str] = Vec.new()
-    for i in 0..link_args.len() as i32:
+pub fn link_stage_driver_args_for_ld(link_args: &Vec[str]) -> Vec[str]:
+    var out: Vec[str] = Vec.new()
+    var i = 0
+    while i < link_args.len() as i32:
         let arg = link_args[i]
-        if arg.starts_with("-Wl,"):
+        if arg == "-Xlinker" and i + 1 < link_args.len() as i32:
+            i += 1
+            out.push(link_args[i].clone())
+        else if arg.starts_with("-Wl,"):
             for part in arg.slice(4, arg.len()).split(","):
                 if part.len() > 0: out.push(part.clone())
         else:
             out.push(with_str_clone_ref(arg))
+        i += 1
+    out
+
+// Separate argv entries protect spaces, commas, dollar signs and loader
+// tokens. The command runs directly, so no shell ever expands these values.
+// Windows loads beside the executable itself; wasm has no dynamic loader.
+pub fn link_stage_rpath_driver_args(paths: &Vec[str], target_os: &str) -> Vec[str]:
+    var out: Vec[str] = Vec.new()
+    if target_os != "Linux" and target_os != "Macos": return out
+    for path in paths:
+        out.push("-Xlinker")
+        out.push("-rpath")
+        out.push("-Xlinker")
+        out.push(path.clone())
     out
 
 // The native-Windows lld-link path, resolved from the environment when the
