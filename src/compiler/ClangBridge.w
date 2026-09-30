@@ -773,6 +773,11 @@ unsafe fn cimport_push_host_library_dirs(args: *mut *const u8, nargs: i32) -> i3
     *((args as i64 + (nargs + 3) as i64 * 8) as *mut *const u8) = "/usr/include\0" as *const u8
     nargs + 4
 
+// How the sysroot is named to clang: -isysroot for Darwin's header search;
+// a Linux target's header search reads the driver's --sysroot (#1915).
+fn sysroot_flag() -> *const u8:
+    if with_sysinfo_os() == "Linux": "--sysroot\0" as *const u8 else: "-isysroot\0" as *const u8
+
 unsafe fn get_sdk_path() -> *const u8:
     // The darwin sysroot on macOS, the linux one on linux-x86_64 (#1915).
     if with_sysinfo_os() != "Macos" and not (with_sysinfo_os() == "Linux" and with_sysinfo_arch() == "x86_64"):
@@ -2067,7 +2072,7 @@ pub fn with_cimport_parse(header_code: &str) -> i64:
         var nargs: i32 = 0
         let sysroot = get_sdk_path()
         if sysroot as i64 != 0:
-            args[nargs] = "-isysroot\0" as *const u8
+            args[nargs] = sysroot_flag()
             nargs = nargs + 1
             args[nargs] = sysroot
             nargs = nargs + 1
@@ -3203,7 +3208,7 @@ unsafe fn cimport_collect_macros_from_libclang(ms: *mut MacroSession, header_cod
     var nargs: i32 = 0
     let sysroot = get_sdk_path()
     if sysroot as i64 != 0:
-        args[nargs] = "-isysroot\0" as *const u8
+        args[nargs] = sysroot_flag()
         nargs = nargs + 1
         args[nargs] = sysroot
         nargs = nargs + 1
@@ -3300,7 +3305,7 @@ pub fn with_cimport_collect_object_macro_types(header_code: &str, macro_names: &
         var nargs: i32 = 0
         let sysroot = get_sdk_path()
         if sysroot as i64 != 0:
-            args[nargs] = "-isysroot\0" as *const u8
+            args[nargs] = sysroot_flag()
             nargs = nargs + 1
             args[nargs] = sysroot
             nargs = nargs + 1
@@ -3402,7 +3407,7 @@ pub fn with_cimport_parse_macro_probe(header_code: &str, macro_names: &str) -> i
         var nargs: i32 = 0
         let sysroot = get_sdk_path()
         if sysroot as i64 != 0:
-            args[nargs] = "-isysroot\0" as *const u8
+            args[nargs] = sysroot_flag()
             nargs = nargs + 1
             args[nargs] = sysroot
             nargs = nargs + 1
