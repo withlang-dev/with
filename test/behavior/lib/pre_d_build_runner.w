@@ -56,18 +56,22 @@ pub fn p7_abs(path: &str) -> str:
 fn p7_argv_append(blob: &str, arg: &str) -> str:
     blob ++ arg ++ "\0"
 
+// The compiler under test: the one running this test, which `with test` names
+// in WITH_TEST_COMPILER. A binary run by hand falls back to the tree's built
+// compilers, and says so when there is none rather than running a missing
+// path (exit 127, "rc=127" and a bare assertion).
 pub fn p7_compiler_path -> str:
+    let running = env("WITH_TEST_COMPILER")
+    if running.len() > 0:
+        return running.clone()
     let ext = if os() == "Windows": ".exe" else: ""
-    let staged_stage2 = p7_abs("out/stage/bin/with-stage2" ++ ext)
-    if file_exists(staged_stage2):
-        return staged_stage2
-    let release = p7_abs("out/release/bin/with" ++ ext)
-    if file_exists(release):
-        return release
-    let stage2 = p7_abs("out/bin/with-stage2" ++ ext)
-    if file_exists(stage2):
-        return stage2
-    p7_abs("out/bin/with" ++ ext)
+    for rel in ["out/stage/bin/with-stage2", "out/release/bin/with", "out/bin/with-stage2", "out/bin/with"]:
+        let candidate = p7_abs(rel ++ ext)
+        if file_exists(candidate):
+            return candidate
+    eprint("pre_d_build_runner: no compiler to test: WITH_TEST_COMPILER is unset (run the test with `with test`), and none of out/stage/bin/with-stage2, out/release/bin/with, out/bin/with-stage2, out/bin/with exists")
+    assert(false)
+    ""
 
 pub fn p7_case_dir(name: &str) -> str:
     p7_abs("out/tmp/pre-d-p7/" ++ name)

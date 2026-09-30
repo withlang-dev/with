@@ -4195,6 +4195,14 @@ fn test_capture_suffix(test_name: &str) -> str:
         return "." ++ test_name
     ".run"
 
+// This compiler's path as a child process can run it: argv[0], made
+// absolute when it names a path (a bare name stays for PATH to resolve).
+fn test_running_compiler_path() -> str:
+    let self_arg = with_arg_at(0)
+    if not self_arg.contains("/") or runtime_path_is_absolute(self_arg):
+        return self_arg
+    test_binary_absolute_path(self_arg)
+
 fn run_test_process(bin_path: &str, test_name: &str, quiet: bool) -> TestRunResult:
     let suffix = test_capture_suffix(test_name)
     let out_path = bin_path ++ suffix ++ ".stdout"
@@ -4207,6 +4215,12 @@ fn run_test_process(bin_path: &str, test_name: &str, quiet: bool) -> TestRunResu
         let _set_filter = build_graph_rt_setenv("WITH_TEST_FILTER", test_name)
     if quiet:
         let _set_short = build_graph_rt_setenv("WITH_TEST_SHORT", "1")
+    // A test that drives a compiler (test/behavior/lib/pre_d_build_runner.w)
+    // drives the one under test: this one. Before, it guessed a binary under
+    // out/ and, in a tree that had built only stage1, ran a path that did not
+    // exist (exit 127).
+    let old_compiler = build_graph_rt_getenv("WITH_TEST_COMPILER") ++ ""
+    let _set_compiler = build_graph_rt_setenv("WITH_TEST_COMPILER", test_running_compiler_path())
     // A test binary is never a build worker, whoever launched `with test`: a
     // lane driven by an older compiler (the pinned seed) still hands its
     // worker switches down, and a `with build` the test runs would obey them.
@@ -4222,6 +4236,7 @@ fn run_test_process(bin_path: &str, test_name: &str, quiet: bool) -> TestRunResu
         let _restore_filter = build_graph_rt_setenv("WITH_TEST_FILTER", old_filter)
     if quiet:
         let _restore_short = build_graph_rt_setenv("WITH_TEST_SHORT", old_short)
+    let _restore_compiler = build_graph_rt_setenv("WITH_TEST_COMPILER", old_compiler)
     let out_text = with_fs_read_file(out_path)
     let err_text = with_fs_read_file(err_path)
     let _cleanup_stdout = build_graph_rt_remove_file(out_path)

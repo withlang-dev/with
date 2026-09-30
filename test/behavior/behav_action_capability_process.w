@@ -2,12 +2,12 @@
 //! expect-stdout: ok
 
 use pre_d_build_runner
-use std.sysinfo
 
 fn main:
     let case_dir = p7_prepare_case("action_process", "p7process")
-    let with_suffix = if os() == "Windows": ".exe" else: ""
-    let with_path = "../../../../out/release/bin/with" ++ with_suffix
+    // The action runs the compiler under test, not a release binary the tree
+    // may not have built (a stage1-only tree has none).
+    let with_path = p7_compiler_path()
     var build_text = "use std.build\n\n"
     build_text = build_text ++ "fn generate(ctx: ActionCtx) -> i32:\n"
     build_text = build_text ++ "    var args: Vec[str] = Vec.new()\n"
