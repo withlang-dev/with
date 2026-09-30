@@ -52,7 +52,7 @@ The standard build graph API lives in `std.build`. It defines
 `OptimizeMode`, plus target construction methods such as
 `Build.executable`, `Build.library`, `Build.test`,
 `Build.generated_source`, `Target.optimize`, `Target.link_system_lib`,
-`Target.include_path`, and `Target.define`.
+`Target.include_path`, `Target.library_path`, `Target.rpath`, and `Target.define`.
 
 `build.w` runs as capability-bearing comptime, not ordinary pure
 `comptime`. Build code may perform effects only through `std.build`
@@ -68,8 +68,16 @@ toolchain.
 The compiler driver discovers `build.w`, evaluates the `build` entry
 point with a driver-minted `BuildCtx`, consumes the returned typed build
 graph, and builds executable, library, and test targets. Per-target
-`link_system_lib`, `include_path`, and `define` settings are honored by
-the corresponding compile/test path. `Build.generated_source(path,
+`link_system_lib`, `include_path`, `library_path`, `rpath`, and `define` settings are honored by
+the corresponding compile/test path. Library search paths resolve relative to
+the project root. Runtime search paths remain literal loader paths, including
+`$ORIGIN` on Linux and `@executable_path` on macOS, and never resolve relative
+to the source or project directory. They are emitted as linker rpaths on Linux
+and macOS; Windows uses its normal executable-directory DLL lookup and emits
+no rpath. These settings belong to the selected target, survive graph caching,
+and invalidate that target's cache when changed.
+
+`Build.generated_source(path,
 contents)` declares a generated source file to write before target
 compilation; generated paths are project-relative and escaping paths
 must fail loudly. `BuildTarget` can represent non-native targets, but

@@ -509,6 +509,8 @@ target = target.optimize(.release)
 target = target.include_path("include")
 target = target.define("WITH_FEATURE=1")
 target = target.link_system_lib("m")
+target = target.library_path("native/lib")
+target = target.rpath("$ORIGIN/lib")  // Linux; @executable_path/lib on macOS
 target = target.output("out/bin/app")
 target = target.dep("generate")
 

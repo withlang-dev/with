@@ -1297,6 +1297,7 @@ Libraries to link are specified either in `c_import` or in `with.toml`:
 [link]
 libs = ["sqlite3", "ssl", "crypto"]
 search_paths = ["/usr/local/lib"]
+rpath = ["$ORIGIN/lib"] # Linux; use @executable_path/lib on macOS
 ```
 
 Or inline:
@@ -1305,7 +1306,11 @@ Or inline:
 use c_import("sqlite3.h", link: "sqlite3")
 ```
 
-The `with build` command passes these to the linker.
+The `with build` command passes these to the linker. `search_paths` resolve
+relative to the manifest directory; `rpath` values remain literal runtime
+loader paths. Linux and macOS record them in the executable; Windows emits no
+rpath. Build scripts can apply these settings per target with
+`Target.library_path(path)` and `Target.rpath(path)`.
 
 ### 16.9 Opaque Types
 
