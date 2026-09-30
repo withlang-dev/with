@@ -2718,8 +2718,11 @@ fn sdk_windows_gnu_cmake_args(ctx: &ActionCtx, tools_prefix: &str, output_prefix
     // set to every link (gdi32 winspool comdlg32 oldnames ...), libraries
     // the SDK does not carry and these programs do not use; clang's MinGW
     // driver already names the runtime's own.
+    // try_compile's inner projects take them too (LLVM's configure checks
+    // link test programs).
     out.push("-DCMAKE_C_STANDARD_LIBRARIES=")
     out.push("-DCMAKE_CXX_STANDARD_LIBRARIES=")
+    out.push("-DCMAKE_TRY_COMPILE_PLATFORM_VARIABLES=CMAKE_C_STANDARD_LIBRARIES;CMAKE_CXX_STANDARD_LIBRARIES")
     out.push("-DCMAKE_EXE_LINKER_FLAGS_INIT=" ++ link_flags)
     out.push("-DCMAKE_SHARED_LINKER_FLAGS_INIT=" ++ link_flags)
     out.push("-DCMAKE_MODULE_LINKER_FLAGS_INIT=" ++ link_flags)
