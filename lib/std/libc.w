@@ -89,16 +89,22 @@ pub fn errno_ptr() -> *mut i32: with_libc_errno()
 
 // process / time
 pub extern fn abort() -> Never
-// Assertion reporters of the Darwin (`__assert_rtn`) and glibc
-// (`__assert_fail`) assert.h expansions, modeled portably: neither symbol
-// exists on the other platforms, and a corpus migrated on one host must
-// assert the same way on every target. Same report, then abort.
+// Assertion reporters of the Darwin (`__assert_rtn`), glibc
+// (`__assert_fail`) and mingw-w64 (`_assert`) assert.h expansions, modeled
+// portably: none of the symbols exists on the other platforms, and a corpus
+// migrated on one host must assert the same way on every target. Same
+// report, then abort.
 pub fn __assert_rtn(function: *const i8, file: *const i8, line: i32, expression: *const i8) -> Never:
     libc_assert_failed(expression, function, file, line)
 pub fn __assert_fail(expression: *const i8, file: *const i8, line: u32, function: *const i8) -> Never:
     libc_assert_failed(expression, function, file, line as i64)
+// mingw-w64's reporter names no function.
+pub fn _assert(expression: *const i8, file: *const i8, line: u32) -> Never:
+    libc_assert_failed(expression, c"".ptr, file, line as i64)
 fn libc_assert_failed(expression: *const i8, function: *const i8, file: *const i8, line: i64) -> Never:
-    let text = unsafe { f"Assertion failed: ({with_str_from_cstr(expression as *const u8)}), function {with_str_from_cstr(function as *const u8)}, file {with_str_from_cstr(file as *const u8)}, line {line}." }
+    let function_name = unsafe { with_str_from_cstr(function as *const u8) }
+    let site = if function_name.len() > 0: ", function " ++ function_name else: ""
+    let text = unsafe { f"Assertion failed: ({with_str_from_cstr(expression as *const u8)}){site}, file {with_str_from_cstr(file as *const u8)}, line {line}." }
     eprint(text)
     abort()
 pub extern fn exit(code: i32) -> Never

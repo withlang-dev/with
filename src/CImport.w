@@ -6856,7 +6856,7 @@ fn ci_cursor_is_void_cstyle_cast(session: i64, cursor: i32) -> bool:
     if with_ci_cursor_kind(session, cursor) != CXK_CSTYLE_CAST:
         return false
     let ty = with_ci_type_translated(session, with_ci_cursor_type(session, cursor))
-    ty == "void" or ty == "unit"
+    ty == "void" or ty == "unit" or ty == "Unit"
 
 impl CiStmtPool:
     fn empty_stmt_ir() -> CiStmtId:
@@ -6901,6 +6901,19 @@ impl CiStmtPool:
                 let stmt = self.lower_effect_expr_ir(session, cursor, exprs, types, scope)
                 if (stmt as i32) != 0:
                     return stmt
+            // A discarded `a && b` / `a || b` runs b's effects only when a
+            // is true / false: mingw-w64's assert() is
+            // `(void) ((!!(e)) || (_assert(#e, __FILE__, __LINE__), 0))`.
+            if (op == BO_LAND or op == BO_LOR) and nc >= 2:
+                let lhs_cursor = with_ci_child(session, cursor, 0)
+                let lhs = self.lower_value_expr_ir(session, lhs_cursor, exprs, types, scope)
+                if not ci_value_ir_valid(lhs): return 0 as CiStmtId
+                let rhs_effects = self.lower_discard_expr_side_effects_ir(session, with_ci_child(session, cursor, 1), exprs, types, scope)
+                if (rhs_effects as i32) == 0: return 0 as CiStmtId
+                let lhs_truthy = exprs.bool_expr_from_value_ir(session, lhs_cursor, lhs.value_expr, types)
+                if (lhs_truthy as i32) == 0: return 0 as CiStmtId
+                let run_rhs = if op == BO_LAND: lhs_truthy else: exprs.unary(CiUnaryOp.CIUO_LOGICAL_NOT, lhs_truthy, 0 as CiTypeId)
+                return self.merge_ir(lhs.setup_stmt, self.if_stmt(run_rhs, rhs_effects, 0 as CiStmtId))
             return self.empty_stmt_ir()
 
         if kind == CXK_UNARY_OP:
@@ -17484,7 +17497,7 @@ fn ci_libc_symbol_kind_mask(name: &str) -> i32:
     if name == "tolower" or name == "toupper": return CI_LIBC_KIND_FN
     if ci_is_libm_fn(name): return CI_LIBC_KIND_FN
     if name == "abort" or name == "exit" or name == "clock" or name == "time" or name == "isatty": return CI_LIBC_KIND_FN
-    if name == "__assert_rtn" or name == "__assert_fail": return CI_LIBC_KIND_FN
+    if name == "__assert_rtn" or name == "__assert_fail" or name == "_assert": return CI_LIBC_KIND_FN
     if name == "mkstemp" or name == "realpath": return CI_LIBC_KIND_FN
     if name == "open" or name == "read" or name == "write" or name == "close": return CI_LIBC_KIND_FN
     if name == "lseek" or name == "unlink": return CI_LIBC_KIND_FN
