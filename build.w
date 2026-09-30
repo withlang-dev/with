@@ -1636,7 +1636,12 @@ fn run_debug_alloc_tests_action(ctx: ActionCtx) -> i32:
             check_args.push(build_project_abs(root, p))
     let cout = build_project_abs(root, build_project_join(out_dir, "check.stdout"))
     let cerr = build_project_abs(root, build_project_join(out_dir, "check.stderr"))
-    let cr = ctx.process_runner().run_capture_cwd(check_args, cout, cerr, 240000, root)
+    // The driver keeps a 60-second limit on each fixture. Give the whole
+    // sequential lane that same allowance per fixture plus startup time;
+    // a fixed lane limit can kill healthy progress as the corpus grows.
+    let fixture_count = check_args.len() as i32 - 3
+    let lane_timeout_ms = 60000 + fixture_count * 60000
+    let cr = ctx.process_runner().run_capture_cwd(check_args, cout, cerr, lane_timeout_ms, root)
     if cr.rc != 0:
         ctx.diagnostics().error(f"debug-alloc-tests: lane failed rc={cr.rc}\n" ++ cr.stdout)
     let _ = fs.write_text(build_project_join(out_dir, ".stamp"), "ok")

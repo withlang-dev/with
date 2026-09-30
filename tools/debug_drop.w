@@ -16,6 +16,7 @@
 // tools/debug_drop_sites.lldb and tools/debug_drop_fields.lldb.
 
 use std.process
+use std.time.now_ns
 
 extern fn with_exec_argv_capture(argv: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32) -> i32
 extern fn with_fs_read_file(path: &str) -> str
@@ -123,12 +124,15 @@ fn main:
             let fx = a.get(i)
             let want = line_after_prefix(read_file(fx), "expect-debug-alloc:")
             let filter = line_after_prefix(read_file(fx), "debug-alloc-filter:")
+            print("START " ++ fx)
+            let started = now_ns()
             let (rc, report) = run_under_debug_alloc(with_bin, fx, filter)
+            let elapsed_ms = (now_ns() - started) / 1000000
             let expects_abort = want.contains("DOUBLE FREE") or want.contains("first_drop=")
             if want.len() > 0 and report.contains(want) and (expects_abort or rc == 0):
-                print("PASS " ++ fx)
+                print("PASS " ++ fx ++ f" ({elapsed_ms} ms)")
             else:
-                print("FAIL " ++ fx ++ "  (want: '" ++ want ++ "', exit " ++ f"{rc}" ++ ")")
+                print("FAIL " ++ fx ++ "  (want: '" ++ want ++ "', exit " ++ f"{rc}" ++ f", {elapsed_ms} ms)")
                 failed = failed + 1
             i = i + 1
         if failed > 0:
