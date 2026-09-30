@@ -826,6 +826,14 @@ jobs:
           test "$(./out/release/bin/with.exe version)" = "with $WITH_VERSION"
           cp out/release/bin/with.exe out/release/with-windows-x86_64.exe
           sha256sum out/release/with-windows-x86_64.exe > out/release/with-windows-x86_64.exe.sha256
+          # A compiler linked from a windows-gnu SDK (lib/libclang.a) carries
+          # mingw-w64's runtime code, whose licenses require their notices in
+          # a binary distribution (#1915): publish them beside the binary, as
+          # build/package.w's pkg_write_windows_notice does for :package-*.
+          if [ -f "$LLVM_PREFIX/lib/libclang.a" ]; then
+            { printf 'The With compiler for Windows (with-windows-x86_64.exe) statically links the mingw-w64\nruntime (startup and support code) from its LLVM SDK. Its notices follow.\n\n'; cat "$LLVM_PREFIX/libc/windows/COPYING.MinGW-w64-runtime.txt"; } > out/release/with-windows-x86_64-NOTICE.txt
+            echo "WITH_NOTICE_FILES=,out/release/with-windows-x86_64-NOTICE.txt" >> "$GITHUB_ENV"
+          fi
           # Every release carries this platform's LLVM SDK too. `with build
           # :deps` resolves the SDK from a release asset, so a release without
           # one leaves a Windows box with no way to provision a toolchain --
@@ -872,7 +880,7 @@ jobs:
           RELEASE_TITLE: ${{ steps.release.outputs.title }}
           RELEASE_CHANNEL: ${{ steps.release.outputs.channel }}
           RELEASE_ASSETS: out/release/with-windows-x86_64.exe
-          RELEASE_EXTRA_FILES: out/release/${{ env.WITH_SDK_PUBLISH_ASSET }},out/release/${{ env.WITH_SDK_PUBLISH_ASSET }}.sha256
+          RELEASE_EXTRA_FILES: out/release/${{ env.WITH_SDK_PUBLISH_ASSET }},out/release/${{ env.WITH_SDK_PUBLISH_ASSET }}.sha256${{ env.WITH_NOTICE_FILES }}
           RELEASE_SOURCE_SHA: ${{ github.sha }}
           RELEASE_BUILDER: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} (windows-x86_64)
           RELEASE_REPO: ${{ github.repository }}
