@@ -5891,13 +5891,13 @@ impl Codegen:
         self.internal_abi_aggregate_indirect(param_ty)
 
     mut fn internal_abi_aggregate_indirect(ty: i64) -> bool:
-        if not codegen_windows_x86_64() or ty == 0:
+        if ty == 0:
             return false
         let kind = wl_get_type_kind(ty)
         let is_aggregate = kind == wl_struct_type_kind() or kind == wl_array_type_kind()
         if not is_aggregate:
             return false
-        fn_abi_platform_aggregate_indirect(true, true, self.abi_size_of(ty))
+        fn_abi_platform_aggregate_indirect(codegen_windows_x86_64(), true, self.abi_size_of(ty))
 
     // Intrinsic iterator adapters synthesize one owned argument at a time.
     // Their declarations and calls still consume the same interned descriptor.

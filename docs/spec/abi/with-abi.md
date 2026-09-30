@@ -1,6 +1,6 @@
-# The With ABI (version 10)
+# The With ABI (version 11)
 
-Status: DRAFT v10 (2026-09-30), the convention as the compiler implements
+Status: DRAFT v11 (2026-09-30), the convention as the compiler implements
 it today, written down so `.wo` bundles (decisions.md D38,
 `docs/spec/toolchain/wo_bundles.md`) can depend on it. Nothing here is a new rule. The
 sources named in §7 define the ABI; this document describes them, and at
@@ -100,8 +100,8 @@ and every call site (D6; `docs/spec/abi/fn_abi_descriptor_design.md`):
 
 | Signature | Pass mode | Physical form |
 |---|---|---|
-| plain `T`, `T: Copy` | COPY | the LLVM value of `T` (§1–3 layout) |
-| plain `T`, not Copy | OWNED | the LLVM value of `T`; the callee owns it |
+| plain `T`, `T: Copy` | COPY | the LLVM value of `T` (§1–3 layout); a pointer to a caller-made copy when `T` is an aggregate over two words (below) |
+| plain `T`, not Copy | OWNED | the LLVM value of `T`, or a pointer to a caller-made copy when `T` is an aggregate over two words (below); the callee owns it |
 | `&T` / `&mut T` (explicit reference) | reference value | pointer word |
 | receiver `mut self` (in-place), compiler-modeled borrowed places | IndirectPlace (`SHARE-PLACE` in `--dump-abi`) | pointer to the caller's place |
 | `[]T` slices, `&str` views | Fat | `{ ptr, len }` by value (indirect under the Windows x86_64 rule below) |
@@ -115,12 +115,14 @@ returns through `sret`, SysV x86_64 passes it `byval` in memory and returns
 it by value, and Windows x86_64 leaves both to LLVM's vector lowering
 (`fn_abi_c_vector_param_indirect`, `fn_abi_c_vector_return_indirect`).
 
-Return values are returned by LLVM value of the return type. One target
-exception, applied by the compiler on both sides: on windows-x86_64 a
-struct/array larger than 8 bytes is returned through a hidden `sret`
-pointer and passed indirectly (`internal_abi_needs_sret`,
-`internal_abi_needs_indirect_param`). Other targets return `str`, `Vec`,
-and structs by value and let LLVM lower them per the platform.
+Return values are returned by LLVM value of the return type, up to a
+size. A struct or array larger than two words (16 bytes) is returned
+through a hidden `sret` pointer and passed as a pointer to a caller-made
+copy, applied by the compiler on both sides (`internal_abi_needs_sret`,
+`internal_abi_needs_indirect_param`, `fn_abi_platform_aggregate_indirect`);
+on windows-x86_64 the line is one word (8 bytes). So `str` and a `&str`
+view (16 bytes) pass and return by value; a `Vec` header (32 bytes) and
+any larger struct go through memory.
 
 **Ownership is part of the ABI.** A plain `T` parameter transfers
 ownership: the callee drops it (or moves it on). A reference parameter
@@ -204,6 +206,18 @@ ABI-owned file when D30's in-unit runtime retirement lands; until then a
 layout change there is caught by the `wo-drift` lane, not by this check.
 
 ## Version history
+
+- **v11** (2026-09-30): a struct or array larger than two words is passed
+  as a pointer to a caller-made copy and returned through `sret` on every
+  target (§4); only windows-x86_64 did so before, above one word. By LLVM
+  value, an aggregate crossed a call scalarized: one load, `insertvalue`
+  and argument slot per leaf field, so a 700-field `Sema` passed to one
+  call became ~2800 stack arguments; instruction selection and scheduling
+  over those blocks was 94% of the slowest codegen unit's time, and
+  compiling the compiler went from 115 s to 47 s (slowest unit 63 s →
+  4 s, peak RSS 11.3 GB → 3.8 GB). AAPCS64 and Rust's own ABI draw
+  the same two-word line. Objects built under v10 do not link with v11
+  code on any target but windows-x86_64.
 
 - **v10** (2026-09-30): windows-x86_64 objects target x86_64-w64-windows-gnu,
   no longer x86_64-pc-windows-msvc (#1915; Eric, 2026-09-30): programs and

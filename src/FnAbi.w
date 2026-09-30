@@ -20,7 +20,7 @@ extern fn with_getenv_str(name: &str) -> str
 
 // A label for docs/spec/abi/with-abi.md's version history, not the bundle key; it
 // becomes a frozen, normative major version at Level 1 of the roadmap.
-pub const WITH_ABI_VERSION: i32 = 10
+pub const WITH_ABI_VERSION: i32 = 11
 
 // #D6: PassMode — the per-parameter ABI classification, the SINGLE source of
 // truth. fn_abi_pass_mode computes it; both the callee prologue
@@ -88,11 +88,15 @@ pub fn fn_abi_argument_pass(place: i32, convention: i32, platform_indirect: bool
 pub fn fn_abi_owned_place(drop_receiver: bool, aggregate: bool) -> bool:
     drop_receiver and aggregate
 
-// The one platform exception in v1: windows-x86_64 passes and returns a
-// struct or array larger than 8 bytes indirectly (byval / sret). Every other
-// target passes aggregates by LLVM value and lets LLVM lower them.
+// A struct or array larger than two words is passed as a pointer to a
+// caller-made copy and returned through sret (v11); windows-x86_64 already
+// did so above one word. By LLVM value, a large aggregate is scalarized
+// into one load, insertvalue and argument slot per leaf at every call and
+// return: a 700-field Sema crossed a call as ~2800 stack arguments, and
+// instruction selection over those blocks was most of the compiler's own
+// build time. AAPCS64 and Rust's ABI draw the same two-word line.
 pub fn fn_abi_platform_aggregate_indirect(windows_x86_64: bool, is_aggregate: bool, size: i64) -> bool:
-    windows_x86_64 and is_aggregate and size > 8
+    is_aggregate and size > (if windows_x86_64: 8 else: 16)
 
 // §4.3d / §16.1 (D78): a vector crossing a C call goes where the target's C
 // compiler puts it (clang's output on each target, checked in IR): up to 16
