@@ -12,6 +12,7 @@ use compiler.TarExtract
 use compiler.EmbeddedSysroot
 use std.http
 use std.crypto.sha256
+use std.string.StringBuilder
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn str_from_byte(b: i32) -> str
 extern fn with_fs_chmod(path: &str, mode: i32) -> i32
@@ -89,15 +90,47 @@ fn conan_argv_append(argv: &str, arg: &str) -> str:
 // #1915: downloads are this compiler's own HTTPS client (std.http over
 // std.tls), not the host's curl. A dropped connection is retried, as
 // build/https_fetch.w does.
+// A file:// URL — a local mirror, or a test's fixture — is copied the way an
+// HTTPS fetch writes its body; an absent file is a failed download.
 fn conan_https_to_file(url: &str, path: &str, timeout_ms: i32) -> i32:
+    if url.starts_with("file://"):
+        let local = conan_file_url_path(url)
+        if runtime_file_exists(local) == 0 or runtime_is_dir(local) != 0: return 1
+        return if runtime_write_file(path, runtime_read_file(local)) == 0: 0 else: 1
     if not url.starts_with("https://"):
-        runtime_eprint("error: Conan download needs an https:// URL: " ++ url)
+        runtime_eprint("error: Conan download needs an https:// or file:// URL: " ++ url)
         return 1
     for attempt in 1..4:
         if https_download(url.to_owned(), path.to_owned()) == 0: return 0
         if attempt < 3: let _ = runtime_nanosleep(attempt as i64 * 1000000000)
     runtime_eprint("error: Conan download failed after 3 attempts: " ++ url ++ " -> " ++ path)
     1
+
+// The local path a file:// URL names: percent-escapes decoded, and a Windows
+// drive path (file:///C:/…) without its leading slash.
+fn conan_file_url_path(url: &str) -> str:
+    let raw = url.slice(7, url.len())
+    var decoded = StringBuilder.new()
+    var i = 0
+    while i < raw.len() as i32:
+        if raw[i] == '%' and i + 2 < raw.len() as i32:
+            let hi = conan_hex_digit(raw[i + 1])
+            let lo = conan_hex_digit(raw[i + 2])
+            if hi >= 0 and lo >= 0:
+                decoded.push_byte((hi * 16 + lo) as u8)
+                i = i + 3
+                continue
+        decoded.push_byte(raw[i])
+        i = i + 1
+    let out = decoded.to_str()
+    if out.len() > 2 and out[0] == '/' and out[2] == ':': return out.slice(1, out.len())
+    out
+
+fn conan_hex_digit(c: u8) -> i32:
+    if c >= '0' and c <= '9': return (c - '0') as i32
+    if c >= 'a' and c <= 'f': return (c - 'a' + 10) as i32
+    if c >= 'A' and c <= 'F': return (c - 'A' + 10) as i32
+    -1
 
 // #1915: a package archive is unpacked in-process (compiler.TarExtract).
 fn conan_extract_tgz(archive: &str, dest: &str) -> i32:
