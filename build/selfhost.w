@@ -2544,6 +2544,29 @@ fn bs_check_build_cache_tracks_declared_input(ctx: &ActionCtx, compiler_path: &s
     if second.rc != 0: return second.rc
     bs_expect_file_contains(ctx, bs_join(case_dir, "out/stamp.txt"), "second", "build cache input invalidation")
 
+// #1925: a graph whose targets are declared from what build(ctx) read with
+// BuildCtx.env_input is keyed on that environment. The SDK build declared
+// its outputs under the previous run's SDK_OUTPUT_PREFIX after a run
+// without it, until the graph cache was deleted by hand.
+fn bs_check_build_cache_tracks_env_input(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    var rc = bs_write_project_manifest(ctx, case_dir, "cacheenv")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "build.w"), "use std.build\n\nfn stamp(ctx: ActionCtx) -> i32:\n    let fs = ctx.fs()\n    if fs.mkdir_all(ctx.args().get(0)) != 0:\n        return 1\n    fs.write_text(ctx.output(), \"stamped\")\n\ncomptime with BuildCtx as ctx:\npub fn build -> Build:\n    var out = ctx.new_build()\n    let dir = \"out/\" ++ ctx.env_input(\"CACHE_ENV_DIR\")\n    var t = target_new(.Action, \"stamp\", \"\").output(dir ++ \"/stamp.txt\")\n    t.action = stamp\n    t = t.arg(dir)\n    t = t.write_scope(\"out\")\n    out = out.add_target(t)\n    out.default(\"stamp\")\n", "cache env build")
+    if rc != 0: return rc
+    let first = bs_run_cli_capture_cwd_with_env(ctx, compiler_path, "build-cache-env-first", bs_project_args("build"), 120000, case_dir, process_env().set("CACHE_ENV_DIR", "first"))
+    if first.rc != 0:
+        return bs_fail(ctx, f"build cache env first run failed with exit code {first.rc}: " ++ first.stderr)
+    rc = bs_expect_file_contains(ctx, bs_join(case_dir, "out/first/stamp.txt"), "stamped", "build cache env first output")
+    if rc != 0: return rc
+    // The stale graph declared out/first/stamp.txt while the runner wrote
+    // out/second: with the first output gone, the declaration fails.
+    if ctx.fs().remove_tree(bs_join(case_dir, "out/first")) != 0:
+        return bs_fail(ctx, "could not remove the first run's output")
+    let second = bs_run_cli_capture_cwd_with_env(ctx, compiler_path, "build-cache-env-second", bs_project_args("build"), 120000, case_dir, process_env().set("CACHE_ENV_DIR", "second"))
+    if second.rc != 0:
+        return bs_fail(ctx, f"build cache env second run failed with exit code {second.rc}: " ++ second.stderr)
+    bs_expect_file_contains(ctx, bs_join(case_dir, "out/second/stamp.txt"), "stamped", "build cache env invalidation (#1925)")
+
 fn bs_check_build_cache_tracks_embed_file(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     var rc = bs_write_project_manifest(ctx, case_dir, "embedcache")
     if rc != 0: return rc
@@ -2769,6 +2792,8 @@ pub fn run_cli_selfhost_project_action(ctx: ActionCtx) -> i32:
     rc = bs_check_build_cache_tracks_action_source(ctx, compiler_path, bs_join(output_dir, "build_cache_action_case"))
     if rc != 0: return rc
     rc = bs_check_build_cache_tracks_declared_input(ctx, compiler_path, bs_join(output_dir, "build_cache_input_case"))
+    if rc != 0: return rc
+    rc = bs_check_build_cache_tracks_env_input(ctx, compiler_path, bs_join(output_dir, "build_cache_env_case"))
     if rc != 0: return rc
     rc = bs_check_build_cache_tracks_embed_file(ctx, compiler_path, bs_join(output_dir, "build_cache_embed_case"))
     if rc != 0: return rc

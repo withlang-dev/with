@@ -2181,7 +2181,9 @@ fn load_build_graph_from_build_w(root: &str, cfg: &ProjectConfig, options: &Buil
         return BuildGraphLoadResult { graph, sema }
     var materialized = materialize_build_graph_from_comptime(move sema, eval_result.value, move eval_result.extras)
     build_cache_record_build_effects(root, eval_result.effect_records)
-    build_cache_graph_write(root, graph_cache_key, &materialized.graph)
+    // Keyed on the environment this evaluation just read (#1925), not the
+    // previous one's.
+    build_cache_graph_write(root, build_cache_graph_key(root, options.target_kind, if options.strict_effects: 1 else: 0), &materialized.graph)
     BuildGraphLoadResult { graph: move materialized.graph, sema: move materialized.sema }
 
 fn build_graph_find_build_root(start_dir: &str) -> str:
