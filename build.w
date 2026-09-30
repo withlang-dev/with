@@ -84,7 +84,7 @@ fn cross_triple(tag: &str) -> str:
     if tag == "linux_aarch64":
         return "aarch64-unknown-linux-gnu"
     if tag == "windows_x86_64":
-        return "x86_64-pc-windows-msvc"
+        return "x86_64-w64-windows-gnu"
     if tag == "windows_aarch64":
         return "aarch64-pc-windows-msvc"
     if tag == "wasm32":
@@ -3165,7 +3165,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     // ── Cross-target runtime (windows_x86_64) ───────────────────────
     // `with build :cross-rt-windows` builds the full windows_x86_64
     // runtime + compiler link inputs into out/lib/cross/windows_x86_64/
-    // (COFF objects, windows triple) so a `--target x86_64-pc-windows-msvc`
+    // (COFF objects, windows triple) so a `--target x86_64-w64-windows-gnu`
     // link resolves entirely from that directory (§18.5). Mirrors the
     // linux cross-rt set; fiber core/asm are the windows variants.
     out = out.add_target(cross_windows_object_target("cross-win-rt-core-object", "rt/rt_core.w", "-O2"))

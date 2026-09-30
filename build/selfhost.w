@@ -119,7 +119,7 @@ fn bs_host_target_triple() -> str:
     if host_os == "Linux" and comp_arch_is_aarch64(host_arch):
         return "aarch64-unknown-linux-gnu"
     if host_os == "Windows" and host_arch == "x86_64":
-        return "x86_64-pc-windows-msvc"
+        return "x86_64-w64-windows-gnu"
     if host_os == "Windows" and (host_arch == "armv8" or host_arch == "aarch64"):
         return "aarch64-pc-windows-msvc"
     ""

@@ -658,10 +658,8 @@ fn link_stage_windows_libc_dir(llvm_ld: &str, arch: &str) -> str:
     link_stage_windows_libc_root_of(llvm_ld) ++ "/" ++ arch ++ "-w64-mingw32/lib"
 
 // The C target a Windows c_import parses for: mingw-w64's headers are
-// written for the GNU environment. The C ABI of the declarations is the
-// same as the MSVC environment With's own objects use (LLP64, the Microsoft
-// x64 calling convention, MS bitfield layout), except long double, which is
-// 80-bit here and 64-bit there.
+// written for the GNU environment, the environment With's own Windows
+// x86_64 objects target too (TargetSpec).
 pub fn link_stage_windows_c_target() -> str: link_stage_windows_arch() ++ "-w64-windows-gnu"
 
 // Whether this compilation targets Windows x86_64, whose programs and

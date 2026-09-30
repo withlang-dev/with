@@ -322,7 +322,10 @@ pub fn driver_target_triple_kind(triple: &str) -> i32:
         return 3
     if triple == "aarch64-apple-darwin" or triple == "arm64-apple-darwin" or triple == "darwin_aarch64":
         return 4
-    if triple == "x86_64-pc-windows-msvc" or triple == "windows_x86_64":
+    // windows-x86_64 is the GNU environment (mingw-w64 UCRT, #1915); the MSVC
+    // spelling is not accepted, since it would name code the compiler does
+    // not emit.
+    if triple == "x86_64-w64-windows-gnu" or triple == "x86_64-w64-mingw32" or triple == "x86_64-pc-windows-gnu" or triple == "windows_x86_64":
         return 5
     if triple == "aarch64-pc-windows-msvc" or triple == "arm64-pc-windows-msvc" or triple == "windows_aarch64":
         return 6

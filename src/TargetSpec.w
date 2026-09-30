@@ -108,7 +108,7 @@ pub fn target_spec_llvm_triple() -> str:
     if kind == 4:
         return "arm64-apple-macosx11.0.0"
     if kind == 5:
-        return "x86_64-pc-windows-msvc"
+        return "x86_64-w64-windows-gnu"
     if kind == 6:
         return "aarch64-pc-windows-msvc"
     if kind == 7:
