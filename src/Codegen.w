@@ -5332,14 +5332,14 @@ impl Codegen:
         if not uses_c_abi and is_variadic == 0:
             self.apply_capture_param_attrs(function, name_sym, sema_sig_idx, param_count, if has_sret != 0: 1 else: 0)
 
-        // Whole-program codegen internalizes non-prelude functions because imported
+        // Whole-program codegen internalizes ordinary With functions, including
+        // the stdlib: foreign archives can define the same bare names. Imported
         // modules are duplicated into the current AST. In module-object mode we must
         // keep owner definitions externally linkable and let importers reference them.
         // A function this unit only declares stays external: its definition is
         // the bundle's object (an internal declaration without a body is invalid).
         if self.module_object_mode == 0 and not self.fn_node_is_declared_only(fn_node):
-            let is_prelude = self.current_decl_source_file.contains("lib/std/")
-            if effective_name != "main" and not is_prelude and
+            if effective_name != "main" and
                 not codegen_preserve_runtime_link_name(self.current_decl_source_file, effective_name):
                 let promoted = self.unit_promoted_name(name_sym, effective_name)
                 if promoted.len() > 0:
@@ -5680,7 +5680,7 @@ impl Codegen:
             else:
                 wl_set_linkage(function, wl_internal_linkage())
         else if self.module_object_mode == 0 and not self.path_is_bundle_provided(self.current_decl_source_file):
-            if effective_name != "main" and not self.current_decl_source_file.contains("lib/std/") and
+            if effective_name != "main" and
                 not codegen_preserve_runtime_link_name(self.current_decl_source_file, effective_name):
                 let promoted_mo = self.unit_promoted_name(fn_sym, effective_name)
                 if promoted_mo.len() > 0:
