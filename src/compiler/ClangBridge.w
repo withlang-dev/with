@@ -21,7 +21,11 @@ extern fn with_libc_realpath(path: *const i8, resolved_path: *mut i8) -> *mut i8
 unsafe fn mkstemp(template_path: *mut u8) -> i32: with_libc_mkstemp(template_path as *mut i8)
 unsafe fn realpath(path: *const u8, resolved_name: *mut u8) -> *mut u8:
     with_libc_realpath(path as *const i8, resolved_name as *mut i8) as *mut u8
-extern fn unlink(path: *const u8) -> i32
+// unlink(2) under its own name here: the pinned seed predates #1919, so an
+// `extern fn unlink` in this module still collides with std.libc's `pub fn
+// unlink` once the compiler imports std.zip (compiler.TarExtract).
+@[link_name("unlink")]
+extern fn ci_unlink(path: *const u8) -> i32
 extern fn opendir(path: *const u8) -> *mut u8
 extern fn readdir(dirp: *mut u8) -> *mut u8
 extern fn closedir(dirp: *mut u8) -> i32
@@ -2120,7 +2124,7 @@ pub fn with_cimport_dispose(session: i64):
             with_free((*s).cursor_spellings as *mut u8)
         // Cleanup temp file
         if (*s).tmp_path as i64 != 0:
-            let _ = unlink((*s).tmp_path as *const u8)
+            let _ = ci_unlink((*s).tmp_path as *const u8)
             with_free((*s).tmp_path)
         if (*s).tu as i64 != 0: clang_disposeTranslationUnit((*s).tu)
         if (*s).index as i64 != 0: clang_disposeIndex((*s).index)

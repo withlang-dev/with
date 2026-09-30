@@ -1200,34 +1200,10 @@ fn conan_write_launcher(dir: &str, tool: &str, self_exe: &str) -> str:
     let _x = with_fs_chmod(path, 0o755)
     path
 
-// #1915: gzip tarballs are unpacked in-process (compiler.TarExtract). A zip,
-// xz or bzip2 archive is still unpacked by the host's tar, and the build
-// says so.
+// #1915: every archive is unpacked in-process (compiler.TarExtract): gzip,
+// xz and bzip2 tarballs and zips, told apart by their first bytes.
 fn conan_extract_any(archive: &str, dest: &str) -> i32:
-    var problem = ""
-    if archive.ends_with(".tar.gz") or archive.ends_with(".tgz"):
-        problem = tar_gz_extract(archive, dest, 0)
-    else:
-        // xz and bzip2 have no With decompressor yet; std.zip has one for zip,
-        // which the compiler cannot import until #1919 is fixed.
-        runtime_eprint("warning: " ++ archive ++ ": this compiler cannot unpack it itself yet; unpacking it with the host's tar (#1915, #1919)")
-        var argv = ""
-        argv = conan_argv_append(argv, "tar")
-        argv = conan_argv_append(argv, "xf")
-        argv = conan_argv_append(argv, archive)
-        argv = conan_argv_append(argv, "-C")
-        argv = conan_argv_append(argv, dest)
-        if conan_run_tool(argv, 300000) == 0: return 0
-        // GNU tar does not read zip; `unzip` is the second try.
-        if not archive.ends_with(".zip"): return 1
-        var unzip = ""
-        unzip = conan_argv_append(unzip, "unzip")
-        unzip = conan_argv_append(unzip, "-q")
-        unzip = conan_argv_append(unzip, "-o")
-        unzip = conan_argv_append(unzip, archive)
-        unzip = conan_argv_append(unzip, "-d")
-        unzip = conan_argv_append(unzip, dest)
-        return conan_run_tool(unzip, 300000)
+    let problem = archive_extract(archive, dest)
     if problem.len() > 0:
         runtime_eprint("error: could not unpack " ++ problem)
         return 1

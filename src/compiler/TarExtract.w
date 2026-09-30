@@ -1,10 +1,14 @@
-// Extracting a .tar.gz in-process, for `with get` (#1915): Conan packages and
-// gzip source archives are unpacked by this compiler, not by the host's tar.
-// gzip is std.zlib (the zlib corpus), and the tar reader is here: ustar, pax `path`/`linkpath` records and GNU
+// Unpacking archives in-process, for `with get` (#1915): Conan packages and
+// source archives are unpacked by this compiler, not by the host's tar or
+// unzip. gzip is std.zlib (the zlib corpus), zip is std.zip, xz and bzip2
+// are compiler.Xz and compiler.Bzip2, and the tar reader is here: ustar, pax `path`/`linkpath` records and GNU
 // long names; regular files, directories, symlinks and hard links.
 
 use compiler.Runtime
 use std.zlib
+use std.zip
+use compiler.Xz
+use compiler.Bzip2
 
 extern fn with_str_from_bytes(s: *const u8, len: i64) -> str
 extern fn with_fs_chmod(path: &str, mode: i32) -> i32
@@ -147,3 +151,36 @@ pub fn tar_gz_extract(archive: &str, dest: &str, strip: i32) -> str:
             let text = unsafe { with_str_from_bytes(&tar[0] as *const u8, tar.len()) }
             tar_extract_text(text, dest, strip)
         .Err(e) => archive ++ ": " ++ e.message
+
+// Unpacks the xz-compressed tar `archive` into `dest`. "" or why not.
+pub fn tar_xz_extract(archive: &str, dest: &str, strip: i32) -> str:
+    let packed = runtime_read_file(archive)
+    if packed.len() == 0: return "could not read " ++ archive
+    let r = xz_decompress(packed)
+    if r[1].len() > 0: return archive ++ ": " ++ r[1]
+    tar_extract_text(r[0], dest, strip)
+
+// Unpacks the bzip2-compressed tar `archive` into `dest`. "" or why not.
+pub fn tar_bz2_extract(archive: &str, dest: &str, strip: i32) -> str:
+    let packed = runtime_read_file(archive)
+    if packed.len() == 0: return "could not read " ++ archive
+    let r = bzip2_decompress(packed)
+    if r[1].len() > 0: return archive ++ ": " ++ r[1]
+    tar_extract_text(r[0], dest, strip)
+
+// Unpacks the zip `archive` into `dest`. "" or why not.
+pub fn zip_extract(archive: &str, dest: &str) -> str:
+    match extract(archive, dest):
+        .Ok(_) => ""
+        .Err(e) => archive ++ ": " ++ e.message
+
+// Unpacks `archive` into `dest` by what its first bytes say it is: a gzip,
+// xz or bzip2 tarball, or a zip (a URL's name need not say). "" or why not.
+pub fn archive_extract(archive: &str, dest: &str) -> str:
+    let head = runtime_read_file(archive)
+    if head.len() < 6: return "could not read " ++ archive
+    if head[0] == 0x1F and head[1] == 0x8B: return tar_gz_extract(archive, dest, 0)
+    if head[0] == 0xFD and head.slice(1, 5) == "7zXZ" and head[5] == 0: return tar_xz_extract(archive, dest, 0)
+    if head.slice(0, 3) == "BZh": return tar_bz2_extract(archive, dest, 0)
+    if head.slice(0, 4) == "PK\x03\x04": return zip_extract(archive, dest)
+    archive ++ ": not a gzip, xz or bzip2 tarball or a zip, the formats this compiler unpacks"
