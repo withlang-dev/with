@@ -75,6 +75,35 @@ fn ht_unquote(token: &str) -> str:
         return token.slice(1, token.len() - 1)
     token.to_owned()
 
+// A Windows path as the record check compares it: '\' as '/', ASCII
+// letters lowered (the file system folds case).
+fn ht_fold_path(path: &str) -> str:
+    var out = ""
+    for i in 0..path.len() as i32:
+        let ch = path[i]
+        if ch == '\\':
+            out = out ++ "/"
+        else if ch >= 'A' and ch <= 'Z':
+            let k = (ch - 'A') as i32
+            out = out ++ "abcdefghijklmnopqrstuvwxyz".slice(k, k + 1)
+        else:
+            out = out ++ path.slice(i, i + 1)
+    out
+
+// The drive-lettered path a Windows record token names — alone, or after an
+// option (`/libpath:C:/x`, `-LC:/x`, `-Wl,C:/x`) — folded, or "".
+fn ht_windows_path(token: &str) -> str:
+    var i = 1
+    while i + 1 < token.len() as i32:
+        if token[i] == ':' and (token[i + 1] == '/' or token[i + 1] == '\\'):
+            let letter = token[i - 1]
+            let is_letter = (letter >= 'A' and letter <= 'Z') or (letter >= 'a' and letter <= 'z')
+            let starts = i == 1 or token[i - 2] == ':' or token[i - 2] == ',' or token[i - 2] == '=' or token[i - 2] == '@' or (i == 3 and token[0] == '-')
+            if is_letter and starts:
+                return ht_fold_path(token.slice(i - 1, token.len()))
+        i = i + 1
+    ""
+
 // Every problem with one record: a forbidden marker, or an absolute path
 // outside the repository and the SDK.
 fn ht_record_problems(path: &str, text: &str, root: &str, sdk: &str) -> Vec[str]:
@@ -89,6 +118,13 @@ fn ht_record_problems(path: &str, text: &str, root: &str, sdk: &str) -> Vec[str]
             if not flagged and token.find(markers[m]) >= 0:
                 problems.push(path ++ ": names the host toolchain (" ++ markers[m] ++ "): " ++ token)
                 flagged = true
+        // Windows: a path is drive-lettered, and a token that starts with
+        // `/` is an lld-link option (/alternatename:, /include:, /libpath:C:/...).
+        if os() == "Windows":
+            let candidate = ht_windows_path(token)
+            if not flagged and candidate.len() > 0 and not candidate.starts_with(ht_fold_path(root)) and not (sdk.len() > 0 and candidate.starts_with(ht_fold_path(sdk))):
+                problems.push(path ++ ": names a path outside the repository and the SDK: " ++ token)
+            continue
         // `-Wl,-foo,/path` and `-L/path` carry a path after a prefix too.
         let at = token.find("/")
         if not flagged and at >= 0:
