@@ -301,6 +301,10 @@ pub type Codegen {
     // Generic functions/structs: sym → node
     generic_fns: HashMap[i32, i32],
     generic_structs: HashMap[i32, i32],
+    // First NK_TYPE_DECL per declared name, in decl order (generic_type_decl_node);
+    // built once per module over type_decl_name_index_count decls.
+    type_decl_name_index: HashMap[str, i32],
+    type_decl_name_index_count: i32,
     generic_struct_methods: HashMap[i32, i32],
     mono_struct_base: HashMap[i32, i32],
     mono_struct_tp_starts: HashMap[i32, i32],
@@ -731,7 +735,7 @@ impl Codegen:
                     let incoming = wl_get_param(function, pi + (if abi.ret.pass == PM_INDIRECT: 1 else: 0))
                     if arg.source_ty != source_ty or incoming == 0 or wl_type_of(incoming) != arg.llvm_ty:
                         self.analysis_fail(f"declaration {self.sema.pool_resolve(sema_sym)} sig={si} param={pi}: finalized source type or LLVM parameter disagrees with FnAbi")
-                    let expected_byval = if arg.pass == PM_INDIRECT and not arg.owned_place and codegen_c_abi_needs_byval_attr(): arg.source_ty else: 0
+                    let expected_byval = if arg.pass == PM_INDIRECT and not arg.owned_place and self.fn_abi_byval(descriptor): arg.source_ty else: 0
                     if wl_get_byval_type(function, pi + (if abi.ret.pass == PM_INDIRECT: 1 else: 0), false) != expected_byval:
                         self.analysis_fail(f"declaration {self.sema.pool_resolve(sema_sym)} sig={si} param={pi}: byval attribute disagrees with FnAbi")
                     if (arg.pass == PM_INDIRECT_PLACE) != (self.sema.sig_param_uses_value_ref_abi(si, pi) != 0):
@@ -865,7 +869,8 @@ impl Codegen:
             named_descriptor >= 0 and param_index >= 0 and param_index < self.fn_abis[named_descriptor].arg_count and
                 self.fn_abi_arg(named_descriptor, param_index).pass == PM_INDIRECT
         let owned_place = has_descriptor and self.fn_abi_arg(descriptor, param_index).owned_place
-        let needs_copy = indirect and not owned_place and not codegen_c_abi_needs_byval_attr()
+        let copy_descriptor = if has_descriptor: descriptor else: named_descriptor
+        let needs_copy = indirect and not owned_place and not (copy_descriptor >= 0 and self.fn_abi_byval(copy_descriptor))
         let ref_table = mono != 0 and self.is_ref_param(mono, param_index)
         var fact = AnalysisFact.new(AnalysisStage.Codegen, AnalysisFactKind.CodegenArgument)
         fact.id = operand
@@ -1042,6 +1047,8 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         type_layout_complete: HashMap.new(),
         generic_fns: HashMap.new(),
         generic_structs: HashMap.new(),
+        type_decl_name_index: HashMap.new(),
+        type_decl_name_index_count: -1,
         generic_struct_methods: HashMap.new(),
         mono_struct_base: HashMap.new(),
         mono_struct_tp_starts: HashMap.new(),
@@ -1192,10 +1199,30 @@ impl Codegen:
     // #685 inc-2: deinit CONSUMES the Codegen — dispose the LLVM resources
     // (they read self), then the consumed receiver's drop frees the tables.
     move fn deinit():
-        wl_builder_dispose(self.builder)
-        wl_module_dispose(self.llmod)
-        wl_context_dispose(self.context)
+        self.dispose_builders()
+        if self.llmod != 0:
+            wl_module_dispose(self.llmod)
+        if self.context != 0:
+            wl_context_dispose(self.context)
         wl_dispose_target_machine(self.target_machine)
+
+    // The IR and debug-info builders point into the context; they go first.
+    mut fn dispose_builders():
+        if self.di_builder != 0:
+            wl_di_dispose_builder(self.di_builder)
+            self.di_builder = 0
+        if self.builder != 0:
+            wl_builder_dispose(self.builder)
+            self.builder = 0
+
+    // #681: the finished unit's module and its context leave this Codegen
+    // for an emit thread (CodegenUnitPipeline.submit). Nothing here touches
+    // them afterwards: the builders are disposed now, on this thread, and
+    // deinit skips what it no longer owns.
+    mut fn release_llvm_module():
+        self.dispose_builders()
+        self.llmod = 0
+        self.context = 0
 
     // ── Public API (called by Driver) ─────────────────────────────────
 
@@ -2498,7 +2525,7 @@ impl Codegen:
             final_args.push(coerced[i])
         let call_val = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&final_args), final_args.len() as i32)
         var byval_types: Vec[i64] = Vec.new()
-        let byval_types_opt = self.fn_abi_symbol_byval_types(fn_sym)
+        let byval_types_opt = self.fn_abi_symbol_byval_attr_types(fn_sym)
         if byval_types_opt.is_some():
             byval_types = vec_copy_i64(byval_types_opt.unwrap())
         self.apply_c_abi_call_attrs(call_val, has_sret, sret_ty, byval_types, arg_count, 0)
@@ -2862,6 +2889,12 @@ pub fn vec_copy_i64(src: &Vec[i64]) -> Vec[i64]:
     let out: Vec[i64] = Vec.new()
     for i in 0..src.len() as i32:
         out.push(src[i])
+    out
+
+pub fn vec_zeros_i64(n: i32) -> Vec[i64]:
+    let out: Vec[i64] = Vec.new()
+    for _i in 0..n:
+        out.push(0)
     out
 
 fn codegen_owned_text(text: &str) -> str:
@@ -4423,25 +4456,55 @@ impl Codegen:
         let gs = self.generic_structs.get(type_sym)
         if gs.is_some():
             return gs.unwrap()
+        // The first type declaration named like `type_sym`, in decl order: by
+        // name when it has one (a declaration with the same symbol has the
+        // same name), else by symbol. The name index answers the first case
+        // without walking every declaration and cloning two names per step;
+        // that walk was the hottest frame of IR generation.
+        let type_name = self.codegen_symbol_name(type_sym)
+        var decl: NodeId = 0 as NodeId
+        var found = false
+        if type_name.len() > 0 and self.type_decl_name_index_count == self.pool.decl_count():
+            let hit = self.type_decl_name_index.get(type_name) ?? -1
+            if hit < 0:
+                return 0
+            decl = hit as NodeId
+            found = true
+        else:
+            for di in 0..self.pool.decl_count():
+                let candidate = self.pool.get_decl(di)
+                if self.pool.kind(candidate) != NodeKind.NK_TYPE_DECL:
+                    continue
+                let decl_sym = self.pool.get_data0(candidate)
+                if decl_sym != type_sym:
+                    let decl_name = self.codegen_symbol_name(decl_sym)
+                    if decl_name.len() == 0 or type_name.len() == 0 or decl_name != type_name:
+                        continue
+                decl = candidate
+                found = true
+                break
+        if not found:
+            return 0
+        let sub_kind = type_decl_sub_kind(self.pool.get_data2(decl))
+        if sub_kind != TypeDeclKind.Struct and sub_kind != TypeDeclKind.Enum:
+            return 0
+        if self.type_decl_tp_count(decl) > 0: decl as i32 else: 0
+
+    // A symbol's text in the codegen pool, else Sema's.
+    fn codegen_symbol_name(sym: i32) -> str:
+        let raw = self.intern.resolve(sym)
+        if raw.len() > 0: with_str_clone_ref(raw) else: self.sema_symbol_text(sym)
+
+    mut fn build_type_decl_name_index():
+        self.type_decl_name_index = HashMap.new()
         for di in 0..self.pool.decl_count():
             let decl = self.pool.get_decl(di)
             if self.pool.kind(decl) != NodeKind.NK_TYPE_DECL:
                 continue
-            let decl_sym = self.pool.get_data0(decl)
-            if decl_sym != type_sym:
-                let decl_name_raw = self.intern.resolve(decl_sym)
-                let decl_name = if decl_name_raw.len() > 0: with_str_clone_ref(decl_name_raw) else: self.sema_symbol_text(decl_sym)
-                let type_name_raw = self.intern.resolve(type_sym)
-                let type_name = if type_name_raw.len() > 0: with_str_clone_ref(type_name_raw) else: self.sema_symbol_text(type_sym)
-                if decl_name.len() == 0 or type_name.len() == 0 or decl_name != type_name:
-                    continue
-            let sub_kind = type_decl_sub_kind(self.pool.get_data2(decl))
-            if sub_kind != TypeDeclKind.Struct and sub_kind != TypeDeclKind.Enum:
-                return 0
-            if self.type_decl_tp_count(decl) > 0:
-                return decl as i32
-            return 0
-        0
+            let name = self.codegen_symbol_name(self.pool.get_data0(decl))
+            if name.len() > 0 and not self.type_decl_name_index.contains(name):
+                self.type_decl_name_index.insert(name, decl as i32)
+        self.type_decl_name_index_count = self.pool.decl_count()
 
     // ── Declare struct type ───────────────────────────────────────────
 
@@ -5203,7 +5266,7 @@ impl Codegen:
         let abi = self.fn_abis[abi_index]
         let has_sret = if abi.ret.pass == PM_INDIRECT: 1 else: 0
         let sret_ty: i64 = abi.ret.source_ty
-        let byval_types = self.fn_abi_byval_types(abi_index)
+        let byval_types = self.fn_abi_byval_attr_types(abi_index)
         let fn_type: i64 = abi.llvm_ty
 
         // Use "main" for @[entry] functions
@@ -5463,7 +5526,7 @@ impl Codegen:
         self.closure_counter = self.closure_counter + 1
         let function = wl_add_function(self.llmod, name, thunk_abi.llvm_ty)
         wl_set_linkage(function, wl_internal_linkage())
-        let thunk_byval = self.fn_abi_byval_types(thunk_index)
+        let thunk_byval = self.fn_abi_byval_attr_types(thunk_index)
         self.apply_c_abi_byval_attrs(function, thunk_byval, target.arg_count, 1)
         let saved_fn: i64 = self.current_function
         let saved_bb = wl_get_insert_block(self.builder)
@@ -5483,7 +5546,7 @@ impl Codegen:
                 value = wl_build_load(self.builder, incoming.source_ty, value)
             args.push(self.push_call_arg(target_index, pi, value, if outgoing.pass == PM_INDIRECT_PLACE: value else: 0))
         let call = wl_build_call(self.builder, target.llvm_ty, fn_val, vec_data_i64(&args), args.len() as i32)
-        let target_byval = self.fn_abi_byval_types(target_index)
+        let target_byval = self.fn_abi_byval_attr_types(target_index)
         self.apply_c_abi_call_attrs(call, has_sret, target.ret.source_ty, target_byval, target.arg_count, 0)
         if target.ret.pass == PM_IGNORE:
             wl_build_ret_void(self.builder)
@@ -5514,7 +5577,7 @@ impl Codegen:
         if arg.pass == PM_INDIRECT_PLACE and place != 0:
             self.analysis_last_marshal_strategy = AnalysisMarshalStrategy.PlaceAddress
             return place
-        if arg.pass == PM_INDIRECT and place != 0 and codegen_c_abi_needs_byval_attr():
+        if arg.pass == PM_INDIRECT and place != 0 and self.fn_abi_byval(abi):
             self.analysis_last_marshal_strategy = AnalysisMarshalStrategy.ExistingPointer
             return place
         if arg.pass == PM_INDIRECT or arg.pass == PM_INDIRECT_PLACE:
@@ -5527,12 +5590,21 @@ impl Codegen:
             return self.c_abi_pack_direct_value(value, arg.llvm_ty)
         self.enforce_coerced_type(value, arg.llvm_ty, "FnAbi direct argument")
 
+    // Whether this descriptor's indirect copies travel as LLVM byval.
+    fn fn_abi_byval(abi: i32): fn_abi_indirect_uses_byval(self.fn_abis[abi].convention, codegen_c_abi_needs_byval_attr())
+
+    // The source type of each argument passed as a pointer to a copy (0 for
+    // the rest): what the callee's prologue reads through the pointer.
     fn fn_abi_byval_types(abi: i32) -> Vec[i64]:
         let result: Vec[i64] = Vec.new()
         for pi in 0..self.fn_abis[abi].arg_count:
             let arg = self.fn_abi_arg(abi, pi)
             result.push(if arg.pass == PM_INDIRECT and not arg.owned_place: arg.source_ty else: 0)
         result
+
+    // The subset of those copies that carry LLVM's byval attribute.
+    fn fn_abi_byval_attr_types(abi: i32) -> Vec[i64]:
+        if self.fn_abi_byval(abi): self.fn_abi_byval_types(abi) else: vec_zeros_i64(self.fn_abis[abi].arg_count)
 
     fn bind_fn_abi_owned_place(body: &MirBody, sym: i32, pi: i32, name: i32, incoming: i64) -> bool:
         let index = self.fn_abi_symbols.get(sym) ?? -1
@@ -6184,6 +6256,11 @@ impl Codegen:
         if index < 0: return .None
         .Some(self.fn_abi_byval_types(index))
 
+    fn fn_abi_symbol_byval_attr_types(sym: i32) -> Option[Vec[i64]]:
+        let index = self.fn_abi_symbols.get(sym) ?? -1
+        if index < 0: return .None
+        .Some(self.fn_abi_byval_attr_types(index))
+
     fn fn_abi_direct_param_types(sym: i32) -> Option[Vec[i64]]:
         let index = self.fn_abi_symbols.get(sym) ?? -1
         if index < 0: return .None
@@ -6281,7 +6358,7 @@ impl Codegen:
         let abi = self.fn_abis[abi_index]
         let has_sret = if abi.ret.pass == PM_INDIRECT: 1 else: 0
         let sret_ty: i64 = abi.ret.source_ty
-        let byval_types = self.fn_abi_byval_types(abi_index)
+        let byval_types = self.fn_abi_byval_attr_types(abi_index)
         let fn_type: i64 = abi.llvm_ty
 
         // @[link_name("symbol")] overrides the C symbol this extern links against
@@ -7035,6 +7112,7 @@ impl Codegen:
         if self.debug_pool_flow_enabled():
             with_eprint(f"[llvm-cg] gen_module input.decls={pool.decl_count()} input.nodes={pool.node_count()}")
         self.pool = pool
+        self.build_type_decl_name_index()
         if self.debug_pool_flow_enabled():
             with_eprint(f"[llvm-cg] gen_module self.decls={self.pool.decl_count()} self.nodes={self.pool.node_count()}")
 

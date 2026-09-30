@@ -122,7 +122,9 @@ copy, applied by the compiler on both sides (`internal_abi_needs_sret`,
 `internal_abi_needs_indirect_param`, `fn_abi_platform_aggregate_indirect`);
 on windows-x86_64 the line is one word (8 bytes). So `str` and a `&str`
 view (16 bytes) pass and return by value; a `Vec` header (32 bytes) and
-any larger struct go through memory.
+any larger struct go through memory. The pointer is a plain pointer, never
+LLVM `byval`, on every target; `byval` belongs to the C convention on SysV
+x86_64 alone (`fn_abi_indirect_uses_byval`).
 
 **Ownership is part of the ABI.** A plain `T` parameter transfers
 ownership: the callee drops it (or moves it on). A reference parameter

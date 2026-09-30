@@ -95,6 +95,13 @@ pub fn fn_abi_owned_place(drop_receiver: bool, aggregate: bool) -> bool:
 // return: a 700-field Sema crossed a call as ~2800 stack arguments, and
 // instruction selection over those blocks was most of the compiler's own
 // build time. AAPCS64 and Rust's ABI draw the same two-word line.
+// An indirect argument carries LLVM's `byval` only where a C callee expects
+// one (SysV x86_64, `target_byval`); under With's own conventions it is a
+// plain pointer to the caller's copy on every target, as windows-x86_64's
+// has always been.
+pub fn fn_abi_indirect_uses_byval(convention: i32, target_byval: bool) -> bool:
+    convention == FN_ABI_C and target_byval
+
 pub fn fn_abi_platform_aggregate_indirect(windows_x86_64: bool, is_aggregate: bool, size: i64) -> bool:
     is_aggregate and size > (if windows_x86_64: 8 else: 16)
 

@@ -2949,7 +2949,7 @@ impl Codegen:
         let abi = self.fn_abis[abi_index]
         let has_sret = if abi.ret.pass == PM_INDIRECT: 1 else: 0
         let sret_ty = abi.ret.source_ty
-        let byval_types = self.fn_abi_byval_types(abi_index)
+        let byval_types = self.fn_abi_byval_attr_types(abi_index)
         let fn_type: i64 = abi.llvm_ty
         let func = wl_add_function(self.llmod, name, fn_type)
         if has_sret != 0:
@@ -4344,7 +4344,7 @@ impl Codegen:
         let args: Vec[i64] = Vec.new()
         args.push(self.push_call_arg(index, 0, value, ptr))
         let call = wl_build_call(self.builder, abi.llvm_ty, function, vec_data_i64(&args), 1)
-        let byval_types = self.fn_abi_byval_types(index)
+        let byval_types = self.fn_abi_byval_attr_types(index)
         self.apply_c_abi_call_attrs(call, 0, 0, byval_types, 1, 0)
 
     mut fn mir_emit_guarded_user_drop(ptr: i64, ty: i64, drop_fn_val: i64, drop_fn_ty: i64):
@@ -16143,7 +16143,7 @@ impl Codegen:
         if param_count > 0: wl_get_param_types(call_ft, vec_data_i64(&param_types))
         let abi_has_sret = if abi.ret.pass == PM_INDIRECT: 1 else: 0
         let abi_sret_ty = abi.ret.source_ty
-        let abi_byval_types = self.fn_abi_byval_types(call_abi)
+        let abi_byval_types = self.fn_abi_byval_attr_types(call_abi)
         let abi_direct_ret_ty = if abi.ret.pass == PM_DIRECT and abi.ret.llvm_ty != abi.ret.source_ty: abi.ret.source_ty else: 0
         var abi_sret_buf: i64 = 0
 
@@ -16208,7 +16208,7 @@ impl Codegen:
                 // PM_INDIRECT is a copy, not a borrowed place. On targets
                 // without LLVM's byval attribute we must create that copy
                 // here even when the operand already has an address.
-                let place = if codegen_c_abi_needs_byval_attr(): self.mir_try_place_ptr_for_ref(body, operand_id) else: 0
+                let place = if self.fn_abi_byval(call_abi): self.mir_try_place_ptr_for_ref(body, operand_id) else: 0
                 let val = if place == 0: self.mir_eval_operand(body, operand_id, 0) else: 0
                 let arg_ptr = self.push_call_arg(call_abi, ai, val, place)
                 let byval_strategy: AnalysisMarshalStrategy = self.analysis_last_marshal_strategy
@@ -16541,7 +16541,9 @@ impl Codegen:
         // Large aggregate moves become memmove/memset before SROA can
         // scalarize them into a store per leaf (see wl_lower_aggregate_copies).
         let _ = wl_lower_aggregate_copies(function, self.context, wl_get_module_data_layout(self.llmod), 64)
-        let rc = wl_run_function_passes(function, self.target_machine, "sroa,mem2reg")
+        // A codegen unit's promotion runs on its emit thread, over the whole
+        // module, instead of serially here (codegen_unit_emit_module).
+        let rc = if self.unit_total > 1 and not should_dump: 0 else: wl_run_function_passes(function, self.target_machine, "sroa,mem2reg")
         if rc != 0:
             with_eprint("error: LLVM MIR cleanup failed for function " ++ name_str ++ "\n")
             self.had_error = 1
@@ -18247,7 +18249,7 @@ impl Codegen:
         self.closure_counter = self.closure_counter + 1
         self.bind_fn_abi(closure_sym, closure_abi_index, closure_fn)
         if closure_has_sret: wl_add_sret_attr(self.context, closure_fn, 0, ret_ty)
-        let closure_byval_types = self.fn_abi_byval_types(closure_abi_index)
+        let closure_byval_types = self.fn_abi_byval_attr_types(closure_abi_index)
         self.apply_c_abi_byval_attrs(closure_fn, closure_byval_types, param_count, closure_param_offset)
         // Save current state
         let saved_fn: i64 = self.current_function

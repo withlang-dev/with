@@ -2,9 +2,10 @@
 // greedily packed into K size-balanced units (statement count as the cost
 // proxy) BEFORE any LLVM exists; Backend.compile_units_generated then
 // generates each unit's module serially (one Codegen alive at a time),
-// applies the global-ownership surgery here, and writes a small per-unit
-// bitcode. Threads finally parse/optimize/emit those ~1/K-size bitcodes
-// concurrently (per-thread LLVMContext is the LLVM threading contract).
+// applies the global-ownership surgery here, and hands the finished module
+// with its own LLVMContext to a thread that optimizes and emits it while
+// the next unit generates (per-thread LLVMContext is the LLVM threading
+// contract; CodegenUnitPipeline).
 //
 // Cross-unit resolution: would-be-internal planned functions are promoted
 // to external under the reserved "__wcu$<plan-index>$" prefix at declare
@@ -25,7 +26,6 @@ use std.string.parse
 use MirCore
 
 extern fn with_str_clone_ref(s: &str) -> str
-extern fn with_fs_remove_file(path: &str) -> i32
 @[effect(fn_ptr: escape_value, ctx: escape_value)]
 extern fn with_thread_spawn(fn_ptr: *mut u8, ctx: *mut u8) -> i64
 extern fn with_thread_join(handle: i64) -> i32
@@ -136,112 +136,109 @@ pub fn codegen_units_assign_from_mir(mir_ptr: i64, unit_count: i32) -> CodegenUn
                 load_slot.set(best_load + cost)
     CodegenUnitAssign { unit_count, fn_syms, units, total_cost }
 
-// One GENERATED unit: parse its own small bitcode, optimize, emit. No strip
-// — bodies were filtered at generation time (#681).
-fn codegen_unit_emit_generated(bc_path: &str, obj_path: &str, opt_level: i32, k: i32, do_profile: bool) -> i32:
+// Optimize and emit one unit's module, then dispose it and its context,
+// which nothing else touches meanwhile (per-thread LLVMContext is LLVM's
+// threading contract). No strip: bodies were filtered at generation (#681).
+fn codegen_unit_emit_module(ctx: i64, unit_module: i64, obj_path: &str, opt_level: i32, k: i32, do_profile: bool) -> i32:
     let t_unit = runtime_clock_nanos()
-    let ctx = wl_context_create()
-    let unit_module = wl_parse_bitcode_in_context(ctx, bc_path)
-    if unit_module == 0:
-        runtime_eprint(f"error: codegen-units generated bitcode parse failed for unit {k}")
-        wl_context_dispose(ctx)
-        return 1
     let tm = wl_init_target_machine(unit_module, opt_level)
     if tm == 0:
         runtime_eprint(f"error: codegen-units target machine init failed for unit {k}")
         wl_module_dispose(unit_module)
         wl_context_dispose(ctx)
         return 1
-    if opt_level > 0:
-        wl_optimize(unit_module, tm, opt_level)
-    let unit_obj = codegen_unit_object_path(obj_path, k)
-    if wl_emit_object(tm, unit_module, unit_obj) != 0:
-        runtime_eprint(f"error: codegen-units emit failed for unit {k}: {unit_obj}")
+    // The promotion each function would have had at generation
+    // (Codegen.run_mir_cleanup_passes), off the serial path.
+    if wl_run_module_passes(unit_module, tm, "function(sroa,mem2reg)") != 0:
+        runtime_eprint(f"error: codegen-units promotion failed for unit {k}")
         wl_dispose_target_machine(tm)
         wl_module_dispose(unit_module)
         wl_context_dispose(ctx)
         return 1
+    if opt_level > 0:
+        wl_optimize(unit_module, tm, opt_level)
+    let unit_obj = codegen_unit_object_path(obj_path, k)
+    let emit_rc = wl_emit_object(tm, unit_module, unit_obj)
     wl_dispose_target_machine(tm)
     wl_module_dispose(unit_module)
     wl_context_dispose(ctx)
+    if emit_rc != 0:
+        runtime_eprint(f"error: codegen-units emit failed for unit {k}: {unit_obj}")
+        return 1
     if do_profile:
         let unit_ns = runtime_clock_nanos() - t_unit
         runtime_eprint(f"[profile] llvm.unit{k}  {unit_ns / 1000000}.{(unit_ns % 1000000) / 1000} ms")
     0
 
 type CodegenUnitEmitJob {
-    bc_path: str,
+    context: i64,
+    llmod: i64,
     obj_path: str,
     opt_level: i32,
     unit_index: i32,
-    do_profile: i32,
+    do_profile: bool,
     rc: i32,
 }
 
 unsafe fn codegen_unit_emit_thread_entry(arg: *mut u8) -> i32:
     let job = arg as *mut CodegenUnitEmitJob
-    (*job).rc = codegen_unit_emit_generated((*job).bc_path, (*job).obj_path, (*job).opt_level, (*job).unit_index, (*job).do_profile != 0)
+    (*job).rc = codegen_unit_emit_module((*job).context, (*job).llmod, (*job).obj_path, (*job).opt_level, (*job).unit_index, (*job).do_profile)
     0
 
-// Optimize + emit every generated unit bitcode on its own thread, at most
-// `window` in flight at once (join-oldest sliding window, the test-runner
-// pattern — memory admission per codegen_units_emit_width). A failed spawn
-// degrades that unit to inline execution. Removes each unit bitcode file
-// on success.
-pub fn codegen_units_emit_generated_all(unit_bc_paths: &Vec[str], obj_path: &str, opt_level: i32, do_profile: bool, window: i32) -> i32:
-    let unit_count = unit_bc_paths.len() as i32
-    var w = if window < 1: 1 else: window
-    if w > unit_count:
-        w = unit_count
+// Units optimize and emit on their own threads while the next unit is
+// generated: generation hands each finished module over in memory, at most
+// `window` in flight (join-oldest, memory admission per
+// codegen_units_emit_width). A failed spawn runs the unit inline. The jobs
+// are allocated up front so no job moves while a thread reads it, and
+// every started thread is joined by `finish` before the pipeline drops.
+pub type CodegenUnitPipeline {
+    jobs: Vec[CodegenUnitEmitJob],
+    handles: Vec[i64],
+    window: i32,
+    next_join: i32,
+    rc: i32,
+}
+
+pub fn codegen_unit_pipeline(unit_count: i32, obj_path: &str, opt_level: i32, do_profile: bool, window: i32) -> CodegenUnitPipeline:
     let jobs: Vec[CodegenUnitEmitJob] = Vec.new()
-    var ji = 0
-    while ji < unit_count:
-        jobs.push(CodegenUnitEmitJob {
-            bc_path: with_str_clone_ref(unit_bc_paths[ji]),
-            obj_path: with_str_clone_ref(obj_path),
-            opt_level,
-            unit_index: ji,
-            do_profile: if do_profile: 1 else: 0,
-            rc: 0,
-        })
-        ji = ji + 1
-    let handles: Vec[i64] = Vec.new()
-    var join_rc = 0
-    var next_join = 0
-    var k = 0
-    while k < unit_count:
+    for k in 0..unit_count:
+        jobs.push(CodegenUnitEmitJob { context: 0, llmod: 0, obj_path: with_str_clone_ref(obj_path), opt_level, unit_index: k, do_profile, rc: 0 })
+    let w = if window < 1: 1 else: if window > unit_count: unit_count else: window
+    CodegenUnitPipeline { jobs, handles: Vec.new(), window: w, next_join: 0, rc: 0 }
+
+impl CodegenUnitPipeline:
+    // Unit k's module and context now belong to the pipeline.
+    mut fn submit(k: i32, context: i64, llmod: i64):
+        if self.handles.len() as i32 - self.next_join >= self.window:
+            self.join_oldest()
         unsafe:
-            let job_ptr = (jobs.ptr as *mut CodegenUnitEmitJob) + k as u64
-            let handle = with_thread_spawn(codegen_unit_emit_thread_entry as *mut u8, job_ptr as *mut u8)
+            let job_ptr = (self.jobs.ptr as *mut CodegenUnitEmitJob) + k as u64
+            (*job_ptr).context = context
+            (*job_ptr).llmod = llmod
+            // A one-unit window is a small host: no unit emits while the
+            // next generates, as none did before the pipeline.
+            let handle = if self.window <= 1: -1 as i64 else: with_thread_spawn(codegen_unit_emit_thread_entry as *mut u8, job_ptr as *mut u8)
             if handle < 0:
-                (*job_ptr).rc = codegen_unit_emit_generated((*job_ptr).bc_path, obj_path, opt_level, k, do_profile)
+                let _ = codegen_unit_emit_thread_entry(job_ptr as *mut u8)
             else:
-                handles.push(handle)
-                if handles.len() as i32 - next_join >= w:
-                    let rc = with_thread_join(handles[next_join])
-                    if rc != 0 and join_rc == 0:
-                        join_rc = rc
-                    next_join = next_join + 1
-        k = k + 1
-    while next_join < handles.len() as i32:
-        let rc = with_thread_join(handles[next_join])
-        if rc != 0 and join_rc == 0:
-            join_rc = rc
-        next_join = next_join + 1
-    var unit_rc = join_rc
-    var ri = 0
-    while ri < unit_count:
-        if jobs[ri].rc != 0 and unit_rc == 0:
-            unit_rc = jobs[ri].rc
-        // WITH_KEEP_BITCODE=1 leaves each unit's `<obj>.u<k>.gen.bc` beside
-        // the object: `llvm-dis` on it is the only way to read the attributes
-        // and metadata codegen attached, which no disassembly shows.
-        if with_getenv_str("WITH_KEEP_BITCODE").len() == 0:
-            let _ = with_fs_remove_file(unit_bc_paths[ri])
-        ri = ri + 1
-    if unit_rc != 0:
-        runtime_eprint(f"error: codegen-units generated emit failed with exit code {unit_rc}")
-    unit_rc
+                self.handles.push(handle)
+
+    mut fn join_oldest():
+        let rc = with_thread_join(self.handles[self.next_join])
+        if rc != 0 and self.rc == 0:
+            self.rc = rc
+        self.next_join = self.next_join + 1
+
+    // Joins every started unit; the first failing unit's code, or 0.
+    mut fn finish() -> i32:
+        while self.next_join < self.handles.len() as i32:
+            self.join_oldest()
+        for k in 0..self.jobs.len() as i32:
+            if self.jobs[k].rc != 0 and self.rc == 0:
+                self.rc = self.jobs[k].rc
+        if self.rc != 0:
+            runtime_eprint(f"error: codegen-units generated emit failed with exit code {self.rc}")
+        self.rc
 
 pub fn codegen_unit_extra_objects(obj_path: &str, unit_count: i32) -> Vec[str]:
     let extras: Vec[str] = Vec.new()

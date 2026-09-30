@@ -629,7 +629,7 @@ impl Codegen:
         self.apply_noalias_param_attrs_with_offset(function, param_start, param_count, param_offset)
         self.apply_capture_param_attrs(function, fn_sym, sig_idx, param_count, param_offset)
         if param_offset != 0: wl_add_sret_attr(self.context, function, 0, final_ret_ty)
-        let byval_types = self.fn_abi_byval_types(abi_index)
+        let byval_types = self.fn_abi_byval_attr_types(abi_index)
         self.apply_c_abi_byval_attrs(function, byval_types, param_count, param_offset)
         if function == 0 or wl_get_value_kind(function) != wl_function_value_kind():
             return

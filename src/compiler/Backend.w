@@ -126,7 +126,14 @@ impl Zcu:
                         unit_slot.set(0)
                 mi = mi + 1
         let t_codegen = runtime_clock_nanos()
-        let unit_bcs: Vec[str] = Vec.new()
+        let emit_window = codegen_units_emit_width(unit_count, assign.total_cost)
+        if do_profile:
+            runtime_eprint(f"[profile] llvm.units plan_cost={assign.total_cost} window={emit_window}/{unit_count}")
+        // WITH_KEEP_BITCODE=1 writes each unit's `<obj>.u<k>.gen.bc` beside
+        // the object: `llvm-dis` on it is the only way to read the attributes
+        // and metadata codegen attached, which no disassembly shows.
+        let keep_bitcode = runtime_getenv("WITH_KEEP_BITCODE").len() > 0
+        var pipeline = codegen_unit_pipeline(unit_count, output_path, opt_level, do_profile, emit_window)
         var k = 0
         while k < unit_count:
             var backend_intern = self.pool
@@ -157,24 +164,28 @@ impl Zcu:
             if rc != 0:
                 self.last_sema = cg.take_sema()
                 runtime_eprint(f"error: code generation failed for unit {k}")
+                let _ = pipeline.finish()
                 return 1
             codegen_units_apply_global_ownership(cg.llmod, k)
-            let unit_bc = f"{output_path}.u{k}.gen.bc"
-            if wl_write_bitcode(cg.llmod, unit_bc) != 0:
+            if keep_bitcode and wl_write_bitcode(cg.llmod, f"{output_path}.u{k}.gen.bc") != 0:
                 self.last_sema = cg.take_sema()
                 runtime_eprint(f"error: unit bitcode write failed for unit {k}")
+                let _ = pipeline.finish()
                 return 1
-            unit_bcs.push(unit_bc)
+            let unit_context: i64 = cg.context
+            let unit_module: i64 = cg.llmod
+            cg.release_llvm_module()
+            pipeline.submit(k, unit_context, unit_module)
             self.last_sema = cg.take_sema()
             cg.deinit()
             k = k + 1
         if do_profile:
             let codegen_ns = runtime_clock_nanos() - t_codegen
             runtime_eprint(f"[profile] llvm.gen_units_serial  {codegen_ns / 1000000}.{(codegen_ns % 1000000) / 1000} ms")
-        let emit_window = codegen_units_emit_width(unit_count, assign.total_cost)
+        let emit_rc = pipeline.finish()
         if do_profile:
-            runtime_eprint(f"[profile] llvm.units plan_cost={assign.total_cost} window={emit_window}/{unit_count}")
-        let emit_rc = codegen_units_emit_generated_all(&unit_bcs, output_path, opt_level, do_profile, emit_window)
+            let units_ns = runtime_clock_nanos() - t_codegen
+            runtime_eprint(f"[profile] llvm.units_total  {units_ns / 1000000}.{(units_ns % 1000000) / 1000} ms")
         if emit_rc != 0:
             return 1
         if runtime_file_exists(output_path) == 0:

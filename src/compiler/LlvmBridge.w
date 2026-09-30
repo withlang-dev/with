@@ -1487,6 +1487,24 @@ pub fn wl_run_function_passes(fn_val: i64, tm: i64, passes: &str) -> i32:
         LLVMDisposePassBuilderOptions(opts)
         0
 
+// A pass pipeline over the whole module (`function(sroa,mem2reg)`); 1 on a
+// pipeline error, which is printed.
+pub fn wl_run_module_passes(m: i64, tm: i64, passes: &str) -> i32:
+    unsafe:
+        let opts = LLVMCreatePassBuilderOptions()
+        let err = LLVMRunPasses(m as *mut u8, to_cstr(passes), tm as *mut u8, opts)
+        LLVMDisposePassBuilderOptions(opts)
+        if err as i64 == 0:
+            return 0
+        let msg = LLVMGetErrorMessage(err)
+        if msg as i64 != 0:
+            let len = c_strlen(msg as *const u8)
+            if len > 0:
+                let _ = rt_write(2, msg as *const u8, len)
+                let _ = rt_write(2, "\n" as *const u8, 1)
+            LLVMDisposeErrorMessage(msg)
+        1
+
 pub fn wl_verify_function(fn_val: i64) -> i32:
     // PrintMessage: the verifier names its complaint on stderr; silent
     // ReturnStatus cost a blind IR-archaeology session.
