@@ -472,7 +472,7 @@ impl Zcu:
                     for nmi in 0..c_import_no_methods_count(nm_packed):
                         nm_types.push(frontend_owned_text(self.pool.resolve(out.get_extra(nm_base + nmi))))
                     ci_set_no_methods(c_import_no_methods_all(nm_packed), move nm_types)
-                    let libclang_result = process_c_import_with_defines(libclang_header_spec, self.project_config.c_import_defines)
+                    let libclang_result = process_c_import_with_defines(libclang_header_spec, self.project_config.c_import_defines, self.c_import_is_cxx_frontend(out, decl))
                     ci_clear_no_methods()
                     if self.trace_c_import_cache != 0 and libclang_result.len() > 0:
                         runtime_eprint("c_import generated:")
@@ -792,6 +792,8 @@ impl Zcu:
         // evaluated macro constants annotate by value range (#775); v15
         // suffixed >i64::MAX literals.
         var key = header_spec ++ "\n#format:cimport-v18\n#links:"
+        // Preserve existing C cache keys; only C++ adds a language discriminator.
+        if self.c_import_is_cxx_frontend(pool, decl): key = key ++ "\n#lang:c++\n"
         let link_start = pool.get_data1(decl)
         let packed_counts = pool.get_data2(decl)
         let link_count = c_import_link_count(packed_counts)
@@ -1076,7 +1078,10 @@ impl Zcu:
         link_start + c_import_link_count(packed) + c_import_allow_count(packed) + c_import_no_methods_count(packed)
 
     fn c_import_is_strict_frontend(pool: AstPool, decl: i32) -> bool:
-        pool.get_extra(self.c_import_select_base_frontend(pool, decl)) != 0
+        (pool.get_extra(self.c_import_select_base_frontend(pool, decl)) & 1) != 0
+
+    fn c_import_is_cxx_frontend(pool: AstPool, decl: i32):
+        (pool.get_extra(self.c_import_select_base_frontend(pool, decl)) & 2) != 0
 
     fn c_import_only_count_frontend(pool: AstPool, decl: i32) -> i32:
         pool.get_extra(self.c_import_select_base_frontend(pool, decl) + 1)
@@ -2363,21 +2368,26 @@ impl Zcu:
     fn displace_c_import_wrappers(pool: AstPool):
         var extern_names: Vec[i32] = Vec.new()
         var extern_paths: Vec[str] = Vec.new()
+        var extern_imports: Vec[bool] = Vec.new()
         for di in 0..pool.decl_count():
             let decl = pool.get_decl(di) as i32
             if pool.kind(decl) == NodeKind.NK_EXTERN_FN:
                 extern_names.push(pool.get_data0(decl))
                 extern_paths.push(self.decl_source_path_frontend(di))
+                extern_imports.push(di < self.decl_is_c_import.len() as i32 and self.decl_is_c_import[di] != 0)
         for di in 0..pool.decl_count():
             let decl = pool.get_decl(di) as i32
-            if di >= self.decl_is_c_import.len() as i32 or self.decl_is_c_import[di] == 0:
-                continue
             if not frontend_fn_decl_is_displaceable(pool, self.pool, decl) or frontend_fn_decl_is_method(pool, self.pool, decl):
                 continue
+            let from_import = di < self.decl_is_c_import.len() as i32 and self.decl_is_c_import[di] != 0
             let name = pool.get_data0(decl)
             let path = self.decl_source_path_frontend(di)
             for e in 0..extern_names.len() as i32:
-                if extern_names[e] == name and extern_paths[e] != path:
+                // A header's extern also must not overwrite another source
+                // module's ordinary With function (e.g. clock(seconds)).
+                // Keep manual extern-to-With bridge behavior: this separation
+                // applies when either side came from c_import.
+                if extern_names[e] == name and extern_paths[e] != path and (from_import or extern_imports[e]):
                     frontend_displace_fn_decl(pool, self.pool, decl, path)
                     break
 

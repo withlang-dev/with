@@ -654,7 +654,7 @@ fn process_c_import(header_spec: &str) -> str:
     let defines: Vec[str] = Vec.new()
     process_c_import_with_defines(header_spec, defines)
 
-pub fn process_c_import_with_defines(header_spec: &str, defines: &Vec[str]) -> str:
+pub fn process_c_import_with_defines(header_spec: &str, defines: &Vec[str], cxx: bool = false) -> str:
     c_import_last_error_clear()
     g_cimport_warnings = ""
     g_ci_prior_macro_consts = g_ci_prior_macro_consts ++ g_ci_current_macro_consts.slice(1, g_ci_current_macro_consts.len())
@@ -678,7 +678,7 @@ pub fn process_c_import_with_defines(header_spec: &str, defines: &Vec[str]) -> s
 
     let include_text = ci_build_define_prefix(defines) ++ ci_build_include_text(header_spec)
     ci_prepare_clang_resource_dir()
-    let session = with_cimport_parse(include_text)
+    let session = with_cimport_parse(include_text, cxx)
     if session == 0:
         g_cimport_last_error = "failed to create c_import parse session"
         return ""
@@ -789,7 +789,7 @@ pub fn process_c_import_with_defines(header_spec: &str, defines: &Vec[str]) -> s
 
     output.push_str(ci_render_missing_pointer_opaques(session, count))
 
-    let macro_session = with_cimport_parse_macros(include_text)
+    let macro_session = with_cimport_parse_macros(include_text, cxx)
     if macro_session != 0:
         g_migrate_macro_values = ci_collect_object_macro_values(macro_session)
         g_migrate_macro_miss_names = HashMap.new()
@@ -1228,6 +1228,7 @@ fn ci_field_cursor_anon_record_decl(session: i64, field_cursor: i32) -> i32:
 fn ci_record_decl_directly_demoted_cursor(session: i64, decl_cursor: i32) -> bool:
     if decl_cursor < 0:
         return true
+    if with_ci_record_requires_cxx_semantics(session, decl_cursor): return true
     if with_ci_cursor_is_definition(session, decl_cursor) == 0:
         return true
     let nc = with_ci_num_children(session, decl_cursor)
@@ -1385,6 +1386,7 @@ pub fn ci_collect_demoted_types(session: i64, count: i32) -> str:
     demoted
 
 fn ci_is_directly_demoted(session: i64, idx: i32, count: i32) -> bool:
+    if with_cimport_record_is_class(session, idx): return true
     // Forward declaration — don't demote if a concrete definition exists elsewhere in the TU.
     if with_cimport_struct_is_opaque(session, idx) != 0:
         let name = with_cimport_decl_name(session, idx)
@@ -1394,7 +1396,9 @@ fn ci_is_directly_demoted(session: i64, idx: i32, count: i32) -> bool:
         return true
     let decl_cursor = ci_find_decl_cursor_for_idx(session, idx)
     let field_count = with_cimport_struct_field_count(session, idx)
+    if with_ci_record_requires_cxx_semantics(session, decl_cursor): return true
     // Bitfield in any field
+    if with_cimport_is_cxx(session) and not ci_record_layout_matches(session, idx, field_count): return true
     var fi = 0
     while fi < field_count:
         if with_cimport_struct_field_is_bitfield(session, idx, fi) != 0:
@@ -2485,6 +2489,29 @@ pub fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs
         return ""
     rendered
 
+// C++ records can contain unlisted base subobjects or a vtable pointer. Verify
+// the layout the generated fields actually describe before granting a value.
+fn ci_record_layout_matches(session: i64, idx: i32, field_count: i32):
+    if field_count == 0:
+        return with_cimport_struct_size(session, idx) == 1 and with_cimport_struct_align(session, idx) == 1
+    let is_union = with_cimport_decl_kind(session, idx) == CK_UNION
+    let packed = with_cimport_struct_is_packed(session, idx) != 0
+    let cap = if packed or is_union: 0 else: ci_record_pack_cap(session, idx, field_count)
+    var end: i64 = 0
+    var alignment: i64 = 1
+    for fi in 0..field_count:
+        let size = with_cimport_struct_field_size(session, idx, fi)
+        let natural = with_cimport_struct_field_align(session, idx, fi)
+        if size < 0 or natural <= 0 or with_cimport_struct_field_is_bitfield(session, idx, fi) != 0: return false
+        let annotation = if packed or cap > 0 or is_union: 0 else: ci_compute_field_alignment(session, idx, fi, field_count)
+        let field_align = if packed: 1 else if cap > 0 and natural > cap: cap else if annotation > 0: annotation else: natural
+        if field_align > alignment: alignment = field_align
+        let offset = if is_union: 0 else: (end + field_align - 1) / field_align * field_align
+        if offset != with_cimport_struct_field_offset(session, idx, fi): return false
+        if offset + size > end: end = offset + size
+    let size = (end + alignment - 1) / alignment * alignment
+    size == with_cimport_struct_size(session, idx) and alignment == with_cimport_struct_align(session, idx)
+
 // Whether a struct (not a union, not packed to 1) places a sized field
 // below its natural alignment: `#pragma pack(N)`, `packed, aligned(N)`.
 fn ci_record_has_field_below_natural(session: i64, idx: i32, field_count: i32) -> bool:
@@ -2989,7 +3016,7 @@ pub fn ci_translate_typedef(session: i64, idx: i32, count: i32) -> str:
 
 // ── Macro translation ───────────────────────────────────────
 
-fn ci_collect_object_macro_type_map(session: i64, macro_source: &str):
+fn ci_collect_object_macro_type_map(session: i64, macro_source: &str, cxx: bool = false):
     if macro_source.len() == 0:
         return ""
     let count = with_cimport_macro_count(session)
@@ -3007,7 +3034,7 @@ fn ci_collect_object_macro_type_map(session: i64, macro_source: &str):
     if names.len() == 0:
         return ""
     ci_prepare_clang_resource_dir()
-    with_cimport_collect_object_macro_types(macro_source, names.to_str())
+    with_cimport_collect_object_macro_types(macro_source, names.to_str(), cxx)
 
 fn ci_collect_object_macro_values(session: i64) -> HashMap[str, str]:
     let count = with_cimport_macro_count(session)
@@ -3134,7 +3161,7 @@ fn CiMacroProbes.new(): CiMacroProbes { opened: false, session: 0, errors: "", o
 
 impl CiMacroProbes:
 
-    mut fn open(session: i64, macro_source: &str):
+    mut fn open(session: i64, macro_source: &str, cxx: bool):
         self.opened = true
         var names = StringBuilder.new()
         for i in 0..with_cimport_macro_count(session):
@@ -3149,7 +3176,7 @@ impl CiMacroProbes:
             names.push_str("|")
         if names.len() == 0: return
         ci_prepare_clang_resource_dir()
-        self.session = with_cimport_parse_macro_probe(macro_source, names.to_str())
+        self.session = with_cimport_parse_macro_probe(macro_source, names.to_str(), cxx)
         if self.session == 0:
             self.errors = "*"
             return
@@ -3161,10 +3188,10 @@ impl CiMacroProbes:
             if decl_name.starts_with(prefix):
                 self.decls.insert(decl_name.slice(prefix.len(), decl_name.len()).to_owned(), i)
 
-    mut fn result(session: i64, macro_source: &str, name: &str) -> str:
-        if not self.opened: self.open(session, macro_source)
+    mut fn result(session: i64, macro_source: &str, name: &str, cxx: bool) -> str:
+        if not self.opened: self.open(session, macro_source, cxx)
         let slot = self.order.get(name)
-        if slot.is_none(): return ci_probe_one_object_macro(macro_source, name)
+        if slot.is_none(): return ci_probe_one_object_macro(macro_source, name, cxx)
         let k: i32 = slot.unwrap()
         if self.errors == "*" or self.errors.contains(f"|{k}|"): return ""
         let found = self.decls.get(name)
@@ -3181,10 +3208,10 @@ impl CiMacroProbes:
 
 // A macro left out of the batch (it opens a delimiter it does not close)
 // gets a parse of its own, so it cannot swallow its siblings' probes.
-fn ci_probe_one_object_macro(macro_source: &str, name: &str) -> str:
+fn ci_probe_one_object_macro(macro_source: &str, name: &str, cxx: bool = false) -> str:
     ci_record_field_caches_clear()
     ci_prepare_clang_resource_dir()
-    let probe_session = with_cimport_parse_macro_probe(macro_source, "|" ++ name ++ "|")
+    let probe_session = with_cimport_parse_macro_probe(macro_source, "|" ++ name ++ "|", cxx)
     if probe_session == 0: return ""
     var result = ""
     if with_cimport_macro_probe_errors(probe_session, with_cimport_macro_probe_first_line(macro_source)).len() == 0:
@@ -3314,7 +3341,43 @@ fn ci_function_macro_alias_target(session: i64, indices: &HashMap[str, i32], val
         name = next
     -1
 
+// Annotation macros that expand to no tokens are not runtime functions.
+// Prove emptiness through macro references, without evaluating discarded
+// arguments or treating an unsupported expansion as empty. C output keeps
+// its existing translation; this classifies the new C++ header surface.
+fn ci_macro_expands_empty(session: i64, indices: &HashMap[str, i32], index: i32, disabled: &str, depth: i32) -> bool:
+    if depth > 16: return false
+    let name = with_cimport_macro_name(session, index)
+    if disabled.contains("|" ++ name ++ "|"): return false
+    let body = ci_trim(ci_strip_c_comments(with_cimport_macro_value(session, index)))
+    var pos = 0
+    while pos < body.len():
+        if ci_is_space(body[pos]):
+            pos += 1
+            continue
+        if not ci_is_ident_start(body[pos]): return false
+        var end = ci_macro_token_end(body, pos)
+        let token = body.slice(pos, end)
+        for pi in 0..with_cimport_macro_param_count(session, index):
+            if token == with_cimport_macro_param_name(session, index, pi): return false
+        let found = indices.get(token)
+        if found.is_none(): return false
+        let dependency: i32 = found.unwrap()
+        if with_cimport_macro_is_fn_like(session, dependency) != 0:
+            var open = end
+            while open < body.len() and ci_is_space(body[open]): open += 1
+            if open >= body.len() or body[open] != 40: return false
+            let close = ci_find_matching_paren(body, open)
+            if close < 0: return false
+            let args = ci_split_top_level_items(body.slice(open + 1, close))
+            if args.len() != with_cimport_macro_param_count(session, dependency): return false
+            end = close + 1
+        if not ci_macro_expands_empty(session, indices, dependency, disabled ++ "|" ++ name ++ "|", depth + 1): return false
+        pos = end
+    true
+
 pub fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) -> str:
+    let cxx = with_cimport_is_cxx(type_session)
     let count = with_cimport_macro_count(session)
     // Match the previous backward lookup: the last definition wins. Build
     // once so private expansion and aliases never scan a whole SDK header.
@@ -3328,7 +3391,7 @@ pub fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) 
     // semantic path, which does not extend known_values (#1417's fold).
     var literal_values = ""
     var blank_macros = ""
-    let object_macro_types = ci_collect_object_macro_type_map(session, macro_source)
+    let object_macro_types = ci_collect_object_macro_type_map(session, macro_source, cxx)
     g_migrate_macro_session = session
     var probes = CiMacroProbes.new()
     for i in 0..count:
@@ -3368,6 +3431,7 @@ pub fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) 
         // Try to translate function-like macros; record explicit omissions
         // instead of emitting placeholder functions.
         if fn_like != 0:
+            if cxx and ci_macro_expands_empty(session, indices, fn_index, "", 0): continue
             if ci_libc_symbol_allowed_as(name, CI_LIBC_KIND_FN):
                 continue
             if ci_is_implicit_compiler_macro(name):
@@ -3646,7 +3710,7 @@ pub fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) 
                 ci_record_untranslated_object_macro(name, macro_is_system)
                 continue
             if compound_literal_result.len() == 0:
-                let probe_result = if macro_is_system == 0: probes.result(session, macro_source, name) else: ""
+                let probe_result = if macro_is_system == 0: probes.result(session, macro_source, name, cxx) else: ""
                 if probe_result.len() > 0:
                     ci_mark_macro_const_emitted(name)
                     ci_record_int_const_type(name, ci_let_line_type(probe_result))

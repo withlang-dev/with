@@ -2690,6 +2690,7 @@ impl Parser:
         var no_methods_all = 0
         let only_names: Vec[i32] = Vec.new()
         var strict_flag = 0
+        var cxx_flag = 0
         let owns_entries: Vec[i32] = Vec.new()
         let borrows_entries: Vec[i32] = Vec.new()
         let retains_entries: Vec[i32] = Vec.new()
@@ -2803,6 +2804,16 @@ impl Parser:
                     self.advance()
                 else:
                     self.emit_error("expected a string literal or a string array for only")
+            else if key == "lang":
+                if self.peek() == TokenKind.TK_STRING_LIT:
+                    let lang = self.source.slice(self.current_start() + 1, self.current_end() - 1)
+                    if lang == "c++": cxx_flag = 2
+                    else if lang == "c": cxx_flag = 0
+                    else: self.emit_error("c_import lang must be \"c\" or \"c++\"")
+                    self.advance()
+                else:
+                    self.emit_error("expected string literal for c_import lang")
+                    return self.poisoned_expr()
             else if key == "strict":
                 // §16.2: strict: true — any unacknowledged omission is a non-zero
                 // import failure.
@@ -2868,10 +2879,11 @@ impl Parser:
             self.pool.add_extra(allow_untranslated[i])
         for i in 0..no_methods_types.len() as i32:
             self.pool.add_extra(no_methods_types[i])
-        // §16.2 selective-import record (d2 is full): [strict, only_count, only...]
+        // §16.2 selective-import record (d2 is full): [flags, only_count, only...]
+        // flags: bit 0 strict, bit 1 C++ language. Existing offsets stay stable.
         // appended after the no_methods group. Existing readers use the packed
         // counts and stop before this; only the selective-import path reads it.
-        self.pool.add_extra(strict_flag)
+        self.pool.add_extra(strict_flag | cxx_flag)
         self.pool.add_extra(only_names.len() as i32)
         for i in 0..only_names.len() as i32:
             self.pool.add_extra(only_names[i])

@@ -125,6 +125,11 @@ extern fn clang_getCursorTLSKind(cursor: CXCursor) -> i32
 extern fn clang_Cursor_Evaluate(cursor: CXCursor) -> *mut u8
 extern fn clang_Cursor_isEqual(a: CXCursor, b: CXCursor) -> i32
 extern fn clang_getCursorSemanticParent(cursor: CXCursor) -> CXCursor
+extern fn clang_CXXConstructor_isCopyConstructor(cursor: CXCursor) -> u32
+extern fn clang_CXXConstructor_isMoveConstructor(cursor: CXCursor) -> u32
+extern fn clang_CXXMethod_isVirtual(cursor: CXCursor) -> u32
+extern fn clang_CXXMethod_isCopyAssignmentOperator(cursor: CXCursor) -> u32
+extern fn clang_CXXMethod_isMoveAssignmentOperator(cursor: CXCursor) -> u32
 
 // Type queries
 extern fn clang_getCanonicalType(ty: CXType) -> CXType
@@ -235,6 +240,7 @@ let CXType_Atomic: i32 = 177
 // ── CXCursorKind constants ──────────────────────────────────────
 let CXCursor_StructDecl: i32 = 2
 let CXCursor_UnionDecl: i32 = 3
+let CXCursor_ClassDecl: i32 = 4
 let CXCursor_EnumDecl: i32 = 5
 let CXCursor_FieldDecl: i32 = 6
 let CXCursor_EnumConstantDecl: i32 = 7
@@ -242,6 +248,11 @@ let CXCursor_FunctionDecl: i32 = 8
 let CXCursor_VarDecl: i32 = 9
 let CXCursor_ParmDecl: i32 = 10
 let CXCursor_TypedefDecl: i32 = 20
+let CXCursor_CXXMethod: i32 = 21
+let CXCursor_LinkageSpec: i32 = 23
+let CXCursor_Constructor: i32 = 24
+let CXCursor_Destructor: i32 = 25
+let CXCursor_CXXBaseSpecifier: i32 = 44
 let CXCursor_TranslationUnit: i32 = 350
 let CXCursor_MacroDefinition: i32 = 501
 let CXCursor_StaticAssert: i32 = 602
@@ -370,6 +381,7 @@ type DeclCache:
     enum_consts_cached: i32
 
 type CImportSession:
+    cxx: bool
     index: *mut u8
     tu: *mut u8
     decls: *mut CXCursor
@@ -1083,6 +1095,16 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
         return translate_fn_type(s, shape, depth + 1)
 
     if kind == CXType_Record:
+        // A named nested C++ record is hoisted under the same cached With
+        // name at declarations and use sites; `Outer::Inner` is not With syntax.
+        if (*s).cxx:
+            let decl = clang_getTypeDeclaration(canonical)
+            if clang_Cursor_isAnonymous(decl) == 0:
+                let name = with_ci_cursor_spelling(s as i64, store_cursor(s, decl))
+                let text = str_to_cstr(name)
+                let result = session_strdup(s, text as *const u8)
+                with_free(text)
+                return result
         let spelling = clang_getTypeSpelling(canonical)
         let name_str = clang_getCString(spelling)
         var bare = name_str
@@ -1256,12 +1278,64 @@ unsafe fn translate_fn_type(s: *mut CImportSession, fn_type: CXType, depth: i32)
 // ── Visitor callbacks ───────────────────────────────────────────
 // These receive CXCursor by pointer (With calling convention matches C ABI for >16B structs)
 
+// LinkageSpec also represents explicit `extern "C++"`. Read its language
+// literal at the spelling location, including `S_API`-style macro bodies;
+// no function mangling or name heuristic decides the imported linkage.
+unsafe fn cimport_linkage_is_c(s: *mut CImportSession, cursor: CXCursor):
+    if clang_getCursorKind(cursor) != CXCursor_LinkageSpec: return false
+    var file: *mut u8 = null
+    var start: u32 = 0
+    clang_getSpellingLocation(clang_getRangeStart(clang_getCursorExtent(cursor)), &raw mut file, null, null, &raw mut start)
+    var size: u64 = 0
+    if file as i64 == 0: return false
+    let contents = clang_getFileContents((*s).tu, file, &raw mut size)
+    if contents as i64 == 0: return false
+    var width: u64 = 128
+    while start as u64 < size:
+        let end = if start as u64 + width < size: start as u64 + width else: size
+        let range = clang_getRange(clang_getLocationForOffset((*s).tu, file, start), clang_getLocationForOffset((*s).tu, file, end as u32))
+        var tokens: *mut CXToken = null
+        var count: u32 = 0
+        clang_tokenize((*s).tu, range, &raw mut tokens, &raw mut count)
+        var seen_extern = false
+        var language = ""
+        for i in 0..count as i32:
+            let token = clang_str_to_with(s, clang_getTokenSpelling((*s).tu, tokens[i]))
+            if token.starts_with("/*") or token.starts_with("//"): continue
+            if not seen_extern:
+                if token != "extern": break
+                seen_extern = true
+            else:
+                language = token
+                break
+        clang_disposeTokens((*s).tu, tokens, count)
+        if language == "\"C\"": return true
+        if language == "\"C++\"": return false
+        if language.len() > 0 or not seen_extern or end == size: break
+        width *= 2
+    if (*s).err_msg as i64 == 0:
+        (*s).err_msg = c_strdup("unsupported C++ language linkage spelling\0" as *const u8)
+    false
+
 @[callconv("c")]
 unsafe fn collect_decl(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32:
     let s = data as *mut CImportSession
     let kind = clang_getCursorKind(cursor)
-    if kind != CXCursor_FunctionDecl and kind != CXCursor_StructDecl and kind != CXCursor_UnionDecl and kind != CXCursor_EnumDecl and kind != CXCursor_TypedefDecl and kind != CXCursor_VarDecl and kind != CXCursor_StaticAssert:
+    if (*s).cxx and kind == CXCursor_LinkageSpec:
+        return CXChildVisit_Recurse
+    if kind != CXCursor_FunctionDecl and kind != CXCursor_StructDecl and kind != CXCursor_UnionDecl and kind != CXCursor_EnumDecl and kind != CXCursor_TypedefDecl and kind != CXCursor_VarDecl and kind != CXCursor_StaticAssert and not ((*s).cxx and kind == CXCursor_ClassDecl):
         return CXChildVisit_Continue
+    // Macro probes are our own variables, filtered to the generated file below.
+    if (*s).cxx and (*s).header_file as i64 == 0 and (kind == CXCursor_FunctionDecl or kind == CXCursor_VarDecl):
+        if not cimport_linkage_is_c(s, parent):
+            if kind == CXCursor_FunctionDecl: return CXChildVisit_Continue
+            if kind == CXCursor_VarDecl:
+                if clang_isConstQualifiedType(clang_getCursorType(cursor)) == 0: return CXChildVisit_Continue
+                let value = clang_Cursor_Evaluate(cursor)
+                if value as i64 == 0: return CXChildVisit_Continue
+                let integral = clang_EvalResult_getKind(value) == CXEval_Int
+                clang_EvalResult_dispose(value)
+                if not integral: return CXChildVisit_Continue
     // Filter transitive includes
     if (*s).header_file as i64 != 0:
         let loc = clang_getCursorLocation(cursor)
@@ -2042,6 +2116,33 @@ pub fn with_cimport_set_resource_dir(path: &str) -> Unit:
 
 // ── Parse ───────────────────────────────────────────────────
 
+// Every declaration parse and macro probe uses the same language and target.
+unsafe fn cimport_build_args(args: *mut *const u8, cxx: bool):
+    var n = 0
+    let sysroot = get_sdk_path()
+    if sysroot as i64 != 0:
+        args[n] = "-isysroot\0" as *const u8
+        args[n + 1] = sysroot
+        n += 2
+    n = cimport_push_target_args(args, n)
+    let resdir = get_clang_resource_dir()
+    if resdir as i64 != 0:
+        args[n] = "-resource-dir\0" as *const u8
+        args[n + 1] = resdir
+        n += 2
+    args[n] = "-x\0" as *const u8
+    args[n + 1] = if cxx: "c++\0" as *const u8 else: "c\0" as *const u8
+    // Restore glibc's ordinary POSIX/BSD surface, as the C importer does.
+    args[n + 2] = "-D_DEFAULT_SOURCE\0" as *const u8
+    n += 3
+    var ip = 0
+    while ip < g_cimport_include_count and n < 62:
+        args[n] = "-I\0" as *const u8
+        args[n + 1] = g_cimport_include_paths[ip] as *const u8
+        n += 2
+        ip += 1
+    n
+
 // A non-null translation unit can contain Clang's error-recovery AST. Only
 // successfully parsed declarations may enter the With translator.
 unsafe fn cimport_record_parse_error(s: *mut CImportSession):
@@ -2073,13 +2174,15 @@ pub fn with_cimport_session_set_migration(session: i64) -> Unit:
 pub fn with_cimport_parse_generation() -> i64:
     g_cimport_parse_counter
 
-pub fn with_cimport_parse(header_code: &str) -> i64:
+pub fn with_cimport_parse(header_code: &str, cxx: bool = false) -> i64:
     unsafe:
         g_cimport_parse_counter = g_cimport_parse_counter + 1
         let size = sizeof[CImportSession]()
         let s = with_alloc(size) as *mut CImportSession
         if s as i64 == 0: return 0
         with_memset(s as *mut u8, 0, size)
+
+        (*s).cxx = cxx
 
         // Create temp file
         var template_path: [4096]u8 = [0 as u8; 4096]
@@ -2099,36 +2202,7 @@ pub fn with_cimport_parse(header_code: &str) -> i64:
 
         // Build compiler args
         var args: [64]*const u8 = [0 as *const u8; 64]
-        var nargs: i32 = 0
-        let sysroot = get_sdk_path()
-        if sysroot as i64 != 0:
-            args[nargs] = "-isysroot\0" as *const u8
-            nargs = nargs + 1
-            args[nargs] = sysroot
-            nargs = nargs + 1
-        nargs = cimport_push_target_args(&raw mut args as *mut [64]*const u8 as *mut *const u8, nargs)
-        let resdir = get_clang_resource_dir()
-        if resdir as i64 != 0:
-            args[nargs] = "-resource-dir\0" as *const u8
-            nargs = nargs + 1
-            args[nargs] = resdir
-            nargs = nargs + 1
-        args[nargs] = "-x\0" as *const u8
-        nargs = nargs + 1
-        args[nargs] = "c\0" as *const u8
-        nargs = nargs + 1
-        // libclang defaults to strict-ANSI C (unlike the clang driver's gnu
-        // dialect); _DEFAULT_SOURCE restores glibc's ordinary POSIX/BSD surface
-        // (realpath, mkstemp, ...). Inert on Darwin/Windows headers.
-        args[nargs] = "-D_DEFAULT_SOURCE\0" as *const u8
-        nargs = nargs + 1
-        var ip: i32 = 0
-        while ip < g_cimport_include_count and nargs < 62:
-            args[nargs] = "-I\0" as *const u8
-            nargs = nargs + 1
-            args[nargs] = g_cimport_include_paths[ip] as *const u8
-            nargs = nargs + 1
-            ip = ip + 1
+        let nargs = cimport_build_args(&raw mut args as *mut [64]*const u8 as *mut *const u8, cxx)
 
         (*s).index = clang_createIndex(0, 0)
         (*s).tu = clang_parseTranslationUnit((*s).index, (*s).tmp_path as *const u8, &args as *const [64]*const u8 as *const *const u8, nargs, 0 as *mut u8, 0 as u32, 0 as u32)
@@ -2283,7 +2357,48 @@ pub fn with_cimport_decl_kind(session: i64, idx: i32) -> i32:
         let s = session as *mut CImportSession
         if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return 0
         let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
-        clang_getCursorKind(cursor)
+        let kind = clang_getCursorKind(cursor)
+        if (*s).cxx and kind == CXCursor_ClassDecl: CXCursor_StructDecl else: kind
+
+pub fn with_cimport_is_cxx(session: i64):
+    unsafe:
+        let s = session as *mut CImportSession
+        s as i64 != 0 and (*s).cxx
+
+pub fn with_cimport_record_is_class(session: i64, idx: i32):
+    unsafe:
+        let s = session as *mut CImportSession
+        if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return false
+        let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
+        (*s).cxx and clang_getCursorKind(cursor) == CXCursor_ClassDecl
+
+// Layout equality cannot prove C value semantics: a destructor or special
+// copy/move operation may change both ownership and the by-value ABI. Keep
+// these records opaque, including explicitly defaulted special members;
+// libclang does not expose the complete triviality predicate. Ordinary
+// constructors alone do not affect copying or the value ABI. Base classes
+// are outside this import surface even when empty-base layout happens to fit.
+@[callconv("c")]
+unsafe fn collect_cxx_record_semantics(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32:
+    let kind = clang_getCursorKind(cursor)
+    var unsupported = kind == CXCursor_Destructor or kind == CXCursor_CXXBaseSpecifier
+    if kind == CXCursor_Constructor:
+        unsupported = clang_CXXConstructor_isCopyConstructor(cursor) != 0 or clang_CXXConstructor_isMoveConstructor(cursor) != 0
+    if kind == CXCursor_CXXMethod:
+        unsupported = clang_CXXMethod_isVirtual(cursor) != 0 or clang_CXXMethod_isCopyAssignmentOperator(cursor) != 0 or clang_CXXMethod_isMoveAssignmentOperator(cursor) != 0
+    if unsupported:
+        *(data as *mut bool) = true
+        return CXChildVisit_Break
+    CXChildVisit_Continue
+
+pub fn with_ci_record_requires_cxx_semantics(session: i64, cursor_idx: i32) -> bool:
+    unsafe:
+        let s = session as *mut CImportSession
+        if s as i64 == 0 or not (*s).cxx or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return false
+        let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
+        var unsupported = false
+        let _ = clang_visitChildren(cursor, collect_cxx_record_semantics as *const u8, &raw mut unsupported as *mut bool as *mut u8)
+        unsupported
 
 pub fn with_cimport_decl_name(session: i64, idx: i32) -> str:
     unsafe:
@@ -2568,6 +2683,29 @@ pub fn with_cimport_struct_field_is_bitfield(session: i64, idx: i32, field: i32)
         let fi = ((*cache).fields as i64 + field as i64 * sizeof[FieldInfo]()) as *const FieldInfo
         (*fi).is_bitfield
 
+type AnonymousRecordOffset:
+    parent: CXType
+    record: CXType
+    bits: i64
+
+// libclang exposes an anonymous record member as a RecordDecl, while
+// clang_Cursor_getOffsetOfField accepts only FieldDecl. A promoted named leaf
+// has an offset in both records; their difference is the member's exact offset.
+@[callconv("c")]
+unsafe fn collect_anonymous_record_offset(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32:
+    let offset = data as *mut AnonymousRecordOffset
+    let kind = clang_getCursorKind(cursor)
+    if kind == CXCursor_StructDecl or kind == CXCursor_UnionDecl: return CXChildVisit_Recurse
+    if kind != CXCursor_FieldDecl: return CXChildVisit_Continue
+    let spelling = clang_getCursorSpelling(cursor)
+    let name = clang_getCString(spelling)
+    if name as i64 != 0 and *name != 0:
+        let outer = clang_Type_getOffsetOf((*offset).parent, name)
+        let inner = clang_Type_getOffsetOf((*offset).record, name)
+        if outer >= 0 and inner >= 0: (*offset).bits = outer - inner
+    clang_disposeString(spelling)
+    if (*offset).bits >= 0: CXChildVisit_Break else: CXChildVisit_Continue
+
 pub fn with_cimport_struct_field_offset(session: i64, idx: i32, field: i32) -> i64:
     unsafe:
         let s = session as *mut CImportSession
@@ -2581,7 +2719,11 @@ pub fn with_cimport_struct_field_offset(session: i64, idx: i32, field: i32) -> i
         let fi = ((*cache).fields as i64 + field as i64 * sizeof[FieldInfo]()) as *const FieldInfo
         // #749: anonymous members have no name to look up; use their cursor.
         if (*fi).name as i64 == 0 or *((*fi).name as *const u8) == 0:
-            let anon_offset_bits = clang_Cursor_getOffsetOfField((*fi).cursor)
+            var anon_offset_bits = clang_Cursor_getOffsetOfField((*fi).cursor)
+            if anon_offset_bits < 0 and (*s).cxx:
+                var offset = AnonymousRecordOffset { parent: ty, record: (*fi).clang_type, bits: -1 }
+                let _ = clang_visitChildren((*fi).cursor, collect_anonymous_record_offset as *const u8, &raw mut offset as *mut AnonymousRecordOffset as *mut u8)
+                anon_offset_bits = offset.bits
             if anon_offset_bits < 0: return -1
             return anon_offset_bits / 8
         let offset_bits = clang_Type_getOffsetOf(ty, (*fi).name as *const u8)
@@ -2655,6 +2797,7 @@ pub fn with_cimport_struct_is_opaque(session: i64, idx: i32) -> i32:
         let s = session as *mut CImportSession
         if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return 1
         let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
+        if (*s).cxx and clang_getCursorKind(cursor) == CXCursor_ClassDecl: return 1
         if clang_isCursorDefinition(cursor) != 0: return 0
         1
 
@@ -2721,6 +2864,14 @@ pub fn with_cimport_enum_const_name(session: i64, idx: i32, ci: i32) -> str:
         let cache = ((*s).caches as i64 + idx as i64 * sizeof[DeclCache]()) as *const DeclCache
         if ci < 0 or ci >= (*cache).enum_const_count: return ""
         let eci = ((*cache).enum_consts as i64 + ci as i64 * 16) as *const EnumConstInfo
+        if (*s).cxx:
+            let decl = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
+            if clang_Cursor_isAnonymous(decl) != 0:
+                let parent = clang_getCursorSemanticParent(decl)
+                let kind = clang_getCursorKind(parent)
+                if kind == CXCursor_StructDecl or kind == CXCursor_UnionDecl or kind == CXCursor_ClassDecl:
+                    let record = with_ci_cursor_spelling(session, store_cursor(s, parent))
+                    return record ++ "_" ++ make_str((*eci).name as *const u8)
         make_str((*eci).name as *const u8)
 
 pub fn with_cimport_enum_const_value(session: i64, idx: i32, ci: i32) -> i64:
@@ -3220,7 +3371,7 @@ unsafe fn collect_macro_def(cursor: CXCursor, parent: CXCursor, data: *mut u8) -
         with_free(loc_ptr)
     CXChildVisit_Continue
 
-unsafe fn cimport_collect_macros_from_libclang(ms: *mut MacroSession, header_code: &str) -> i32:
+unsafe fn cimport_collect_macros_from_libclang(ms: *mut MacroSession, header_code: &str, cxx: bool) -> i32:
     let size = sizeof[CImportSession]()
     let s = with_alloc(size) as *mut CImportSession
     if s as i64 == 0:
@@ -3242,36 +3393,7 @@ unsafe fn cimport_collect_macros_from_libclang(ms: *mut MacroSession, header_cod
     (*s).tmp_path = c_strdup(&template_path as *const [4096]u8 as *const u8)
 
     var args: [64]*const u8 = [0 as *const u8; 64]
-    var nargs: i32 = 0
-    let sysroot = get_sdk_path()
-    if sysroot as i64 != 0:
-        args[nargs] = "-isysroot\0" as *const u8
-        nargs = nargs + 1
-        args[nargs] = sysroot
-        nargs = nargs + 1
-    nargs = cimport_push_target_args(&raw mut args as *mut [64]*const u8 as *mut *const u8, nargs)
-    let resdir = get_clang_resource_dir()
-    if resdir as i64 != 0:
-        args[nargs] = "-resource-dir\0" as *const u8
-        nargs = nargs + 1
-        args[nargs] = resdir
-        nargs = nargs + 1
-    args[nargs] = "-x\0" as *const u8
-    nargs = nargs + 1
-    args[nargs] = "c\0" as *const u8
-    nargs = nargs + 1
-    // libclang defaults to strict-ANSI C (unlike the clang driver's gnu
-    // dialect); _DEFAULT_SOURCE restores glibc's ordinary POSIX/BSD surface
-    // (realpath, mkstemp, ...). Inert on Darwin/Windows headers.
-    args[nargs] = "-D_DEFAULT_SOURCE\0" as *const u8
-    nargs = nargs + 1
-    var ip: i32 = 0
-    while ip < g_cimport_include_count and nargs < 62:
-        args[nargs] = "-I\0" as *const u8
-        nargs = nargs + 1
-        args[nargs] = g_cimport_include_paths[ip] as *const u8
-        nargs = nargs + 1
-        ip = ip + 1
+    let nargs = cimport_build_args(&raw mut args as *mut [64]*const u8 as *mut *const u8, cxx)
 
     (*s).index = clang_createIndex(0, 0)
     (*s).tu = clang_parseTranslationUnit((*s).index, (*s).tmp_path as *const u8, &args as *const [64]*const u8 as *const *const u8, nargs, 0 as *mut u8, 0 as u32, CXTranslationUnit_DetailedPreprocessingRecord)
@@ -3285,13 +3407,13 @@ unsafe fn cimport_collect_macros_from_libclang(ms: *mut MacroSession, header_cod
     with_cimport_dispose(s as i64)
     1
 
-pub fn with_cimport_parse_macros(header_code: &str) -> i64:
+pub fn with_cimport_parse_macros(header_code: &str, cxx: bool = false) -> i64:
     unsafe:
         let ms_size = 72  // sizeof(MacroSession)
         let ms = with_alloc(ms_size) as *mut MacroSession
         if ms as i64 == 0: return 0
         with_memset(ms as *mut u8, 0, ms_size)
-        if cimport_collect_macros_from_libclang(ms, header_code) != 0:
+        if cimport_collect_macros_from_libclang(ms, header_code, cxx) != 0:
             return ms as i64
         // §16.1: libclang is the only macro engine — no `cc -E -dM` fallback.
         // A failed collection means the header parse itself failed; the
@@ -3299,7 +3421,7 @@ pub fn with_cimport_parse_macros(header_code: &str) -> i64:
         // empty session rather than a second engine that can disagree.
         ms as i64
 
-pub fn with_cimport_collect_object_macro_types(header_code: &str, macro_names: &str) -> str:
+pub fn with_cimport_collect_object_macro_types(header_code: &str, macro_names: &str, cxx: bool = false) -> str:
     unsafe:
         if macro_names.len() == 0:
             return ""
@@ -3339,36 +3461,7 @@ pub fn with_cimport_collect_object_macro_types(header_code: &str, macro_names: &
         (*s).tmp_path = c_strdup(&template_path as *const [4096]u8 as *const u8)
 
         var args: [64]*const u8 = [0 as *const u8; 64]
-        var nargs: i32 = 0
-        let sysroot = get_sdk_path()
-        if sysroot as i64 != 0:
-            args[nargs] = "-isysroot\0" as *const u8
-            nargs = nargs + 1
-            args[nargs] = sysroot
-            nargs = nargs + 1
-        nargs = cimport_push_target_args(&raw mut args as *mut [64]*const u8 as *mut *const u8, nargs)
-        let resdir = get_clang_resource_dir()
-        if resdir as i64 != 0:
-            args[nargs] = "-resource-dir\0" as *const u8
-            nargs = nargs + 1
-            args[nargs] = resdir
-            nargs = nargs + 1
-        args[nargs] = "-x\0" as *const u8
-        nargs = nargs + 1
-        args[nargs] = "c\0" as *const u8
-        nargs = nargs + 1
-        // libclang defaults to strict-ANSI C (unlike the clang driver's gnu
-        // dialect); _DEFAULT_SOURCE restores glibc's ordinary POSIX/BSD surface
-        // (realpath, mkstemp, ...). Inert on Darwin/Windows headers.
-        args[nargs] = "-D_DEFAULT_SOURCE\0" as *const u8
-        nargs = nargs + 1
-        var ip: i32 = 0
-        while ip < g_cimport_include_count and nargs < 62:
-            args[nargs] = "-I\0" as *const u8
-            nargs = nargs + 1
-            args[nargs] = g_cimport_include_paths[ip] as *const u8
-            nargs = nargs + 1
-            ip = ip + 1
+        let nargs = cimport_build_args(&raw mut args as *mut [64]*const u8 as *mut *const u8, cxx)
 
         (*s).index = clang_createIndex(0, 0)
         (*s).tu = clang_parseTranslationUnit((*s).index, (*s).tmp_path as *const u8, &args as *const [64]*const u8 as *const *const u8, nargs, 0 as *mut u8, 0 as u32, 0 as u32)
@@ -3407,7 +3500,7 @@ pub fn with_cimport_collect_object_macro_types(header_code: &str, macro_names: &
 // c_import cost macros x header: bzip2 and libcurl timed out on Windows,
 // where every parse re-reads windows.h. The parse keeps going past errors;
 // with_cimport_macro_probe_errors says which probes they belong to.
-pub fn with_cimport_parse_macro_probe(header_code: &str, macro_names: &str) -> i64:
+pub fn with_cimport_parse_macro_probe(header_code: &str, macro_names: &str, cxx: bool = false) -> i64:
     unsafe:
         if macro_names.len() == 0:
             return 0
@@ -3441,36 +3534,7 @@ pub fn with_cimport_parse_macro_probe(header_code: &str, macro_names: &str) -> i
         (*s).tmp_path = c_strdup(&template_path as *const [4096]u8 as *const u8)
 
         var args: [64]*const u8 = [0 as *const u8; 64]
-        var nargs: i32 = 0
-        let sysroot = get_sdk_path()
-        if sysroot as i64 != 0:
-            args[nargs] = "-isysroot\0" as *const u8
-            nargs = nargs + 1
-            args[nargs] = sysroot
-            nargs = nargs + 1
-        nargs = cimport_push_target_args(&raw mut args as *mut [64]*const u8 as *mut *const u8, nargs)
-        let resdir = get_clang_resource_dir()
-        if resdir as i64 != 0:
-            args[nargs] = "-resource-dir\0" as *const u8
-            nargs = nargs + 1
-            args[nargs] = resdir
-            nargs = nargs + 1
-        args[nargs] = "-x\0" as *const u8
-        nargs = nargs + 1
-        args[nargs] = "c\0" as *const u8
-        nargs = nargs + 1
-        // libclang defaults to strict-ANSI C (unlike the clang driver's gnu
-        // dialect); _DEFAULT_SOURCE restores glibc's ordinary POSIX/BSD surface
-        // (realpath, mkstemp, ...). Inert on Darwin/Windows headers.
-        args[nargs] = "-D_DEFAULT_SOURCE\0" as *const u8
-        nargs = nargs + 1
-        var ip: i32 = 0
-        while ip < g_cimport_include_count and nargs < 62:
-            args[nargs] = "-I\0" as *const u8
-            nargs = nargs + 1
-            args[nargs] = g_cimport_include_paths[ip] as *const u8
-            nargs = nargs + 1
-            ip = ip + 1
+        let nargs = cimport_build_args(&raw mut args as *mut [64]*const u8 as *mut *const u8, cxx)
 
         (*s).index = clang_createIndex(0, 0)
         (*s).tu = clang_parseTranslationUnit((*s).index, (*s).tmp_path as *const u8, &args as *const [64]*const u8 as *const *const u8, nargs, 0 as *mut u8, 0 as u32, 0 as u32)
@@ -3889,6 +3953,13 @@ pub fn with_ci_cursor_spelling(session: i64, cursor_idx: i32) -> str:
     unsafe:
         let s = session as *mut CImportSession
         if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return ""
+        let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
+        if (*s).cxx:
+            let kind = clang_getCursorKind(cursor)
+            if kind == CXCursor_StructDecl or kind == CXCursor_UnionDecl or kind == CXCursor_ClassDecl:
+                let definition = clang_getCursorDefinition(cursor)
+                if clang_Cursor_isNull(definition) == 0 and clang_equalCursors(cursor, definition) == 0:
+                    return with_ci_cursor_spelling(session, store_cursor(s, definition))
         // Memoized per stored cursor (see cursor_spellings). Store-dedupe
         // (#747) makes cursor_idx canonical for a node, so one libclang
         // spelling print per distinct node serves every lowering pass.
@@ -3904,7 +3975,6 @@ pub fn with_ci_cursor_spelling(session: i64, cursor_idx: i32) -> str:
         let slot = ((*s).cursor_spellings as i64 + cursor_idx as i64 * 8) as *mut *mut u8
         if (*slot) as i64 != 0:
             return make_str(*slot as *const u8)
-        let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
         // #1396: a file-scope record with no tag and no typedef name is
         // spelled by the name its first user gave it, everywhere.
         let synthesized = session_file_scope_anon_record_name(s, cursor)
@@ -3915,9 +3985,24 @@ pub fn with_ci_cursor_spelling(session: i64, cursor_idx: i32) -> str:
             let cxs = clang_getCursorSpelling(cursor)
             dup = c_strdup(clang_getCString(cxs))
             clang_disposeString(cxs)
+            let kind = clang_getCursorKind(cursor)
+            let parent = clang_getCursorSemanticParent(cursor)
+            let parent_kind = clang_getCursorKind(parent)
+            if (*s).cxx and (kind == CXCursor_StructDecl or kind == CXCursor_UnionDecl or kind == CXCursor_ClassDecl) and clang_Cursor_isAnonymous(cursor) == 0 and (parent_kind == CXCursor_StructDecl or parent_kind == CXCursor_UnionDecl or parent_kind == CXCursor_ClassDecl):
+                let owner = with_ci_cursor_spelling(session, store_cursor(s, parent))
+                let stem = owner ++ "_" ++ make_str(dup as *const u8)
+                with_free(dup)
+                dup = str_to_cstr(stem)
+                var suffix = 2
+                while anon_record_name_taken(s, dup as *const u8):
+                    with_free(dup)
+                    dup = str_to_cstr(stem ++ f"_{suffix}")
+                    suffix += 1
+                anon_taken_add(s, dup as *const u8)
         if dup as i64 == 0:
             return ""
-        *slot = dup
+        // Naming the parent can grow the spelling cache, invalidating `slot`.
+        *(((*s).cursor_spellings as i64 + cursor_idx as i64 * 8) as *mut *mut u8) = dup
         make_str(dup as *const u8)
 
 pub fn with_ci_cursor_kind_name(session: i64, cursor_idx: i32) -> str:
