@@ -615,11 +615,13 @@ fn link_stage_windows_lib_is_crt_implicit(name: &str): name == "m" or name == "c
 
 // The compiler's own link (#1267): a link that carries the LLVM static bridge
 // response file (`@…/llvm_ld.rsp`) is the compiler being built as a program.
-// Until the SDK's LLVM/Clang archives are rebuilt against its own libc++
-// (#1915 step 3), those archives are MSVC-built, MultiThreaded (static UCRT)
-// and need Visual Studio's static C and C++ runtime (libcmt, libcpmt). That
-// is the only link that still reads Visual Studio or a Windows Kit
-// (WITH_WINDOWS_*_LIBDIR); every program link reads the SDK only.
+// An SDK whose LLVM is a windows-gnu build against the SDK's own libc++
+// (#1915; its archives are GNU-named, lib/libclang.a) links the compiler
+// like any program, from the SDK only. The Visual Studio-built SDKs pinned
+// before it (lib/libclang.lib) are MultiThreaded (static UCRT) archives
+// that need Visual Studio's static C and C++ runtime (libcmt, libcpmt): that
+// link, with such an SDK, is the only one that still reads Visual Studio or a
+// Windows Kit (WITH_WINDOWS_*_LIBDIR).
 fn link_stage_windows_is_compiler_link(extras: &Vec[str]) -> bool:
     for i in 0..extras.len() as i32:
         if link_stage_is_llvm_bridge_rsp(extras[i]):
@@ -726,7 +728,8 @@ fn link_stage_make_windows_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_
     let arch = link_stage_windows_arch()
     // The SDK recipe covers x86_64; windows-aarch64 programs keep the
     // Visual Studio recipe until its libc slice lands (#1915).
-    let sdk_libc = not compiler_link and arch == "x86_64"
+    let sdk_is_gnu = link_stage_file_exists(link_stage_sdk_dir_of(llvm_ld) ++ "/lib/libclang.a")
+    let sdk_libc = arch == "x86_64" and (not compiler_link or sdk_is_gnu)
     let libc_dir = if sdk_libc: link_stage_windows_libc_dir(llvm_ld, arch) else: ""
     let builtins = if sdk_libc: link_stage_windows_builtins(llvm_ld, arch) else: ""
     if sdk_libc:

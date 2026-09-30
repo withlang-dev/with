@@ -1160,8 +1160,15 @@ fn sdk_ninja_target(ctx: &BuildCtx) -> Target:
     target = target.write_scope(build_root)
     target = target.write_scope("out/command/sdk-ninja")
     target = target.dep("sdk-ninja-source")
+    // Windows (#1915): ninja is a windows-gnu program against the SDK's own
+    // libc and libc++.
+    if sdk_platform_is_windows(platform):
+        target = target.dep("sdk-libcxx")
     target.timeout(1800000)
 
+// Windows builds CMake after LLVM: its version and manifest resources go
+// through the SDK's own llvm-windres (#1915). Elsewhere CMake comes first and
+// configures the LLVM build.
 fn sdk_cmake_target(ctx: &BuildCtx) -> Target:
     let platform = sdk_current_platform()
     let bootstrap_prefix = sdk_bootstrap_prefix_arg(ctx, platform)
@@ -1174,17 +1181,18 @@ fn sdk_cmake_target(ctx: &BuildCtx) -> Target:
     target = target.arg(sdk_cmake_source_dir())
     target = target.arg(build_root ++ "/cmake-" ++ sdk_host_tag_for_platform(platform))
     target = target.arg(sdk_jobs_arg(ctx))
-    // Windows: cmake's own build is MSVC-style (clang-cl, lld-link, mt.exe).
-    target = target.arg(ctx.env_input("SDK_WINDOWS_MT"))
     target = target.input(sdk_cmake_source_marker())
     target = target.input(output_prefix ++ "/bin/ninja" ++ host_exe_suffix())
     target = target.input(bootstrap_prefix)
     target = target.input("build/sdk.w")
-    target = target.write_scope(output_prefix)
+    target = target.write_scope(build_owned_text(output_prefix))
     target = target.write_scope(build_root)
     target = target.write_scope("out/command/sdk-cmake")
     target = target.dep("sdk-ninja")
     target = target.dep("sdk-cmake-source")
+    if sdk_platform_is_windows(platform):
+        target = target.input(output_prefix ++ "/lib/libclang.a")
+        target = target.dep("sdk-llvm")
     target.timeout(3600000)
 
 fn sdk_llvm_target(ctx: &BuildCtx) -> Target:
@@ -1192,7 +1200,9 @@ fn sdk_llvm_target(ctx: &BuildCtx) -> Target:
     let bootstrap_prefix = sdk_bootstrap_prefix_arg(ctx, platform)
     let output_prefix = sdk_output_prefix_arg(ctx, platform)
     let build_root = sdk_build_root_arg(ctx, platform)
-    var target = target_new(.Action, "sdk-llvm", "").output(if platform == "windows-x86_64" or platform == "windows-aarch64": output_prefix ++ "/lib/libclang.lib" else: output_prefix ++ "/lib/libclang.a")
+    // libclang.a everywhere: the Windows SDK's LLVM is a windows-gnu build
+    // since #1915, GNU-named like the others.
+    var target = target_new(.Action, "sdk-llvm", "").output(output_prefix ++ "/lib/libclang.a")
     target.action = run_sdk_llvm_action
     target = target.arg(build_owned_text(bootstrap_prefix))
     target = target.arg(build_owned_text(output_prefix))
@@ -1202,17 +1212,22 @@ fn sdk_llvm_target(ctx: &BuildCtx) -> Target:
     target = target.arg(ctx.env_input("LLVM_TARGETS_TO_BUILD"))
     target = target.arg(ctx.env_input("SDKROOT"))
     target = target.arg(ctx.env_input("MACOSX_DEPLOYMENT_TARGET"))
-    target = target.arg(ctx.env_input("SDK_WINDOWS_MT"))
     target = target.input(sdk_llvm_source_marker())
-    target = target.input(output_prefix ++ "/bin/cmake" ++ host_exe_suffix())
     target = target.input(output_prefix ++ "/bin/ninja" ++ host_exe_suffix())
     target = target.input(bootstrap_prefix)
     target = target.input("build/sdk.w")
-    target = target.write_scope(output_prefix)
+    target = target.write_scope(build_owned_text(output_prefix))
     target = target.write_scope(build_root)
     target = target.write_scope("out/command/sdk-llvm")
-    target = target.dep("sdk-cmake")
     target = target.dep("sdk-llvm-source")
+    if sdk_platform_is_windows(platform):
+        // The SDK's libc, compiler-rt and libc++ first (#1915); the
+        // bootstrap's cmake configures (sdk-cmake follows).
+        target = target.dep("sdk-libcxx")
+        target = target.dep("sdk-ninja")
+    else:
+        target = target.input(output_prefix ++ "/bin/cmake" ++ host_exe_suffix())
+        target = target.dep("sdk-cmake")
     target.timeout(21600000)
 
 // The Windows C runtime of the SDK (#1915; build/sdk.w): mingw-w64's headers,
