@@ -1,4 +1,3 @@
-//! skip-on: windows POSIX dup/close
 //! expect-stdout: live 1
 //! expect-stdout: closed 1
 //! expect-stdout: ok
