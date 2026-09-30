@@ -2839,15 +2839,27 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
         ld_rsp = ld_rsp ++ "-syslibroot\n" ++ comp_rsp_path(sysroot) ++ "\n"
         rsp = rsp ++ "-lc++\n"
         ld_rsp = ld_rsp ++ "-lc++\n"
+    else if os() == "Linux" and arch() == "x86_64":
+        // #1915 (D81): the SDK's static libc++ (libc++abi and libunwind in
+        // it), over our linux sysroot's glibc 2.28 stubs; Link.w adds the
+        // sysroot's crt objects, libc and compiler-rt. Nothing of the host's
+        // gcc, libstdc++, zlib, zstd or libxml2 (the SDK is built without them).
+        let libcxx = llvm_lib_dir ++ "/x86_64-unknown-linux-gnu/libc++.a"
+        if not fs.host_exists(libcxx):
+            return comp_fail(ctx, "the LLVM SDK at " ++ llvm_prefix ++ " has no " ++ libcxx ++ ": a linux-x86_64 SDK carries its own libc++ (build/sdk.w sdk_linux_runtimes)")
+        let sysroot = comp_rsp_path(root ++ "/out/gen/linux-sysroot")
+        rsp = rsp ++ "--sysroot=" ++ sysroot ++ "\n"
+        rsp = rsp ++ "-fuse-ld=lld\n--rtlib=compiler-rt\n--unwindlib=none\n-stdlib=libc++\n-static-libstdc++\n"
+        rsp = rsp ++ "-L" ++ comp_rsp_path(llvm_lib_dir ++ "/x86_64-unknown-linux-gnu") ++ "\n"
+        rsp = rsp ++ "-lpthread\n-ldl\n-lm\n"
+        ld_rsp = ld_rsp ++ comp_rsp_path(libcxx) ++ "\n"
+        ld_rsp = ld_rsp ++ "-lpthread\n-ldl\n-lm\n"
     else if os() == "Linux":
         rsp = rsp ++ "-lpthread\n"
         rsp = rsp ++ "-ldl\n"
         rsp = rsp ++ "-lm\n"
         rsp = rsp ++ "-static-libstdc++\n"
         rsp = rsp ++ "-static-libgcc\n"
-        rsp = rsp ++ comp_linux_system_lib_arg(fs, "z") ++ "\n"
-        rsp = rsp ++ comp_linux_system_lib_arg(fs, "zstd") ++ "\n"
-        rsp = rsp ++ comp_linux_system_lib_arg(fs, "xml2") ++ "\n"
         ld_rsp = ld_rsp ++ "-Bstatic\n"
         ld_rsp = ld_rsp ++ "-lstdc++\n"
         ld_rsp = ld_rsp ++ "-lgcc\n"
@@ -2856,9 +2868,9 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
         ld_rsp = ld_rsp ++ "-lpthread\n"
         ld_rsp = ld_rsp ++ "-ldl\n"
         ld_rsp = ld_rsp ++ "-lm\n"
-        ld_rsp = ld_rsp ++ comp_linux_system_lib_arg(fs, "z") ++ "\n"
-        ld_rsp = ld_rsp ++ comp_linux_system_lib_arg(fs, "zstd") ++ "\n"
-        ld_rsp = ld_rsp ++ comp_linux_system_lib_arg(fs, "xml2") ++ "\n"
+        for lib in ["z", "zstd", "xml2"]:
+            rsp = rsp ++ comp_linux_system_lib_arg(fs, lib) ++ "\n"
+            ld_rsp = ld_rsp ++ comp_linux_system_lib_arg(fs, lib) ++ "\n"
     else if os() == "Windows":
         rsp = rsp ++ comp_windows_msvc_lib("libcpmt.lib") ++ "\n"
         rsp = rsp ++ comp_windows_msvc_lib("libcmt.lib") ++ "\n"

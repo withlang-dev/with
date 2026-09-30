@@ -102,7 +102,7 @@ pub fn with_cc_main() -> i32:
         var names_sysroot = false
         for i in 2..with_arg_count():
             if with_arg_at(i) == "-isysroot": names_sysroot = true
-        let sdk = host_darwin_sdk_root()
+        let sdk = host_c_sysroot()
         if sdk.len() > 0 and not names_sysroot:
             args.push("-isysroot")
             args.push(sdk.trim().to_owned())

@@ -231,9 +231,9 @@ pub fn ci_prepare_clang_resource_dir():
     let dir = ensure_clang_resource_dir()
     if dir.len() > 0:
         with_cimport_set_resource_dir(dir)
-    // #1915: the macOS headers are the embedded sysroot's unless an SDK is
-    // named (compiler.EmbeddedSysroot decides which).
-    with_cimport_set_sdk_path(host_darwin_sdk_root())
+    // #1915: the libc headers are the embedded sysroot's (macOS, and
+    // linux-x86_64) unless one is named (compiler.EmbeddedSysroot decides).
+    with_cimport_set_sdk_path(host_c_sysroot())
 
 pub fn ci_set_include_paths(paths: &Vec[str]):
     with_cimport_clear_include_paths()

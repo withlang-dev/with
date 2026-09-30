@@ -35,6 +35,7 @@ extern fn with_fs_remove_file(path: &str) -> i32
 extern fn with_fs_file_exists(path: &str) -> i32
 extern fn with_getenv_str(name: &str) -> str
 extern fn with_sysinfo_os() -> str
+extern fn with_sysinfo_arch() -> str
 
 // ── libclang types ──────────────────────────────────────────────
 // Struct layouts match the C ABI exactly.
@@ -759,8 +760,22 @@ unsafe fn copy_first_line_to_buf(text: &str, dst: *mut u8, cap: i64) -> i32:
 unsafe fn c_path_to_str(path: *const u8) -> str:
     make_str(path)
 
+// linux-x86_64 (#1915): libc's headers are the sysroot's, and a library the
+// program names that the sysroot does not carry (zlib.h, curl/curl.h) is
+// looked up in the host's include directories after every sysroot one, so a
+// header the sysroot has is never the host's.
+unsafe fn cimport_push_host_library_dirs(args: *mut *const u8, nargs: i32) -> i32:
+    if with_sysinfo_os() != "Linux" or with_sysinfo_arch() != "x86_64":
+        return nargs
+    *((args as i64 + nargs as i64 * 8) as *mut *const u8) = "-idirafter\0" as *const u8
+    *((args as i64 + (nargs + 1) as i64 * 8) as *mut *const u8) = "/usr/include/x86_64-linux-gnu\0" as *const u8
+    *((args as i64 + (nargs + 2) as i64 * 8) as *mut *const u8) = "-idirafter\0" as *const u8
+    *((args as i64 + (nargs + 3) as i64 * 8) as *mut *const u8) = "/usr/include\0" as *const u8
+    nargs + 4
+
 unsafe fn get_sdk_path() -> *const u8:
-    if with_sysinfo_os() != "Macos":
+    // The darwin sysroot on macOS, the linux one on linux-x86_64 (#1915).
+    if with_sysinfo_os() != "Macos" and not (with_sysinfo_os() == "Linux" and with_sysinfo_arch() == "x86_64"):
         return 0 as *const u8
     if sdk_path_resolved == 0:
         sdk_path_resolved = 1
@@ -2056,6 +2071,7 @@ pub fn with_cimport_parse(header_code: &str) -> i64:
             nargs = nargs + 1
             args[nargs] = sysroot
             nargs = nargs + 1
+            nargs = cimport_push_host_library_dirs(&raw mut args as *mut [64]*const u8 as *mut *const u8, nargs)
         let resdir = get_clang_resource_dir()
         if resdir as i64 != 0:
             args[nargs] = "-resource-dir\0" as *const u8
@@ -3191,6 +3207,7 @@ unsafe fn cimport_collect_macros_from_libclang(ms: *mut MacroSession, header_cod
         nargs = nargs + 1
         args[nargs] = sysroot
         nargs = nargs + 1
+        nargs = cimport_push_host_library_dirs(&raw mut args as *mut [64]*const u8 as *mut *const u8, nargs)
     let resdir = get_clang_resource_dir()
     if resdir as i64 != 0:
         args[nargs] = "-resource-dir\0" as *const u8
@@ -3287,6 +3304,7 @@ pub fn with_cimport_collect_object_macro_types(header_code: &str, macro_names: &
             nargs = nargs + 1
             args[nargs] = sysroot
             nargs = nargs + 1
+            nargs = cimport_push_host_library_dirs(&raw mut args as *mut [64]*const u8 as *mut *const u8, nargs)
         let resdir = get_clang_resource_dir()
         if resdir as i64 != 0:
             args[nargs] = "-resource-dir\0" as *const u8
@@ -3388,6 +3406,7 @@ pub fn with_cimport_parse_macro_probe(header_code: &str, macro_names: &str) -> i
             nargs = nargs + 1
             args[nargs] = sysroot
             nargs = nargs + 1
+            nargs = cimport_push_host_library_dirs(&raw mut args as *mut [64]*const u8 as *mut *const u8, nargs)
         let resdir = get_clang_resource_dir()
         if resdir as i64 != 0:
             args[nargs] = "-resource-dir\0" as *const u8
