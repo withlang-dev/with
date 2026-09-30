@@ -35,10 +35,9 @@ jobs:
       WITH_SEED_VERSION: nightly-20260926-local-1-2e8defaa18ef
       WITH_SEED_SHA256: ce5c3c4729650b215fb166ac8078fe7c7982b094bc4a1e31401e04eb7e7460d0
       WITH_SDK_REPO: withlang-dev/with
-      # Built from build/sdk.w at main 2e8defaa + the llvm-dwarfdump fix: the
-      # WebAssembly backend (#1210) and llvm-dwarfdump (stage2-debug-lines),
-      # which the v0.15.1 SDK lacks.
-      WITH_SDK_VERSION: nightly-20260926-local-1-2e8defaa18ef
+      # Built from build/sdk.w at 594656a8: the With linux sysroot, its own
+      # compiler-rt and static libc++, no libxml2 (#1915, D81).
+      WITH_SDK_VERSION: nightly-sdk-20260930-594656a80308
       WITH_SDK_ASSET: with-llvm-sdk-22.1.6-linux-x86_64.tar.gz
     steps:
       - name: Checkout

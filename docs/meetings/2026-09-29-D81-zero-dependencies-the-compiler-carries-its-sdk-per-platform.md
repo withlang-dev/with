@@ -54,3 +54,7 @@ files) and links with its own lld, so `zig build` needs no host SDK.
 vendor SDK (then the SDK must still carry what we generate from the
 running OS, never require the vendor's install), or a redistribution
 license forbids shipping a header the C standard library needs.
+
+**Linux rulings (Eric, 2026-09-30).**
+- glibc 2.28 is the floor: the linux-x86_64 sysroot's stubs and headers target it, so a With program runs on 2.28 or later.
+- A library a user program names that the sysroot does not carry (zlib, curl) may be found on the host, searched after the sysroot: an application brings its own dependencies "via `with get` or manually".
