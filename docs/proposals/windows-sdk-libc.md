@@ -23,7 +23,14 @@ Under `<sdk>/libc/windows` (the sysroot clang's MinGW driver takes with
 and `<sdk>/lib/clang/<major>/lib/windows/libclang_rt.builtins-<arch>.a`
 (`:sdk-compiler-rt-builtins`). A library an application uses beyond these
 (opengl32, gdi32, winmm, ...) is the application's dependency (`with get`
-or its own link settings), per D81.
+or its own link settings), per D81. `with get` writes the import libraries a
+package names for in-box DLLs the SDK does not carry (Eric, 2026-09-30,
+ruling A), as it writes Apple framework stubs on macOS: from the `.def` files
+of the mingw-w64 release this C runtime was built from (its `PROVENANCE`
+names the archive and its sha256; the definitions are fetched once into the
+user's cache), preprocessed by the SDK's clang and written by its
+llvm-dlltool into the package's `windows-libs/` (compiler.WindowsImportLibs;
+`with __windows-import-libs <dir> <dll>...` runs the step alone).
 
 ## Provenance
 

@@ -194,6 +194,97 @@ fn ht_setup_framework_project(ctx: &ActionCtx, scratch: &str, compiler: &str, pr
         return f"error: test/host_toolchain/framework_project: `with __framework-stubs` failed (exit {made.rc}):\n" ++ made.stdout ++ made.stderr
     ht_join(root, ht_join(dir, "src/main.w"))
 
+// Windows has no sandbox-exec: the fixtures build and run with PATH holding
+// only the Windows directories and every variable that could point a build
+// at Visual Studio or a Windows SDK emptied. The SDK is reached the way the
+// compiler reaches it (its link record, or the LLVM_PREFIX a lane pins).
+fn ht_windows_env() -> ProcessEnv:
+    var e = process_env()
+    e = e.set("PATH", "C:\\Windows\\System32;C:\\Windows")
+    for name in ["LIB", "LIBPATH", "INCLUDE", "VSINSTALLDIR", "VCINSTALLDIR", "VCToolsInstallDir", "WindowsSdkDir", "UniversalCRTSdkDir", "WITH_WINDOWS_MSVC_LIBDIR", "WITH_WINDOWS_UCRT_LIBDIR", "WITH_WINDOWS_UM_LIBDIR", "WITH_WINDOWS_MSVC_INCDIR", "WITH_WINDOWS_UCRT_INCDIR", "WITH_WINDOWS_SHARED_INCDIR", "WITH_WINDOWS_UM_INCDIR", "WITH_WINDOWS_LIBC_DIR"]:
+        e = e.set(name.to_owned(), "")
+    e
+
+// Copies test/host_toolchain/windows_dll_project into the scratch directory
+// with the dependency `with get` would have installed: .with/deps/c/dllstub/1.0
+// whose metadata.json links gdi32, winmm and opengl32 from its windows-libs/
+// directory, filled by `with __windows-import-libs` (#1915). The source to
+// build, or "error: <why>".
+fn ht_setup_windows_dll_project(ctx: &ActionCtx, scratch: &str, compiler: &str) -> str:
+    let fs = ctx.fs()
+    let root = ctx.project_info().project_root()
+    let dir = ht_join(scratch, "windows_dll_project")
+    let dep = ht_join(dir, ".with/deps/c/dllstub/1.0")
+    if fs.mkdir_all(ht_join(dir, "src")) != 0 or fs.mkdir_all(dep) != 0:
+        return "error: could not create " ++ dep
+    if fs.write_text(ht_join(dir, "with.toml"), fs.read_text("test/host_toolchain/windows_dll_project/with.toml")) != 0 or fs.write_text(ht_join(dir, "src/main.w"), fs.read_text("test/host_toolchain/windows_dll_project/src/main.w")) != 0:
+        return "error: could not copy test/host_toolchain/windows_dll_project into " ++ dir
+    var meta = "{\n  \"name\": \"dllstub\",\n  \"version\": \"1.0\",\n  \"include_paths\": [],\n  \"lib_paths\": [\"windows-libs\"],\n"
+    meta = meta ++ "  \"libs\": [\"gdi32\", \"opengl32\", \"winmm\"],\n  \"defines\": [],\n  \"link_args\": [],\n  \"requires\": []\n}\n"
+    if fs.write_text(ht_join(dep, "metadata.json"), meta) != 0:
+        return "error: could not write " ++ dep ++ "/metadata.json"
+    let made_args: Vec[str] = Vec.new()
+    made_args.push(compiler.to_owned())
+    made_args.push("__windows-import-libs")
+    made_args.push(ht_join(root, ht_join(dep, "windows-libs")))
+    made_args.push("gdi32")
+    made_args.push("opengl32")
+    made_args.push("winmm")
+    let made = ctx.process_runner().run_capture_with_env(made_args, ht_join(root, ht_join(scratch, "import_libs.stdout")), ht_join(root, ht_join(scratch, "import_libs.stderr")), 600000, ht_windows_env())
+    if made.rc != 0:
+        return f"error: test/host_toolchain/windows_dll_project: `with __windows-import-libs` failed (exit {made.rc}):\n" ++ made.stdout ++ made.stderr
+    ht_join(root, ht_join(dir, "src/main.w"))
+
+// The Windows builds: each fixture built and run with no Visual Studio or
+// Windows SDK in reach. One line per result; a problem starts "problem: ".
+fn ht_windows_builds(ctx: &ActionCtx, root: &str, compiler: &str) -> Vec[str]:
+    let fs = ctx.fs()
+    let out: Vec[str] = Vec.new()
+    let scratch = ht_join("out/command", ctx.target_name())
+    let _clean = fs.remove_tree(scratch)
+    if fs.mkdir_all(scratch) != 0:
+        out.push("problem: could not create " ++ scratch)
+        return out
+    let fixtures: Vec[str] = Vec.new()
+    let sources: Vec[str] = Vec.new()
+    let names: Vec[str] = Vec.new()
+    fixtures.push("test/host_toolchain/hi.w")
+    sources.push(ht_join(root, "test/host_toolchain/hi.w"))
+    names.push("hi")
+    fixtures.push("test/host_toolchain/cimport_stdio.w")
+    sources.push(ht_join(root, "test/host_toolchain/cimport_stdio.w"))
+    names.push("cimport_stdio")
+    let project = ht_setup_windows_dll_project(ctx, scratch, compiler)
+    if project.starts_with("error: "):
+        out.push("problem: " ++ project.slice(7, project.len()))
+    else:
+        fixtures.push("test/host_toolchain/windows_dll_project/src/main.w")
+        sources.push(project)
+        names.push("windows_dll_program")
+    for i in 0..fixtures.len() as i32:
+        let source = fixtures[i]
+        let name = names[i].clone()
+        let binary = ht_join(root, ht_join(scratch, name ++ ".exe"))
+        let build: Vec[str] = Vec.new()
+        build.push(compiler.to_owned())
+        build.push("build")
+        build.push(sources[i].clone())
+        build.push("-o")
+        build.push(binary.clone())
+        let built = ctx.process_runner().run_capture_with_env(build, ht_join(root, ht_join(scratch, name ++ ".build.stdout")), ht_join(root, ht_join(scratch, name ++ ".build.stderr")), 600000, ht_windows_env())
+        if built.rc != 0:
+            out.push("problem: " ++ source ++ ": the build failed with no Visual Studio or Windows SDK in reach (exit " ++ f"{built.rc}" ++ "):\n" ++ built.stdout ++ built.stderr)
+            continue
+        let run: Vec[str] = Vec.new()
+        run.push(binary.clone())
+        let ran = ctx.process_runner().run_capture_with_env(run, ht_join(root, ht_join(scratch, name ++ ".run.stdout")), ht_join(root, ht_join(scratch, name ++ ".run.stderr")), 60000, ht_windows_env())
+        let expected = ht_expected_stdout(fs.read_text(source))
+        if ran.rc != 0 or ran.stdout.replace("\r\n", "\n") != expected:
+            out.push("problem: " ++ source ++ f": the program exited {ran.rc} printing:\n" ++ ran.stdout ++ ran.stderr ++ "expected:\n" ++ expected)
+            continue
+        out.push(source ++ ": built and ran with no Visual Studio or Windows SDK")
+    out
+
 pub fn run_no_host_toolchain_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let root = ctx.project_info().project_root()
@@ -216,7 +307,14 @@ pub fn run_no_host_toolchain_action(ctx: ActionCtx) -> i32:
     if read == 0:
         problems.push("no link records under out/: build the compiler first")
     var verdict = f"link records read: {read}\n"
-    if os() != "Macos":
+    if os() == "Windows":
+        let lines = ht_windows_builds(ctx, root, ht_join(root, inputs.get(0)))
+        for l in 0..lines.len() as i32:
+            if lines[l].starts_with("problem: "):
+                problems.push(lines[l].slice(9, lines[l].len()))
+            else:
+                verdict = verdict ++ lines[l] ++ "\n"
+    else if os() != "Macos":
         verdict = verdict ++ "sandboxed builds: not checked on " ++ os() ++ " yet (the #1915 slice for it adds them)\n"
     else:
         let scratch = ht_join("out/command", ctx.target_name())

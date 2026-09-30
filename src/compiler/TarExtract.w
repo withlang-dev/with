@@ -73,6 +73,21 @@ fn te_dirname(path: &str) -> str:
 // Unpacks the tar image `data` into `dest`, dropping the first `strip`
 // components of every name. "" on success, else why not.
 pub fn tar_extract_text(data: &str, dest: &str, strip: i32) -> str:
+    let all: Vec[str] = Vec.new()
+    tar_extract_text_keep(data, dest, strip, &all)
+
+// Whether the stripped name `rel` is under one of `keep`; every name is when
+// `keep` is empty.
+fn te_kept(rel: &str, keep: &Vec[str]) -> bool:
+    if keep.len() == 0: return true
+    for prefix in keep:
+        if rel.starts_with(prefix) or prefix == rel ++ "/": return true
+    false
+
+// tar_extract_text, writing only the entries whose stripped name starts with
+// one of `keep`: the few directories of a large source archive a step needs
+// (compiler.WindowsImportLibs).
+pub fn tar_extract_text_keep(data: &str, dest: &str, strip: i32, keep: &Vec[str]) -> str:
     if runtime_mkdir_p(dest) != 0: return "could not create " ++ dest
     var at: i64 = 0
     var long_name = ""
@@ -117,7 +132,7 @@ pub fn tar_extract_text(data: &str, dest: &str, strip: i32) -> str:
         long_link = ""
         if not te_safe(name): return "an unsafe path in the archive: " ++ name
         let rel = te_strip(name, strip)
-        if rel.len() == 0: continue
+        if rel.len() == 0 or not te_kept(rel, keep): continue
         let out = dest ++ "/" ++ rel
         let parent = te_dirname(out)
         if parent.len() > 0 and runtime_mkdir_p(parent) != 0: return "could not create " ++ parent
@@ -143,13 +158,18 @@ fn te_bytes(text: &str) -> Vec[u8]:
 
 // Unpacks the gzip-compressed tar `archive` into `dest`. "" or why not.
 pub fn tar_gz_extract(archive: &str, dest: &str, strip: i32) -> str:
+    let all: Vec[str] = Vec.new()
+    tar_gz_extract_keep(archive, dest, strip, &all)
+
+// tar_gz_extract, writing only the entries under one of `keep`.
+pub fn tar_gz_extract_keep(archive: &str, dest: &str, strip: i32, keep: &Vec[str]) -> str:
     let packed = runtime_read_file(archive)
     if packed.len() == 0: return "could not read " ++ archive
     match decompress_gzip_with_limit(&te_bytes(packed), 8589934592):
         .Ok(tar) =>
             if tar.len() == 0: return "an empty archive: " ++ archive
             let text = unsafe { with_str_from_bytes(&tar[0] as *const u8, tar.len()) }
-            tar_extract_text(text, dest, strip)
+            tar_extract_text_keep(text, dest, strip, keep)
         .Err(e) => archive ++ ": " ++ e.message
 
 // Unpacks the xz-compressed tar `archive` into `dest`. "" or why not.

@@ -1,0 +1,6 @@
+[package]
+name = "windows_dll_project"
+version = "0.1.0"
+
+[deps]
+c.dllstub = "1.0"

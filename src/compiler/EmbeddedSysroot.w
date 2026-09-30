@@ -70,7 +70,11 @@ pub fn with_user_cache_dir() -> str:
     if xdg.len() > 0:
         return xdg
     let home = runtime_getenv("HOME")
-    if home.len() == 0: "/tmp/with-cache" else: home ++ "/.cache"
+    if home.len() > 0:
+        return home ++ "/.cache"
+    // A Windows shell sets no HOME; its per-user cache is LOCALAPPDATA.
+    let local = runtime_getenv("LOCALAPPDATA")
+    if local.len() > 0: local.replace("\\", "/") else: "/tmp/with-cache"
 
 // A path in the pack is relative and stays inside the sysroot.
 fn es_path_ok(rel: &str) -> bool:

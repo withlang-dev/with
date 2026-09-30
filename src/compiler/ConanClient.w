@@ -8,6 +8,7 @@ use compiler.ConanRecipe
 use compiler.ConanPatch
 use compiler.ClangDriver
 use compiler.FrameworkStubs
+use compiler.WindowsImportLibs
 use compiler.TarExtract
 use compiler.EmbeddedSysroot
 use std.http
@@ -559,7 +560,19 @@ fn conan_write_metadata(dest_dir: &str, name: &str, version: &str, recipe_rev: &
     meta = meta ++ "  " ++ q ++ "package_id" ++ q ++ ": " ++ q ++ conan_json_escape(package_id) ++ q ++ "," ++ nl
     meta = meta ++ "  " ++ q ++ "package_revision" ++ q ++ ": " ++ q ++ conan_json_escape(package_rev) ++ q ++ "," ++ nl
     meta = meta ++ "  " ++ q ++ "include_paths" ++ q ++ ": " ++ conan_json_array(include_paths) ++ "," ++ nl
-    meta = meta ++ "  " ++ q ++ "lib_paths" ++ q ++ ": " ++ conan_json_array(lib_paths) ++ "," ++ nl
+    // #1915 (Eric, 2026-09-30): a package that links in-box Windows DLLs the
+    // SDK has no import library for (gdi32, opengl32, winmm) gets them,
+    // generated from mingw-w64's definitions (compiler.WindowsImportLibs).
+    var all_lib_paths = lib_paths.clone()
+    if runtime_sysinfo_os() == "Windows":
+        let wanted = conan_windows_libs_without_import_lib(dest_dir, lib_paths, libs)
+        if wanted.len() > 0:
+            let made = windows_import_libs_write(dest_dir ++ "/windows-libs", &wanted)
+            if made.problem.len() > 0:
+                runtime_eprint("error: " ++ name ++ "/" ++ version ++ " links Windows DLLs whose import libraries could not be written: " ++ made.problem)
+                return 1
+            if made.written.len() > 0: all_lib_paths.push("windows-libs")
+    meta = meta ++ "  " ++ q ++ "lib_paths" ++ q ++ ": " ++ conan_json_array(&all_lib_paths) ++ "," ++ nl
     meta = meta ++ "  " ++ q ++ "libs" ++ q ++ ": " ++ conan_json_array(libs) ++ "," ++ nl
     meta = meta ++ "  " ++ q ++ "defines" ++ q ++ ": " ++ conan_json_array(defines) ++ "," ++ nl
     meta = meta ++ "  " ++ q ++ "link_args" ++ q ++ ": " ++ conan_json_array(link_args) ++ "," ++ nl
@@ -576,6 +589,19 @@ fn conan_write_metadata(dest_dir: &str, name: &str, version: &str, recipe_rev: &
     meta = meta ++ "  " ++ q ++ "requires" ++ q ++ ": " ++ conan_json_array(requires) ++ nl
     meta = meta ++ "}" ++ nl
     runtime_write_file(dest_dir ++ "/metadata.json", meta)
+
+// The libraries a Windows package names that neither the package's own
+// library directories nor the SDK's C runtime provide: the in-box DLLs
+// `with get` writes import libraries for.
+fn conan_windows_libs_without_import_lib(dest_dir: &str, lib_paths: &Vec[str], libs: &Vec[str]) -> Vec[str]:
+    var dirs: Vec[str] = Vec.new()
+    for p in lib_paths: dirs.push(dest_dir ++ "/" ++ p)
+    let libc_root = link_stage_windows_libc_root()
+    if libc_root.len() > 0: dirs.push(libc_root ++ "/" ++ link_stage_windows_arch() ++ "-w64-mingw32/lib")
+    let out: Vec[str] = Vec.new()
+    for lib in libs:
+        if not windows_lib_in_dirs(lib, &dirs): out.push(lib.clone())
+    out
 
 pub fn conan_library_name_from_path(path: &str) -> str:
     let base = conan_path_basename(path)

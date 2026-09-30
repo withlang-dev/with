@@ -634,7 +634,7 @@ fn link_stage_is_llvm_bridge_rsp(extra: &str) -> bool:
     extra.starts_with("@") and extra.ends_with("/llvm_ld.rsp")
 
 // The architecture of a Windows link: the cross target's, else the host's.
-fn link_stage_windows_arch() -> str:
+pub fn link_stage_windows_arch() -> str:
     if not target_spec_is_native():
         return if target_spec_active_kind() == 6: "aarch64" else: "x86_64"
     let arch = runtime_sysinfo_arch()

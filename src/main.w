@@ -32,6 +32,7 @@ use BuildGraphCache
 use compiler.ClangDriver
 use compiler.LldDriver
 use compiler.FrameworkStubs
+use compiler.WindowsImportLibs
 use compiler.EmbeddedSysroot
 use compiler.DsymutilDriver
 use compiler.GreenEvidence
@@ -789,6 +790,12 @@ fn run_cli(argc: i32) -> i32:
         let stub_args: Vec[str] = Vec.new()
         for i in 2..argc: stub_args.push(with_arg_at(i))
         return with_framework_stubs_main(&stub_args)
+    // `with __windows-import-libs <dir> <name>...`: the import libraries of
+    // in-box DLLs `with get` writes for a package that links them (#1915).
+    if cli_command(argc) == "__windows-import-libs":
+        let lib_args: Vec[str] = Vec.new()
+        for i in 2..argc: lib_args.push(with_arg_at(i))
+        return with_windows_import_libs_main(&lib_args)
     // `with __ar qc lib.a a.o b.o` / `with __ranlib lib.a`: what CMake asks of
     // an archiver, so a source build needs no binutils. They are the compiler
     // invoking itself (the `__` prefix), not commands a user types. The
