@@ -158,18 +158,18 @@ with_fiber_start:
         callq with_fiber_bootstrap_finish
         ud2
 
-// ── The two symbols MSVC-ABI code expects the C runtime to define (#1915) ──
+// ── The two symbols MSVC-environment code expects the C runtime to define ──
 //
-// With emits x86_64-pc-windows-msvc objects. LLVM's code for that triple
-// calls __chkstk before growing a frame by more than a page, and references
-// _fltused from any module that uses floating point; prebuilt MSVC-built C
-// libraries do the same. Visual Studio's CRT defined both. Programs now link
-// the SDK's mingw-w64 UCRT runtime instead, which is GNU-ABI code and defines
-// neither (its own probe is compiler-rt's ___chkstk_ms), so the runtime
-// defines them here, in the one object every Windows program links. Both
-// are weak: the compiler's own link still takes Visual Studio's static CRT
-// until the SDK carries libc++ (#1915), and libcmt's chkstk.obj and
-// fltused.obj then win instead of colliding.
+// With's Windows x86_64 objects are x86_64-w64-windows-gnu code (#1915): their
+// stack probes call compiler-rt's ___chkstk_ms and they reference no _fltused.
+// The compiler that builds stage1 — the pinned Windows seed — still emits
+// x86_64-pc-windows-msvc objects, which call __chkstk before growing a frame
+// by more than a page and reference _fltused wherever floating point is used;
+// Visual Studio's CRT defined both, and the SDK's mingw-w64 runtime defines
+// neither. So the runtime defines them here, in the one object every Windows
+// program links, weakly (with a Visual Studio-built SDK the compiler's own
+// link takes libcmt's instead). Delete this section once seed.lock's Windows
+// seed emits windows-gnu objects: nothing will reference either symbol.
 
         .text
         .globl __chkstk
