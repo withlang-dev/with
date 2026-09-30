@@ -3078,7 +3078,6 @@ fn frontend_resolve_module_rel(module_dir: &str, rel_path: &str) -> str:
     let gen_cand = resolve_join("out/gen", rel_path)
     if resolve_file_exists(gen_cand):
         return gen_cand
-
     let cand5 = resolve_join("src", rel_path)
     if resolve_file_exists(cand5):
         return cand5
@@ -3087,7 +3086,7 @@ fn frontend_resolve_module_rel(module_dir: &str, rel_path: &str) -> str:
     if resolve_file_exists(cand6):
         return cand6
 
-    ""
+    resolve_own_tree_candidate(rel_path)
 
 impl Zcu:
     fn use_path_name_frontend(pool: AstPool, path_start: i32, path_count: i32) -> str:

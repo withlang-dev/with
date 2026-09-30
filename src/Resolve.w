@@ -1317,9 +1317,22 @@ impl ResolveState:
         if resolve_file_exists(cand6):
             return cand6
 
-        ""
+        resolve_own_tree_candidate(rel_path)
 
 extern fn with_fs_is_dir(path: &str) -> i32
+
+// Strategy 7: a stage compiler's own tree — its out/gen, then its lib — as
+// strategies 4b and 6 read them from the tree root, so the compiler resolves
+// a module the same from any directory (compiler.Runtime
+// runtime_own_tree_root; "" for an installed release, which embeds them).
+pub fn resolve_own_tree_candidate(rel_path: &str) -> str:
+    let root = runtime_own_tree_root()
+    if root.len() == 0: return ""
+    let gen_cand = resolve_join(root, resolve_join("out/gen", rel_path))
+    if resolve_file_exists(gen_cand): return gen_cand
+    let lib_cand = resolve_join(root, resolve_join("lib", rel_path))
+    if resolve_file_exists(lib_cand): return lib_cand
+    ""
 
 // #932: one message for an unresolved `use`, from both the resolver and the
 // frontend's import pass. It names the module; in a tree that has never been

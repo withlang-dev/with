@@ -182,3 +182,37 @@ pub fn runtime_program_path(path: &str) -> str:
     if runtime_sysinfo_os() == "Windows" and not path.ends_with(".exe"):
         return path ++ ".exe"
     path ++ ""
+
+// A stage compiler's own tree: the directory holding the `out` its executable
+// sits under (out/bootstrap/bin/with-stage1 → the checkout), or "" for a
+// compiler outside a built tree — an installed release, which embeds the
+// stdlib and the bundles. Module resolution tries its out/gen and lib last,
+// so a stage compiler compiles a program in any directory the way it does
+// from the tree root (stage1 driven from a test's case directory could not
+// find std.re, a bundle corpus the embedded stdlib leaves out).
+var g_own_tree_resolved: bool = false
+var g_own_tree: str = ""
+
+fn runtime_path_parent(path: &str) -> str:
+    var last = -1
+    for i in 0..path.len() as i32:
+        if path[i] == '/' or path[i] == '\\': last = i
+    if last <= 0: "" else: path.slice(0, last as i64)
+
+pub fn runtime_own_tree_root() -> str:
+    if g_own_tree_resolved: return with_str_clone_ref(g_own_tree)
+    g_own_tree_resolved = true
+    var exe = with_arg_at(0)
+    if not exe.contains("/") and not exe.contains("\\"): return ""
+    if not runtime_path_is_absolute(exe):
+        let cwd = with_getenv_str("PWD")
+        if cwd.len() == 0: return ""
+        exe = cwd ++ "/" ++ exe
+    var dir = runtime_path_parent(exe)
+    while dir.len() > 0:
+        if dir.ends_with("/out") or dir.ends_with("\\out"):
+            let root = runtime_path_parent(dir)
+            if with_fs_is_dir(root ++ "/lib/std") != 0: g_own_tree = root
+            break
+        dir = runtime_path_parent(dir)
+    with_str_clone_ref(g_own_tree)
