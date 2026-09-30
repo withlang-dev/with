@@ -2006,6 +2006,7 @@ impl Sema:
         // (the callee-first dependencies still apply): a program whose facts
         // or diagnostics change under it depends on declaration order.
         let reverse = with_getenv_str("WITH_SEMA_BODY_ORDER") == "reverse"
+        self.publish_trait_contract_returns(count)
         for di in 0..count:
             self.check_decl_body_in_order(if reverse: count - 1 - di else: di)
         self.resolve_allocating_callees()
@@ -3400,6 +3401,50 @@ impl Sema:
                 param_count: self.trait_method_param_counts[mt_idx],
             }
         sema_trait_impl_method_contract_missing()
+
+    // A trait impl's method written without a return type returns what the
+    // trait declares: a fact of the declarations, published before any body
+    // is checked. It was set when the method's own body finished, so a call
+    // checked earlier — `print(42)` reaching `i32.to_str` through `print[T]`
+    // when `main` is checked first — read `Unit` (#1941 class; the
+    // declaration order does not make it unknown, §4.10 D43 concerns bodies).
+    mut fn publish_trait_contract_returns(count: i32):
+        for di in 0..count:
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) != NodeKind.NK_FN_DECL or self.decl_is_lazy_skipped(di) or self.ast.fn_decl_body_is_interface(decl):
+                continue
+            let meta = self.ast.find_fn_meta(decl)
+            if meta < 0 or self.ast.fn_meta_ret(meta) != 0 or self.ast.fn_meta_tp_count(meta) != 0:
+                continue
+            let fn_name = self.fn_decl_semantic_symbol_at(decl, self.ast.get_data0(decl), di)
+            let sig_idx = self.get_sig(fn_name)
+            if sig_idx < 0 or not self.method_impl_nodes.contains(fn_name):
+                continue
+            let owner_sym = self.method_decl_owner_symbol(decl, self.ast.get_data0(decl))
+            if owner_sym != 0 and self.type_decl_nodes.contains(owner_sym) and self.type_decl_tp_count(self.type_decl_nodes.get(owner_sym).unwrap()) != 0:
+                continue
+            self.update_decl_source_context(di)
+            let saved_self = if self.named_types.contains(self.syms.self_type): self.named_types.get(self.syms.self_type).unwrap() else: 0
+            let self_tid = if owner_sym != 0: self.lookup_named_type_visible(owner_sym) else: 0
+            if self_tid != 0:
+                self.named_types.insert(self.syms.self_type, self_tid)
+            self.assoc_type_bindings.clear()
+            let impl_nd: i32 = self.method_impl_nodes.get(fn_name).unwrap()
+            let impl_ex = self.ast.get_data1(impl_nd)
+            for iai in 0..self.ast.get_extra(impl_ex):
+                let at_tid = self.resolve_type_expr(self.ast.get_extra(impl_ex + 1 + iai * 2 + 1))
+                if at_tid != 0:
+                    self.assoc_type_bindings.insert(self.ast.get_extra(impl_ex + 1 + iai * 2), at_tid as i32)
+            let contract = self.trait_impl_method_contract(decl, fn_name)
+            if contract.ok != 0 and contract.ret_type != 0:
+                let contract_ret = self.fn_signature_return_type(self.ast.get_data2(decl), contract.ret_type as TypeId)
+                self.set_sig_return_type(sig_idx, contract_ret as i32)
+                self.body_typed_sigs.insert(sig_idx, 1)
+            self.assoc_type_bindings.clear()
+            if saved_self != 0:
+                self.named_types.insert(self.syms.self_type, saved_self)
+            else if self_tid != 0:
+                self.named_types.remove(self.syms.self_type)
 
     mut fn check_trait_impl_method_signature_contract(node: i32, sig_idx: i32, contract: &SemaTraitImplMethodContract, has_ret_annotation: bool):
         if contract.ok == 0 or sig_idx < 0:
