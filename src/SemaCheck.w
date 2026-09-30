@@ -2027,6 +2027,7 @@ impl Sema:
     // capture ephemeral references".
     mut fn check_bodies():
         let count = self.ast.decl_count()
+        let diags_start = self.diags.items.len() as i32
         self.prepare_body_order(count)
         // WITH_SEMA_BODY_ORDER=reverse checks top-level bodies last to first
         // (the callee-first dependencies still apply): a program whose facts
@@ -2052,6 +2053,7 @@ impl Sema:
         self.local_file_id = saved_file_id
         self.validate_global_data_race_accesses()
         self.check_calls_against_live_global_views()
+        self.diags.sort_from(diags_start)
 
     // #1473 (§21.1 Rule 6): a function whose declared return is a view — a
     // reference, or a value carrying one (`Option[&T]`, an ephemeral value) —

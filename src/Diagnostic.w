@@ -38,6 +38,13 @@ pub type Diagnostic {
     helps: Vec[str],
 }
 
+fn diagnostic_sorts_before(a: &Diagnostic, b: &Diagnostic) -> bool:
+    let af = a.primary.file as i32
+    let bf = b.primary.file as i32
+    if af != bf: return af < bf
+    if a.primary.start != b.primary.start: return a.primary.start < b.primary.start
+    a.message < b.message
+
 fn diagnostic_owned_text(text: &str) -> str:
     with_str_clone_ref(text)
 
@@ -186,6 +193,21 @@ impl DiagnosticList:
                existing.code == diag.code:
                 return
         self.items.push(move diag)
+
+    // The diagnostics from `start` on in source order: file, then offset,
+    // then message; equal keys keep their emission order. A phase whose
+    // work order is not the program's (bodies checked callee first, or in
+    // parallel) reports in the program's order.
+    mut fn sort_from(start: i32):
+        var rest: Vec[Diagnostic] = Vec.new()
+        while self.items.len() as i32 > start:
+            rest.push(self.items.remove(start))
+        while rest.len() > 0:
+            var best = 0
+            for i in 1..rest.len() as i32:
+                if diagnostic_sorts_before(&rest[i], &rest[best]):
+                    best = i
+            self.items.push(rest.remove(best))
 
     fn count() -> i32:
         self.items.len() as i32
