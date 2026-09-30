@@ -127,8 +127,8 @@ fn cross_platform_symbol(tag: &str) -> str:
 // target). `with build :cross-rt-wasm` populates out/lib/cross/wasm32/.
 fn add_cross_wasm_rt_targets(out0: Build, tag: &str, p: &str, group_name: &str) -> Build:
     var out = out0
-    out = out.add_target(cross_object_target(tag, p ++ "rt-core-object", "rt/rt_core.w", "-O2"))
-    out = out.add_target(cross_object_target_named(tag, p ++ "rt-platform-object", "rt/wasm.w", "rt_wasm.o", "-O2"))
+    out = out.add_target(cross_object_target(tag, p ++ "rt-core-object", "rt/rt_core.w", "-O1"))
+    out = out.add_target(cross_object_target_named(tag, p ++ "rt-platform-object", "rt/wasm.w", "rt_wasm.o", "-O1"))
     var cross_compat = cross_object_target_named(tag, p ++ "compat-runtime-object", "out/gen/compat_runtime.w", "compat_runtime.o", "-O1")
     cross_compat = cross_compat.dep("compat-runtime-source")
     out = out.add_target(cross_compat)
@@ -173,8 +173,8 @@ fn add_cross_rt_targets(out0: Build, ctx: &BuildCtx, tag: &str, p: &str, group_n
     var out = out0
     let dir = cross_dir(tag)
     let triple = cross_triple(tag)
-    out = out.add_target(cross_object_target(tag, p ++ "rt-core-object", "rt/rt_core.w", "-O2"))
-    out = out.add_target(cross_object_target_named(tag, p ++ "rt-platform-object", cross_platform_source(tag), cross_platform_obj(tag), "-O2"))
+    out = out.add_target(cross_object_target(tag, p ++ "rt-core-object", "rt/rt_core.w", "-O1"))
+    out = out.add_target(cross_object_target_named(tag, p ++ "rt-platform-object", cross_platform_source(tag), cross_platform_obj(tag), "-O1"))
     out = out.add_target(cross_object_target(tag, p ++ "cimport-stubs-object", "rt/cimport_stubs.w", "-O1"))
     var cross_compat = cross_object_target_named(tag, p ++ "compat-runtime-object", "out/gen/compat_runtime.w", "compat_runtime.o", "-O1")
     cross_compat = cross_compat.dep("compat-runtime-source")
@@ -3357,8 +3357,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     // (COFF objects, windows triple) so a `--target x86_64-w64-windows-gnu`
     // link resolves entirely from that directory (§18.5). Mirrors the
     // linux cross-rt set; fiber core/asm are the windows variants.
-    out = out.add_target(cross_windows_object_target("cross-win-rt-core-object", "rt/rt_core.w", "-O2"))
-    out = out.add_target(cross_windows_object_target_named("cross-win-rt-platform-object", "rt/windows_x86_64.w", "rt_windows_x86_64.o", "-O2"))
+    out = out.add_target(cross_windows_object_target("cross-win-rt-core-object", "rt/rt_core.w", "-O1"))
+    out = out.add_target(cross_windows_object_target_named("cross-win-rt-platform-object", "rt/windows_x86_64.w", "rt_windows_x86_64.o", "-O1"))
     out = out.add_target(cross_windows_object_target("cross-win-cimport-stubs-object", "rt/cimport_stubs.w", "-O1"))
     var cross_win_compat = cross_windows_object_target_named("cross-win-compat-runtime-object", "out/gen/compat_runtime.w", "compat_runtime.o", "-O1")
     cross_win_compat = cross_win_compat.dep("compat-runtime-source")
@@ -3436,8 +3436,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     // `--target aarch64-pc-windows-msvc` link resolves entirely from that
     // directory (§18.5). Mirrors the windows_x86_64 cross-rt set; fiber
     // core is the windows variant, fiber asm the arm64 windows variant.
-    out = out.add_target(cross_windows_aarch64_object_target("cross-winarm-rt-core-object", "rt/rt_core.w", "-O2"))
-    out = out.add_target(cross_windows_aarch64_object_target_named("cross-winarm-rt-platform-object", "rt/windows_aarch64.w", "rt_windows_aarch64.o", "-O2"))
+    out = out.add_target(cross_windows_aarch64_object_target("cross-winarm-rt-core-object", "rt/rt_core.w", "-O1"))
+    out = out.add_target(cross_windows_aarch64_object_target_named("cross-winarm-rt-platform-object", "rt/windows_aarch64.w", "rt_windows_aarch64.o", "-O1"))
     out = out.add_target(cross_windows_aarch64_object_target("cross-winarm-cimport-stubs-object", "rt/cimport_stubs.w", "-O1"))
     var cross_winarm_compat = cross_windows_aarch64_object_target_named("cross-winarm-compat-runtime-object", "out/gen/compat_runtime.w", "compat_runtime.o", "-O1")
     cross_winarm_compat = cross_winarm_compat.dep("compat-runtime-source")
