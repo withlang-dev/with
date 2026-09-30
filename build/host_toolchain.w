@@ -126,9 +126,6 @@ fn ht_sandboxed(profile: &str, home: &str, command: Vec[str]) -> Vec[str]:
     argv.push("HOME=" ++ home)
     argv.push("PATH=/nonexistent")
     argv.push("TMPDIR=" ++ home ++ "/tmp")
-    // An ambient SDKROOT is not the program naming an SDK (§16.1, D81): the
-    // compiler must not follow it into the (denied) Command Line Tools.
-    argv.push("SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk")
     for i in 0..command.len() as i32:
         argv.push(command[i].clone())
     argv

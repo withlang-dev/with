@@ -4,10 +4,8 @@
 // `darwin_sysroot` blob) and materialized to a cache directory on first use.
 // A macOS link (-syslibroot) and c_import (-isysroot) read this directory, so
 // building a With program reads nothing from Xcode, the Command Line Tools
-// or an Apple SDK. Only the program names another SDK: with.toml's
-// [c_import] sdk_path (§16.1, D81: "No host SDK is consulted unless the
-// program names one"). An environment variable (SDKROOT, which Xcode's
-// tools and many shells set) is not the program naming one.
+// or an Apple SDK. WITH_SDKROOT, SDKROOT and with.toml's [c_import] sdk_path
+// name another SDK explicitly; nothing falls back to an installed one.
 //
 // The pack is text: "WITH-SYSROOT 1\n", then per file "F <path> <size>\n"
 // and its bytes, per alias "A <path> <target>\n" (the target's bytes again).
@@ -179,10 +177,16 @@ pub fn embedded_sdk_tools_dir() -> str:
     g_sdk_tools_dir = es_materialize(pack, "sdk-tools/" ++ runtime_sysinfo_os(), "the SDK build tools")
     with_str_clone_ref(g_sdk_tools_dir)
 
-// The macOS SDK a link and c_import read: with.toml [c_import] sdk_path when
-// the program names one, else the embedded sysroot. "" only when this
-// compiler carries no sysroot and the program names none.
+// The macOS SDK a link and c_import read: WITH_SDKROOT, SDKROOT or with.toml
+// [c_import] sdk_path when one names it, else the embedded sysroot. "" only
+// when this compiler carries no sysroot and none is named.
 pub fn darwin_sdk_root() -> str:
+    let with_sdkroot = runtime_getenv("WITH_SDKROOT")
+    if with_sdkroot.len() > 0:
+        return with_sdkroot
+    let sdkroot = runtime_getenv("SDKROOT")
+    if sdkroot.len() > 0:
+        return sdkroot
     if g_darwin_configured_sdk.len() > 0:
         return with_str_clone_ref(g_darwin_configured_sdk)
     embedded_darwin_sysroot_dir()

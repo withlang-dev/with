@@ -696,8 +696,8 @@ var g_emitted_cap: i32 = 0
 var g_cimport_include_paths: [32]*mut u8 = [0 as *mut u8; 32]
 var g_cimport_include_count: i32 = 0
 // The macOS SDK c_import parses against (empty = none), resolved by
-// compiler.EmbeddedSysroot's darwin_sdk_root (#1915): with.toml [c_import]
-// sdk_path (§16.1), else the embedded sysroot. This
+// compiler.EmbeddedSysroot's darwin_sdk_root (#1915): WITH_SDKROOT, SDKROOT,
+// with.toml [c_import] sdk_path (§16.1), else the embedded sysroot. This
 // object stays import-free, so the caller hands the answer in.
 var g_cimport_sdk_path: str = ""
 

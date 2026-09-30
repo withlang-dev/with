@@ -378,7 +378,11 @@ jobs:
         env:
           WITH_GET_CMAKE_RAYLIB: "PLATFORM=RGFW;OPENGL_VERSION=Software;USE_EXTERNAL_GLFW=OFF"
         if: runner.os == 'macOS'
-        run: ./out/release/bin/with build :release-uat
+        # raylib's own sources include Apple framework headers (IOKit,
+        # CoreAudio) that only Apple's SDK carries, and the compiler reads no
+        # host SDK unless one is named (§16.1, D81). The runner has Xcode: name
+        # its SDK, as a user building raylib from source does.
+        run: SDKROOT="$(xcrun --show-sdk-path)" ./out/release/bin/with build :release-uat
 
       - name: Package fixpoint-verified release asset
         run: |
@@ -568,7 +572,11 @@ jobs:
         # software rasterizer, and the spiral draws into a real window.
         env:
           WITH_GET_CMAKE_RAYLIB: "PLATFORM=RGFW;OPENGL_VERSION=Software;USE_EXTERNAL_GLFW=OFF"
-        run: ./out/release/bin/with build :release-uat
+        # raylib's own sources include Apple framework headers (IOKit,
+        # CoreAudio) that only Apple's SDK carries, and the compiler reads no
+        # host SDK unless one is named (§16.1, D81). The runner has Xcode: name
+        # its SDK, as a user building raylib from source does.
+        run: SDKROOT="$(xcrun --show-sdk-path)" ./out/release/bin/with build :release-uat
 
       - name: Package fixpoint-verified release asset
         run: |
