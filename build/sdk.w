@@ -365,7 +365,7 @@ fn sdk_validate_package_prefix(ctx: &ActionCtx, platform: &str, prefix: &str, bu
         for i in 0..tools.len() as i32:
             rc = sdk_check_file(ctx, sdk_required_tool(prefix, tools[i]), tools[i])
             if rc != 0: return rc
-    rc = sdk_check_file(ctx, sdk_clang_main_archive(prefix), "clang driver archive (with cc)")
+    rc = sdk_check_file(ctx, sdk_clang_main_archive(ctx.fs(), prefix), "clang driver archive (with cc)")
     if rc != 0: return rc
     if platform == "darwin-aarch64":
         rc = sdk_check_file(ctx, sdk_dsymutil_main_archive(prefix), "dsymutil archive (with __dsymutil, #1915)")
@@ -1016,6 +1016,9 @@ pub fn run_sdk_cmake_action(ctx: ActionCtx) -> i32:
         for i in 0..gnu.items.len() as i32:
             configure.push(sdk_owned_text(gnu.items[i]))
         configure.push("-DCMAKE_RC_COMPILER=" ++ sdk_abs(root, sdk_tool(output_prefix, "llvm-windres")))
+        // llvm-windres preprocesses with clang and no sysroot: the .rc files
+        // include <winuser.h> from the SDK's libc headers.
+        configure.push("-DCMAKE_RC_FLAGS=-I" ++ sdk_abs(root, sdk_windows_libc_root(output_prefix) ++ "/include"))
     else:
         configure.push("-DCMAKE_C_COMPILER=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, "clang")))
         configure.push("-DCMAKE_CXX_COMPILER=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, "clang++")))
@@ -1236,7 +1239,7 @@ pub fn run_sdk_llvm_action(ctx: ActionCtx) -> i32:
     build = sdk_append_jobs(move build, jobs)
     rc = sdk_run_capture(ctx, "llvm-build", build, 21600000)
     if rc != 0: return rc
-    let libclang = if os() == "Windows": sdk_join(output_prefix, "lib/libclang.lib") else: sdk_join(output_prefix, "lib/libclang.a")
+    let libclang = sdk_join(output_prefix, "lib/libclang.a")
     if not fs.exists(libclang):
         return sdk_fail(ctx, "static libclang archive was not installed: " ++ libclang)
     if not fs.exists(sdk_tool(output_prefix, "clang")):
@@ -1293,16 +1296,16 @@ fn sdk_archive_dsymutil_main(ctx: &ActionCtx, root: &str, objects_dir: &str, out
 // its objects — driver, cc1, cc1as, cc1gen_reproducer, where clang_main lives —
 // stay in the build tree. Archive them next to the other clang libraries, where
 // the compiler link already picks up every libclang*.a / clang*.lib.
-fn sdk_clang_main_archive(prefix: &str) -> str:
+fn sdk_clang_main_archive(fs: &ToolFs, prefix: &str) -> str:
     // The Visual Studio-built Windows SDKs pinned before #1915 name it
     // clangMain.lib; every SDK built since names it GNU-style.
-    if os() == "Windows" and with_fs_file_exists(sdk_join(prefix, "lib/clangMain.lib")) != 0:
+    if os() == "Windows" and fs.exists(sdk_join(prefix, "lib/clangMain.lib")):
         return sdk_join(prefix, "lib/clangMain.lib")
     sdk_join(prefix, "lib/libclangMain.a")
 
 fn sdk_archive_clang_main(ctx: &ActionCtx, root: &str, objects_dir: &str, output_prefix: &str) -> i32:
     let ext = if os() == "Windows": ".cpp.obj" else: ".cpp.o"
-    let archive = sdk_abs(root, sdk_clang_main_archive(output_prefix))
+    let archive = sdk_abs(root, sdk_clang_main_archive(ctx.fs(), output_prefix))
     // GNU-named and made by llvm-ar on every platform: the Windows SDK's LLVM
     // is a windows-gnu build (#1915); CMake there still names objects .obj.
     var argv: Vec[str] = Vec.new()
@@ -1322,8 +1325,8 @@ fn sdk_archive_clang_main(ctx: &ActionCtx, root: &str, objects_dir: &str, output
         argv.push(object)
     let rc = sdk_run_capture(ctx, "clang-main-archive", argv, 120000)
     if rc != 0: return rc
-    if not ctx.fs().host_exists(sdk_abs(root, sdk_clang_main_archive(output_prefix))):
-        return sdk_fail(ctx, "clang driver archive was not written: " ++ sdk_clang_main_archive(output_prefix))
+    if not ctx.fs().host_exists(sdk_abs(root, sdk_clang_main_archive(ctx.fs(), output_prefix))):
+        return sdk_fail(ctx, "clang driver archive was not written: " ++ sdk_clang_main_archive(ctx.fs(), output_prefix))
     0
 
 // A packaged SDK (`with build :deps`) predating `with cc` has no clang driver
@@ -1345,7 +1348,7 @@ pub fn run_sdk_clang_main_action(ctx: ActionCtx) -> i32:
     // the same fact and takes this file as an input, so it is regenerated
     // when an SDK gains the archive.
     let root = ctx.project_info().project_root()
-    let linked = ctx.fs().host_exists(sdk_abs(root, sdk_clang_main_archive(comp_llvm_prefix_for_root(root))))
+    let linked = ctx.fs().host_exists(sdk_abs(root, sdk_clang_main_archive(ctx.fs(), comp_llvm_prefix_for_root(root))))
     if ctx.fs().mkdir_all(sdk_dirname(ctx.output())) != 0 or ctx.fs().write_text(ctx.output(), (if linked: "linked" else: "absent") ++ "\n") != 0:
         return sdk_fail(ctx, "could not write " ++ ctx.output())
     0
@@ -1355,7 +1358,7 @@ fn sdk_ensure_clang_main(ctx: &ActionCtx) -> i32:
     let root = ctx.project_info().project_root()
     // The same SDK the link will read, which on CI is LLVM_PREFIX, not .deps.
     let prefix = comp_llvm_prefix_for_root(root)
-    if fs.host_exists(sdk_abs(root, sdk_clang_main_archive(prefix))):
+    if fs.host_exists(sdk_abs(root, sdk_clang_main_archive(ctx.fs(), prefix))):
         return 0
     // Compiling the driver needs LLVM's and clang's headers. A packaged SDK
     // ships libraries and tools only; it has to be published with the archive.
@@ -1751,7 +1754,8 @@ pub fn sdk_compiler_rt_builtins(prefix: &str, arch_name: &str) -> str:
 // runtime and the compiler import (dbghelp for backtraces, ws2_32 for
 // std.net, advapi32/bcrypt for randomness, the COM and shell pieces LLVM's
 // Support library calls), plus the libraries clang's MinGW driver names on
-// every link (advapi32 shell32 user32 kernel32). A library an application
+// every link (advapi32 shell32 user32 kernel32), and what the SDK's own
+// tools import. A library an application
 // pulls in (opengl32, gdi32, winmm, ...) is that application's dependency,
 // fetched by `with get` or linked by hand; it is not here.
 fn sdk_windows_import_libs() -> Vec[str]:
@@ -1769,6 +1773,11 @@ fn sdk_windows_import_libs() -> Vec[str]:
     names.push("oleaut32")
     names.push("version")
     names.push("psapi")
+    // The SDK's own cmake.exe (its curl, libarchive and system probes).
+    names.push("crypt32")
+    names.push("secur32")
+    names.push("iphlpapi")
+    names.push("powrprof")
     names
 
 fn sdk_windows_triple(arch_name: &str) -> str: arch_name ++ "-w64-windows-gnu"
