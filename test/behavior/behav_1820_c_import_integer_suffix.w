@@ -1,4 +1,3 @@
-//! skip-on: windows #799: `use c_import("limits.h")` does not yet compile as a C header snippet on native Windows (UCRT/MSVC header modeling, task #79)
 //! expect-stdout: 18446744073709551615 4294967295 4294967295
 //! expect-stdout: 6
 

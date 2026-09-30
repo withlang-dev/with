@@ -1,4 +1,3 @@
-//! skip-on: windows #799: opendir/telldir/closedir are POSIX <dirent.h>, absent from MSVCRT (link-undefined on Windows); the facade lend-method rendering is covered on Windows by behav_c_facade_resource_drop_once
 //! expect-stdout: ok
 
 // D51 §16.2b.5: what the retired `borrows: ["telldir(0) -> opendir"]`

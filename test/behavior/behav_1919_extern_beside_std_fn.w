@@ -1,4 +1,3 @@
-//! skip-on: windows #799: unlink is POSIX; MSVCRT spells it _unlink
 //! expect-stdout: -1 -1
 
 // #1919: a module's own `extern fn unlink` binds its own calls even when the

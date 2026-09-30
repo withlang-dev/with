@@ -1,4 +1,3 @@
-//! skip-on: windows #799: uses tmpfile() (MSVCRT creates it in the drive root — privilege-dependent), POSIX fdopen/dup and a hardcoded Unix "/tmp/" path absent on Windows; the libc facade's destroy-once rendering is covered on Windows by behav_c_import_owning_wrapper_strdup
 //! expect-stdout: fopen closed 1
 //! expect-stdout: tmpfile closed 1
 //! expect-stdout: fdopen closed 1

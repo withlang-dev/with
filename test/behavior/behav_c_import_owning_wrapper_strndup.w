@@ -1,4 +1,4 @@
-//! skip-on: windows #799: strndup is POSIX, absent from MSVCRT (link-undefined on Windows); the libc facade's rendering is covered on Windows by behav_c_import_owning_wrapper_strdup
+//! skip-on: windows strndup is POSIX: neither Windows' UCRT nor mingw-w64's runtime (the SDK's C runtime, #1915) defines it; the libc facade's rendering is covered on Windows by behav_c_import_owning_wrapper_strdup
 //! expect-stdout: strndup 3
 //! expect-stdout: ok
 

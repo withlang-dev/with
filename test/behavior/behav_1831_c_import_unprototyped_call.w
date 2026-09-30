@@ -1,4 +1,3 @@
-//! skip-on: windows jn is POSIX; MSVCRT spells it _jn
 //! expect-stdout: -0.242268
 //! expect-stdout: 0.030604
 //! expect-stdout: -12

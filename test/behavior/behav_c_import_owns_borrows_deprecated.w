@@ -1,4 +1,3 @@
-//! skip-on: windows #799: opendir/telldir/closedir are POSIX <dirent.h>, absent from MSVCRT
 //! expect-stdout: cwd ok
 //! expect-stdout: tell ok
 //! expect-stdout: ok

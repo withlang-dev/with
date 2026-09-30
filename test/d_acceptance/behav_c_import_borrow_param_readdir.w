@@ -1,4 +1,4 @@
-//! skip-on: windows #799: opendir/readdir/rewinddir/closedir are POSIX <dirent.h>, absent from MSVCRT (link-undefined on Windows); the libc facade's destroy-once rendering is covered on Windows by behav_c_import_owning_wrapper_strdup
+//! skip-on: windows dirfd is POSIX: mingw-w64's <dirent.h> (the SDK's C runtime, #1915) has opendir/readdir/rewinddir/closedir but no dirfd; the libc facade's destroy-once rendering is covered on Windows by behav_c_import_owning_wrapper_strdup
 //! expect-stdout: entries ok
 //! expect-stdout: rewound ok
 //! expect-stdout: closed 1

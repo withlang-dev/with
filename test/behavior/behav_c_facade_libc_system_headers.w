@@ -1,4 +1,4 @@
-//! skip-on: windows #799: POSIX strdup/fdopen/<dirent.h> are absent from MSVCRT; the libc facade's rendering is covered on Windows by behav_c_import_owning_wrapper_strdup
+//! skip-on: windows dirfd is POSIX: mingw-w64's <dirent.h> (the SDK's C runtime, #1915) declares no dirfd, which this facade names; the libc facade's rendering is covered on Windows by behav_c_import_owning_wrapper_strdup and behav_c_import_borrows_annotation
 //! expect-stdout: string ok
 //! expect-stdout: line ok
 //! expect-stdout: file closed 1
