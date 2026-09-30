@@ -367,6 +367,9 @@ pub type Compilation {
     last_link_command: LinkStageCommand,
     last_link_rc: i32,
     // D38: `--link-object` paths for this build's link (see build_binary_to_path).
+    // #1816: the entry source is statements by construction (a CLI
+    // one-liner or a REPL line): its top-level `let`/`var`s are main's locals.
+    statements_entry: bool,
     link_objects: Vec[str],
     // D39: `--link-bundle` prefixes, loaded once by load_link_bundles before
     // the first frontend entry (the interface registry must be populated
@@ -409,6 +412,7 @@ pub fn Compilation.init -> Compilation:
         last_link_command_available: 0,
         last_link_command: link_stage_empty_command(),
         last_link_rc: 0,
+        statements_entry: false,
         link_objects: Vec.new(),
         link_bundles: Vec.new(),
         link_bundles_loaded: false,
@@ -666,6 +670,8 @@ impl Compilation:
         var cfg = move self.config
         cfg.overflow_mode = if overflow_mode_valid(mode): mode else: -1
         self.config = cfg
+
+    mut fn set_statements_entry(enabled: bool): self.statements_entry = enabled
 
     mut fn set_debug_info(enabled: bool):
         var cfg = move self.config
@@ -1061,6 +1067,15 @@ fn compilation_cleanup_build_products(obj_path: &str, bin_path: &str):
         compilation_remove_file_best_effort(bin_path)
         compilation_remove_dsym_best_effort(bin_path)
 
+// Whether this compile lowered a body for `main` — the symbol the backend pins
+// to unit 0 (Backend.compile_units_generated reads the same lookup).
+fn compilation_defines_main(zcu: &Zcu) -> bool:
+    let main_sym = zcu.last_sema.pool_lookup_symbol("main")
+    if main_sym == 0: return false
+    for i in 0..zcu.last_mir_module.body_fn_syms.len() as i32:
+        if zcu.last_mir_module.body_fn_syms[i] == main_sym: return true
+    false
+
 fn compilation_binary_link_plan_fail() -> CompilationBinaryLinkPlan:
     CompilationBinaryLinkPlan {
         ok: false,
@@ -1148,7 +1163,7 @@ impl Compilation:
             extra_texts.push(with_str_clone_ref(source_texts[i]))
         zcu.set_extra_sources(move extra_names, move extra_texts)
         zcu = self.apply_cli_diag_mappings(move zcu)
-        let pool = zcu.compile_source_frontend_mode(source_text, source_path, 0, 1)
+        let pool = zcu.compile_source_frontend_mode(source_text, source_path, 0, if self.statements_entry: 2 else: 1)
         self.zcu = zcu
         pool
 
@@ -1194,6 +1209,14 @@ impl Compilation:
             return compilation_binary_link_plan_fail()
         if not self.ensure_codegen_mir(prepared_pool):
             compilation_debug_init("build_binary_to_path:ensure_codegen_mir FAILED")
+            compilation_cleanup_build_products(obj_path, bin_path)
+            return compilation_binary_link_plan_fail()
+        // #1816: an executable needs a `main`. An entry file whose top level
+        // holds only declarations — a top-level `let`/`var` alone is a module
+        // global (§18.5b, D74) — has none, and the link used to fail with the
+        // linker's raw "undefined symbol: _main".
+        if not compilation_defines_main(&self.zcu):
+            runtime_eprint("error: " ++ source_path ++ " has no `fn main` and no top-level statement to run: a top-level `let`/`var` alone is a module global (§18.5b). Add `fn main`, or a statement for the program to run.")
             compilation_cleanup_build_products(obj_path, bin_path)
             return compilation_binary_link_plan_fail()
         let active_pool: AstPool = self.active_pool(prepared_pool)

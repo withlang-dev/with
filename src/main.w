@@ -746,6 +746,7 @@ fn run_one_liner_command(argc: i32, one: &CliOneLiner, no_std: bool, alloc_mode:
     comp.configure(one.opt_level, no_std, alloc_mode, runtime_available)
     comp.set_prelude_mode(prelude_mode)
     comp.set_debug_info(false)
+    comp.set_statements_entry(true)
     for mi in 0..synthetic.gen_starts.len() as i32:
         comp.add_cli_diag_mapping(
             synthetic.gen_starts[mi],
@@ -5144,6 +5145,7 @@ fn run_repl_line(line: &str, no_std: bool, alloc_mode: bool, runtime_available: 
     let bin_path = repl_bin_path()
     var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
     comp.set_debug_info(false)
+    comp.set_statements_entry(true)
     let built = comp.build_entry_binary_from_source_to_path("<repl>", source, bin_path)
     if built == "":
         return 1

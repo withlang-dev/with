@@ -223,6 +223,15 @@ impl Parser:
         self.implicit_main_has_main_hint = self.has_top_level_main_decl()
         self.implicit_main_has_exec_stmt = self.has_top_level_exec_stmt()
 
+    // A source that is statements by construction — a CLI one-liner's code
+    // (§18.5b: "Compile and run CODE as top-level executable statements").
+    // Its top-level `let`/`var`s are main's locals even when nothing else is
+    // there: `with -e 'let x = 1'` runs (#1816), where a file of only
+    // `let`s stays a module of globals.
+    mut fn enable_statement_main_mode():
+        self.enable_implicit_main_mode()
+        self.implicit_main_has_exec_stmt = 1
+
     // §18.5b (D74): a file is an entry source when its top level holds an
     // executable statement other than a `let`/`var`. A `let`/`var` alone is
     // a module-level declaration (a comptime fn or an importer reads it);

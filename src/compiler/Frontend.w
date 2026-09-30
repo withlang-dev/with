@@ -1864,7 +1864,7 @@ impl Zcu:
             let utokens = ulexer.tokenize()
             var uparser = Parser.init_with_pool(move utokens, normalized_text, file_id, self.pool, move self.diagnostics, pool)
             if implicit_main_mode != 0:
-                uparser.enable_implicit_main_mode()
+                if implicit_main_mode == 2: uparser.enable_statement_main_mode() else: uparser.enable_implicit_main_mode()
             if interface_root:
                 uparser.enable_interface_mode()
             pool = uparser.parse_module()
@@ -1876,7 +1876,7 @@ impl Zcu:
             let tokens = lexer.tokenize()
             var parser = Parser.init(move tokens, normalized_text, file_id, self.pool, move self.diagnostics)
             if implicit_main_mode != 0:
-                parser.enable_implicit_main_mode()
+                if implicit_main_mode == 2: parser.enable_statement_main_mode() else: parser.enable_implicit_main_mode()
             if interface_root:
                 parser.enable_interface_mode()
             pool = parser.parse_module()
