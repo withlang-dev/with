@@ -1,4 +1,3 @@
-//! skip-on: windows UCRT defines snprintf inline in <stdio.h>; this bare prototype links against glibc/libSystem
 //! expect-stdout: -3
 //! expect-stdout: 200
 //! expect-stdout: -1000

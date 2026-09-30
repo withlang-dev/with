@@ -33,12 +33,16 @@ unsafe fn each_type(n: i32, ...):
     print(f"{a} {b} {c} {d} {e}")
 
 // More arguments than the registers hold: the list walks into the stack.
+// The literals pass as i32, so they are read as i32: reading a wider type
+// than the caller passed is C's undefined va_arg (C11 7.16.1.1p2), and on
+// Windows x64 the upper half of a stack slot holding an i32 is whatever
+// was there (#1912).
 unsafe fn many_ints(n: i32, ...):
     var ap = va_start()
     var out = ""
     for i in 0..n:
         if i > 0: out = out ++ " "
-        out = out ++ f"{ap.arg[i64]()}"
+        out = out ++ f"{ap.arg[i32]()}"
     print(out)
 
 unsafe fn many_doubles(n: i32, ...):
