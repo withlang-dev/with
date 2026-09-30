@@ -1023,7 +1023,27 @@ pub fn build_cache_graph_path(root: &str) -> str:
     build_cache_state_dir(root) ++ "/build-graph.cache"
 
 pub fn build_cache_graph_key(root: &str, target_kind: i32, strict_effects: i32) -> str:
-    build_cache_hash_build_graph_sources(root) ++ ":" ++ build_cache_current_compiler_fingerprint() ++ ":" ++ build_cache_fingerprint_file(root ++ "/with.toml") ++ f":{target_kind}:{strict_effects}"
+    build_cache_hash_build_graph_sources(root) ++ ":" ++ build_cache_current_compiler_fingerprint() ++ ":" ++ build_cache_fingerprint_file(root ++ "/with.toml") ++ f":{target_kind}:{strict_effects}:" ++ build_cache_graph_env_fingerprint(root)
+
+// The environment build(ctx) read (BuildCtx.env_input), as it is now: every
+// variable the last evaluation recorded in build.w.effects, with its current
+// value's hash. A graph evaluated under SDK_OUTPUT_PREFIX=a declared a's
+// paths, and was served from the cache under SDK_OUTPUT_PREFIX=b (#1925).
+fn build_cache_graph_env_fingerprint(root: &str) -> str:
+    let path = build_cache_build_effects_path(root)
+    if build_graph_rt_file_exists(path) == 0:
+        return "noenv"
+    let lines = build_graph_rt_read_file(path).split("\n")
+    var reads = ""
+    for i in 0..lines.len() as i32:
+        let line = lines[i]
+        if not line.starts_with("env\t"):
+            continue
+        let fields = line.split("\t")
+        if fields.len() < 4:
+            continue
+        reads = reads ++ fields[2] ++ "=" ++ build_cache_sha256_text(with_getenv_str(fields[2])) ++ "\n"
+    build_cache_sha256_text(reads)
 
 fn bcg_put_str(out: &str, s: &str) -> str:
     out ++ f"s{s.len()}\n" ++ s ++ "\n"
