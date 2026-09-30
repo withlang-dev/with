@@ -1628,6 +1628,13 @@ fn build_runner_ensure(root: &str, options: &BuildCommandOptions) -> str:
     let key = build_cache_graph_key(root, options.target_kind, 0)
     if with_fs_file_exists(bin_path) != 0 and with_fs_read_file(key_path) == key:
         return bin_path
+    // Another project built this very runner: take its copy.
+    let shared = build_cache_runner_store_path(key)
+    if shared.len() > 0 and with_fs_file_exists(shared) != 0 and with_fs_read_file(shared ++ ".key") == key:
+        let _state = build_graph_rt_mkdir_p(resolve_join(root, "out/.build-state"))
+        if build_runner_copy(shared, bin_path):
+            let _k = with_fs_write_file(key_path, key)
+            return bin_path
     let entry_path = resolve_join(root, "__with_build_runner.w")
     let t0 = with_clock_nanos()
     var comp = Compilation.init()
@@ -1656,7 +1663,27 @@ fn build_runner_ensure(root: &str, options: &BuildCommandOptions) -> str:
         return ""
     let _k = with_fs_write_file(key_path, key)
     with_eprint("[build] runner compiled " ++ build_graph_time_fmt(with_clock_nanos() - t0))
+    // Publish it for every other project with the same key: the binary
+    // first, then its key, each through a rename, so a reader that finds the
+    // key finds the whole binary.
+    if shared.len() > 0 and build_graph_rt_mkdir_p(resolve_dirname(shared)) == 0:
+        if build_runner_copy(bin_path, shared):
+            let key_tmp = shared ++ f".key.tmp.{with_getpid()}"
+            if with_fs_write_file(key_tmp, key) == 0:
+                let _publish = build_graph_rt_rename_file(key_tmp, shared ++ ".key")
     bin_path
+
+// Copy `from` to `to` through a temporary beside `to` and a rename, so a
+// concurrent build never runs a half-written runner; the copy is executable.
+fn build_runner_copy(from: &str, to: &str) -> bool:
+    let data = with_fs_read_file(from)
+    if data.len() == 0: return false
+    let tmp = to ++ f".tmp.{with_getpid()}"
+    if with_fs_write_file(tmp, data) != 0: return false
+    if build_graph_rt_chmod(tmp, 0o755) != 0 or build_graph_rt_rename_file(tmp, to) != 0:
+        let _rm = with_fs_remove_file(tmp)
+        return false
+    true
 
 // #1797: the runner may be linked now when no runtime directory the link
 // could take belongs to another compiler generation: a complete out/lib or

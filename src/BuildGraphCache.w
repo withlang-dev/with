@@ -547,6 +547,22 @@ pub fn build_cache_test_verdict_store(root: &str) -> str:
 
 pub fn build_cache_test_verdicts_path(root: &str, compiler_fp: &str, target_name: &str): build_cache_test_verdict_store(root) ++ "/" ++ compiler_fp ++ "/" ++ target_name ++ ".test-verdicts"
 
+// The compiled build runner is a function of its graph key alone — the
+// build sources' content, the compiler, with.toml; never a path — so a runner
+// compiled in one project serves every project whose key matches: a fresh
+// `with init` project, or each case directory a behavior test builds,
+// instead of each paying the runner compile (12–16 s on a stage compiler,
+// which pushed tests past the runner's 120 s limit). The store is
+// machine-wide like the test verdicts: $WITH_BUILD_RUNNER_DIR, else
+// ~/.local/with-build-runners; "" when neither names a home.
+pub fn build_cache_runner_store_path(key: &str) -> str:
+    var dir = build_graph_rt_getenv("WITH_BUILD_RUNNER_DIR") ++ ""
+    if dir.len() == 0:
+        let home = build_graph_rt_getenv("HOME")
+        if home.len() == 0: return ""
+        dir = home ++ "/.local/with-build-runners"
+    dir ++ "/" ++ build_cache_sha256_text(key)
+
 // Environment the test compile, c_import and link read: a pass under one
 // SDK or C compiler is not a pass under another.
 fn build_cache_test_env_sig_text() -> str:
