@@ -414,24 +414,30 @@ pub fn run_no_host_toolchain_action(ctx: ActionCtx) -> i32:
                     problems.push("the SDK's " ++ tool ++ f" the compiler carries does not run (exit {ran_tool.rc}): " ++ ran_tool.stderr)
                 else:
                     verdict = verdict ++ "SDK " ++ tool ++ " runs from the compiler's cache\n"
-        // `with cc` compiles and links C with the compiler's own clang, lld and
-        // sysroot (what `with get` builds a package from source with).
-        let cc_source = "test/host_toolchain/cc_hello.c"
-        let cc_binary = ht_join(root, ht_join(scratch, "cc_hello"))
-        let cc_argv: Vec[str] = Vec.new()
-        cc_argv.push(compiler.clone())
-        cc_argv.push("cc")
-        cc_argv.push(ht_join(root, cc_source))
-        cc_argv.push("-o")
-        cc_argv.push(cc_binary.clone())
-        cc_argv.push("-lm")
-        let cc_built = ctx.process_runner().run_capture(ht_sandboxed(profile, home, cc_argv), ht_join(root, ht_join(scratch, "cc_hello.build.stdout")), ht_join(root, ht_join(scratch, "cc_hello.build.stderr")), 600000)
-        if cc_built.rc != 0:
-            problems.push(cc_source ++ f": `with cc` failed with no host toolchain in reach (exit {cc_built.rc}):\n" ++ cc_built.stdout ++ cc_built.stderr)
-        else:
+        // `with cc` compiles and links C, and C++ against the libc++ the
+        // compiler carries, with its own clang, lld and sysroot (what `with get`
+        // builds a package from source with).
+        // C++ is the linux-x86_64 slice's (its sysroot carries libc++); the
+        // darwin sysroot carries no libc++ headers yet.
+        for which in 0..(if linux: 2 else: 1):
+            let cc_source = if which == 0: "test/host_toolchain/cc_hello.c" else: "test/host_toolchain/cxx_hello.cpp"
+            let cc_name = if which == 0: "cc_hello" else: "cxx_hello"
+            let cc_binary = ht_join(root, ht_join(scratch, cc_name))
+            let cc_argv: Vec[str] = Vec.new()
+            cc_argv.push(compiler.clone())
+            cc_argv.push("cc")
+            if which == 1: cc_argv.push("--driver-mode=g++")
+            cc_argv.push(ht_join(root, cc_source))
+            cc_argv.push("-o")
+            cc_argv.push(cc_binary.clone())
+            if which == 0: cc_argv.push("-lm")
+            let cc_built = ctx.process_runner().run_capture(ht_sandboxed(profile, home, cc_argv), ht_join(root, ht_join(scratch, cc_name ++ ".build.stdout")), ht_join(root, ht_join(scratch, cc_name ++ ".build.stderr")), 600000)
+            if cc_built.rc != 0:
+                problems.push(cc_source ++ f": `with cc` failed with no host toolchain in reach (exit {cc_built.rc}):\n" ++ cc_built.stdout ++ cc_built.stderr)
+                continue
             let cc_run: Vec[str] = Vec.new()
             cc_run.push(cc_binary.clone())
-            let cc_ran = ctx.process_runner().run_capture(ht_sandboxed(profile, home, cc_run), ht_join(root, ht_join(scratch, "cc_hello.run.stdout")), ht_join(root, ht_join(scratch, "cc_hello.run.stderr")), 60000)
+            let cc_ran = ctx.process_runner().run_capture(ht_sandboxed(profile, home, cc_run), ht_join(root, ht_join(scratch, cc_name ++ ".run.stdout")), ht_join(root, ht_join(scratch, cc_name ++ ".run.stderr")), 60000)
             let cc_expected = ht_expected_stdout(fs.read_text(cc_source))
             if cc_ran.rc != 0 or cc_ran.stdout != cc_expected:
                 problems.push(cc_source ++ f": the program exited {cc_ran.rc} printing:\n" ++ cc_ran.stdout ++ cc_ran.stderr ++ "expected:\n" ++ cc_expected)

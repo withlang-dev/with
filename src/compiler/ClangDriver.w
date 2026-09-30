@@ -194,6 +194,16 @@ pub fn with_cc_main() -> i32:
             return 1
         for a in ["-fuse-ld=lld", "--rtlib=compiler-rt", "--unwindlib=none"]: args.push(a.to_owned())
         args.push("--ld-path=" ++ ld)
+        // libc++ (the sysroot's, libc++abi and libunwind in it) uses
+        // pthreads and dl, separate libraries in glibc 2.28; only a link that
+        // needs them records them.
+        for a in ["-Wl,--as-needed", "-lpthread", "-ldl", "-Wl,--no-as-needed"]: args.push(a.to_owned())
+    // Linux C++ is the sysroot's libc++, never the host's libstdc++.
+    var names_stdlib = false
+    for i in 2..with_arg_count():
+        if with_arg_at(i).starts_with("-stdlib="): names_stdlib = true
+    if not first.starts_with("-cc1") and linux and not names_stdlib:
+        for a in ["--start-no-unused-arguments", "-stdlib=libc++", "--end-no-unused-arguments"]: args.push(a.to_owned())
     unsafe:
         let argv = with_alloc((args.len() + 1) * 8) as *mut *mut u8
         for i in 0..args.len() as i32:

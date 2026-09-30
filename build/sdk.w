@@ -2137,6 +2137,28 @@ pub fn run_linux_link_pack_action(ctx: ActionCtx) -> i32:
             return sdk_fail(ctx, "the LLVM SDK at " ++ prefix ++ " has no " ++ sdk_join(rt_dir, name) ++ ": a linux-x86_64 SDK carries compiler-rt (build/sdk.w sdk_linux_runtimes)")
         pack.push_str("F usr/lib/" ++ name ++ " " ++ f"{bytes.len()}" ++ "\n")
         pack.push_str(bytes)
+    // A C++ program `with cc` links (a `with get` package): the SDK's static
+    // libc++ (libc++abi and libunwind in it) and its headers, where clang's
+    // Linux driver looks in a sysroot: usr/include/c++/v1 and the target's
+    // __config_site under usr/include/<triple>/c++/v1.
+    let libcxx = fs.read_text(sdk_join(prefix, "lib/" ++ SDK_LINUX_TRIPLE ++ "/libc++.a"))
+    if libcxx.len() == 0:
+        return sdk_fail(ctx, "the LLVM SDK at " ++ prefix ++ " has no lib/" ++ SDK_LINUX_TRIPLE ++ "/libc++.a: a linux-x86_64 SDK carries libc++ (build/sdk.w sdk_linux_runtimes)")
+    pack.push_str("F usr/lib/libc++.a " ++ f"{libcxx.len()}" ++ "\n")
+    pack.push_str(libcxx)
+    var headers = 0
+    for inc in ["include/c++/v1", "include/" ++ SDK_LINUX_TRIPLE ++ "/c++/v1"]:
+        let files = sdk_merge_sort_strings(fs.list_files(sdk_join(prefix, inc)))
+        for i in 0..files.len() as i32:
+            let rel = "usr/" ++ sdk_rel_path(prefix, sdk_normalize(files[i]))
+            if not sdk_sysroot_path_ok(rel):
+                return sdk_fail(ctx, "a libc++ header path the sysroot pack cannot carry: " ++ files[i])
+            let bytes = fs.read_text(files[i])
+            pack.push_str("F " ++ rel ++ " " ++ f"{bytes.len()}" ++ "\n")
+            pack.push_str(bytes)
+            headers = headers + 1
+    if headers < 100:
+        return sdk_fail(ctx, f"only {headers} libc++ headers in the LLVM SDK at " ++ prefix)
     sdk_write_text(ctx, pack_path, pack.to_str())
 
 // ── The linux-x86_64 SDK's own C++ runtime (#1915, D81) ──────────────
