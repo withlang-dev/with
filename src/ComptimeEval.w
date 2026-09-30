@@ -17,6 +17,7 @@ use render
 use CiMigrate
 use Overflow
 use std.string.StringBuilder
+use std.zlib
 use TargetSpec
 use SemaTypes
 use compiler.Compilation.Config
@@ -645,63 +646,20 @@ fn comptime_tar_sum(data: &str) -> i64:
         sum = sum + data[i] as i64
     sum
 
-fn comptime_gzip_append_u16_le(out: StringBuilder, value: i32) -> StringBuilder:
-    var next = out
-    next.push_byte((value & 0xff) as u8)
-    next.push_byte(((value >> 8) & 0xff) as u8)
-    next
-
-fn comptime_gzip_append_u32_le(out: StringBuilder, value: u32) -> StringBuilder:
-    var next = out
-    next.push_byte((value & (0xff as u32)) as u8)
-    next.push_byte(((value >> (8 as u32)) & (0xff as u32)) as u8)
-    next.push_byte(((value >> (16 as u32)) & (0xff as u32)) as u8)
-    next.push_byte(((value >> (24 as u32)) & (0xff as u32)) as u8)
-    next
-
-fn comptime_gzip_crc32(data: &str) -> u32:
-    var crc = 0xffffffff as u32
-    for i in 0..data.len() as i32:
-        var c = (crc ^ (data[i] as u32)) & (0xff as u32)
-        var bit = 0
-        while bit < 8:
-            if (c & (1 as u32)) != 0 as u32:
-                c = (c >> (1 as u32)) ^ (0xedb88320 as u32)
-            else:
-                c = c >> (1 as u32)
-            bit = bit + 1
-        crc = (crc >> (8 as u32)) ^ c
-    crc ^ (0xffffffff as u32)
-
-fn comptime_gzip_stored(data: &str) -> str:
-    var out = StringBuilder.new()
-    out.push_byte(31 as u8)
-    out.push_byte(139 as u8)
-    out.push_byte(8 as u8)
-    out.push_byte(0 as u8)
-    out = comptime_gzip_append_u32_le(move out, 0 as u32)
-    out.push_byte(0 as u8)
-    out.push_byte(255 as u8)
-    var offset: i64 = 0
-    if data.len() == 0:
-        out.push_byte(1 as u8)
-        out = comptime_gzip_append_u16_le(move out, 0)
-        out = comptime_gzip_append_u16_le(move out, 0xffff)
-    while offset < data.len():
-        let remaining = data.len() - offset
-        let chunk = if remaining > 65535: 65535 else: remaining
-        let final_block = offset + chunk == data.len()
-        out.push_byte(if final_block: 1 as u8 else: 0 as u8)
-        out = comptime_gzip_append_u16_le(move out, chunk as i32)
-        out = comptime_gzip_append_u16_le(move out, 0xffff - chunk as i32)
-        var i: i64 = 0
-        while i < chunk:
-            out.push_byte(data[offset + i] as u8)
-            i = i + 1
-        offset = offset + chunk
-    out = comptime_gzip_append_u32_le(move out, comptime_gzip_crc32(data))
-    out = comptime_gzip_append_u32_le(move out, data.len() as u32)
-    out.to_str()
+// The gzip member std.build's ToolFs.write_tar_gz writes: zlib's deflate at
+// its default level, window bits 15 + 16, memLevel 8, default strategy —
+// byte for byte, so an action's archive is the same whichever worker ran
+// it (#1915: the evaluator wrote stored blocks, a 157 MB Windows toolchain
+// where the runner wrote 22.5 MB). "" when zlib fails.
+fn comptime_gzip_deflate(data: &str) -> str:
+    let bytes: Vec[u8] = Vec.with_capacity(data.len())
+    for i in 0..data.len(): bytes.push(data[i] as u8)
+    match compress_gzip(&bytes):
+        .Ok(packed) =>
+            var out = StringBuilder.with_capacity(packed.len())
+            for i in 0..packed.len(): out.push_byte(packed[i])
+            out.to_str()
+        .Err(_) => ""
 
 fn comptime_tar_entry_name(path: &str, directory: bool) -> str:
     if path.len() == 0 or (not directory and path.ends_with("/")):
@@ -5330,7 +5288,10 @@ impl ComptimeEvaluator:
         out.push_str(comptime_tar_zeroes(1024))
         let tar = out.to_str()
         if method == "write_tar_gz":
-            return with_fs_write_file(resolved_output, comptime_gzip_stored(tar))
+            let gz = comptime_gzip_deflate(tar)
+            if gz.len() == 0:
+                return 1
+            return with_fs_write_file(resolved_output, gz)
         with_fs_write_file(resolved_output, tar)
 
     mut fn toolfs_extract_tar_contents(record: &ComptimeCapabilityRecord, archive: &str, output_dir: &str, method: &str, node: i32) -> i32:
