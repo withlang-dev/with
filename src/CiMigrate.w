@@ -460,10 +460,36 @@ fn ci_migrate_publicize_shared_defs(text: &str) -> str: ci_migrate_publicize_lin
 
 fn ci_migrate_publicize_types(text: &str) -> str: ci_migrate_publicize_lines(text, true)
 
+// The migrator's own helpers share a module with the C program's globals,
+// and a global named `a`, `b`, `c` or `out` made every helper parameter of
+// that name a refused shadow (#1933). Their parameters and locals take the
+// reserved `__with_` prefix, which C code does not spell.
+const CI_MIGRATE_HELPER_LOCALS: [15]str = ["a", "b", "c", "out", "result", "a_hi", "b_hi", "a_lo", "b_lo", "cross", "low", "neg", "ua", "ub", "limit"]
+
+fn ci_migrate_hygienic(text: &str) -> str:
+    var out = StringBuilder.new()
+    var i = 0
+    while i < text.len() as i32:
+        let ch = text[i]
+        if ci_is_ident_start(ch):
+            var end = i + 1
+            while end < text.len() as i32 and ci_is_ident_char(text[end]): end += 1
+            let word = text.slice(i as i64, end as i64)
+            for local in CI_MIGRATE_HELPER_LOCALS:
+                if word == local:
+                    out.push_str("__with_")
+                    break
+            out.push_str(word)
+            i = end
+        else:
+            out.push_str(text.slice(i as i64, (i + 1) as i64))
+            i += 1
+    out.to_str()
+
 fn ci_migrate_render_preamble_fn(signature: &str, colon_expr: &str, brace_expr: &str) -> str:
     if migrate_prefer_brace():
-        return signature ++ " {\n    " ++ brace_expr ++ "\n}\n"
-    signature ++ ": " ++ colon_expr ++ "\n"
+        return ci_migrate_hygienic(signature ++ " {\n    " ++ brace_expr ++ "\n}\n")
+    ci_migrate_hygienic(signature ++ ": " ++ colon_expr ++ "\n")
 
 // The helper a `__builtin_<op>_overflow` call names. The migrator's preamble
 // defines `__with_builtin_<op>_overflow_<ty>` for every width; a c_import
@@ -492,7 +518,7 @@ fn ci_migrate_render_overflow_helper(name: &str, op: &str, ty: &str, is_signed: 
         "if b == 0: false else: result / b != a"
     let signature = "unsafe fn " ++ name ++ "(a: " ++ ty ++ ", b: " ++ ty ++ ", out: *mut " ++ ty ++ ") -> bool"
     let body = "    let result = a " ++ token ++ " b\n    unsafe { (*out = result) }\n    " ++ overflow ++ "\n"
-    ci_migrate_render_fn_with_body(signature, body)
+    ci_migrate_hygienic(ci_migrate_render_fn_with_body(signature, body))
 
 fn ci_migrate_render_fn_with_body(signature: &str, body: &str) -> str:
     if migrate_prefer_brace():
@@ -508,7 +534,7 @@ fn ci_migrate_render_fn_with_body(signature: &str, body: &str) -> str:
 pub fn ci_migrate_render_u128_mul_would_overflow(name: &str) -> str:
     let comment = "// The 128-bit overflow checks stay division-free on purpose: `/` on i128/u128\n// lowers to the __divti3/__udivti3 compiler-rt libcalls, and this shim is\n// compiled into freestanding runtime objects whose COFF link has no builtins\n// library to resolve them from. Limb decomposition keeps the check to multiplies\n// and shifts, which lower inline on every target and at every -O level.\n"
     let body = "    let a_hi = (a >> 64) as u64\n    let b_hi = (b >> 64) as u64\n    if a_hi != 0 and b_hi != 0: return true\n    let a_lo = (a as u64) as u128\n    let b_lo = (b as u64) as u128\n    let cross = (a_hi as u128) *% b_lo +% (b_hi as u128) *% a_lo\n    if (cross >> 64) != 0: return true\n    let low = a_lo *% b_lo\n    ((low >> 64) +% cross) >> 64 != 0\n"
-    comment ++ ci_migrate_render_fn_with_body("fn " ++ name ++ "(a: u128, b: u128) -> bool", body)
+    comment ++ ci_migrate_hygienic(ci_migrate_render_fn_with_body("fn " ++ name ++ "(a: u128, b: u128) -> bool", body))
 
 fn ci_migrate_render_mul_overflow_128(name: &str, shared: &str, ty: &str, is_signed: bool) -> str:
     let signature = "unsafe fn " ++ name ++ "(a: " ++ ty ++ ", b: " ++ ty ++ ", out: *mut " ++ ty ++ ") -> bool"
@@ -516,7 +542,7 @@ fn ci_migrate_render_mul_overflow_128(name: &str, shared: &str, ty: &str, is_sig
         "    unsafe { (*out = a *% b) }\n    if a == 0 or b == 0: return false\n    let neg = (a < 0) != (b < 0)\n    let ua = if a < 0: (0 as u128) -% (a as u128) else: a as u128\n    let ub = if b < 0: (0 as u128) -% (b as u128) else: b as u128\n    if " ++ shared ++ "(ua, ub): return true\n    let limit = if neg: (1 as u128) << 127 else: ((1 as u128) << 127) -% 1\n    ua *% ub > limit\n"
     else:
         "    unsafe { (*out = a *% b) }\n    " ++ shared ++ "(a, b)\n"
-    ci_migrate_render_fn_with_body(signature, body)
+    ci_migrate_hygienic(ci_migrate_render_fn_with_body(signature, body))
 
 // One overflow helper definition for a c_import translation that names it
 // (#1877): the migrator's preamble defines every width up front; a header

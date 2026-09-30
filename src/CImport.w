@@ -5028,7 +5028,7 @@ fn ci_find_array_elem_start(ty: &str) -> i32:
         return i + 1  // skip past ']'
     0
 
-fn ci_is_ident_start(c: i32) -> bool:
+pub fn ci_is_ident_start(c: i32) -> bool:
     (c >= 65 and c <= 90) or (c >= 97 and c <= 122) or c == 95
 
 pub fn ci_is_ident_char(c: i32) -> bool:
@@ -6741,7 +6741,7 @@ fn ci_effect_expr_needs_terminal_stmt(session: i64, cursor: i32) -> bool:
             return ci_effect_expr_needs_terminal_stmt(session, inner)
         return true
 
-    if kind == CXK_PAREN_EXPR or kind == 100 or kind == CXK_IMPLICIT_CAST or kind == 122:
+    if (kind == CXK_PAREN_EXPR or kind == 100 or kind == CXK_IMPLICIT_CAST or kind == 122) and ci_unexposed_expr_form(session, cursor) == CI_UNEXPOSED_WRAPPER:
         if nc == 1:
             return ci_effect_expr_needs_terminal_stmt(session, with_ci_child(session, cursor, 0))
         if nc > 0:
@@ -6861,7 +6861,16 @@ impl CiStmtPool:
                 return self.lower_discard_expr_side_effects_ir(session, inner, exprs, types, scope)
             return self.empty_stmt_ir()
 
-        if kind == CXK_PAREN_EXPR or kind == CXK_IMPLICIT_CAST or kind == 100 or kind == 122:
+        if ci_unexposed_expr_form(session, cursor) == CI_UNEXPOSED_CHOOSE:
+            let chosen = ci_choose_expr_selected(session, cursor)
+            if chosen < 0:
+                ci_bail_unsupported_unexposed(session, cursor)
+                return 0 as CiStmtId
+            return self.lower_discard_expr_side_effects_ir(session, chosen, exprs, types, scope)
+
+        // An unexposed operator (`a ?: b`, an atomic builtin) is not a
+        // wrapper to peel: it lowers as an expression below.
+        if (kind == CXK_PAREN_EXPR or kind == CXK_IMPLICIT_CAST or kind == 100 or kind == 122) and ci_unexposed_expr_form(session, cursor) == CI_UNEXPOSED_WRAPPER:
             if nc == 1:
                 return self.lower_discard_expr_side_effects_ir(session, with_ci_child(session, cursor, 0), exprs, types, scope)
             if nc > 0:
@@ -6905,10 +6914,10 @@ impl CiStmtPool:
                 return self.lower_discard_expr_side_effects_ir(session, with_ci_child(session, cursor, 0), exprs, types, scope)
             return self.empty_stmt_ir()
 
-        let lowered = self.lower_value_expr_ir(session, cursor, exprs, types, scope)
-        if ci_value_ir_valid(lowered) and (lowered.setup_stmt as i32) != 0:
-            return lowered.setup_stmt
-        self.empty_stmt_ir()
+        // Anything else is an expression statement: its lowering failing
+        // fails the statement (it was an empty one, so `c ? a[g()] : 0`
+        // lost the call and a refused initializer inside it passed, #1933).
+        self.lower_effect_expr_ir(session, cursor, exprs, types, scope)
 
     fn lower_effect_expr_ir(session: i64, cursor: i32, exprs: CiExprPool, types: CiTypePool, scope: CiScope) -> CiStmtId:
         let kind = with_ci_cursor_kind(session, cursor)
@@ -6920,7 +6929,14 @@ impl CiStmtPool:
                 return self.lower_effect_expr_ir(session, inner, exprs, types, scope)
             return 0 as CiStmtId
 
-        if kind == CXK_PAREN_EXPR or kind == CXK_IMPLICIT_CAST or kind == 100 or kind == 122:
+        if ci_unexposed_expr_form(session, cursor) == CI_UNEXPOSED_CHOOSE:
+            let chosen = ci_choose_expr_selected(session, cursor)
+            if chosen < 0:
+                ci_bail_unsupported_unexposed(session, cursor)
+                return 0 as CiStmtId
+            return self.lower_effect_expr_ir(session, chosen, exprs, types, scope)
+
+        if (kind == CXK_PAREN_EXPR or kind == CXK_IMPLICIT_CAST or kind == 100 or kind == 122) and ci_unexposed_expr_form(session, cursor) == CI_UNEXPOSED_WRAPPER:
             if nc == 1:
                 return self.lower_effect_expr_ir(session, with_ci_child(session, cursor, 0), exprs, types, scope)
             if nc > 0:
@@ -8193,6 +8209,18 @@ impl CiExprPool:
         if kind == 100:
             if ci_unexposed_expr_is_va_arg(session, cursor):
                 return self.va_arg_expr(session, cursor, types, scope)
+            let form = ci_unexposed_expr_form(session, cursor)
+            if form == CI_UNEXPOSED_CHOOSE:
+                let selected = ci_choose_expr_selected(session, cursor)
+                if selected < 0:
+                    ci_bail_unsupported_unexposed(session, cursor)
+                    return 0 as CiExprId
+                return self.lower_expr_ir(session, selected, types, scope)
+            if form != CI_UNEXPOSED_WRAPPER:
+                // `a ?: b` evaluates a once: it needs the statement-level
+                // lowering (lower_value_expr_ir) and its temporary.
+                ci_bail_unsupported_unexposed(session, cursor)
+                return 0 as CiExprId
             let nc = with_ci_num_children(session, cursor)
             if with_ci_eval_int_valid(session, cursor) != 0 and not ci_expr_children_need_rvalue_lowering(session, cursor):
                 let ival = with_ci_eval_int_value(session, cursor)
@@ -9771,6 +9799,10 @@ fn ci_rvalue_needs_lowering(session: i64, cursor: i32) -> bool:
             return ci_rvalue_needs_lowering(session, inner)
         return false
 
+    // An unexposed operator needs the statement-level lowering (`a ?: b`
+    // keeps a in a temporary; the others are refused there).
+    if ci_unexposed_expr_form(session, cursor) != CI_UNEXPOSED_WRAPPER:
+        return true
     if kind == CXK_PAREN_EXPR or kind == 100 or kind == CXK_IMPLICIT_CAST or kind == CXK_CSTYLE_CAST or kind == 122:
         if nc == 1:
             return ci_rvalue_needs_lowering(session, with_ci_child(session, cursor, 0))
@@ -10801,6 +10833,35 @@ impl CiStmtPool:
             return ci_value_ir_plain(expr_id)
         ci_value_ir_invalid()
 
+    // GNU `a ?: b`: a is evaluated once, into a temporary that is the value
+    // when truthy; b is evaluated only when it is not.
+    fn lower_elvis_value_ir(session: i64, cursor: i32, exprs: CiExprPool, types: CiTypePool, scope: CiScope) -> CiValueExprIR:
+        let common_cursor = with_ci_child(session, cursor, 0)
+        let else_cursor = with_ci_child(session, cursor, 3)
+        let common = self.lower_value_expr_ir(session, common_cursor, exprs, types, scope)
+        let else_v = self.lower_value_expr_ir(session, else_cursor, exprs, types, scope)
+        if not ci_value_ir_valid(common) or not ci_value_ir_valid(else_v):
+            return ci_value_ir_invalid()
+        let result_name = ci_expr_temp_name(session, cursor, "elvis")
+        let result_ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
+        if (result_ty as i32) == 0:
+            return ci_value_ir_invalid()
+        let first = exprs.coerce_value_expr_for_target(session, result_ty, common_cursor, common.value_expr, types)
+        let fallback = exprs.coerce_value_expr_for_target(session, result_ty, else_cursor, else_v.value_expr, types)
+        if (first as i32) == 0 or (fallback as i32) == 0:
+            return ci_value_ir_invalid()
+        let result_expr_name = exprs.add_string(result_name)
+        let decl_id = self.var_decl(self.add_string(result_name), result_ty, first, 1)
+        let truthy = exprs.bool_expr_from_value_ir(session, cursor, exprs.ident(result_expr_name, result_ty), types)
+        if (truthy as i32) == 0:
+            return ci_value_ir_invalid()
+        let not_truthy = exprs.unary(CiUnaryOp.CIUO_LOGICAL_NOT, truthy, 0 as CiTypeId)
+        let else_body = self.merge_ir(else_v.setup_stmt, self.assign(exprs.ident(result_expr_name, result_ty), fallback))
+        CiValueExprIR {
+            setup_stmt: self.merge3_ir(common.setup_stmt, decl_id, self.if_stmt(not_truthy, else_body, 0 as CiStmtId)),
+            value_expr: exprs.ident(result_expr_name, result_ty),
+        }
+
     fn lower_value_expr_ir(session: i64, cursor: i32, exprs: CiExprPool, types: CiTypePool, scope: CiScope) -> CiValueExprIR:
         let kind = with_ci_cursor_kind(session, cursor)
         let nc = with_ci_num_children(session, cursor)
@@ -10812,6 +10873,18 @@ impl CiStmtPool:
             return ci_value_ir_invalid()
 
         if kind == 100:
+            let form = ci_unexposed_expr_form(session, cursor)
+            if form == CI_UNEXPOSED_CHOOSE:
+                let selected = ci_choose_expr_selected(session, cursor)
+                if selected < 0:
+                    ci_bail_unsupported_unexposed(session, cursor)
+                    return ci_value_ir_invalid()
+                return self.lower_value_expr_ir(session, selected, exprs, types, scope)
+            if form == CI_UNEXPOSED_ELVIS:
+                return self.lower_elvis_value_ir(session, cursor, exprs, types, scope)
+            if form == CI_UNEXPOSED_UNSUPPORTED:
+                ci_bail_unsupported_unexposed(session, cursor)
+                return ci_value_ir_invalid()
             if ci_unexposed_expr_is_va_arg(session, cursor):
                 let va_value = exprs.va_arg_expr(session, cursor, types, scope)
                 if (va_value as i32) == 0:
@@ -17300,6 +17373,53 @@ fn ci_find_var_cursor(session: i64, name: &str) -> i32:
 
 fn ci_cursor_kind_is_expr(kind: i32) -> bool:
     kind >= 100 and kind < 200
+
+// What an unexposed expression (libclang's UnexposedExpr, 100) is. With at
+// most one expression child it is a transparent wrapper (an implicit cast,
+// a type-trait over TypeRefs); with more it is an operator libclang does not
+// name, and its last child is NOT its value: `__builtin_choose_expr(1, f(),
+// 7)`, `f() ?: 1` and `__atomic_load_n(&g, 0)` all lowered to their last
+// operand (#1933). Each such form is translated or refused, never peeled.
+let CI_UNEXPOSED_WRAPPER: i32 = 0
+let CI_UNEXPOSED_CHOOSE: i32 = 1
+let CI_UNEXPOSED_ELVIS: i32 = 2
+let CI_UNEXPOSED_UNSUPPORTED: i32 = 3
+
+fn ci_unexposed_expr_form(session: i64, cursor: i32) -> i32:
+    if with_ci_cursor_kind(session, cursor) != 100 or ci_unexposed_expr_is_va_arg(session, cursor):
+        return CI_UNEXPOSED_WRAPPER
+    let nc = with_ci_num_children(session, cursor)
+    var expr_children = 0
+    for i in 0..nc:
+        if ci_cursor_kind_is_expr(with_ci_cursor_kind(session, with_ci_child(session, cursor, i))):
+            expr_children += 1
+    if expr_children <= 1:
+        return CI_UNEXPOSED_WRAPPER
+    // `__builtin_choose_expr` spelled in the source (through a macro its
+    // text is the macro's, and it is refused rather than guessed).
+    if nc == 3 and ci_starts_with(ci_trim(with_ci_cursor_source_text(session, cursor)), "__builtin_choose_expr"):
+        return CI_UNEXPOSED_CHOOSE
+    // GNU `a ?: b`: libclang visits the common operand, then its two opaque
+    // uses as that same expression (one cursor), then the fallback.
+    let first = with_ci_child(session, cursor, 0)
+    if nc == 4 and with_ci_child(session, cursor, 1) == first and with_ci_child(session, cursor, 2) == first:
+        return CI_UNEXPOSED_ELVIS
+    CI_UNEXPOSED_UNSUPPORTED
+
+// The operand `__builtin_choose_expr(c, a, b)` selects (c is a constant
+// expression), or -1 when clang cannot evaluate c.
+fn ci_choose_expr_selected(session: i64, cursor: i32) -> i32:
+    let cond = with_ci_child(session, cursor, 0)
+    if with_ci_eval_int_valid(session, cond) == 0:
+        return -1
+    with_ci_child(session, cursor, if with_ci_eval_int_value(session, cond) != 0: 1 else: 2)
+
+// Records the loud reason an unexposed operator has no translation.
+fn ci_bail_unsupported_unexposed(session: i64, cursor: i32):
+    if g_ci_bail_message.len() == 0:
+        g_ci_bail_message = "C expression `" ++ ci_trim(with_ci_cursor_source_text(session, cursor)) ++ "` has no translation"
+        g_ci_bail_location = with_ci_cursor_location(session, cursor)
+        g_ci_bail_kind = 100
 
 fn ci_find_last_expr_child(session: i64, cursor: i32) -> i32:
     let nc = with_ci_num_children(session, cursor)
