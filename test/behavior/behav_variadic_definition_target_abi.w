@@ -40,13 +40,14 @@ fn main:
             assert(not ints.contains("icmp ule i32") and not ints.contains("icmp sge i32"))
             assert(ints.contains("i64 8"))
         // The C convention, not With's: an aggregate crosses the variadic
-        // definition as C passes it.
+        // definition as C passes it (`byval` on SysV x86_64), while With's
+        // own convention passes an aggregate over two words as a plain
+        // pointer on every target (ABI v11), never `byval`.
+        assert(ir.stdout.contains("@plain_trio(ptr %0)"))
         if target == "linux_x86_64":
             assert(ir.stdout.contains("@trio(ptr byval(%Trio)"))
-            assert(ir.stdout.contains("@plain_trio(%Trio"))
         if target == "darwin_aarch64" or target == "linux_aarch64":
             assert(ir.stdout.contains("@trio(ptr %0, ...)"))
-            assert(ir.stdout.contains("@plain_trio(%Trio"))
         let audit = p7_run(case_dir, "va_def_audit_" ++ target, "analyze\0src/defs.w\0audit:all" ++ flags)
         p7_assert_success(audit, "variadic definition audit for " ++ target)
         assert(audit.stdout.contains("violations=0"))
