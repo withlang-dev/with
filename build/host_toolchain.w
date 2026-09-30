@@ -171,10 +171,20 @@ fn ht_sandboxed(profile: &str, home: &str, command: Vec[str]) -> Vec[str]:
                 argv.push("--ro-bind")
                 argv.push("/dev/null")
                 argv.push(m.slice(5, m.len()).to_owned())
-    else:
-        argv.push("/usr/bin/sandbox-exec")
-        argv.push("-p")
-        argv.push(profile.to_owned())
+        // The environment bwrap sets itself: /usr/bin, where env lives, is
+        // one of the hidden directories.
+        argv.push("--clearenv")
+        for kv in ["HOME", "PATH", "TMPDIR"]:
+            argv.push("--setenv")
+            argv.push(kv.to_owned())
+            argv.push(if kv == "HOME": home.to_owned() else if kv == "PATH": "/nonexistent" else: home ++ "/tmp")
+        argv.push("--")
+        for i in 0..command.len() as i32:
+            argv.push(command[i].clone())
+        return argv
+    argv.push("/usr/bin/sandbox-exec")
+    argv.push("-p")
+    argv.push(profile.to_owned())
     argv.push("/usr/bin/env")
     argv.push("-i")
     argv.push("HOME=" ++ home)
@@ -186,17 +196,15 @@ fn ht_sandboxed(profile: &str, home: &str, command: Vec[str]) -> Vec[str]:
 
 // linux-x86_64: what the sandbox hides, one per line, "dir <path>" (an
 // empty directory over it) or "file <path>" (/dev/null over it), for the
-// paths this host has.
+// paths this host has: every executable directory (no cc, gcc, ld, as or
+// clang can run), the C headers, gcc's libraries and objects, and glibc's
+// crt objects and development link scripts.
 fn ht_linux_masks(fs: &ToolFs) -> str:
     var out = ""
-    for d in ["/usr/include", "/usr/local/include", "/usr/lib/gcc", "/usr/libexec/gcc", "/usr/lib/llvm"]:
+    for d in ["/usr/bin", "/usr/sbin", "/usr/local/bin", "/usr/include", "/usr/local/include", "/usr/lib/gcc", "/usr/libexec/gcc", "/usr/lib/llvm"]:
         if fs.host_exists(d): out = out ++ "dir " ++ d ++ "\n"
-    for dir in ["/usr/lib/x86_64-linux-gnu", "/lib/x86_64-linux-gnu", "/usr/lib64", "/lib64"]:
-        for name in ["crt1.o", "Scrt1.o", "crti.o", "crtn.o", "libc.so", "libm.so", "libpthread.so", "libdl.so", "librt.so", "libc_nonshared.a", "libgcc_s.so", "libstdc++.so"]:
-            let path = dir ++ "/" ++ name
-            if fs.host_exists(path): out = out ++ "file " ++ path ++ "\n"
-    for tool in ["cc", "c++", "gcc", "g++", "clang", "clang++", "ld", "ld.bfd", "ld.gold", "ld.lld", "as", "x86_64-linux-gnu-gcc", "x86_64-linux-gnu-ld", "x86_64-linux-gnu-as"]:
-        let path = "/usr/bin/" ++ tool
+    for name in ["crt1.o", "Scrt1.o", "crti.o", "crtn.o", "libc.so", "libm.so", "libc_nonshared.a"]:
+        let path = "/usr/lib/x86_64-linux-gnu/" ++ name
         if fs.host_exists(path): out = out ++ "file " ++ path ++ "\n"
     out
 
