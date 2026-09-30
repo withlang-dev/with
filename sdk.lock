@@ -29,8 +29,13 @@ with-llvm-sdk-22.1.6-linux-x86_64.tar.gz.manifest=6b218dbcfdfaf0c728c400a062171f
 with-llvm-sdk-22.1.6-linux-aarch64.tar.gz.version=sdk-linux-aarch64
 with-llvm-sdk-22.1.6-linux-aarch64.tar.gz=b1597fe5281c760f594235a0d5b01fe3360b8303f7615b9f87c3ff87a2740926
 
-with-llvm-sdk-22.1.6-windows-x86_64.tar.gz.version=nightly-20260926-local-1-2e8defaa18ef
-with-llvm-sdk-22.1.6-windows-x86_64.tar.gz=8eb0ec5de7a338e777fa85a33b366aa632498d6b20e9d12ab831d5b3085be945
+# windows-x86_64: 6cd934e8, x86_64-w64-windows-gnu with its own C runtime
+# (mingw-w64 14.0.0 + UCRT), compiler-rt builtins, libc++ and the build tools,
+# built on win10 with no Visual Studio or Windows SDK (#1915).
+with-llvm-sdk-22.1.6-windows-x86_64.tar.gz.version=nightly-sdk-20260930-6cd934e82b4d
+with-llvm-sdk-22.1.6-windows-x86_64.tar.gz=a24652c52d9fb1aa32210b3d765f2c74e6b221648f7d891b73c879350d785bd7
+with-llvm-sdk-22.1.6-windows-x86_64.tar.gz.sha256=830bc3dc38bdffc71693aed4e28817c305a32b3c7198e9284853631aab6dc624
+with-llvm-sdk-22.1.6-windows-x86_64.tar.gz.manifest=6ef4af37a583ba96881f4b16e3c43798397c8ece0be56d78f8d61c507c3b1c7c
 
 with-llvm-sdk-22.1.6-windows-aarch64.tar.gz.version=sdk-windows-aarch64
 with-llvm-sdk-22.1.6-windows-aarch64.tar.gz=ad13e07af474d683c699f041c52cd98697df9781b581dda913d39d92be186743

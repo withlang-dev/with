@@ -63,9 +63,9 @@ jobs:
         include:
           - arch: x86_64
             runner: windows-latest
-            seed_version: nightly-20260926-local-1-2e8defaa18ef
+            seed_version: nightly-20260930-local-1-6cd934e82b4d
             seed_asset: with-windows-x86_64.exe
-            seed_sha256: 52ae948ab3f7a677daf950b45f34fd9fa4b398081c8593519540f78c898d02f4
+            seed_sha256: af14aafe2c377707cdfd17c8b1b3db41b598e8e86b8b22518b41129b27d357db
             mesa_arch: x64
             mesa_sha256: 418f1938dc48d401538cf6440d3c718e2f456ef2023e44133105263f483e903f
           - arch: aarch64
@@ -651,20 +651,17 @@ jobs:
       # predated that fix; a compiler bootstrapped from it self-perpetuates the
       # miscompile and crashes (0xC0000005) compiling any regex literal at comptime.
       # build and :fixpoint never compile a regex, so that poison shipped green.
-      WITH_SEED_VERSION: nightly-20260926-local-1-2e8defaa18ef
+      WITH_SEED_VERSION: nightly-20260930-local-1-6cd934e82b4d
       WITH_SEED_ASSET: with-windows-x86_64.exe
-      WITH_SEED_SHA256: 52ae948ab3f7a677daf950b45f34fd9fa4b398081c8593519540f78c898d02f4
-      # The Windows LLVM SDK is versioned independently of the nightly-sdk-* used
-      # by darwin/linux and ships without .sha256/.manifest sidecars, so we pin the
-      # archive digest directly here rather than fetching sidecar files.
+      WITH_SEED_SHA256: af14aafe2c377707cdfd17c8b1b3db41b598e8e86b8b22518b41129b27d357db
+      # The windows-gnu SDK of sdk.lock (#1915): its own C runtime, so the
+      # job reads no Visual Studio and no Windows SDK. The archive digest is
+      # pinned here; the release republishes the verified archive as is.
       WITH_SDK_REPO: withlang-dev/with
-      WITH_SDK_VERSION: v0.15.1
-      WITH_SDK_ASSET: with-llvm-sdk-22.1.6-windows-x86_64.tar.zst
-      # What this job publishes: the same SDK under the .tar.gz name
-      # build.w's llvm_sdk_asset_for_host() looks for (see the repack in
-      # "Package fixpoint-verified release asset").
+      WITH_SDK_VERSION: nightly-sdk-20260930-6cd934e82b4d
+      WITH_SDK_ASSET: with-llvm-sdk-22.1.6-windows-x86_64.tar.gz
+      WITH_SDK_SHA256: a24652c52d9fb1aa32210b3d765f2c74e6b221648f7d891b73c879350d785bd7
       WITH_SDK_PUBLISH_ASSET: with-llvm-sdk-22.1.6-windows-x86_64.tar.gz
-      WITH_SDK_SHA256: 0c4f9860cf528b3821781d89e5b42947ef8ee2249327cffa64fb9fb5eac09a4a
       # windows-latest is a 4-vCPU runner; pin the worker pool to the real core
       # count (the seed's rt_sysinfo reads the wrong SYSTEM_INFO offset, which would
       # otherwise oversubscribe the pool). Honoured before the core probe.
@@ -693,14 +690,17 @@ jobs:
           mkdir -p .deps
           # git-bash GNU tar treats "D:\..." as host:path (the drive colon looks
           # like host:path), so keep the archive on an msys path.
-          sdk="$(cygpath -u "$RUNNER_TEMP")/sdk.tar.zst"
+          sdk="$(cygpath -u "$RUNNER_TEMP")/sdk.tar.gz"
           curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o "$sdk" \
             "https://github.com/$WITH_SDK_REPO/releases/download/$WITH_SDK_VERSION/$WITH_SDK_ASSET"
           printf '%s  %s\n' "$WITH_SDK_SHA256" "$sdk" | sha256sum -c -
-          tar --zstd -xf "$sdk" -C .deps
+          tar -xzf "$sdk" -C .deps
+          mkdir -p out/release
+          cp "$sdk" "out/release/$WITH_SDK_PUBLISH_ASSET"
           prefix=".deps/llvm-22.1.6-windows-x86_64-msvc"
-          test -f "$prefix/lib/libclang.lib" || { echo "SDK libclang.lib missing"; exit 1; }
+          test -f "$prefix/lib/libclang.a" || { echo "SDK libclang.a missing"; exit 1; }
           test -f "$prefix/bin/lld-link.exe" || { echo "SDK lld-link.exe missing"; exit 1; }
+          test -f "$prefix/libc/windows/include/stdio.h" || { echo "SDK C runtime missing"; exit 1; }
 
       - name: Fetch verified Windows seed
         run: |
@@ -718,15 +718,8 @@ jobs:
           # both the file APIs and lld-link accept).
           echo "WITH=$(cygpath -m "$PWD/src/main.exe")" >> "$GITHUB_ENV"
           echo "LLVM_PREFIX=$(cygpath -m "$PWD/.deps/llvm-22.1.6-windows-x86_64-msvc")" >> "$GITHUB_ENV"
-          # MSVC CRT + Windows SDK import libs (Link.w reads WITH_WINDOWS_{MSVC,UCRT,UM}_LIBDIR).
-          vswhere="/c/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe"
-          vs_root="$(cygpath -u "$("$vswhere" -latest -products '*' -property installationPath)")"
-          msvc_ver="$(ls "$vs_root/VC/Tools/MSVC" | sort -V | tail -1)"
-          echo "WITH_WINDOWS_MSVC_LIBDIR=$(cygpath -m "$vs_root/VC/Tools/MSVC/$msvc_ver/lib/x64")" >> "$GITHUB_ENV"
-          kit_root="/c/Program Files (x86)/Windows Kits/10/Lib"
-          kit_ver="$(ls "$kit_root" | sort -V | tail -1)"
-          echo "WITH_WINDOWS_UCRT_LIBDIR=$(cygpath -m "$kit_root/$kit_ver/ucrt/x64")" >> "$GITHUB_ENV"
-          echo "WITH_WINDOWS_UM_LIBDIR=$(cygpath -m "$kit_root/$kit_ver/um/x64")" >> "$GITHUB_ENV"
+          # The C runtime and every import library come from the SDK (#1915);
+          # nothing here names Visual Studio or a Windows SDK.
           echo "$PWD/.deps/llvm-22.1.6-windows-x86_64-msvc/bin" >> "$GITHUB_PATH"
 
       - name: Build seed to release compiler
@@ -834,21 +827,10 @@ jobs:
             { printf 'The With compiler for Windows (with-windows-x86_64.exe) statically links the mingw-w64\nruntime (startup and support code) from its LLVM SDK. Its notices follow.\n\n'; cat "$LLVM_PREFIX/libc/windows/COPYING.MinGW-w64-runtime.txt"; } > out/release/with-windows-x86_64-NOTICE.txt
             echo "WITH_NOTICE_FILES=,out/release/with-windows-x86_64-NOTICE.txt" >> "$GITHUB_ENV"
           fi
-          # Every release carries this platform's LLVM SDK too. `with build
+          # Every release carries this platform's LLVM SDK too: `with build
           # :deps` resolves the SDK from a release asset, so a release without
-          # one leaves a Windows box with no way to provision a toolchain --
-          # and no way to build the compiler at all. The unix matrix job
-          # republishes its SDK (RELEASE_EXTRA_FILES); this job fetched one and
-          # never republished it, so the newest Windows SDK on any release was
-          # v0.15.1's.
-          #
-          # Repacked as .tar.gz rather than passed through: the pinned source
-          # archive is .tar.zst, but build.w's llvm_sdk_asset_for_host() names
-          # a .tar.gz on every platform and the deps action decompresses with
-          # build/zlib_gunzip.w, which has no zstd. Publishing the .zst would
-          # put an asset on the release that `:deps` cannot name or unpack.
-          # The tree repacked is the one whose .zst digest was verified above.
-          tar -czf "out/release/$WITH_SDK_PUBLISH_ASSET" -C .deps llvm-22.1.6-windows-x86_64-msvc
+          # one leaves a Windows box with no way to provision a toolchain. The
+          # archive published is the one whose digest was verified above.
           sha256sum "out/release/$WITH_SDK_PUBLISH_ASSET" > "out/release/$WITH_SDK_PUBLISH_ASSET.sha256"
 
       - name: Verify packaged checksum

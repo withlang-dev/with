@@ -26,13 +26,16 @@ with-linux-x86_64.version=nightly-20260926-local-1-2e8defaa18ef
 with-linux-x86_64=ce5c3c4729650b215fb166ac8078fe7c7982b094bc4a1e31401e04eb7e7460d0
 with-linux-aarch64.version=v0.15.2.0
 with-linux-aarch64=3e54f7839dbf9549233a19753c897fb08f493fa8cfafeeec25b62fa87a43aac3
-# windows-x86_64 is main 2e8defaa, built natively on a Windows 10 VM by the
-# same ladder as linux-x86_64, from v0.15.2.1; the published binary builds
-# main from a fresh checkout to a stage2 == stage3 fixpoint. windows-aarch64
-# stays on v0.15.2.1: cross-built from ea377276 (v0.15.2.1 + the #1089
-# embed-slot fix), an intermediate seed the native windows-aarch64 lane
-# bootstraps and verifies.
-with-windows-x86_64.exe.version=nightly-20260926-local-1-2e8defaa18ef
-with-windows-x86_64.exe=52ae948ab3f7a677daf950b45f34fd9fa4b398081c8593519540f78c898d02f4
+# windows-x86_64 is win-own-sdk 6cd934e8 (#1915): the first seed that emits
+# x86_64-w64-windows-gnu and links against the SDK's own C runtime, with no
+# Visual Studio or Windows SDK. Built natively on win10 by a seed of the same
+# branch at bab6f634 (MSVC-emitting, SDK-aware link) with the windows-gnu SDK
+# of sdk.lock; that build reaches a stage2 == stage3 fixpoint over all 16
+# units, and the published binary is its fixpoint-verified release compiler.
+# windows-aarch64 stays on v0.15.2.1: cross-built from ea377276 (v0.15.2.1 +
+# the #1089 embed-slot fix), an intermediate seed the native windows-aarch64
+# lane bootstraps and verifies.
+with-windows-x86_64.exe.version=nightly-20260930-local-1-6cd934e82b4d
+with-windows-x86_64.exe=af14aafe2c377707cdfd17c8b1b3db41b598e8e86b8b22518b41129b27d357db
 with-windows-aarch64.exe.version=v0.15.2.1
 with-windows-aarch64.exe=bb3b17c64ad057ddc852a5ee6a61a4e4a224780447013699d490e6f726893c73
