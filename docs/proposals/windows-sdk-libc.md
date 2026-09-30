@@ -16,7 +16,7 @@ Under `<sdk>/libc/windows` (the sysroot clang's MinGW driver takes with
 | `<arch>-w64-mingw32/lib/crt2.o crtbegin.o crtend.o` | UCRT startup (`crt/crtexe.c`, `crt/crtbegin.c`, `crt/crtend.c`) | `:sdk-windows-libc` |
 | `<arch>-w64-mingw32/lib/mingw32.lib mingwex.lib uuid.lib` | the support libraries, from `mingw-w64-crt/Makefile.am`'s own source lists and flags | `:sdk-windows-libc` |
 | `<arch>-w64-mingw32/lib/ucrt.lib` (= `msvcrt.lib`) | the `api-ms-win-crt-*` import libraries and `libucrt_extra` wrappers, per `lib-common/ucrt.mri` | `:sdk-windows-libc` |
-| `<arch>-w64-mingw32/lib/<dll>.lib` | import libraries of the in-box DLLs the runtime and compiler use: kernel32 ntdll advapi32 bcrypt dbghelp ws2_32 shell32 user32 ole32 oleaut32 version psapi | `:sdk-windows-libc` (llvm-dlltool over mingw-w64's `.def` files) |
+| `<arch>-w64-mingw32/lib/<dll>.lib` | import libraries of the in-box DLLs the runtime and compiler use: kernel32 ntdll advapi32 bcrypt dbghelp ws2_32 shell32 user32 ole32 oleaut32 version psapi, and for the SDK's own cmake crypt32 secur32 iphlpapi powrprof | `:sdk-windows-libc` (llvm-dlltool over mingw-w64's `.def` files) |
 | `<arch>-w64-mingw32/lib/libc++.a libunwind.a`, `include/c++/v1` | the C++ runtime of the SDK's LLVM | `:sdk-libcxx` |
 | `COPYING* DISCLAIMER* PROVENANCE` | mingw-w64's licenses and this build's provenance | `:sdk-windows-libc` |
 
