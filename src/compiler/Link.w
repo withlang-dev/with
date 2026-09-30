@@ -554,9 +554,13 @@ fn link_stage_make_linux_own_sysroot_command(linker: &str, sysroot: &str, obj_pa
     if link_libs.len() > 0: args.push(link_stage_archive_group_marker(1, 0, 0))
     for i in 0..link_args.len() as i32:
         args.push(with_str_clone_ref(link_args[i]))
-    // libm, libc (glibc's script: libc.so.6, libc_nonshared, the dynamic
-    // linker), and compiler-rt where a gcc link has libgcc.
+    // libm, libpthread and libdl (separate libraries until glibc 2.34, and
+    // the sysroot targets 2.28), libc (glibc's script: libc.so.6,
+    // libc_nonshared, the dynamic linker), and compiler-rt where a gcc link
+    // has libgcc.
     args.push("-lm")
+    args.push("-lpthread")
+    args.push("-ldl")
     args.push("-lc")
     for rt in ["libclang_rt.builtins.a", "clang_rt.crtend.o", "crtn.o"]:
         args.push(lib ++ "/" ++ rt)
