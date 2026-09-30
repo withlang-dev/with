@@ -12262,7 +12262,18 @@ fn ci_cursor_kind_is_expression(kind: i32) -> bool:
     if kind == 100: return true
     false
 
+// A lowered statement's text, and whether it lowered at all: an empty
+// statement (`{}`, `(void)x;`) lowers to no text, which is not a failure.
+type CiTransStmt {
+    lowered: bool,
+    text: str,
+}
+
 fn ci_trans_stmt_via_ir(session: i64, cursor: i32, kind: i32, indent: i32, scope: CiScope) -> str:
+    var t = ci_trans_stmt_ir(session, cursor, kind, indent, scope)
+    move t.text
+
+fn ci_trans_stmt_ir(session: i64, cursor: i32, kind: i32, indent: i32, scope: CiScope) -> CiTransStmt:
     // Snapshot by LENGTH, not by clone: the registry is append-only inside
     // statement lowering (ci_temp_reset only runs at function entry), so the
     // failure path can truncate back. The old unconditional clone copied the
@@ -12290,7 +12301,7 @@ fn ci_trans_stmt_via_ir(session: i64, cursor: i32, kind: i32, indent: i32, scope
         exprs.deinit()
         types.deinit()
         // CXK_NULL_STMT and empty-bypass map to empty string.
-        return ""
+        return CiTransStmt { lowered: false, text: "" }
 
     // Target depth is the caller's indent level converted to
     // spaces. For simple single-line stmt kinds (break / continue
@@ -12309,7 +12320,7 @@ fn ci_trans_stmt_via_ir(session: i64, cursor: i32, kind: i32, indent: i32, scope
     stmts.deinit()
     exprs.deinit()
     types.deinit()
-    rendered
+    CiTransStmt { lowered: true, text: rendered }
 
 fn ci_location_path(loc: &str) -> str:
     if loc.len() == 0:
@@ -13191,11 +13202,19 @@ fn ci_try_translate_fn_body_at(session: i64, decl_idx: i32, found_cursor: i32) -
     // Goto-containing bodies are lowered by ci_lower_stmt_ir's
     // CXK_COMPOUND_STMT + ci_has_goto check, which builds a
     // CFG and emits stackified labeled blocks/loops.
-    let body = ci_trans_stmt_via_ir(session, body_cursor, with_ci_cursor_kind(session, body_cursor), 1, init_scope)
-    if body.len() == 0:
+    let body = ci_trans_stmt_ir(session, body_cursor, with_ci_cursor_kind(session, body_cursor), 1, init_scope)
+    if not body.lowered:
         return ""
+    // A void body with no statement — `{}`, or `{ (void)d; }` whose only
+    // statement discards a pure value — is `return`: an empty block is not a
+    // body, and "" is this function's failure answer. A non-void body with
+    // nothing to return has no translation.
+    if ci_trim(body.text).len() == 0:
+        if not (ret_type == "void" or ret_type == "Unit"):
+            return ""
+        return param_rebinds ++ "    return\n"
 
-    param_rebinds ++ body
+    param_rebinds ++ body.text
 
 // ── String helpers ──────────────────────────────────────────
 
