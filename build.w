@@ -411,6 +411,9 @@ fn run_cross_linux_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     if not fs.host_exists(cross_libcxx):
         ctx.diagnostics().error("cross-llvm-link-metadata: missing " ++ cross_libcxx ++ "; a linux SDK carries its own libc++ (build/sdk.w sdk_linux_runtimes)")
     ld_rsp = ld_rsp ++ comp_rsp_path(cross_libcxx) ++ "\n-lpthread\n-ldl\n-lm\n"
+    if not comp_sdk_has_clang_main(fs, lib_dir):
+        ctx.diagnostics().error("cross-llvm-link-metadata: the target SDK has no clang driver archive: " ++ lib_dir ++ "/libclangMain.a")
+    ld_rsp = ld_rsp ++ comp_clang_main_link_lines(true, "Linux", false, false)
     ld_rsp = ld_rsp ++ comp_wasm_backend_alias_lines(comp_sdk_has_wasm_backend(fs, lib_dir), "Linux", false)
     // #1915: the cross SDK's lld drivers, as the host link takes its own.
     let cross_lld = comp_sdk_lld_flavors(fs, lib_dir, "Linux")

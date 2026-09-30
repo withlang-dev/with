@@ -2674,6 +2674,25 @@ pub fn comp_lld_alias_lines(flavors: &Vec[str], target_os: &str, driver_form: bo
             out = out ++ (if driver_form: "-Wl,--defsym=" else: "--defsym=") ++ name ++ "=" ++ target ++ "\n"
     out
 
+// The C driver's plain entry point is the same on native and cross links;
+// only the target's C++ name mangling and linker spelling vary.
+pub fn comp_sdk_has_clang_main(fs: &ToolFs, llvm_lib_dir: &str) -> bool:
+    fs.host_exists(llvm_lib_dir ++ "/libclangMain.a") or fs.host_exists(llvm_lib_dir ++ "/clangMain.lib")
+
+pub fn comp_clang_main_link_lines(has_clang_main: bool, target_os: &str, windows_gnu_sdk: bool, driver_form: bool) -> str:
+    let itanium = if has_clang_main: "_Z10clang_mainiPPcRKN4llvm11ToolContextE" else: "with_alloc"
+    if target_os == "Macos":
+        if driver_form:
+            return "-Wl,-u,_" ++ itanium ++ "\n-Wl,-alias,_" ++ itanium ++ ",_with_clang_main\n"
+        return "-u\n_" ++ itanium ++ "\n-alias\n_" ++ itanium ++ "\n_with_clang_main\n"
+    if target_os == "Windows":
+        let target = if not has_clang_main: "with_alloc" else if windows_gnu_sdk: itanium else: "?clang_main@@YAHHPEAPEADAEBUToolContext@llvm@@@Z"
+        let prefix = if driver_form: "-Wl," else: ""
+        return prefix ++ "/include:" ++ target ++ "\n" ++ prefix ++ "/alternatename:with_clang_main=" ++ target ++ "\n"
+    if driver_form:
+        return "-Wl,-u," ++ itanium ++ "\n-Wl,--defsym=with_clang_main=" ++ itanium ++ "\n"
+    "-u\n" ++ itanium ++ "\n--defsym=with_clang_main=" ++ itanium ++ "\n"
+
 // #1915: `with __dsymutil` (src/compiler/DsymutilDriver.w) is LLVM's dsymutil
 // linked into a macOS compiler: `int dsymutil_main(int, char **, const
 // llvm::ToolContext &)` from the SDK's lib/libdsymutilMain.a (build/sdk.w
@@ -2841,19 +2860,9 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     // has, and ClangDriver.w tells the two apart by address and says that
     // this build has no C compiler. Each platform gains `with cc` when its SDK
     // is republished with the archive.
-    let has_clang_main = fs.host_exists(llvm_lib_dir ++ "/libclangMain.a") or fs.host_exists(llvm_lib_dir ++ "/clangMain.lib")
-    let clang_main_itanium = if has_clang_main: "_Z10clang_mainiPPcRKN4llvm11ToolContextE" else: "with_alloc"
-    if os() == "Macos":
-        rsp = rsp ++ "-Wl,-u,_" ++ clang_main_itanium ++ "\n-Wl,-alias,_" ++ clang_main_itanium ++ ",_with_clang_main\n"
-        ld_rsp = ld_rsp ++ "-u\n_" ++ clang_main_itanium ++ "\n-alias\n_" ++ clang_main_itanium ++ "\n_with_clang_main\n"
-    else if os() == "Linux":
-        rsp = rsp ++ "-Wl,-u," ++ clang_main_itanium ++ "\n-Wl,--defsym=with_clang_main=" ++ clang_main_itanium ++ "\n"
-        ld_rsp = ld_rsp ++ "-u\n" ++ clang_main_itanium ++ "\n--defsym=with_clang_main=" ++ clang_main_itanium ++ "\n"
-    else if os() == "Windows":
-        // A windows-gnu SDK's clang_main has the Itanium spelling (#1915).
-        let clang_main_msvc = if not has_clang_main: "with_alloc" else if windows_gnu_sdk: clang_main_itanium else: "?clang_main@@YAHHPEAPEADAEBUToolContext@llvm@@@Z"
-        rsp = rsp ++ "-Wl,/include:" ++ clang_main_msvc ++ "\n-Wl,/alternatename:with_clang_main=" ++ clang_main_msvc ++ "\n"
-        ld_rsp = ld_rsp ++ "/include:" ++ clang_main_msvc ++ "\n/alternatename:with_clang_main=" ++ clang_main_msvc ++ "\n"
+    let has_clang_main = comp_sdk_has_clang_main(fs, llvm_lib_dir)
+    rsp = rsp ++ comp_clang_main_link_lines(has_clang_main, os(), windows_gnu_sdk, true)
+    ld_rsp = ld_rsp ++ comp_clang_main_link_lines(has_clang_main, os(), windows_gnu_sdk, false)
     // An SDK built without the WebAssembly backend (every SDK published before
     // the wasm32 target) has no LLVMInitializeWebAssembly* entry points. The
     // compiler still links: each is aliased to a bridge no-op, and
