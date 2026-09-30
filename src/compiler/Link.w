@@ -671,6 +671,11 @@ pub fn link_stage_windows_c_target_uses_sdk_libc() -> bool:
 // The Windows libc c_import reads for this compilation: the SDK's (the same
 // one the link will read), "" when the target is not Windows x86_64 or the
 // SDK carries none.
+// The LLVM SDK directory a link reads, from the lld it runs; "" when none.
+pub fn link_stage_windows_sdk_dir() -> str:
+    let ld = link_stage_llvm_ld_path()
+    if ld.len() == 0: "" else: link_stage_sdk_dir_of(ld)
+
 pub fn link_stage_windows_libc_root() -> str:
     if not link_stage_windows_c_target_uses_sdk_libc():
         return ""
@@ -716,6 +721,25 @@ fn link_stage_windows_system_libs() -> Vec[str]:
     // GUID_NULL, IID_* and the other GUIDs windows.h declares extern.
     names.push("uuid.lib")
     names
+
+// A `link:` name on the SDK recipe, found as clang's MinGW driver finds `-l`
+// (lld MinGW's search order): lib<name>.a, <name>.lib, lib<name>.lib,
+// <name>.a in each search path, the extras' -L paths first, then the SDK's
+// libc. A library `with get` builds from source on Windows is a GNU-named
+// archive (libbz2.a), so `bz2` names it (#1915). A name found nowhere stays
+// `<name>.lib`, and lld says it could not open it.
+fn link_stage_windows_find_lib(name: &str, libc_dir: &str, extras: &Vec[str]) -> str:
+    var dirs: Vec[str] = Vec.new()
+    for i in 0..extras.len() as i32:
+        if extras[i].starts_with("-L"):
+            dirs.push(extras[i].slice(2, extras[i].len()))
+    dirs.push(with_str_clone_ref(libc_dir))
+    for d in dirs:
+        for candidate in ["lib" ++ name ++ ".a", name ++ ".lib", "lib" ++ name ++ ".lib", name ++ ".a"]:
+            let path = d ++ "/" ++ candidate
+            if link_stage_file_exists(path):
+                return path
+    name ++ ".lib"
 
 fn link_stage_make_windows_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_path: &str, extras: &Vec[str], link_libs: &Vec[str], link_args: &Vec[str]) -> LinkStageCommand:
     let args: Vec[str] = Vec.new()
@@ -785,7 +809,7 @@ fn link_stage_make_windows_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_
         if lib.ends_with(".lib"):
             args.push(with_str_clone_ref(lib))
         else if not link_stage_windows_lib_is_crt_implicit(lib):
-            args.push(lib ++ ".lib")
+            args.push(if sdk_libc: link_stage_windows_find_lib(lib, libc_dir, extras) else: lib ++ ".lib")
         // else: `m` (libm) and `c` (libc) are Unix-only spellings — Windows has
         // no `m.lib`/`c.lib`, and their symbols (cos, abs, strlen, …) resolve
         // from the C runtime already linked below. Emitting a bare
