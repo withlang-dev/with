@@ -548,6 +548,31 @@ pub fn run_package_bootstrap_c_action(ctx: ActionCtx) -> i32:
     if rc != 0: return rc
     pkg_write_archive(ctx, compiler_path, stage_root, top_dir, output_path)
 
+// The release asset beside a Windows compiler: `<asset>-NOTICE.txt`, the
+// mingw-w64 runtime notice (#1915; Eric, 2026-09-30: "ship the notice with
+// the release"). A compiler linked from a windows-gnu SDK (lib/libclang.a)
+// carries mingw-w64's startup and support code, whose ZPL 2.1 and BSD-style
+// licenses require their notices in a binary distribution; they are
+// COPYING.MinGW-w64-runtime.txt, which the SDK's libc ships. A compiler
+// linked from a Visual Studio-built SDK contains none of it, and has no
+// notice to ship.
+fn pkg_notice_asset(asset: &str) -> str:
+    let stem = if asset.ends_with(".exe"): asset.slice(0, asset.len() - 4) else: asset.clone()
+    stem ++ "-NOTICE.txt"
+
+fn pkg_write_windows_notice(ctx: &ActionCtx, asset: &str, platform: &str, llvm_prefix: &str) -> i32:
+    if platform != "windows-x86_64" and platform != "windows-aarch64":
+        return 0
+    let fs = ctx.fs()
+    if not fs.host_exists(llvm_prefix ++ "/lib/libclang.a"):
+        return 0
+    let notice = llvm_prefix ++ "/libc/windows/COPYING.MinGW-w64-runtime.txt"
+    if not fs.host_exists(notice):
+        return pkg_fail(ctx, "the compiler links the SDK's mingw-w64 runtime but the SDK carries no notice to ship with it: " ++ notice)
+    let text = "The With compiler for Windows (" ++ asset ++ ") statically links the mingw-w64\n" ++
+        "runtime (startup and support code) from its LLVM SDK. Its notices follow.\n\n" ++ fs.host_read_text(notice)
+    pkg_write_text(ctx, pkg_join("out/release", pkg_notice_asset(asset)), text)
+
 pub fn run_package_platform_release_action(ctx: ActionCtx) -> i32:
     let args = ctx.args()
     if args.len() < 4:
@@ -584,6 +609,8 @@ pub fn run_package_platform_release_action(ctx: ActionCtx) -> i32:
     rc = pkg_check_dynamic_dependencies(ctx, asset_path, platform, "after-strip")
     if rc != 0: return rc
     rc = pkg_write_release_checksum(ctx, asset_path)
+    if rc != 0: return rc
+    rc = pkg_write_windows_notice(ctx, asset, platform, args.get(3))
     if rc != 0: return rc
     let output = ctx.output()
     if output.len() > 0:
