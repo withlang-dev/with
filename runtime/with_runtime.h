@@ -153,6 +153,10 @@ with_str with_fmt_u64(uint64_t n);
 with_str with_fmt_int_spec(int64_t val, int32_t is_unsigned,
                            int64_t flags, int32_t width,
                            int32_t precision, int32_t mode);
+with_str with_fmt_int128(uint64_t lo, uint64_t hi, int32_t is_unsigned);
+with_str with_fmt_int128_spec(uint64_t lo, uint64_t hi, int32_t is_unsigned,
+                              int64_t flags, int32_t width,
+                              int32_t precision, int32_t mode);
 with_str with_fmt_f64(double n);
 with_str with_fmt_f64_spec(double val, int64_t flags, int32_t width,
                            int32_t precision, int32_t mode);

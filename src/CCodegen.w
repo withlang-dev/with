@@ -1407,7 +1407,7 @@ impl CCodegen:
         if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
             return "with_fmt_i64((int64_t)(intptr_t)(" ++ expr ++ "))"
         if tk == TypeKind.TY_INT:
-            return "with_fmt_i64((int64_t)(" ++ expr ++ "))"
+            return self.debug_int_format_expr(resolved as i32, expr)
         if (tk == TypeKind.TY_ENUM or tk == TypeKind.TY_GENERIC_INST) and self.type_is_payload_enum(resolved as i32) != 0:
             return self.payload_enum_format_expr(resolved as i32, expr, context)
         // A payload with no default display shows its Debug form (D61).
@@ -1492,12 +1492,31 @@ impl CCodegen:
             resolved = self.sema.resolve_alias(self.sema.get_type_d0(resolved as TypeId)) as i32
         self.sema.debug_fmt_is_inline(self.sema.get_type_kind(resolved as TypeId)) or self.sema.debug_fmt_index.contains(resolved)
 
-    // An integer's decimal text by its signedness, as the LLVM backend's
-    // with_fmt_u32/u64 choice formats it: a u64 above i64::MAX is positive.
+    // An integer's decimal text at its own width and signedness, as the LLVM
+    // backend formats it: a u64 above i64::MAX is positive, and a 128-bit
+    // value keeps both words (#1922).
     fn debug_int_format_expr(resolved: i32, expr: &str) -> str:
+        let unsigned_flag = if self.sema.get_type_d1(resolved as TypeId) == 0: "1" else: "0"
+        if self.sema.get_type_d0(resolved as TypeId) == 128:
+            return f"with_fmt_int128((uint64_t)({expr}), (uint64_t)(((unsigned __int128)({expr})) >> 64), {unsigned_flag})"
         if self.sema.get_type_d1(resolved as TypeId) == 0:
             return "with_fmt_u64((uint64_t)(" ++ expr ++ "))"
         "with_fmt_i64((int64_t)(" ++ expr ++ "))"
+
+    // The value and signedness arguments an integer spec formatter takes,
+    // and which one: with_fmt_int_spec / with_fmt_buf_write_i64_spec take the
+    // value extended to 64 bits by its own signedness, the int128 forms its
+    // two words (#1922).
+    fn int_spec_value_args(resolved: i32, expr: &str) -> str:
+        let unsigned_flag = if self.sema.get_type_kind(resolved as TypeId) == TypeKind.TY_INT and self.sema.get_type_d1(resolved as TypeId) == 0: "1" else: "0"
+        if self.sema.get_type_kind(resolved as TypeId) == TypeKind.TY_INT and self.sema.get_type_d0(resolved as TypeId) == 128:
+            return f"(uint64_t)({expr}), (uint64_t)(((unsigned __int128)({expr})) >> 64), {unsigned_flag}"
+        if unsigned_flag == "1":
+            return f"(int64_t)(uint64_t)({expr}), 1"
+        f"(int64_t)({expr}), 0"
+
+    fn int_spec_is_128(resolved: i32) -> bool:
+        self.sema.get_type_kind(resolved as TypeId) == TypeKind.TY_INT and self.sema.get_type_d0(resolved as TypeId) == 128
 
     fn fn_type_c_name(tid: i32) -> str:
         let resolved = self.sema.resolve_alias(tid)
@@ -7697,7 +7716,8 @@ impl CCodegen:
             else if tk == TypeKind.TY_STR:
                 out = out ++ "    with_fmt_buf_write_str_spec_ref((uint8_t*)(" ++ buf ++ "), " ++ val ++ ", (int64_t)(" ++ flags ++ "), (int32_t)(" ++ width ++ "), (int32_t)(" ++ precision ++ "));\n"
             else:
-                out = out ++ "    with_fmt_buf_write_i64_spec((uint8_t*)(" ++ buf ++ "), (int64_t)(" ++ val ++ "), 0, (int64_t)(" ++ flags ++ "), (int32_t)(" ++ width ++ "), (int32_t)(" ++ precision ++ "), (int32_t)(((" ++ flags ++ ") & 255)));\n"
+                let spec_fn = if self.int_spec_is_128(resolved as i32): "with_fmt_buf_write_int128_spec" else: "with_fmt_buf_write_i64_spec"
+                out = out ++ "    " ++ spec_fn ++ "((uint8_t*)(" ++ buf ++ "), " ++ self.int_spec_value_args(resolved as i32, val) ++ ", (int64_t)(" ++ flags ++ "), (int32_t)(" ++ width ++ "), (int32_t)(" ++ precision ++ "), (int32_t)(((" ++ flags ++ ") & 255)));\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 
@@ -7737,19 +7757,24 @@ impl CCodegen:
                     out_enum = out_enum ++ "    (void)(" ++ fmt_expr ++ ");\n"
                 out_enum = out_enum ++ f"    goto bb{next_bb};"
                 return out_enum
-            let fmt_fn = if tk == TypeKind.TY_STR: "with_fmt_str_ref"
-                else if tk == TypeKind.TY_BOOL: "with_fmt_bool"
-                else if tk == TypeKind.TY_FLOAT: "with_fmt_f64"
-                else: "with_fmt_i64"
-            let cast_prefix = if tk == TypeKind.TY_FLOAT: "(double)("
-                else if tk == TypeKind.TY_BOOL: "(int32_t)("
-                else if tk == TypeKind.TY_STR: "("
-                else: "(int64_t)("
+            var fmt_call = ""
+            if tk == TypeKind.TY_INT:
+                fmt_call = self.debug_int_format_expr(resolved as i32, val_text)
+            else:
+                let fmt_fn = if tk == TypeKind.TY_STR: "with_fmt_str_ref"
+                    else if tk == TypeKind.TY_BOOL: "with_fmt_bool"
+                    else if tk == TypeKind.TY_FLOAT: "with_fmt_f64"
+                    else: "with_fmt_i64"
+                let cast_prefix = if tk == TypeKind.TY_FLOAT: "(double)("
+                    else if tk == TypeKind.TY_BOOL: "(int32_t)("
+                    else if tk == TypeKind.TY_STR: "("
+                    else: "(int64_t)("
+                fmt_call = fmt_fn ++ "(" ++ cast_prefix ++ val_text ++ "))"
             var out = ""
             if has_ret != 0:
-                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = " ++ fmt_fn ++ "(" ++ cast_prefix ++ val_text ++ "));\n"
+                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = " ++ fmt_call ++ ";\n"
             else:
-                out = out ++ "    (void)" ++ fmt_fn ++ "(" ++ cast_prefix ++ val_text ++ "));\n"
+                out = out ++ "    (void)" ++ fmt_call ++ ";\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 
@@ -7811,7 +7836,8 @@ impl CCodegen:
                 else if tk == TypeKind.TY_STR:
                     out = out ++ "    " ++ dst ++ " = with_fmt_str_spec_ref(" ++ val_text ++ ", (int64_t)(" ++ flags_text ++ "), (int32_t)(" ++ width_text ++ "), (int32_t)(" ++ prec_text ++ "));\n"
                 else:
-                    out = out ++ "    " ++ dst ++ " = with_fmt_int_spec((int64_t)(" ++ val_text ++ "), 0, (int64_t)(" ++ flags_text ++ "), (int32_t)(" ++ width_text ++ "), (int32_t)(" ++ prec_text ++ "), (int32_t)(" ++ mode_text ++ "));\n"
+                    let spec_fn = if self.int_spec_is_128(resolved as i32): "with_fmt_int128_spec" else: "with_fmt_int_spec"
+                    out = out ++ "    " ++ dst ++ " = " ++ spec_fn ++ "(" ++ self.int_spec_value_args(resolved as i32, val_text) ++ ", (int64_t)(" ++ flags_text ++ "), (int32_t)(" ++ width_text ++ "), (int32_t)(" ++ prec_text ++ "), (int32_t)(" ++ mode_text ++ "));\n"
             else:
                 out = out ++ "    (void)0;\n"
             out = out ++ f"    goto bb{next_bb};"
@@ -10173,6 +10199,7 @@ impl CCodegen:
         out.write("extern void with_fmt_buf_write_str_ref(uint8_t*, with_str);\n")
         out.write("extern with_str with_str_clone_ref(with_str);\n")
         out.write("extern void with_fmt_buf_write_i64_spec(uint8_t*, int64_t, int32_t, int64_t, int32_t, int32_t, int32_t);\n")
+        out.write("extern void with_fmt_buf_write_int128_spec(uint8_t*, uint64_t, uint64_t, int32_t, int64_t, int32_t, int32_t, int32_t);\n")
         out.write("extern void with_fmt_buf_write_f64_spec(uint8_t*, double, int64_t, int32_t, int32_t, int32_t);\n")
         out.write("extern void with_fmt_buf_write_str_spec_ref(uint8_t*, with_str, int64_t, int32_t, int32_t);\n")
         out.write("extern with_str with_fmt_buf_finish(uint8_t*);\n")

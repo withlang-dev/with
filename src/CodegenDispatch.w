@@ -2838,6 +2838,15 @@ impl Codegen:
     mut fn coerce_val_to_str(val: i64, str_ty: i64) -> i64:
         self.coerce_val_to_str_ext(val, str_ty, false)
 
+    // One 64-bit word of a 128-bit integer: the runtime's 128-bit formatters
+    // take the low and high words, so no target's i128 convention is
+    // involved (#1922).
+    mut fn int128_word(val: i64, high: bool) -> i64:
+        let i64_ty = wl_i64_type(self.context)
+        if not high: return wl_build_trunc(self.builder, val, i64_ty)
+        let shifted = wl_build_lshr(self.builder, val, wl_const_int(wl_type_of(val), 64, 0))
+        wl_build_trunc(self.builder, shifted, i64_ty)
+
     // Like coerce_val_to_str, but formats integers as unsigned when is_unsigned is
     // set — routing to with_fmt_u32/with_fmt_u64 and zero-extending sub-width
     // values, so a u32/u64 prints its unsigned value rather than the signed
@@ -2857,6 +2866,19 @@ impl Codegen:
             else if bit_w <= 32:
                 fn_name = if is_unsigned: "with_fmt_u32" else: "with_fmt_i32"
                 coerced = self.coerce_int_ext(val, wl_i32_type(self.context), is_unsigned)
+            else if bit_w > 64:
+                // #1922: a 128-bit value keeps both words.
+                let i32_ty = wl_i32_type(self.context)
+                let i64_ty = wl_i64_type(self.context)
+                let pts: Vec[i64] = Vec.new()
+                pts.push(i64_ty)
+                pts.push(i64_ty)
+                pts.push(i32_ty)
+                let a: Vec[i64] = Vec.new()
+                a.push(self.int128_word(val, false))
+                a.push(self.int128_word(val, true))
+                a.push(wl_const_int(i32_ty, if is_unsigned: 1 else: 0, 0))
+                return self.call_internal_runtime_fn("with_fmt_int128", pts, a, 3, str_ty)
             else:
                 fn_name = if is_unsigned: "with_fmt_u64" else: "with_fmt_i64"
                 arg_ty = wl_i64_type(self.context)
@@ -3024,7 +3046,7 @@ impl Codegen:
             // bit (19) of the f-string spec flags, mode 'x' — as emit-C
             // formats it.
             let addr = wl_build_ptr_to_int(self.builder, val, wl_i64_type(self.context))
-            return self.gen_fmt_with_spec(addr, 1 << 19, 0, 0, 'x' as i32, str_ty)
+            return self.gen_fmt_with_spec(addr, true, 1 << 19, 0, 0, 'x' as i32, str_ty)
         if tk == TypeKind.TY_INT or tk == TypeKind.TY_FLOAT or tk == TypeKind.TY_BOOL:
             return self.coerce_val_to_str_ext(val, str_ty, self.mir_sema_type_is_unsigned(sema_ty))
         self.call_debug_formatter(val, sema_ty, str_ty)
@@ -3153,18 +3175,39 @@ impl Codegen:
         wl_position_at_end(self.builder, merge_bb)
         wl_build_load(self.builder, str_ty, result_ptr)
 
-    mut fn gen_fmt_with_spec(val: i64, flags: i32, width: i32, precision: i32, mode: i32, str_ty: i64) -> i64:
+    // `is_unsigned` is Sema's signedness of the value's type (the FMT_SPEC
+    // intrinsic carries the type id): an unsigned or narrow value keeps its
+    // own width, never a sign-extended 64-bit reading (#1922).
+    mut fn gen_fmt_with_spec(val: i64, is_unsigned: bool, flags: i32, width: i32, precision: i32, mode: i32, str_ty: i64) -> i64:
         // Dispatch to runtime with_fmt_*_spec based on LLVM value type.
         let val_ty = wl_type_of(val)
         let vk = wl_get_type_kind(val_ty)
         let i32_ty = wl_i32_type(self.context)
         let i64_ty = wl_i64_type(self.context)
 
+        if vk == wl_integer_type_kind() and wl_get_int_type_width(val_ty) > 64:
+            let pts: Vec[i64] = Vec.new()
+            pts.push(i64_ty)
+            pts.push(i64_ty)
+            pts.push(i32_ty)
+            pts.push(i64_ty)
+            pts.push(i32_ty)
+            pts.push(i32_ty)
+            pts.push(i32_ty)
+            let a: Vec[i64] = Vec.new()
+            a.push(self.int128_word(val, false))
+            a.push(self.int128_word(val, true))
+            a.push(wl_const_int(i32_ty, if is_unsigned: 1 else: 0, 0))
+            a.push(wl_const_int(i64_ty, flags as i64, 0))
+            a.push(wl_const_int(i32_ty, width as i64, 0))
+            a.push(wl_const_int(i32_ty, precision as i64, 0))
+            a.push(wl_const_int(i32_ty, mode as i64, 0))
+            return self.call_internal_runtime_fn("with_fmt_int128_spec", pts, a, 7, str_ty)
+
         if vk == wl_integer_type_kind():
-            let bit_w = wl_get_int_type_width(val_ty)
             // Integer spec: with_fmt_int_spec(val, is_unsigned, flags, width, precision, mode)
-            var coerced_val = self.coerce_int_ext(val, i64_ty, false)
-            let is_unsigned = 0
+            var coerced_val = self.coerce_int_ext(val, i64_ty, is_unsigned)
+            let unsigned_flag: i64 = if is_unsigned: 1 else: 0
             let fn_name = "with_fmt_int_spec"
             let sym = self.intern.intern(fn_name)
             let fv = self.fn_values.get(sym)
@@ -3174,7 +3217,7 @@ impl Codegen:
                 let fn_type: i64 = ft.unwrap()
                 let a: Vec[i64] = Vec.new()
                 a.push(coerced_val)
-                a.push(wl_const_int(i32_ty, is_unsigned as i64, 0))
+                a.push(wl_const_int(i32_ty, unsigned_flag, 0))
                 a.push(wl_const_int(i64_ty, flags as i64, 0))
                 a.push(wl_const_int(i32_ty, width as i64, 0))
                 a.push(wl_const_int(i32_ty, precision as i64, 0))
@@ -3189,7 +3232,7 @@ impl Codegen:
             pts.push(i32_ty)
             let a: Vec[i64] = Vec.new()
             a.push(coerced_val)
-            a.push(wl_const_int(i32_ty, is_unsigned as i64, 0))
+            a.push(wl_const_int(i32_ty, unsigned_flag, 0))
             a.push(wl_const_int(i64_ty, flags as i64, 0))
             a.push(wl_const_int(i32_ty, width as i64, 0))
             a.push(wl_const_int(i32_ty, precision as i64, 0))
@@ -3402,17 +3445,44 @@ impl Codegen:
         args.push(s)
         self.build_call_fn_value(ft_sym, func, ft, -1, 0, args, 1, "with_str_clone_ref", 0)
 
-    mut fn gen_fmt_buf_write_fmt(buf: i64, val: i64, flags: i32, width: i32, precision: i32, mode: i32):
+    // `is_unsigned` as for gen_fmt_with_spec: Sema's signedness of the
+    // value's type, from the FMT_BUF_WRITE_FMT intrinsic (#1922).
+    mut fn gen_fmt_buf_write_fmt(buf: i64, val: i64, is_unsigned: bool, flags: i32, width: i32, precision: i32, mode: i32):
         // Dispatch by LLVM type: integer → i64_spec, float → f64_spec, string → str_spec
         let val_ty = wl_type_of(val)
         let vk = wl_get_type_kind(val_ty)
         let ptr_ty = wl_ptr_type(self.context)
         let i32_ty = wl_i32_type(self.context)
         let i64_ty = wl_i64_type(self.context)
+        let unsigned_flag: i64 = if is_unsigned: 1 else: 0
 
-        if vk == wl_integer_type_kind():
+        if vk == wl_integer_type_kind() and wl_get_int_type_width(val_ty) > 64:
+            let pts: Vec[i64] = Vec.new()
+            pts.push(ptr_ty)
+            pts.push(i64_ty)
+            pts.push(i64_ty)
+            pts.push(i32_ty)
+            pts.push(i64_ty)
+            pts.push(i32_ty)
+            pts.push(i32_ty)
+            pts.push(i32_ty)
+            let func = self.ensure_fmt_buf_fn("with_fmt_buf_write_int128_spec", pts, 8, wl_void_type(self.context))
+            let ft_sym = self.intern.intern("with_fmt_buf_write_int128_spec")
+            let ft = self.fn_fn_types.get(ft_sym).unwrap() as i64
+            let args: Vec[i64] = Vec.new()
+            args.push(buf)
+            args.push(self.int128_word(val, false))
+            args.push(self.int128_word(val, true))
+            args.push(wl_const_int(i32_ty, unsigned_flag, 0))
+            args.push(wl_const_int(i64_ty, flags as i64, 0))
+            args.push(wl_const_int(i32_ty, width as i64, 0))
+            args.push(wl_const_int(i32_ty, precision as i64, 0))
+            args.push(wl_const_int(i32_ty, mode as i64, 0))
+            self.build_call_fn_value(ft_sym, func, ft, -1, 0, args, 8, "with_fmt_buf_write_int128_spec", 0)
+
+        else if vk == wl_integer_type_kind():
             // Integer: with_fmt_buf_write_i64_spec(buf, val, is_unsigned, flags, width, precision, mode)
-            let coerced = self.coerce_int_ext(val, i64_ty, false)
+            let coerced = self.coerce_int_ext(val, i64_ty, is_unsigned)
             let pts: Vec[i64] = Vec.new()
             pts.push(ptr_ty)
             pts.push(i64_ty)
@@ -3427,7 +3497,7 @@ impl Codegen:
             let args: Vec[i64] = Vec.new()
             args.push(buf)
             args.push(coerced)
-            args.push(wl_const_int(i32_ty, 0, 0))  // is_unsigned
+            args.push(wl_const_int(i32_ty, unsigned_flag, 0))
             args.push(wl_const_int(i64_ty, flags as i64, 0))
             args.push(wl_const_int(i32_ty, width as i64, 0))
             args.push(wl_const_int(i32_ty, precision as i64, 0))
@@ -11913,7 +11983,7 @@ impl Codegen:
             let sp_width = wl_const_int_sext_val(sp_width_v) as i32
             let sp_prec = wl_const_int_sext_val(sp_prec_v) as i32
             let sp_mode = sp_flags & 255
-            result = self.gen_fmt_with_spec(sp_val, sp_flags, sp_width, sp_prec, sp_mode, sp_str_ty)
+            result = self.gen_fmt_with_spec(sp_val, self.mir_sema_type_is_unsigned(wl_const_int_sext_val(sp_type_v) as i32), sp_flags, sp_width, sp_prec, sp_mode, sp_str_ty)
 
         // ── FmtBuffer intrinsics (f-string formatting via buffer) ────
         else if intrinsic == MirIntrinsic.FMT_BUF_NEW:
@@ -11948,7 +12018,7 @@ impl Codegen:
             let fb_width = wl_const_int_sext_val(fb_width_v) as i32
             let fb_prec = wl_const_int_sext_val(fb_prec_v) as i32
             let fb_mode = fb_flags & 255
-            self.gen_fmt_buf_write_fmt(fb_buf, fb_val, fb_flags, fb_width, fb_prec, fb_mode)
+            self.gen_fmt_buf_write_fmt(fb_buf, fb_val, self.mir_sema_type_is_unsigned(wl_const_int_sext_val(fb_type_v) as i32), fb_flags, fb_width, fb_prec, fb_mode)
             result = wl_const_int(wl_i32_type(self.context), 0, 0)
 
         else if intrinsic == MirIntrinsic.FMT_BUF_FINISH:

@@ -2161,6 +2161,42 @@ fn u64_base_to_buf(n_arg: u64, base: i32, uppercase: i32, buf: *mut u8) -> i64:
     rt_memcpy(buf, (&raw const tmp as i64 + (pos + 1) as i64) as *const u8, len)
     len
 
+// Write the 128-bit unsigned value hi:lo in `base` (2..16) to buf, return its
+// length (#1922). Long division by the base over four 32-bit limbs, so no
+// 128-bit division helper is needed on any target.
+fn u128_base_to_buf(lo_arg: u64, hi_arg: u64, base: i32, uppercase: i32, buf: *mut u8) -> i64:
+    let lower = "0123456789abcdef" as *const u8
+    let upper = "0123456789ABCDEF" as *const u8
+    let digits = if uppercase != 0: upper else: lower
+    var tmp: [130]u8 = [0 as u8; 130]
+    var pos: i32 = 129
+    let mask: u64 = 0xffffffff
+    let b = base as u64
+    var l3 = hi_arg >> 32
+    var l2 = hi_arg & mask
+    var l1 = lo_arg >> 32
+    var l0 = lo_arg & mask
+    if l3 == 0 and l2 == 0 and l1 == 0 and l0 == 0:
+        tmp[pos] = 48
+        pos = pos - 1
+    while l3 != 0 or l2 != 0 or l1 != 0 or l0 != 0:
+        var r = l3 % b
+        l3 = l3 / b
+        var cur = (r << 32) | l2
+        l2 = cur / b
+        r = cur % b
+        cur = (r << 32) | l1
+        l1 = cur / b
+        r = cur % b
+        cur = (r << 32) | l0
+        l0 = cur / b
+        r = cur % b
+        tmp[pos] = unsafe digits[r as i64]
+        pos = pos - 1
+    let len = 129 - pos as i64
+    rt_memcpy(buf, (&raw const tmp as i64 + (pos + 1) as i64) as *const u8, len)
+    len
+
 // ── with_fmt_* functions ───────────────────────────────────────────
 
 pub fn with_fmt_i32(n: i32) -> str:
@@ -2381,33 +2417,61 @@ fn pad_str(content: *const u8, clen: i64, width: i64, fill_char: i32, align_mode
 
 // ── with_fmt_int_spec ──────────────────────────────────────────────
 
+// Mode is ASCII char: 'd'=100, 'x'=120, 'X'=88, 'b'=98, 'o'=111
+fn fmt_spec_base(mode: i32) -> i32:
+    if mode == 120 or mode == 88: return 16
+    if mode == 98: return 2
+    if mode == 111: return 8
+    10
+
+// A 64-bit integer under a spec: `val_arg` holds the value's bits, extended
+// to 64 by the caller as its type's signedness says (zero for unsigned).
 pub fn with_fmt_int_spec(val_arg: i64, is_unsigned: i32, flags: i64, width: i32, precision: i32, mode: i32) -> str:
     let _ = precision
+    let bits = val_arg as u64
+    // A negative decimal prints its magnitude after '-'; ~x + 1 cannot
+    // overflow for a negative x, i64::MIN included (#1922).
+    if is_unsigned == 0 and val_arg < 0 and fmt_spec_base(mode) == 10:
+        return fmt_int_spec_parts(~bits + 1, 0, true, true, flags, width, mode)
+    fmt_int_spec_parts(bits, 0, false, is_unsigned == 0, flags, width, mode)
+
+// A 128-bit integer under a spec, passed as its low and high 64-bit words
+// so no target's 128-bit calling convention is involved (#1922).
+pub fn with_fmt_int128_spec(lo: u64, hi: u64, is_unsigned: i32, flags: i64, width: i32, precision: i32, mode: i32) -> str:
+    let _ = precision
+    if is_unsigned == 0 and (hi >> 63) != 0 and fmt_spec_base(mode) == 10:
+        // Two's-complement negation of hi:lo, with the carry out of the low
+        // word; neither add overflows for a negative value.
+        if lo == 0:
+            return fmt_int_spec_parts(0, ~hi + 1, true, true, flags, width, mode)
+        return fmt_int_spec_parts(~lo + 1, ~hi, true, true, flags, width, mode)
+    fmt_int_spec_parts(lo, hi, false, is_unsigned == 0, flags, width, mode)
+
+pub fn with_fmt_int128(lo: u64, hi: u64, is_unsigned: i32) -> str:
+    with_fmt_int128_spec(lo, hi, is_unsigned, 0, 0, 0, 100)
+
+pub fn with_fmt_buf_write_int128_spec(b: *mut u8, lo: u64, hi: u64, is_unsigned: i32, flags: i64, width: i32, precision: i32, mode: i32):
+    let s = with_fmt_int128_spec(lo, hi, is_unsigned, flags, width, precision, mode)
+    with_fmt_buf_write_str_ref(b, s)
+
+// The body of every integer spec: hi:lo is the value the digits spell (its
+// magnitude when `negative`), and `signed` says whether a sign may be shown.
+fn fmt_int_spec_parts(lo: u64, hi: u64, negative: bool, signed: bool, flags: i64, width: i32, mode: i32) -> str:
     let fill_char = ((flags >> 8) & 255) as i32
     let align_mode = ((flags >> 16) & 3) as i32
     let sign_plus = ((flags >> 18) & 1) as i32
     let alternate_form = ((flags >> 19) & 1) as i32
     let zero_pad = ((flags >> 20) & 1) as i32
 
-    var buf: [80]u8 = [0 as u8; 80]
+    var buf: [140]u8 = [0 as u8; 140]
     var len: i64 = 0
-    var val = val_arg
-
-    // Mode is ASCII char: 'd'=100, 'x'=120, 'X'=88, 'b'=98, 'o'=111
-    var base: i32 = 10
-    if mode == 120 or mode == 88:  // 'x' or 'X'
-        base = 16
-    else if mode == 98:  // 'b'
-        base = 2
-    else if mode == 111:  // 'o'
-        base = 8
+    let base = fmt_spec_base(mode)
 
     // Sign handling
-    if base == 10 and is_unsigned == 0:
-        if val < 0:
+    if base == 10 and signed:
+        if negative:
             buf[len] = 45  // '-'
             len = len + 1
-            val = 0 - val
         else if sign_plus != 0:
             buf[len] = 43  // '+'
             len = len + 1
@@ -2431,8 +2495,8 @@ pub fn with_fmt_int_spec(val_arg: i64, is_unsigned: i32, flags: i64, width: i32,
             len = len + 1
 
     // Digits
-    var dbuf: [66]u8 = [0 as u8; 66]
-    let dlen = u64_base_to_buf(val as u64, base, if mode == 88: 1 else: 0, &dbuf as *mut u8)
+    var dbuf: [130]u8 = [0 as u8; 130]
+    let dlen = u128_base_to_buf(lo, hi, base, if mode == 88: 1 else: 0, &dbuf as *mut u8)
     rt_memcpy((&raw const buf as i64 + len) as *mut u8, &dbuf as *const u8, dlen)
     len = len + dlen
 
