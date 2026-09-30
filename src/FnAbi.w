@@ -13,6 +13,7 @@
 // an edit here rebuilds every bundle once, automatically, and an ABI rule
 // cannot drift into an unhashed file unnoticed.
 use Resolve
+use compiler.Runtime.runtime_cwd
 
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_str_hash(s: &str) -> u64
@@ -187,7 +188,7 @@ pub fn codegen_canonical_module_path(path: &str) -> str:
         return "<embedded-std>/" ++ std_rel
     if path[0] == '/':
         return fn_abi_file_prefix_mapped(resolve_normalize_path(path))
-    let cwd = with_getenv_str("PWD")
+    let cwd = runtime_cwd()
     if cwd.len() == 0:
         return resolve_normalize_path(path)
     fn_abi_file_prefix_mapped(resolve_join(cwd, path))
