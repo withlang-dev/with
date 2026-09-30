@@ -168,7 +168,7 @@ fn ht_linux_masks(fs: &ToolFs) -> str:
     for d in ["/usr/bin", "/usr/sbin", "/usr/local/bin", "/usr/include", "/usr/local/include", "/usr/lib/gcc", "/usr/libexec/gcc", "/usr/lib/llvm"]:
         if fs.host_exists(d): out = out ++ "dir " ++ d ++ "\n"
     for name in ["crt1.o", "Scrt1.o", "crti.o", "crtn.o", "libc.so", "libm.so", "libc_nonshared.a"]:
-        let path = "/usr/lib/x86_64-linux-gnu/" ++ name
+        let path = "/usr/lib/" ++ arch() ++ "-linux-gnu/" ++ name
         if fs.host_exists(path): out = out ++ "file " ++ path ++ "\n"
     out
 
@@ -222,7 +222,7 @@ pub fn run_no_host_toolchain_action(ctx: ActionCtx) -> i32:
     if read == 0:
         problems.push("no link records under out/: build the compiler first")
     var verdict = f"link records read: {read}\n"
-    let linux = os() == "Linux" and arch() == "x86_64"
+    let linux = os() == "Linux" and (arch() == "x86_64" or arch() == "aarch64")
     if os() != "Macos" and not linux:
         verdict = verdict ++ "sandboxed builds: not checked on " ++ os() ++ "/" ++ arch() ++ " yet (the #1915 slice for it adds them)\n"
     else if linux and not fs.host_exists("/usr/bin/bwrap"):

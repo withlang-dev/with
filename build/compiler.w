@@ -2839,18 +2839,19 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
         ld_rsp = ld_rsp ++ "-syslibroot\n" ++ comp_rsp_path(sysroot) ++ "\n"
         rsp = rsp ++ "-lc++\n"
         ld_rsp = ld_rsp ++ "-lc++\n"
-    else if os() == "Linux" and arch() == "x86_64":
+    else if os() == "Linux" and (arch() == "x86_64" or arch() == "aarch64"):
         // #1915 (D81): the SDK's static libc++ (libc++abi and libunwind in
         // it), over our linux sysroot's glibc 2.28 stubs; Link.w adds the
         // sysroot's crt objects, libc and compiler-rt. Nothing of the host's
         // gcc, libstdc++, zlib, zstd or libxml2 (the SDK is built without them).
-        let libcxx = llvm_lib_dir ++ "/x86_64-unknown-linux-gnu/libc++.a"
+        let triple = arch() ++ "-unknown-linux-gnu"
+        let libcxx = llvm_lib_dir ++ "/" ++ triple ++ "/libc++.a"
         if not fs.host_exists(libcxx):
             return comp_fail(ctx, "the LLVM SDK at " ++ llvm_prefix ++ " has no " ++ libcxx ++ ": a linux-x86_64 SDK carries its own libc++ (build/sdk.w sdk_linux_runtimes)")
-        let sysroot = comp_rsp_path(root ++ "/out/gen/linux-sysroot")
+        let sysroot = comp_rsp_path(root ++ (if arch() == "x86_64": "/out/gen/linux-sysroot" else: "/out/gen/linux-sysroot-" ++ arch()))
         rsp = rsp ++ "--sysroot=" ++ sysroot ++ "\n"
         rsp = rsp ++ "-fuse-ld=lld\n--rtlib=compiler-rt\n--unwindlib=none\n-stdlib=libc++\n-static-libstdc++\n"
-        rsp = rsp ++ "-L" ++ comp_rsp_path(llvm_lib_dir ++ "/x86_64-unknown-linux-gnu") ++ "\n"
+        rsp = rsp ++ "-L" ++ comp_rsp_path(llvm_lib_dir ++ "/" ++ triple) ++ "\n"
         rsp = rsp ++ "-lpthread\n-ldl\n-lm\n"
         ld_rsp = ld_rsp ++ comp_rsp_path(libcxx) ++ "\n"
         ld_rsp = ld_rsp ++ "-lpthread\n-ldl\n-lm\n"

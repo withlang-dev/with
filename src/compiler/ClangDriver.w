@@ -85,14 +85,14 @@ fn cc_self_linker(name: &str) -> str:
             return ""
     link
 
-// linux-x86_64 (#1915): clang finds compiler-rt (builtins, crtbegin/crtend)
+// Linux (#1915): clang finds compiler-rt (builtins, crtbegin/crtend)
 // under its resource directory; the embedded one holds only headers. This
 // directory holds both, as links: include/ to the embedded headers, and
 // lib/<triple>/ to the compiler-rt files the linux sysroot carries. "" (and
 // the reason printed) when it cannot be made.
 fn cc_linux_resource_dir(headers: &str, sysroot: &str) -> str:
     let dir = with_user_cache_dir() ++ "/with/cc-resource/" ++ f"{with_str_hash(headers ++ "|" ++ sysroot)}"
-    let rt = dir ++ "/lib/x86_64-unknown-linux-gnu"
+    let rt = dir ++ "/lib/" ++ with_sysinfo_arch() ++ "-unknown-linux-gnu"
     if with_fs_file_exists(rt ++ "/libclang_rt.builtins.a") != 0:
         return dir
     let _mk = with_fs_mkdir_p(rt)
@@ -113,7 +113,7 @@ pub fn with_cc_main() -> i32:
     args.push("clang")
     let first = if with_arg_count() > 2: with_arg_at(2) else: ""
     // The driver passes -resource-dir down to its own -cc1 invocations.
-    let linux = with_sysinfo_os() == "Linux" and with_sysinfo_arch() == "x86_64"
+    let linux = with_sysinfo_os() == "Linux" and (with_sysinfo_arch() == "x86_64" or with_sysinfo_arch() == "aarch64")
     if not first.starts_with("-cc1"):
         var resource_dir = ensure_clang_resource_dir()
         // A Linux link reads compiler-rt beside the headers.

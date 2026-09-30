@@ -512,8 +512,25 @@ fn link_stage_make_darwin_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_p
 // files. WITH_LINUX_SYSROOT names another sysroot explicitly (the host
 // layout, as a cross link uses it); a cross target and linux-aarch64 keep
 // that path until their slices.
+// On linux-x86_64 and linux-aarch64, native or cross.
 fn link_stage_linux_uses_own_sysroot() -> bool:
-    target_spec_is_native() and runtime_sysinfo_os() == "Linux" and runtime_sysinfo_arch() == "x86_64" and runtime_getenv("WITH_LINUX_SYSROOT").len() == 0
+    if runtime_getenv("WITH_LINUX_SYSROOT").len() > 0:
+        return false
+    let a = link_stage_linux_arch()
+    let linux_target = if target_spec_is_native(): runtime_sysinfo_os() == "Linux" else: target_spec_os() == "Linux"
+    linux_target and (a == "x86_64" or a == "aarch64")
+
+// The own sysroot a Linux link reads: this compiler's embedded one for a
+// native link; for a cross link, the one the cross build put beside the
+// target's runtime objects (build.w's cross-*-sysroot). "" when absent.
+fn link_stage_linux_own_sysroot_dir() -> str:
+    if target_spec_is_native():
+        return embedded_linux_sysroot_dir()
+    let dir = link_stage_runtime_variant_dir() ++ "/sysroot"
+    if link_stage_file_exists(dir ++ "/usr/lib/libc.so.6"): dir else: ""
+
+fn link_stage_linux_own_dynamic_linker() -> str:
+    if link_stage_linux_arch() == "aarch64": "/lib/ld-linux-aarch64.so.1" else: "/lib64/ld-linux-x86-64.so.2"
 
 fn link_stage_make_linux_own_sysroot_command(linker: &str, sysroot: &str, obj_path: &str, bin_path: &str, extras: &Vec[str], link_libs: &Vec[str], link_args: &Vec[str], compiler_link: bool) -> LinkStageCommand:
     let args: Vec[str] = Vec.new()
@@ -521,8 +538,11 @@ fn link_stage_make_linux_own_sysroot_command(linker: &str, sysroot: &str, obj_pa
     let inputs: Vec[str] = Vec.new()
     let outputs: Vec[str] = Vec.new()
     let lib = sysroot ++ "/usr/lib"
-    for a in ["-m", "elf_x86_64", "--eh-frame-hdr", "--hash-style=gnu", "--build-id", "--gc-sections", "--as-needed", "-dynamic-linker", "/lib64/ld-linux-x86-64.so.2"]:
+    args.push("-m")
+    args.push(link_stage_linux_emulation())
+    for a in ["--eh-frame-hdr", "--hash-style=gnu", "--build-id", "--gc-sections", "--as-needed", "-dynamic-linker"]:
         args.push(a.clone())
+    args.push(link_stage_linux_own_dynamic_linker())
     // The compiler folds identical code, as its link always has.
     if compiler_link: args.push("--icf=all")
     args.push("-o")
@@ -541,9 +561,9 @@ fn link_stage_make_linux_own_sysroot_command(linker: &str, sysroot: &str, obj_pa
     // is the host's, found after every sysroot one, as c_import finds its
     // header (ClangBridge cimport_push_host_library_dirs). The compiler's own
     // link names none.
-    if not compiler_link and link_libs.len() > 0:
-        args.push("-L/usr/lib/x86_64-linux-gnu")
-        args.push("-L/lib/x86_64-linux-gnu")
+    if not compiler_link and link_libs.len() > 0 and target_spec_is_native():
+        args.push("-L/usr/lib/" ++ link_stage_linux_multiarch())
+        args.push("-L/lib/" ++ link_stage_linux_multiarch())
     if link_libs.len() > 0: args.push(link_stage_archive_group_marker(1, 0, 1))
     for i in 0..link_libs.len() as i32:
         let name = link_libs[i]
@@ -599,9 +619,12 @@ fn link_stage_linux_driver_args_for_ld(link_args: &Vec[str]) -> Vec[str]:
 
 fn link_stage_make_linux_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_path: &str, extras: &Vec[str], link_libs: &Vec[str], link_args: &Vec[str]) -> LinkStageCommand:
     if link_stage_linux_uses_own_sysroot():
-        let own = embedded_linux_sysroot_dir()
+        let own = link_stage_linux_own_sysroot_dir()
         if own.len() == 0:
-            with_eprint("error: link: this compiler carries no linux sysroot, and WITH_LINUX_SYSROOT names none")
+            if target_spec_is_native():
+                with_eprint("error: link: this compiler carries no linux sysroot, and WITH_LINUX_SYSROOT names none")
+            else:
+                with_eprint("error: link: no linux sysroot for " ++ target_spec_name() ++ " at " ++ link_stage_runtime_variant_dir() ++ "/sysroot (build the cross runtime, which puts it there), and WITH_LINUX_SYSROOT names none")
             return LinkStageCommand { linker: "", args: Vec.new(), cwd: "", env: Vec.new(), inputs: Vec.new(), outputs: Vec.new(), cleanup_files: Vec.new() }
         return link_stage_make_linux_own_sysroot_command(llvm_ld, own, obj_path, bin_path, extras, link_libs, link_args, true)
     let args: Vec[str] = Vec.new()
