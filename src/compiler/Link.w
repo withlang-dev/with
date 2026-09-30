@@ -650,14 +650,14 @@ fn link_stage_sdk_dir_of(llvm_ld: &str) -> str: link_stage_dirname(link_stage_di
 // c_import parses; <arch>-w64-mingw32/lib holds its UCRT startup objects,
 // support libraries and the in-box DLLs' import libraries, which a program
 // links. WITH_WINDOWS_LIBC_DIR names another directory laid out the same.
-fn link_stage_windows_libc_root_of(llvm_ld: &str) -> str:
+fn link_stage_windows_libc_root_in(sdk_dir: &str) -> str:
     let explicit = runtime_getenv("WITH_WINDOWS_LIBC_DIR")
     if explicit.len() > 0:
         return explicit ++ ""
-    link_stage_sdk_dir_of(llvm_ld) ++ "/libc/windows"
+    sdk_dir ++ "/libc/windows"
 
-fn link_stage_windows_libc_dir(llvm_ld: &str, arch: &str) -> str:
-    link_stage_windows_libc_root_of(llvm_ld) ++ "/" ++ arch ++ "-w64-mingw32/lib"
+fn link_stage_windows_libc_dir(sdk_dir: &str, arch: &str) -> str:
+    link_stage_windows_libc_root_in(sdk_dir) ++ "/" ++ arch ++ "-w64-mingw32/lib"
 
 // The C target a Windows c_import parses for: mingw-w64's headers are
 // written for the GNU environment, the environment With's own Windows
@@ -673,18 +673,25 @@ pub fn link_stage_windows_c_target_uses_sdk_libc() -> bool:
 // The Windows libc c_import reads for this compilation: the SDK's (the same
 // one the link will read), "" when the target is not Windows x86_64 or the
 // SDK carries none.
-// The LLVM SDK directory a link reads, from the lld it runs; "" when none.
+// The toolchain a native Windows link and `with cc` read, laid out as the
+// LLVM SDK is: the SDK above the lld the link runs (the build's record, or
+// the SDK the environment names), else the one this compiler carries
+// (compiler.EmbeddedSysroot, #1915 D81). "" when there is neither.
 pub fn link_stage_windows_sdk_dir() -> str:
     let ld = link_stage_llvm_ld_path()
-    if ld.len() == 0: "" else: link_stage_sdk_dir_of(ld)
+    if ld.len() > 0:
+        return link_stage_sdk_dir_of(ld)
+    if runtime_sysinfo_os() == "Windows" and target_spec_is_native():
+        return embedded_windows_sysroot_dir()
+    ""
 
 pub fn link_stage_windows_libc_root() -> str:
     if not link_stage_windows_c_target_uses_sdk_libc():
         return ""
-    let ld = link_stage_llvm_ld_path()
-    if ld.len() == 0:
+    let sdk = link_stage_windows_sdk_dir()
+    if sdk.len() == 0:
         return ""
-    let root = link_stage_windows_libc_root_of(ld)
+    let root = link_stage_windows_libc_root_in(sdk)
     if not link_stage_file_exists(root ++ "/include/stdio.h"):
         return ""
     root
@@ -701,8 +708,8 @@ fn link_stage_llvm_ld_path() -> str:
 
 // compiler-rt's builtins for the target, in the SDK's clang resource dir: the
 // mingw-w64 runtime's ___chkstk_ms and its 128-bit and soft-float helpers.
-fn link_stage_windows_builtins(llvm_ld: &str, arch: &str) -> str:
-    link_stage_sdk_dir_of(llvm_ld) ++ "/lib/clang/" ++ embedded_clang_resource_version() ++ "/lib/windows/libclang_rt.builtins-" ++ arch ++ ".a"
+fn link_stage_windows_builtins(sdk_dir: &str, arch: &str) -> str:
+    sdk_dir ++ "/lib/clang/" ++ embedded_clang_resource_version() ++ "/lib/windows/libclang_rt.builtins-" ++ arch ++ ".a"
 
 // The in-box DLLs every program links, and uuid's GUIDs (their libraries ship
 // in the SDK's libc; build/sdk.w sdk_windows_import_libs names the DLLs).
@@ -743,7 +750,7 @@ fn link_stage_windows_find_lib(name: &str, libc_dir: &str, extras: &Vec[str]) ->
                 return path
     name ++ ".lib"
 
-fn link_stage_make_windows_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_path: &str, extras: &Vec[str], link_libs: &Vec[str], link_args: &Vec[str]) -> LinkStageCommand:
+fn link_stage_make_windows_llvm_link_command(llvm_ld: &str, sdk_dir: &str, obj_path: &str, bin_path: &str, extras: &Vec[str], link_libs: &Vec[str], link_args: &Vec[str]) -> LinkStageCommand:
     let args: Vec[str] = Vec.new()
     let env: Vec[LinkStageEnvVar] = Vec.new()
     let inputs: Vec[str] = Vec.new()
@@ -752,16 +759,16 @@ fn link_stage_make_windows_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_
     let arch = link_stage_windows_arch()
     // The SDK recipe covers x86_64; windows-aarch64 programs keep the
     // Visual Studio recipe until its libc slice lands (#1915).
-    let sdk_is_gnu = link_stage_file_exists(link_stage_sdk_dir_of(llvm_ld) ++ "/lib/libclang.a")
+    let sdk_is_gnu = link_stage_file_exists(sdk_dir ++ "/lib/libclang.a")
     let sdk_libc = arch == "x86_64" and (not compiler_link or sdk_is_gnu)
-    let libc_dir = if sdk_libc: link_stage_windows_libc_dir(llvm_ld, arch) else: ""
-    let builtins = if sdk_libc: link_stage_windows_builtins(llvm_ld, arch) else: ""
+    let libc_dir = if sdk_libc: link_stage_windows_libc_dir(sdk_dir, arch) else: ""
+    let builtins = if sdk_libc: link_stage_windows_builtins(sdk_dir, arch) else: ""
     if sdk_libc:
         if not link_stage_file_exists(libc_dir ++ "/crt2.o"):
-            with_eprint("error: the LLVM SDK at " ++ link_stage_sdk_dir_of(llvm_ld) ++ " carries no Windows C runtime (" ++ libc_dir ++ "/crt2.o); a Windows link reads the SDK only (#1915). Install an SDK built with `with build :sdk-windows-libc` (or name one with WITH_WINDOWS_LIBC_DIR).")
+            with_eprint("error: the LLVM SDK at " ++ sdk_dir ++ " carries no Windows C runtime (" ++ libc_dir ++ "/crt2.o); a Windows link reads the SDK only (#1915). Install an SDK built with `with build :sdk-windows-libc` (or name one with WITH_WINDOWS_LIBC_DIR).")
             return link_stage_empty_command()
         if not link_stage_file_exists(builtins):
-            with_eprint("error: the LLVM SDK at " ++ link_stage_sdk_dir_of(llvm_ld) ++ " carries no compiler-rt builtins for Windows (" ++ builtins ++ "); build them with `with build :sdk-compiler-rt-builtins` (#1915).")
+            with_eprint("error: the LLVM SDK at " ++ sdk_dir ++ " carries no compiler-rt builtins for Windows (" ++ builtins ++ "); build them with `with build :sdk-compiler-rt-builtins` (#1915).")
             return link_stage_empty_command()
     args.push("/nologo")
     // Reproducible PE output: lld-link derives the header timestamp and the
@@ -972,7 +979,7 @@ fn link_stage_make_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_path: &s
             if coff_ld.len() == 0:
                 with_eprint("error: cross link needs the COFF lld driver (lld-link) next to " ++ llvm_ld)
                 return LinkStageCommand { linker: "", args: Vec.new(), cwd: "", env: Vec.new(), inputs: Vec.new(), outputs: Vec.new(), cleanup_files: Vec.new() }
-            return link_stage_make_windows_llvm_link_command(coff_ld, obj_path, bin_path, extras, link_libs, link_args)
+            return link_stage_make_windows_llvm_link_command(coff_ld, link_stage_sdk_dir_of(coff_ld), obj_path, bin_path, extras, link_libs, link_args)
         if target_spec_is_wasm():
             let wasm_ld = link_stage_wasm_lld_for(llvm_ld)
             if wasm_ld.len() == 0:
@@ -990,9 +997,9 @@ fn link_stage_make_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_path: &s
     if os == "Macos" and arch == "aarch64":
         return link_stage_make_darwin_llvm_link_command(llvm_ld, obj_path, bin_path, extras, link_libs, link_args)
     if os == "Windows" and arch == "x86_64":
-        return link_stage_make_windows_llvm_link_command(llvm_ld, obj_path, bin_path, extras, link_libs, link_args)
+        return link_stage_make_windows_llvm_link_command(llvm_ld, link_stage_sdk_dir_of(llvm_ld), obj_path, bin_path, extras, link_libs, link_args)
     if os == "Windows" and (arch == "armv8" or arch == "aarch64"):
-        return link_stage_make_windows_llvm_link_command(llvm_ld, obj_path, bin_path, extras, link_libs, link_args)
+        return link_stage_make_windows_llvm_link_command(llvm_ld, link_stage_sdk_dir_of(llvm_ld), obj_path, bin_path, extras, link_libs, link_args)
     with_eprint("error: unsupported host LLVM linker platform: " ++ os ++ "/" ++ arch)
     LinkStageCommand { linker: "", args: Vec.new(), cwd: "", env: Vec.new(), inputs: Vec.new(), outputs: Vec.new(), cleanup_files: Vec.new() }
 
@@ -1104,13 +1111,15 @@ fn link_stage_link_with_extras_libs_args_plan(obj_path: &str, bin_path: &str, ex
         // generated metadata (it also carries the cross SDK's lib response).
         if ld_path.len() == 0 and runtime_sysinfo_os() == "Windows" and target_spec_is_native():
             ld_path = link_stage_windows_lld_from_env()
+        // #1915 (D81): with no SDK named, a native Windows link is this
+        // binary's own lld over the toolchain it carries, as a macOS link is.
+        if ld_path.len() == 0 and runtime_sysinfo_os() == "Windows" and target_spec_is_native() and lld_flavor_linked("coff"):
+            let carried = embedded_windows_sysroot_dir()
+            if carried.len() > 0:
+                return link_stage_windows_native_link_plan(carried, obj_path, bin_path, extras, link_libs, link_args)
         if ld_path.len() == 0:
             if runtime_sysinfo_os() == "Windows":
-                // #1914: say what a fresh Windows checkout needs. Until the
-                // compiler carries its Windows linker and C runtime (as the
-                // macOS one carries lld and its sysroot), linking anything,
-                // `with build :deps`'s fetch helper included, needs the SDK.
-                with_eprint("error: missing Windows LLVM linker metadata (" ++ root ++ "/llvm_ld) and no WITH_LLVM_LD / LLVM_LD / LLVM_PREFIX in the environment: a Windows link needs the LLVM SDK's lld-link and C runtime. Extract the with-llvm-sdk-<version>-windows-x86_64.tar.gz release asset sdk.lock pins and set LLVM_PREFIX to its llvm-<version>-windows-x86_64-msvc directory")
+                with_eprint("error: missing Windows LLVM linker metadata (" ++ root ++ "/llvm_ld), no WITH_LLVM_LD / LLVM_LD / LLVM_PREFIX in the environment, and this compiler carries no Windows linker and C runtime of its own (one cross-linked from another host, or linked against a Visual Studio-built SDK): extract the with-llvm-sdk-<version>-windows-x86_64.tar.gz release asset sdk.lock pins and set LLVM_PREFIX to its llvm-<version>-windows-x86_64-msvc directory")
             else:
                 with_eprint("error: cross-target link requires LLVM linker metadata (" ++ root ++ "/llvm_ld)")
             return link_stage_plan_fail()
@@ -1118,6 +1127,28 @@ fn link_stage_link_with_extras_libs_args_plan(obj_path: &str, bin_path: &str, ex
     if runtime_sysinfo_os() == "Macos":
         return link_stage_darwin_native_link_plan(obj_path, bin_path, extras, link_libs, link_args)
     let command = link_stage_make_link_command("cc", obj_path, bin_path, extras, link_libs, link_args)
+    link_stage_plan_for_command(move command)
+
+// #1915 (D81): a native Windows link with no SDK named is this binary's own
+// lld-link (`with __ld -flavor link`, src/compiler/LldDriver.w) over the
+// Windows toolchain it carries (compiler.EmbeddedSysroot), read exactly as
+// an SDK's: no Visual Studio, no Windows Kits, no LLVM install.
+fn link_stage_windows_native_link_plan(toolchain: &str, obj_path: &str, bin_path: &str, extras: &Vec[str], link_libs: &Vec[str], link_args: &Vec[str]) -> LinkStagePlan:
+    let self_exe = with_self_exe()
+    if self_exe.len() == 0:
+        with_eprint("error: link: cannot find this compiler's own executable to run its linker (argv[0] is '" ++ runtime_arg_at(0) ++ "')")
+        return link_stage_plan_fail()
+    var command = link_stage_make_windows_llvm_link_command("lld-link", toolchain, obj_path, bin_path, extras, link_libs, link_args)
+    if command.linker.len() == 0:
+        return link_stage_plan_fail()
+    let args: Vec[str] = Vec.new()
+    args.push("__ld")
+    args.push("-flavor")
+    args.push("link")
+    for i in 0..command.args.len() as i32:
+        args.push(with_str_clone_ref(command.args[i]))
+    command.args = args
+    command.linker = with_str_clone_ref(self_exe)
     link_stage_plan_for_command(move command)
 
 // #1915: a native macOS link is this binary's own lld (`with __ld`, src/
@@ -1267,12 +1298,65 @@ pub fn link_stage_macho_undefined_symbols(path: &str) -> str:
         offset = offset + cmdsize
     ""
 
+fn link_stage_read_u16_le(data: &str, offset: i64) -> i64:
+    if offset < 0 or offset + 1 >= data.len():
+        return -1
+    (data[offset] as i64) | ((data[offset + 1] as i64) << 8)
+
+// The external symbols a COFF object (regular or /bigobj) references and does
+// not define, one per line: storage class EXTERNAL, section 0, value 0 (a
+// nonzero value is a common symbol). "<probe-failed>" when it is not one.
+pub fn link_stage_coff_undefined_symbols(path: &str) -> str:
+    let data = runtime_read_file(path)
+    if data.len() < 20:
+        return "<probe-failed>"
+    let bigobj = link_stage_read_u16_le(data, 0) == 0 and link_stage_read_u16_le(data, 2) == 0xffff
+    let symtab = if bigobj: link_stage_read_u32_le(data, 48) else: link_stage_read_u32_le(data, 8)
+    let count = if bigobj: link_stage_read_u32_le(data, 52) else: link_stage_read_u32_le(data, 12)
+    let entry_size: i64 = if bigobj: 20 else: 18
+    if symtab <= 0 or count < 0 or symtab + count * entry_size + 4 > data.len():
+        return "<probe-failed>"
+    let strtab = symtab + count * entry_size
+    var out = StringBuilder.new()
+    var i: i64 = 0
+    while i < count:
+        let at = symtab + i * entry_size
+        let section = if bigobj: link_stage_read_u32_le(data, (at + 12) as i32) else: link_stage_read_u16_le(data, at + 12)
+        let class = data[at + entry_size - 2] as i32
+        let aux = data[at + entry_size - 1] as i64
+        let value = link_stage_read_u32_le(data, (at + 8) as i32)
+        if class == 2 and section == 0 and value == 0:
+            var name = ""
+            if link_stage_read_u32_le(data, at as i32) == 0:
+                var start = strtab + link_stage_read_u32_le(data, (at + 4) as i32)
+                var end = start
+                while end < data.len() and data[end] != 0:
+                    end = end + 1
+                name = data.slice(start, end)
+            else:
+                var end = at
+                while end < at + 8 and data[end] != 0:
+                    end = end + 1
+                name = data.slice(at, end)
+            if name.len() > 0:
+                out.push_str(name)
+                out.push_str("\n")
+        i = i + 1 + aux
+    out.to_str()
+
 fn link_stage_undefined_symbols_for_object(obj_path: &str) -> str:
     // A native macOS object is read in-process: no host nm (#1915).
     if runtime_sysinfo_os() == "Macos" and target_spec_is_native():
         let symbols = link_stage_macho_undefined_symbols(obj_path)
         if symbols == "<probe-failed>":
             with_eprint(f"warning: link: {obj_path} is not a 64-bit Mach-O object this compiler can read for undefined symbols; linking every embedded bundle\n")
+        return symbols
+    // So is a native Windows one (#1915, D81): no llvm-nm, the SDK's or
+    // the host's.
+    if runtime_sysinfo_os() == "Windows" and target_spec_is_native():
+        let symbols = link_stage_coff_undefined_symbols(obj_path)
+        if symbols == "<probe-failed>":
+            with_eprint(f"warning: link: {obj_path} is not a COFF object this compiler can read for undefined symbols; linking every embedded bundle\n")
         return symbols
     let report_path = obj_path ++ ".undef"
     let null_path = if runtime_sysinfo_os() == "Windows": "NUL" else: "/dev/null"

@@ -16,6 +16,7 @@ use compiler.EmbeddedSysroot
 use compiler.LldDriver
 use compiler.Runtime
 use compiler.Link
+use compiler.AbiStamp
 
 extern fn with_alloc(size: i64) -> *mut u8
 extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> *mut u8
@@ -82,6 +83,38 @@ fn cc_macos_linker() -> str:
         if with_fs_file_exists(link) == 0:
             with_eprint("error: with cc: could not link " ++ link ++ " to " ++ self_exe ++ " for clang's linker")
             return ""
+    link
+
+// #1915 (D81): clang's MinGW driver links by running `ld.lld`. With no SDK's,
+// it is handed this binary under that name (src/main.w runs a binary named
+// ld.lld.exe as lld): a symbolic link in the cache where Windows allows one,
+// else a copy, keyed by this binary's stamped identity so a rebuilt compiler
+// never runs an older copy. "" (the reason printed) when neither can be made.
+fn cc_windows_self_linker() -> str:
+    var self_exe = with_self_exe()
+    if self_exe.len() > 0 and not runtime_path_is_absolute(self_exe):
+        self_exe = runtime_cwd() ++ "/" ++ self_exe
+    if self_exe.len() == 0:
+        with_eprint("error: with cc: cannot find this compiler's own executable to hand clang as its linker (argv[0] is '" ++ with_arg_at(0) ++ "')")
+        return ""
+    let identity = if compiler_self_id_is_stamped(): compiler_self_id() else: f"unstamped-{runtime_getpid()}"
+    let key = self_exe ++ "|" ++ identity
+    let dir = with_user_cache_dir() ++ "/with/lld-tool/" ++ f"{with_str_hash(key)}"
+    let link = dir ++ "/ld.lld.exe"
+    if with_fs_file_exists(link) != 0:
+        return link
+    let _mk = with_fs_mkdir_p(dir)
+    let _ln = with_fs_symlink(self_exe, link)
+    if with_fs_file_exists(link) != 0:
+        return link
+    let bytes = runtime_read_file(self_exe)
+    let tmp = link ++ f".tmp.{runtime_getpid()}"
+    if bytes.len() == 0 or runtime_write_file(tmp, bytes) != 0 or runtime_rename(tmp, link) != 0:
+        let _rm = runtime_remove_file(tmp)
+        if with_fs_file_exists(link) != 0:
+            return link
+        with_eprint("error: with cc: could not link or copy " ++ self_exe ++ " to " ++ link ++ " for clang's linker")
+        return ""
     link
 
 // argv[0] is `with`, argv[1] is `cc`; everything after it is clang's.
@@ -152,9 +185,13 @@ fn cc_windows_toolchain() -> CcToolchain:
     if libc.len() == 0:
         return CcToolchain { problem: "the LLVM SDK carries no Windows C runtime (libc/windows); build one with `with build :sdk-windows-libc`", args }
     let sdk = link_stage_windows_sdk_dir()
-    let ld = sdk ++ "/bin/ld.lld.exe"
+    var ld = sdk ++ "/bin/ld.lld.exe"
     if with_fs_file_exists(ld) == 0:
-        return CcToolchain { problem: "the LLVM SDK at " ++ sdk ++ " has no ld.lld.exe, the linker clang's MinGW driver runs (an SDK built by :sdk-llvm since #1915 ships it)", args }
+        // #1915 (D81): the toolchain this compiler carries has no ld.lld.exe;
+        // this binary is lld (made only for an invocation that may link).
+        ld = if cc_may_link(): cc_windows_self_linker() else: "-"
+        if ld.len() == 0:
+            return CcToolchain { problem: "no ld.lld.exe for clang's MinGW driver: the toolchain at " ++ sdk ++ " has none, and this compiler could not stand in for it (above)", args }
     let resource = sdk ++ "/lib/clang/" ++ embedded_clang_resource_version()
     if not cc_caller_names("--target") and not cc_caller_names("-target"):
         args.push("--target=" ++ link_stage_windows_c_target())
@@ -169,7 +206,7 @@ fn cc_windows_toolchain() -> CcToolchain:
         args.push("-unwindlib=libunwind")
     if not cc_caller_names("-stdlib") and not cc_caller_names("--stdlib"):
         args.push("-stdlib=libc++")
-    if not cc_caller_names("--ld-path") and not cc_caller_names("-fuse-ld"):
+    if ld != "-" and not cc_caller_names("--ld-path") and not cc_caller_names("-fuse-ld"):
         args.push("--ld-path=" ++ ld)
     args.push("--end-no-unused-arguments")
     CcToolchain { problem: "", args }

@@ -249,6 +249,10 @@ fn cr_generate(ctx: &ActionCtx, include_dir: &str, files: &Vec[str], version: &s
     // comp_dsymutil_link_lines).
     let dsymutil_linked = comp_sdk_has_dsymutil(ctx.fs(), lib_dir, os())
     out = out ++ "pub fn embedded_dsymutil_linked() -> bool:\n    return " ++ (if dsymutil_linked: "true" else: "false") ++ "\n\n"
+    // #1915 (D81): whether this compiler links dlltool (build/compiler.w
+    // comp_dlltool_link_lines).
+    let dlltool_linked = comp_sdk_has_dlltool(ctx.fs(), lib_dir, os())
+    out = out ++ "pub fn embedded_dlltool_linked() -> bool:\n    return " ++ (if dlltool_linked: "true" else: "false") ++ "\n\n"
     out = out ++ "pub fn embedded_clang_resource_data(name: &str) -> str:\n"
     for i in 0..files.len() as i32:
         let rel = cr_relpath(files[i], include_dir)

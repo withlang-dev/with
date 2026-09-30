@@ -161,6 +161,16 @@ pub fn tar_gz_extract(archive: &str, dest: &str, strip: i32) -> str:
     let all: Vec[str] = Vec.new()
     tar_gz_extract_keep(archive, dest, strip, &all)
 
+// Unpacks the gzip-compressed tar image `packed` (bytes in memory, an
+// embedded blob) into `dest`. "" or why not.
+pub fn tar_gz_extract_data(packed: &str, dest: &str, strip: i32) -> str:
+    match decompress_gzip_with_limit(&te_bytes(packed), 8589934592):
+        .Ok(tar) =>
+            if tar.len() == 0: return "an empty embedded archive"
+            let text = unsafe { with_str_from_bytes(&tar[0] as *const u8, tar.len()) }
+            tar_extract_text(text, dest, strip)
+        .Err(e) => "an embedded archive: " ++ e.message
+
 // tar_gz_extract, writing only the entries under one of `keep`.
 pub fn tar_gz_extract_keep(archive: &str, dest: &str, strip: i32, keep: &Vec[str]) -> str:
     let packed = runtime_read_file(archive)

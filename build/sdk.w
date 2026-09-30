@@ -1696,6 +1696,66 @@ pub fn run_sdk_build_tools_pack_action(ctx: ActionCtx) -> i32:
     if count < 100:
         return sdk_fail(ctx, f"only {count} CMake module files under " ++ share)
     sdk_write_text(ctx, pack_path, pack.to_str())
+
+// ── The Windows toolchain, carried by the compiler (#1915, D81) ────────
+//
+// What a Windows compiler needs beyond itself to build a With program, a
+// c_import and a `with get` package, taken from the SDK it is built with:
+// the Windows C runtime (libc/windows: mingw-w64's headers, the UCRT
+// startup objects and support libraries, the in-box DLLs' import
+// libraries, libc++ and libunwind, and their licenses), clang's resource
+// directory (lib/clang/<major>: its headers and compiler-rt's builtins),
+// and the build tools `with get` drives (bin/cmake.exe, bin/ninja.exe,
+// share/cmake-<v>). The linker (lld) and dlltool are linked into the
+// compiler itself. Laid out as the SDK is, so a link reads it exactly as it
+// reads an SDK; gzip-compressed (the headers alone are 85 MB), embedded as
+// the `windows_sysroot` blob and unpacked to the user's cache on first use
+// (src/compiler/EmbeddedSysroot.w). Every other host writes an empty file.
+pub fn sdk_windows_sysroot_pack() -> str: "out/gen/windows-sysroot.tar.gz"
+
+pub fn run_windows_sysroot_action(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    let pack_path = ctx.output()
+    if pack_path.len() == 0:
+        return sdk_fail(ctx, "requires an output path")
+    if os() != "Windows" or arch() != "x86_64":
+        return sdk_write_text(ctx, pack_path, "")
+    let prefix = compiler_default_llvm_prefix()
+    let arch_name = "x86_64"
+    let required: Vec[str] = Vec.new()
+    required.push(sdk_windows_libc_marker(prefix, arch_name))
+    required.push(sdk_join(sdk_windows_libc_root(prefix), "include/stdio.h"))
+    required.push(sdk_compiler_rt_builtins(prefix, arch_name))
+    required.push(sdk_join(prefix, "lib/clang/" ++ sdk_llvm_major() ++ "/include/stddef.h"))
+    required.push(sdk_join(prefix, "bin/cmake.exe"))
+    required.push(sdk_join(prefix, "bin/ninja.exe"))
+    for i in 0..required.len() as i32:
+        if not fs.exists(required[i]):
+            return sdk_fail(ctx, "the LLVM SDK at " ++ prefix ++ " has no " ++ required[i] ++ ": a Windows compiler carries the SDK's C runtime, clang resource directory and build tools (a windows-gnu SDK since #1915 ships them)")
+    let roots: Vec[str] = Vec.new()
+    roots.push("libc/windows")
+    roots.push("lib/clang/" ++ sdk_llvm_major())
+    roots.push(sdk_cmake_data_prefix().slice(0, sdk_cmake_data_prefix().len() - 1))
+    var rels: Vec[str] = Vec.new()
+    rels.push("bin/cmake.exe")
+    rels.push("bin/ninja.exe")
+    for r in 0..roots.len() as i32:
+        let files = fs.list_files(sdk_join(prefix, roots[r]))
+        for i in 0..files.len() as i32:
+            let rel = sdk_rel_path(prefix, sdk_normalize(files[i]))
+            if rel.len() == 0 or rel.find("/Help/") >= 0:
+                continue
+            rels.push(rel)
+    let sorted = sdk_merge_sort_strings(rels)
+    if sorted.len() < 1000:
+        return sdk_fail(ctx, f"only {sorted.len()} files for the Windows toolchain under " ++ prefix)
+    let entries: Vec[ArchiveEntry] = Vec.new()
+    for i in 0..sorted.len() as i32:
+        let mode = if sorted[i].ends_with(".exe"): 0o755 else: 0o644
+        entries.push(archive_file_entry(sdk_join(prefix, sorted[i]), sdk_owned_text(sorted[i]), mode))
+    if fs.write_tar_gz(pack_path, entries) != 0:
+        return sdk_fail(ctx, "could not write " ++ pack_path)
+    0
 // ── The Windows C runtime the SDK carries (#1915) ─────────────────────────
 //
 // A With program and the With compiler link on Windows against nothing but

@@ -33,6 +33,7 @@ use compiler.ClangDriver
 use compiler.LldDriver
 use compiler.FrameworkStubs
 use compiler.WindowsImportLibs
+use compiler.DlltoolDriver
 use compiler.EmbeddedSysroot
 use compiler.DsymutilDriver
 use compiler.GreenEvidence
@@ -775,6 +776,9 @@ fn run_cli(argc: i32) -> i32:
     // `with __dsymutil ...` is LLVM's dsymutil (#1915), for a debug build's
     // .dSYM: the compiler invoking itself.
     if cli_command(argc) == "__dsymutil": return with_dsymutil_cli_main()
+    // `with __dlltool ...` is LLVM's dlltool (#1915), with which `with get`
+    // writes a Windows package's in-box DLL import libraries.
+    if cli_command(argc) == "__dlltool": return with_dlltool_cli_main()
     // `with __framework-stubs <dir> <Name>...`: the framework stubs `with get`
     // writes for a package that links Apple frameworks (#1915).
     // `with __sdk-tools`: the directory of the SDK build tools this compiler

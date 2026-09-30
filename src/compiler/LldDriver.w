@@ -138,7 +138,7 @@ pub fn lld_flavor_for_tool_name(argv0: &str) -> str:
         if argv0[i] == '/' or argv0[i] == '\\':
             start = i + 1
     let base = argv0.slice(start, argv0.len())
-    if base == "ld64.lld": "macho" else if base == "ld.lld": "elf" else if base == "lld-link" or base == "lld-link.exe": "coff" else if base == "wasm-ld": "wasm" else: ""
+    if base == "ld64.lld": "macho" else if base == "ld.lld" or base == "ld.lld.exe": "elf" else if base == "lld-link" or base == "lld-link.exe": "coff" else if base == "wasm-ld": "wasm" else: ""
 
 // argv[0] is the tool name; every other argument is lld's.
 pub fn with_ld_tool_main(flavor: &str) -> i32:

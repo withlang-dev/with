@@ -12,6 +12,7 @@
 // A compiler built off macOS carries an empty pack.
 
 use compiler.Runtime
+use compiler.TarExtract
 
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_fs_write_file(path: &str, data: &str) -> i32
@@ -25,6 +26,12 @@ extern let with_embedded_darwin_sysroot_end: u8
 // run_sdk_build_tools_pack_action). Empty where this host's slice has none.
 extern let with_embedded_sdk_tools_start: u8
 extern let with_embedded_sdk_tools_end: u8
+// #1915 (D81): the Windows toolchain a Windows compiler carries — the SDK's
+// C runtime, clang resource directory and build tools, laid out as the SDK
+// is (build/sdk.w run_windows_sysroot_action), gzip-compressed. Empty on
+// every other host.
+extern let with_embedded_windows_sysroot_start: u8
+extern let with_embedded_windows_sysroot_end: u8
 extern fn with_fs_chmod(path: &str, mode: i32) -> i32
 
 // with.toml [c_import] sdk_path (§16.1), set by the frontend.
@@ -33,6 +40,8 @@ var g_darwin_sysroot_dir: str = ""
 var g_darwin_sysroot_resolved: bool = false
 var g_sdk_tools_dir: str = ""
 var g_sdk_tools_resolved: bool = false
+var g_windows_sysroot_dir: str = ""
+var g_windows_sysroot_resolved: bool = false
 
 pub fn darwin_sdk_set_configured(path: &str):
     g_darwin_configured_sdk = with_str_clone_ref(path)
@@ -55,6 +64,11 @@ fn es_pack() -> str:
 fn es_tools_pack() -> str:
     let start = &with_embedded_sdk_tools_start as *const u8
     let end = &with_embedded_sdk_tools_end as *const u8
+    es_str_from_raw_parts(start, end as i64 - start as i64)
+
+fn es_windows_pack() -> str:
+    let start = &with_embedded_windows_sysroot_start as *const u8
+    let end = &with_embedded_windows_sysroot_end as *const u8
     es_str_from_raw_parts(start, end as i64 - start as i64)
 
 fn es_dirname(path: &str) -> str:
@@ -168,13 +182,53 @@ pub fn embedded_darwin_sysroot_dir() -> str:
     g_darwin_sysroot_dir = es_materialize(pack, "sysroot/darwin", "the darwin sysroot")
     with_str_clone_ref(g_darwin_sysroot_dir)
 
+// #1915 (D81): the materialized Windows toolchain (libc/windows, lib/clang/
+// <major>, bin/cmake.exe, bin/ninja.exe, share/cmake-<v>), or "" when this
+// binary carries none (built off Windows) or it could not be written (the
+// reason is printed). Unpacked beside its final name and renamed into
+// place, as es_materialize does, keyed by the pack's hash.
+pub fn embedded_windows_sysroot_dir() -> str:
+    if g_windows_sysroot_resolved:
+        return with_str_clone_ref(g_windows_sysroot_dir)
+    g_windows_sysroot_resolved = true
+    let pack = es_windows_pack()
+    if pack.len() == 0:
+        return ""
+    let root = with_user_cache_dir() ++ "/with/sysroot/windows-" ++ f"{with_str_hash(pack)}"
+    let stamp = root ++ "/.with-sysroot-ready"
+    if with_fs_file_exists(stamp) == 0:
+        let tmp = root ++ f".tmp.{runtime_getpid()}.{runtime_clock_nanos()}"
+        let problem = tar_gz_extract_data(pack, tmp, 0)
+        if problem.len() > 0:
+            let _ = runtime_remove_tree(tmp)
+            runtime_eprint("error: could not materialize the Windows toolchain at " ++ root ++ ": " ++ problem)
+            return ""
+        if with_fs_write_file(tmp ++ "/.with-sysroot-ready", "ok\n") != 0:
+            let _ = runtime_remove_tree(tmp)
+            runtime_eprint("error: could not write " ++ tmp ++ "/.with-sysroot-ready")
+            return ""
+        let _parent = runtime_mkdir_p(es_dirname(root))
+        if runtime_rename(tmp, root) != 0:
+            // Another build won the rename; its copy is complete.
+            let _ = runtime_remove_tree(tmp)
+            if with_fs_file_exists(stamp) == 0:
+                runtime_eprint("error: could not move the Windows toolchain into " ++ root)
+                return ""
+    g_windows_sysroot_dir = root
+    with_str_clone_ref(g_windows_sysroot_dir)
+
 // #1915 (D81): the materialized SDK build tools (bin/cmake, bin/ninja,
 // share/cmake-<v>), or "" when this binary carries none or they could not
-// be written (the reason is printed).
+// be written (the reason is printed). A Windows compiler carries them in its
+// Windows toolchain.
 pub fn embedded_sdk_tools_dir() -> str:
     if g_sdk_tools_resolved:
         return with_str_clone_ref(g_sdk_tools_dir)
     g_sdk_tools_resolved = true
+    let windows = embedded_windows_sysroot_dir()
+    if windows.len() > 0 and with_fs_file_exists(windows ++ "/bin/cmake.exe") != 0:
+        g_sdk_tools_dir = windows
+        return with_str_clone_ref(g_sdk_tools_dir)
     let pack = es_tools_pack()
     if pack.len() == 0:
         return ""

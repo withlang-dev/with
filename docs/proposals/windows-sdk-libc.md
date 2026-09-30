@@ -32,6 +32,20 @@ user's cache), preprocessed by the SDK's clang and written by its
 llvm-dlltool into the package's `windows-libs/` (compiler.WindowsImportLibs;
 `with __windows-import-libs <dir> <dll>...` runs the step alone).
 
+## What the Windows compiler carries (D81)
+
+A Windows compiler built against this SDK carries what a build needs beyond
+itself, as the macOS one carries its sysroot: lld's drivers and LLVM's dlltool
+are linked into it (`with __ld`, `with __dlltool`), and `libc/windows`,
+`lib/clang/<major>` (clang's headers and compiler-rt's builtins),
+`bin/cmake.exe`, `bin/ninja.exe` and `share/cmake-<v>` are embedded
+(gzip-compressed, `:windows-sysroot`, build/sdk.w run_windows_sysroot_action)
+and unpacked to the user's cache on first use. With no SDK named (no link
+record, no WITH_LLVM_LD / LLVM_LD / LLVM_PREFIX), a native Windows link, a
+c_import, `with cc` (handed the compiler itself as `ld.lld.exe`) and
+`with get` read only that: `with build hi.w` works on a machine that has
+only `with.exe`, and a fresh checkout runs `:deps` with no SDK present.
+
 ## Provenance
 
 - mingw-w64 v14.0.0, `https://github.com/mingw-w64/mingw-w64/archive/refs/tags/v14.0.0.tar.gz`,

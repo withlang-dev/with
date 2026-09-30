@@ -13,14 +13,18 @@
 // its sha256, and the definitions are fetched once into the user's cache.
 // A .def is found as mingw-w64-crt's Makefile.am finds it (build/sdk.w
 // sdk_mingw_def): the architecture's directory first, then lib-common; a
-// .def.in is run through the SDK's clang preprocessor, and a lib-common one
-// loses the i386 `@N` decorations of its export names. The SDK's
-// llvm-dlltool writes <dir>/lib<name>.a, which lld finds with -L<dir>.
+// .def.in is run through clang's preprocessor, and a lib-common one loses the
+// i386 `@N` decorations of its export names. dlltool writes
+// <dir>/lib<name>.a, which lld finds with -L<dir>. Both are this compiler's
+// own (`with cc -E`, `with __dlltool`, D81): nothing is read from an SDK
+// beyond the C runtime's PROVENANCE, which the compiler carries too.
 
 use compiler.Runtime
 use compiler.TarExtract
 use compiler.EmbeddedSysroot
 use compiler.Link
+use compiler.LldDriver
+use compiler.DlltoolDriver
 use std.http
 use std.crypto.sha256
 
@@ -99,7 +103,7 @@ fn wil_run(argv: &Vec[str], work: &str, label: &str) -> str:
 
 // The .def of `name` for `arch`, or "" when mingw-w64 has none; "error: ..."
 // when one exists and could not be prepared.
-fn wil_def(sdk: &str, crt: &str, arch: &str, name: &str, work: &str) -> str:
+fn wil_def(self_exe: &str, crt: &str, arch: &str, name: &str, work: &str) -> str:
     let arch_dir = crt ++ "/" ++ (if arch == "aarch64": "libarm64" else: "lib64")
     let common_dir = crt ++ "/lib-common"
     if runtime_file_exists(arch_dir ++ "/" ++ name ++ ".def") != 0: return arch_dir ++ "/" ++ name ++ ".def"
@@ -112,7 +116,8 @@ fn wil_def(sdk: &str, crt: &str, arch: &str, name: &str, work: &str) -> str:
         if runtime_file_exists(input) == 0: return ""
     let pre = work ++ "/" ++ name ++ ".pre.def"
     let argv: Vec[str] = Vec.new()
-    argv.push(sdk ++ "/bin/clang.exe")
+    argv.push(self_exe.to_owned())
+    argv.push("cc")
     argv.push("--target=" ++ arch ++ "-w64-windows-gnu")
     argv.push("-E")
     argv.push("-P")
@@ -152,23 +157,29 @@ pub fn windows_import_libs_write(dir: &str, names: &Vec[str]) -> WindowsImportLi
     let written: Vec[str] = Vec.new()
     if runtime_sysinfo_os() != "Windows":
         return WindowsImportLibs { written, problem: "Windows import libraries are generated on Windows only" }
-    let sdk = link_stage_windows_sdk_dir()
     let libc_root = link_stage_windows_libc_root()
-    if sdk.len() == 0 or libc_root.len() == 0:
-        return WindowsImportLibs { written, problem: "this `with` has no Windows SDK C runtime to generate import libraries with" }
+    if libc_root.len() == 0:
+        return WindowsImportLibs { written, problem: "this `with` has no Windows C runtime (its own or an SDK's) to generate import libraries for" }
+    if not with_dlltool_available():
+        return WindowsImportLibs { written, problem: "this `with` carries no dlltool (only a Windows compiler linked against a windows-gnu LLVM SDK does)" }
+    var self_exe = with_self_exe()
+    if self_exe.len() > 0 and not runtime_path_is_absolute(self_exe): self_exe = runtime_cwd() ++ "/" ++ self_exe
+    if self_exe.len() == 0:
+        return WindowsImportLibs { written, problem: "cannot find this compiler's own executable to run `with cc -E` and `with __dlltool`" }
     let crt = wil_crt_dir(libc_root)
     if crt.starts_with("error: "): return WindowsImportLibs { written, problem: crt.slice(7, crt.len()) }
     let arch = link_stage_windows_arch()
     let work = dir ++ "/.work"
     if runtime_mkdir_p(work) != 0: return WindowsImportLibs { written, problem: "could not create " ++ work }
     for name in names:
-        let def = wil_def(sdk, crt, arch, name, work)
+        let def = wil_def(self_exe, crt, arch, name, work)
         if def.len() == 0: continue
         if def.starts_with("error: "):
             let _rm = runtime_remove_tree(work)
             return WindowsImportLibs { written, problem: def.slice(7, def.len()) }
         let argv: Vec[str] = Vec.new()
-        argv.push(sdk ++ "/bin/llvm-dlltool.exe")
+        argv.push(self_exe.clone())
+        argv.push("__dlltool")
         argv.push("-m")
         argv.push(if arch == "aarch64": "arm64" else: "i386:x86-64")
         argv.push("-k")

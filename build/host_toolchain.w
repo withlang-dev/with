@@ -196,12 +196,15 @@ fn ht_setup_framework_project(ctx: &ActionCtx, scratch: &str, compiler: &str, pr
 
 // Windows has no sandbox-exec: the fixtures build and run with PATH holding
 // only the Windows directories and every variable that could point a build
-// at Visual Studio or a Windows SDK emptied. The SDK is reached the way the
-// compiler reaches it (its link record, or the LLVM_PREFIX a lane pins).
-fn ht_windows_env() -> ProcessEnv:
+// at Visual Studio, a Windows SDK or an LLVM install emptied — LLVM_PREFIX
+// too: the release compiler links with the lld and C runtime it carries
+// (#1915, D81), unpacked into a fresh cache under the scratch directory, as
+// on a machine that has only with.exe.
+fn ht_windows_env(cache: &str) -> ProcessEnv:
     var e = process_env()
     e = e.set("PATH", "C:\\Windows\\System32;C:\\Windows")
-    for name in ["LIB", "LIBPATH", "INCLUDE", "VSINSTALLDIR", "VCINSTALLDIR", "VCToolsInstallDir", "WindowsSdkDir", "UniversalCRTSdkDir", "WITH_WINDOWS_MSVC_LIBDIR", "WITH_WINDOWS_UCRT_LIBDIR", "WITH_WINDOWS_UM_LIBDIR", "WITH_WINDOWS_MSVC_INCDIR", "WITH_WINDOWS_UCRT_INCDIR", "WITH_WINDOWS_SHARED_INCDIR", "WITH_WINDOWS_UM_INCDIR", "WITH_WINDOWS_LIBC_DIR"]:
+    e = e.set("LOCALAPPDATA", cache.to_owned())
+    for name in ["HOME", "XDG_CACHE_HOME", "LLVM_PREFIX", "WITH_LLVM_LD", "LLVM_LD", "LIB", "LIBPATH", "INCLUDE", "VSINSTALLDIR", "VCINSTALLDIR", "VCToolsInstallDir", "WindowsSdkDir", "UniversalCRTSdkDir", "WITH_WINDOWS_MSVC_LIBDIR", "WITH_WINDOWS_UCRT_LIBDIR", "WITH_WINDOWS_UM_LIBDIR", "WITH_WINDOWS_MSVC_INCDIR", "WITH_WINDOWS_UCRT_INCDIR", "WITH_WINDOWS_SHARED_INCDIR", "WITH_WINDOWS_UM_INCDIR", "WITH_WINDOWS_LIBC_DIR"]:
         e = e.set(name.to_owned(), "")
     e
 
@@ -230,7 +233,7 @@ fn ht_setup_windows_dll_project(ctx: &ActionCtx, scratch: &str, compiler: &str) 
     made_args.push("gdi32")
     made_args.push("opengl32")
     made_args.push("winmm")
-    let made = ctx.process_runner().run_capture_with_env(made_args, ht_join(root, ht_join(scratch, "import_libs.stdout")), ht_join(root, ht_join(scratch, "import_libs.stderr")), 600000, ht_windows_env())
+    let made = ctx.process_runner().run_capture_with_env(made_args, ht_join(root, ht_join(scratch, "import_libs.stdout")), ht_join(root, ht_join(scratch, "import_libs.stderr")), 600000, ht_windows_env(ht_join(root, ht_join(scratch, "cache"))))
     if made.rc != 0:
         return f"error: test/host_toolchain/windows_dll_project: `with __windows-import-libs` failed (exit {made.rc}):\n" ++ made.stdout ++ made.stderr
     ht_join(root, ht_join(dir, "src/main.w"))
@@ -271,13 +274,13 @@ fn ht_windows_builds(ctx: &ActionCtx, root: &str, compiler: &str) -> Vec[str]:
         build.push(sources[i].clone())
         build.push("-o")
         build.push(binary.clone())
-        let built = ctx.process_runner().run_capture_with_env(build, ht_join(root, ht_join(scratch, name ++ ".build.stdout")), ht_join(root, ht_join(scratch, name ++ ".build.stderr")), 600000, ht_windows_env())
+        let built = ctx.process_runner().run_capture_with_env(build, ht_join(root, ht_join(scratch, name ++ ".build.stdout")), ht_join(root, ht_join(scratch, name ++ ".build.stderr")), 600000, ht_windows_env(ht_join(root, ht_join(scratch, "cache"))))
         if built.rc != 0:
             out.push("problem: " ++ source ++ ": the build failed with no Visual Studio or Windows SDK in reach (exit " ++ f"{built.rc}" ++ "):\n" ++ built.stdout ++ built.stderr)
             continue
         let run: Vec[str] = Vec.new()
         run.push(binary.clone())
-        let ran = ctx.process_runner().run_capture_with_env(run, ht_join(root, ht_join(scratch, name ++ ".run.stdout")), ht_join(root, ht_join(scratch, name ++ ".run.stderr")), 60000, ht_windows_env())
+        let ran = ctx.process_runner().run_capture_with_env(run, ht_join(root, ht_join(scratch, name ++ ".run.stdout")), ht_join(root, ht_join(scratch, name ++ ".run.stderr")), 60000, ht_windows_env(ht_join(root, ht_join(scratch, "cache"))))
         let expected = ht_expected_stdout(fs.read_text(source))
         if ran.rc != 0 or ran.stdout.replace("\r\n", "\n") != expected:
             out.push("problem: " ++ source ++ f": the program exited {ran.rc} printing:\n" ++ ran.stdout ++ ran.stderr ++ "expected:\n" ++ expected)

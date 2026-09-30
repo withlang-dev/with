@@ -386,6 +386,7 @@ fn run_cross_linux_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     let cross_lld = comp_sdk_lld_flavors(fs, lib_dir, "Linux")
     ld_rsp = ld_rsp ++ comp_lld_archive_lines(&cross_lld, lib_dir) ++ comp_lld_alias_lines(&cross_lld, "Linux", false)
     ld_rsp = ld_rsp ++ comp_dsymutil_link_lines(false, lib_dir, "Linux", false)
+    ld_rsp = ld_rsp ++ comp_dlltool_link_lines(false, "Linux", false)
     if fs.write_text(output_path, ld_rsp) != 0:
         ctx.diagnostics().error("cross-llvm-link-metadata: could not write: " ++ output_path)
     0
@@ -446,9 +447,11 @@ fn run_cross_windows_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     for i in 0..sorted_llvm.len() as i32:
         ld_rsp = ld_rsp ++ comp_rsp_path(sorted_llvm[i]) ++ "\n"
     ld_rsp = ld_rsp ++ comp_wasm_backend_alias_lines(comp_sdk_has_wasm_backend(fs, lib_dir), "Windows", false)
-    // #1915: no `with ld` on Windows yet; its names are stand-ins.
+    // #1915: a compiler cross-linked for Windows carries no `with __ld`;
+    // its names are stand-ins (build/compiler.w comp_sdk_lld_flavors).
     ld_rsp = ld_rsp ++ comp_lld_alias_lines(&comp_sdk_lld_flavors(fs, lib_dir, "Windows"), "Windows", false)
     ld_rsp = ld_rsp ++ comp_dsymutil_link_lines(false, lib_dir, "Windows", false)
+    ld_rsp = ld_rsp ++ comp_dlltool_link_lines(false, "Windows", false)
     if fs.write_text(output_path, ld_rsp) != 0:
         ctx.diagnostics().error("cross-windows-llvm-link-metadata: could not write: " ++ output_path)
     0
@@ -506,9 +509,11 @@ fn run_cross_windows_aarch64_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     for i in 0..sorted_llvm.len() as i32:
         ld_rsp = ld_rsp ++ comp_rsp_path(sorted_llvm[i]) ++ "\n"
     ld_rsp = ld_rsp ++ comp_wasm_backend_alias_lines(comp_sdk_has_wasm_backend(fs, lib_dir), "Windows", false)
-    // #1915: no `with ld` on Windows yet; its names are stand-ins.
+    // #1915: a compiler cross-linked for Windows carries no `with __ld`;
+    // its names are stand-ins (build/compiler.w comp_sdk_lld_flavors).
     ld_rsp = ld_rsp ++ comp_lld_alias_lines(&comp_sdk_lld_flavors(fs, lib_dir, "Windows"), "Windows", false)
     ld_rsp = ld_rsp ++ comp_dsymutil_link_lines(false, lib_dir, "Windows", false)
+    ld_rsp = ld_rsp ++ comp_dlltool_link_lines(false, "Windows", false)
     if fs.write_text(output_path, ld_rsp) != 0:
         ctx.diagnostics().error("cross-windows-aarch64-llvm-link-metadata: could not write: " ++ output_path)
     0
@@ -559,13 +564,20 @@ fn target_with_darwin_sysroot_blob(target: Target) -> Target:
     // #1915 (D81): and the SDK's build tools `with get` uses (build/sdk.w).
     out = out.input(sdk_build_tools_pack())
     out = out.arg("sdk_tools")
-    out.dep("sdk-build-tools-pack")
+    out = out.dep("sdk-build-tools-pack")
+    // #1915 (D81): and, on Windows, its C runtime, clang resource directory
+    // and build tools (build/sdk.w run_windows_sysroot_action).
+    out = out.input(sdk_windows_sysroot_pack())
+    out = out.arg("windows_sysroot")
+    out.dep("windows-sysroot")
 
 fn target_with_empty_darwin_sysroot_blob(target: Target, prefix: &str, dir: &str) -> Target:
     var out = target.input(dir ++ "/empty_darwin_sysroot.bin")
     out = out.arg("darwin_sysroot")
     out = out.input(dir ++ "/empty_darwin_sysroot.bin")
     out = out.arg("sdk_tools")
+    out = out.input(dir ++ "/empty_darwin_sysroot.bin")
+    out = out.arg("windows_sysroot")
     out.dep(prefix ++ "empty-darwin-sysroot")
 
 fn add_empty_darwin_sysroot_blob_target(out: Build, prefix: &str, dir: &str) -> Build:
@@ -2564,6 +2576,7 @@ pub fn build(ctx: BuildCtx) -> Build:
         sdk_lld_text = sdk_lld_text ++ " " ++ sdk_lld_flavors[li]
     clang_resource = clang_resource.arg("lld=" ++ sdk_lld_text)
     clang_resource = clang_resource.arg("dsymutil=" ++ (if comp_sdk_has_dsymutil(ctx.fs(), sdk_lib_dir, os()): "yes" else: "no"))
+    clang_resource = clang_resource.arg("dlltool=" ++ (if comp_sdk_has_dlltool(ctx.fs(), sdk_lib_dir, os()): "yes" else: "no"))
     clang_resource.action = generate_embedded_clang_resource_action
     out = out.add_target(clang_resource)
 
@@ -2576,6 +2589,15 @@ pub fn build(ctx: BuildCtx) -> Build:
     sdk_tools_pack = sdk_tools_pack.input("sdk.lock")
     sdk_tools_pack = sdk_tools_pack.timeout(600000)
     out = out.add_target(sdk_tools_pack)
+
+    // #1915 (D81): the Windows toolchain a Windows compiler carries (build/sdk.w
+    // run_windows_sysroot_action): empty on every other host.
+    var windows_sysroot = target_new(.Action, "windows-sysroot", "").output(sdk_windows_sysroot_pack())
+    windows_sysroot.action = run_windows_sysroot_action
+    windows_sysroot = windows_sysroot.input("build/sdk.w")
+    windows_sysroot = windows_sysroot.input("sdk.lock")
+    windows_sysroot = windows_sysroot.timeout(1200000)
+    out = out.add_target(windows_sysroot)
 
     var darwin_sysroot = target_new(.Action, "darwin-sysroot", "").output(sdk_darwin_sysroot_pack())
     darwin_sysroot.action = run_darwin_sysroot_action

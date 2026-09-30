@@ -2577,11 +2577,13 @@ pub fn comp_darwin_sysroot_abs(root: &str) -> str: comp_join(root, comp_darwin_s
 // driver archive this SDK has; the compiler link pulls those archives in and
 // aliases each driver's entry point, `bool lld::<ns>::link(ArrayRef<const
 // char *>, raw_ostream &, raw_ostream &, bool, bool)`, to a plain name.
-// Windows is empty until its MSVC spellings are wired (the Itanium ones are
-// what this build can check against an SDK here).
+// A Windows compiler links them from a windows-gnu SDK (Itanium spellings,
+// GNU-named archives, #1915); a Windows compiler cross-linked from another
+// host, or from a Visual Studio-built SDK (lldCommon.lib), links none and
+// runs the SDK's lld-link as before.
 pub fn comp_sdk_lld_flavors(fs: &ToolFs, llvm_lib_dir: &str, target_os: &str) -> Vec[str]:
     let out: Vec[str] = Vec.new()
-    if target_os == "Windows" or not fs.host_exists(llvm_lib_dir ++ "/liblldCommon.a"):
+    if (target_os == "Windows" and os() != "Windows") or not fs.host_exists(llvm_lib_dir ++ "/liblldCommon.a"):
         return out
     let flavors = comp_lld_all_flavors()
     for i in 0..flavors.len() as i32:
@@ -2659,6 +2661,10 @@ pub fn comp_lld_alias_lines(flavors: &Vec[str], target_os: &str, driver_form: bo
                 out = out ++ (if driver_form: "-Wl,-u,_" ++ target ++ "\n" else: "-u\n_" ++ target ++ "\n")
             out = out ++ (if driver_form: "-Wl,-alias,_" ++ target ++ ",_" ++ name ++ "\n" else: "-alias\n_" ++ target ++ "\n_" ++ name ++ "\n")
         else if target_os == "Windows":
+            // /alternatename resolves the name only if the target is linked:
+            // /include pulls the driver's archive member in.
+            if target != stand_in:
+                out = out ++ (if driver_form: "-Wl,/include:" else: "/include:") ++ target ++ "\n"
             out = out ++ (if driver_form: "-Wl,/alternatename:" else: "/alternatename:") ++ name ++ "=" ++ target ++ "\n"
         else:
             if target != stand_in:
@@ -2687,6 +2693,29 @@ pub fn comp_dsymutil_link_lines(has_dsymutil: bool, llvm_lib_dir: &str, target_o
         out = out ++ (if driver_form: "-Wl,/alternatename:" else: "/alternatename:") ++ "with_dsymutil_main=" ++ target ++ "\n"
     else:
         out = out ++ (if driver_form: "-Wl,--defsym=" else: "--defsym=") ++ "with_dsymutil_main=" ++ target ++ "\n"
+    out
+
+// #1915 (D81): `with __dlltool` (src/compiler/DlltoolDriver.w) is LLVM's
+// dlltool linked into a Windows compiler — `int llvm::dlltoolDriverMain(
+// ArrayRef<const char *>)` from the SDK's lib/libLLVMDlltoolDriver.a —
+// with which `with get` writes the import libraries of in-box DLLs
+// (compiler.WindowsImportLibs). It is aliased to with_dlltool_main; every
+// other compiler aliases it to a stand-in the generated
+// embedded_dlltool_linked() fact says not to call.
+pub fn comp_sdk_has_dlltool(fs: &ToolFs, llvm_lib_dir: &str, target_os: &str) -> bool:
+    target_os == "Windows" and os() == "Windows" and fs.host_exists(llvm_lib_dir ++ "/libLLVMDlltoolDriver.a")
+
+pub fn comp_dlltool_link_lines(has_dlltool: bool, target_os: &str, driver_form: bool) -> str:
+    let target = if has_dlltool: "_ZN4llvm17dlltoolDriverMainENS_8ArrayRefIPKcEE" else: "with_alloc"
+    var out = ""
+    if target_os == "Macos":
+        out = out ++ (if driver_form: "-Wl,-alias,_" ++ target ++ ",_with_dlltool_main\n" else: "-alias\n_" ++ target ++ "\n_with_dlltool_main\n")
+    else if target_os == "Windows":
+        if has_dlltool:
+            out = out ++ (if driver_form: "-Wl,/include:" else: "/include:") ++ target ++ "\n"
+        out = out ++ (if driver_form: "-Wl,/alternatename:" else: "/alternatename:") ++ "with_dlltool_main=" ++ target ++ "\n"
+    else:
+        out = out ++ (if driver_form: "-Wl,--defsym=" else: "--defsym=") ++ "with_dlltool_main=" ++ target ++ "\n"
     out
 
 fn comp_is_sha256_hex(text: &str) -> bool:
@@ -2835,6 +2864,9 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     let has_dsymutil = comp_sdk_has_dsymutil(fs, llvm_lib_dir, os())
     rsp = rsp ++ comp_dsymutil_link_lines(has_dsymutil, llvm_lib_dir, os(), true)
     ld_rsp = ld_rsp ++ comp_dsymutil_link_lines(has_dsymutil, llvm_lib_dir, os(), false)
+    let has_dlltool = comp_sdk_has_dlltool(fs, llvm_lib_dir, os())
+    rsp = rsp ++ comp_dlltool_link_lines(has_dlltool, os(), true)
+    ld_rsp = ld_rsp ++ comp_dlltool_link_lines(has_dlltool, os(), false)
     if os() == "Macos":
         // #1915: the compiler links against our darwin sysroot (build/sdk.w
         // run_darwin_sysroot_action), never an Apple SDK: libSystem and
