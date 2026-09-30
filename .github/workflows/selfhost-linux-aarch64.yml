@@ -40,11 +40,11 @@ jobs:
       WITH_SEED_VERSION: v0.15.2.0
       WITH_SEED_SHA256: 3e54f7839dbf9549233a19753c897fb08f493fa8cfafeeec25b62fa87a43aac3
       WITH_SDK_REPO: withlang-dev/with
-      WITH_SDK_VERSION: sdk-linux-aarch64
+      WITH_SDK_VERSION: nightly-sdk-20260930-e997223d40ce
       # NOTE: this platform's SDK ships as .tar.gz (the linux-x86_64 asset is
       # .tar.zst), so it is extracted with tar -xzf rather than zstd.
       WITH_SDK_ASSET: with-llvm-sdk-22.1.6-linux-aarch64.tar.gz
-      WITH_SDK_SHA256: b1597fe5281c760f594235a0d5b01fe3360b8303f7615b9f87c3ff87a2740926
+      WITH_SDK_SHA256: 4fe9695ef30a05d2f15bd0095b2d8b892ae9102930ca520b382ab545a3727a2b
       # The linux-aarch64 compiler does not yet embed its platform runtime
       # object: the build emits with_embedded_rt_linux_aarch64_o_* into
       # embedded_objects.s, but src/compiler/Link.w declares no extern for it --

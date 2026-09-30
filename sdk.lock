@@ -27,8 +27,13 @@ with-llvm-sdk-22.1.6-linux-x86_64.tar.gz=5d3f1a34f677185880d87bb3b9031e6c4f2967b
 with-llvm-sdk-22.1.6-linux-x86_64.tar.gz.sha256=bd9719f205d97faa5739a407fcef3fb4950f81c1dcd71ae074513c859a318a25
 with-llvm-sdk-22.1.6-linux-x86_64.tar.gz.manifest=4252f86279af1c7d1d345e649447ec6877726fc176ef58d5584224b457662850
 
-with-llvm-sdk-22.1.6-linux-aarch64.tar.gz.version=sdk-linux-aarch64
-with-llvm-sdk-22.1.6-linux-aarch64.tar.gz=b1597fe5281c760f594235a0d5b01fe3360b8303f7615b9f87c3ff87a2740926
+# linux-aarch64: cross-built from e997223d with the same glibc 2.28 floor,
+# static libc++, compiler-rt, CMake and Ninja as linux-x86_64. Verified by
+# a native ARM self-host and :no-host-toolchain, including C++.
+with-llvm-sdk-22.1.6-linux-aarch64.tar.gz.version=nightly-sdk-20260930-e997223d40ce
+with-llvm-sdk-22.1.6-linux-aarch64.tar.gz=4fe9695ef30a05d2f15bd0095b2d8b892ae9102930ca520b382ab545a3727a2b
+with-llvm-sdk-22.1.6-linux-aarch64.tar.gz.sha256=ff9ad6a70018894231a7b45ce90f66cd1516cadae045b438ffc2aeba0117eec3
+with-llvm-sdk-22.1.6-linux-aarch64.tar.gz.manifest=0f29d9fd8dd0d7e94babdaddf67d2f9e3007442dc320271e8a0a49cbe442c966
 
 # windows-x86_64: 6cd934e8, x86_64-w64-windows-gnu with its own C runtime
 # (mingw-w64 14.0.0 + UCRT), compiler-rt builtins, libc++ and the build tools,
