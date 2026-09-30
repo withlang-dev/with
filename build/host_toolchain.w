@@ -214,6 +214,25 @@ pub fn run_no_host_toolchain_action(ctx: ActionCtx) -> i32:
             fixtures.push("test/host_toolchain/framework_project/src/main.w")
             sources.push(project)
             names.push("framework_program")
+        // #1915 (D81): `with get` builds from source with the SDK's cmake and
+        // ninja, which the compiler carries; they run in the sandbox too.
+        let tools_argv: Vec[str] = Vec.new()
+        tools_argv.push(compiler.clone())
+        tools_argv.push("__sdk-tools")
+        let tools = ctx.process_runner().run_capture(ht_sandboxed(profile, home, tools_argv), ht_join(root, ht_join(scratch, "sdk-tools.stdout")), ht_join(root, ht_join(scratch, "sdk-tools.stderr")), 300000)
+        let tools_dir = ht_trim(tools.stdout.replace("\n", ""))
+        if tools.rc != 0 or tools_dir.len() == 0:
+            problems.push(f"`with __sdk-tools` failed (exit {tools.rc}): " ++ tools.stdout ++ tools.stderr)
+        else:
+            for tool in ["cmake", "ninja"]:
+                let run_tool: Vec[str] = Vec.new()
+                run_tool.push(tools_dir ++ "/bin/" ++ tool)
+                run_tool.push("--version")
+                let ran_tool = ctx.process_runner().run_capture(ht_sandboxed(profile, home, run_tool), ht_join(root, ht_join(scratch, tool ++ ".stdout")), ht_join(root, ht_join(scratch, tool ++ ".stderr")), 60000)
+                if ran_tool.rc != 0 or ran_tool.stdout.len() == 0:
+                    problems.push("the SDK's " ++ tool ++ f" the compiler carries does not run (exit {ran_tool.rc}): " ++ ran_tool.stderr)
+                else:
+                    verdict = verdict ++ "SDK " ++ tool ++ " runs from the compiler's cache\n"
         for i in 0..fixtures.len() as i32:
             let source = fixtures[i]
             let name = names[i].clone()

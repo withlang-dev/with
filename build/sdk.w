@@ -1628,3 +1628,56 @@ pub fn run_darwin_sysroot_action(ctx: ActionCtx) -> i32:
             return rc
         pack.push_str("A " ++ aliases[i] ++ " usr/lib/libSystem.tbd\n")
     sdk_write_text(ctx, pack_path, pack.to_str())
+
+// ── The SDK's build tools, carried by the compiler (#1915, D81) ────────
+//
+// `with get` builds a package from source with CMake and Ninja. They are our
+// SDK's (sdk-cmake, sdk-ninja build them into the SDK prefix, and the SDK
+// package ships bin/cmake, bin/ninja and share/cmake-<v>), never the
+// machine's: the compiler embeds them as the `sdk_tools` blob and unpacks
+// them to its cache on first use (src/compiler/EmbeddedSysroot.w). Same pack
+// format as the darwin sysroot; "E" marks an executable. CMake's Help/ (the
+// reference manual, whose file names carry spaces) is left out: CMake does
+// not read it to configure or build. macOS only for now; every other host
+// carries an empty pack until its #1915 slice.
+pub fn sdk_build_tools_pack() -> str: "out/gen/sdk-tools.pack"
+
+pub fn run_sdk_build_tools_pack_action(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    let pack_path = ctx.output()
+    if pack_path.len() == 0:
+        return sdk_fail(ctx, "requires an output path")
+    if os() != "Macos":
+        return sdk_write_text(ctx, pack_path, "")
+    // The in-project SDK path: the build's file sandbox reads under the
+    // project root (as build/clang_resource.w does).
+    let prefix = compiler_default_llvm_prefix()
+    let share = sdk_join(prefix, sdk_cmake_data_prefix().slice(0, sdk_cmake_data_prefix().len() - 1))
+    var pack = StringBuilder.with_capacity(48000000)
+    pack.push_str("WITH-SYSROOT 1\n")
+    let tools: Vec[str] = Vec.new()
+    tools.push("bin/cmake")
+    tools.push("bin/ninja")
+    for i in 0..tools.len() as i32:
+        let bytes = fs.read_text(sdk_join(prefix, tools[i]))
+        if bytes.len() == 0:
+            return sdk_fail(ctx, "the LLVM SDK at " ++ prefix ++ " has no " ++ tools[i] ++ " (sdk-cmake / sdk-ninja build it; the SDK package ships it)")
+        pack.push_str("E " ++ tools[i] ++ " " ++ f"{bytes.len()}" ++ "\n")
+        pack.push_str(bytes)
+    let files = sdk_merge_sort_strings(fs.list_files(share))
+    if files.len() == 0:
+        return sdk_fail(ctx, "the LLVM SDK at " ++ prefix ++ " has no CMake modules under " ++ share)
+    var count = 0
+    for i in 0..files.len() as i32:
+        let rel = sdk_rel_path(prefix, sdk_normalize(files[i]))
+        if rel.len() == 0 or rel.find("/Help/") >= 0:
+            continue
+        if not sdk_sysroot_path_ok(rel):
+            return sdk_fail(ctx, "a CMake file the tools pack cannot carry: " ++ files[i])
+        let bytes = fs.read_text(files[i])
+        pack.push_str("F " ++ rel ++ " " ++ f"{bytes.len()}" ++ "\n")
+        pack.push_str(bytes)
+        count = count + 1
+    if count < 100:
+        return sdk_fail(ctx, f"only {count} CMake module files under " ++ share)
+    sdk_write_text(ctx, pack_path, pack.to_str())

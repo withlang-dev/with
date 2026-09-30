@@ -555,11 +555,17 @@ fn embedded_platform_symbols() -> Vec[str]:
 fn target_with_darwin_sysroot_blob(target: Target) -> Target:
     var out = target.input(sdk_darwin_sysroot_pack())
     out = out.arg("darwin_sysroot")
-    out.dep("darwin-sysroot")
+    out = out.dep("darwin-sysroot")
+    // #1915 (D81): and the SDK's build tools `with get` uses (build/sdk.w).
+    out = out.input(sdk_build_tools_pack())
+    out = out.arg("sdk_tools")
+    out.dep("sdk-build-tools-pack")
 
 fn target_with_empty_darwin_sysroot_blob(target: Target, prefix: &str, dir: &str) -> Target:
     var out = target.input(dir ++ "/empty_darwin_sysroot.bin")
     out = out.arg("darwin_sysroot")
+    out = out.input(dir ++ "/empty_darwin_sysroot.bin")
+    out = out.arg("sdk_tools")
     out.dep(prefix ++ "empty-darwin-sysroot")
 
 fn add_empty_darwin_sysroot_blob_target(out: Build, prefix: &str, dir: &str) -> Build:
@@ -2459,6 +2465,13 @@ pub fn build(ctx: BuildCtx) -> Build:
     // #1915: the darwin sysroot every macOS link and c_import reads, built
     // from pinned sources (build/sdk.w). Off macOS the pack is empty and
     // nothing is fetched.
+    var sdk_tools_pack = target_new(.Action, "sdk-build-tools-pack", "").output(sdk_build_tools_pack())
+    sdk_tools_pack.action = run_sdk_build_tools_pack_action
+    sdk_tools_pack = sdk_tools_pack.input("build/sdk.w")
+    sdk_tools_pack = sdk_tools_pack.input("sdk.lock")
+    sdk_tools_pack = sdk_tools_pack.timeout(600000)
+    out = out.add_target(sdk_tools_pack)
+
     var darwin_sysroot = target_new(.Action, "darwin-sysroot", "").output(sdk_darwin_sysroot_pack())
     darwin_sysroot.action = run_darwin_sysroot_action
     darwin_sysroot = darwin_sysroot.input("build/sdk.w")

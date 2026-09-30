@@ -32,6 +32,7 @@ use BuildGraphCache
 use compiler.ClangDriver
 use compiler.LldDriver
 use compiler.FrameworkStubs
+use compiler.EmbeddedSysroot
 use compiler.DsymutilDriver
 use compiler.GreenEvidence
 use compiler.DriverOptions
@@ -775,6 +776,15 @@ fn run_cli(argc: i32) -> i32:
     if cli_command(argc) == "__dsymutil": return with_dsymutil_cli_main()
     // `with __framework-stubs <dir> <Name>...`: the framework stubs `with get`
     // writes for a package that links Apple frameworks (#1915).
+    // `with __sdk-tools`: the directory of the SDK build tools this compiler
+    // carries (cmake, ninja; #1915), unpacked on first use.
+    if cli_command(argc) == "__sdk-tools":
+        let tools_dir = embedded_sdk_tools_dir()
+        if tools_dir.len() == 0:
+            with_eprint("error: this build of `with` carries no SDK build tools")
+            return 1
+        print(tools_dir)
+        return 0
     if cli_command(argc) == "__framework-stubs":
         let stub_args: Vec[str] = Vec.new()
         for i in 2..argc: stub_args.push(with_arg_at(i))

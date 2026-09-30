@@ -9,6 +9,7 @@ use compiler.ConanPatch
 use compiler.ClangDriver
 use compiler.FrameworkStubs
 use compiler.TarExtract
+use compiler.EmbeddedSysroot
 use std.http
 use std.crypto.sha256
 extern fn with_str_clone_ref(s: &str) -> str
@@ -1183,20 +1184,34 @@ fn conan_find_program(name: &str) -> str:
         if runtime_file_exists(candidate) != 0: return candidate
     ""
 
-// A build tool: WITH_<NAME> names it outright, otherwise PATH.
+// A build tool: WITH_<NAME> names it outright; otherwise it is this
+// compiler's own (#1915, D81): the SDK's cmake and ninja, which the compiler
+// carries and unpacks to its cache (compiler.EmbeddedSysroot), never the
+// machine's. A compiler that carries none — a host whose #1915 slice has not
+// landed — still looks on PATH.
 fn conan_build_tool(name: &str, env_name: &str) -> str:
     let named = runtime_getenv(env_name)
-    if named.len() > 0: named else: conan_find_program(name)
+    if named.len() > 0: return named
+    let tools = embedded_sdk_tools_dir()
+    if tools.len() > 0:
+        let path = tools ++ "/bin/" ++ name ++ (if runtime_sysinfo_os() == "Windows": ".exe" else: "")
+        return if runtime_file_exists(path) != 0: path else: ""
+    conan_find_program(name)
 
 // `<dir>/<tool>`: a launcher that runs `<self> <tool> ...`. CMake wants one
 // program path for a compiler; `with cc` is two words.
 fn conan_write_launcher(dir: &str, tool: &str, self_exe: &str) -> str:
+    conan_write_launcher_named(dir, tool, self_exe, tool)
+
+// `<dir>/<name>`: runs `<self> <command> ...`; the command may carry its own
+// leading arguments (`cc --driver-mode=g++`).
+fn conan_write_launcher_named(dir: &str, name: &str, self_exe: &str, command: &str) -> str:
     if runtime_sysinfo_os() == "Windows":
-        let path = dir ++ "/" ++ tool ++ ".cmd"
-        let _w = runtime_write_file(path, "@\"" ++ self_exe ++ "\" " ++ tool ++ " %*\r\n")
+        let path = dir ++ "/" ++ name ++ ".cmd"
+        let _w = runtime_write_file(path, "@\"" ++ self_exe ++ "\" " ++ command ++ " %*\r\n")
         return path
-    let path = dir ++ "/" ++ tool
-    let _w = runtime_write_file(path, "#!/bin/sh\nexec \"" ++ self_exe ++ "\" " ++ tool ++ " \"$@\"\n")
+    let path = dir ++ "/" ++ name
+    let _w = runtime_write_file(path, "#!/bin/sh\nexec \"" ++ self_exe ++ "\" " ++ command ++ " \"$@\"\n")
     let _x = with_fs_chmod(path, 0o755)
     path
 
@@ -1267,6 +1282,8 @@ fn conan_install_from_source(name: &str, version: &str, project_root: &str, dept
     let ninja = conan_build_tool("ninja", "WITH_NINJA")
     if cmake.len() == 0 or ninja.len() == 0:
         let missing = if cmake.len() == 0 and ninja.len() == 0: "cmake and ninja" else: if cmake.len() == 0: "cmake" else: "ninja"
+        if embedded_sdk_tools_dir().len() > 0:
+            return conan_source_fail("", "building " ++ name ++ " from source needs " ++ missing ++ ", which this compiler's SDK tools (" ++ embedded_sdk_tools_dir() ++ ") lack; set WITH_CMAKE / WITH_NINJA to name them")
         return conan_source_fail("", "building " ++ name ++ " from source needs " ++ missing ++ ", which " ++ (if missing.contains(" and "): "are" else: "is") ++ " not on PATH; install " ++ (if missing.contains(" and "): "them" else: "it") ++ " (or set WITH_CMAKE / WITH_NINJA) and run `with get` again")
     let self_exe = conan_self_exe()
     if self_exe.len() == 0: return conan_source_fail("", "could not locate this `with` executable to use as the C compiler")
@@ -1331,6 +1348,9 @@ fn conan_install_from_source(name: &str, version: &str, project_root: &str, dept
     configure = conan_argv_append(configure, "Ninja")
     configure = conan_argv_append(configure, "-DCMAKE_MAKE_PROGRAM=" ++ ninja)
     configure = conan_argv_append(configure, "-DCMAKE_C_COMPILER=" ++ conan_write_launcher(tools_dir, "cc", self_exe))
+    // #1915: a project that declares C++ (raylib's `project(raylib C CXX)`)
+    // gets clang's C++ driver too, never the host's c++.
+    configure = conan_argv_append(configure, "-DCMAKE_CXX_COMPILER=" ++ conan_write_launcher_named(tools_dir, "c++", self_exe, "cc --driver-mode=g++"))
     configure = conan_argv_append(configure, "-DCMAKE_AR=" ++ conan_write_launcher(tools_dir, "__ar", self_exe))
     configure = conan_argv_append(configure, "-DCMAKE_RANLIB=" ++ conan_write_launcher(tools_dir, "__ranlib", self_exe))
     configure = conan_argv_append(configure, "-DCMAKE_BUILD_TYPE=Release")
