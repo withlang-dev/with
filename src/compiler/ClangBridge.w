@@ -35,6 +35,7 @@ extern fn with_fs_remove_file(path: &str) -> i32
 extern fn with_fs_file_exists(path: &str) -> i32
 extern fn with_getenv_str(name: &str) -> str
 extern fn with_sysinfo_os() -> str
+extern fn with_sysinfo_arch() -> str
 
 // ── libclang types ──────────────────────────────────────────────
 // Struct layouts match the C ABI exactly.
@@ -779,8 +780,22 @@ unsafe fn copy_first_line_to_buf(text: &str, dst: *mut u8, cap: i64) -> i32:
 unsafe fn c_path_to_str(path: *const u8) -> str:
     make_str(path)
 
+// linux-x86_64 (#1915): libc's headers are the sysroot's, and a library the
+// program names that the sysroot does not carry (zlib.h, curl/curl.h) is
+// looked up in the host's include directories after every sysroot one, so a
+// header the sysroot has is never the host's.
+unsafe fn cimport_push_host_library_dirs(args: *mut *const u8, nargs: i32) -> i32:
+    if with_sysinfo_os() != "Linux" or with_sysinfo_arch() != "x86_64":
+        return nargs
+    *((args as i64 + nargs as i64 * 8) as *mut *const u8) = "-idirafter\0" as *const u8
+    *((args as i64 + (nargs + 1) as i64 * 8) as *mut *const u8) = "/usr/include/x86_64-linux-gnu\0" as *const u8
+    *((args as i64 + (nargs + 2) as i64 * 8) as *mut *const u8) = "-idirafter\0" as *const u8
+    *((args as i64 + (nargs + 3) as i64 * 8) as *mut *const u8) = "/usr/include\0" as *const u8
+    nargs + 4
+
 unsafe fn get_sdk_path() -> *const u8:
-    if with_sysinfo_os() != "Macos":
+    // The darwin sysroot on macOS, the linux one on linux-x86_64 (#1915).
+    if with_sysinfo_os() != "Macos" and not (with_sysinfo_os() == "Linux" and with_sysinfo_arch() == "x86_64"):
         return 0 as *const u8
     if sdk_path_resolved == 0:
         sdk_path_resolved = 1
@@ -2150,6 +2165,7 @@ unsafe fn cimport_build_args(args: *mut *const u8, cxx: bool):
         args[n] = "-isysroot\0" as *const u8
         args[n + 1] = sysroot
         n += 2
+        n = cimport_push_host_library_dirs(args, n)
     n = cimport_push_target_args(args, n)
     let resdir = get_clang_resource_dir()
     if resdir as i64 != 0:
@@ -2173,8 +2189,9 @@ unsafe fn cimport_build_args(args: *mut *const u8, cxx: bool):
 // array here so every declaration/macro parse gets the complete search path.
 unsafe fn cimport_parse_translation_unit(index: *mut u8, path: *const u8, cxx: bool, options: u32) -> *mut u8:
     if g_cimport_include_error: return 0 as *mut u8
-    // At most ten fixed arguments: sysroot(2), target(3), resource(2), mode(3).
-    let capacity = 10 + g_cimport_include_count as i64 * 2
+    // At most fourteen fixed arguments: sysroot(2), host library dirs(4),
+    // target(3), resource(2), mode(3).
+    let capacity = 14 + g_cimport_include_count as i64 * 2
     let args = with_alloc(capacity * 8) as *mut *const u8
     if args as i64 == 0: return 0 as *mut u8
     let nargs = cimport_build_args(args, cxx)

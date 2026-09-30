@@ -289,6 +289,7 @@ fn add_stage1_runtime_targets(out0: Build, host_runtime: &HostRuntimeSpec, corpu
     metadata = metadata.input("sdk.lock")
     // #1915: the rsp names the darwin sysroot as -syslibroot.
     metadata = metadata.dep("darwin-sysroot")
+    metadata = metadata.dep("linux-sysroot")
     metadata = metadata.input(sdk_darwin_sysroot_pack())
     metadata = metadata.input(dir ++ "/llvm_bridge.o")
     metadata = metadata.input(dir ++ "/clang_bridge.o")
@@ -570,7 +571,11 @@ fn target_with_darwin_sysroot_blob(target: Target) -> Target:
     // and build tools (build/sdk.w run_windows_sysroot_action).
     out = out.input(sdk_windows_sysroot_pack())
     out = out.arg("windows_sysroot")
-    out.dep("windows-sysroot")
+    out = out.dep("windows-sysroot")
+    // And the linux-x86_64 sysroot (empty off linux-x86_64).
+    out = out.input(sdk_linux_link_pack())
+    out = out.arg("linux_sysroot")
+    out.dep("linux-link-pack")
 
 fn target_with_empty_darwin_sysroot_blob(target: Target, prefix: &str, dir: &str) -> Target:
     var out = target.input(dir ++ "/empty_darwin_sysroot.bin")
@@ -579,6 +584,8 @@ fn target_with_empty_darwin_sysroot_blob(target: Target, prefix: &str, dir: &str
     out = out.arg("sdk_tools")
     out = out.input(dir ++ "/empty_darwin_sysroot.bin")
     out = out.arg("windows_sysroot")
+    out = out.input(dir ++ "/empty_darwin_sysroot.bin")
+    out = out.arg("linux_sysroot")
     out.dep(prefix ++ "empty-darwin-sysroot")
 
 fn add_empty_darwin_sysroot_blob_target(out: Build, prefix: &str, dir: &str) -> Build:
@@ -1241,6 +1248,10 @@ fn sdk_llvm_target(ctx: &BuildCtx) -> Target:
     else:
         target = target.input(output_prefix ++ "/bin/cmake" ++ host_exe_suffix())
         target = target.dep("sdk-cmake")
+    // linux-x86_64 builds its runtimes and LLVM against the With sysroot.
+    if os() == "Linux" and arch() == "x86_64":
+        target = target.dep("linux-sysroot")
+        target = target.input(sdk_linux_sysroot_pack())
     target.timeout(21600000)
 
 // The Windows C runtime of the SDK (#1915; build/sdk.w): mingw-w64's headers,
@@ -2635,6 +2646,15 @@ pub fn build(ctx: BuildCtx) -> Build:
     linux_sysroot = linux_sysroot.timeout(1200000)
     out = out.add_target(linux_sysroot)
 
+    var linux_link_pack = target_new(.Action, "linux-link-pack", "").output(sdk_linux_link_pack())
+    linux_link_pack.action = run_linux_link_pack_action
+    linux_link_pack = linux_link_pack.input("build/sdk.w")
+    linux_link_pack = linux_link_pack.input("sdk.lock")
+    linux_link_pack = linux_link_pack.input(sdk_linux_sysroot_pack())
+    linux_link_pack = linux_link_pack.dep("linux-sysroot")
+    linux_link_pack = linux_link_pack.timeout(600000)
+    out = out.add_target(linux_link_pack)
+
     var compiler_no_c_export = target_new(.Action, "compiler-no-c-export", "").output("out/.build-state/compiler-no-c-export.txt")
     compiler_no_c_export.action = run_check_compiler_no_new_c_export_action
     compiler_no_c_export = compiler_no_c_export.write_scope("out/.build-state")
@@ -2716,6 +2736,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.input("sdk.lock")
     // #1915: the rsp names the darwin sysroot as -syslibroot.
     bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.dep("darwin-sysroot")
+    bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.dep("linux-sysroot")
     bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.input(sdk_darwin_sysroot_pack())
     bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.input("out/bootstrap-lib/llvm_bridge.o")
     bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.input("out/bootstrap-lib/clang_bridge.o")
@@ -2858,6 +2879,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     llvm_link_metadata = llvm_link_metadata.input("sdk.lock")
     // #1915: the rsp names the darwin sysroot as -syslibroot.
     llvm_link_metadata = llvm_link_metadata.dep("darwin-sysroot")
+    llvm_link_metadata = llvm_link_metadata.dep("linux-sysroot")
     llvm_link_metadata = llvm_link_metadata.input(sdk_darwin_sysroot_pack())
     llvm_link_metadata = llvm_link_metadata.input("out/lib/llvm_bridge.o")
     llvm_link_metadata = llvm_link_metadata.input("out/lib/clang_bridge.o")

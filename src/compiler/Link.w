@@ -518,7 +518,100 @@ fn link_stage_make_darwin_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_p
     let cleanup_files = link_stage_collect_cleanup_files(extras)
     LinkStageCommand { linker: with_str_clone_ref(llvm_ld), args, cwd: "", env, inputs, outputs, cleanup_files }
 
+// #1915 (D81): a native linux-x86_64 link reads this compiler's own sysroot
+// (compiler.EmbeddedSysroot: glibc 2.28 link stubs, glibc's crt objects,
+// compiler-rt's builtins and crtbegin/crtend), never the host's gcc or glibc
+// files. WITH_LINUX_SYSROOT names another sysroot explicitly (the host
+// layout, as a cross link uses it); a cross target and linux-aarch64 keep
+// that path until their slices.
+fn link_stage_linux_uses_own_sysroot() -> bool:
+    target_spec_is_native() and runtime_sysinfo_os() == "Linux" and runtime_sysinfo_arch() == "x86_64" and runtime_getenv("WITH_LINUX_SYSROOT").len() == 0
+
+fn link_stage_make_linux_own_sysroot_command(linker: &str, sysroot: &str, obj_path: &str, bin_path: &str, extras: &Vec[str], link_libs: &Vec[str], link_args: &Vec[str], compiler_link: bool) -> LinkStageCommand:
+    let args: Vec[str] = Vec.new()
+    let env: Vec[LinkStageEnvVar] = Vec.new()
+    let inputs: Vec[str] = Vec.new()
+    let outputs: Vec[str] = Vec.new()
+    let lib = sysroot ++ "/usr/lib"
+    for a in ["-m", "elf_x86_64", "--eh-frame-hdr", "--hash-style=gnu", "--build-id", "--gc-sections", "--as-needed", "-dynamic-linker", "/lib64/ld-linux-x86-64.so.2"]:
+        args.push(a.clone())
+    // The compiler folds identical code, as its link always has.
+    if compiler_link: args.push("--icf=all")
+    args.push("-o")
+    args.push(with_str_clone_ref(bin_path))
+    outputs.push(with_str_clone_ref(bin_path))
+    for crt in ["crt1.o", "crti.o", "clang_rt.crtbegin.o"]:
+        args.push(lib ++ "/" ++ crt)
+        inputs.push(lib ++ "/" ++ crt)
+    args.push(with_str_clone_ref(obj_path))
+    inputs.push(with_str_clone_ref(obj_path))
+    for i in 0..extras.len() as i32:
+        args.push(with_str_clone_ref(extras[i]))
+        inputs.push(with_str_clone_ref(extras[i]))
+    args.push("-L" ++ lib)
+    // A library a program names that the sysroot does not carry (zlib, curl)
+    // is the host's, found after every sysroot one, as c_import finds its
+    // header (ClangBridge cimport_push_host_library_dirs). The compiler's own
+    // link names none.
+    if not compiler_link and link_libs.len() > 0:
+        args.push("-L/usr/lib/x86_64-linux-gnu")
+        args.push("-L/lib/x86_64-linux-gnu")
+    if link_libs.len() > 0: args.push(link_stage_archive_group_marker(1, 0, 1))
+    for i in 0..link_libs.len() as i32:
+        let name = link_libs[i]
+        if link_stage_framework_name(name).len() > 0:
+            with_eprint("error: link: \"" ++ name ++ "\" — Apple frameworks are only available on macOS targets\n")
+        else:
+            args.push("-l" ++ name)
+    if link_libs.len() > 0: args.push(link_stage_archive_group_marker(1, 0, 0))
+    for i in 0..link_args.len() as i32:
+        args.push(with_str_clone_ref(link_args[i]))
+    // libm, libc (glibc's script: libc.so.6, libc_nonshared, the dynamic
+    // linker), and compiler-rt where a gcc link has libgcc.
+    args.push("-lm")
+    args.push("-lc")
+    for rt in ["libclang_rt.builtins.a", "clang_rt.crtend.o", "crtn.o"]:
+        args.push(lib ++ "/" ++ rt)
+        inputs.push(lib ++ "/" ++ rt)
+    let cleanup_files = link_stage_collect_cleanup_files(extras)
+    LinkStageCommand { linker: with_str_clone_ref(linker), args, cwd: "", env, inputs, outputs, cleanup_files }
+
+// A native linux-x86_64 program: this binary's own lld (`with __ld`) over
+// its own sysroot. No cc, no ld, no gcc, no host glibc development files.
+fn link_stage_linux_native_link_plan(obj_path: &str, bin_path: &str, extras: &Vec[str], link_libs: &Vec[str], link_args: &Vec[str]) -> LinkStagePlan:
+    let self_exe = with_self_exe()
+    if self_exe.len() == 0:
+        with_eprint("error: link: cannot find this compiler's own executable to run its linker (argv[0] is '" ++ runtime_arg_at(0) ++ "')")
+        return link_stage_plan_fail()
+    let sysroot = embedded_linux_sysroot_dir()
+    if sysroot.len() == 0:
+        with_eprint("error: link: this compiler carries no linux sysroot, and WITH_LINUX_SYSROOT names none")
+        return link_stage_plan_fail()
+    let ld_link_args = link_stage_linux_driver_args_for_ld(link_args)
+    var command = link_stage_make_linux_own_sysroot_command(self_exe, sysroot, obj_path, bin_path, extras, link_libs, &ld_link_args, false)
+    let args: Vec[str] = Vec.new()
+    args.push("__ld")
+    for i in 0..command.args.len() as i32:
+        args.push(with_str_clone_ref(command.args[i]))
+    command.args = args
+    link_stage_plan_for_command(move command)
+
+// The driver spellings a program's link arguments use on Linux, for lld:
+// `-Wl,` unwrapped as on macOS, and `-pthread` (a driver flag) its library.
+fn link_stage_linux_driver_args_for_ld(link_args: &Vec[str]) -> Vec[str]:
+    let unwrapped = link_stage_driver_args_for_ld(link_args)
+    let out: Vec[str] = Vec.new()
+    for i in 0..unwrapped.len() as i32:
+        if unwrapped[i] == "-pthread": out.push("-lpthread") else: out.push(with_str_clone_ref(unwrapped[i]))
+    out
+
 fn link_stage_make_linux_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_path: &str, extras: &Vec[str], link_libs: &Vec[str], link_args: &Vec[str]) -> LinkStageCommand:
+    if link_stage_linux_uses_own_sysroot():
+        let own = embedded_linux_sysroot_dir()
+        if own.len() == 0:
+            with_eprint("error: link: this compiler carries no linux sysroot, and WITH_LINUX_SYSROOT names none")
+            return LinkStageCommand { linker: "", args: Vec.new(), cwd: "", env: Vec.new(), inputs: Vec.new(), outputs: Vec.new(), cleanup_files: Vec.new() }
+        return link_stage_make_linux_own_sysroot_command(llvm_ld, own, obj_path, bin_path, extras, link_libs, link_args, true)
     let args: Vec[str] = Vec.new()
     let env: Vec[LinkStageEnvVar] = Vec.new()
     let inputs: Vec[str] = Vec.new()
@@ -1126,6 +1219,8 @@ fn link_stage_link_with_extras_libs_args_plan(obj_path: &str, bin_path: &str, ex
         return link_stage_link_with_llvm_args_plan(obj_path, bin_path, extras, link_libs, link_args, ld_path)
     if runtime_sysinfo_os() == "Macos":
         return link_stage_darwin_native_link_plan(obj_path, bin_path, extras, link_libs, link_args)
+    if link_stage_linux_uses_own_sysroot():
+        return link_stage_linux_native_link_plan(obj_path, bin_path, extras, link_libs, link_args)
     let command = link_stage_make_link_command("cc", obj_path, bin_path, extras, link_libs, link_args)
     link_stage_plan_for_command(move command)
 

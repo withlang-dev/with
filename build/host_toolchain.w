@@ -15,8 +15,10 @@ module build.host_toolchain
 //      sandbox that denies reading /Library/Developer and
 //      /Applications/Xcode.app and running the host's cc, ld, nm or xcrun,
 //      and each program prints its `//! expect-stdout:` lines.
-// The sandbox half is macOS's (sandbox-exec is part of the OS); the Linux and
-// Windows slices of #1915 add theirs.
+// The sandbox is macOS's sandbox-exec, and on linux-x86_64 bubblewrap: the
+// host's C headers (/usr/include), gcc (/usr/lib/gcc), glibc's crt objects
+// and development link names, and every cc, gcc, ld and as are out of reach.
+// The Windows slice of #1915 adds its own.
 
 use std.build
 use std.sysinfo
@@ -154,9 +156,25 @@ fn ht_sandbox_profile() -> str:
 
 fn ht_sandboxed(profile: &str, home: &str, command: Vec[str]) -> Vec[str]:
     let argv: Vec[str] = Vec.new()
-    argv.push("/usr/bin/sandbox-exec")
-    argv.push("-p")
-    argv.push(profile.to_owned())
+    if os() == "Linux":
+        // bwrap: the host as it is, but for what ht_linux_masks() hides.
+        argv.push("/usr/bin/bwrap")
+        argv.push("--dev-bind")
+        argv.push("/")
+        argv.push("/")
+        for m in profile.split("\n"):
+            if m.len() == 0: continue
+            if m.starts_with("dir "):
+                argv.push("--tmpfs")
+                argv.push(m.slice(4, m.len()).to_owned())
+            else:
+                argv.push("--ro-bind")
+                argv.push("/dev/null")
+                argv.push(m.slice(5, m.len()).to_owned())
+    else:
+        argv.push("/usr/bin/sandbox-exec")
+        argv.push("-p")
+        argv.push(profile.to_owned())
     argv.push("/usr/bin/env")
     argv.push("-i")
     argv.push("HOME=" ++ home)
@@ -165,6 +183,22 @@ fn ht_sandboxed(profile: &str, home: &str, command: Vec[str]) -> Vec[str]:
     for i in 0..command.len() as i32:
         argv.push(command[i].clone())
     argv
+
+// linux-x86_64: what the sandbox hides, one per line, "dir <path>" (an
+// empty directory over it) or "file <path>" (/dev/null over it), for the
+// paths this host has.
+fn ht_linux_masks(fs: &ToolFs) -> str:
+    var out = ""
+    for d in ["/usr/include", "/usr/local/include", "/usr/lib/gcc", "/usr/libexec/gcc", "/usr/lib/llvm"]:
+        if fs.host_exists(d): out = out ++ "dir " ++ d ++ "\n"
+    for dir in ["/usr/lib/x86_64-linux-gnu", "/lib/x86_64-linux-gnu", "/usr/lib64", "/lib64"]:
+        for name in ["crt1.o", "Scrt1.o", "crti.o", "crtn.o", "libc.so", "libm.so", "libpthread.so", "libdl.so", "librt.so", "libc_nonshared.a", "libgcc_s.so", "libstdc++.so"]:
+            let path = dir ++ "/" ++ name
+            if fs.host_exists(path): out = out ++ "file " ++ path ++ "\n"
+    for tool in ["cc", "c++", "gcc", "g++", "clang", "clang++", "ld", "ld.bfd", "ld.gold", "ld.lld", "as", "x86_64-linux-gnu-gcc", "x86_64-linux-gnu-ld", "x86_64-linux-gnu-as"]:
+        let path = "/usr/bin/" ++ tool
+        if fs.host_exists(path): out = out ++ "file " ++ path ++ "\n"
+    out
 
 // Copies test/host_toolchain/framework_project into the scratch directory
 // with the dependency `with get` would have installed: .with/deps/c/cfstub/1.0
@@ -310,6 +344,7 @@ pub fn run_no_host_toolchain_action(ctx: ActionCtx) -> i32:
     if read == 0:
         problems.push("no link records under out/: build the compiler first")
     var verdict = f"link records read: {read}\n"
+    let linux = os() == "Linux" and arch() == "x86_64"
     if os() == "Windows":
         let lines = ht_windows_builds(ctx, root, ht_join(root, inputs.get(0)))
         for l in 0..lines.len() as i32:
@@ -317,8 +352,10 @@ pub fn run_no_host_toolchain_action(ctx: ActionCtx) -> i32:
                 problems.push(lines[l].slice(9, lines[l].len()))
             else:
                 verdict = verdict ++ lines[l] ++ "\n"
-    else if os() != "Macos":
-        verdict = verdict ++ "sandboxed builds: not checked on " ++ os() ++ " yet (the #1915 slice for it adds them)\n"
+    else if os() != "Macos" and not linux:
+        verdict = verdict ++ "sandboxed builds: not checked on " ++ os() ++ "/" ++ arch() ++ " yet (the #1915 slice for it adds them)\n"
+    else if linux and not fs.host_exists("/usr/bin/bwrap"):
+        problems.push("the Linux sandbox needs bubblewrap (/usr/bin/bwrap); install it to run :no-host-toolchain")
     else:
         let scratch = ht_join("out/command", ctx.target_name())
         let _clean = fs.remove_tree(scratch)
@@ -326,7 +363,7 @@ pub fn run_no_host_toolchain_action(ctx: ActionCtx) -> i32:
         if fs.mkdir_all(ht_join(scratch, "home/tmp")) != 0:
             return ht_fail(ctx, "could not create " ++ scratch ++ "/home/tmp")
         let compiler = ht_join(root, inputs.get(0))
-        let profile = ht_sandbox_profile()
+        let profile = if linux: ht_linux_masks(fs) else: ht_sandbox_profile()
         // Each fixture: the repository file its expect-stdout lines come from,
         // the source built, and the binary's name.
         let fixtures: Vec[str] = Vec.new()
@@ -341,8 +378,10 @@ pub fn run_no_host_toolchain_action(ctx: ActionCtx) -> i32:
         // A project whose dependency links CoreFoundation, set up the way
         // `with get` installs one: metadata.json names the framework and the
         // stub directory, and the stub is generated from the running OS.
-        let project = ht_setup_framework_project(ctx, scratch, compiler, profile, home)
-        if project.starts_with("error: "):
+        let project = if linux: "error: skip" else: ht_setup_framework_project(ctx, scratch, compiler, profile, home)
+        if project == "error: skip":
+            verdict = verdict ++ "framework project: macOS only\n"
+        else if project.starts_with("error: "):
             problems.push(project.slice(7, project.len()))
         else:
             fixtures.push("test/host_toolchain/framework_project/src/main.w")
@@ -353,20 +392,26 @@ pub fn run_no_host_toolchain_action(ctx: ActionCtx) -> i32:
         let tools_argv: Vec[str] = Vec.new()
         tools_argv.push(compiler.clone())
         tools_argv.push("__sdk-tools")
-        let tools = ctx.process_runner().run_capture(ht_sandboxed(profile, home, tools_argv), ht_join(root, ht_join(scratch, "sdk-tools.stdout")), ht_join(root, ht_join(scratch, "sdk-tools.stderr")), 300000)
-        let tools_dir = ht_trim(tools.stdout.replace("\n", ""))
-        if tools.rc != 0 or tools_dir.len() == 0:
-            problems.push(f"`with __sdk-tools` failed (exit {tools.rc}): " ++ tools.stdout ++ tools.stderr)
+        // The Linux compiler carries no cmake/ninja yet (build/sdk.w
+        // run_sdk_build_tools_pack_action is macOS's): a gap of this slice,
+        // named in the verdict, not a pass.
+        if linux:
+            verdict = verdict ++ "SDK cmake/ninja: not carried on Linux yet\n"
         else:
-            for tool in ["cmake", "ninja"]:
-                let run_tool: Vec[str] = Vec.new()
-                run_tool.push(tools_dir ++ "/bin/" ++ tool)
-                run_tool.push("--version")
-                let ran_tool = ctx.process_runner().run_capture(ht_sandboxed(profile, home, run_tool), ht_join(root, ht_join(scratch, tool ++ ".stdout")), ht_join(root, ht_join(scratch, tool ++ ".stderr")), 60000)
-                if ran_tool.rc != 0 or ran_tool.stdout.len() == 0:
-                    problems.push("the SDK's " ++ tool ++ f" the compiler carries does not run (exit {ran_tool.rc}): " ++ ran_tool.stderr)
-                else:
-                    verdict = verdict ++ "SDK " ++ tool ++ " runs from the compiler's cache\n"
+            let tools = ctx.process_runner().run_capture(ht_sandboxed(profile, home, tools_argv), ht_join(root, ht_join(scratch, "sdk-tools.stdout")), ht_join(root, ht_join(scratch, "sdk-tools.stderr")), 300000)
+            let tools_dir = ht_trim(tools.stdout.replace("\n", ""))
+            if tools.rc != 0 or tools_dir.len() == 0:
+                problems.push(f"`with __sdk-tools` failed (exit {tools.rc}): " ++ tools.stdout ++ tools.stderr)
+            else:
+                for tool in ["cmake", "ninja"]:
+                    let run_tool: Vec[str] = Vec.new()
+                    run_tool.push(tools_dir ++ "/bin/" ++ tool)
+                    run_tool.push("--version")
+                    let ran_tool = ctx.process_runner().run_capture(ht_sandboxed(profile, home, run_tool), ht_join(root, ht_join(scratch, tool ++ ".stdout")), ht_join(root, ht_join(scratch, tool ++ ".stderr")), 60000)
+                    if ran_tool.rc != 0 or ran_tool.stdout.len() == 0:
+                        problems.push("the SDK's " ++ tool ++ f" the compiler carries does not run (exit {ran_tool.rc}): " ++ ran_tool.stderr)
+                    else:
+                        verdict = verdict ++ "SDK " ++ tool ++ " runs from the compiler's cache\n"
         for i in 0..fixtures.len() as i32:
             let source = fixtures[i]
             let name = names[i].clone()

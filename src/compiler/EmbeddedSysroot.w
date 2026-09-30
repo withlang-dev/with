@@ -32,6 +32,11 @@ extern let with_embedded_sdk_tools_end: u8
 // every other host.
 extern let with_embedded_windows_sysroot_start: u8
 extern let with_embedded_windows_sysroot_end: u8
+// #1915 (D81): the linux-x86_64 sysroot — glibc 2.28 link stubs and crt
+// objects, compiler-rt, the glibc headers (build/sdk.w
+// run_linux_link_pack_action). Empty in every other host's compiler.
+extern let with_embedded_linux_sysroot_start: u8
+extern let with_embedded_linux_sysroot_end: u8
 extern fn with_fs_chmod(path: &str, mode: i32) -> i32
 
 // with.toml [c_import] sdk_path (§16.1), set by the frontend.
@@ -39,6 +44,8 @@ var g_darwin_configured_sdk: str = ""
 var g_darwin_sysroot_dir: str = ""
 var g_darwin_sysroot_resolved: bool = false
 var g_sdk_tools_dir: str = ""
+var g_linux_sysroot_dir: str = ""
+var g_linux_sysroot_resolved: bool = false
 var g_sdk_tools_resolved: bool = false
 var g_windows_sysroot_dir: str = ""
 var g_windows_sysroot_resolved: bool = false
@@ -69,6 +76,11 @@ fn es_tools_pack() -> str:
 fn es_windows_pack() -> str:
     let start = &with_embedded_windows_sysroot_start as *const u8
     let end = &with_embedded_windows_sysroot_end as *const u8
+    es_str_from_raw_parts(start, end as i64 - start as i64)
+
+fn es_linux_pack() -> str:
+    let start = &with_embedded_linux_sysroot_start as *const u8
+    let end = &with_embedded_linux_sysroot_end as *const u8
     es_str_from_raw_parts(start, end as i64 - start as i64)
 
 fn es_dirname(path: &str) -> str:
@@ -217,6 +229,19 @@ pub fn embedded_windows_sysroot_dir() -> str:
     g_windows_sysroot_dir = root
     with_str_clone_ref(g_windows_sysroot_dir)
 
+// #1915 (D81): the materialized linux sysroot a native linux-x86_64 link
+// and c_import read, or "" when this binary carries none or it could not
+// be written (the reason is printed).
+pub fn embedded_linux_sysroot_dir() -> str:
+    if g_linux_sysroot_resolved:
+        return with_str_clone_ref(g_linux_sysroot_dir)
+    g_linux_sysroot_resolved = true
+    let pack = es_linux_pack()
+    if pack.len() == 0:
+        return ""
+    g_linux_sysroot_dir = es_materialize(pack, "sysroot/linux-x86_64", "the linux sysroot")
+    with_str_clone_ref(g_linux_sysroot_dir)
+
 // #1915 (D81): the materialized SDK build tools (bin/cmake, bin/ninja,
 // share/cmake-<v>), or "" when this binary carries none or they could not
 // be written (the reason is printed). A Windows compiler carries them in its
@@ -253,3 +278,15 @@ pub fn darwin_sdk_root() -> str:
 // reads that host's headers; a cross target names its own).
 pub fn host_darwin_sdk_root() -> str:
     if runtime_sysinfo_os() != "Macos": "" else: darwin_sdk_root()
+
+// The sysroot whose C headers c_import and `with cc` read on this host:
+// the darwin one on macOS; on linux-x86_64 WITH_LINUX_SYSROOT or the
+// embedded one (#1915, D81); "" elsewhere.
+pub fn host_c_sysroot() -> str:
+    if runtime_sysinfo_os() == "Macos":
+        return darwin_sdk_root()
+    if runtime_sysinfo_os() == "Linux" and runtime_sysinfo_arch() == "x86_64":
+        let explicit = runtime_getenv("WITH_LINUX_SYSROOT")
+        if explicit.len() > 0: return explicit
+        return embedded_linux_sysroot_dir()
+    ""
