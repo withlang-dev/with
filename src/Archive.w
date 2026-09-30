@@ -239,6 +239,54 @@ fn extract_elf_symbols(data: &str) -> Vec[str]:
             sym_pos = sym_pos + sym_entsize
     result
 
+// The external symbols a COFF object defines (#1915): a static library `with
+// get` builds on Windows is windows-gnu objects, and an archive with no index
+// of them links as if empty (lld: "undefined symbol: BZ2_bzlibVersion" from
+// the package's own libbz2.a). The file header is machine(2) sections(2)
+// timestamp(4) symtab-offset(4) symbol-count(4) ...; each symbol is 18 bytes:
+// name(8, or 0000+string-table offset), value(4), section(i16), type(2),
+// class(1), aux-count(1). A definition is an external (class 2) in a section
+// (> 0), or a common symbol (section 0, value > 0); a weak external (class
+// 105) defines its name too.
+fn extract_coff_symbols(data: &str) -> Vec[str]:
+    let result: Vec[str] = Vec.new()
+    if data.len() < 20:
+        return result
+    let machine = ar_read_u16_le(data, 0)
+    // x86-64, arm64, arm64ec, i386, armnt: the COFF objects clang writes.
+    if machine != 0x8664 and machine != 0xaa64 and machine != 0xa641 and machine != 0x14c and machine != 0x1c4:
+        return result
+    let symtab = ar_read_u32_le(data, 8) as i64
+    let count = ar_read_u32_le(data, 12) as i64
+    if symtab <= 0 or count <= 0 or symtab + count * 18 > data.len():
+        return result
+    let strtab = symtab + count * 18
+    var i: i64 = 0
+    while i < count:
+        let at = symtab + i * 18
+        let section = ar_read_u16_le(data, at + 12)
+        let signed_section = if section >= 0x8000: section - 0x10000 else: section
+        let class = data[at + 16] as i32
+        let aux = data[at + 17] as i64
+        let value = ar_read_u32_le(data, at + 8)
+        let defined = (class == 2 and (signed_section > 0 or (signed_section == 0 and value != 0))) or class == 105
+        if defined:
+            let name = if ar_read_u32_le(data, at) == 0:
+                ar_elf_str_at(data, strtab + ar_read_u32_le(data, at + 4) as i64)
+            else:
+                ar_coff_short_name(data, at)
+            if name.len() > 0:
+                result.push(name)
+        i = i + 1 + aux
+    result
+
+// An 8-byte COFF symbol name, NUL-padded.
+fn ar_coff_short_name(data: &str, at: i64) -> str:
+    var end = at
+    while end < at + 8 and data[end] != 0:
+        end = end + 1
+    data.slice(at, end)
+
 fn create_gnu_indexed_archive(output_path: &str, member_names: &Vec[str], member_data: &Vec[str], sorted: &Vec[ArSymbol]) -> i32:
     var string_table = ""
     for i in 0..sorted.len() as i32:
@@ -310,21 +358,23 @@ pub fn create_static_archive(output_path: &str, member_paths: &Vec[str]) -> i32:
         member_names.push(ar_basename(path))
         member_data.push(data)
 
-    var saw_elf = false
+    var gnu_index = false
     let all_symbols: Vec[ArSymbol] = Vec.new()
     for i in 0..member_count:
         let data = member_data[i]
         let elf_syms = extract_elf_symbols(data)
-        let syms = if elf_syms.len() > 0:
-            saw_elf = true
-            elf_syms
+        let coff_syms = if elf_syms.len() == 0: extract_coff_symbols(data) else: Vec.new()
+        // COFF objects index GNU-style too: lld reads that symbol table.
+        let syms = if elf_syms.len() > 0 or coff_syms.len() > 0:
+            gnu_index = true
+            if elf_syms.len() > 0: elf_syms else: coff_syms
         else:
             extract_macho_symbols(data)
         for si in 0..syms.len() as i32:
             let sym = ArSymbol { name: with_str_clone_ref(syms[si]), member_index: i }
             all_symbols.push(move sym)
     let sorted = ar_sort_symbols(all_symbols)
-    if saw_elf:
+    if gnu_index:
         return create_gnu_indexed_archive(output_path, member_names, member_data, sorted)
 
     var string_table = ""
