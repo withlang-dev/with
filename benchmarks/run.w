@@ -10,7 +10,7 @@
 //   rss       peak resident set size, maximum over the runs
 //   checksum  the program's result, which must agree across languages
 //
-// Usage (from anywhere; paths resolve against this file's directory):
+// Usage, from the repository root or from benchmarks/:
 //   with run benchmarks/run.w                    debug and release levels, every workload
 //   with run benchmarks/run.w --full             every optimization level each compiler offers
 //   with run benchmarks/run.w -w nbody -w trees  only the named workloads
