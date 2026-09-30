@@ -1,7 +1,9 @@
-// The binary-read error cases shared by behav_action_binary_read_errors.w
-// (plain effects) and behav_action_binary_read_errors_strict.w
-// (--strict-effects): one build per method and input kind. Split in two so
-// each file stays inside the test runner's 120 s limit on a stage compiler.
+// The binary-read error cases, one build per input kind, shared by four
+// tests — behav_action_binary_read_errors{,_read_binary}.w (plain effects)
+// and behav_action_binary_read_errors_strict{,_read_binary}.w
+// (--strict-effects) — one method and one strictness each, so every file
+// (four builds) stays inside the test runner's 120 s limit on a stage
+// compiler; all sixteen in one file took 127 s.
 use pre_d_build_runner
 use std.fs
 use std.string.StringBuilder
@@ -36,7 +38,7 @@ fn exercise(method: &str, kind: &str, strict: bool):
         p7_assert_success(result, label)
         assert(read_file(root ++ "/out/result.bin").unwrap() == payload)
 
-pub fn exercise_all(strict: bool):
-    for method in ["copy_file", "read_binary"]:
-        for kind in ["missing", "directory", "empty", "binary"]:
-            exercise(method, kind, strict)
+pub fn exercise_all(strict: bool, method: &str):
+    for kind in ["missing", "directory", "empty", "binary"]:
+        exercise(method, kind, strict)
+
