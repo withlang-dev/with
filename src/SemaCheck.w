@@ -21636,9 +21636,7 @@ impl Sema:
             if expected_ty == 0 and sig_idx < 0 and self.generic_param_bounded_by_display(fn_sym, ai + param_offset) != 0:
                 self.display_join_node = arg_node
             let arg_ty = if facade_context.userdata_node != 0 and arg_node == facade_context.userdata_node: facade_context.userdata_type as TypeId
-                else if self.join_meets_ref_param(arg_node, expected_ty): self.check_join_arg_at_ref_param(arg_node, expected_ty)
-                else if expected_ty != 0: self.check_expr_with_expected(arg_node, expected_ty as TypeId)
-                else: self.check_expr_value_context(arg_node)
+                else: self.check_call_argument_expr(node, ai, fn_sym, arg_node, expected_ty)
             self.display_join_node = saved_display_join_node
             if is_closure_arg:
                 self.closure_direct_arg_escape_flags.pop()
@@ -22066,6 +22064,40 @@ impl Sema:
 
     fn resolved_call_arg_is_default(call_node: i32, idx: i32) -> i32:
         if self.call_resolved_default_arg_keys.contains(self.resolved_call_arg_key(call_node, idx)): 1 else: 0
+
+    mut fn check_call_argument_expr(call_node: i32, arg_index: i32, callee_sym: i32, arg_node: i32, expected_ty: i32) -> TypeId:
+        // A default is evaluated at each call, but its names and imports
+        // belong to the declaration's module. Explicit arguments keep the
+        // caller's visibility, including after checking a default here.
+        let is_default = self.resolved_call_arg_is_default(call_node, arg_index) != 0
+        if not is_default:
+            return if self.join_meets_ref_param(arg_node, expected_ty): self.check_join_arg_at_ref_param(arg_node, expected_ty)
+                else if expected_ty != 0: self.check_expr_with_expected(arg_node, expected_ty as TypeId)
+                else: self.check_expr_value_context(arg_node)
+        let saved_file_id: i32 = self.local_file_id
+        let saved_module_has_ci: i32 = self.current_module_has_ci
+        let saved_module_path = self.current_module_path.clone()
+        let saved_scope_name_map = move self.scope_name_map
+        self.scope_name_map = HashMap.new()
+        let module_scope_len = if self.scope_starts.len() > 1: self.scope_starts[1] else: self.bind_names.len() as i32
+        for gi in 0..module_scope_len:
+            let sym = self.bind_names[gi]
+            let mapped = saved_scope_name_map.get(sym)
+            if mapped.is_some() and mapped.unwrap() == gi:
+                self.scope_name_map.insert(sym, gi)
+        for si in 0..self.shadowed_global_syms.len() as i32:
+            if self.shadowed_global_indices[si] < module_scope_len:
+                self.scope_name_map.insert(self.shadowed_global_syms[si], self.shadowed_global_indices[si])
+        if self.fn_decl_nodes.contains(callee_sym):
+            self.update_fn_source_context(callee_sym, self.fn_decl_nodes.get(callee_sym).unwrap())
+        let ty = if self.join_meets_ref_param(arg_node, expected_ty): self.check_join_arg_at_ref_param(arg_node, expected_ty)
+            else if expected_ty != 0: self.check_expr_with_expected(arg_node, expected_ty as TypeId)
+            else: self.check_expr_value_context(arg_node)
+        self.local_file_id = saved_file_id
+        self.current_module_has_ci = saved_module_has_ci
+        self.current_module_path = saved_module_path
+        self.scope_name_map = saved_scope_name_map
+        ty
 
     fn magic_ident_kind(node: i32) -> i32:
         if self.magic_ident_kinds.contains(node):
@@ -27281,9 +27313,7 @@ impl Sema:
             if mc_expected == 0:
                 mc_expected = self.method_sig_expected_arg_type(obj_type as i32, static_type_sym != 0 and self.static_receiver_type_is_known(expr) != 0, field, ai)
             let mc_arg_ty = if facade_ud_node != 0 and mc_arg_node == facade_ud_node: facade_ud_ty as TypeId
-                else if self.join_meets_ref_param(mc_arg_node, mc_expected): self.check_join_arg_at_ref_param(mc_arg_node, mc_expected)
-                else if mc_expected != 0: self.check_expr_with_expected(mc_arg_node, mc_expected as TypeId)
-                else: self.check_expr_value_context(mc_arg_node)
+                else: self.check_call_argument_expr(node, ai, mc_method_fn_for_resolution, mc_arg_node, mc_expected)
             arg_types.push(mc_arg_ty as i32)
             // Record the value read before viral view-origin propagation below:
             // storing a copied pointee stores T, not the argument's &T view.

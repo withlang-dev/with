@@ -3104,7 +3104,25 @@ impl MirBuilder:
         let magic_kind = self.magic_ident_kind(default_node)
         if magic_kind != 0:
             return self.lower_magic_ident(magic_kind, call_node)
-        self.lower_call_arg(default_node, sig_idx, callable_fn_tid, param_idx)
+        // The default's names were resolved in the callee's lexical scope.
+        // Its evaluation must not bind to a caller local of the same name.
+        let saved_bind_syms = move self.bind_syms
+        let saved_bind_local_ids = move self.bind_local_ids
+        let saved_alias_syms = move self.alias_syms
+        let saved_alias_places = move self.alias_places
+        let saved_alias_types = move self.alias_types
+        self.bind_syms = Vec.new()
+        self.bind_local_ids = Vec.new()
+        self.alias_syms = Vec.new()
+        self.alias_places = Vec.new()
+        self.alias_types = Vec.new()
+        let value = self.lower_call_arg(default_node, sig_idx, callable_fn_tid, param_idx)
+        self.bind_syms = saved_bind_syms
+        self.bind_local_ids = saved_bind_local_ids
+        self.alias_syms = saved_alias_syms
+        self.alias_places = saved_alias_places
+        self.alias_types = saved_alias_types
+        value
 
     mut fn lower_regex_literal(node: i32) -> i32:
         let regex_ty = self.sema.lookup_named_type_ambient(self.sema.syms.regex)
@@ -11790,10 +11808,13 @@ impl MirBuilder:
         if recv_op >= 0:
             args.push(recv_op)
             arg_pos = 1
+        let default_offset = if self.sema.has_resolved_call_args(node) != 0: arg_node_vec.len() as i32 - self.sema.get_resolved_call_arg_count(node) else: 0
         for i in 0..arg_node_vec.len() as i32:
             let arg_node = arg_node_vec[i]
             if arg_node < 0:
                 args.push(self.lower_var(0 - arg_node, 0, 0))
+            else if i >= default_offset and self.sema.resolved_call_arg_is_default(node, i - default_offset) != 0:
+                args.push(self.lower_default_call_arg(arg_node, node, sig_idx, 0, i + arg_pos))
             else:
                 args.push(self.lower_call_arg(arg_node, sig_idx, 0, i + arg_pos, callee_sym))
         let args_id = self.body.new_call_args(args)
