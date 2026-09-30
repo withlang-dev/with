@@ -8693,9 +8693,16 @@ impl Sema:
         if profile:
             sema_profile_report("type_decl_field_defaults", t)
             t = with_clock_nanos()
+        let types_before = self.type_kinds.len()
+        let symbols_before = self.pool.state.symbol_texts.len()
+        let sigs_before = self.sig_names.len()
         self.check_bodies()
         if profile:
             sema_profile_report("bodies", t)
+            // What body checking adds to the module-wide tables: every entry
+            // is numbered in check order, which is what a parallel check
+            // would have to reproduce.
+            with_eprint(f"[profile] sema.bodies.added types={self.type_kinds.len() - types_before} symbols={self.pool.state.symbol_texts.len() - symbols_before} sigs={self.sig_names.len() - sigs_before}")
             t = with_clock_nanos()
         // #D5/P0: with every top-level body checked, complete transitive
         // write/consume/escape_value effects across the call graph so sig_param_effects is

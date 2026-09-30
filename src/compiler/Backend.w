@@ -158,7 +158,12 @@ impl Zcu:
             while ai < assign.fn_syms.len() as i32:
                 cg.unit_assign_insert(assign.fn_syms[ai], assign.units[ai], ai)
                 ai = ai + 1
+            let unit_symbols_before = cg.intern.state.symbol_texts.len()
             let rc = cg.gen_module_from_mir(mir_ptr, pool)
+            // Symbols a unit adds to the shared pool: numbered in unit order,
+            // what parallel generation would have to reproduce.
+            if do_profile:
+                runtime_eprint(f"[profile] llvm.unit{k}.symbols_added {cg.intern.state.symbol_texts.len() - unit_symbols_before}")
             var tracked = move self.tracked_input_paths
             self.tracked_input_paths = tracked_input_merge_unique(move tracked, &cg.tracked_input_paths)
             if rc != 0:
