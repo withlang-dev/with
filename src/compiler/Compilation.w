@@ -1293,7 +1293,9 @@ pub fn compilation_execute_binary_link_plan(debug_info: bool, plan: CompilationB
         return link_result
     if profile_enabled():
         profile_emit("link", t_link, "")
-    if debug_info:
+    // A .dSYM is Mach-O's: a COFF or ELF binary keeps its debug info in
+    // its PDB or its own sections, and has no dsymutil step.
+    if debug_info and target_spec_os() == "Macos":
         let t_dsym = profile_now()
         compilation_run_dsymutil_best_effort(owned.bin_path)
         if profile_enabled():
