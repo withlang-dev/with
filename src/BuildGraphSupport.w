@@ -164,9 +164,18 @@ pub fn build_graph_path_project_contained(path: &str) -> bool:
 // through it and the freshness check looks for the output through it (#1157:
 // the check tested the literal `$HOME/...`, so every Install target was
 // permanently stale and everything downstream of it rebuilt).
+// The home directory an install destination's `$HOME/` names: $HOME, else
+// on Windows %USERPROFILE% ('\\' as '/'), which a Windows shell other than
+// Git Bash sets instead (#1915; build/wo.w wo_home spells it the same).
+pub fn build_graph_home_dir() -> str:
+    let home = build_graph_rt_getenv("HOME")
+    if home.len() > 0 or runtime_sysinfo_os() != "Windows":
+        return home
+    build_graph_rt_getenv("USERPROFILE").replace("\\", "/")
+
 pub fn build_graph_expand_install_path(root: &str, path: &str) -> str:
     if path.starts_with("$HOME/"):
-        let home = build_graph_rt_getenv("HOME")
+        let home = build_graph_home_dir()
         if home.len() > 0:
             return resolve_join(home, path.slice(6, path.len()))
     if path.starts_with("$INSTALL_BINDIR/"):
