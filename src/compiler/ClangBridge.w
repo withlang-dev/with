@@ -1978,7 +1978,7 @@ fn with_cimport_add_windows_incdir(var_name: &str) -> i32:
 // `triple` "" clears it (not a Windows target). `sysroot` "" with a triple
 // means the SDK carries no libc: the parse then finds no system header, and
 // with_cimport_windows_libc_missing names the cause.
-pub fn with_cimport_set_windows_target(triple: &str, sysroot: &str) -> Unit:
+pub fn with_cimport_set_windows_target(triple: &str, sysroot: &str):
     unsafe:
         g_cimport_target_buf[0] = 0
         g_cimport_sysroot_arg_buf[0] = 0
