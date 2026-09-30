@@ -5072,7 +5072,7 @@ fn bs_check_migrate_builtin_overflow(ctx: &ActionCtx, compiler_path: &str, case_
     // #941: the 128-bit multiply checks go through the limb helper and never
     // divide (`/` on i128/u128 is a __udivti3 libcall a freestanding runtime
     // object cannot resolve); the narrower helpers still may.
-    rc = bs_assert_contains(ctx, out_text, "u128_mul_would_overflow(a, b)", "builtin_overflow_u128_limb_helper")
+    rc = bs_assert_contains(ctx, out_text, "u128_mul_would_overflow(__with_a, __with_b)", "builtin_overflow_u128_limb_helper")
     if rc != 0: return rc
     let wide_start = bs_index_of(out_text, "fn __with_builtin_mul_overflow_i128")
     let wide_end = bs_index_of(out_text, "with_clz")
