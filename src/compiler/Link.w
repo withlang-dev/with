@@ -697,8 +697,8 @@ fn link_stage_llvm_ld_path() -> str:
 fn link_stage_windows_builtins(llvm_ld: &str, arch: &str) -> str:
     link_stage_sdk_dir_of(llvm_ld) ++ "/lib/clang/" ++ embedded_clang_resource_version() ++ "/lib/windows/libclang_rt.builtins-" ++ arch ++ ".a"
 
-// The in-box DLLs every program links (their import libraries ship in the
-// SDK's libc; build/sdk.w sdk_windows_import_libs names the same set).
+// The in-box DLLs every program links, and uuid's GUIDs (their libraries ship
+// in the SDK's libc; build/sdk.w sdk_windows_import_libs names the DLLs).
 fn link_stage_windows_system_libs() -> Vec[str]:
     let names: Vec[str] = Vec.new()
     names.push("kernel32.lib")
@@ -713,6 +713,8 @@ fn link_stage_windows_system_libs() -> Vec[str]:
     names.push("oleaut32.lib")
     names.push("version.lib")
     names.push("psapi.lib")
+    // GUID_NULL, IID_* and the other GUIDs windows.h declares extern.
+    names.push("uuid.lib")
     names
 
 fn link_stage_make_windows_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_path: &str, extras: &Vec[str], link_libs: &Vec[str], link_args: &Vec[str]) -> LinkStageCommand:
