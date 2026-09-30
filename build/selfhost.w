@@ -6044,7 +6044,10 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
     let message_dir = bs_join(base_dir, "workspace_message_complete")
     rc = bs_write_project_manifest(ctx, message_dir, "workspacemessage")
     if rc != 0: return rc
-    let message_link_flag = if os() == "Linux": "-Wl,--gc-sections" else: "-Wl,-dead_strip"
+    // The PreLink command is the linker's own argv, so the flag the fixture
+    // appends is in that linker's syntax: the C driver's on Linux, lld's on
+    // macOS, where the native link is the compiler's lld (#1915).
+    let message_link_flag = if os() == "Linux": "-Wl,--gc-sections" else: "-dead_strip"
     let message_build =
         "use std.build\n\n" ++
         "comptime with BuildCtx as ctx:\n" ++

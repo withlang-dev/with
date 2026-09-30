@@ -978,7 +978,8 @@ fn link_stage_darwin_native_link_plan(obj_path: &str, bin_path: &str, extras: &V
     if sysroot.len() == 0:
         with_eprint("error: link: no darwin sysroot: this compiler carries none, and WITH_SDKROOT / SDKROOT name none")
         return link_stage_plan_fail()
-    var command = link_stage_make_darwin_llvm_link_command(self_exe, obj_path, bin_path, extras, link_libs, link_args)
+    let ld_link_args = link_stage_driver_args_for_ld(link_args)
+    var command = link_stage_make_darwin_llvm_link_command(self_exe, obj_path, bin_path, extras, link_libs, &ld_link_args)
     let args: Vec[str] = Vec.new()
     args.push("__ld")
     args.push("-syslibroot")
@@ -987,6 +988,22 @@ fn link_stage_darwin_native_link_plan(obj_path: &str, bin_path: &str, extras: &V
         args.push(with_str_clone_ref(command.args[i]))
     command.args = args
     link_stage_plan_for_command(move command)
+
+// A program's link arguments are written for a C compiler driver (`cc`), as
+// they were when the native link ran through one: `-Wl,a,b` hands `a` and `b`
+// to the linker. The native macOS link is lld itself now (#1915), so the
+// driver's wrapper is unwrapped here; every other argument passes as written
+// and lld names one it does not know.
+fn link_stage_driver_args_for_ld(link_args: &Vec[str]) -> Vec[str]:
+    let out: Vec[str] = Vec.new()
+    for i in 0..link_args.len() as i32:
+        let arg = link_args[i]
+        if arg.starts_with("-Wl,"):
+            for part in arg.slice(4, arg.len()).split(","):
+                if part.len() > 0: out.push(part.clone())
+        else:
+            out.push(with_str_clone_ref(arg))
+    out
 
 // The native-Windows lld-link path, resolved from the environment when the
 // generated `llvm_ld` metadata file is not present yet (#1075). Mirrors
