@@ -1778,6 +1778,10 @@ fn sdk_windows_import_libs() -> Vec[str]:
     names.push("secur32")
     names.push("iphlpapi")
     names.push("powrprof")
+    names.push("userenv")
+    names.push("rpcrt4")
+    names.push("wldap32")
+    names.push("normaliz")
     names
 
 fn sdk_windows_triple(arch_name: &str) -> str: arch_name ++ "-w64-windows-gnu"
@@ -2723,14 +2727,17 @@ fn sdk_windows_gnu_cmake_args(ctx: &ActionCtx, tools_prefix: &str, output_prefix
     out.push("-DCMAKE_C_FLAGS_INIT=" ++ compile_flags)
     out.push("-DCMAKE_CXX_FLAGS_INIT=" ++ compile_flags ++ " -stdlib=libc++")
     out.push("-DCMAKE_ASM_FLAGS_INIT=" ++ compile_flags)
-    // CMake's Windows-Clang module appends Visual Studio's default library
-    // set to every link (gdi32 winspool comdlg32 oldnames ...), libraries
-    // the SDK does not carry and these programs do not use; clang's MinGW
-    // driver already names the runtime's own.
-    // try_compile's inner projects take them too (LLVM's configure checks
-    // link test programs).
-    out.push("-DCMAKE_C_STANDARD_LIBRARIES=")
-    out.push("-DCMAKE_CXX_STANDARD_LIBRARIES=")
+    // CMake's Windows-Clang module links every program with Visual Studio's
+    // default library set (kernel32 user32 gdi32 winspool shell32 ole32
+    // oleaut32 uuid comdlg32 advapi32 oldnames), and programs rely on it
+    // (cmake's cmcldeps calls CoTaskMemFree and reads FOLDERID_LocalAppData).
+    // The set here is that one less what the SDK does not carry (gdi32,
+    // winspool, comdlg32; oldnames is mingw-w64's moldname, which clang's
+    // MinGW driver names). try_compile's inner projects take it too (LLVM's
+    // configure checks link test programs).
+    let standard_libraries = "-lkernel32 -luser32 -lshell32 -lole32 -loleaut32 -luuid -ladvapi32"
+    out.push("-DCMAKE_C_STANDARD_LIBRARIES=" ++ standard_libraries)
+    out.push("-DCMAKE_CXX_STANDARD_LIBRARIES=" ++ standard_libraries)
     out.push("-DCMAKE_TRY_COMPILE_PLATFORM_VARIABLES=CMAKE_C_STANDARD_LIBRARIES;CMAKE_CXX_STANDARD_LIBRARIES")
     out.push("-DCMAKE_EXE_LINKER_FLAGS_INIT=" ++ link_flags)
     out.push("-DCMAKE_SHARED_LINKER_FLAGS_INIT=" ++ link_flags)
