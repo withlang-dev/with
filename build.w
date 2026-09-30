@@ -245,6 +245,7 @@ fn add_cross_rt_targets(out0: Build, ctx: &BuildCtx, tag: &str, p: &str, group_n
     cross_tools_pack = cross_tools_pack.write_scope(build_owned_text(dir)).write_scope("out/command/" ++ p ++ "sdk-tools-pack")
     out = out.add_target(cross_tools_pack.timeout(600000))
     cross_embedded = cross_embedded.input(dir ++ "/empty_darwin_sysroot.bin").arg("darwin_sysroot").dep(p ++ "empty-darwin-sysroot")
+    cross_embedded = cross_embedded.input(dir ++ "/empty_darwin_sysroot.bin").arg("windows_sysroot").dep(p ++ "empty-darwin-sysroot")
     cross_embedded = cross_embedded.input(dir ++ "/sdk-tools.pack").arg("sdk_tools").dep(p ++ "sdk-tools-pack")
     cross_embedded = cross_embedded.input(dir ++ "/linux-link.pack").arg("linux_sysroot").dep(p ++ "linux-link-pack")
     let cross_embedded_obj = embedded_objects_object(p ++ "embedded-objects-object", &cross_embedded, triple)
