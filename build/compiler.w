@@ -398,9 +398,12 @@ fn comp_select_libclang_path(fs: &ToolFs, llvm_prefix: &str) -> str:
 fn comp_link_path_is_dynamic(path: &str) -> bool:
     not path.ends_with(".a") and not path.ends_with(".lib")
 
+// The SDK's static libclang, the marker `:deps` installs: libclang.lib in a
+// Visual Studio-built SDK (windows-aarch64), libclang.a everywhere else,
+// the windows-gnu x86_64 SDK included (#1915).
 pub fn compiler_default_libclang_archive_path() -> str:
     let prefix = compiler_default_llvm_prefix()
-    if os() == "Windows":
+    if os() == "Windows" and comp_arch_is_aarch64(arch()):
         return prefix ++ "/lib/libclang.lib"
     prefix ++ "/lib/libclang.a"
 
