@@ -1,0 +1,48 @@
+alloc_site_elided	RESULT-CROSS	list position	bool	none	shared append-only, no readers
+alloc_site_fn_syms	RESULT-CROSS	list position	SymbolId	none	shared append-only, no readers
+alloc_site_kinds	RESULT-CROSS	list position	enum	none	shared append-only, no readers
+alloc_site_nodes	RESULT-CROSS	list position	NodeId	none	shared append-only, no readers
+array_fill_counts	RESULT-LOCAL	NodeId	count	MIR,ComptimeEval
+assign_target_revive_sym	SCRATCH	scalar	SymbolId	none
+assign_view_targets	RESULT-LOCAL	NodeId	SymbolId	same body	never cleared
+assoc_type_bindings	SCRATCH	SymbolId	TypeId	none	cleared per fn
+async_scope_names	SCRATCH	stack	SymbolId	none
+auto_ref_binding_values	RESULT-LOCAL	NodeId	flag	MIR
+auto_ref_payload_args	RESULT-LOCAL	NodeId	flag	MIR
+autoderef_step_counts	RESULT-LOCAL	NodeId	count	MIR	pairs with starts
+autoderef_step_fns	RESULT-CROSS	list position	SymbolId	MIR,Analysis	shared flat vec; starts need rebasing
+autoderef_step_starts	RESULT-LOCAL	NodeId	offset	MIR	offsets into shared flat vecs
+autoderef_step_tys	RESULT-CROSS	list position	TypeId	MIR,Analysis	flat vec of TypeIds: remap + rebase
+bind_is_scoped_task	SCRATCH	binding idx	bool	Analysis(len)	scope stack; global rows at base
+bind_is_task	SCRATCH	binding idx	bool	Analysis(len)	bodies write global rows
+bind_is_view_bound	SCRATCH	binding idx	bool	Analysis(len)
+bind_muts	SCRATCH	binding idx	bool	Analysis(len)
+bind_names	SCRATCH	binding idx	SymbolId	Analysis(len)	globals at base shared by all bodies
+bind_provenance	SCRATCH	binding idx	struct	Analysis(len)
+bind_states	SCRATCH	binding idx	VarState	Analysis(len)	bodies write global rows (move state of a global)
+bind_task_used	SCRATCH	binding idx	bool	Analysis(len)
+bind_types	SCRATCH	binding idx	TypeId	Analysis(len)	bodies may overwrite global rows
+binding_closure_nodes	SCRATCH	SymbolId	NodeId	none
+binding_decl_nodes	SCRATCH	SymbolId	NodeId	ComptimeEval during body
+binding_epoch_counter	RESULT-CROSS	scalar	counter	none	global epoch counter
+binding_last_use	SCRATCH	SymbolId	i64 pair	none	one map shared, split by epoch
+binding_use_epoch	SCRATCH	scalar	epoch	none
+binding_use_seq	SCRATCH	scalar	count	none	never reset; written into consume_call_sites
+binding_value_nodes	SCRATCH	SymbolId	NodeId	ComptimeEval during body
+body_order_lower	MODULE	DeclIdx	NodeId	none
+body_order_state	SCRATCH	DeclIdx	state	none	scheduler; callee-first order is load-bearing
+body_tail_block	SCRATCH	scalar	NodeId	none
+body_tail_discards	SCRATCH	scalar	bool	none
+body_tail_holder	SCRATCH	scalar	NodeId	none
+body_tail_is_statement	SCRATCH	scalar	bool	none
+body_typed_decls	MODULE	SymbolId	DeclIdx	none
+body_typed_next	MODULE	DeclIdx	DeclIdx	none
+body_typed_sigs	RESULT-CROSS	SigIdx	flag	other-body	order-dependent diagnostic
+borrow_creation_nodes	SCRATCH	row	NodeId	none	per-fn swap
+borrow_fields	SCRATCH	row	SymbolId	none
+borrow_kinds	SCRATCH	row	enum	none
+borrow_path_counts	SCRATCH	row	count	none
+borrow_path_data	SCRATCH	list position	SymbolId	none	append-only whole compilation
+borrow_path_starts	SCRATCH	row	offset	none
+borrow_places	SCRATCH	row	SymbolId	none
+borrow_pointee_join_node	SCRATCH	scalar	NodeId	none
