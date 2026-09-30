@@ -785,7 +785,7 @@ tests for what you touched. Never run the full battery per edit.
 **The pre-battery gate is one command:** `src/main build :gate`. It covers
 the fixed list (the release build, the self-check, the build.w check with the
 fresh release binary, abi-hash-check, unit-return-review,
-spec-inventory-check, examples-tests, c-migrator-basic-tests,
+spec-inventory-check, examples-tests, benchmarks-check, c-migrator-basic-tests,
 deep-debug-tool-tests, user-programs-safe) plus every test target the last
 battery measured under 60 s; a fresh worktree has no measurements and runs
 the fixed list, and the closing `gate:` line names the measured members.
