@@ -1148,6 +1148,30 @@ fn sdk_build_root_arg(ctx: &BuildCtx, platform: &str) -> str:
 fn sdk_jobs_arg(ctx: &BuildCtx) -> str:
     ctx.env_input("PARALLEL_JOBS")
 
+// linux-x86_64: the SDK's own runtimes, which its ninja, cmake and LLVM link.
+fn sdk_runtimes_target(ctx: &BuildCtx) -> Target:
+    let platform = sdk_current_platform()
+    let bootstrap_prefix = sdk_bootstrap_prefix_arg(ctx, platform)
+    let output_prefix = sdk_output_prefix_arg(ctx, platform)
+    let build_root = sdk_build_root_arg(ctx, platform)
+    var target = target_new(.Action, "sdk-runtimes", "").output(output_prefix ++ "/lib/x86_64-unknown-linux-gnu/libc++.a")
+    target.action = run_sdk_runtimes_action
+    target = target.arg(build_owned_text(bootstrap_prefix))
+    target = target.arg(build_owned_text(output_prefix))
+    target = target.arg(sdk_llvm_source_dir())
+    target = target.arg(build_root ++ "/runtimes-" ++ sdk_host_tag_for_platform(platform))
+    target = target.arg(sdk_jobs_arg(ctx))
+    target = target.input(sdk_llvm_source_marker())
+    target = target.input(bootstrap_prefix)
+    target = target.input("build/sdk.w")
+    target = target.input(sdk_linux_sysroot_pack())
+    target = target.write_scope(output_prefix)
+    target = target.write_scope(build_root)
+    target = target.write_scope("out/command/sdk-runtimes")
+    target = target.dep("sdk-llvm-source")
+    target = target.dep("linux-sysroot")
+    target.timeout(7200000)
+
 fn sdk_ninja_target(ctx: &BuildCtx) -> Target:
     let platform = sdk_current_platform()
     let bootstrap_prefix = sdk_bootstrap_prefix_arg(ctx, platform)
@@ -1167,6 +1191,10 @@ fn sdk_ninja_target(ctx: &BuildCtx) -> Target:
     target = target.write_scope(build_root)
     target = target.write_scope("out/command/sdk-ninja")
     target = target.dep("sdk-ninja-source")
+    // linux-x86_64 links its ninja against the SDK's runtimes.
+    if os() == "Linux" and arch() == "x86_64":
+        target = target.dep("sdk-runtimes")
+        target = target.input(sdk_linux_sysroot_pack())
     target.timeout(1800000)
 
 fn sdk_cmake_target(ctx: &BuildCtx) -> Target:
@@ -2409,6 +2437,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(sdk_source_target("sdk-ninja-source", sdk_ninja_source_url(), sdk_ninja_source_sha256(), sdk_ninja_archive(), sdk_source_root(), sdk_ninja_source_dir(), sdk_ninja_source_marker()))
     out = out.add_target(sdk_source_target("sdk-cmake-source", sdk_cmake_source_url(), sdk_cmake_source_sha256(), sdk_cmake_archive(), sdk_source_root(), sdk_cmake_source_dir(), sdk_cmake_source_marker()))
     out = out.add_target(sdk_source_target("sdk-llvm-source", sdk_llvm_source_url(), sdk_llvm_source_sha256(), sdk_llvm_archive(), sdk_source_root(), sdk_llvm_source_dir(), sdk_llvm_source_marker()))
+    if os() == "Linux" and arch() == "x86_64":
+        out = out.add_target(sdk_runtimes_target(ctx))
     out = out.add_target(sdk_ninja_target(ctx))
     out = out.add_target(sdk_cmake_target(ctx))
     out = out.add_target(sdk_llvm_target(ctx))
