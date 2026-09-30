@@ -43,7 +43,7 @@ fn World.new() -> World:
 
 extend World:
     fn create(mut self: Self) -> i32:
-        let id = self.count
+        let id: i32 = self.count
         self.count += 1
         id
 
