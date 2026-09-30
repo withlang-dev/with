@@ -4580,7 +4580,7 @@ fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, r
             files.push(with_str_clone_ref(target))
     if files.len() > 1:
         var lane = empty_build_graph_target()
-        lane.name = "with test"
+        lane.name = "with-test"
         lane.args = test_command_pass_through_args(argc)
         return build_graph_run_test_files_pool(test_command_root(), &lane, test_running_compiler_path(), &files, true)
     run_test_file(files[0], opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, keep_binary, filter)
