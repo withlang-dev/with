@@ -88,7 +88,7 @@ pub fn rt_fill_random(buf: *mut u8, len: u64) -> Unit:
             rt_random_fail()
         while off < len:
             let p = (buf as i64 + off as i64) as *mut u8
-            let n = rt_read(fd, p, len - off)
+            let n = rt_read(fd, p, (len - off) as i64)
             if n <= 0:
                 let _close = rt_close(fd)
                 rt_random_fail()
