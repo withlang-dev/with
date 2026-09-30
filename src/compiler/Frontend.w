@@ -2828,16 +2828,32 @@ fn frontend_fn_tier_verdict(tier: &Vec[i32], paths: &Vec[str], pool: AstPool, in
         return if displaceable: FRONTEND_FN_DISPLACE else: FRONTEND_FN_DROP
 
     // Within-tier precedence:
-    // - a real fn beats any extern fn of the same name, regardless of order
+    // - a real fn beats an extern fn of the same name in its own module,
+    //   regardless of order
+    // - an extern fn and a standard-library fn of ANOTHER module both stand
+    //   (#1919): the extern is its module's global C symbol, the std fn (a
+    //   With wrapper named like the C function, std.libc's `unlink`) is
+    //   displaced to its module-qualified identity (below), and each
+    //   module's references bind to its own. Dropping the extern bound
+    //   `extern fn unlink` in one module to std.libc's `pub fn unlink` once
+    //   any module imported std.libc, and the call became "requires an
+    //   explicit import". Outside the standard library an extern still
+    //   binds to a same-name fn of the program: the compiler's own bridges
+    //   declare `extern fn wl_*` for functions LlvmBridge.w defines.
     // - otherwise, a later decl of the same rank wins
     if current_kind == NodeKind.NK_EXTERN_FN:
         for j in 0..tier.len() as i32:
             if j == idx:
                 continue
             let jd = tier[j]
-            if pool.kind(jd) == NodeKind.NK_FN_DECL and pool.get_data0(jd) == iname:
+            if pool.kind(jd) == NodeKind.NK_FN_DECL and pool.get_data0(jd) == iname and (paths[idx] == paths[j] or sema_tier_path_is_std_implementation(paths[j]) == 0 or not frontend_fn_decl_is_displaceable(pool, intern, jd)):
                 return FRONTEND_FN_DROP
         return FRONTEND_FN_KEEP
+    if displaceable:
+        for j in 0..tier.len() as i32:
+            let jd = tier[j]
+            if j != idx and pool.kind(jd) == NodeKind.NK_EXTERN_FN and pool.get_data0(jd) == iname and paths[idx] != paths[j] and sema_tier_path_is_std_implementation(paths[idx]) != 0:
+                return FRONTEND_FN_DISPLACE
 
     let current_rank = frontend_fn_decl_rank(current_kind)
     var j = idx + 1
