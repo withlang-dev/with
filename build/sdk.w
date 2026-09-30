@@ -123,7 +123,7 @@ pub fn sdk_host_tag_for_platform(platform: &str) -> str:
         return "windows-aarch64-msvc"
     "unsupported"
 
-fn sdk_platform_is_windows(platform: &str) -> bool:
+pub fn sdk_platform_is_windows(platform: &str) -> bool:
     platform == "windows-x86_64" or platform == "windows-aarch64"
 
 pub fn sdk_default_prefix_for_platform(platform: &str) -> str:
@@ -285,12 +285,12 @@ fn sdk_validate_cache(ctx: &ActionCtx, platform: &str, cache_path: &str) -> i32:
     let cc = sdk_cache_line(cache, "CMAKE_C_COMPILER:")
     let cxx = sdk_cache_line(cache, "CMAKE_CXX_COMPILER:")
     if sdk_platform_is_windows(platform):
-        if not cc.contains("clang-cl") or not cxx.contains("clang-cl"):
-            return sdk_fail(ctx, "refusing to package SDK not built with clang-cl; CMAKE_C_COMPILER=" ++ cc ++ " CMAKE_CXX_COMPILER=" ++ cxx)
-        if platform == "windows-x86_64":
-            let masm = sdk_cache_line(cache, "CMAKE_ASM_MASM_COMPILER:")
-            if not masm.contains("llvm-ml64"):
-                return sdk_fail(ctx, "refusing to package SDK not built with llvm-ml64; CMAKE_ASM_MASM_COMPILER=" ++ masm)
+        // #1915: the Windows SDK's LLVM is built for <arch>-w64-windows-gnu
+        // against the SDK's own libc++, never by clang-cl against Visual
+        // Studio's STL (whose runtime every compiler link would then need).
+        let cxx_target = sdk_cache_line(cache, "CMAKE_CXX_COMPILER_TARGET:")
+        if cc.contains("clang-cl") or cxx.contains("clang-cl") or not cxx.contains("clang++") or not cxx_target.contains("windows-gnu"):
+            return sdk_fail(ctx, "refusing to package a Windows SDK whose LLVM is not built by clang++ for windows-gnu against the SDK's libc++; CMAKE_CXX_COMPILER=" ++ cxx ++ " " ++ cxx_target)
         return 0
     if not cc.contains("clang") or cc.contains("/usr/bin/cc") or cc.contains("/usr/bin/gcc"):
         return sdk_fail(ctx, "refusing to package SDK not built with clang; CMAKE_C_COMPILER=" ++ cc)
@@ -310,18 +310,31 @@ fn sdk_validate_package_prefix(ctx: &ActionCtx, platform: &str, prefix: &str, bu
     if rc != 0:
         return rc
     if sdk_platform_is_windows(platform):
-        rc = sdk_check_file(ctx, sdk_join(prefix, "lib/libclang.lib"), "static libclang archive")
+        rc = sdk_check_file(ctx, sdk_join(prefix, "lib/libclang.a"), "static libclang archive")
+        if rc != 0: return rc
+        // What a Windows link and the next SDK build read (#1915): the libc,
+        // the C++ runtime, compiler-rt's builtins, and the tools the build
+        // runs by name.
+        let arch_name = if platform == "windows-aarch64": "aarch64" else: "x86_64"
+        rc = sdk_check_file(ctx, sdk_windows_libc_marker(prefix, arch_name), "Windows C runtime startup (libc/windows)")
+        if rc != 0: return rc
+        rc = sdk_check_file(ctx, sdk_windows_libc_lib_dir(prefix, arch_name) ++ "/libc++.a", "libc++")
+        if rc != 0: return rc
+        rc = sdk_check_file(ctx, sdk_compiler_rt_builtins(prefix, arch_name), "compiler-rt builtins")
         if rc != 0: return rc
         let tools: Vec[str] = Vec.new()
         tools.push("clang")
         tools.push("clang++")
-        tools.push("clang-cl")
         tools.push("cmake")
         tools.push("ninja")
         tools.push("lld-link")
+        tools.push("ld.lld")
+        tools.push("llvm-ar")
         tools.push("llvm-lib")
-        tools.push("llvm-ml")
-        tools.push("llvm-ml64")
+        tools.push("llvm-ranlib")
+        tools.push("llvm-dlltool")
+        tools.push("llvm-rc")
+        tools.push("llvm-windres")
         tools.push("llvm-nm")
         tools.push("llvm-readobj")
         tools.push("llvm-strip")
@@ -371,7 +384,7 @@ fn sdk_validate_package_prefix(ctx: &ActionCtx, platform: &str, prefix: &str, bu
 fn sdk_validate_wasm_install(ctx: &ActionCtx, prefix: &str) -> i32:
     var rc = sdk_check_file(ctx, sdk_tool(prefix, "wasm-ld"), "WebAssembly linker")
     if rc != 0: return rc
-    let linker_archive = if os() == "Windows": "lib/lldWasm.lib" else: "lib/liblldWasm.a"
+    let linker_archive = "lib/liblldWasm.a"
     rc = sdk_check_file(ctx, sdk_join(prefix, linker_archive), "static WebAssembly linker archive")
     if rc != 0: return rc
     let components: Vec[str] = Vec.new()
@@ -383,7 +396,7 @@ fn sdk_validate_wasm_install(ctx: &ActionCtx, prefix: &str) -> i32:
     components.push("Utils")
     for i in 0..components.len() as i32:
         let name = "LLVMWebAssembly" ++ components[i]
-        let archive = if os() == "Windows": name ++ ".lib" else: "lib" ++ name ++ ".a"
+        let archive = "lib" ++ name ++ ".a"
         rc = sdk_check_file(ctx, sdk_join(prefix, "lib/" ++ archive), "static WebAssembly backend archive")
         if rc != 0: return rc
     0
@@ -418,6 +431,10 @@ fn sdk_select_package_files(fs: &ToolFs, prefix: &str, platform: &str) -> Vec[st
     let cmake_data = fs.list_files(sdk_join(prefix, "share"))
     for i in 0..cmake_data.len() as i32:
         candidates.push(sdk_owned_text(cmake_data[i]))
+    if sdk_platform_is_windows(platform) and fs.is_dir(sdk_join(prefix, "libc")):
+        let libc = fs.list_files(sdk_join(prefix, "libc"))
+        for i in 0..libc.len() as i32:
+            candidates.push(sdk_owned_text(libc[i]))
     let all = sdk_sort_strings(candidates)
     for i in 0..all.len() as i32:
         let path = all[i]
@@ -429,13 +446,14 @@ fn sdk_select_package_files(fs: &ToolFs, prefix: &str, platform: &str) -> Vec[st
         if rel.starts_with("lib/clang/") or rel.starts_with(sdk_cmake_data_prefix()):
             selected.push(sdk_owned_text(path))
         else if rel.starts_with("lib/"):
+            // Static archives, GNU-named on every platform: the Windows SDK's
+            // LLVM is a windows-gnu build (#1915).
             let lib_rel = rel.slice(4, rel.len())
-            if not sdk_has_slash(lib_rel):
-                if sdk_platform_is_windows(platform):
-                    if rel.ends_with(".lib"):
-                        selected.push(sdk_owned_text(path))
-                else if rel.ends_with(".a"):
-                    selected.push(sdk_owned_text(path))
+            if not sdk_has_slash(lib_rel) and rel.ends_with(".a"):
+                selected.push(sdk_owned_text(path))
+        else if rel.starts_with("libc/") and sdk_platform_is_windows(platform):
+            // The Windows C runtime and C++ runtime (#1915), whole.
+            selected.push(sdk_owned_text(path))
         else if rel.starts_with("bin/"):
             if sdk_package_tool_selected(rel, platform):
                 selected.push(sdk_owned_text(path))
@@ -454,8 +472,16 @@ fn sdk_package_tool_selected(rel: &str, platform: &str) -> bool:
         tools.push("bin/cmcldeps.exe")
         tools.push("bin/ninja.exe")
         tools.push("bin/lld-link.exe")
+        // #1915: the names the GNU-driver build of the next SDK, and the
+        // libc step, run the multicall binaries under.
+        tools.push("bin/ld.lld.exe")
         tools.push("bin/wasm-ld.exe")
         tools.push("bin/llvm-lib.exe")
+        tools.push("bin/llvm-ar.exe")
+        tools.push("bin/llvm-ranlib.exe")
+        tools.push("bin/llvm-dlltool.exe")
+        tools.push("bin/llvm-rc.exe")
+        tools.push("bin/llvm-windres.exe")
         tools.push("bin/llvm-ml.exe")
         tools.push("bin/llvm-ml64.exe")
         tools.push("bin/llvm-nm.exe")
@@ -494,21 +520,19 @@ fn sdk_clang_driver_rel() -> str: "bin/clang-" ++ COMPILER_LLVM_VERSION.split(".
 
 // Everything the next SDK build needs from this package as its bootstrap
 // (sdk_validate_staged_paths asks for exactly these): the compiler driver,
-// its links, CMake with its module tree and RC scanner, and Ninja; on
-// Windows also the MSVC-style driver and linker cmake's own build uses.
+// its links, CMake with its module tree, and Ninja; on Windows (#1915) the
+// linker and archiver under the names the GNU driver and CMake run them by.
 fn sdk_bootstrap_set(platform: &str) -> Vec[str]:
     let set: Vec[str] = Vec.new()
     if sdk_platform_is_windows(platform):
         set.push("bin/clang.exe")
         set.push("bin/clang++.exe")
-        set.push("bin/clang-cl.exe")
         set.push("bin/lld-link.exe")
+        set.push("bin/ld.lld.exe")
+        set.push("bin/llvm-ar.exe")
+        set.push("bin/llvm-ranlib.exe")
         set.push("bin/cmake.exe")
-        set.push("bin/cmcldeps.exe")
         set.push("bin/ninja.exe")
-        // LLVM's BLAKE3 on x86_64 is MASM, assembled with llvm-ml64.
-        if platform == "windows-x86_64":
-            set.push("bin/llvm-ml64.exe")
     else:
         set.push("bin/clang")
         set.push("bin/clang++")
@@ -568,12 +592,6 @@ fn sdk_package_entries(ctx: &ActionCtx, prefix: &str, sdk_base: &str, platform: 
                 entries.push(archive_symlink_entry("lld", sdk_base ++ "/bin/" ++ alias, 0o777))
     entries
 
-// The resource compiler of the same Windows Kit as mt.exe (they share
-// bin/<version>/<arch>/). Left to PATH, CMake found a 2015 rc.exe that
-// rejects its flags: `fatal error RC1107: invalid usage` compiling
-// CMakeVersion.rc on both Windows lanes.
-fn sdk_windows_rc_from_mt(windows_mt: &str) -> str: sdk_dirname(windows_mt) ++ "/rc.exe"
-
 fn sdk_write_text(ctx: &ActionCtx, path: &str, text: &str) -> i32:
     let fs = ctx.fs()
     let dir = sdk_dirname(path)
@@ -609,7 +627,7 @@ pub fn run_package_llvm_sdk_action(ctx: ActionCtx) -> i32:
     // Validate what will actually be written, not just the source prefix.
     // In particular, linker aliases alone do not make a usable SDK.
     let selected = sdk_archive_manifest(entries)
-    let clang = if sdk_platform_is_windows(platform): "lib/libclang.lib" else: "lib/libclang.a"
+    let clang = "lib/libclang.a"
     let lld = if sdk_platform_is_windows(platform): "bin/lld-link.exe" else: "bin/lld"
     let wasm = if sdk_platform_is_windows(platform): "bin/wasm-ld.exe" else: "bin/wasm-ld"
     if not selected.contains(sdk_base ++ "/" ++ clang ++ "\n") or not selected.contains(sdk_base ++ "/" ++ lld ++ "\n") or not selected.contains(sdk_base ++ "/" ++ wasm ++ "\n"):
@@ -920,7 +938,16 @@ pub fn run_sdk_ninja_action(ctx: ActionCtx) -> i32:
     configure.push("-B")
     configure.push(sdk_abs(root, build_dir))
     configure.push("-DCMAKE_BUILD_TYPE=Release")
-    configure.push("-DCMAKE_CXX_COMPILER=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, "clang++")))
+    if os() == "Windows":
+        // #1915: a windows-gnu program against the output SDK's libc and
+        // libc++, like everything in it; the bootstrap's ninja.exe (a
+        // Visual Studio /MD build) needs msvcp140/vcruntime140 to run.
+        let gnu = sdk_windows_gnu_cmake_args(&ctx, bootstrap_prefix, output_prefix, sdk_windows_host_arch(), sdk_join(build_dir, "tools"))
+        if not gnu.ok: return 1
+        for i in 0..gnu.items.len() as i32:
+            configure.push(sdk_owned_text(gnu.items[i]))
+    else:
+        configure.push("-DCMAKE_CXX_COMPILER=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, "clang++")))
     configure.push("-DCMAKE_INSTALL_PREFIX=" ++ sdk_abs(root, output_prefix))
     configure.push("-DCMAKE_MAKE_PROGRAM=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, "ninja")))
     configure.push("-DBUILD_TESTING=OFF")
@@ -956,31 +983,23 @@ pub fn run_sdk_cmake_action(ctx: ActionCtx) -> i32:
     let source_dir = args.get(2)
     let build_dir = args.get(3)
     let jobs = args.get(4)
-    let windows_mt = if args.len() > 5: sdk_owned_text(args.get(5)) else: ""
     var rc = sdk_validate_staged_paths(ctx, bootstrap_prefix, output_prefix)
     if rc != 0:
         return rc
     let fs = ctx.fs()
     if not fs.exists(sdk_tool(output_prefix, "ninja")):
         return sdk_fail(ctx, "missing staged Ninja: " ++ sdk_tool(output_prefix, "ninja"))
-    // Windows: cmake's own build is an MSVC-style build — clang-cl, lld-link
-    // and mt.exe, as tools/build-cmake.ps1 (the recipe behind the shipped
-    // cmake.exe) does. The GNU-style clang driver made CMake generate its
-    // own manifest .res beside cmake's manifest .rc: `duplicate resource:
-    // type MANIFEST` at cmcldeps.exe on both Windows lanes.
-    if os() == "Windows":
-        if not fs.exists(sdk_tool(bootstrap_prefix, "clang-cl")):
-            return sdk_fail(ctx, "missing bootstrap SDK clang-cl: " ++ sdk_tool(bootstrap_prefix, "clang-cl"))
-        if not fs.exists(sdk_tool(bootstrap_prefix, "lld-link")):
-            return sdk_fail(ctx, "missing bootstrap SDK lld-link: " ++ sdk_tool(bootstrap_prefix, "lld-link"))
-        if windows_mt.len() == 0:
-            return sdk_fail(ctx, "SDK_WINDOWS_MT must name the Windows SDK mt.exe path for the Windows cmake build")
+    // Windows (#1915): cmake is a windows-gnu program against the output
+    // SDK's libc and libc++, like the rest of the SDK; its version and
+    // manifest resources (cmake.version.manifest.rc, CMakeVersion.rc) go
+    // through the output SDK's own llvm-windres, which the LLVM build
+    // installs before this runs. No Visual Studio, mt.exe or rc.exe.
+    if os() == "Windows" and not fs.exists(sdk_tool(output_prefix, "llvm-windres")):
+        return sdk_fail(ctx, "missing staged llvm-windres (the SDK's LLVM builds it; run :sdk-llvm first): " ++ sdk_tool(output_prefix, "llvm-windres"))
     if fs.mkdir_all(build_dir) != 0:
         return sdk_fail(ctx, "could not create CMake build directory: " ++ build_dir)
     let root = ctx.project_info().project_root()
     let cmake = sdk_abs(root, sdk_tool(bootstrap_prefix, "cmake"))
-    let cc = if os() == "Windows": "clang-cl" else: "clang"
-    let cxx = if os() == "Windows": "clang-cl" else: "clang++"
     let configure: Vec[str] = Vec.new()
     configure.push(sdk_owned_text(cmake))
     configure.push("-G")
@@ -991,32 +1010,18 @@ pub fn run_sdk_cmake_action(ctx: ActionCtx) -> i32:
     configure.push(sdk_abs(root, build_dir))
     configure.push("-DCMAKE_BUILD_TYPE=Release")
     configure.push("-DCMAKE_INSTALL_PREFIX=" ++ sdk_abs(root, output_prefix))
-    configure.push("-DCMAKE_C_COMPILER=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, cc)))
-    configure.push("-DCMAKE_CXX_COMPILER=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, cxx)))
+    if os() == "Windows":
+        let gnu = sdk_windows_gnu_cmake_args(&ctx, bootstrap_prefix, output_prefix, sdk_windows_host_arch(), sdk_join(build_dir, "tools"))
+        if not gnu.ok: return 1
+        for i in 0..gnu.items.len() as i32:
+            configure.push(sdk_owned_text(gnu.items[i]))
+        configure.push("-DCMAKE_RC_COMPILER=" ++ sdk_abs(root, sdk_tool(output_prefix, "llvm-windres")))
+    else:
+        configure.push("-DCMAKE_C_COMPILER=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, "clang")))
+        configure.push("-DCMAKE_CXX_COMPILER=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, "clang++")))
     configure.push("-DCMAKE_MAKE_PROGRAM=" ++ sdk_abs(root, sdk_tool(output_prefix, "ninja")))
     configure.push("-DBUILD_TESTING=OFF")
     configure.push("-DCMAKE_USE_OPENSSL=OFF")
-    if os() == "Windows":
-        configure.push("-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded")
-        configure.push("-DCMAKE_LINKER=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, "lld-link")))
-        configure.push("-DCMAKE_MT=" ++ windows_mt)
-        configure.push("-DCMAKE_RC_COMPILER=" ++ sdk_windows_rc_from_mt(windows_mt))
-        // CMake's clang-cl platform module takes the llvm-rc rule (clang
-        // preprocess + `-clang:-MD` depfile flags) when CMAKE_RC_COMPILER_INIT
-        // is llvm-rc, which it defaults to whenever rc.exe is not on PATH, even
-        // with CMAKE_RC_COMPILER naming rc.exe: rc.exe then reads `-clang:-MD`
-        // as a code page, `fatal error RC1205: invalid code page`.
-        configure.push("-DCMAKE_RC_COMPILER_INIT=" ++ sdk_windows_rc_from_mt(windows_mt))
-        // CMake links its executables with `/MANIFEST:EMBED
-        // /MANIFESTINPUT:cmake.version.manifest`, so the linker merges its
-        // own UAC block into that manifest. lld-link writes that block
-        // without an xmlns, and a lld-link built with libxml2 (the LLVM
-        // Windows releases a runner bootstraps from) merges it into
-        // `ms_asmv1:level` attributes Windows rejects: the built cmake.exe
-        // fails to start with "side-by-side configuration is incorrect".
-        // cmake.version.manifest already carries requestedExecutionLevel,
-        // so the linker's block is redundant; leave it out.
-        configure.push("-DCMAKE_EXE_LINKER_FLAGS=/MANIFESTUAC:NO")
     rc = sdk_run_capture(ctx, "cmake-configure", configure, 600000)
     if rc != 0: return rc
     var build: Vec[str] = Vec.new()
@@ -1127,8 +1132,8 @@ pub fn run_sdk_contract_tests_action(ctx: ActionCtx) -> i32:
 
 pub fn run_sdk_llvm_action(ctx: ActionCtx) -> i32:
     let args = ctx.args()
-    if args.len() < 9:
-        return sdk_fail(ctx, "requires bootstrap-prefix, output-prefix, source-dir, build-dir, jobs, targets, sdkroot, deployment-target, and windows-mt args")
+    if args.len() < 8:
+        return sdk_fail(ctx, "requires bootstrap-prefix, output-prefix, source-dir, build-dir, jobs, targets, sdkroot, and deployment-target args")
     let bootstrap_prefix = args.get(0)
     let output_prefix = args.get(1)
     let source_dir = args.get(2)
@@ -1139,19 +1144,21 @@ pub fn run_sdk_llvm_action(ctx: ActionCtx) -> i32:
         return sdk_fail(ctx, "LLVM_TARGETS_TO_BUILD must include WebAssembly for the With SDK")
     let sdkroot = args.get(6)
     let deployment_target = if args.get(7).len() > 0: sdk_owned_text(args.get(7)) else: "11.0"
-    let windows_mt = args.get(8)
+    // Windows builds cmake after LLVM (its resources need the SDK's own
+    // llvm-windres, #1915), so LLVM configures with the bootstrap's cmake.
+    let cmake_prefix = if os() == "Windows": sdk_owned_text(bootstrap_prefix) else: sdk_owned_text(output_prefix)
     var rc = sdk_validate_staged_paths(ctx, bootstrap_prefix, output_prefix)
     if rc != 0:
         return rc
     let fs = ctx.fs()
-    if not fs.exists(sdk_tool(output_prefix, "cmake")):
-        return sdk_fail(ctx, "missing staged CMake: " ++ sdk_tool(output_prefix, "cmake"))
+    if not fs.exists(sdk_tool(cmake_prefix, "cmake")):
+        return sdk_fail(ctx, "missing CMake: " ++ sdk_tool(cmake_prefix, "cmake"))
     if not fs.exists(sdk_tool(output_prefix, "ninja")):
         return sdk_fail(ctx, "missing staged Ninja: " ++ sdk_tool(output_prefix, "ninja"))
     if fs.mkdir_all(build_dir) != 0:
         return sdk_fail(ctx, "could not create LLVM build directory: " ++ build_dir)
     let root = ctx.project_info().project_root()
-    let cmake = sdk_abs(root, sdk_tool(output_prefix, "cmake"))
+    let cmake = sdk_abs(root, sdk_tool(cmake_prefix, "cmake"))
     let configure: Vec[str] = Vec.new()
     configure.push(sdk_owned_text(cmake))
     configure.push("-G")
@@ -1178,24 +1185,25 @@ pub fn run_sdk_llvm_action(ctx: ActionCtx) -> i32:
     configure.push("-DLLVM_ENABLE_ZLIB=OFF")
     configure.push("-DLLVM_ENABLE_ZSTD=OFF")
     if os() == "Windows":
-        configure.push("-DCMAKE_C_COMPILER=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, "clang-cl")))
-        configure.push("-DCMAKE_CXX_COMPILER=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, "clang-cl")))
-        configure.push("-DCMAKE_LINKER=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, "lld-link")))
-        if arch() == "x86_64":
-            configure.push("-DCMAKE_ASM_MASM_COMPILER=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, "llvm-ml64")))
-        configure.push("-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded")
+        // #1915: LLVM, clang and lld are windows-gnu code against the output
+        // SDK's own libc, libc++ and compiler-rt (built before this by
+        // :sdk-windows-libc, :sdk-compiler-rt-builtins and :sdk-libcxx), so
+        // the compiler's link needs nothing Visual Studio ships. The SDK's
+        // clang defaults to that toolchain (compiler-rt, libunwind, libc++,
+        // lld) for a windows-gnu target, which is what `with cc` compiles
+        // for. MinGW builds use no .rc resources (AddLLVM's
+        // add_windows_version_resource_file is MSVC-only), and BLAKE3's
+        // assembly is its GNU .S flavor, so no rc.exe or llvm-ml64.
+        let gnu = sdk_windows_gnu_cmake_args(&ctx, bootstrap_prefix, output_prefix, sdk_windows_host_arch(), sdk_join(build_dir, "tools"))
+        if not gnu.ok: return 1
+        for i in 0..gnu.items.len() as i32:
+            configure.push(sdk_owned_text(gnu.items[i]))
+        configure.push("-DLLVM_HOST_TRIPLE=" ++ sdk_windows_triple(sdk_windows_host_arch()))
+        configure.push("-DCLANG_DEFAULT_RTLIB=compiler-rt")
+        configure.push("-DCLANG_DEFAULT_UNWINDLIB=libunwind")
+        configure.push("-DCLANG_DEFAULT_CXX_STDLIB=libc++")
+        configure.push("-DCLANG_DEFAULT_LINKER=lld")
         configure.push("-DLLVM_ENABLE_PIC=OFF")
-        configure.push("-DLLVM_ENABLE_DIA_SDK=OFF")
-        if windows_mt.len() == 0:
-            return sdk_fail(ctx, "SDK_WINDOWS_MT must name the Windows SDK mt.exe path for Windows SDK rebuilds")
-        configure.push("-DCMAKE_MT=" ++ windows_mt)
-        configure.push("-DCMAKE_RC_COMPILER=" ++ sdk_windows_rc_from_mt(windows_mt))
-        // CMake's clang-cl platform module takes the llvm-rc rule (clang
-        // preprocess + `-clang:-MD` depfile flags) when CMAKE_RC_COMPILER_INIT
-        // is llvm-rc, which it defaults to whenever rc.exe is not on PATH, even
-        // with CMAKE_RC_COMPILER naming rc.exe: rc.exe then reads `-clang:-MD`
-        // as a code page, `fatal error RC1205: invalid code page`.
-        configure.push("-DCMAKE_RC_COMPILER_INIT=" ++ sdk_windows_rc_from_mt(windows_mt))
     else:
         configure.push("-DCMAKE_C_COMPILER=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, "clang")))
         configure.push("-DCMAKE_CXX_COMPILER=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, "clang++")))
@@ -1286,19 +1294,21 @@ fn sdk_archive_dsymutil_main(ctx: &ActionCtx, root: &str, objects_dir: &str, out
 // stay in the build tree. Archive them next to the other clang libraries, where
 // the compiler link already picks up every libclang*.a / clang*.lib.
 fn sdk_clang_main_archive(prefix: &str) -> str:
-    sdk_join(prefix, if os() == "Windows": "lib/clangMain.lib" else: "lib/libclangMain.a")
+    // The Visual Studio-built Windows SDKs pinned before #1915 name it
+    // clangMain.lib; every SDK built since names it GNU-style.
+    if os() == "Windows" and with_fs_file_exists(sdk_join(prefix, "lib/clangMain.lib")) != 0:
+        return sdk_join(prefix, "lib/clangMain.lib")
+    sdk_join(prefix, "lib/libclangMain.a")
 
 fn sdk_archive_clang_main(ctx: &ActionCtx, root: &str, objects_dir: &str, output_prefix: &str) -> i32:
     let ext = if os() == "Windows": ".cpp.obj" else: ".cpp.o"
     let archive = sdk_abs(root, sdk_clang_main_archive(output_prefix))
+    // GNU-named and made by llvm-ar on every platform: the Windows SDK's LLVM
+    // is a windows-gnu build (#1915); CMake there still names objects .obj.
     var argv: Vec[str] = Vec.new()
-    if os() == "Windows":
-        argv.push(sdk_abs(root, sdk_tool(output_prefix, "llvm-lib")))
-        argv.push("/OUT:" ++ archive)
-    else:
-        argv.push(sdk_abs(root, sdk_tool(output_prefix, "llvm-ar")))
-        argv.push("rcs")
-        argv.push(archive)
+    argv.push(sdk_abs(root, sdk_tool(output_prefix, "llvm-ar")))
+    argv.push("rcs")
+    argv.push(archive)
     // Pushed one by one: the build layer runs on the pinned seed (#1122).
     let names: Vec[str] = Vec.new()
     names.push("driver")
@@ -1762,6 +1772,9 @@ fn sdk_windows_import_libs() -> Vec[str]:
     names
 
 fn sdk_windows_triple(arch_name: &str) -> str: arch_name ++ "-w64-windows-gnu"
+
+// This Windows host's architecture in the libc's spelling.
+fn sdk_windows_host_arch() -> str: if sdk_current_platform() == "windows-aarch64": "aarch64" else: "x86_64"
 
 // mingw-w64-crt/Makefile.am names each architecture's libraries under its
 // own directory prefix (lib64_libmingw32_a_SOURCES, libarm64_...).
