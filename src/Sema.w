@@ -64,7 +64,7 @@ pub enum VarState: i32:
     LIVE = 0
     MOVED = 1
 
-type BindingProvenance {
+pub type BindingProvenance {
     view_origin_mask: i32,
     view_dep_start: i32,
     view_dep_count: i32,
@@ -1723,6 +1723,9 @@ pub type Sema {
     // then an unannotated signature reads as Unit, which a caller cannot tell
     // from a function that returns nothing.
     body_typed_sigs: HashMap[i32, i32],
+    // Each top-level function declaration index by its semantic symbol
+    // (prepare_body_order), for checking a body on demand.
+    body_decl_by_fn: HashMap[i32, i32],
     // Calls checked against such a placeholder: (node, sig, callee symbol, file)
     // in fours. Whether the placeholder was wrong is known once every body is typed.
     untyped_callee_calls: Vec[i32],
@@ -3193,6 +3196,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         display_join_node: 0,
         join_assign_arms_as_views: 0,
         body_typed_sigs: sema_new_map_i32_i32(),
+        body_decl_by_fn: sema_new_map_i32_i32(),
         untyped_callee_calls: Vec.new(),
         discarded_stmt_node: 0,
         body_order_state: Vec.new(),

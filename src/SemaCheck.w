@@ -82,6 +82,32 @@ impl Sema:
             return 0
         self.fn_signature_return_type(method_flags, ret_ty as TypeId) as i32
 
+// The caller's local lexical environment — the scope-stack family (#664:
+// all nine bind_* members and the moved_field_* satellites), the scope map
+// and the pending generic bindings — set aside while another body is
+// checked in the middle of it (a concrete generic instance, or a body
+// checked on demand for its inferred return type).
+type SemaLexicalEnv {
+    bind_names: Vec[i32],
+    bind_types: Vec[i32],
+    bind_muts: Vec[i32],
+    bind_states: Vec[i32],
+    bind_is_task: Vec[i32],
+    bind_task_used: Vec[i32],
+    bind_is_scoped_task: Vec[i32],
+    bind_is_view_bound: Vec[i32],
+    moved_field_base_syms: Vec[i32],
+    moved_field_path_starts: Vec[i32],
+    moved_field_path_counts: Vec[i32],
+    moved_field_path_syms: Vec[i32],
+    bind_provenance: Vec[BindingProvenance],
+    scope_starts: Vec[i32],
+    scope_name_map: HashMap[i32, i32],
+    pending_generic_binding_base: HashMap[i32, i32],
+    pending_generic_binding_call: HashMap[i32, i32],
+    pending_generic_binding_decl: HashMap[i32, i32],
+}
+
 type SemaTraitImplMethodContract {
     ok: i32,
     trait_sym: i32,
@@ -2082,9 +2108,13 @@ impl Sema:
             self.body_order_state.push(0)
             self.body_order_lower.push(below)
             self.body_typed_next.push(-1)
+        self.body_decl_by_fn = sema_new_map_i32_i32()
         for di in 0..count:
             let decl = self.ast.get_decl(di)
             if self.ast.kind(decl) != NodeKind.NK_FN_DECL: continue
+            let fn_sym = self.fn_decl_semantic_symbol_at(decl, self.ast.get_data0(decl), di)
+            if fn_sym != 0 and not self.body_decl_by_fn.contains(fn_sym):
+                self.body_decl_by_fn.insert(fn_sym, di)
             let meta = self.ast.find_fn_meta(decl)
             if meta < 0 or self.ast.fn_meta_tp_count(meta) != 0 or self.fn_decl_is_entry_point(decl) != 0: continue
             if self.ast.fn_meta_ret(meta) != 0 and not self.decl_returns_view(decl, di) and not self.decl_may_store_view_into_receiver(decl, di): continue
@@ -2097,6 +2127,33 @@ impl Sema:
             let earlier: i32 = self.body_typed_decls.get(bare) ?? -1
             self.body_typed_next[di] = earlier
             self.body_typed_decls.insert(bare, di)
+
+    // D43 (§4.10): a function written without a return type has the type
+    // its body gives it, so a use of it — a call, or the function as a
+    // value — has its body checked first, whatever order bodies are
+    // otherwise checked in. Only a body still in progress (a cycle) is
+    // unknown at the use; check_bodies reports that. prepare_body_order
+    // finds the calls a body makes by name before checking it; this covers
+    // the uses it cannot see (a value, a call inside a generic instance).
+    mut fn ensure_body_typed(fn_sym: i32, sig_idx: i32):
+        if sig_idx < 0 or fn_sym == 0 or fn_sym == self.current_fn_symbol or self.body_typed_sigs.contains(sig_idx):
+            return
+        let di: i32 = self.body_decl_by_fn.get(fn_sym) ?? -1
+        if di < 0 or di >= self.body_order_state.len() as i32 or self.body_order_state[di] != 0:
+            return
+        let decl = self.ast.get_decl(di)
+        let meta = self.ast.find_fn_meta(decl)
+        if meta < 0 or self.ast.fn_meta_ret(meta) != 0 or self.ast.fn_meta_tp_count(meta) != 0 or self.fn_decl_is_entry_point(decl) != 0:
+            return
+        let saved_file_id: i32 = self.local_file_id
+        let saved_module_path = move self.current_module_path
+        let saved_module_has_ci: i32 = self.current_module_has_ci
+        let caller_env = self.enter_callee_lexical_env()
+        self.check_decl_body_in_order(di)
+        self.leave_callee_lexical_env(caller_env)
+        self.local_file_id = saved_file_id
+        self.current_module_path = move saved_module_path
+        self.current_module_has_ci = saved_module_has_ci
 
     mut fn check_decl_body_in_order(di: i32):
         if self.body_order_state[di] != 0: return
@@ -5391,6 +5448,94 @@ impl Sema:
         for pi in 0..param_concrete_tys.len() as i32:
             self.concrete_specialization_param_types.push(param_concrete_tys[pi])
 
+    // Sets the caller's locals aside and leaves the module-level scope (every
+    // module's globals, below scope_starts[1]) in place: a body checked in the
+    // middle of another reads its module's `let`/`const` as any body does
+    // (#1743), never the caller's locals. Visibility is still decided per
+    // lookup against the callee's module.
+    mut fn enter_callee_lexical_env() -> SemaLexicalEnv:
+        let caller = SemaLexicalEnv {
+            bind_names: move self.bind_names,
+            bind_types: move self.bind_types,
+            bind_muts: move self.bind_muts,
+            bind_states: move self.bind_states,
+            bind_is_task: move self.bind_is_task,
+            bind_task_used: move self.bind_task_used,
+            bind_is_scoped_task: move self.bind_is_scoped_task,
+            bind_is_view_bound: move self.bind_is_view_bound,
+            moved_field_base_syms: move self.moved_field_base_syms,
+            moved_field_path_starts: move self.moved_field_path_starts,
+            moved_field_path_counts: move self.moved_field_path_counts,
+            moved_field_path_syms: move self.moved_field_path_syms,
+            bind_provenance: move self.bind_provenance,
+            scope_starts: move self.scope_starts,
+            scope_name_map: move self.scope_name_map,
+            pending_generic_binding_base: move self.pending_generic_binding_base,
+            pending_generic_binding_call: move self.pending_generic_binding_call,
+            pending_generic_binding_decl: move self.pending_generic_binding_decl,
+        }
+        self.bind_names = Vec.new()
+        self.bind_types = Vec.new()
+        self.bind_muts = Vec.new()
+        self.bind_states = Vec.new()
+        self.bind_is_task = Vec.new()
+        self.bind_task_used = Vec.new()
+        self.bind_is_scoped_task = Vec.new()
+        self.bind_is_view_bound = Vec.new()
+        self.moved_field_base_syms = Vec.new()
+        self.moved_field_path_starts = Vec.new()
+        self.moved_field_path_counts = Vec.new()
+        self.moved_field_path_syms = Vec.new()
+        self.bind_provenance = Vec.new()
+        self.scope_starts = Vec.new()
+        self.scope_starts.push(0)
+        self.scope_name_map = HashMap.new()
+        self.pending_generic_binding_base = HashMap.new()
+        self.pending_generic_binding_call = HashMap.new()
+        self.pending_generic_binding_decl = HashMap.new()
+        let module_scope_len = if caller.scope_starts.len() > 1: caller.scope_starts[1] else: caller.bind_names.len() as i32
+        for gi in 0..module_scope_len:
+            let gsym = caller.bind_names[gi]
+            self.bind_names.push(gsym)
+            self.bind_types.push(caller.bind_types[gi])
+            self.bind_muts.push(caller.bind_muts[gi])
+            self.bind_states.push(caller.bind_states[gi])
+            self.bind_is_task.push(caller.bind_is_task[gi])
+            self.bind_task_used.push(caller.bind_task_used[gi])
+            self.bind_is_scoped_task.push(caller.bind_is_scoped_task[gi])
+            self.bind_is_view_bound.push(caller.bind_is_view_bound[gi])
+            self.bind_provenance.push(caller.bind_provenance[gi])
+            let mapped = caller.scope_name_map.get(gsym)
+            if mapped.is_some() and mapped.unwrap() == gi:
+                self.scope_name_map.insert(gsym, gi)
+        // A caller local that shadows a module global hid the global's map
+        // entry; the callee does not see the caller's local.
+        for sgi in 0..self.shadowed_global_syms.len() as i32:
+            if self.shadowed_global_indices[sgi] < module_scope_len:
+                self.scope_name_map.insert(self.shadowed_global_syms[sgi], self.shadowed_global_indices[sgi])
+        caller
+
+    mut fn leave_callee_lexical_env(caller: SemaLexicalEnv):
+        var env = caller
+        self.bind_names = move env.bind_names
+        self.bind_types = move env.bind_types
+        self.bind_muts = move env.bind_muts
+        self.bind_states = move env.bind_states
+        self.bind_is_task = move env.bind_is_task
+        self.bind_task_used = move env.bind_task_used
+        self.bind_is_scoped_task = move env.bind_is_scoped_task
+        self.bind_is_view_bound = move env.bind_is_view_bound
+        self.moved_field_base_syms = move env.moved_field_base_syms
+        self.moved_field_path_starts = move env.moved_field_path_starts
+        self.moved_field_path_counts = move env.moved_field_path_counts
+        self.moved_field_path_syms = move env.moved_field_path_syms
+        self.bind_provenance = move env.bind_provenance
+        self.scope_starts = move env.scope_starts
+        self.scope_name_map = move env.scope_name_map
+        self.pending_generic_binding_base = move env.pending_generic_binding_base
+        self.pending_generic_binding_call = move env.pending_generic_binding_call
+        self.pending_generic_binding_decl = move env.pending_generic_binding_decl
+
     mut fn check_fn_body_concrete(fn_node: i32, tp_syms: &Vec[i32], tp_sema_tys: &Vec[i32], mono_sym: i32, param_concrete_tys: &Vec[i32]) -> i32:
         let fn_name = self.ast.get_data0(fn_node)
         let body = self.ast.get_data1(fn_node)
@@ -5511,74 +5656,7 @@ impl Sema:
 
         // Concrete generic validation must run in the callee's own lexical
         // environment, not inside the caller's active local scopes.
-        let saved_bind_names = move self.bind_names
-        let saved_bind_types = move self.bind_types
-        let saved_bind_muts = move self.bind_muts
-        let saved_bind_states = move self.bind_states
-        let saved_bind_is_task = move self.bind_is_task
-        let saved_bind_task_used = move self.bind_task_used
-        let saved_bind_is_scoped_task = move self.bind_is_scoped_task
-        // #664: bind_is_view_bound is the 9th member of the scope-stack
-        // family (scope_insert_at pushes all 9) and the moved_field_* vecs
-        // are its satellites; skipping them here left the inner environment
-        // pushing view-bound flags into the OUTER vec — lengths diverged and
-        // inner bindings read the caller's flags at their aligned indices.
-        let saved_bind_is_view_bound = move self.bind_is_view_bound
-        let saved_moved_field_base_syms = move self.moved_field_base_syms
-        let saved_moved_field_path_starts = move self.moved_field_path_starts
-        let saved_moved_field_path_counts = move self.moved_field_path_counts
-        let saved_moved_field_path_syms = move self.moved_field_path_syms
-        let saved_bind_provenance = move self.bind_provenance
-        let saved_scope_starts = move self.scope_starts
-        let saved_scope_name_map = move self.scope_name_map
-        let saved_pending_generic_binding_base = move self.pending_generic_binding_base
-        let saved_pending_generic_binding_call = move self.pending_generic_binding_call
-        let saved_pending_generic_binding_decl = move self.pending_generic_binding_decl
-        self.bind_names = Vec.new()
-        self.bind_types = Vec.new()
-        self.bind_muts = Vec.new()
-        self.bind_states = Vec.new()
-        self.bind_is_task = Vec.new()
-        self.bind_task_used = Vec.new()
-        self.bind_is_scoped_task = Vec.new()
-        self.bind_is_view_bound = Vec.new()
-        self.moved_field_base_syms = Vec.new()
-        self.moved_field_path_starts = Vec.new()
-        self.moved_field_path_counts = Vec.new()
-        self.moved_field_path_syms = Vec.new()
-        self.bind_provenance = Vec.new()
-        self.scope_starts = Vec.new()
-        self.scope_starts.push(0)
-        self.scope_name_map = HashMap.new()
-        self.pending_generic_binding_base = HashMap.new()
-        self.pending_generic_binding_call = HashMap.new()
-        self.pending_generic_binding_decl = HashMap.new()
-        // #1743: the callee's lexical environment is its module's, and the
-        // module-level scope (every module's globals, below scope_starts[1])
-        // is part of it: a generic body reads its module's `let`/`const`
-        // exactly as a non-generic body does. Only the caller's locals stay
-        // out. Visibility is still decided per lookup against the callee's
-        // module (update_fn_source_context above).
-        let module_scope_len = if saved_scope_starts.len() > 1: saved_scope_starts[1] else: saved_bind_names.len() as i32
-        for gi in 0..module_scope_len:
-            let gsym = saved_bind_names[gi]
-            self.bind_names.push(gsym)
-            self.bind_types.push(saved_bind_types[gi])
-            self.bind_muts.push(saved_bind_muts[gi])
-            self.bind_states.push(saved_bind_states[gi])
-            self.bind_is_task.push(saved_bind_is_task[gi])
-            self.bind_task_used.push(saved_bind_task_used[gi])
-            self.bind_is_scoped_task.push(saved_bind_is_scoped_task[gi])
-            self.bind_is_view_bound.push(saved_bind_is_view_bound[gi])
-            self.bind_provenance.push(saved_bind_provenance[gi])
-            let mapped = saved_scope_name_map.get(gsym)
-            if mapped.is_some() and mapped.unwrap() == gi:
-                self.scope_name_map.insert(gsym, gi)
-        // A caller local that shadows a module global hid the global's map
-        // entry; the callee does not see the caller's local.
-        for sgi in 0..self.shadowed_global_syms.len() as i32:
-            if self.shadowed_global_indices[sgi] < module_scope_len:
-                self.scope_name_map.insert(self.shadowed_global_syms[sgi], self.shadowed_global_indices[sgi])
+        let caller_env = self.enter_callee_lexical_env()
 
         // Type-check body with concrete substitutions installed. Generic bodies
         // may still become invalid after instantiation (for example `T + T`
@@ -5589,24 +5667,7 @@ impl Sema:
         self.in_concrete_generic_body = saved_concrete_generic_body
         self.register_concrete_specialization(fn_node, mono_sym, sig_idx, tp_syms, tp_sema_tys, param_concrete_tys)
 
-        self.bind_names = saved_bind_names
-        self.bind_types = saved_bind_types
-        self.bind_muts = saved_bind_muts
-        self.bind_states = saved_bind_states
-        self.bind_is_task = saved_bind_is_task
-        self.bind_task_used = saved_bind_task_used
-        self.bind_is_scoped_task = saved_bind_is_scoped_task
-        self.bind_is_view_bound = saved_bind_is_view_bound
-        self.moved_field_base_syms = saved_moved_field_base_syms
-        self.moved_field_path_starts = saved_moved_field_path_starts
-        self.moved_field_path_counts = saved_moved_field_path_counts
-        self.moved_field_path_syms = saved_moved_field_path_syms
-        self.bind_provenance = saved_bind_provenance
-        self.scope_starts = saved_scope_starts
-        self.scope_name_map = saved_scope_name_map
-        self.pending_generic_binding_base = saved_pending_generic_binding_base
-        self.pending_generic_binding_call = saved_pending_generic_binding_call
-        self.pending_generic_binding_decl = saved_pending_generic_binding_decl
+        self.leave_callee_lexical_env(caller_env)
 
         // Restore named_types
         for ti in 0..tp_count:
@@ -9505,6 +9566,7 @@ impl Sema:
 
         let sig_idx = self.get_visible_sig(sym)
         if sig_idx >= 0 and self.is_ci_visible(sym) != 0 and self.symbol_visible_from_current(sym) != 0:
+            self.ensure_body_typed(sym, sig_idx)
             let fn_tid: i32 = self.sig_type_ids[sig_idx]
             // An async fn referenced as a value can be called through the value
             // later; the call site no longer knows it spawns — record here.
@@ -21873,6 +21935,7 @@ impl Sema:
             if self.fn_symbol_is_explicit_alloc_api(fn_sym) != 0:
                 self.note_allocation_site(node, AllocConstructKind.EXPLICIT_API, 0, 0)
             self.note_allocating_callee(node, fn_sym)
+            self.ensure_body_typed(fn_sym, sig_idx)
             var ret = self.sig_return_type(sig_idx) as i32
             // D51 stage 7 (spec §16.2b.8): a presented text-view return —
             // `returns borrow CStr …` / `returns static CStr` on a function
