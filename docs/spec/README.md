@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.15
+# The With Programming Language — Specification v7.16
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,11 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.16:** §4.3d masks (D80 amendment): a mask lane is
+writable, a `bool` literal in a mask context and a scalar operand of
+`m.select` broadcast, the width-cast example is `m as Mask[4, 8]`; `m == n`,
+mask-vector casts, `.bits()`/`.from_bits` and components on a mask, and
+`~m`, are refused.
 **Changelog v7.15:** §16.1: the C standard library headers `c_import`
 reads come from the target's sysroot, which the compiler carries; other C
 headers come from the program's dependencies; no host SDK is consulted

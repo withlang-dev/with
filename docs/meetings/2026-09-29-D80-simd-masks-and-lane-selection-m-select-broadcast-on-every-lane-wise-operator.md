@@ -62,3 +62,14 @@ any integer lane width); Swift stdlib SIMD (`replacing(with:where:)`,
 **Reopen if** a target cannot represent a 128-bit-lane mask without a
 cost the lowering cannot hide, or mixed-width mask combination turns out
 to be common enough that one result width is forced by use.
+
+**Amendment (2026-09-30, spec v7.16; Eric: "As predicted").** The
+example `m as m8x4` named no alias (`m8x4` is 32 bits; aliases exist only
+for native widths, D78) and is spelled `m as Mask[4, 8]`. A mask lane is
+writable (`m[i] = b`), as a vector lane is. A `bool` literal in a mask
+context broadcasts (`let m: m32x4 = true`), and a scalar operand of
+`m.select(a, b)` broadcasts, both by this ruling's own one-meaning rule.
+Refused, each having two meanings: `m == n` (a whole-mask `bool` in
+Rust, or a lane-wise mask), mask-vector casts and `.bits()`/`.from_bits`
+on a mask (a true lane as `1` or `-1`), `.x` components on a mask; `~m`
+is refused because `not` is the one spelling.

@@ -1113,14 +1113,22 @@ mask; `reduce_add`, `reduce_mul`, `reduce_min`, `reduce_max`,
 `reduce_and`, `reduce_or` and `reduce_xor` reduce a vector.
 
 **Masks.** `m32x4(true, false, true, true)` and `m32x4.splat(true)`
-construct a mask as a vector is constructed, and `m[i]` reads lane `i`
-as a `bool`. `&`, `|` and `^` combine masks of the same shape lane-wise,
-a `bool` operand broadcasting as a scalar does (#Construction and
-splat), and `not m` negates each lane. `and` and `or` are refused on a
-mask: they short-circuit, and lanes cannot. Masks of different widths do
-not combine; `m as m8x4` converts the width. The width is
-representation, not meaning: every width holds the same lane booleans,
-which is why `W` reaches 128 for 128-bit lanes.
+construct a mask as a vector is constructed, and a `bool` literal in a
+mask context broadcasts (`let m: m32x4 = true`). `m[i]` reads lane `i`
+as a `bool`, and `m[i] = b` writes it. `&`, `|` and `^` combine masks of
+the same shape lane-wise, a `bool` operand broadcasting as a scalar does
+(#Construction and splat), and `not m` negates each lane; `not` is the
+one spelling, so `~m` is refused. `and` and `or` are refused on a mask:
+they short-circuit, and lanes cannot. Masks of different widths do not
+combine; `m as Mask[4, 8]` converts the width. A scalar `a` or `b` of
+`m.select(a, b)` broadcasts as an operator's scalar operand does. Each of
+these has more than one meaning and is refused: `m == n` (a whole-mask
+`bool`, or a lane-wise mask — spelled `(m ^ n).any()` or `not (m ^ n)`);
+a cast between a mask and a vector, and `.bits()` or `.from_bits` on a
+mask (a true lane as `1` or as `-1`); `.x`-style components on a mask
+(its lanes are `m[i]`). The width is representation, not meaning: every
+width holds the same lane booleans, which is why `W` reaches 128 for
+128-bit lanes.
 
 **Casts.** `v as i32x4` converts lane-wise, under §4.2.6 for each lane
 (an implicit narrowing is refused as it is for a scalar). `v.bits()`
