@@ -1398,7 +1398,7 @@ It does NOT need to parse:
 - Function bodies
 - Expressions (except in enum initializers and macro constants)
 - Preprocessor directives (already expanded)
-- C++ (not supported)
+- C++ (only the C-linkage surface, with `lang: "c++"`)
 
 **Implementation options (in order of recommendation):**
 

@@ -26,6 +26,11 @@ makes all declarations available as With symbols. This includes:
 - **`#define` constants** → `const` values (integer and string literals)
 - **Function-like macros** → not translated (warning emitted; see §16.2)
 
+`lang: "c++"` reads the header as C++ and imports only its declarations
+with C language linkage, the structs, unions, enums and typedefs they use,
+and integral constants. A class is an opaque type (§16.9); declarations
+with C++ linkage are not imported. `lang: "c"` is the default.
+
 ```
 use c_import("sqlite3.h", link: "sqlite3")
 
