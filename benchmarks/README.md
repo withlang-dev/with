@@ -14,13 +14,19 @@ workloads, measuring what people actually ask about a native language:
 
 ## Running
 
+From the repository root (or from `benchmarks/`):
+
 ```sh
-./run.py                       # debug and release level for every language and workload
-./run.py --full                # every optimization level each compiler offers
-./run.py -w nbody -w trees     # a subset of workloads
-./run.py -l with -l rust       # a subset of languages
-./run.py -n 5 -o results       # five runs per cell; write results.md, .csv, .json
+with run benchmarks/run.w                    # debug and release level for every language and workload
+with run benchmarks/run.w --full             # every optimization level each compiler offers
+with run benchmarks/run.w -w nbody -w trees  # a subset of workloads
+with run benchmarks/run.w -l with -l rust    # a subset of languages
+with run benchmarks/run.w -n 5 -o results    # five runs per cell; write results.md, .csv, .json
 ```
+
+`--timeout <seconds>` bounds each run (default 120) and `--keep` keeps the
+build directory. The runner starts each program itself and reads its peak RSS
+from the OS when it reaps it, so a run's wall clock is the program alone.
 
 Toolchains are looked up on `PATH` and skipped when missing. On macOS the C
 compiler is Apple's `/usr/bin/clang`, which carries the SDK sysroot. Zig is
