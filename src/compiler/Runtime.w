@@ -27,6 +27,10 @@ extern fn with_str_hash(s: &str) -> u64
 extern fn with_nanosleep(ns: i64) -> i32
 extern fn with_sysinfo_os() -> str
 extern fn with_sysinfo_arch() -> str
+extern fn with_alloc(size: i64) -> *mut u8
+extern fn with_free(ptr: *mut u8)
+extern fn with_str_from_bytes(s: *const u8, len: i64) -> str
+extern fn rt_getcwd(buf: *mut u8, size: i64) -> i32
 
 pub fn runtime_eprint(s: &str):
     with_eprint(s)
@@ -80,6 +84,25 @@ pub fn runtime_mkdir_p(path: &str) -> i32:
 // backend uses MoveFileExW with MOVEFILE_REPLACE_EXISTING.
 pub fn runtime_rename(old_path: &str, new_path: &str) -> i32:
     with_fs_rename_file(old_path, new_path)
+
+// The working directory: $PWD, which keeps the path the user typed, else
+// the process's own (getcwd) — `env -i` and some launchers set no PWD, and
+// a relative path joined onto "" named nothing (#1915).
+pub fn runtime_cwd() -> str:
+    let pwd = with_getenv_str("PWD")
+    if pwd.len() > 0:
+        return pwd
+    unsafe:
+        let buf = with_alloc(4096)
+        if rt_getcwd(buf, 4096) != 0:
+            with_free(buf)
+            return ""
+        var n: i64 = 0
+        while n < 4096 and *((buf as i64 + n) as *const u8) != 0:
+            n = n + 1
+        let out = with_str_from_bytes(buf as *const u8, n)
+        with_free(buf)
+        out
 
 pub fn runtime_getenv(name: &str) -> str:
     with_getenv_str(name)

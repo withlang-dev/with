@@ -1171,7 +1171,7 @@ fn conan_self_exe() -> str:
 
 // CMake wants absolute paths; a relative one is relative to where we were run.
 fn conan_absolute(path: &str) -> str:
-    let cwd = runtime_getenv("PWD")
+    let cwd = runtime_cwd()
     if runtime_path_is_absolute(path) or cwd.len() == 0: path.to_owned() else: cwd ++ "/" ++ path
 
 // `name` on PATH, or "".

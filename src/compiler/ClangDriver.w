@@ -14,6 +14,7 @@ use compiler.EmbeddedClangResourceData
 use compiler.ClangBridge
 use compiler.EmbeddedSysroot
 use compiler.LldDriver
+use compiler.Runtime
 
 extern fn with_alloc(size: i64) -> *mut u8
 extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> *mut u8
@@ -67,7 +68,7 @@ fn cc_may_link() -> bool:
 fn cc_macos_linker() -> str:
     var self_exe = with_self_exe()
     if self_exe.len() > 0 and not self_exe.starts_with("/"):
-        let cwd = with_getenv_str("PWD")
+        let cwd = runtime_cwd()
         self_exe = if cwd.len() > 0: cwd ++ "/" ++ self_exe else: ""
     if self_exe.len() == 0:
         with_eprint("error: with cc: cannot find this compiler's own executable by an absolute path to hand clang as its linker (argv[0] is '" ++ with_arg_at(0) ++ "')")

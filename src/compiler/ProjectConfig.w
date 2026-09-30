@@ -727,7 +727,7 @@ pub fn project_config_absolutize_path(path: &str) -> str:
         return with_str_clone_ref(path)
     if project_config_is_absolute_path(path):
         return project_config_normalize_absolute_path(path)
-    let cwd = runtime_getenv("PWD")
+    let cwd = runtime_cwd()
     if cwd.len() == 0:
         return with_str_clone_ref(path)
     project_config_normalize_absolute_path(resolve_join(cwd, path))

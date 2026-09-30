@@ -168,7 +168,7 @@ pub fn tracked_embed_read(source_path: &str, raw_path: &str, package_root: &str)
     // like. Leading '..' segments collapse against the cwd here, turning a true
     // escape into an absolute path outside the root.
     if root.len() > 0 and tracked_path_is_absolute(root) and not tracked_path_is_absolute(resolved):
-        let cwd = runtime_getenv("PWD")
+        let cwd = runtime_cwd()
         if cwd.len() > 0:
             resolved = tracked_normalize_path(cwd ++ "/" ++ resolved)
     if tracked_path_has_parent_segment(resolved) or (root.len() > 0 and not tracked_inside_root(resolved, root)):

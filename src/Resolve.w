@@ -1468,7 +1468,7 @@ pub fn resolve_canonical_module_key(path: &str) -> str:
         return with_str_clone_ref(path)
     var p = with_str_clone_ref(path)
     if not runtime_path_is_absolute(p):
-        let cwd = with_getenv_str("PWD")
+        let cwd = runtime_cwd()
         if cwd.len() > 0:
             p = cwd ++ "/" ++ p
     let parts: Vec[str] = Vec.new()
