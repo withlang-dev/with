@@ -15,6 +15,7 @@ use compiler.ClangBridge
 use compiler.EmbeddedSysroot
 use compiler.LldDriver
 use compiler.Runtime
+use compiler.Link
 
 extern fn with_alloc(size: i64) -> *mut u8
 extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> *mut u8
@@ -93,8 +94,9 @@ pub fn with_cc_main() -> i32:
     let first = if with_arg_count() > 2: with_arg_at(2) else: ""
     // The driver passes -resource-dir down to its own -cc1 invocations.
     if not first.starts_with("-cc1"):
+        let windows_sdk = link_stage_windows_c_target_uses_sdk_libc()
         let resource_dir = ensure_clang_resource_dir()
-        if resource_dir.len() > 0:
+        if resource_dir.len() > 0 and not windows_sdk:
             args.push("-resource-dir")
             args.push(resource_dir)
         // macOS has no /usr/include: the driver reads the sysroot c_import
@@ -106,6 +108,16 @@ pub fn with_cc_main() -> i32:
         if sdk.len() > 0 and not names_sysroot:
             args.push("-isysroot")
             args.push(sdk.trim().to_owned())
+        // Windows x86_64 (#1915): C compiles for the same windows-gnu target
+        // With's objects are, against the SDK's own libc, compiler-rt, libc++
+        // and lld — never a host toolchain. The SDK's resource dir replaces
+        // the embedded headers because it also holds compiler-rt.
+        if windows_sdk:
+            let toolchain = cc_windows_toolchain()
+            if toolchain.problem.len() > 0:
+                with_eprint("error: with cc: " ++ toolchain.problem)
+                return 1
+            for extra in toolchain.args: args.push(extra.clone())
     for i in 2..with_arg_count(): args.push(with_arg_at(i))
     if not first.starts_with("-cc1") and with_sysinfo_os() == "Macos" and cc_may_link():
         let ld = cc_macos_linker()
@@ -120,3 +132,44 @@ pub fn with_cc_main() -> i32:
         *((argv as i64 + args.len() * 8) as *mut *mut u8) = 0 as *mut u8
         let ctx = ClangToolContext { path: cc_c_string(with_arg_at(0)), prepend_arg: cc_c_string("cc"), needs_prepend_arg: true }
         with_clang_main(args.len() as i32, argv, &raw const ctx)
+
+// Whether the caller's own arguments spell `name` (as `name`, `name=...` or
+// `nameVALUE`).
+fn cc_caller_names(prefix: &str) -> bool:
+    for i in 2..with_arg_count():
+        if with_arg_at(i).starts_with(prefix): return true
+    false
+
+// The windows-gnu toolchain `with cc` drives on Windows x86_64, from the SDK
+// the link reads: its arguments, or the piece that is missing.
+type CcToolchain { problem: str, args: Vec[str] }
+
+fn cc_windows_toolchain() -> CcToolchain:
+    var args: Vec[str] = Vec.new()
+    // The link-only choices below are not unused in a compile-only run.
+    args.push("--start-no-unused-arguments")
+    let libc = link_stage_windows_libc_root()
+    if libc.len() == 0:
+        return CcToolchain { problem: "the LLVM SDK carries no Windows C runtime (libc/windows); build one with `with build :sdk-windows-libc`", args }
+    let sdk = link_stage_windows_sdk_dir()
+    let ld = sdk ++ "/bin/ld.lld.exe"
+    if with_fs_file_exists(ld) == 0:
+        return CcToolchain { problem: "the LLVM SDK at " ++ sdk ++ " has no ld.lld.exe, the linker clang's MinGW driver runs (an SDK built by :sdk-llvm since #1915 ships it)", args }
+    let resource = sdk ++ "/lib/clang/" ++ embedded_clang_resource_version()
+    if not cc_caller_names("--target") and not cc_caller_names("-target"):
+        args.push("--target=" ++ link_stage_windows_c_target())
+    if not cc_caller_names("--sysroot"):
+        args.push("--sysroot=" ++ libc)
+    if not cc_caller_names("-resource-dir") and with_fs_file_exists(resource ++ "/include/stddef.h") != 0:
+        args.push("-resource-dir")
+        args.push(resource)
+    if not cc_caller_names("-rtlib") and not cc_caller_names("--rtlib"):
+        args.push("-rtlib=compiler-rt")
+    if not cc_caller_names("-unwindlib") and not cc_caller_names("--unwindlib"):
+        args.push("-unwindlib=libunwind")
+    if not cc_caller_names("-stdlib") and not cc_caller_names("--stdlib"):
+        args.push("-stdlib=libc++")
+    if not cc_caller_names("--ld-path") and not cc_caller_names("-fuse-ld"):
+        args.push("--ld-path=" ++ ld)
+    args.push("--end-no-unused-arguments")
+    CcToolchain { problem: "", args }

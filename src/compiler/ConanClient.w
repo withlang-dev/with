@@ -11,6 +11,7 @@ use compiler.FrameworkStubs
 use compiler.TarExtract
 use compiler.EmbeddedSysroot
 use std.http
+use compiler.Link
 use std.crypto.sha256
 use std.string.StringBuilder
 extern fn with_str_clone_ref(s: &str) -> str
@@ -1034,7 +1035,18 @@ fn conan_write_binary_metadata(name: &str, version: &str, recipe_rev: &str, pack
     let known = conan_link_metadata_with_recipe(name, version, move libs, move link_args, conan_fetch_recipe_text(name, version))
     conan_write_metadata(dep_dir, name, version, recipe_rev, package_id, package_rev, include_paths, lib_paths, known.libs, defines, known.lib_paths, requirements)
 
+// On Windows every C package is built from source with the SDK's toolchain
+// (#1915; Eric, 2026-09-30: "with get builds packages from source in
+// windows"). Conan Center's Windows binaries are MSVC builds: they name
+// Visual Studio's CRT libraries and need its /GS runtime
+// (__security_cookie, __GSHandlerCheck), which neither Windows nor the SDK
+// ships.
+fn conan_builds_from_source_only() -> bool: conan_detect_os() == "Windows"
+
 pub fn conan_restore_locked_binary_package(name: &str, version: &str, recipe_rev: &str, package_id: &str, package_rev: &str, expected_sha256: &str, project_root: &str) -> bool:
+    if conan_builds_from_source_only():
+        runtime_eprint("error: the lock pins c." ++ name ++ "@" ++ version ++ " to a Conan Center binary; on Windows packages are built from source (#1915): run `with get c." ++ name ++ "` again to lock the source build")
+        return false
     let dep_dir = project_root ++ "/.with/deps/c/" ++ name ++ "/" ++ version
     let _clean = runtime_remove_tree(dep_dir)
     if runtime_mkdir_p(dep_dir) != 0:
@@ -1229,6 +1241,10 @@ fn conan_build_tool(name: &str, env_name: &str) -> str:
     if tools.len() > 0:
         let path = tools ++ "/bin/" ++ name ++ (if runtime_sysinfo_os() == "Windows": ".exe" else: "")
         return if runtime_file_exists(path) != 0: path else: ""
+    // Windows (#1915): the SDK's own cmake and ninja, never a host install.
+    if conan_builds_from_source_only():
+        let sdk_tool = link_stage_windows_sdk_dir() ++ "/bin/" ++ name ++ ".exe"
+        return if runtime_file_exists(sdk_tool) != 0: sdk_tool else: ""
     conan_find_program(name)
 
 // `<dir>/<tool>`: a launcher that runs `<self> <tool> ...`. CMake wants one
@@ -1291,7 +1307,7 @@ fn conan_install_from_source(name: &str, version: &str, project_root: &str, dept
     let cmake_env = conan_package_cmake_env(name)
     if cmake_env.problem.len() > 0:
         return conan_source_fail("", cmake_env_name ++ " entry '" ++ cmake_env.problem ++ "' is not NAME=VALUE (entries are separated by `;`)")
-    let why = if g_conan_from_source: "--from-source" else: if cmake_env.defines.len() > 0: cmake_env_name ++ " is set" else: "Conan Center has no binary for " ++ platform ++ " that this toolchain can link"
+    let why = if g_conan_from_source: "--from-source" else: if cmake_env.defines.len() > 0: cmake_env_name ++ " is set" else: if conan_builds_from_source_only(): "on Windows every C package is built by the SDK's toolchain" else: "Conan Center has no binary for " ++ platform ++ " that this toolchain can link"
     runtime_eprint("  " ++ why ++ "; building " ++ name ++ "/" ++ version ++ " from source")
     let folder = conan_recipe_folder(name, version)
     let data = if folder.len() > 0: conan_http_get(conan_recipe_file_url(name, folder, "conandata.yml")) else: ""
@@ -1317,6 +1333,8 @@ fn conan_install_from_source(name: &str, version: &str, project_root: &str, dept
         let missing = if cmake.len() == 0 and ninja.len() == 0: "cmake and ninja" else: if cmake.len() == 0: "cmake" else: "ninja"
         if embedded_sdk_tools_dir().len() > 0:
             return conan_source_fail("", "building " ++ name ++ " from source needs " ++ missing ++ ", which this compiler's SDK tools (" ++ embedded_sdk_tools_dir() ++ ") lack; set WITH_CMAKE / WITH_NINJA to name them")
+        if conan_builds_from_source_only():
+            return conan_source_fail("", "building " ++ name ++ " from source needs the LLVM SDK's " ++ missing ++ " (" ++ link_stage_windows_sdk_dir() ++ "/bin), which it does not carry (or set WITH_CMAKE / WITH_NINJA)")
         return conan_source_fail("", "building " ++ name ++ " from source needs " ++ missing ++ ", which " ++ (if missing.contains(" and "): "are" else: "is") ++ " not on PATH; install " ++ (if missing.contains(" and "): "them" else: "it") ++ " (or set WITH_CMAKE / WITH_NINJA) and run `with get` again")
     let self_exe = conan_self_exe()
     if self_exe.len() == 0: return conan_source_fail("", "could not locate this `with` executable to use as the C compiler")
@@ -1391,6 +1409,15 @@ fn conan_install_from_source(name: &str, version: &str, project_root: &str, dept
     configure = conan_argv_append(configure, "-DCMAKE_POSITION_INDEPENDENT_CODE=ON")
     configure = conan_argv_append(configure, "-DCMAKE_INSTALL_PREFIX=" ++ dep_dir)
     configure = conan_argv_append(configure, "-DCMAKE_INSTALL_LIBDIR=lib")
+    // Windows (#1915): CMake's Windows-Clang module links every program with
+    // Visual Studio's default library set; gdi32, winspool and comdlg32 are
+    // not in the SDK (a package that uses them names them itself). Its
+    // try_compile checks link programs too.
+    if conan_builds_from_source_only():
+        let standard_libraries = "-lkernel32 -luser32 -lshell32 -lole32 -loleaut32 -luuid -ladvapi32"
+        configure = conan_argv_append(configure, "-DCMAKE_C_STANDARD_LIBRARIES=" ++ standard_libraries)
+        configure = conan_argv_append(configure, "-DCMAKE_CXX_STANDARD_LIBRARIES=" ++ standard_libraries)
+        configure = conan_argv_append(configure, "-DCMAKE_TRY_COMPILE_PLATFORM_VARIABLES=CMAKE_C_STANDARD_LIBRARIES;CMAKE_CXX_STANDARD_LIBRARIES")
     if prefix_path.len() > 0: configure = conan_argv_append(configure, "-DCMAKE_PREFIX_PATH=" ++ prefix_path)
     for define in variables.defines: configure = conan_argv_append(configure, define)
     for define in cmake_env.defines:
@@ -1457,7 +1484,7 @@ fn conan_install_internal(name: &str, version_hint: &str, project_root: &str, de
         return ""
     runtime_eprint("  revision: " ++ recipe_rev.slice(0, if recipe_rev.len() > 12: 12 else: recipe_rev.len()))
     let cmake_env = conan_package_cmake_env(name)
-    if g_conan_from_source or cmake_env.defines.len() > 0 or cmake_env.problem.len() > 0:
+    if g_conan_from_source or conan_builds_from_source_only() or cmake_env.defines.len() > 0 or cmake_env.problem.len() > 0:
         return conan_install_from_source(name, version, project_root, depth)
     let installed_binary = conan_install_binary(name, version, recipe_rev, project_root, depth, force_reinstall)
     if installed_binary.len() > 0:
