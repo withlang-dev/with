@@ -4982,6 +4982,7 @@ pub fn with_ci_unary_op(session: i64, cursor_idx: i32) -> i32:
         if cx_uop == 8: return 1   // CXUnaryOperator_Minus → CB_UO_MINUS
         if cx_uop == 9: return 2   // CXUnaryOperator_Not → UO_NOT (bitwise ~)
         if cx_uop == 10: return 3  // CXUnaryOperator_LNot → UO_LNOT (logical !)
+        if cx_uop == 13: return 11 // CXUnaryOperator_Extension → UO_EXTENSION
         -1
 
 // ── Implicit cast kind ──────────────────────────────────────
