@@ -2714,6 +2714,12 @@ fn sdk_windows_gnu_cmake_args(ctx: &ActionCtx, tools_prefix: &str, output_prefix
     out.push("-DCMAKE_C_FLAGS_INIT=" ++ compile_flags)
     out.push("-DCMAKE_CXX_FLAGS_INIT=" ++ compile_flags ++ " -stdlib=libc++")
     out.push("-DCMAKE_ASM_FLAGS_INIT=" ++ compile_flags)
+    // CMake's Windows-Clang module appends Visual Studio's default library
+    // set to every link (gdi32 winspool comdlg32 oldnames ...), libraries
+    // the SDK does not carry and these programs do not use; clang's MinGW
+    // driver already names the runtime's own.
+    out.push("-DCMAKE_C_STANDARD_LIBRARIES=")
+    out.push("-DCMAKE_CXX_STANDARD_LIBRARIES=")
     out.push("-DCMAKE_EXE_LINKER_FLAGS_INIT=" ++ link_flags)
     out.push("-DCMAKE_SHARED_LINKER_FLAGS_INIT=" ++ link_flags)
     out.push("-DCMAKE_MODULE_LINKER_FLAGS_INIT=" ++ link_flags)
@@ -2750,6 +2756,13 @@ pub fn run_sdk_libcxx_action(ctx: ActionCtx) -> i32:
     if not common.ok: return 1
     let cmake = sdk_abs(root, sdk_tool(tools_prefix, "cmake"))
     let prefix = sdk_abs(root, sdk_windows_libc_root(output_prefix) ++ "/" ++ sdk_windows_libc_triple_dir(arch_name))
+    // clang's MinGW driver searches <sysroot>/<triple>/include/c++/v1, so a
+    // libc++ this step installed before would sit beside the build tree's
+    // own headers in every compile of the rebuild: the installed copy goes
+    // first.
+    let installed_headers = sdk_windows_libc_root(output_prefix) ++ "/" ++ sdk_windows_libc_triple_dir(arch_name) ++ "/include/c++"
+    if fs.exists(installed_headers) and fs.remove_tree(installed_headers) != 0:
+        return sdk_fail(ctx, "could not remove the previous libc++ headers: " ++ installed_headers)
     let configure: Vec[str] = Vec.new()
     configure.push(sdk_owned_text(cmake))
     configure.push("-G")
