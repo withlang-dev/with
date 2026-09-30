@@ -764,7 +764,21 @@ fn run_one_liner_command(argc: i32, one: &CliOneLiner, no_std: bool, alloc_mode:
     let _dsym = build_graph_rt_remove_tree(built ++ ".dSYM")
     rc
 
-fn run_cli(argc: i32) -> i32:
+// The arguments the driver reads: for `with run tool.w ...` and `with tool.w
+// ...`, everything through the source. What follows it is the program's
+// argv (run_program_args), never a driver flag: `with run bench.w -n 5` once
+// became the `-n` one-liner over an empty stdin, printed nothing and exited 0.
+fn cli_driver_argc(argc: i32) -> i32:
+    if cli_is_implicit_run(argc): return 2
+    if cli_command(argc) != "run": return argc
+    let source = find_source_arg(argc)
+    if source.len() == 0: return argc
+    for i in 2..argc:
+        if with_arg_at(i) == source: return i + 1
+    argc
+
+fn run_cli(full_argc: i32) -> i32:
+    let argc = cli_driver_argc(full_argc)
     // Run as ld64.lld (a link to this binary that `with cc` hands clang's
     // driver, #1915): lld itself.
     let lld_tool = lld_flavor_for_tool_name(with_arg_at(0))
@@ -862,7 +876,7 @@ fn run_cli(argc: i32) -> i32:
 
     // `with hello.w` is shorthand for `with run hello.w`
     if cli_is_implicit_run(argc):
-        return run_run_command(cli_command(argc), "", opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, run_program_args(argc, cli_command(argc)))
+        return run_run_command(cli_command(argc), "", opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, run_program_args(full_argc))
 
     if cli_command(argc) == "build":
         if cli_has_flag(argc, "--help") or cli_has_flag(argc, "-h"):
@@ -891,7 +905,7 @@ fn run_cli(argc: i32) -> i32:
             return 1
         if cli_apply_platform_target(argc) != 0:
             return 1
-        return run_run_command(source, find_target_selector_arg(argc), opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, run_program_args(argc, source))
+        return run_run_command(source, find_target_selector_arg(argc), opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, run_program_args(full_argc))
     if cli_command(argc) == "emit-c-header":
         // §16.5: print the generated C header for this module's @[c_export]
         // symbols to stdout.
@@ -1151,20 +1165,13 @@ fn has_output_prefix(arg: &str) -> bool:
 // Everything on the command line after the source `.w` is forwarded to the
 // program as its argv, so `with run tool.w a b` runs the program with a, b
 // (no separate build step needed). Returns "" when there are no trailing args.
-fn run_program_args(argc: i32, source: &str) -> str:
-    if source == "":
-        return ""
+// The source is where the driver's arguments end (cli_driver_argc): the
+// implicit `with tool.w a b` has it at argv[1], which a scan from argv[2]
+// never found, so it forwarded nothing.
+fn run_program_args(argc: i32) -> str:
     // NUL-terminated argv blob (the format with_exec_argv expects).
     var result = ""
-    var i = 2
-    var found = false
-    while i < argc:
-        let arg = with_arg_at(i)
-        if found:
-            result = result ++ arg ++ "\0"
-        else if arg == source:
-            found = true
-        i = i + 1
+    for i in cli_driver_argc(argc)..argc: result = result ++ with_arg_at(i) ++ "\0"
     result
 
 // Find the first positional (non-flag) argument starting from argv[2].

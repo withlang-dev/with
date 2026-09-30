@@ -1431,6 +1431,24 @@ pub fn run_cli_selfhost_one_liner_action(ctx: ActionCtx) -> i32:
     rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "implicit-main-regex-fstring", bs_one_liner_args("run", implicit_src), "error 42\nok\n", "ERROR code=42")
     if rc != 0: return rc
 
+    // What follows the source is the program's argv, never a driver flag:
+    // `run tool.w -n 5` became the `-n` one-liner over an empty stdin,
+    // printed nothing and exited 0.
+    let echo_src = bs_join(output_dir, "echo_args.w")
+    if fs.write_text(echo_src, "use std.process\nlet argv = args()\nfor i in 1..argv.len(): print(argv[i])\n") != 0:
+        return bs_fail(ctx, "could not write one-liner fixture source: " ++ echo_src)
+    args = Vec.new()
+    args |> push("run")
+    args |> push(selfhost_owned_text(echo_src))
+    for a in "-n 5 -e x -p y --debug-alloc -O0 --help".split(" "): args |> push(selfhost_owned_text(a))
+    rc = bs_expect_cli_success_exact(ctx, compiler_path, "run-forwards-driver-flags", args, "-n\n5\n-e\nx\n-p\ny\n--debug-alloc\n-O0\n--help")
+    if rc != 0: return rc
+    args = Vec.new()
+    args |> push(selfhost_owned_text(echo_src))
+    for a in "-n 5".split(" "): args |> push(selfhost_owned_text(a))
+    rc = bs_expect_cli_success_exact(ctx, compiler_path, "implicit-run-forwards-driver-flags", args, "-n\n5")
+    if rc != 0: return rc
+
     // sed/awk/coreutils/jq parity (docs/spec/toolchain/improve_oneliners.md, 2026-09-03):
     // every idiom that works today stays working. The rows that do not
     // are #957–#961; each joins here when its gap closes.
