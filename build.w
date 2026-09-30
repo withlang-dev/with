@@ -254,16 +254,56 @@ fn add_cross_rt_targets(out0: Build, ctx: &BuildCtx, tag: &str, p: &str, group_n
     var cross_ld_rsp = target_new(.Action, p ++ "llvm-link-metadata", "").output(dir ++ "/llvm_ld.rsp")
     cross_ld_rsp.action = run_cross_linux_llvm_link_metadata_action
     cross_ld_rsp = cross_ld_rsp.arg(build_owned_text(tag))
-    cross_ld_rsp = cross_ld_rsp.write_scope(dir)
+    cross_ld_rsp = cross_ld_rsp.write_scope(build_owned_text(dir))
     cross_ld_rsp = cross_ld_rsp.write_scope("out/command/" ++ p ++ "llvm-link-metadata")
     out = out.add_target(cross_ld_rsp)
+
+    var objects: Vec[str] = Vec.new()
+    for suffix in "rt-core-object rt-platform-object cimport-stubs-object compat-runtime-object panic-runtime-object fiber-stubs-object channel-runtime-object fiber-runtime-object fiber-core-object fiber-asm-object llvm-bridge-object clang-bridge-object embedded-objects-object llvm-link-metadata".split(" "):
+        objects.push(p ++ suffix)
+    out = out.add_target(runtime_producer_target(p ++ "runtime-producer", release_compiler_bin("with"), dir, &objects))
 
     var cross_rt = target_new(.Group, build_owned_text(group_name), "")
     cross_rt = cross_rt.dep(p ++ "embedded-objects-object")
     cross_rt = cross_rt.dep(p ++ "llvm-bridge-object")
     cross_rt = cross_rt.dep(p ++ "clang-bridge-object")
     cross_rt = cross_rt.dep(p ++ "llvm-link-metadata")
-    out.add_target(cross_rt)
+    cross_rt = cross_rt.dep(p ++ "runtime-producer")
+    out = out.add_target(cross_rt)
+
+    // A native-verified cross bootstrap is needed when the pinned target seed
+    // predates current syntax. Build and stamp it through the same compiler
+    // actions as the native stages, with every target corpus and producer.
+    let bin_dir = "out/cross/" ++ tag ++ "/bin"
+    let bin = bin_dir ++ "/with"
+    var compiler = target_new(.Action, p ++ "link-compiler", "").output(bin ++ ".unstamped")
+    compiler.action = run_with_compiler_build_action
+    compiler = compiler.compiler(release_compiler_bin("with"))
+    compiler = compiler.input("out/gen/main.w")
+    compiler = target_with_compiler_source_inputs(move compiler, ctx)
+    compiler = compiler.arg("-O1").arg("--target=" ++ triple)
+    compiler = compiler.arg("embedded-object=" ++ dir ++ "/embedded_objects.o")
+    compiler = compiler.arg("runtime-root=" ++ dir)
+    compiler = compiler.input(dir ++ "/.producer")
+    compiler = compiler.dep(build_owned_text(group_name))
+    compiler = compiler.write_scope(build_owned_text(bin_dir))
+    compiler = compiler.extra_output("out/command/" ++ p ++ "link-compiler")
+    compiler = compiler.timeout(1800000)
+    for pi in 0..plans.len() as i32:
+        compiler = target_with_link_bundle(move compiler, ctx, plans[pi])
+    out = out.add_target(compiler)
+
+    var stamp = target_new(.Action, p ++ "compiler", "").output(build_owned_text(bin))
+    stamp.action = run_patch_version_action
+    stamp = stamp.input(bin ++ ".unstamped").input("docs/with-abi.sha256")
+    stamp = stamp.arg("runtime-producer=" ++ dir ++ "/.producer")
+    stamp = stamp.input(dir ++ "/.producer")
+    stamp = stamp.dep(p ++ "link-compiler").dep("abi-hash-check")
+    stamp = target_with_generation_inputs(move stamp, ctx)
+    stamp = target_with_version_inputs(move stamp, ctx)
+    stamp = stamp.write_scope(build_owned_text(bin_dir))
+    stamp = stamp.extra_output("out/command/" ++ p ++ "compiler")
+    out.add_target(stamp)
 
 // #1815 (D30): stage1's runtime and bridge objects, compiled by stage1 into
 // out/bootstrap/lib. stage2's code is stage1's codegen, so stage2 links this
