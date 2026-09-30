@@ -18,12 +18,13 @@ with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz=dd824534e89fe9570558036a69fcddfecb607
 with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz.sha256=66258ada1ca04f6bfa4ff1f55753fa890b75a2cc3b7fb978f6d9979ae24179f1
 with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz.manifest=9623c66f4f03265c64f2cda63ddc20be0eac9b690d0fab1155fb30f47c3b781e
 
-# linux-x86_64: built by build/sdk.w at 594656a8 against the With linux
+# linux-x86_64: built by build/sdk.w at 6f039463 against the With linux
 # sysroot (glibc 2.28), with its own compiler-rt and static libc++ and no
-# libxml2 (#1915, D81); a compiler it links needs no host gcc or glibc files.
-with-llvm-sdk-22.1.6-linux-x86_64.tar.gz.version=nightly-sdk-20260930-594656a80308
-with-llvm-sdk-22.1.6-linux-x86_64.tar.gz=1b60cd5e61f2246d3ecda49b118bd76112b8d35b183935680161712c98b15661
-with-llvm-sdk-22.1.6-linux-x86_64.tar.gz.sha256=5d53ecf44300116f5518ce41c9248d8da5efe90b762a0d22440dbefedfc9b24e
+# libxml2 (#1915, D81); every executable in it, cmake and ninja included,
+# needs glibc 2.28+ and nothing else of the host.
+with-llvm-sdk-22.1.6-linux-x86_64.tar.gz.version=nightly-sdk-20260930-6f0394637064
+with-llvm-sdk-22.1.6-linux-x86_64.tar.gz=5d3f1a34f677185880d87bb3b9031e6c4f2967bf4fd0b5077fb3c9e702b6a47f
+with-llvm-sdk-22.1.6-linux-x86_64.tar.gz.sha256=bd9719f205d97faa5739a407fcef3fb4950f81c1dcd71ae074513c859a318a25
 with-llvm-sdk-22.1.6-linux-x86_64.tar.gz.manifest=4252f86279af1c7d1d345e649447ec6877726fc176ef58d5584224b457662850
 
 with-llvm-sdk-22.1.6-linux-aarch64.tar.gz.version=sdk-linux-aarch64
