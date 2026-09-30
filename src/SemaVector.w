@@ -463,12 +463,11 @@ impl Sema:
             return 0
         if not (lv and rv):
             // §4.3d: a scalar operand beside a vector broadcasts to every lane.
-            if is_shift and not lv:
-                self.emit_error(f"a shift's left operand is the value shifted; `{type_text}` shifts a vector (§4.3d)", node)
-                return 0
+            // A scalar shift amount is any integer; a scalar shifted by a
+            // vector (`2 << v`) is a lane value like any other operand.
             let scalar_node = if lv: rhs_node else: lhs_node
             let scalar_ty = if lv: rhs else: lhs
-            if not self.vector_scalar_operand_ok(scalar_node, scalar_ty, vec_ty, is_shift):
+            if not self.vector_scalar_operand_ok(scalar_node, scalar_ty, vec_ty, is_shift and lv):
                 return 0
             self.vector_splats.insert(scalar_node, vec_ty)
         let result = if is_cmp: self.vector_compare_mask_type(vec_ty) else: vec_ty

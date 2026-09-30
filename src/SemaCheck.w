@@ -11308,10 +11308,19 @@ impl Sema:
             // A shift's type is its left operand's: an untyped left operand
             // takes the context's integer type (§4.2.1, as Rust and Swift
             // type `let x: u8 = 1 << 3`); the amount types on its own.
-            let shift_context = if lhs_is_num_lit: self.untyped_literal_int_context_type() else: 0 as TypeId
-            lhs = if shift_context != 0: self.check_expr_with_expected(lhs_node, shift_context) else: self.check_expr_value_context(lhs_node)
-            let shift_count_ty = if rhs_is_num_lit: self.shift_count_literal_type(rhs_node) else: 0
-            rhs = self.check_expr_with_expected(rhs_node, shift_count_ty as TypeId)
+            // §4.3d (D80): a literal shifted by a vector (`2 << v`) is a lane
+            // value, so the vector types it.
+            if lhs_is_num_lit and not rhs_is_num_lit:
+                rhs = self.check_expr_value_context(rhs_node)
+                let shift_peer = self.literal_peer_type(rhs as i32)
+                if self.is_vector_type(rhs as i32) or self.is_vector_type(self.shared_copy_pointee(rhs as i32)):
+                    lhs = self.check_expr_with_expected(lhs_node, shift_peer as TypeId)
+            if lhs == 0:
+                let shift_context = if lhs_is_num_lit: self.untyped_literal_int_context_type() else: 0 as TypeId
+                lhs = if shift_context != 0: self.check_expr_with_expected(lhs_node, shift_context) else: self.check_expr_value_context(lhs_node)
+            if rhs == 0:
+                let shift_count_ty = if rhs_is_num_lit: self.shift_count_literal_type(rhs_node) else: 0
+                rhs = self.check_expr_with_expected(rhs_node, shift_count_ty as TypeId)
         else if op == BinaryOp.OP_BIT_AND or op == BinaryOp.OP_BIT_OR or op == BinaryOp.OP_BIT_XOR:
             let lhs_is_bit_lit = sema_node_is_bitwise_adaptable_literal(self.ast, lhs_node) or lhs_is_num_lit
             let rhs_is_bit_lit = sema_node_is_bitwise_adaptable_literal(self.ast, rhs_node) or rhs_is_num_lit
