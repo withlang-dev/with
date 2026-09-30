@@ -1364,6 +1364,10 @@ fn win_spawn_argv(args: &str, stdout_path: &str, stderr_path: &str, stdin_path: 
     if cmd as i64 == 0:
         return -12
     let cmd_rc = win_build_command_line(data, args.len(), cmd as *mut u16, 32768)
+    // Windows' own limit on a command line; past it the spawn fails, and
+    // says why (#1916) instead of returning -1 alone.
+    if cmd_rc == -1:
+        let _ = rt_write(2, c"error: a command line longer than Windows allows (32767 UTF-16 units)\n".ptr, 70)
     if cmd_rc != 0:
         with_free(cmd)
         return cmd_rc

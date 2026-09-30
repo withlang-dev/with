@@ -1055,7 +1055,7 @@ fn posix_argv_blob_count(blob: *const u8, len: i64) -> i32:
 fn posix_fill_argv(blob: *const u8, len: i64, argv: *mut *const u8) -> i32:
     var argi = 0
     var offset: i64 = 0
-    while offset < len and argi < 255:
+    while offset < len:
         unsafe *((argv as i64 + argi as i64 * 8) as *mut *const u8) = (blob as i64 + offset) as *const u8
         argi += 1
         while offset < len and (unsafe *((blob as i64 + offset) as *const u8)) != 0:
@@ -1095,7 +1095,15 @@ fn posix_child_common(mask_rc: i32, prev_mask: *const u32):
 
 fn posix_run_argv(blob: *const u8, len: i64, stdout_path: *const u8, stderr_path: *const u8, stdin_path: *const u8, cwd: *const u8, timeout_ms: i32, wait: bool) -> i32:
     let argc = posix_argv_blob_count(blob, len)
-    if argc <= 0 or argc >= 256:
+    if argc <= 0:
+        return -1
+    // The argv table is the command's own size (#1916): it was a fixed
+    // 256-entry array, and a longer command returned -1 with nothing said.
+    // Mapped before the fork, so the child only fills it.
+    let table_bytes = (argc as i64 + 1) * 8
+    let table = rt_mmap(table_bytes) as *mut *const u8
+    if table as i64 == 0:
+        let _ = rt_write(2, c"error: could not map the argument table for a command\n".ptr, 54)
         return -1
     var prev_mask: u32 = 0 as u32
     let mask_rc = posix_block_interrupt_signals(&raw mut prev_mask)
@@ -1112,10 +1120,10 @@ fn posix_run_argv(blob: *const u8, len: i64, stdout_path: *const u8, stderr_path
             if rt_libc_chdir(cwd) != 0:
                 rt_libc_exit(127)
             let _ = rt_libc_setenv(c"PWD".ptr, cwd, 1)
-        var argv: [256]*const u8 = [0 as *const u8; 256]
-        let _argc2 = posix_fill_argv(blob, len, (&raw mut argv) as *mut [256]*const u8 as *mut *const u8)
-        let _ = rt_libc_execvp(argv[0], (&argv) as *const [256]*const u8 as *const *const u8)
+        let _argc2 = posix_fill_argv(blob, len, table)
+        let _ = rt_libc_execvp(unsafe *table, table as *const *const u8)
         rt_libc_exit(127)
+    rt_munmap(table as *mut u8, table_bytes)
     if pid < 0:
         if mask_rc == 0:
             posix_restore_signal_mask(&prev_mask as *const u32)
