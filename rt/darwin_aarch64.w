@@ -69,6 +69,21 @@ type MachTimebaseInfo:
 @[link_name("mach_timebase_info")]
 extern fn rt_libc_mach_timebase_info(info: *mut MachTimebaseInfo) -> i32
 
+// Clang emits this compiler-runtime ABI for @available in foreign objects.
+// The supported arm64 macOS baseline is 11.0, where libSystem already owns
+// the platform/variant availability policy. Match compiler-rt's version
+// packing and forward to it; never substitute a host-version guess.
+@[repr(C)]
+type RtDarwinBuildVersion { platform: u32, version: u32 }
+
+@[link_name("_availability_version_check")]
+extern fn rt_libc_availability_version_check(count: u32, versions: *const RtDarwinBuildVersion) -> bool
+
+@[c_export("__isPlatformVersionAtLeast")]
+fn rt_darwin_is_platform_version_at_least(platform: u32, major: u32, minor: u32, subminor: u32) -> i32:
+    let version = RtDarwinBuildVersion { platform, version: ((major & 65535) << 16) | ((minor & 255) << 8) | (subminor & 255) }
+    if rt_libc_availability_version_check(1, &raw const version): 1 else: 0
+
 // ── Helpers ─────────────────────────────────────────────────────
 
 fn get_errno() -> i32:
@@ -1563,6 +1578,9 @@ c facade libsystem:
         preserves domain environ
         preserves domain locale
     fn rt_libc_sysctlbyname
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_availability_version_check
         preserves domain environ
         preserves domain locale
     fn rt_libc_setenv

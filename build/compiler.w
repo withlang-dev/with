@@ -938,7 +938,9 @@ fn comp_count_actual_c_export_attrs(text: &str) -> i32:
     count
 
 fn comp_c_export_budget(path: &str) -> i32:
-    let _ = path
+    // A real foreign ABI: Clang-built libraries call compiler-rt's Darwin
+    // availability helper. This is not a compiler-internal module boundary.
+    if path == "rt/darwin_aarch64.w": return 1
     -1
 
 fn comp_check_c_export_path(ctx: &ActionCtx, path: &str) -> i32:
