@@ -32,7 +32,7 @@ extern let with_embedded_sdk_tools_end: u8
 // every other host.
 extern let with_embedded_windows_sysroot_start: u8
 extern let with_embedded_windows_sysroot_end: u8
-// #1915 (D81): the linux-x86_64 sysroot — glibc 2.28 link stubs and crt
+// #1915 (D81): the linux sysroot (x86_64 or aarch64) — glibc 2.28 link stubs and crt
 // objects, compiler-rt, the glibc headers (build/sdk.w
 // run_linux_link_pack_action). Empty in every other host's compiler.
 extern let with_embedded_linux_sysroot_start: u8
@@ -239,7 +239,7 @@ pub fn embedded_linux_sysroot_dir() -> str:
     let pack = es_linux_pack()
     if pack.len() == 0:
         return ""
-    g_linux_sysroot_dir = es_materialize(pack, "sysroot/linux-x86_64", "the linux sysroot")
+    g_linux_sysroot_dir = es_materialize(pack, "sysroot/linux-" ++ runtime_sysinfo_arch(), "the linux sysroot")
     with_str_clone_ref(g_linux_sysroot_dir)
 
 // #1915 (D81): the materialized SDK build tools (bin/cmake, bin/ninja,
@@ -285,7 +285,7 @@ pub fn host_darwin_sdk_root() -> str:
 pub fn host_c_sysroot() -> str:
     if runtime_sysinfo_os() == "Macos":
         return darwin_sdk_root()
-    if runtime_sysinfo_os() == "Linux" and runtime_sysinfo_arch() == "x86_64":
+    if runtime_sysinfo_os() == "Linux" and (runtime_sysinfo_arch() == "x86_64" or runtime_sysinfo_arch() == "aarch64"):
         let explicit = runtime_getenv("WITH_LINUX_SYSROOT")
         if explicit.len() > 0: return explicit
         return embedded_linux_sysroot_dir()

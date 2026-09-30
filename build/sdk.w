@@ -304,7 +304,9 @@ fn sdk_validate_package_prefix(ctx: &ActionCtx, platform: &str, prefix: &str, bu
     let current = sdk_current_platform()
     if current.len() == 0:
         return sdk_fail(ctx, "unsupported SDK packaging host: " ++ os() ++ "/" ++ arch())
-    if current != platform:
+    // linux-aarch64 is cross-built on linux-x86_64 (sdk-cross-aarch64-*).
+    let cross_linux = current == "linux-x86_64" and platform == "linux-aarch64"
+    if current != platform and not cross_linux:
         return sdk_fail(ctx, "SDK packages must be built on their native host; requested " ++ platform ++ " on " ++ current)
     var rc = sdk_validate_cache(ctx, platform, build_cache)
     if rc != 0:
@@ -432,7 +434,7 @@ fn sdk_select_package_files(fs: &ToolFs, prefix: &str, platform: &str) -> Vec[st
     if fs.exists(sdk_join(prefix, "include/c++/v1")):
         let cxx_headers = fs.list_files(sdk_join(prefix, "include/c++/v1"))
         for i in 0..cxx_headers.len() as i32: candidates.push(sdk_owned_text(cxx_headers[i]))
-        let site = fs.list_files(sdk_join(prefix, "include/" ++ SDK_LINUX_TRIPLE))
+        let site = fs.list_files(sdk_join(prefix, "include/" ++ sdk_linux_triple(sdk_platform_linux_arch(platform))))
         for i in 0..site.len() as i32: candidates.push(sdk_owned_text(site[i]))
     let cmake_data = fs.list_files(sdk_join(prefix, "share"))
     for i in 0..cmake_data.len() as i32:
@@ -451,9 +453,9 @@ fn sdk_select_package_files(fs: &ToolFs, prefix: &str, platform: &str) -> Vec[st
             continue
         if rel.starts_with("lib/clang/") or rel.starts_with(sdk_cmake_data_prefix()):
             selected.push(sdk_owned_text(path))
-        else if rel.starts_with("lib/" ++ SDK_LINUX_TRIPLE ++ "/") and rel.ends_with(".a"):
+        else if rel.starts_with("lib/" ++ sdk_linux_triple(sdk_platform_linux_arch(platform)) ++ "/") and rel.ends_with(".a"):
             selected.push(sdk_owned_text(path))
-        else if rel.starts_with("include/c++/v1/") or rel.starts_with("include/" ++ SDK_LINUX_TRIPLE ++ "/c++/v1/"):
+        else if rel.starts_with("include/c++/v1/") or rel.starts_with("include/" ++ sdk_linux_triple(sdk_platform_linux_arch(platform)) ++ "/c++/v1/"):
             selected.push(sdk_owned_text(path))
         else if rel.starts_with("lib/"):
             // Static archives, GNU-named on every platform: the Windows SDK's
@@ -961,8 +963,10 @@ pub fn run_sdk_ninja_action(ctx: ActionCtx) -> i32:
     configure.push("-DCMAKE_INSTALL_PREFIX=" ++ sdk_abs(root, output_prefix))
     configure.push("-DCMAKE_MAKE_PROGRAM=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, "ninja")))
     configure.push("-DBUILD_TESTING=OFF")
-    if os() == "Linux" and arch() == "x86_64":
-        let linux_flags = sdk_linux_toolchain_flags(root, output_prefix, build_dir)
+    // args[5]: the target architecture of a cross build.
+    let ninja_arch = if args.len() > 5: sdk_owned_text(args.get(5)) else: arch()
+    if os() == "Linux" and sdk_linux_arch_supported(ninja_arch):
+        let linux_flags = sdk_linux_toolchain_flags(root, output_prefix, build_dir, ninja_arch)
         for i in 0..linux_flags.len() as i32: configure.push(sdk_owned_text(linux_flags[i]))
     rc = sdk_run_capture(ctx, "ninja-configure", configure, 300000)
     if rc != 0: return rc
@@ -1035,14 +1039,18 @@ pub fn run_sdk_cmake_action(ctx: ActionCtx) -> i32:
     else:
         configure.push("-DCMAKE_C_COMPILER=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, "clang")))
         configure.push("-DCMAKE_CXX_COMPILER=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, "clang++")))
-    configure.push("-DCMAKE_MAKE_PROGRAM=" ++ sdk_abs(root, sdk_tool(output_prefix, "ninja")))
+    // args[6]: the target architecture of a cross build, which runs the
+    // bootstrap's ninja (the new one is the target's).
+    let cmake_arch = if args.len() > 6: sdk_owned_text(args.get(6)) else: arch()
+    let make_prefix = if cmake_arch != arch(): sdk_owned_text(bootstrap_prefix) else: sdk_owned_text(output_prefix)
+    configure.push("-DCMAKE_MAKE_PROGRAM=" ++ sdk_abs(root, sdk_tool(make_prefix, "ninja")))
     configure.push("-DBUILD_TESTING=OFF")
     configure.push("-DCMAKE_USE_OPENSSL=OFF")
-    if os() == "Linux" and arch() == "x86_64":
+    if os() == "Linux" and sdk_linux_arch_supported(cmake_arch):
         // CMake's bundled curl looks for the host's optional libraries; the
         // sysroot carries none, and a leftover find must not reach the host.
         for a in ["-DCMAKE_DISABLE_FIND_PACKAGE_PkgConfig=ON", "-DCMAKE_DISABLE_FIND_PACKAGE_Libidn2=ON", "-DCURL_USE_LIBPSL=OFF", "-DCURL_USE_LIBSSH2=OFF", "-DCURL_ZSTD=OFF", "-DCURL_BROTLI=OFF", "-DBUILD_CursesDialog=OFF"]: configure.push(sdk_owned_text(a))
-        let linux_flags = sdk_linux_toolchain_flags(root, output_prefix, build_dir)
+        let linux_flags = sdk_linux_toolchain_flags(root, output_prefix, build_dir, cmake_arch)
         for i in 0..linux_flags.len() as i32: configure.push(sdk_owned_text(linux_flags[i]))
     rc = sdk_run_capture(ctx, "cmake-configure", configure, 600000)
     if rc != 0: return rc
@@ -1180,7 +1188,11 @@ pub fn run_sdk_llvm_action(ctx: ActionCtx) -> i32:
     if fs.mkdir_all(build_dir) != 0:
         return sdk_fail(ctx, "could not create LLVM build directory: " ++ build_dir)
     let root = ctx.project_info().project_root()
-    let cmake = sdk_abs(root, sdk_tool(cmake_prefix, "cmake"))
+    // A cross build (args[9]) runs the bootstrap's cmake and ninja; the new
+    // ones are the target's.
+    let tools_prefix = if args.len() > 9 and args.get(9) != arch(): sdk_owned_text(bootstrap_prefix) else: sdk_owned_text(output_prefix)
+    let run_cmake_prefix = if args.len() > 9 and args.get(9) != arch(): sdk_owned_text(bootstrap_prefix) else: sdk_owned_text(cmake_prefix)
+    let cmake = sdk_abs(root, sdk_tool(run_cmake_prefix, "cmake"))
     let configure: Vec[str] = Vec.new()
     configure.push(sdk_owned_text(cmake))
     configure.push("-G")
@@ -1191,7 +1203,7 @@ pub fn run_sdk_llvm_action(ctx: ActionCtx) -> i32:
     configure.push(sdk_abs(root, build_dir))
     configure.push("-DCMAKE_BUILD_TYPE=Release")
     configure.push("-DCMAKE_INSTALL_PREFIX=" ++ sdk_abs(root, output_prefix))
-    configure.push("-DCMAKE_MAKE_PROGRAM=" ++ sdk_abs(root, sdk_tool(output_prefix, "ninja")))
+    configure.push("-DCMAKE_MAKE_PROGRAM=" ++ sdk_abs(root, sdk_tool(tools_prefix, "ninja")))
     configure.push("-DLLVM_ENABLE_PROJECTS=clang;lld")
     configure.push("-DLLVM_TARGETS_TO_BUILD=" ++ targets)
     configure.push("-DLIBCLANG_BUILD_STATIC=ON")
@@ -1244,10 +1256,14 @@ pub fn run_sdk_llvm_action(ctx: ActionCtx) -> i32:
                 configure.push("-DCMAKE_OSX_ARCHITECTURES=x86_64")
             else:
                 return sdk_fail(ctx, "unsupported macOS arch: " ++ arch())
-    if os() == "Linux" and arch() == "x86_64":
-        if not fs.exists(sdk_join(output_prefix, "lib/" ++ SDK_LINUX_TRIPLE ++ "/libc++.a")):
+    // args[9]/[10]: a cross build's target architecture and the host SDK
+    // build's tools directory.
+    let llvm_arch = if args.len() > 9: sdk_owned_text(args.get(9)) else: arch()
+    let native_tools = if args.len() > 10: sdk_owned_text(args.get(10)) else: ""
+    if os() == "Linux" and sdk_linux_arch_supported(llvm_arch):
+        if not fs.exists(sdk_join(output_prefix, "lib/" ++ sdk_linux_triple(llvm_arch) ++ "/libc++.a")):
             return sdk_fail(ctx, "the SDK's runtimes are not built: run :sdk-runtimes")
-        let linux_flags = sdk_linux_llvm_flags(root, output_prefix, build_dir)
+        let linux_flags = sdk_linux_llvm_flags(root, output_prefix, build_dir, llvm_arch, native_tools)
         for i in 0..linux_flags.len() as i32: configure.push(sdk_owned_text(linux_flags[i]))
     rc = sdk_run_capture(ctx, "llvm-configure", configure, 1800000)
     if rc != 0: return rc
@@ -1272,7 +1288,8 @@ pub fn run_sdk_llvm_action(ctx: ActionCtx) -> i32:
         return sdk_fail(ctx, "llvm-nm was not installed: " ++ sdk_tool(output_prefix, "llvm-nm"))
     rc = sdk_validate_wasm_install(ctx, output_prefix)
     if rc != 0: return rc
-    let clang_rc = sdk_archive_clang_main(ctx, root, sdk_abs(root, build_dir) ++ "/tools/clang/tools/driver/CMakeFiles/clang.dir", output_prefix)
+    let archiver_prefix = if llvm_arch != arch(): sdk_owned_text(bootstrap_prefix) else: sdk_owned_text(output_prefix)
+    let clang_rc = sdk_archive_clang_main(ctx, root, sdk_abs(root, build_dir) ++ "/tools/clang/tools/driver/CMakeFiles/clang.dir", output_prefix, archiver_prefix)
     if clang_rc != 0: return clang_rc
     if os() != "Macos": return 0
     sdk_archive_dsymutil_main(ctx, root, sdk_abs(root, build_dir) ++ "/tools/dsymutil/CMakeFiles/dsymutil.dir", output_prefix)
@@ -1327,13 +1344,13 @@ fn sdk_clang_main_archive(fs: &ToolFs, prefix: &str) -> str:
         return sdk_join(prefix, "lib/clangMain.lib")
     sdk_join(prefix, "lib/libclangMain.a")
 
-fn sdk_archive_clang_main(ctx: &ActionCtx, root: &str, objects_dir: &str, output_prefix: &str) -> i32:
+fn sdk_archive_clang_main(ctx: &ActionCtx, root: &str, objects_dir: &str, output_prefix: &str, archiver_prefix: &str) -> i32:
     let ext = if os() == "Windows": ".cpp.obj" else: ".cpp.o"
     let archive = sdk_abs(root, sdk_clang_main_archive(ctx.fs(), output_prefix))
     // GNU-named and made by llvm-ar on every platform: the Windows SDK's LLVM
     // is a windows-gnu build (#1915); CMake there still names objects .obj.
     var argv: Vec[str] = Vec.new()
-    argv.push(sdk_abs(root, sdk_tool(output_prefix, "llvm-ar")))
+    argv.push(sdk_abs(root, sdk_tool(archiver_prefix, "llvm-ar")))
     argv.push("rcs")
     argv.push(archive)
     // Pushed one by one: the build layer runs on the pinned seed (#1122).
@@ -1445,7 +1462,7 @@ fn sdk_ensure_clang_main(ctx: &ActionCtx) -> i32:
                 argv.push(sdkroot)
         rc = sdk_run_capture(ctx, "clang-main-" ++ names[i], argv, 600000)
         if rc != 0: return rc
-    sdk_archive_clang_main(ctx, root, sdk_abs(root, scratch), prefix)
+    sdk_archive_clang_main(ctx, root, sdk_abs(root, scratch), prefix, prefix)
 
 // ── The darwin sysroot (#1915) ─────────────────────────────────────────
 //
@@ -1790,13 +1807,16 @@ pub fn sdk_glibc_stub_sources(abilists: &str, target: &str, major: i32, minor: i
             let count = r.u16le()
             var sym = ""
             var chosen: Vec[i32] = Vec.new()
-            var sizes: Vec[i32] = Vec.new()
-            for _k in 0..versions.len(): sizes.push(0)
+            // An object's size at each chosen version, beside it (pushed, not
+            // indexed: the build's comptime evaluator assigns only locals and
+            // fields).
+            var chosen_sizes: Vec[i32] = Vec.new()
             var have_name = false
             for _s in 0..count:
                 if not have_name:
                     sym = r.cstr()
                     chosen = Vec.new()
+                    chosen_sizes = Vec.new()
                     have_name = true
                 let targets = r.leb()
                 let size = if pass == 1: r.leb() as i32 else: 0
@@ -1809,7 +1829,7 @@ pub fn sdk_glibc_stub_sources(abilists: &str, target: &str, major: i32, minor: i
                     let ver = b & 127
                     if applies and ver <= pin:
                         chosen.push(ver)
-                        sizes[ver] = size
+                        chosen_sizes.push(size)
                     if (b & 128) != 0 or not r.ok: break
                 if not terminal: continue
                 have_name = false
@@ -1824,6 +1844,9 @@ pub fn sdk_glibc_stub_sources(abilists: &str, target: &str, major: i32, minor: i
                         if w == c: seen = true
                     if seen: continue
                     written.push(c)
+                    var object_size = 0
+                    for k in 0..chosen.len() as i32:
+                        if chosen[k] == c: object_size = chosen_sizes[k]
                     let v = &versions[c]
                     let label = sym ++ "_" ++ sdk_glibc_version_suffix(v)
                     let at = if c == newest: "@@" else: "@"
@@ -1831,9 +1854,9 @@ pub fn sdk_glibc_stub_sources(abilists: &str, target: &str, major: i32, minor: i
                     if pass == 0:
                         stub.push_str(".type " ++ label ++ ", %function\n")
                     else:
-                        stub.push_str(".type " ++ label ++ ", %object\n.size " ++ label ++ f", {sizes[c]}\n")
+                        stub.push_str(".type " ++ label ++ ", %object\n.size " ++ label ++ f", {object_size}\n")
                     stub.push_str(".symver " ++ label ++ ", " ++ sym ++ at ++ sdk_glibc_version_name(v) ++ ", remove\n")
-                    if pass == 0: stub.push_str(label ++ ": .quad 0\n") else: stub.push_str(label ++ f": .fill {sizes[c]}, 1, 0\n")
+                    if pass == 0: stub.push_str(label ++ ": .quad 0\n") else: stub.push_str(label ++ f": .fill {object_size}, 1, 0\n")
             if pass == 0:
                 // glibc reads _IO_stdin_used to tell a modern FILE layout
                 // from a pre-2.1 one (Zig's comment explains the reference);
@@ -1952,7 +1975,7 @@ pub fn run_linux_sysroot_action(ctx: ActionCtx) -> i32:
     // architecture's for a cross build. Off Linux the pack is empty (and
     // nothing is fetched).
     let a = if ctx.args().len() > 0: sdk_owned_text(ctx.args().get(0)) else: arch()
-    if os() != "Linux" or not sdk_linux_arch_supported(a):
+    if not sdk_linux_arch_supported(a) or (ctx.args().len() == 0 and os() != "Linux"):
         return sdk_write_text(ctx, pack_path, "")
     let root = ctx.project_info().project_root()
     let prefix = compiler_default_llvm_prefix()
@@ -2138,35 +2161,50 @@ pub fn run_linux_link_pack_action(ctx: ActionCtx) -> i32:
     let pack_path = ctx.output()
     if pack_path.len() == 0:
         return sdk_fail(ctx, "requires an output path")
-    if os() != "Linux" or arch() != "x86_64":
+    // A cross build names the architecture, that target's SDK and the
+    // directory the target's links read (args); a host build takes its own.
+    let args = ctx.args()
+    let cross = args.len() >= 3
+    let a = if cross: sdk_owned_text(args.get(0)) else: arch()
+    if not sdk_linux_arch_supported(a) or (not cross and os() != "Linux"):
         return sdk_write_text(ctx, pack_path, "")
-    let base = fs.read_text(sdk_linux_sysroot_pack())
+    let base = fs.read_text(sdk_linux_sysroot_pack_for(a))
     if not base.starts_with("WITH-SYSROOT 1\n"):
-        return sdk_fail(ctx, "the linux sysroot pack " ++ sdk_linux_sysroot_pack() ++ " is missing or malformed")
+        return sdk_fail(ctx, "the linux sysroot pack " ++ sdk_linux_sysroot_pack_for(a) ++ " is missing or malformed")
     // The SDK the compiler links against: LLVM_PREFIX when a lane names one.
     let named = ctx.env_input("LLVM_PREFIX")
     let root = ctx.project_info().project_root()
-    let prefix = if named.len() == 0: compiler_default_llvm_prefix() else if named.starts_with(root ++ "/"): sdk_rel_path(root, named) else: sdk_owned_text(named)
-    let rt_dir = sdk_join(prefix, "lib/clang/" ++ sdk_llvm_major() ++ "/lib/" ++ SDK_LINUX_TRIPLE)
+    let prefix = if cross: sdk_owned_text(args.get(1)) else if named.len() == 0: compiler_default_llvm_prefix() else if named.starts_with(root ++ "/"): sdk_rel_path(root, named) else: sdk_owned_text(named)
+    // The unpacked copy a cross link reads (Link.w's cross sysroot).
+    let unpack = if cross: sdk_owned_text(args.get(2)) else: ""
+    if cross:
+        let _old = fs.remove_tree(unpack)
+        if fs.copy_tree(sdk_linux_sysroot_dir_for(a), unpack) != 0:
+            return sdk_fail(ctx, "could not copy " ++ sdk_linux_sysroot_dir_for(a) ++ " to " ++ unpack)
+    let rt_dir = sdk_join(prefix, "lib/clang/" ++ sdk_llvm_major() ++ "/lib/" ++ sdk_linux_triple(a))
     var pack = StringBuilder.with_capacity(base.len() + 4000000)
     pack.push_str(base)
     for name in ["libclang_rt.builtins.a", "clang_rt.crtbegin.o", "clang_rt.crtend.o"]:
         let bytes = fs.read_text(sdk_join(rt_dir, name))
         if bytes.len() == 0:
-            return sdk_fail(ctx, "the LLVM SDK at " ++ prefix ++ " has no " ++ sdk_join(rt_dir, name) ++ ": a linux-x86_64 SDK carries compiler-rt (build/sdk.w sdk_linux_runtimes)")
+            return sdk_fail(ctx, "the LLVM SDK at " ++ prefix ++ " has no " ++ sdk_join(rt_dir, name) ++ ": a linux SDK carries compiler-rt (build/sdk.w sdk_linux_runtimes)")
         pack.push_str("F usr/lib/" ++ name ++ " " ++ f"{bytes.len()}" ++ "\n")
         pack.push_str(bytes)
+        if cross and fs.copy_file(sdk_join(rt_dir, name), sdk_join(unpack, "usr/lib/" ++ name)) != 0:
+            return sdk_fail(ctx, "could not copy " ++ name ++ " into " ++ unpack)
     // A C++ program `with cc` links (a `with get` package): the SDK's static
     // libc++ (libc++abi and libunwind in it) and its headers, where clang's
     // Linux driver looks in a sysroot: usr/include/c++/v1 and the target's
     // __config_site under usr/include/<triple>/c++/v1.
-    let libcxx = fs.read_text(sdk_join(prefix, "lib/" ++ SDK_LINUX_TRIPLE ++ "/libc++.a"))
+    let libcxx = fs.read_text(sdk_join(prefix, "lib/" ++ sdk_linux_triple(a) ++ "/libc++.a"))
     if libcxx.len() == 0:
-        return sdk_fail(ctx, "the LLVM SDK at " ++ prefix ++ " has no lib/" ++ SDK_LINUX_TRIPLE ++ "/libc++.a: a linux-x86_64 SDK carries libc++ (build/sdk.w sdk_linux_runtimes)")
+        return sdk_fail(ctx, "the LLVM SDK at " ++ prefix ++ " has no lib/" ++ sdk_linux_triple(a) ++ "/libc++.a: a linux SDK carries libc++ (build/sdk.w sdk_linux_runtimes)")
     pack.push_str("F usr/lib/libc++.a " ++ f"{libcxx.len()}" ++ "\n")
     pack.push_str(libcxx)
+    if cross and fs.copy_file(sdk_join(prefix, "lib/" ++ sdk_linux_triple(a) ++ "/libc++.a"), sdk_join(unpack, "usr/lib/libc++.a")) != 0:
+        return sdk_fail(ctx, "could not copy libc++.a into " ++ unpack)
     var headers = 0
-    for inc in ["include/c++/v1", "include/" ++ SDK_LINUX_TRIPLE ++ "/c++/v1"]:
+    for inc in ["include/c++/v1", "include/" ++ sdk_linux_triple(a) ++ "/c++/v1"]:
         let files = sdk_merge_sort_strings(fs.list_files(sdk_join(prefix, inc)))
         for i in 0..files.len() as i32:
             let rel = "usr/" ++ sdk_rel_path(prefix, sdk_normalize(files[i]))
@@ -2175,6 +2213,9 @@ pub fn run_linux_link_pack_action(ctx: ActionCtx) -> i32:
             let bytes = fs.read_text(files[i])
             pack.push_str("F " ++ rel ++ " " ++ f"{bytes.len()}" ++ "\n")
             pack.push_str(bytes)
+            if cross:
+                let rc = sdk_write_text(ctx, sdk_join(unpack, rel), bytes)
+                if rc != 0: return rc
             headers = headers + 1
     if headers < 100:
         return sdk_fail(ctx, f"only {headers} libc++ headers in the LLVM SDK at " ++ prefix)
@@ -2189,9 +2230,12 @@ pub fn run_linux_link_pack_action(ctx: ActionCtx) -> i32:
 // against the With linux sysroot (glibc 2.28 headers and link stubs), and
 // LLVM itself is then compiled against that libc++ and linked against those
 // runtimes and stubs.
-const SDK_LINUX_TRIPLE: str = "x86_64-unknown-linux-gnu"
+pub fn sdk_linux_triple(a: &str) -> str: a ++ "-unknown-linux-gnu"
 
-fn sdk_linux_sysroot_abs(root: &str) -> str: sdk_abs(root, sdk_linux_sysroot_dir())
+// The Linux architecture a platform names ("linux-aarch64" -> "aarch64").
+fn sdk_platform_linux_arch(platform: &str) -> str: if platform == "linux-aarch64": "aarch64" else: "x86_64"
+
+fn sdk_linux_sysroot_abs(root: &str, a: &str) -> str: sdk_abs(root, sdk_linux_sysroot_dir_for(a))
 
 // clang's resource directory for the SDK's own builds (ninja, cmake, LLVM):
 // the bootstrap SDK's headers with the runtimes' compiler-rt beside them,
@@ -2209,19 +2253,21 @@ pub fn run_sdk_runtimes_action(ctx: ActionCtx) -> i32:
     let rc = sdk_validate_staged_paths(ctx, bootstrap_prefix, output_prefix)
     if rc != 0: return rc
     let root = ctx.project_info().project_root()
-    sdk_linux_runtimes(ctx, root, bootstrap_prefix, output_prefix, args.get(2), args.get(3), args.get(4), sdk_abs(root, sdk_tool(bootstrap_prefix, "cmake")))
+    // The target architecture: args[5] for a cross build, else the host's.
+    let target_arch = if args.len() > 5: sdk_owned_text(args.get(5)) else: arch()
+    sdk_linux_runtimes(ctx, root, bootstrap_prefix, output_prefix, args.get(2), args.get(3), args.get(4), sdk_abs(root, sdk_tool(bootstrap_prefix, "cmake")), target_arch)
 
-pub fn sdk_linux_runtimes(ctx: &ActionCtx, root: &str, bootstrap_prefix: &str, output_prefix: &str, source_dir: &str, build_dir: &str, jobs: &str, cmake: &str) -> i32:
+pub fn sdk_linux_runtimes(ctx: &ActionCtx, root: &str, bootstrap_prefix: &str, output_prefix: &str, source_dir: &str, build_dir: &str, jobs: &str, cmake: &str, a: &str) -> i32:
     let fs = ctx.fs()
-    let sysroot = sdk_linux_sysroot_abs(root)
-    if not fs.exists(sdk_join(sdk_linux_sysroot_dir(), "usr/lib/libc.so.6")):
-        return sdk_fail(ctx, "the linux sysroot is missing: run :linux-sysroot (" ++ sdk_linux_sysroot_dir() ++ ")")
+    let sysroot = sdk_linux_sysroot_abs(root, a)
+    if not fs.exists(sdk_join(sdk_linux_sysroot_dir_for(a), "usr/lib/libc.so.6")):
+        return sdk_fail(ctx, "the linux sysroot is missing: run :linux-sysroot (" ++ sdk_linux_sysroot_dir_for(a) ++ ")")
     let runtimes_build = sdk_abs(root, build_dir)
     if fs.mkdir_all(build_dir) != 0:
         return sdk_fail(ctx, "could not create " ++ runtimes_build)
     let flags = "--sysroot=" ++ sysroot
     var configure = sdk_cmd(cmake)
-    for a in ["-G", "Ninja", "-S"]: configure.push(sdk_owned_text(a))
+    for flag in ["-G", "Ninja", "-S"]: configure.push(sdk_owned_text(flag))
     configure.push(sdk_abs(root, sdk_join(source_dir, "runtimes")))
     configure.push("-B")
     configure.push(sdk_owned_text(runtimes_build))
@@ -2231,9 +2277,12 @@ pub fn sdk_linux_runtimes(ctx: &ActionCtx, root: &str, bootstrap_prefix: &str, o
     configure.push("-DCMAKE_C_COMPILER=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, "clang")))
     configure.push("-DCMAKE_CXX_COMPILER=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, "clang++")))
     configure.push("-DCMAKE_ASM_COMPILER=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, "clang")))
-    configure.push("-DCMAKE_C_COMPILER_TARGET=" ++ SDK_LINUX_TRIPLE)
-    configure.push("-DCMAKE_CXX_COMPILER_TARGET=" ++ SDK_LINUX_TRIPLE)
-    configure.push("-DCMAKE_ASM_COMPILER_TARGET=" ++ SDK_LINUX_TRIPLE)
+    configure.push("-DCMAKE_C_COMPILER_TARGET=" ++ sdk_linux_triple(a))
+    configure.push("-DCMAKE_CXX_COMPILER_TARGET=" ++ sdk_linux_triple(a))
+    configure.push("-DCMAKE_ASM_COMPILER_TARGET=" ++ sdk_linux_triple(a))
+    if a != arch():
+        configure.push("-DCMAKE_SYSTEM_NAME=Linux")
+        configure.push("-DCMAKE_SYSTEM_PROCESSOR=" ++ a)
     configure.push("-DCMAKE_SYSROOT=" ++ sysroot)
     configure.push("-DCMAKE_C_FLAGS=" ++ flags)
     configure.push("-DCMAKE_CXX_FLAGS=" ++ flags)
@@ -2242,19 +2291,19 @@ pub fn sdk_linux_runtimes(ctx: &ActionCtx, root: &str, bootstrap_prefix: &str, o
     configure.push("-DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY")
     configure.push("-DLLVM_ENABLE_RUNTIMES=compiler-rt;libunwind;libcxxabi;libcxx")
     configure.push("-DLLVM_ENABLE_PER_TARGET_RUNTIME_DIR=ON")
-    configure.push("-DLLVM_DEFAULT_TARGET_TRIPLE=" ++ SDK_LINUX_TRIPLE)
+    configure.push("-DLLVM_DEFAULT_TARGET_TRIPLE=" ++ sdk_linux_triple(a))
     configure.push("-DLLVM_INCLUDE_TESTS=OFF")
     // Absolute: compiler-rt reads a relative one against its source tree.
     configure.push("-DCOMPILER_RT_INSTALL_PATH=" ++ sdk_abs(root, sdk_join(output_prefix, "lib/clang/" ++ sdk_llvm_major())))
     configure.push("-DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON")
-    for a in ["-DCOMPILER_RT_BUILD_BUILTINS=ON", "-DCOMPILER_RT_BUILD_CRT=ON", "-DCOMPILER_RT_BUILD_SANITIZERS=OFF", "-DCOMPILER_RT_BUILD_XRAY=OFF", "-DCOMPILER_RT_BUILD_LIBFUZZER=OFF", "-DCOMPILER_RT_BUILD_PROFILE=OFF", "-DCOMPILER_RT_BUILD_MEMPROF=OFF", "-DCOMPILER_RT_BUILD_ORC=OFF", "-DCOMPILER_RT_BUILD_CTX_PROFILE=OFF", "-DCOMPILER_RT_BUILD_GWP_ASAN=OFF", "-DCOMPILER_RT_INCLUDE_TESTS=OFF"]:
-        configure.push(sdk_owned_text(a))
-    for a in ["-DLIBUNWIND_ENABLE_SHARED=OFF", "-DLIBUNWIND_USE_COMPILER_RT=ON", "-DLIBUNWIND_INCLUDE_TESTS=OFF"]:
-        configure.push(sdk_owned_text(a))
-    for a in ["-DLIBCXXABI_ENABLE_SHARED=OFF", "-DLIBCXXABI_USE_LLVM_UNWINDER=ON", "-DLIBCXXABI_USE_COMPILER_RT=ON", "-DLIBCXXABI_ENABLE_STATIC_UNWINDER=ON", "-DLIBCXXABI_STATICALLY_LINK_UNWINDER_IN_STATIC_LIBRARY=ON", "-DLIBCXXABI_INCLUDE_TESTS=OFF"]:
-        configure.push(sdk_owned_text(a))
-    for a in ["-DLIBCXX_ENABLE_SHARED=OFF", "-DLIBCXX_USE_COMPILER_RT=ON", "-DLIBCXX_CXX_ABI=libcxxabi", "-DLIBCXX_ENABLE_STATIC_ABI_LIBRARY=ON", "-DLIBCXX_STATICALLY_LINK_ABI_IN_STATIC_LIBRARY=ON", "-DLIBCXX_INCLUDE_TESTS=OFF", "-DLIBCXX_INCLUDE_BENCHMARKS=OFF", "-DLIBCXX_HAS_ATOMIC_LIB=NO"]:
-        configure.push(sdk_owned_text(a))
+    for flag in ["-DCOMPILER_RT_BUILD_BUILTINS=ON", "-DCOMPILER_RT_BUILD_CRT=ON", "-DCOMPILER_RT_BUILD_SANITIZERS=OFF", "-DCOMPILER_RT_BUILD_XRAY=OFF", "-DCOMPILER_RT_BUILD_LIBFUZZER=OFF", "-DCOMPILER_RT_BUILD_PROFILE=OFF", "-DCOMPILER_RT_BUILD_MEMPROF=OFF", "-DCOMPILER_RT_BUILD_ORC=OFF", "-DCOMPILER_RT_BUILD_CTX_PROFILE=OFF", "-DCOMPILER_RT_BUILD_GWP_ASAN=OFF", "-DCOMPILER_RT_INCLUDE_TESTS=OFF"]:
+        configure.push(sdk_owned_text(flag))
+    for flag in ["-DLIBUNWIND_ENABLE_SHARED=OFF", "-DLIBUNWIND_USE_COMPILER_RT=ON", "-DLIBUNWIND_INCLUDE_TESTS=OFF"]:
+        configure.push(sdk_owned_text(flag))
+    for flag in ["-DLIBCXXABI_ENABLE_SHARED=OFF", "-DLIBCXXABI_USE_LLVM_UNWINDER=ON", "-DLIBCXXABI_USE_COMPILER_RT=ON", "-DLIBCXXABI_ENABLE_STATIC_UNWINDER=ON", "-DLIBCXXABI_STATICALLY_LINK_UNWINDER_IN_STATIC_LIBRARY=ON", "-DLIBCXXABI_INCLUDE_TESTS=OFF"]:
+        configure.push(sdk_owned_text(flag))
+    for flag in ["-DLIBCXX_ENABLE_SHARED=OFF", "-DLIBCXX_USE_COMPILER_RT=ON", "-DLIBCXX_CXX_ABI=libcxxabi", "-DLIBCXX_ENABLE_STATIC_ABI_LIBRARY=ON", "-DLIBCXX_STATICALLY_LINK_ABI_IN_STATIC_LIBRARY=ON", "-DLIBCXX_INCLUDE_TESTS=OFF", "-DLIBCXX_INCLUDE_BENCHMARKS=OFF", "-DLIBCXX_HAS_ATOMIC_LIB=NO"]:
+        configure.push(sdk_owned_text(flag))
     var rc = sdk_run_capture(ctx, "runtimes-configure", configure, 1800000)
     if rc != 0: return rc
     var build = sdk_cmd(cmake)
@@ -2265,8 +2314,8 @@ pub fn sdk_linux_runtimes(ctx: &ActionCtx, root: &str, bootstrap_prefix: &str, o
     build = sdk_append_jobs(move build, jobs)
     rc = sdk_run_capture(ctx, "runtimes-build", build, 7200000)
     if rc != 0: return rc
-    let builtins = sdk_join(output_prefix, "lib/clang/" ++ sdk_llvm_major() ++ "/lib/" ++ SDK_LINUX_TRIPLE ++ "/libclang_rt.builtins.a")
-    let libcxx = sdk_join(output_prefix, "lib/" ++ SDK_LINUX_TRIPLE ++ "/libc++.a")
+    let builtins = sdk_join(output_prefix, "lib/clang/" ++ sdk_llvm_major() ++ "/lib/" ++ sdk_linux_triple(a) ++ "/libclang_rt.builtins.a")
+    let libcxx = sdk_join(output_prefix, "lib/" ++ sdk_linux_triple(a) ++ "/libc++.a")
     if not fs.exists(builtins) or not fs.exists(libcxx):
         return sdk_fail(ctx, "the runtimes build did not install " ++ builtins ++ " and " ++ libcxx)
     // The LLVM build's resource directory: the bootstrap clang's headers and
@@ -2283,13 +2332,13 @@ pub fn sdk_linux_runtimes(ctx: &ActionCtx, root: &str, bootstrap_prefix: &str, o
 // sysroot and the SDK's libc++, linked by lld against compiler-rt and the
 // static libc++ (libc++abi and libunwind in it): they run on glibc 2.28+
 // and need nothing else of the host.
-pub fn sdk_linux_toolchain_flags(root: &str, output_prefix: &str, build_dir: &str) -> Vec[str]:
-    let sysroot = sdk_linux_sysroot_abs(root)
+pub fn sdk_linux_toolchain_flags(root: &str, output_prefix: &str, build_dir: &str, a: &str) -> Vec[str]:
+    let sysroot = sdk_linux_sysroot_abs(root, a)
     let resource = sdk_abs(root, sdk_linux_resource_rel(build_dir))
     let out = sdk_abs(root, output_prefix)
-    let common = "--target=" ++ SDK_LINUX_TRIPLE ++ " --sysroot=" ++ sysroot ++ " -resource-dir=" ++ resource
-    let cxx = common ++ " -stdlib=libc++ -nostdinc++ -isystem " ++ out ++ "/include/" ++ SDK_LINUX_TRIPLE ++ "/c++/v1 -isystem " ++ out ++ "/include/c++/v1"
-    let link = "-fuse-ld=lld " ++ common ++ " -stdlib=libc++ --rtlib=compiler-rt --unwindlib=none -L" ++ out ++ "/lib/" ++ SDK_LINUX_TRIPLE
+    let common = "--target=" ++ sdk_linux_triple(a) ++ " --sysroot=" ++ sysroot ++ " -resource-dir=" ++ resource
+    let cxx = common ++ " -stdlib=libc++ -nostdinc++ -isystem " ++ out ++ "/include/" ++ sdk_linux_triple(a) ++ "/c++/v1 -isystem " ++ out ++ "/include/c++/v1"
+    let link = "-fuse-ld=lld " ++ common ++ " -stdlib=libc++ --rtlib=compiler-rt --unwindlib=none -L" ++ out ++ "/lib/" ++ sdk_linux_triple(a)
     var flags: Vec[str] = Vec.new()
     flags.push("-DCMAKE_SYSROOT=" ++ sysroot)
     flags.push("-DCMAKE_C_FLAGS=" ++ common)
@@ -2298,11 +2347,20 @@ pub fn sdk_linux_toolchain_flags(root: &str, output_prefix: &str, build_dir: &st
     flags.push("-DCMAKE_EXE_LINKER_FLAGS=" ++ link)
     flags.push("-DCMAKE_SHARED_LINKER_FLAGS=" ++ link)
     flags.push("-DCMAKE_MODULE_LINKER_FLAGS=" ++ link)
+    if a != arch():
+        // A cross build: CMake runs nothing it builds.
+        flags.push("-DCMAKE_SYSTEM_NAME=Linux")
+        flags.push("-DCMAKE_SYSTEM_PROCESSOR=" ++ a)
     flags
 
-pub fn sdk_linux_llvm_flags(root: &str, output_prefix: &str, build_dir: &str) -> Vec[str]:
-    var flags = sdk_linux_toolchain_flags(root, output_prefix, build_dir)
-    flags.push("-DLLVM_DEFAULT_TARGET_TRIPLE=" ++ SDK_LINUX_TRIPLE)
+// native_tools: for a cross build, the host SDK build's bin/, whose
+// tablegens the cross build runs.
+pub fn sdk_linux_llvm_flags(root: &str, output_prefix: &str, build_dir: &str, a: &str, native_tools: &str) -> Vec[str]:
+    var flags = sdk_linux_toolchain_flags(root, output_prefix, build_dir, a)
+    flags.push("-DLLVM_DEFAULT_TARGET_TRIPLE=" ++ sdk_linux_triple(a))
+    if a != arch():
+        flags.push("-DLLVM_HOST_TRIPLE=" ++ sdk_linux_triple(a))
+        flags.push("-DLLVM_NATIVE_TOOL_DIR=" ++ sdk_abs(root, native_tools))
     // Static archives only, linked into a non-PIE compiler: no shared
     // libLTO or libclang, whose non-PIC TLS lld refuses in a shared object.
     flags.push("-DLLVM_ENABLE_PIC=OFF")
@@ -2313,8 +2371,8 @@ pub fn sdk_linux_llvm_flags(root: &str, output_prefix: &str, build_dir: &str) ->
     flags.push("-DLLVM_TOOL_LLVM_EXEGESIS_BUILD=OFF")
     // Nothing the host has: no libxml2 (lld's COFF manifest merging, which
     // With does not use), editline, pfm, curl or ffi.
-    for a in ["-DLLVM_ENABLE_LIBXML2=OFF", "-DLLVM_ENABLE_LIBEDIT=OFF", "-DLLVM_ENABLE_LIBPFM=OFF", "-DLLVM_ENABLE_CURL=OFF", "-DLLVM_ENABLE_HTTPLIB=OFF", "-DLLVM_ENABLE_FFI=OFF", "-DLLVM_ENABLE_TERMINFO=OFF"]:
-        flags.push(sdk_owned_text(a))
+    for flag in ["-DLLVM_ENABLE_LIBXML2=OFF", "-DLLVM_ENABLE_LIBEDIT=OFF", "-DLLVM_ENABLE_LIBPFM=OFF", "-DLLVM_ENABLE_CURL=OFF", "-DLLVM_ENABLE_HTTPLIB=OFF", "-DLLVM_ENABLE_FFI=OFF", "-DLLVM_ENABLE_TERMINFO=OFF"]:
+        flags.push(sdk_owned_text(flag))
     flags
 
 // ── The SDK's build tools, carried by the compiler (#1915, D81) ────────
@@ -2335,14 +2393,16 @@ pub fn run_sdk_build_tools_pack_action(ctx: ActionCtx) -> i32:
     let pack_path = ctx.output()
     if pack_path.len() == 0:
         return sdk_fail(ctx, "requires an output path")
-    if os() != "Macos" and not (os() == "Linux" and arch() == "x86_64"):
+    // args[0]: a cross target's SDK (its cmake and ninja run on the target).
+    let cross_prefix = if ctx.args().len() > 0: sdk_owned_text(ctx.args().get(0)) else: ""
+    if cross_prefix.len() == 0 and os() != "Macos" and not (os() == "Linux" and sdk_linux_arch_supported(arch())):
         return sdk_write_text(ctx, pack_path, "")
     // The in-project SDK path: the build's file sandbox reads under the
     // project root (as build/clang_resource.w does).
     // LLVM_PREFIX when a lane names the SDK, as the compiler link reads it.
     let named = ctx.env_input("LLVM_PREFIX")
     let root = ctx.project_info().project_root()
-    let prefix = if named.len() == 0: compiler_default_llvm_prefix() else if named.starts_with(root ++ "/"): sdk_rel_path(root, named) else: sdk_owned_text(named)
+    let prefix = if cross_prefix.len() > 0: cross_prefix.clone() else if named.len() == 0: compiler_default_llvm_prefix() else if named.starts_with(root ++ "/"): sdk_rel_path(root, named) else: sdk_owned_text(named)
     let share = sdk_join(prefix, sdk_cmake_data_prefix().slice(0, sdk_cmake_data_prefix().len() - 1))
     var pack = StringBuilder.with_capacity(48000000)
     pack.push_str("WITH-SYSROOT 1\n")

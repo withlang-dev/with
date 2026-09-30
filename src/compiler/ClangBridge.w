@@ -785,10 +785,13 @@ unsafe fn c_path_to_str(path: *const u8) -> str:
 // looked up in the host's include directories after every sysroot one, so a
 // header the sysroot has is never the host's.
 unsafe fn cimport_push_host_library_dirs(args: *mut *const u8, nargs: i32) -> i32:
-    if with_sysinfo_os() != "Linux" or with_sysinfo_arch() != "x86_64":
+    if with_sysinfo_os() != "Linux":
+        return nargs
+    let multiarch = if with_sysinfo_arch() == "aarch64": "/usr/include/aarch64-linux-gnu\0" as *const u8 else if with_sysinfo_arch() == "x86_64": "/usr/include/x86_64-linux-gnu\0" as *const u8 else: 0 as *const u8
+    if multiarch as i64 == 0:
         return nargs
     *((args as i64 + nargs as i64 * 8) as *mut *const u8) = "-idirafter\0" as *const u8
-    *((args as i64 + (nargs + 1) as i64 * 8) as *mut *const u8) = "/usr/include/x86_64-linux-gnu\0" as *const u8
+    *((args as i64 + (nargs + 1) as i64 * 8) as *mut *const u8) = multiarch
     *((args as i64 + (nargs + 2) as i64 * 8) as *mut *const u8) = "-idirafter\0" as *const u8
     *((args as i64 + (nargs + 3) as i64 * 8) as *mut *const u8) = "/usr/include\0" as *const u8
     nargs + 4
@@ -800,7 +803,7 @@ fn sysroot_flag() -> *const u8:
 
 unsafe fn get_sdk_path() -> *const u8:
     // The darwin sysroot on macOS, the linux one on linux-x86_64 (#1915).
-    if with_sysinfo_os() != "Macos" and not (with_sysinfo_os() == "Linux" and with_sysinfo_arch() == "x86_64"):
+    if with_sysinfo_os() != "Macos" and not (with_sysinfo_os() == "Linux" and (with_sysinfo_arch() == "x86_64" or with_sysinfo_arch() == "aarch64")):
         return 0 as *const u8
     if sdk_path_resolved == 0:
         sdk_path_resolved = 1
