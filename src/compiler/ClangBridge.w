@@ -705,8 +705,10 @@ var g_emitted_names: *mut *mut u8 = 0 as *mut *mut u8
 var g_emitted_count: i32 = 0
 var g_emitted_cap: i32 = 0
 
-var g_cimport_include_paths: [32]*mut u8 = [0 as *mut u8; 32]
+var g_cimport_include_paths: *mut *mut u8 = 0 as *mut *mut u8
 var g_cimport_include_count: i32 = 0
+var g_cimport_include_capacity: i32 = 0
+var g_cimport_include_error: bool = false
 // The macOS SDK c_import parses against (empty = none), resolved by
 // compiler.EmbeddedSysroot's darwin_sdk_root (#1915): WITH_SDKROOT, SDKROOT,
 // with.toml [c_import] sdk_path (§16.1), else the embedded sysroot. This
@@ -2020,9 +2022,28 @@ pub fn cimport_forget_emitted_name(name: &str):
 
 pub fn with_cimport_add_include_path(path: &str) -> i32:
     unsafe:
-        if g_cimport_include_count >= 32 or path.len() <= 0: return 0
+        if path.len() <= 0: return 0
+        // The final argv count is an int in libclang. Otherwise retain every
+        // path, including duplicate dependency roots, in the supplied order.
+        if g_cimport_include_error or g_cimport_include_count >= 1073741818:
+            g_cimport_include_error = true
+            return 0
+        if g_cimport_include_count == g_cimport_include_capacity:
+            let capacity = if g_cimport_include_capacity == 0: 64 else if g_cimport_include_capacity > 536870909: 1073741818 else: g_cimport_include_capacity * 2
+            let paths = with_alloc(capacity as i64 * 8) as *mut *mut u8
+            if paths as i64 == 0:
+                g_cimport_include_error = true
+                return 0
+            if g_cimport_include_count > 0:
+                with_memcpy(paths as *mut u8, g_cimport_include_paths as *const u8, g_cimport_include_count as i64 * 8)
+            if g_cimport_include_paths as i64 != 0:
+                with_free(g_cimport_include_paths as *mut u8)
+            g_cimport_include_paths = paths
+            g_cimport_include_capacity = capacity
         let buf = with_alloc(path.len() + 1)
-        if buf as i64 == 0: return 0
+        if buf as i64 == 0:
+            g_cimport_include_error = true
+            return 0
         let sp = *(path as *const str as *const *const u8)
         with_memcpy(buf, sp, path.len())
         *((buf as i64 + path.len()) as *mut u8) = 0
@@ -2031,12 +2052,17 @@ pub fn with_cimport_add_include_path(path: &str) -> i32:
         0
 
 pub fn with_cimport_clear_include_paths() -> i32:
-    var i: i32 = 0
-    while i < g_cimport_include_count:
-        with_free(g_cimport_include_paths[i])
-        g_cimport_include_paths[i] = 0 as *mut u8
-        i = i + 1
+    unsafe:
+        var i: i32 = 0
+        while i < g_cimport_include_count:
+            with_free(g_cimport_include_paths[i])
+            i = i + 1
+        if g_cimport_include_paths as i64 != 0:
+            with_free(g_cimport_include_paths as *mut u8)
+    g_cimport_include_paths = 0 as *mut *mut u8
     g_cimport_include_count = 0
+    g_cimport_include_capacity = 0
+    g_cimport_include_error = false
     0
 
 fn with_cimport_add_windows_incdir(var_name: &str) -> i32:
@@ -2136,12 +2162,25 @@ unsafe fn cimport_build_args(args: *mut *const u8, cxx: bool):
     args[n + 2] = "-D_DEFAULT_SOURCE\0" as *const u8
     n += 3
     var ip = 0
-    while ip < g_cimport_include_count and n < 62:
+    while ip < g_cimport_include_count:
         args[n] = "-I\0" as *const u8
         args[n + 1] = g_cimport_include_paths[ip] as *const u8
         n += 2
         ip += 1
     n
+
+// The bridge is compiled without the prelude. Own the temporary pointer
+// array here so every declaration/macro parse gets the complete search path.
+unsafe fn cimport_parse_translation_unit(index: *mut u8, path: *const u8, cxx: bool, options: u32) -> *mut u8:
+    if g_cimport_include_error: return 0 as *mut u8
+    // At most ten fixed arguments: sysroot(2), target(3), resource(2), mode(3).
+    let capacity = 10 + g_cimport_include_count as i64 * 2
+    let args = with_alloc(capacity * 8) as *mut *const u8
+    if args as i64 == 0: return 0 as *mut u8
+    let nargs = cimport_build_args(args, cxx)
+    let tu = clang_parseTranslationUnit(index, path, args as *const *const u8, nargs, 0 as *mut u8, 0 as u32, options)
+    with_free(args as *mut u8)
+    tu
 
 // A non-null translation unit can contain Clang's error-recovery AST. Only
 // successfully parsed declarations may enter the With translator.
@@ -2183,6 +2222,9 @@ pub fn with_cimport_parse(header_code: &str, cxx: bool = false) -> i64:
         with_memset(s as *mut u8, 0, size)
 
         (*s).cxx = cxx
+        if g_cimport_include_error:
+            (*s).err_msg = c_strdup("could not retain all c_import include paths\0" as *const u8)
+            return s as i64
 
         // Create temp file
         var template_path: [4096]u8 = [0 as u8; 4096]
@@ -2200,12 +2242,8 @@ pub fn with_cimport_parse(header_code: &str, cxx: bool = false) -> i64:
         let _ = rt_close(fd)
         (*s).tmp_path = c_strdup(&template_path as *const [4096]u8 as *const u8)
 
-        // Build compiler args
-        var args: [64]*const u8 = [0 as *const u8; 64]
-        let nargs = cimport_build_args(&raw mut args as *mut [64]*const u8 as *mut *const u8, cxx)
-
         (*s).index = clang_createIndex(0, 0)
-        (*s).tu = clang_parseTranslationUnit((*s).index, (*s).tmp_path as *const u8, &args as *const [64]*const u8 as *const *const u8, nargs, 0 as *mut u8, 0 as u32, 0 as u32)
+        (*s).tu = cimport_parse_translation_unit((*s).index, (*s).tmp_path as *const u8, cxx, 0 as u32)
 
         if (*s).tu as i64 == 0:
             (*s).err_msg = c_strdup("failed to parse translation unit\0" as *const u8)
@@ -3392,11 +3430,8 @@ unsafe fn cimport_collect_macros_from_libclang(ms: *mut MacroSession, header_cod
     let _ = rt_close(fd)
     (*s).tmp_path = c_strdup(&template_path as *const [4096]u8 as *const u8)
 
-    var args: [64]*const u8 = [0 as *const u8; 64]
-    let nargs = cimport_build_args(&raw mut args as *mut [64]*const u8 as *mut *const u8, cxx)
-
     (*s).index = clang_createIndex(0, 0)
-    (*s).tu = clang_parseTranslationUnit((*s).index, (*s).tmp_path as *const u8, &args as *const [64]*const u8 as *const *const u8, nargs, 0 as *mut u8, 0 as u32, CXTranslationUnit_DetailedPreprocessingRecord)
+    (*s).tu = cimport_parse_translation_unit((*s).index, (*s).tmp_path as *const u8, cxx, CXTranslationUnit_DetailedPreprocessingRecord)
     if (*s).tu as i64 == 0:
         with_cimport_dispose(s as i64)
         return 0
@@ -3460,11 +3495,8 @@ pub fn with_cimport_collect_object_macro_types(header_code: &str, macro_names: &
         let _ = rt_close(fd)
         (*s).tmp_path = c_strdup(&template_path as *const [4096]u8 as *const u8)
 
-        var args: [64]*const u8 = [0 as *const u8; 64]
-        let nargs = cimport_build_args(&raw mut args as *mut [64]*const u8 as *mut *const u8, cxx)
-
         (*s).index = clang_createIndex(0, 0)
-        (*s).tu = clang_parseTranslationUnit((*s).index, (*s).tmp_path as *const u8, &args as *const [64]*const u8 as *const *const u8, nargs, 0 as *mut u8, 0 as u32, 0 as u32)
+        (*s).tu = cimport_parse_translation_unit((*s).index, (*s).tmp_path as *const u8, cxx, 0 as u32)
         if (*s).tu as i64 == 0:
             with_cimport_dispose(s as i64)
             return ""
@@ -3533,11 +3565,8 @@ pub fn with_cimport_parse_macro_probe(header_code: &str, macro_names: &str, cxx:
         let _ = rt_close(fd)
         (*s).tmp_path = c_strdup(&template_path as *const [4096]u8 as *const u8)
 
-        var args: [64]*const u8 = [0 as *const u8; 64]
-        let nargs = cimport_build_args(&raw mut args as *mut [64]*const u8 as *mut *const u8, cxx)
-
         (*s).index = clang_createIndex(0, 0)
-        (*s).tu = clang_parseTranslationUnit((*s).index, (*s).tmp_path as *const u8, &args as *const [64]*const u8 as *const *const u8, nargs, 0 as *mut u8, 0 as u32, 0 as u32)
+        (*s).tu = cimport_parse_translation_unit((*s).index, (*s).tmp_path as *const u8, cxx, 0 as u32)
         if (*s).tu as i64 == 0:
             with_cimport_dispose(s as i64)
             return 0
