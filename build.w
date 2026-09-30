@@ -2472,12 +2472,15 @@ pub fn build(ctx: BuildCtx) -> Build:
     sdk_tools_pack = sdk_tools_pack.timeout(600000)
     out = out.add_target(sdk_tools_pack)
 
+    // The darwin and linux sysroots come from the Zig source (#1915).
+    let sysroot_host = os() == "Macos" or (os() == "Linux" and arch() == "x86_64")
+    if sysroot_host:
+        out = out.add_target(sdk_source_target("sysroot-zig-source", sdk_zig_source_url(), sdk_zig_source_sha256(), sdk_zig_archive(), sdk_zig_source_root(), sdk_zig_source_dir(), sdk_zig_source_marker()))
     var darwin_sysroot = target_new(.Action, "darwin-sysroot", "").output(sdk_darwin_sysroot_pack())
     darwin_sysroot.action = run_darwin_sysroot_action
     darwin_sysroot = darwin_sysroot.input("build/sdk.w")
     if os() == "Macos":
-        out = out.add_target(sdk_source_target("darwin-sysroot-zig-source", sdk_zig_source_url(), sdk_zig_source_sha256(), sdk_zig_archive(), sdk_zig_source_root(), sdk_zig_source_dir(), sdk_zig_source_marker()))
-        darwin_sysroot = darwin_sysroot.dep("darwin-sysroot-zig-source")
+        darwin_sysroot = darwin_sysroot.dep("sysroot-zig-source")
         darwin_sysroot = darwin_sysroot.input(sdk_zig_source_marker())
         darwin_sysroot = darwin_sysroot.input("build/https_fetch.w")
         darwin_sysroot = darwin_sysroot.allow_network()
@@ -2486,6 +2489,18 @@ pub fn build(ctx: BuildCtx) -> Build:
     darwin_sysroot = darwin_sysroot.write_scope("out/command/darwin-sysroot")
     darwin_sysroot = darwin_sysroot.timeout(600000)
     out = out.add_target(darwin_sysroot)
+
+    var linux_sysroot = target_new(.Action, "linux-sysroot", "").output(sdk_linux_sysroot_pack())
+    linux_sysroot.action = run_linux_sysroot_action
+    linux_sysroot = linux_sysroot.input("build/sdk.w")
+    linux_sysroot = linux_sysroot.input("sdk.lock")
+    if os() == "Linux" and arch() == "x86_64":
+        linux_sysroot = linux_sysroot.dep("sysroot-zig-source")
+        linux_sysroot = linux_sysroot.input(sdk_zig_source_marker())
+    linux_sysroot = linux_sysroot.write_scope(sdk_linux_sysroot_dir())
+    linux_sysroot = linux_sysroot.write_scope("out/command/linux-sysroot")
+    linux_sysroot = linux_sysroot.timeout(1200000)
+    out = out.add_target(linux_sysroot)
 
     var compiler_no_c_export = target_new(.Action, "compiler-no-c-export", "").output("out/.build-state/compiler-no-c-export.txt")
     compiler_no_c_export.action = run_check_compiler_no_new_c_export_action

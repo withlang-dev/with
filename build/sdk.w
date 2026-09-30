@@ -1629,6 +1629,431 @@ pub fn run_darwin_sysroot_action(ctx: ActionCtx) -> i32:
         pack.push_str("A " ++ aliases[i] ++ " usr/lib/libSystem.tbd\n")
     sdk_write_text(ctx, pack_path, pack.to_str())
 
+// ── The Linux sysroot (#1915, D81) ───────────────────────────────────
+//
+// What linking a With program and c_import of libc read on linux-x86_64,
+// generated from the Zig source like the darwin sysroot, never the host's:
+// - usr/lib/lib{c,m,pthread,dl,rt,util,resolv}.so.* and ld-linux-x86-64.so.2:
+//   link stubs for glibc SDK_LINUX_GLIBC_MINOR, from Zig's glibc abilists
+//   (every symbol at every version up to the pin, the newest the default);
+// - usr/lib/crt1.o, Scrt1.o: glibc's csu start code; usr/lib/libc_nonshared.a;
+// - usr/include: Zig's glibc headers, pinned to the same minor version.
+// A program built against it runs on any glibc at or after the pin.
+const SDK_LINUX_GLIBC_MAJOR: i32 = 2
+const SDK_LINUX_GLIBC_MINOR: i32 = 28
+const SDK_LINUX_GLIBC_TARGET: str = "x86_64-linux-gnu"
+
+pub fn sdk_linux_sysroot_dir() -> str: "out/gen/linux-sysroot"
+pub fn sdk_linux_sysroot_pack() -> str: "out/gen/linux-sysroot.pack"
+
+// Zig's glibc library order, which the abilists' library indices name.
+const SDK_GLIBC_LIB_NAMES: [8]str = ["m", "c", "ld", "resolv", "pthread", "dl", "rt", "util"]
+const SDK_GLIBC_LIB_SOVERS: [8]i32 = [6, 6, 2, 2, 0, 2, 1, 1]
+
+pub fn sdk_glibc_lib_file(index: i32) -> str:
+    if SDK_GLIBC_LIB_NAMES[index] == "ld": return "ld-linux-x86-64.so.2"
+    f"lib{SDK_GLIBC_LIB_NAMES[index]}.so.{SDK_GLIBC_LIB_SOVERS[index]}"
+
+type SdkAbiReader { bytes: str, at: i32, ok: bool }
+
+impl SdkAbiReader:
+    mut fn byte() -> i32:
+        if self.at >= self.bytes.len() as i32:
+            self.ok = false
+            return 0
+        let b = self.bytes[self.at] as i32
+        self.at = self.at + 1
+        b
+
+    mut fn cstr() -> str:
+        let start: i32 = self.at
+        while self.at < self.bytes.len() as i32 and self.bytes[self.at] != 0:
+            self.at = self.at + 1
+        let out = self.bytes.slice(start as i64, self.at as i64).to_owned()
+        self.at = self.at + 1
+        if self.at > self.bytes.len() as i32:
+            self.ok = false
+        out
+
+    mut fn u16le() -> i32:
+        let lo = self.byte()
+        lo + self.byte() * 256
+
+    // Unsigned LEB128; the target sets are at most 64 bits.
+    mut fn leb() -> u64:
+        var value: u64 = 0
+        var shift: u64 = 0
+        while true:
+            let b = self.byte()
+            value = value | (((b & 127) as u64) << shift)
+            if (b & 128) == 0 or not self.ok: break
+            shift = shift + 7
+        value
+
+// One glibc version from the abilists header.
+type SdkGlibcVersion { major: i32, minor: i32, patch: i32 }
+
+fn sdk_glibc_version_name(v: &SdkGlibcVersion) -> str:
+    if v.patch == 0: f"GLIBC_{v.major}.{v.minor}" else: f"GLIBC_{v.major}.{v.minor}.{v.patch}"
+
+fn sdk_glibc_version_suffix(v: &SdkGlibcVersion) -> str:
+    if v.patch == 0: f"{v.major}_{v.minor}" else: f"{v.major}_{v.minor}_{v.patch}"
+
+// The link stubs' sources from Zig's abilists (src/libs/glibc.zig
+// buildSharedObjects): element 0 is the version script naming every version
+// up to the pin, element 1 + i the assembly of SDK_GLIBC_LIB_NAMES[i]. An
+// empty vector is a malformed abilists or a target or version it lacks.
+pub fn sdk_glibc_stub_sources(abilists: &str, target: &str, major: i32, minor: i32) -> Vec[str]:
+    var out: Vec[str] = Vec.new()
+    var r = SdkAbiReader { bytes: abilists.to_owned(), at: 0, ok: true }
+    let lib_count = r.byte()
+    for i in 0..lib_count:
+        let name = r.cstr()
+        if i >= 8 or name != SDK_GLIBC_LIB_NAMES[i]: return out
+    let version_count = r.byte()
+    var versions: Vec[SdkGlibcVersion] = Vec.new()
+    for _i in 0..version_count:
+        let ma = r.byte()
+        let mi = r.byte()
+        versions.push(SdkGlibcVersion { major: ma, minor: mi, patch: r.byte() })
+    var pin = -1
+    for i in 0..versions.len() as i32:
+        if versions[i].major == major and versions[i].minor == minor and versions[i].patch == 0: pin = i
+    let target_count = r.byte()
+    var target_index = -1
+    for i in 0..target_count:
+        if r.cstr() == target: target_index = i
+    if not r.ok or pin < 0 or target_index < 0: return out
+    let inclusions_at: i32 = r.at
+    var map = StringBuilder.new()
+    for i in 0..pin + 1:
+        map.push_str(sdk_glibc_version_name(&versions[i]) ++ " { };\n")
+    out.push(map.to_str())
+    let target_bit = (1 as u64) << (target_index as u64)
+    for lib in 0..8:
+        var stub = StringBuilder.new()
+        stub.push_str(".text\n")
+        r.at = inclusions_at
+        // Functions, then objects (which carry a size): each symbol is a run
+        // of inclusions, the last with the library index's top bit set.
+        for pass in 0..2:
+            let count = r.u16le()
+            var sym = ""
+            var chosen: Vec[i32] = Vec.new()
+            var sizes: Vec[i32] = Vec.new()
+            for _k in 0..versions.len(): sizes.push(0)
+            var have_name = false
+            for _s in 0..count:
+                if not have_name:
+                    sym = r.cstr()
+                    chosen = Vec.new()
+                    have_name = true
+                let targets = r.leb()
+                let size = if pass == 1: r.leb() as i32 else: 0
+                var lib_index = r.byte()
+                let terminal = (lib_index & 128) != 0
+                lib_index = lib_index & 127
+                let applies = lib_index == lib and (targets & target_bit) != 0
+                while true:
+                    let b = r.byte()
+                    let ver = b & 127
+                    if applies and ver <= pin:
+                        chosen.push(ver)
+                        sizes[ver] = size
+                    if (b & 128) != 0 or not r.ok: break
+                if not terminal: continue
+                have_name = false
+                if chosen.len() == 0: continue
+                var newest = -1
+                for c in chosen:
+                    if c > newest: newest = c
+                var written: Vec[i32] = Vec.new()
+                for c in chosen:
+                    var seen = false
+                    for w in written:
+                        if w == c: seen = true
+                    if seen: continue
+                    written.push(c)
+                    let v = &versions[c]
+                    let label = sym ++ "_" ++ sdk_glibc_version_suffix(v)
+                    let at = if c == newest: "@@" else: "@"
+                    stub.push_str(".balign 8\n.globl " ++ label ++ "\n")
+                    if pass == 0:
+                        stub.push_str(".type " ++ label ++ ", %function\n")
+                    else:
+                        stub.push_str(".type " ++ label ++ ", %object\n.size " ++ label ++ f", {sizes[c]}\n")
+                    stub.push_str(".symver " ++ label ++ ", " ++ sym ++ at ++ sdk_glibc_version_name(v) ++ ", remove\n")
+                    if pass == 0: stub.push_str(label ++ ": .quad 0\n") else: stub.push_str(label ++ f": .fill {sizes[c]}, 1, 0\n")
+            if pass == 0:
+                // glibc reads _IO_stdin_used to tell a modern FILE layout
+                // from a pre-2.1 one (Zig's comment explains the reference);
+                // a writable section takes the reference's dynamic
+                // relocation, which lld refuses in .rodata of a shared object.
+                stub.push_str(".data\n")
+                if SDK_GLIBC_LIB_NAMES[lib] == "c":
+                    stub.push_str(".balign 8\n.globl _IO_stdin_used\n.quad _IO_stdin_used\n")
+        out.push(stub.to_str())
+    if not r.ok: return Vec.new()
+    out
+
+// Zig's include order for compiling glibc's own start code
+// (src/libs/glibc.zig add_include_dirs, x86_64-linux-gnu).
+fn sdk_glibc_internal_includes(zig_libc: &str) -> Vec[str]:
+    let g = sdk_join(zig_libc, "glibc")
+    let dirs: Vec[str] = Vec.new()
+    for rel in ["include", "sysdeps/unix/sysv/linux/x86_64", "sysdeps/unix/sysv/linux/x86", "sysdeps/x86_64/nptl", "sysdeps/x86/nptl", "sysdeps/unix/sysv/linux/generic", "sysdeps/unix/sysv/linux/include", "sysdeps/unix/sysv/linux", "sysdeps/nptl", "sysdeps/pthread", "sysdeps/unix/sysv", "sysdeps/unix/x86_64", "sysdeps/unix/x86", "sysdeps/unix", "sysdeps/x86_64", "sysdeps/x86", "sysdeps/generic"]:
+        dirs.push(sdk_join(g, rel))
+    dirs.push(g.clone())
+    for rel in sdk_glibc_header_dirs():
+        dirs.push(sdk_join(zig_libc, "include/" ++ rel))
+    dirs
+
+// A command line: the tool, then its arguments.
+fn sdk_cmd(tool: &str) -> Vec[str]:
+    var out: Vec[str] = Vec.new()
+    out.push(sdk_owned_text(tool))
+    out
+
+
+// The LLVM major version, the name of clang's resource directory.
+fn sdk_llvm_major() -> str:
+    let v = compiler_llvm_version()
+    let dot = v.find(".")
+    if dot < 0: sdk_owned_text(v) else: sdk_owned_text(v.slice(0, dot))
+
+// Compiling glibc's own sources: the SDK's clang, no host header.
+fn sdk_glibc_cc(clang: &str, resource_include: &str, zig_libc: &str) -> Vec[str]:
+    var argv = sdk_cmd(clang)
+    argv.push(sdk_owned_text("--target=" ++ SDK_LINUX_GLIBC_TARGET))
+    for a in ["-nostdinc", "-w", "-O2", "-isystem"]: argv.push(sdk_owned_text(a))
+    argv.push(sdk_owned_text(resource_include))
+    argv.push(sdk_owned_text(f"-D__GLIBC_MINOR__={SDK_LINUX_GLIBC_MINOR}"))
+    let dirs = sdk_glibc_internal_includes(zig_libc)
+    for i in 0..dirs.len() as i32:
+        argv.push(sdk_owned_text("-I"))
+        argv.push(sdk_owned_text(dirs[i]))
+    argv
+
+// The public glibc headers for x86_64-linux-gnu, most specific first.
+fn sdk_glibc_header_dir(index: i32) -> str:
+    if index == 0: return "x86-linux-gnu"
+    if index == 1: return "generic-glibc"
+    if index == 2: return "x86-linux-any"
+    "any-linux-any"
+
+// Zig's include order for compiling glibc's own start code
+// (src/libs/glibc.zig add_include_dirs, x86_64-linux-gnu).
+fn sdk_glibc_internal_includes(zig_libc: &str) -> Vec[str]:
+    let g = sdk_join(zig_libc, "glibc")
+    var dirs: Vec[str] = Vec.new()
+    for rel in ["include", "sysdeps/unix/sysv/linux/x86_64", "sysdeps/unix/sysv/linux/x86", "sysdeps/x86_64/nptl", "sysdeps/x86/nptl", "sysdeps/unix/sysv/linux/generic", "sysdeps/unix/sysv/linux/include", "sysdeps/unix/sysv/linux", "sysdeps/nptl", "sysdeps/pthread", "sysdeps/unix/sysv", "sysdeps/unix/x86_64", "sysdeps/unix/x86", "sysdeps/unix", "sysdeps/x86_64", "sysdeps/x86", "sysdeps/generic"]:
+        dirs.push(sdk_join(g, rel))
+    dirs.push(sdk_owned_text(g))
+    for i in 0..4:
+        dirs.push(sdk_join(zig_libc, "include/" ++ sdk_glibc_header_dir(i)))
+    dirs
+
+fn sdk_linux_sysroot_provenance() -> str:
+    var out = "The With linux-x86_64 sysroot (#1915, D81): what linking a With program and\n"
+    out = out ++ "c_import of libc read on Linux. Generated by `with build :linux-sysroot`.\n\n"
+    out = out ++ f"Target glibc {SDK_LINUX_GLIBC_MAJOR}.{SDK_LINUX_GLIBC_MINOR}: a program built against it runs on that glibc or any later one.\n\n"
+    out = out ++ "usr/lib/*.so.*: link stubs generated from Zig's lib/libc/glibc/abilists;\n"
+    out = out ++ "usr/lib/{crt1.o,Scrt1.o,libc_nonshared.o}: built from Zig's copy of glibc's csu,\n"
+    out = out ++ "stdlib, io, debug and pthread sources; usr/lib/libc.so: glibc's linker script;\n"
+    out = out ++ "usr/include: Zig's glibc headers (x86-linux-gnu, generic-glibc, x86-linux-any,\n"
+    out = out ++ "any-linux-any), with __GLIBC_MINOR__ pinned in features.h.\n"
+    out = out ++ "  Zig " ++ SDK_ZIG_VERSION ++ " source archive " ++ sdk_zig_source_url() ++ "\n"
+    out = out ++ "  sha256 " ++ SDK_ZIG_TAR_GZ_SHA256 ++ "\n"
+    out = out ++ "  Zig: MIT. glibc: LGPL-2.1-or-later (the crt objects and libc_nonshared\n"
+    out = out ++ "  under its linking exception); the Linux kernel UAPI headers: GPL-2.0 WITH\n"
+    out = out ++ "  Linux-syscall-note.\n"
+    out
+
+// glibc's libc.so is a linker script over the shared object and the static
+// pieces every program needs; -lc reads it.
+fn sdk_linux_libc_script() -> str:
+    "/* GNU ld script (the With linux sysroot, as glibc installs it) */\nOUTPUT_FORMAT(elf64-x86-64)\nGROUP ( libc.so.6 libc_nonshared.o AS_NEEDED ( ld-linux-x86-64.so.2 ) )\n"
+
+fn sdk_linux_nonshared_sources() -> Vec[str]:
+    var out: Vec[str] = Vec.new()
+    for rel in ["stdlib/atexit.c", "stdlib/at_quick_exit.c", "sysdeps/pthread/pthread_atfork.c", "debug/stack_chk_fail_local.c"]:
+        out.push(sdk_owned_text(rel))
+    // libc_nonshared redirected stat to xstat until glibc 2.33.
+    if SDK_LINUX_GLIBC_MINOR <= 32:
+        for rel in ["io/stat-2.32.c", "io/fstat-2.32.c", "io/lstat-2.32.c", "io/stat64-2.32.c", "io/fstat64-2.32.c", "io/lstat64-2.32.c", "io/fstatat-2.32.c", "io/fstatat64-2.32.c", "io/mknodat-2.32.c", "io/mknod-2.32.c"]:
+            out.push(sdk_owned_text(rel))
+    // __libc_start_main took static init/fini callbacks until glibc 2.34.
+    if SDK_LINUX_GLIBC_MINOR <= 33:
+        out.push("csu/elf-init-2.33.c")
+    out
+
+pub fn run_linux_sysroot_action(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    let pack_path = ctx.output()
+    if pack_path.len() == 0:
+        return sdk_fail(ctx, "requires an output path")
+    // Only a linux-x86_64 compiler embeds it; every other host's compiler
+    // carries a zero-length blob (and fetches nothing).
+    if os() != "Linux" or arch() != "x86_64":
+        return sdk_write_text(ctx, pack_path, "")
+    let root = ctx.project_info().project_root()
+    let prefix = compiler_default_llvm_prefix()
+    let clang = sdk_abs(root, sdk_tool(prefix, "clang"))
+    let lld = sdk_abs(root, sdk_tool(prefix, "ld.lld"))
+    if not fs.exists(clang) or not fs.exists(lld):
+        return sdk_fail(ctx, "the LLVM SDK at " ++ prefix ++ " has no clang or ld.lld")
+    let resource_include = sdk_abs(root, sdk_join(prefix, "lib/clang/" ++ sdk_llvm_major() ++ "/include"))
+    let zig_libc = sdk_abs(root, sdk_join(sdk_zig_source_dir(), "lib/libc"))
+    let abilists = fs.read_text(sdk_join(zig_libc, "glibc/abilists"))
+    if abilists.len() == 0:
+        return sdk_fail(ctx, "the Zig " ++ SDK_ZIG_VERSION ++ " source at " ++ sdk_zig_source_dir() ++ " has no lib/libc/glibc/abilists")
+    let sources = sdk_glibc_stub_sources(abilists, SDK_LINUX_GLIBC_TARGET, SDK_LINUX_GLIBC_MAJOR, SDK_LINUX_GLIBC_MINOR)
+    if sources.len() != 9:
+        return sdk_fail(ctx, "Zig's glibc abilists has no " ++ SDK_LINUX_GLIBC_TARGET ++ f" glibc {SDK_LINUX_GLIBC_MAJOR}.{SDK_LINUX_GLIBC_MINOR}, or is malformed")
+    let work = sdk_abs(root, sdk_join("out/command", ctx.target_name()) ++ "/work")
+    let _old_work = fs.remove_tree(work)
+    // The tree is rebuilt whole: a file dropped by a newer pin must not linger.
+    let tree = sdk_linux_sysroot_dir()
+    let _old = fs.remove_tree(tree)
+    let lib_rel = sdk_join(tree, "usr/lib")
+    let lib_dir = sdk_abs(root, lib_rel)
+    if fs.mkdir_all(work) != 0 or fs.mkdir_all(lib_rel) != 0:
+        return sdk_fail(ctx, "could not create " ++ work ++ " and " ++ lib_rel)
+    let map_path = sdk_join(work, "all.map")
+    var rc = sdk_write_text(ctx, map_path, sources[0])
+    if rc != 0: return rc
+    for lib in 0..8:
+        let name = SDK_GLIBC_LIB_NAMES[lib]
+        let asm_path = sdk_join(work, name ++ ".s")
+        rc = sdk_write_text(ctx, asm_path, sources[lib + 1])
+        if rc != 0: return rc
+        let obj = sdk_join(work, name ++ ".o")
+        var as_cmd = sdk_cmd(clang)
+        as_cmd.push(sdk_owned_text("--target=" ++ SDK_LINUX_GLIBC_TARGET))
+        as_cmd.push(sdk_owned_text("-c"))
+        as_cmd.push(sdk_owned_text(asm_path))
+        as_cmd.push(sdk_owned_text("-o"))
+        as_cmd.push(sdk_owned_text(obj))
+        rc = sdk_run_capture(ctx, "stub-" ++ name ++ "-as", as_cmd, 600000)
+        if rc != 0: return rc
+        let file = sdk_glibc_lib_file(lib)
+        var ld_cmd = sdk_cmd(lld)
+        for a in ["-shared", "-z", "noexecstack", "-soname"]: ld_cmd.push(sdk_owned_text(a))
+        ld_cmd.push(sdk_owned_text(file))
+        ld_cmd.push(sdk_owned_text("--version-script"))
+        ld_cmd.push(sdk_owned_text(map_path))
+        ld_cmd.push(sdk_owned_text("-o"))
+        ld_cmd.push(sdk_owned_text(sdk_join(lib_dir, file)))
+        ld_cmd.push(sdk_owned_text(obj))
+        rc = sdk_run_capture(ctx, "stub-" ++ name ++ "-ld", ld_cmd, 600000)
+        if rc != 0: return rc
+    // glibc's own start code and libc_nonshared, compiled as Zig compiles them.
+    let libc_modules = sdk_join(zig_libc, "glibc/include/libc-modules.h")
+    let libc_symbols = sdk_join(zig_libc, "glibc/include/libc-symbols.h")
+    let start_src = if SDK_LINUX_GLIBC_MINOR <= 33: "glibc/sysdeps/x86_64/start-2.33.S" else: "glibc/sysdeps/x86_64/start.S"
+    var start = sdk_glibc_cc(clang, resource_include, zig_libc)
+    for a in ["-D_LIBC_REENTRANT", "-include"]: start.push(sdk_owned_text(a))
+    start.push(sdk_owned_text(libc_modules))
+    for a in ["-DMODULE_NAME=libc", "-include"]: start.push(sdk_owned_text(a))
+    start.push(sdk_owned_text(libc_symbols))
+    for a in ["-DPIC", "-DSHARED", "-DTOP_NAMESPACE=glibc", "-DASSEMBLER", "-Wa,--noexecstack", "-c"]: start.push(sdk_owned_text(a))
+    start.push(sdk_owned_text(sdk_join(zig_libc, start_src)))
+    start.push(sdk_owned_text("-o"))
+    start.push(sdk_owned_text(sdk_join(work, "start.o")))
+    rc = sdk_run_capture(ctx, "crt-start", start, 600000)
+    if rc != 0: return rc
+    var note = sdk_glibc_cc(clang, resource_include, zig_libc)
+    note.push(sdk_owned_text("-I"))
+    note.push(sdk_owned_text(sdk_join(zig_libc, "glibc/csu")))
+    for a in ["-D_LIBC_REENTRANT", "-DMODULE_NAME=libc", "-DTOP_NAMESPACE=glibc", "-DASSEMBLER", "-Wa,--noexecstack", "-c"]: note.push(sdk_owned_text(a))
+    note.push(sdk_owned_text(sdk_join(zig_libc, "glibc/csu/abi-note.S")))
+    note.push(sdk_owned_text("-o"))
+    note.push(sdk_owned_text(sdk_join(work, "abi-note.o")))
+    rc = sdk_run_capture(ctx, "crt-abi-note", note, 600000)
+    if rc != 0: return rc
+    var init = sdk_glibc_cc(clang, resource_include, zig_libc)
+    init.push(sdk_owned_text("-c"))
+    init.push(sdk_owned_text(sdk_join(zig_libc, "glibc/csu/init.c")))
+    init.push(sdk_owned_text("-o"))
+    init.push(sdk_owned_text(sdk_join(work, "init.o")))
+    rc = sdk_run_capture(ctx, "crt-init", init, 600000)
+    if rc != 0: return rc
+    var crt1 = sdk_cmd(lld)
+    crt1.push(sdk_owned_text("-r"))
+    crt1.push(sdk_owned_text("-o"))
+    crt1.push(sdk_owned_text(sdk_join(lib_dir, "crt1.o")))
+    for part in ["start.o", "abi-note.o", "init.o"]: crt1.push(sdk_owned_text(sdk_join(work, part)))
+    rc = sdk_run_capture(ctx, "crt1-link", crt1, 600000)
+    if rc != 0: return rc
+    if fs.copy_file(sdk_join(lib_rel, "crt1.o"), sdk_join(lib_rel, "Scrt1.o")) != 0:
+        return sdk_fail(ctx, "could not copy crt1.o to Scrt1.o")
+    let nonshared = sdk_linux_nonshared_sources()
+    var nonshared_link = sdk_cmd(lld)
+    nonshared_link.push(sdk_owned_text("-r"))
+    nonshared_link.push(sdk_owned_text("-o"))
+    nonshared_link.push(sdk_owned_text(sdk_join(lib_dir, "libc_nonshared.o")))
+    for i in 0..nonshared.len() as i32:
+        let obj = sdk_join(work, f"nonshared{i}.o")
+        var cmd = sdk_glibc_cc(clang, resource_include, zig_libc)
+        for a in ["-std=gnu11", "-fgnu89-inline", "-fmerge-all-constants", "-frounding-math", "-fno-common", "-fmath-errno", "-ftls-model=initial-exec", "-Qunused-arguments", "-fPIC", "-DNO_INITFINI", "-D_LIBC_REENTRANT", "-include"]: cmd.push(sdk_owned_text(a))
+        cmd.push(sdk_owned_text(libc_modules))
+        for a in ["-DMODULE_NAME=libc", "-include"]: cmd.push(sdk_owned_text(a))
+        cmd.push(sdk_owned_text(libc_symbols))
+        for a in ["-DPIC", "-DLIBC_NONSHARED=1", "-DTOP_NAMESPACE=glibc", "-c"]: cmd.push(sdk_owned_text(a))
+        cmd.push(sdk_owned_text(sdk_join(zig_libc, "glibc/" ++ nonshared[i])))
+        cmd.push(sdk_owned_text("-o"))
+        cmd.push(sdk_owned_text(obj))
+        rc = sdk_run_capture(ctx, f"nonshared-{i}", cmd, 600000)
+        if rc != 0: return rc
+        nonshared_link.push(sdk_owned_text(obj))
+    rc = sdk_run_capture(ctx, "nonshared-link", nonshared_link, 600000)
+    if rc != 0: return rc
+    rc = sdk_write_text(ctx, sdk_join(lib_rel, "libc.so"), sdk_linux_libc_script())
+    if rc != 0: return rc
+    // -lm, -lpthread, ...: the link name of each other library, as a script
+    // naming its shared object.
+    for lib in 0..8:
+        let name = SDK_GLIBC_LIB_NAMES[lib]
+        if name == "c" or name == "ld": continue
+        rc = sdk_write_text(ctx, sdk_join(lib_rel, "lib" ++ name ++ ".so"), "INPUT ( " ++ sdk_glibc_lib_file(lib) ++ " )\n")
+        if rc != 0: return rc
+    // Headers: written least specific first, so the most specific directory's
+    // copy of a header is the one left, as Zig's search order finds it.
+    var hd = 3
+    while hd >= 0:
+        // Project-relative, as the build's file listing names what it finds.
+        let dir = sdk_join(sdk_zig_source_dir(), "lib/libc/include/" ++ sdk_glibc_header_dir(hd))
+        hd = hd - 1
+        let headers = sdk_merge_sort_strings(fs.list_files(dir))
+        if headers.len() == 0:
+            return sdk_fail(ctx, "no glibc headers under " ++ dir)
+        for h in 0..headers.len() as i32:
+            let rel = sdk_rel_path(dir, sdk_normalize(headers[h]))
+            if not sdk_sysroot_path_ok(rel):
+                return sdk_fail(ctx, "a header path the sysroot pack cannot carry: " ++ headers[h])
+            var text = fs.read_text(headers[h])
+            if rel == "features.h":
+                // Zig passes -D__GLIBC_MINOR__ per target; the sysroot is one
+                // target, so its features.h names the pin itself.
+                let marker = "/* zig patch: we pass `-D__GLIBC_MINOR__=XX` depending on the target. */"
+                if text.find(marker) < 0:
+                    return sdk_fail(ctx, "Zig's generic-glibc/features.h no longer carries the __GLIBC_MINOR__ patch comment")
+                text = text.replace(marker, f"#ifndef __GLIBC_MINOR__\n#define __GLIBC_MINOR__ {SDK_LINUX_GLIBC_MINOR}\n#endif")
+            rc = sdk_write_text(ctx, sdk_join(tree, "usr/include/" ++ rel), text)
+            if rc != 0: return rc
+    rc = sdk_write_text(ctx, sdk_join(tree, "PROVENANCE"), sdk_linux_sysroot_provenance())
+    if rc != 0: return rc
+    // "F <path> <size>\n<bytes>" per file, as the darwin pack.
+    let files = sdk_merge_sort_strings(fs.list_files(tree))
+    var pack = StringBuilder.with_capacity(24000000)
+    pack.push_str("WITH-SYSROOT 1\n")
+    for i in 0..files.len() as i32:
+        let rel = sdk_rel_path(tree, sdk_normalize(files[i]))
+        let bytes = fs.read_text(files[i])
+        pack.push_str("F " ++ rel ++ " " ++ f"{bytes.len()}" ++ "\n")
+        pack.push_str(bytes)
+    sdk_write_text(ctx, pack_path, pack.to_str())
+
 // ── The SDK's build tools, carried by the compiler (#1915, D81) ────────
 //
 // `with get` builds a package from source with CMake and Ninja. They are our
