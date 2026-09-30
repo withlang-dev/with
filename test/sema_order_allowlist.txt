@@ -1,0 +1,4 @@
+# Fixtures whose diagnostics may change when top-level bodies are checked
+# in reverse order, because the spec orders them (D43: a return type
+# inferred from a body declared later is not known at an earlier call).
+# One fixture file name per line. sema-order-check fails on any other.

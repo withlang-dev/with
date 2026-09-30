@@ -586,6 +586,24 @@ offset, and a small byte window around the mismatch. It does not yet attribute
 the difference to an object symbol; use `llvm-nm`, `otool`, or `lldb` after the
 byte offset narrows the search.
 
+## Declaration-Order Independence
+
+A function body's facts and diagnostics must not depend on which other
+bodies were checked first, except where the spec orders them (D43: a
+return type inferred from a body declared later is not known at an
+earlier call). `--sema-body-order-reverse` (or
+`WITH_SEMA_BODY_ORDER=reverse`) checks top-level bodies last to first;
+comparing a program's output with and without it shows a dependence:
+
+```sh
+with check file.w
+with check --sema-body-order-reverse file.w
+```
+
+`with build :sema-order-check` runs the comparison over every
+`test/compile_errors` fixture (tools/sema_order_check.w) and fails on a
+difference outside `test/sema_order_allowlist.txt` (#1941).
+
 ## Debug Allocator
 
 The native debug allocator remains the first tool for drop, lifetime,

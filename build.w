@@ -15,6 +15,7 @@ use build.package
 use build.sdk
 use build.wo
 use build.examples
+use build.sema_order
 use build.tools_lane
 use build.benchmarks
 use build.host_toolchain
@@ -3708,6 +3709,17 @@ pub fn build(ctx: BuildCtx) -> Build:
     examples_tests = examples_tests.input("examples").input("lib/facades")
     examples_tests = examples_tests.dep("build")
     out = out.add_target(examples_tests)
+
+    // Type checking does not depend on declaration order except where the
+    // spec orders it (#1941; build/sema_order.w).
+    var sema_order_check = target_new(.Action, "sema-order-check", "").output("out/test-graph/sema-order-check")
+    sema_order_check = sema_order_check.allow_parallel()
+    sema_order_check.action = run_sema_order_check_action
+    sema_order_check = sema_order_check.input(release_compiler_bin("with"))
+    sema_order_check = sema_order_check.input("tools/sema_order_check.w").input("test/compile_errors").input("test/sema_order_allowlist.txt")
+    sema_order_check = sema_order_check.write_scope("out/test-graph/sema-order-check")
+    sema_order_check = sema_order_check.dep("build")
+    out = out.add_target(sema_order_check)
 
     // The tools lane (#1335): every tools/*.w is compiled (never run) with
     // the release compiler, so a tool that stops compiling turns the battery

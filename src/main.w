@@ -862,6 +862,11 @@ fn run_cli(full_argc: i32) -> i32:
         with_setenv_str("WITH_DEBUG_ALLOC", "1")
     if cli_has_flag(argc, "--trace-alloc"):
         with_setenv_str("WITH_DEBUG_ALLOC_TRACE", "1")
+    // --sema-body-order-reverse: check top-level bodies last to first
+    // (WITH_SEMA_BODY_ORDER=reverse); `sema-order-check` compares it with
+    // the normal order.
+    if cli_has_flag(argc, "--sema-body-order-reverse"):
+        with_setenv_str("WITH_SEMA_BODY_ORDER", "reverse")
     let debug_alloc_filter = cli_value_or_prefix(argc, "--debug-alloc-filter", "--debug-alloc-filter=")
     if debug_alloc_filter.len() > 0:
         with_setenv_str("WITH_DEBUG_ALLOC_FILTER", debug_alloc_filter)
