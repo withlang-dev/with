@@ -332,10 +332,12 @@ impl LinkStageCommand:
             with_eprint("link: " ++ shown)
         let saved = link_stage_apply_env(&self.env)
         let linux_target = if target_spec_is_native(): runtime_sysinfo_os() == "Linux" else: target_spec_active_kind() == 1 or target_spec_active_kind() == 2
-        // #1915: a failed macOS link says why (lld's own diagnostics, or the
-        // exit status), never a bare "build failed".
+        // #1915, #1914: a failed macOS or Windows link says why (lld's own
+        // diagnostics, or the linker and its exit status), never a bare
+        // "build failed".
         let darwin_native = target_spec_is_native() and runtime_sysinfo_os() == "Macos"
-        let rc = if linux_target or darwin_native:
+        let windows_native = target_spec_is_native() and runtime_sysinfo_os() == "Windows"
+        let rc = if linux_target or darwin_native or windows_native:
             link_run_with_diagnostics(argv, self.cwd)
         else if self.cwd.len() > 0:
             runtime_exec_argv_cwd(argv, self.cwd)
@@ -1104,7 +1106,11 @@ fn link_stage_link_with_extras_libs_args_plan(obj_path: &str, bin_path: &str, ex
             ld_path = link_stage_windows_lld_from_env()
         if ld_path.len() == 0:
             if runtime_sysinfo_os() == "Windows":
-                with_eprint("error: missing Windows LLVM linker metadata (" ++ root ++ "/llvm_ld) and no WITH_LLVM_LD / LLVM_LD / LLVM_PREFIX in the environment")
+                // #1914: say what a fresh Windows checkout needs. Until the
+                // compiler carries its Windows linker and C runtime (as the
+                // macOS one carries lld and its sysroot), linking anything,
+                // `with build :deps`'s fetch helper included, needs the SDK.
+                with_eprint("error: missing Windows LLVM linker metadata (" ++ root ++ "/llvm_ld) and no WITH_LLVM_LD / LLVM_LD / LLVM_PREFIX in the environment: a Windows link needs the LLVM SDK's lld-link and C runtime. Extract the with-llvm-sdk-<version>-windows-x86_64.tar.gz release asset sdk.lock pins and set LLVM_PREFIX to its llvm-<version>-windows-x86_64-msvc directory")
             else:
                 with_eprint("error: cross-target link requires LLVM linker metadata (" ++ root ++ "/llvm_ld)")
             return link_stage_plan_fail()

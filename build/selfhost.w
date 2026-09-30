@@ -1809,6 +1809,10 @@ fn bs_check_declarative_manifest_config(ctx: &ActionCtx, compiler_path: &str, ca
         return bs_fail(ctx, "missing [link].libs library unexpectedly linked")
     rc = bs_assert_contains(ctx, link_bad.stderr, "with_phase1_missing_lib", "declarative_link_lib_missing")
     if rc != 0: return rc
+    // #1914: the linker's own message, not only the compiler's "build failed".
+    if os() == "Windows":
+        rc = bs_assert_contains(ctx, link_bad.stderr, "lld-link: error: could not open 'with_phase1_missing_lib.lib'", "declarative_link_lib_missing_lld_message")
+        if rc != 0: return rc
 
     let native_target_dir = bs_join(case_dir, "target_native")
     rc = bs_write_fixture(ctx, bs_join(native_target_dir, "with.toml"), "[package]\nname = \"targetnative\"\nversion = \"0.1.0\"\n\n[target]\ndefault = \"native\"\n", "native target default manifest")
