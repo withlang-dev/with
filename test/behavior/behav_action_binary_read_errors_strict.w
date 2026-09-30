@@ -3,5 +3,5 @@
 use binary_read_cases
 
 fn main:
-    exercise_all(false)
+    exercise_all(true)
     print("ok")
