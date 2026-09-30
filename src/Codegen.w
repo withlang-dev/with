@@ -1239,7 +1239,7 @@ impl Codegen:
         self.di_files.insert(0, self.di_file)
 
         wl_add_module_flag_int(self.llmod, "Debug Info Version", wl_debug_metadata_version())
-        // The debug format follows the target's object format. A COFF/MSVC
+        // The debug format follows the target's object format. A COFF
         // target carries its debug info as CodeView: lld-link's `/debug`
         // builds the PDB from it, and the runtime's backtraces (dbghelp
         // SymFromAddr) read that PDB. AsmPrinter emits DWARF whenever the

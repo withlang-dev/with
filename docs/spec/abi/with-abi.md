@@ -1,6 +1,6 @@
-# The With ABI (version 9)
+# The With ABI (version 10)
 
-Status: DRAFT v9 (2026-09-30), the convention as the compiler implements
+Status: DRAFT v10 (2026-09-30), the convention as the compiler implements
 it today, written down so `.wo` bundles (decisions.md D38,
 `docs/spec/toolchain/wo_bundles.md`) can depend on it. Nothing here is a new rule. The
 sources named in §7 define the ABI; this document describes them, and at
@@ -205,6 +205,19 @@ layout change there is caught by the `wo-drift` lane, not by this check.
 
 ## Version history
 
+- **v10** (2026-09-30): windows-x86_64 objects target x86_64-w64-windows-gnu,
+  no longer x86_64-pc-windows-msvc (#1915; Eric, 2026-09-30): programs and
+  the compiler link the SDK's mingw-w64 UCRT runtime, so the platform
+  substrate With's convention lowers onto is the GNU environment's. With's
+  own rules (§1–§6, including the windows-x86_64 indirect-aggregate rule)
+  are unchanged; what changes is what LLVM emits under them: stack probes
+  call `___chkstk_ms` (compiler-rt) instead of `__chkstk`, no `_fltused`
+  reference, `main` calls mingw-w64's `__main`, constructors run from
+  `.ctors`, and a C `long double` is the 16-byte x87 type rather than
+  `double`. Debug info stays CodeView. Objects built under v9 for
+  windows-x86_64 do not link with v10 code; every other target is
+  unchanged. windows-aarch64 stays MSVC-environment until its slice.
+
 - **v9** (2026-09-30): SIMD vectors and masks (spec §4.3d, D78/D80; #1874):
   `Vector[N, T]` and `Mask[N, W]` lay out as `<N x T>` / `<N x iW>`, size
   rounded up to a power of two, alignment the target's (capped at 16 bytes
@@ -212,6 +225,7 @@ layout change there is caught by the `wo-drift` lane, not by this check.
   explicit padding (§2). A vector crossing a C boundary takes the target's
   C vector rule (§4). No existing layout changes; the version marks the new
   types a bundle may expose.
+
 - **v8** (2026-09-28): a shared `&str` is a view value, `{ ptr, len }` with
   str's layout (16 bytes, align 8), passed and returned by value like a
   slice; it had been a pointer to a str header (§1, §3; spec §4.8a, #1810).

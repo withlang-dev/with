@@ -606,13 +606,13 @@ fn llvm_object_triple(default_triple: *mut u8) -> *const u8:
         return &wl_active_triple_buf as *const u8
     if rt_sysinfo_os() == "Macos" and (rt_sysinfo_arch() == "aarch64"):
         return c"arm64-apple-macosx11.0.0".ptr as *const u8
-    // With's Windows objects are MSVC-environment code whatever environment
-    // the SDK's LLVM was itself built for: an SDK built for
-    // x86_64-w64-windows-gnu against its own libc++ (#1915) defaults to that
-    // triple, and must not change what the compiler emits.
+    // With's Windows objects target the GNU environment on x86_64 (mingw-w64's
+    // UCRT runtime from the SDK, #1915; Eric 2026-09-30), whatever
+    // environment the SDK's own LLVM was built for. windows-aarch64 stays
+    // MSVC until its slice.
     if rt_sysinfo_os() == "Windows":
         if rt_sysinfo_arch() == "x86_64":
-            return c"x86_64-pc-windows-msvc".ptr as *const u8
+            return c"x86_64-w64-windows-gnu".ptr as *const u8
         return c"aarch64-pc-windows-msvc".ptr as *const u8
     default_triple as *const u8
 
