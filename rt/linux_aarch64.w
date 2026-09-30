@@ -920,7 +920,7 @@ extern fn with_memset(dst: *mut u8, val: i32, len: i64) -> *mut u8
 @[link_name("setenv")]
 extern fn rt_libc_setenv(name: *const u8, value: *const u8, overwrite: i32) -> i32
 @[link_name("sigprocmask")]
-extern fn rt_libc_sigprocmask(how: i32, set: *const u32, old: *mut u32) -> i32
+extern fn rt_libc_sigprocmask(how: i32, set: *const PosixSigset, old: *mut PosixSigset) -> i32
 @[link_name("fork")]
 extern fn rt_libc_fork() -> i32
 @[link_name("setpgid")]
@@ -957,13 +957,12 @@ let POSIX_SIGINT: i32 = 2
 let POSIX_SIGQUIT: i32 = 3
 let POSIX_SIGTERM: i32 = 15
 let POSIX_SIGHUP: i32 = 1
-let POSIX_SIG_BLOCK: i32 = 1
-let POSIX_SIG_SETMASK: i32 = 3
+let POSIX_SIG_BLOCK: i32 = 0
+let POSIX_SIG_SETMASK: i32 = 2
 let POSIX_RLIMIT_STACK: i32 = 3
 let POSIX_RLIMIT_AS: i32 = 9
-let POSIX_RLIM_INFINITY: u64 = 9223372036854775807 as u64
+let POSIX_RLIM_INFINITY: u64 = 0xffffffffffffffff
 let POSIX_EINTR: i32 = 4
-let POSIX_SIGACTION_SIZE: i64 = 16
 let POSIX_RLIMIT_SIZE: i64 = 16
 let POSIX_WNOHANG: i32 = 1
 let POSIX_CAPTURE_TIMEOUT_RC: i32 = 124
@@ -977,10 +976,16 @@ fn posix_store_i64(base: i64, offset: i64, value: i64):
 fn posix_load_u64(base: i64, offset: i64) -> u64:
     unsafe *((base + offset) as *const u64)
 
-fn posix_signal_bit(signo: i32) -> u32:
+// glibc's sigset_t is 1024 bits, and sigprocmask copies all 128 bytes of
+// the old set: a narrower buffer (Darwin's u32) is overwritten past its end
+// (#1911). Signal n is bit n - 1 of the first word.
+type PosixSigset:
+    words: [16]u64
+
+fn posix_signal_bit(signo: i32) -> u64:
     if signo <= 0:
-        return 0 as u32
-    (1 as u32) << ((signo - 1) as u32)
+        return 0
+    (1 as u64) << ((signo - 1) as u64)
 
 fn posix_str_to_c_buf(s: &str) -> *mut u8:
     let out = with_alloc(s.len() + 1)
@@ -992,22 +997,16 @@ fn posix_str_to_c_buf(s: &str) -> *mut u8:
     unsafe *((out as i64 + s.len()) as *mut u8) = 0
     out
 
-fn posix_restore_default_signal_handler(signo: i32):
-    var sa: [16]u8 = [0 as u8; 16]
-    let sa_base = (&raw mut sa) as *mut [16]u8 as i64
-    with_memset(sa_base as *mut u8, 0, POSIX_SIGACTION_SIZE)
-    let _ = rt_libc_sigaction(signo, sa_base as *const u8, 0 as *mut u8)
+fn posix_restore_default_signal_handler(signo: i32): linux_zero_sigaction(signo)
 
-fn posix_block_interrupt_signals(prev_mask: *mut u32) -> i32:
-    var blocked: u32 = 0 as u32
-    blocked = blocked | posix_signal_bit(POSIX_SIGINT)
-    blocked = blocked | posix_signal_bit(POSIX_SIGTERM)
-    blocked = blocked | posix_signal_bit(POSIX_SIGHUP)
-    rt_libc_sigprocmask(POSIX_SIG_BLOCK, &blocked as *const u32, prev_mask)
+fn posix_block_interrupt_signals(prev_mask: *mut PosixSigset) -> i32:
+    var blocked = PosixSigset { words: [0 as u64; 16] }
+    blocked.words[0] = posix_signal_bit(POSIX_SIGINT) | posix_signal_bit(POSIX_SIGTERM) | posix_signal_bit(POSIX_SIGHUP)
+    rt_libc_sigprocmask(POSIX_SIG_BLOCK, &blocked as *const PosixSigset, prev_mask)
 
-fn posix_restore_signal_mask(prev_mask: *const u32):
+fn posix_restore_signal_mask(prev_mask: *const PosixSigset):
     if prev_mask as i64 != 0:
-        let _ = rt_libc_sigprocmask(POSIX_SIG_SETMASK, prev_mask, 0 as *mut u32)
+        let _ = rt_libc_sigprocmask(POSIX_SIG_SETMASK, prev_mask, 0 as *mut PosixSigset)
 
 fn posix_wait_child(pid: i32, timeout_ms: i32) -> i32:
     var status: i32 = -1
@@ -1084,7 +1083,7 @@ fn posix_redirect_fd_from_path(path: *const u8, fd: i32) -> i32:
     let _ = rt_close(in_fd)
     0
 
-fn posix_child_common(mask_rc: i32, prev_mask: *const u32):
+fn posix_child_common(mask_rc: i32, prev_mask: *const PosixSigset):
     if mask_rc == 0:
         posix_restore_signal_mask(prev_mask)
     let _ = rt_libc_setpgid(0, 0)
@@ -1105,11 +1104,11 @@ fn posix_run_argv(blob: *const u8, len: i64, stdout_path: *const u8, stderr_path
     if table as i64 == 0:
         let _ = rt_write(2, c"error: could not map the argument table for a command\n".ptr, 54)
         return -1
-    var prev_mask: u32 = 0 as u32
+    var prev_mask = PosixSigset { words: [0 as u64; 16] }
     let mask_rc = posix_block_interrupt_signals(&raw mut prev_mask)
     let pid = rt_libc_fork()
     if pid == 0:
-        posix_child_common(mask_rc, &prev_mask as *const u32)
+        posix_child_common(mask_rc, &prev_mask as *const PosixSigset)
         if stdin_path as i64 != 0 and posix_redirect_fd_from_path(stdin_path, 0) != 0:
             rt_libc_exit(127)
         if stdout_path as i64 != 0 and posix_redirect_fd_to_path(stdout_path, 1) != 0:
@@ -1126,11 +1125,11 @@ fn posix_run_argv(blob: *const u8, len: i64, stdout_path: *const u8, stderr_path
     rt_munmap(table as *mut u8, table_bytes)
     if pid < 0:
         if mask_rc == 0:
-            posix_restore_signal_mask(&prev_mask as *const u32)
+            posix_restore_signal_mask(&prev_mask as *const PosixSigset)
         return -1
     let _ = rt_libc_setpgid(pid, pid)
     if mask_rc == 0:
-        posix_restore_signal_mask(&prev_mask as *const u32)
+        posix_restore_signal_mask(&prev_mask as *const PosixSigset)
     if not wait:
         return pid
     posix_active_child_pgid = pid
@@ -1161,9 +1160,8 @@ pub fn rt_compat_setenv_str(name: &str, value: &str) -> i32:
     rc
 
 pub fn rt_compat_install_interrupt_handlers() -> Unit:
-    var sa: [16]u8 = [0 as u8; 16]
-    let sa_base = (&raw mut sa) as *mut [16]u8 as i64
-    with_memset(sa_base as *mut u8, 0, POSIX_SIGACTION_SIZE)
+    var sa: [152]u8 = [0 as u8; 152]
+    let sa_base = (&raw mut sa) as *mut [152]u8 as i64
     posix_store_i64(sa_base, 0, posix_interrupt_signal_handler as i64)
     let _ = rt_libc_sigaction(POSIX_SIGINT, sa_base as *const u8, 0 as *mut u8)
     let _ = rt_libc_sigaction(POSIX_SIGTERM, sa_base as *const u8, 0 as *mut u8)
