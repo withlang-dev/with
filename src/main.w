@@ -1872,6 +1872,13 @@ fn run_build_action_worker_process(target: &BuildGraphTarget, options: &BuildCom
     let rc = with_exec_argv(build_target_worker_argv(target, options))
     let _restore_worker = with_setenv_str("WITH_BUILD_ACTION_WORKER", old_worker)
     let _restore_force = with_setenv_str("WITH_BUILD_ACTION_FORCE", old_force)
+    // The worker names its own failures, but a worker the kernel kills (the
+    // evaluator's heap past RAM: SIGKILL, 137) says nothing; the survey
+    // then listed the target as failed with no reason at all.
+    if rc > 128 and rc < 160:
+        with_eprint("error: build.w target '" ++ target.name ++ f"' worker was killed by signal {rc - 128}" ++ (if rc == 137: " (SIGKILL: out of memory?)" else: ""))
+    else if rc != 0:
+        with_eprint("error: build.w target '" ++ target.name ++ f"' failed with exit code {rc}")
     rc
 
 fn build_pool_parse_jobs(value: &str) -> i32:
