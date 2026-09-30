@@ -283,7 +283,9 @@ fn add_cross_rt_targets(out0: Build, ctx: &BuildCtx, tag: &str, p: &str, group_n
     compiler = target_with_compiler_source_inputs(move compiler, ctx)
     compiler = compiler.arg("-O1").arg("--target=" ++ triple)
     compiler = compiler.arg("embedded-object=" ++ dir ++ "/embedded_objects.o")
-    compiler = compiler.arg("runtime-root=" ++ dir)
+    // Link selects cross/<target> beneath the producer's native root
+    // (link_stage_runtime_variant_dir); the target directory is for embedding.
+    compiler = compiler.arg("runtime-root=out/lib")
     compiler = compiler.input(dir ++ "/.producer")
     compiler = compiler.dep(build_owned_text(group_name))
     compiler = compiler.write_scope(build_owned_text(bin_dir))
