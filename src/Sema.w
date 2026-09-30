@@ -1654,6 +1654,11 @@ pub type Sema {
     alloc_site_elided: Vec[i32],
     current_no_alloc_depth: i32,
     current_fn_may_alloc: i32,
+    // #1941: calls recorded while bodies are checked, resolved once every
+    // body has published whether it allocates (resolve_allocating_callees).
+    // Stride 5: owner fn, callee fn, call node, in @[no_alloc] context, file.
+    alloc_callee_calls: Vec[i32],
+    alloc_callee_calls_resolved: i32,
     current_fn_symbol: i32,
 
     // Current state
@@ -3163,6 +3168,8 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         alloc_site_elided: Vec.new(),
         current_no_alloc_depth: 0,
         current_fn_may_alloc: 0,
+        alloc_callee_calls: Vec.new(),
+        alloc_callee_calls_resolved: 0,
         current_fn_symbol: 0,
         source_text: "",
         tracked_input_root: "",

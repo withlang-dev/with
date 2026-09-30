@@ -2008,6 +2008,7 @@ impl Sema:
         let reverse = with_getenv_str("WITH_SEMA_BODY_ORDER") == "reverse"
         for di in 0..count:
             self.check_decl_body_in_order(if reverse: count - 1 - di else: di)
+        self.resolve_allocating_callees()
         // A call typed before its callee's body was: wrong only if that body
         // turned out to produce a value.
         let saved_file_id: i32 = self.local_file_id
@@ -5798,11 +5799,56 @@ impl Sema:
             let label = self.alloc_construct_label(kind)
             self.emit_error(f"{label} allocates here; @[no_alloc] context forbids it", node)
 
+    // #1941: whether a callee allocates is known only once its body has been
+    // checked, which may be after this call's body. The call is recorded and
+    // judged by resolve_allocating_callees once every body is; a body checked
+    // after that (a concrete generic body MIR asks for) sees the final answer.
     mut fn note_allocating_callee(node: i32, fn_sym: i32):
         if fn_sym == 0:
             return
-        if self.fn_may_alloc.contains(fn_sym) and self.fn_may_alloc.get(fn_sym).unwrap() != 0:
-            self.note_allocation_site(node, AllocConstructKind.CALLEE, 0, 0)
+        if self.alloc_callee_calls_resolved != 0:
+            if (self.fn_may_alloc.get(fn_sym) ?? 0) != 0:
+                self.note_allocation_site(node, AllocConstructKind.CALLEE, 0, 0)
+            return
+        self.alloc_callee_calls.push(self.current_fn_symbol)
+        self.alloc_callee_calls.push(fn_sym)
+        self.alloc_callee_calls.push(node)
+        self.alloc_callee_calls.push(if self.current_no_alloc_depth != 0: 1 else: 0)
+        self.alloc_callee_calls.push(self.local_file_id)
+
+    // A function allocates when its own body does or when it calls one that
+    // does: the fixpoint over the recorded calls, then an error at each call
+    // an @[no_alloc] context makes to an allocating function.
+    mut fn resolve_allocating_callees():
+        let count = self.alloc_callee_calls.len() as i32
+        var changed = true
+        while changed:
+            changed = false
+            var ci = 0
+            while ci + 4 < count:
+                let owner = self.alloc_callee_calls[ci]
+                let callee = self.alloc_callee_calls[ci + 1]
+                if owner != 0 and (self.fn_may_alloc.get(owner) ?? 0) == 0 and (self.fn_may_alloc.get(callee) ?? 0) != 0:
+                    self.fn_may_alloc.insert(owner, 1)
+                    changed = true
+                ci = ci + 5
+        let saved_file_id: i32 = self.local_file_id
+        let saved_no_alloc_depth: i32 = self.current_no_alloc_depth
+        let saved_fn_may_alloc: i32 = self.current_fn_may_alloc
+        let saved_fn_symbol: i32 = self.current_fn_symbol
+        var ci = 0
+        while ci + 4 < count:
+            if self.alloc_callee_calls[ci + 3] != 0 and (self.fn_may_alloc.get(self.alloc_callee_calls[ci + 1]) ?? 0) != 0:
+                self.current_fn_symbol = self.alloc_callee_calls[ci]
+                self.local_file_id = self.alloc_callee_calls[ci + 4]
+                self.current_no_alloc_depth = 1
+                self.note_allocation_site(self.alloc_callee_calls[ci + 2], AllocConstructKind.CALLEE, 0, 0)
+            ci = ci + 5
+        self.local_file_id = saved_file_id
+        self.current_no_alloc_depth = saved_no_alloc_depth
+        self.current_fn_may_alloc = saved_fn_may_alloc
+        self.current_fn_symbol = saved_fn_symbol
+        self.alloc_callee_calls_resolved = 1
 
     fn no_alloc_allows_method_allocation(type_name_sym: i32, field: i32) -> i32:
         let type_name = self.pool_resolve(type_name_sym)
