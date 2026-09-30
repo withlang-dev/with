@@ -1279,12 +1279,12 @@ fn link_stage_undefined_symbols_for_object(obj_path: &str) -> str:
     var argv = ""
     var nm_tool = "nm"
     if runtime_sysinfo_os() == "Windows":
-        let root = link_stage_resolve_runtime_root()
-        let ld_path = link_stage_read_file_trimmed(root ++ "/llvm_ld")
-        if ld_path.len() > 0:
-            nm_tool = link_stage_dirname(ld_path) ++ "/llvm-nm.exe"
-        else:
-            nm_tool = "llvm-nm.exe"
+        // The SDK's llvm-nm, beside the lld this link runs (its record, or
+        // the environment's SDK, as link_stage_llvm_ld_path resolves it):
+        // a PATH lookup found none in a shell without the SDK on PATH, and
+        // every such link carried every embedded bundle (#1915).
+        let ld_path = link_stage_llvm_ld_path()
+        nm_tool = if ld_path.len() > 0: link_stage_dirname(ld_path) ++ "/llvm-nm.exe" else: "llvm-nm.exe"
     else if not target_spec_is_native():
         // Cross objects are foreign to the host toolchain; use the
         // SDK's llvm-nm (beside lld) when it's available.
