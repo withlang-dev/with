@@ -81,12 +81,12 @@ fn build_graph_test_jobs -> i32:
         return 32
     parsed
 
-fn build_graph_external_test_argv(root: &str, target: &BuildGraphTarget, compiler_path: &str, test_path: &str) -> str:
+fn build_graph_external_test_argv(root: &str, target: &BuildGraphTarget, compiler_path: &str, test_path: &str, quiet: bool) -> str:
     var argv = ""
     argv = build_graph_argv_append(argv, compiler_path)
     argv = build_graph_argv_append(argv, "test")
     argv = build_graph_append_test_args(argv, target)
-    argv = build_graph_argv_append(argv, "--quiet")
+    if quiet: argv = build_graph_argv_append(argv, "--quiet")
     argv = build_graph_argv_append(argv, build_graph_path_for_child_process(root, test_path))
     argv
 
@@ -121,7 +121,7 @@ pub fn build_graph_run_external_test_file(root: &str, target: &BuildGraphTarget,
     let base = build_graph_path_basename(test_path)
     let stdout_path = resolve_join(capture_dir, base ++ ".stdout")
     let stderr_path = resolve_join(capture_dir, base ++ ".stderr")
-    let argv = build_graph_external_test_argv(root, target, compiler_path, test_path)
+    let argv = build_graph_external_test_argv(root, target, compiler_path, test_path, true)
     let rc = build_graph_rt_exec_argv_capture(argv, stdout_path, stderr_path, 300000)
     if rc == 124:
         build_graph_rt_eprint("error: build.w test target '" ++ target.name ++ "' timed out in '" ++ test_path ++ "'; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
@@ -152,6 +152,12 @@ fn build_graph_finish_external_test_job(target: &BuildGraphTarget, job: &BuildGr
     0
 
 pub fn build_graph_run_external_test_files(root: &str, target: &BuildGraphTarget, compiler_path: &str, test_files: &Vec[str]) -> i32:
+    build_graph_run_test_files_pool(root, target, compiler_path, test_files, false)
+
+// `echo` is `with test`'s view (a person at a terminal): each file runs
+// without a forced --quiet and its output is printed as it finishes. A lane
+// keeps the captures to itself and prints only failures.
+pub fn build_graph_run_test_files_pool(root: &str, target: &BuildGraphTarget, compiler_path: &str, test_files: &Vec[str], echo: bool) -> i32:
     let capture_dir = resolve_join(resolve_join(root, "out/test-graph"), target.name)
     if build_graph_rt_mkdir_p(capture_dir) != 0:
         build_graph_rt_eprint("error: could not create test output directory for target '" ++ target.name ++ "': " ++ capture_dir)
@@ -205,10 +211,10 @@ pub fn build_graph_run_external_test_files(root: &str, target: &BuildGraphTarget
             let base = build_graph_path_basename(test_path)
             let stdout_path = resolve_join(capture_dir, base ++ ".stdout")
             let stderr_path = resolve_join(capture_dir, base ++ ".stderr")
-            let argv = build_graph_external_test_argv(root, target, compiler_path, test_path)
+            let argv = build_graph_external_test_argv(root, target, compiler_path, test_path, not echo)
             let pid = build_graph_rt_exec_argv_capture_spawn(argv, stdout_path, stderr_path)
             if pid <= 0:
-                build_graph_rt_eprint("error: build.w test target '" ++ target.name ++ "' could not spawn '" ++ test_path ++ "'")
+                build_graph_rt_eprint("error: test target '" ++ target.name ++ "' could not spawn '" ++ test_path ++ "'")
                 return 1
             active.push(build_graph_external_test_job_new(test_path, stdout_path, stderr_path, pid))
             active_keys.push(with_str_clone_ref(run_keys[next]))
@@ -228,6 +234,7 @@ pub fn build_graph_run_external_test_files(root: &str, target: &BuildGraphTarget
                     li = li + 1
                     continue
                 rc = build_graph_rt_exec_wait(active[idx].pid, 1)
+            if echo: build_graph_rt_write(build_graph_rt_read_file(active[idx].stdout_path))
             let verdict = build_graph_finish_external_test_job(target, active[idx], rc)
             if verdict == 0:
                 pass_keys.push(with_str_clone_ref(active_keys[idx]))
@@ -249,7 +256,7 @@ pub fn build_graph_run_external_test_files(root: &str, target: &BuildGraphTarget
     build_cache_write_test_verdicts(root, compiler_fp, target.name, &pass_keys, &pass_paths)
 
     if failed_paths.len() as i32 > 0:
-        build_graph_rt_eprint(f"error: build.w test target '{target.name}': {failed_paths.len() as i32} of {test_files.len() as i32} files failed ({cached_count} cached, {run_files.len() as i32} ran):")
+        build_graph_rt_eprint(f"error: test target '{target.name}': {failed_paths.len() as i32} of {test_files.len() as i32} files failed ({cached_count} cached, {run_files.len() as i32} ran):")
         for fi in 0..failed_paths.len() as i32:
             build_graph_rt_eprint("error:   failed: " ++ failed_paths[fi])
         return first_failure

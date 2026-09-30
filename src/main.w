@@ -4543,21 +4543,6 @@ fn test_command_collect_targets(argc: i32) -> Vec[str]:
         i = i + 1
     targets
 
-fn run_test_target(target: &str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, keep_binary: bool, filter: &str) -> i32:
-    if test_target_is_directory(target):
-        let test_files = collect_test_files(target)
-        if test_files.len() == 0:
-            with_eprint(f"error: no test sources found in '{target}'")
-            return 1
-        for ti in 0..test_files.len() as i32:
-            let test_file = test_files[ti]
-            let run_rc = run_test_file(test_file, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, keep_binary, filter)
-            if run_rc != 0:
-                with_eprint(f"error: test failed in '{test_file}'")
-                return run_rc
-        return 0
-    run_test_file(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, keep_binary, filter)
-
 fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool) -> i32:
     let verbose = cli_test_verbose(argc)
     var quiet = cli_test_quiet(argc)
@@ -4577,12 +4562,50 @@ fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, r
         var graph_options = build_graph_command_options_default()
         graph_options.selected_target = "test"
         return run_build_command(move build_options, graph_options)
+    // Two or more files run as a build.w test lane runs them: on the build
+    // graph's pool, a worker per core, every failure reported and passes
+    // cached machine-wide. Before, the files ran one after another and the
+    // first failure ended the run, so a set of tests took their sum and
+    // hid every failure after the first.
+    var files: Vec[str] = Vec.new()
     for ti in 0..targets.len() as i32:
         let target = targets[ti]
-        let rc = run_test_target(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, keep_binary, filter)
-        if rc != 0:
-            return rc
-    0
+        if test_target_is_directory(target):
+            let dir_files = collect_test_files(target)
+            if dir_files.len() == 0:
+                with_eprint(f"error: no test sources found in '{target}'")
+                return 1
+            for fi in 0..dir_files.len() as i32: files.push(with_str_clone_ref(dir_files[fi]))
+        else:
+            files.push(with_str_clone_ref(target))
+    if files.len() > 1:
+        var lane = empty_build_graph_target()
+        lane.name = "with test"
+        lane.args = test_command_pass_through_args(argc)
+        return build_graph_run_test_files_pool(test_command_root(), &lane, test_running_compiler_path(), &files, true)
+    run_test_file(files[0], opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, keep_binary, filter)
+
+// The options each file's run takes: every argument that is not a test file
+// or directory, a value-taking option with its value.
+fn test_command_pass_through_args(argc: i32) -> Vec[str]:
+    var args: Vec[str] = Vec.new()
+    var i = 2
+    while i < argc:
+        let arg = with_arg_at(i)
+        if test_command_option_takes_value(arg) and i + 1 < argc:
+            args.push(arg)
+            args.push(with_arg_at(i + 1))
+            i = i + 2
+            continue
+        if arg.len() > 0 and arg[0] == 45: args.push(arg)
+        i = i + 1
+    args
+
+// Where the lane keeps its per-file captures (out/test-graph/…) and how its
+// verdict keys name a file: the working directory.
+fn test_command_root() -> str:
+    let cwd = with_getenv_str("PWD")
+    if cwd.len() == 0: "." else: cwd
 
 fn run_bench_file(target: &str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool, filter: &str) -> i32:
     let text = with_fs_read_file(target)
