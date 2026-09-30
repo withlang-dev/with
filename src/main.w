@@ -18,6 +18,7 @@ use Fmt
 use Lsp
 use CiPrint
 use CiMigrate
+use CImport
 use BuildGraphKinds
 use BuildGraphModel
 use BuildGraphMaterialize
@@ -4737,6 +4738,11 @@ fn run_migrate_command(argc: i32) -> i32:
     if argc < 3:
         eprint("usage: with migrate <file.c|dir/> [-o output] [-I include_dir] [-include header] [--exclude basename]")
         return 1
+    // #1915: the migrator parses C as c_import does (compiler.Frontend): on
+    // Windows x86_64 for the windows-gnu target against the C runtime the
+    // link reads; without it no system header is found.
+    if link_stage_windows_c_target_uses_sdk_libc():
+        ci_set_windows_target(link_stage_windows_c_target(), link_stage_windows_libc_root())
 
     // Hidden developer mode: run the CiIR/CiPrint roundtrip harness
     // and exit. Used by the cli-selfhost-ir-roundtrip test.

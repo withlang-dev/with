@@ -2941,6 +2941,13 @@ unsafe fn cimport_location_path_is_system(path: *const u8) -> i32:
         let resource_root = make_str(resource_dir).replace("\\", "/")
         let prefix = if resource_root.ends_with("/"): resource_root else: resource_root ++ "/"
         if normalized.starts_with(prefix): return 1
+    // The Windows C runtime this parse names as its sysroot (#1915): its
+    // headers are the system's, wherever the SDK or the compiler's own
+    // toolchain cache puts them.
+    if g_cimport_sysroot_arg_buf[0] != 0:
+        let sysroot = make_str((&raw const g_cimport_sysroot_arg_buf as *const [1100]u8 as i64 + 10) as *const u8).replace("\\", "/")
+        let root_prefix = if sysroot.ends_with("/"): sysroot else: sysroot ++ "/"
+        if normalized.starts_with(root_prefix): return 1
     if normalized.starts_with("/usr/"): return 1
     if normalized.starts_with("/Library/"): return 1
     if normalized.starts_with("/Applications/Xcode"): return 1
