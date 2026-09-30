@@ -20,6 +20,13 @@ extern fn with_vec_new_out(v: *mut u8, elem_size: i64) -> Unit
 @[effect(val: escape_value)]
 extern fn with_vec_push_str(v: *mut u8, val: str) -> Unit
 extern fn with_str_len(s: &str) -> i64
+extern fn with_exec_argv_capture_cwd(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32, cwd: &str) -> i32
+extern fn with_exec_argv_capture_spawn(args: &str, stdout_path: &str, stderr_path: &str) -> i32
+extern fn with_exec_try_wait(pid: i32) -> i32
+extern fn with_exec_wait(pid: i32, timeout_ms: i32) -> i32
+extern fn with_exec_child_maxrss() -> i64
+extern fn with_clock_nanos() -> i64
+extern fn with_nanosleep(ns: i64) -> i32
 
 /// Exit the process with the given status code.
 pub fn exit_code(code: i32) -> Never:
@@ -58,6 +65,56 @@ fn argv_blob(items: &Vec[str]) -> str:
 /// Execute an argument vector. The first item is the program name.
 pub fn run(argv: &Vec[str]) -> i32:
     with_exec_argv(argv_blob(argv))
+
+/// How a child run with its output sent to files finished.
+pub type Finished {
+    /// The exit code: 128 + the signal number when a signal ended it,
+    /// 127 when the program could not be started, -1 when it could not be
+    /// spawned or waited for.
+    code: i32,
+    /// The timeout ended it; the child and its process group were killed.
+    timed_out: bool,
+    /// The child's peak resident set size in bytes, 0 where the platform
+    /// reports none.
+    peak_rss: i64,
+}
+
+/// Run an argument vector with its stdout and stderr written to the named
+/// files, and wait for it. `timeout_ms` of 0 waits for as long as it runs.
+///
+/// The wait ends within 0.1% of the child's run time (and never later than
+/// 1 ms), so wall-clock timing around the call measures the child: a
+/// stopwatch, not a scheduler tick.
+pub fn run_to_files(argv: &Vec[str], stdout_path: &str, stderr_path: &str, timeout_ms: i32) -> Finished:
+    let pid = with_exec_argv_capture_spawn(argv_blob(argv), stdout_path, stderr_path)
+    if pid <= 0: return Finished { code: -1, timed_out: false, peak_rss: 0 }
+    if timeout_ms <= 0: return finished(with_exec_wait(pid, 0), false)
+    let start = with_clock_nanos()
+    let deadline = timeout_ms as i64 * 1000000
+    while true:
+        let code = with_exec_try_wait(pid)
+        if code != -2: return finished(code, false)
+        let elapsed = with_clock_nanos() - start
+        if elapsed >= deadline:
+            // The runtime's timed wait, already past due, kills the child's
+            // process group (TERM, then KILL) and reaps it.
+            let _ = with_exec_wait(pid, 1)
+            return finished(-1, true)
+        // Poll at a thousandth of the time run so far, between 20 µs and 1 ms.
+        var nap = elapsed / 1000
+        if nap < 20000: nap = 20000
+        if nap > 1000000: nap = 1000000
+        let _ = with_nanosleep(nap)
+    finished(-1, false)
+
+/// Run an argument vector from the directory `cwd`, with its stdout and
+/// stderr written to the named files, and wait for it however long it runs.
+pub fn run_to_files_in(cwd: &str, argv: &Vec[str], stdout_path: &str, stderr_path: &str) -> Finished:
+    finished(with_exec_argv_capture_cwd(argv_blob(argv), stdout_path, stderr_path, 0, cwd), false)
+
+// The peak comes from the reap; a child never reaped (-1, or killed at its
+// timeout) has none to report.
+fn finished(code: i32, timed_out: bool): Finished { code, timed_out, peak_rss: if code == -1: 0 else: with_exec_child_maxrss() }
 
 /// An argv-based command wrapper.
 pub type Command  {

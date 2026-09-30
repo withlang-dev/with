@@ -48,26 +48,25 @@ impl JsonWriter:
         return move owned.text
 
 fn json_escape_string(value: &str) -> str:
+    let digits = "0123456789abcdef"
     var out = ""
-    var i = 0
-    while i < value.len() as i32:
+    for i in 0..value.len():
         let ch = value[i]
-        if ch == 34:
-            out = out ++ "\\\""
-        else if ch == 92:
-            out = out ++ "\\\\"
-        else if ch == 10:
-            out = out ++ "\\n"
-        else if ch == 13:
-            out = out ++ "\\r"
-        else if ch == 9:
-            out = out ++ "\\t"
-        else:
-            out = out ++ value.slice(i as i64, (i + 1) as i64)
-        i = i + 1
+        if ch == '"': out = out ++ "\\\""
+        else if ch == '\\': out = out ++ "\\\\"
+        else if ch == '\n': out = out ++ "\\n"
+        else if ch == '\r': out = out ++ "\\r"
+        else if ch == '\t': out = out ++ "\\t"
+        else if ch < 32:
+            // Every other control character (RFC 8259 §7): a raw one, such
+            // as the ESC of a terminal color code, is invalid JSON.
+            out = out ++ "\\u00" ++ digits.slice(ch / 16, ch / 16 + 1) ++ digits.slice(ch % 16, ch % 16 + 1)
+        else: out = out ++ value.slice(i, i + 1)
     out
 
-fn json_quote(value: &str) -> str:
+/// A string as a JSON string literal: quoted, with `"`, `\` and every
+/// control character escaped.
+pub fn json_quote(value: &str) -> str:
     "\"" ++ json_escape_string(value) ++ "\""
 
 impl JsonWriter:
