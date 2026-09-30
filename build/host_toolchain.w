@@ -400,26 +400,43 @@ pub fn run_no_host_toolchain_action(ctx: ActionCtx) -> i32:
         let tools_argv: Vec[str] = Vec.new()
         tools_argv.push(compiler.clone())
         tools_argv.push("__sdk-tools")
-        // The Linux compiler carries no cmake/ninja yet (build/sdk.w
-        // run_sdk_build_tools_pack_action is macOS's): a gap of this slice,
-        // named in the verdict, not a pass.
-        if linux:
-            verdict = verdict ++ "SDK cmake/ninja: not carried on Linux yet\n"
+        let tools = ctx.process_runner().run_capture(ht_sandboxed(profile, home, tools_argv), ht_join(root, ht_join(scratch, "sdk-tools.stdout")), ht_join(root, ht_join(scratch, "sdk-tools.stderr")), 300000)
+        let tools_dir = ht_trim(tools.stdout.replace("\n", ""))
+        if tools.rc != 0 or tools_dir.len() == 0:
+            problems.push(f"`with __sdk-tools` failed (exit {tools.rc}): " ++ tools.stdout ++ tools.stderr)
         else:
-            let tools = ctx.process_runner().run_capture(ht_sandboxed(profile, home, tools_argv), ht_join(root, ht_join(scratch, "sdk-tools.stdout")), ht_join(root, ht_join(scratch, "sdk-tools.stderr")), 300000)
-            let tools_dir = ht_trim(tools.stdout.replace("\n", ""))
-            if tools.rc != 0 or tools_dir.len() == 0:
-                problems.push(f"`with __sdk-tools` failed (exit {tools.rc}): " ++ tools.stdout ++ tools.stderr)
+            for tool in ["cmake", "ninja"]:
+                let run_tool: Vec[str] = Vec.new()
+                run_tool.push(tools_dir ++ "/bin/" ++ tool)
+                run_tool.push("--version")
+                let ran_tool = ctx.process_runner().run_capture(ht_sandboxed(profile, home, run_tool), ht_join(root, ht_join(scratch, tool ++ ".stdout")), ht_join(root, ht_join(scratch, tool ++ ".stderr")), 60000)
+                if ran_tool.rc != 0 or ran_tool.stdout.len() == 0:
+                    problems.push("the SDK's " ++ tool ++ f" the compiler carries does not run (exit {ran_tool.rc}): " ++ ran_tool.stderr)
+                else:
+                    verdict = verdict ++ "SDK " ++ tool ++ " runs from the compiler's cache\n"
+        // `with cc` compiles and links C with the compiler's own clang, lld and
+        // sysroot (what `with get` builds a package from source with).
+        let cc_source = "test/host_toolchain/cc_hello.c"
+        let cc_binary = ht_join(root, ht_join(scratch, "cc_hello"))
+        let cc_argv: Vec[str] = Vec.new()
+        cc_argv.push(compiler.clone())
+        cc_argv.push("cc")
+        cc_argv.push(ht_join(root, cc_source))
+        cc_argv.push("-o")
+        cc_argv.push(cc_binary.clone())
+        cc_argv.push("-lm")
+        let cc_built = ctx.process_runner().run_capture(ht_sandboxed(profile, home, cc_argv), ht_join(root, ht_join(scratch, "cc_hello.build.stdout")), ht_join(root, ht_join(scratch, "cc_hello.build.stderr")), 600000)
+        if cc_built.rc != 0:
+            problems.push(cc_source ++ f": `with cc` failed with no host toolchain in reach (exit {cc_built.rc}):\n" ++ cc_built.stdout ++ cc_built.stderr)
+        else:
+            let cc_run: Vec[str] = Vec.new()
+            cc_run.push(cc_binary.clone())
+            let cc_ran = ctx.process_runner().run_capture(ht_sandboxed(profile, home, cc_run), ht_join(root, ht_join(scratch, "cc_hello.run.stdout")), ht_join(root, ht_join(scratch, "cc_hello.run.stderr")), 60000)
+            let cc_expected = ht_expected_stdout(fs.read_text(cc_source))
+            if cc_ran.rc != 0 or cc_ran.stdout != cc_expected:
+                problems.push(cc_source ++ f": the program exited {cc_ran.rc} printing:\n" ++ cc_ran.stdout ++ cc_ran.stderr ++ "expected:\n" ++ cc_expected)
             else:
-                for tool in ["cmake", "ninja"]:
-                    let run_tool: Vec[str] = Vec.new()
-                    run_tool.push(tools_dir ++ "/bin/" ++ tool)
-                    run_tool.push("--version")
-                    let ran_tool = ctx.process_runner().run_capture(ht_sandboxed(profile, home, run_tool), ht_join(root, ht_join(scratch, tool ++ ".stdout")), ht_join(root, ht_join(scratch, tool ++ ".stderr")), 60000)
-                    if ran_tool.rc != 0 or ran_tool.stdout.len() == 0:
-                        problems.push("the SDK's " ++ tool ++ f" the compiler carries does not run (exit {ran_tool.rc}): " ++ ran_tool.stderr)
-                    else:
-                        verdict = verdict ++ "SDK " ++ tool ++ " runs from the compiler's cache\n"
+                verdict = verdict ++ cc_source ++ ": `with cc` built it and it ran with no host toolchain\n"
         for i in 0..fixtures.len() as i32:
             let source = fixtures[i]
             let name = names[i].clone()
