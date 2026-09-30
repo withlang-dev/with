@@ -16,6 +16,7 @@ use build.sdk
 use build.wo
 use build.examples
 use build.tools_lane
+use build.benchmarks
 use build.host_toolchain
 use std.sysinfo
 fn build_owned_text(s: &str): s ++ ""
@@ -782,7 +783,7 @@ fn gate_fixed_targets() -> Vec[str]:
     // Built by push: the pinned seed evaluating build.w cannot take .len() of a
     // collection literal (the #1122 class).
     var fixed: Vec[str] = Vec.new()
-    for name in "build selfcheck reseed-check-build-w abi-hash-check unit-return-review spec-inventory-check examples-tests c-migrator-basic-tests deep-debug-tool-tests user-programs-safe no-host-toolchain".split(" "): fixed.push(name.clone())
+    for name in "build selfcheck reseed-check-build-w abi-hash-check unit-return-review spec-inventory-check examples-tests benchmarks-check c-migrator-basic-tests deep-debug-tool-tests user-programs-safe no-host-toolchain".split(" "): fixed.push(name.clone())
     fixed
 
 fn gate_times_ledger_path() -> str: "out/.build-state/battery-times.tsv"
@@ -3713,6 +3714,17 @@ pub fn build(ctx: BuildCtx) -> Build:
     tools_tests = tools_tests.input("tools")
     tools_tests = tools_tests.dep("build")
     out = out.add_target(tools_tests)
+
+    // The benchmarks lane: every benchmarks/workloads/*/*.w and the runner,
+    // benchmarks/run.w, are checked (never built or run) with the release
+    // compiler, so a benchmark that stops compiling fails the gate.
+    var benchmarks_check = target_new(.Action, "benchmarks-check", "").output("out/test-graph/benchmarks-check")
+    benchmarks_check = benchmarks_check.allow_parallel()
+    benchmarks_check.action = run_benchmarks_check_action
+    benchmarks_check = benchmarks_check.input(release_compiler_bin("with"))
+    benchmarks_check = benchmarks_check.input("benchmarks")
+    benchmarks_check = benchmarks_check.dep("build")
+    out = out.add_target(benchmarks_check)
 
     // The battery is driven by the PUBLISHED seed pinned in seed.lock, as CI
     // is (build/retention.w): the driver's digest must be the lock's, and
