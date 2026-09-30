@@ -35,8 +35,13 @@ runs:
       run: |
         set -euo pipefail
         exe=""
-        if [[ "$RUNNER_OS" == Windows ]]; then
-          exe=".exe"
+        [[ "$RUNNER_OS" == Windows ]] && exe=".exe"
+        # windows-x86_64 is windows-gnu (#1915): it reads nothing but our SDK,
+        # never a runner LLVM, Visual Studio or Chocolatey tool (D81).
+        # windows-aarch64 keeps the Visual Studio-built recipe until its slice.
+        gnu_windows=0
+        [[ "$RUNNER_OS" == Windows && "$RUNNER_ARCH" == X64 ]] && gnu_windows=1
+        if [[ "$RUNNER_OS" == Windows && $gnu_windows == 0 ]]; then
           export PATH="/c/Program Files/LLVM/bin:$PATH"
           command -v ninja >/dev/null 2>&1 || choco install ninja -y --no-progress >/dev/null
         fi
@@ -48,16 +53,19 @@ runs:
           if [[ "$tool" == cmake ]]; then
             ls -d "$asset"/share/cmake-*/Modules >/dev/null 2>&1 || return 1
             # Ninja's RC dependency scanner (see the seed copy below).
-            [[ "$RUNNER_OS" != Windows || -f "$asset/bin/cmcldeps$exe" ]] || return 1
+            [[ "$RUNNER_OS" != Windows || $gnu_windows == 1 || -f "$asset/bin/cmcldeps$exe" ]] || return 1
           fi
           return 0
         }
         need=0
         bootstrap_tools="clang clang++ cmake ninja"
-        [[ "$RUNNER_OS" == Windows ]] && bootstrap_tools="$bootstrap_tools clang-cl lld-link"
-        # LLVM's BLAKE3 on x86_64 Windows is MASM; sdk.w assembles it with the
-        # bootstrap's llvm-ml64 (its packaging contract refuses anything else).
-        [[ "$RUNNER_OS" == Windows && "$RUNNER_ARCH" == X64 ]] && bootstrap_tools="$bootstrap_tools llvm-ml64"
+        # windows-gnu bootstraps from its own lld and archiver (build/sdk.w
+        # sdk_bootstrap_set); the Visual Studio recipe from clang-cl.
+        if [[ $gnu_windows == 1 ]]; then
+          bootstrap_tools="$bootstrap_tools lld-link ld.lld llvm-ar llvm-ranlib"
+        elif [[ "$RUNNER_OS" == Windows ]]; then
+          bootstrap_tools="$bootstrap_tools clang-cl lld-link"
+        fi
         for tool in $bootstrap_tools; do
           usable "$tool" || need=1
         done
@@ -65,6 +73,10 @@ runs:
           echo "SDK_BOOTSTRAP_PREFIX=$asset" >> "$GITHUB_ENV"
           echo "source-sdk: the fetched SDK bootstraps itself ($asset)"
           exit 0
+        fi
+        if [[ $gnu_windows == 1 ]]; then
+          echo "source-sdk: the pinned windows-x86_64 SDK ($asset) cannot bootstrap the next SDK, and nothing but our SDK is ever seeded from (D81): pin a windows-gnu SDK built by :sdk-package (sdk.lock)" >&2
+          exit 1
         fi
         # Generation zero: a separate seed prefix holding only links to the
         # runner's tools; the fetched SDK stays untouched.
@@ -164,7 +176,11 @@ runs:
         if [[ "$RUNNER_OS" == macOS ]]; then
           export SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
         fi
-        if [[ "$RUNNER_OS" == Windows ]]; then
+        if [[ "$RUNNER_OS" == Windows && "$RUNNER_ARCH" == X64 ]]; then
+          # windows-gnu (#1915): the SDK's own C runtime; no Visual Studio.
+          ./src/main.exe build :dev
+          export WITH="$(cygpath -m "$PWD/out/bootstrap/bin/with-stage1.exe")"
+        elif [[ "$RUNNER_OS" == Windows ]]; then
           export INCLUDE="$WITH_WINDOWS_MSVC_INCDIR;$WITH_WINDOWS_UCRT_INCDIR;$WITH_WINDOWS_SHARED_INCDIR;$WITH_WINDOWS_UM_INCDIR"
           export LIB="$WITH_WINDOWS_MSVC_LIBDIR;$WITH_WINDOWS_UCRT_LIBDIR;$WITH_WINDOWS_UM_LIBDIR"
           kit="${WITH_WINDOWS_UCRT_INCDIR%/Include/*}"
