@@ -260,6 +260,9 @@ impl Sema:
                 let _ = self.check_expr_with_owned_demand(self.ast.get_extra(extra_start), self.vector_element_type(base_ty) as TypeId)
                 return self.record_vector_op(node, VectorOp.SPLAT, base_ty)
             if not self.is_vector_type(base_ty):
+                if method == "from_bits":
+                    self.emit_error(f"`{type_text}.from_bits` is refused: a true lane from bits could be `1` or `-1`, two meanings (§4.3d); build the mask from a comparison, `{type_text}(...)` or `{type_text}.splat(b)`", callee)
+                    return 0
                 self.emit_error(f"`{type_text}` has no associated function `{method}`; a mask is built with `{type_text}(...)` or `{type_text}.splat(b)` (§4.3d)", callee)
                 return 0
             if method == "from_bits":
@@ -312,27 +315,55 @@ impl Sema:
     // comparison yields.
     mut fn check_vector_select(node: i32, m_ty: i32, extra_start: i32, arg_count: i32) -> i32:
         if arg_count != 2:
-            self.emit_error("select takes two vectors: `m.select(a, b)` (§4.3d)", node)
+            self.emit_error("select takes two operands: `m.select(a, b)` (§4.3d)", node)
             return 0
         let a_node = self.ast.get_extra(extra_start)
         let b_node = self.ast.get_extra(extra_start + 1)
-        let a_exact = self.check_expr_value_context(a_node) as i32
-        let a_ty = self.vector_value_type(a_node, a_exact)
-        if a_ty == 0: return 0
-        if not self.is_vector_type(a_ty):
-            self.emit_error(f"select picks between two vectors, not `{self.type_name(a_ty)}` (§4.3d)", a_node)
+        // D80 amendment (v7.16): a scalar `a` or `b` broadcasts as an
+        // operator's scalar operand does — the vector type comes from the
+        // other operand or from the context; two scalars with no vector
+        // context have no one meaning and are refused.
+        var vec_ty = if self.has_expected_type != 0 and self.is_vector_type(self.expected_expr_type as i32): self.expected_expr_type as i32 else: 0
+        var a_ty = 0
+        var b_ty = 0
+        if vec_ty == 0 and not self.expr_is_untyped_literal_arith(a_node):
+            let a_exact = self.check_expr_value_context(a_node) as i32
+            a_ty = self.vector_value_type(a_node, a_exact)
+            if a_ty == 0: return 0
+            if self.is_vector_type(a_ty): vec_ty = a_ty
+        if vec_ty == 0 and not self.expr_is_untyped_literal_arith(b_node):
+            let b_exact = self.check_expr_value_context(b_node) as i32
+            b_ty = self.vector_value_type(b_node, b_exact)
+            if b_ty == 0: return 0
+            if self.is_vector_type(b_ty): vec_ty = b_ty
+        if vec_ty == 0:
+            self.emit_error("`m.select(a, b)` needs a vector: a scalar operand broadcasts only beside a vector operand or where the context gives the vector type (§4.3d)", node)
             return 0
-        let b_exact = self.check_expr_with_expected(b_node, a_ty as TypeId) as i32
-        let b_ty = self.vector_value_type(b_node, b_exact)
-        if b_ty == 0: return 0
-        if not self.types_identical(a_ty, b_ty):
-            self.emit_error(f"select picks between two vectors of one type, not `{self.type_name(a_ty)}` and `{self.type_name(b_ty)}` (§4.3d)", b_node)
+        if a_ty == 0:
+            let a_exact2 = self.check_expr_with_expected(a_node, vec_ty as TypeId) as i32
+            a_ty = self.vector_value_type(a_node, a_exact2)
+        if b_ty == 0:
+            let b_exact2 = self.check_expr_with_expected(b_node, vec_ty as TypeId) as i32
+            b_ty = self.vector_value_type(b_node, b_exact2)
+        if a_ty == 0 or b_ty == 0: return 0
+        if not self.select_operand_ok(a_node, a_ty, vec_ty) or not self.select_operand_ok(b_node, b_ty, vec_ty):
             return 0
-        let want_mask = self.vector_compare_mask_type(a_ty)
+        let want_mask = self.vector_compare_mask_type(vec_ty)
         if not self.types_identical(m_ty, want_mask):
-            self.emit_error(f"select over `{self.type_name(a_ty)}` takes a `{self.type_name(want_mask)}` mask, not `{self.type_name(m_ty)}` (§4.3d)", node)
+            self.emit_error(f"select over `{self.type_name(vec_ty)}` takes a `{self.type_name(want_mask)}` mask, not `{self.type_name(m_ty)}` (§4.3d)", node)
             return 0
-        self.record_vector_op(node, VectorOp.SELECT, a_ty)
+        self.record_vector_op(node, VectorOp.SELECT, vec_ty)
+
+    // One operand of `m.select(a, b)` against the vector type: the vector
+    // itself, or a scalar that broadcasts (a literal already splatted).
+    mut fn select_operand_ok(node: i32, ty: i32, vec_ty: i32) -> bool:
+        if self.is_vector_type(ty):
+            if self.types_identical(ty, vec_ty): return true
+            self.emit_error(f"select picks between two vectors of one type, not `{self.type_name(ty)}` and `{self.type_name(vec_ty)}` (§4.3d)", node)
+            return false
+        if not self.vector_scalar_operand_ok(node, ty, vec_ty, false): return false
+        self.vector_splats.insert(node, vec_ty)
+        true
 
     // A method on a vector or mask value: `.all()`, `.any()`, the
     // reductions, `.bits()`. -1 when `field` is none of them.
@@ -346,6 +377,9 @@ impl Sema:
             if name == "select": return self.check_vector_select(node, recv_ty, self.ast.get_data1(node), arg_count)
             if name == "all": op = VectorOp.ALL as i32
             else if name == "any": op = VectorOp.ANY as i32
+            else if name == "bits":
+                self.emit_error(f"`{type_text}.bits()` is refused: a true lane read as bits is `1` or `-1`, two meanings (§4.3d); read lanes with `m[i]` or pick with `m.select(a, b)`", node)
+                return 0
             else: return -1
         else:
             if name == "reduce_add": op = VectorOp.REDUCE_ADD as i32
@@ -376,9 +410,18 @@ impl Sema:
     // swizzles, for N ≤ 4. -1 when `field` is no component spelling.
     mut fn check_vector_swizzle(node: i32, recv_node: i32, recv_ty0: i32, field: i32) -> i32:
         let recv_ty = self.vector_value_type(recv_node, recv_ty0)
-        if not self.is_vector_type(recv_ty): return -1
         let name = self.pool_resolve_symbol(field).clone()
         if name.len() == 0: return -1
+        if self.is_mask_type(recv_ty):
+            var components = true
+            for mi in 0..name.len() as i32:
+                let mc = name[mi]
+                if mc != 'x' and mc != 'y' and mc != 'z' and mc != 'w': components = false
+            if components:
+                self.emit_error(f"`.{name}` on the mask `{self.type_name(recv_ty)}` is refused: a mask's lanes are `m[i]` (§4.3d)", node)
+                return 0
+            return -1
+        if not self.is_vector_type(recv_ty): return -1
         var lanes = ""
         for ci in 0..name.len() as i32:
             let c = name[ci]
@@ -483,6 +526,9 @@ impl Sema:
         if op == BinaryOp.OP_AND or op == BinaryOp.OP_OR:
             self.emit_error(f"`{sema_operator_symbol_text(op)}` short-circuits, and the lanes of `{type_text}` cannot; combine masks with `&` or `|` (§4.3d)", node)
             return 0
+        if op == BinaryOp.OP_EQ or op == BinaryOp.OP_NEQ:
+            self.emit_error(f"`{sema_operator_symbol_text(op)}` on masks is refused: it could mean one `bool` for the whole mask or a lane-wise mask (§4.3d); spell `(m ^ n).any()` or `not (m ^ n)`", node)
+            return 0
         if op != BinaryOp.OP_BIT_AND and op != BinaryOp.OP_BIT_OR and op != BinaryOp.OP_BIT_XOR:
             self.emit_error(f"operator '{sema_operator_symbol_text(op)}' is not defined on a mask; masks combine with `&`, `|`, `^` and `not`, and `.select`, `.all()` and `.any()` read one (§4.3d)", node)
             return 0
@@ -539,6 +585,9 @@ impl Sema:
         let operand = self.vector_value_type(operand_node, operand0)
         if self.is_mask_type(operand):
             // `not m` negates each lane (D80); nothing else is unary on a mask.
+            if op == UnaryOp.UOP_BIT_NOT:
+                self.emit_error("`~m` is refused: `not m` is the one spelling that negates a mask's lanes (§4.3d)", node)
+                return 0
             if op != UnaryOp.UOP_NOT:
                 self.emit_error("a mask is negated with `not m`; no other unary operator is defined on it (§4.3d)", node)
                 return 0
@@ -562,6 +611,14 @@ impl Sema:
 
     // §4.3d: a literal in a vector context broadcasts to every lane. The
     // literal takes the lane type; the node's value is the vector.
+    // §4.3d (v7.16): a `bool` literal in a mask context broadcasts
+    // (`let m: m32x4 = true`); the mask type, or 0.
+    fn mask_literal_context(node: i32) -> i32:
+        if self.has_expected_type == 0 or self.expected_expr_type == 0: return 0
+        let expected = self.expected_expr_type as i32
+        if not self.is_mask_type(expected): return 0
+        expected
+
     mut fn vector_literal_context_lane(node: i32) -> i32:
         if self.has_expected_type == 0 or self.expected_expr_type == 0: return 0
         let expected = self.expected_expr_type as i32
@@ -605,6 +662,9 @@ impl Sema:
         // `m as m8x4` converts a mask's width (D80).
         if self.is_mask_type(src) and self.is_mask_type(target) and self.vector_lane_count(src) == self.vector_lane_count(target):
             return target
+        if self.is_mask_type(src) != self.is_mask_type(target) and self.is_vector_or_mask_type(src) and self.is_vector_or_mask_type(target):
+            self.emit_error(f"a cast between the mask and vector `{self.type_name(src)}` and `{self.type_name(target)}` is refused: a true lane could be `1` or `-1`, two meanings (§4.3d); use `m.select(a, b)`", node)
+            return 0
         self.emit_error(f"`as` converts a vector lane-wise to a vector of the same lane count, not `{self.type_name(src)}` to `{self.type_name(target)}`; `.bits()` reinterprets the bytes (§4.3d)", node)
         0
 

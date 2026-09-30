@@ -1,6 +1,6 @@
-# The With ABI (version 8)
+# The With ABI (version 9)
 
-Status: DRAFT v8 (2026-09-28), the convention as the compiler implements
+Status: DRAFT v9 (2026-09-30), the convention as the compiler implements
 it today, written down so `.wo` bundles (decisions.md D38,
 `docs/spec/toolchain/wo_bundles.md`) can depend on it. Nothing here is a new rule. The
 sources named in §7 define the ABI; this document describes them, and at
@@ -56,6 +56,16 @@ a With value type, not as a contract With makes with another language.
   a `repr` lower to that integer.
 - **Tuples** lay out as structs of their elements.
 - **Generic instantiations** lay out as the instantiated struct/enum.
+- **SIMD vectors and masks** (spec §4.3d): `Vector[N, T]` is LLVM
+  `<N x T>`; `Mask[N, W]` is `<N x iW>`, each lane all ones (true) or zero
+  (false). Size is `N × size(T)` (a mask: `N × W/8`) rounded up to a power
+  of two, so `Vector[3, f32]` is 16 bytes. Alignment is the target's for
+  that shape, as clang lays out `vector_size` / `ext_vector_type`: the size
+  on x86_64 and WebAssembly, and at most 16 bytes on AArch64
+  (`TypeLayout.type_layout_vector_bytes`, `type_layout_vector_align`). A
+  struct holding a vector whose TypeLayout alignment is below LLVM's (a
+  vector over 16 bytes on AArch64) is emitted as a packed body with explicit
+  padding, so the field sits where C puts it.
 
 ## 3. The built-in value types (the runtime's headers)
 
@@ -95,6 +105,15 @@ and every call site (D6; `docs/spec/abi/fn_abi_descriptor_design.md`):
 | `&T` / `&mut T` (explicit reference) | reference value | pointer word |
 | receiver `mut self` (in-place), compiler-modeled borrowed places | IndirectPlace (`SHARE-PLACE` in `--dump-abi`) | pointer to the caller's place |
 | `[]T` slices, `&str` views | Fat | `{ ptr, len }` by value (indirect under the Windows x86_64 rule below) |
+
+A vector or mask is passed and returned as its LLVM vector value under
+With's own convention. At a C boundary (an `extern fn`, a `c_import`
+declaration, a C callable type) it follows the target's C rule, checked
+against clang's IR: up to 16 bytes in a vector register everywhere; larger,
+AAPCS64 (Darwin and Linux) passes a pointer to a caller-made copy and
+returns through `sret`, SysV x86_64 passes it `byval` in memory and returns
+it by value, and Windows x86_64 leaves both to LLVM's vector lowering
+(`fn_abi_c_vector_param_indirect`, `fn_abi_c_vector_return_indirect`).
 
 Return values are returned by LLVM value of the return type. One target
 exception, applied by the compiler on both sides: on windows-x86_64 a
@@ -186,6 +205,13 @@ layout change there is caught by the `wo-drift` lane, not by this check.
 
 ## Version history
 
+- **v9** (2026-09-30): SIMD vectors and masks (spec §4.3d, D78/D80; #1874):
+  `Vector[N, T]` and `Mask[N, W]` lay out as `<N x T>` / `<N x iW>`, size
+  rounded up to a power of two, alignment the target's (capped at 16 bytes
+  on AArch64), a record holding an over-aligned-in-LLVM vector packed with
+  explicit padding (§2). A vector crossing a C boundary takes the target's
+  C vector rule (§4). No existing layout changes; the version marks the new
+  types a bundle may expose.
 - **v8** (2026-09-28): a shared `&str` is a view value, `{ ptr, len }` with
   str's layout (16 bytes, align 8), passed and returned by value like a
   slice; it had been a pointer to a str header (§1, §3; spec §4.8a, #1810).

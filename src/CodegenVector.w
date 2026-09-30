@@ -357,7 +357,7 @@ impl Codegen:
 
     // The SIMD_* intrinsic calls MirVector emits. False for any other.
     mut fn mir_emit_vector_intrinsic_call(body: &MirBody, intrinsic: MirIntrinsic, args_id: i32, dest_place: i32, next_bb: i32) -> bool:
-        let is_simd = intrinsic == MirIntrinsic.SIMD_BITCAST or intrinsic == MirIntrinsic.SIMD_SELECT or intrinsic == MirIntrinsic.SIMD_ALL or intrinsic == MirIntrinsic.SIMD_ANY or intrinsic == MirIntrinsic.SIMD_MASK_LANE or
+        let is_simd = intrinsic == MirIntrinsic.SIMD_BITCAST or intrinsic == MirIntrinsic.SIMD_SELECT or intrinsic == MirIntrinsic.SIMD_ALL or intrinsic == MirIntrinsic.SIMD_ANY or intrinsic == MirIntrinsic.SIMD_MASK_LANE or intrinsic == MirIntrinsic.SIMD_MASK_LANE_SET or
             intrinsic == MirIntrinsic.SIMD_REDUCE_ADD or intrinsic == MirIntrinsic.SIMD_REDUCE_MUL or intrinsic == MirIntrinsic.SIMD_REDUCE_MIN or intrinsic == MirIntrinsic.SIMD_REDUCE_MAX or
             intrinsic == MirIntrinsic.SIMD_REDUCE_AND or intrinsic == MirIntrinsic.SIMD_REDUCE_OR or intrinsic == MirIntrinsic.SIMD_REDUCE_XOR
         if not is_simd: return false
@@ -371,7 +371,7 @@ impl Codegen:
             let on = self.mir_intrinsic_arg(body, args_id, 1)
             let off = self.mir_intrinsic_arg(body, args_id, 2)
             result = wl_build_select(self.builder, self.cg_mask_to_bits(a), on, off)
-        else if intrinsic == MirIntrinsic.SIMD_MASK_LANE:
+        else if intrinsic == MirIntrinsic.SIMD_MASK_LANE or intrinsic == MirIntrinsic.SIMD_MASK_LANE_SET:
             let idx = self.mir_intrinsic_arg(body, args_id, 1)
             let i64_ty = wl_i64_type(self.context)
             let idx64 = if wl_get_int_type_width(wl_type_of(idx)) < 64: wl_build_sext(self.builder, idx, i64_ty) else: idx
@@ -383,8 +383,14 @@ impl Codegen:
                 wl_position_at_end(self.builder, panic_bb)
                 self.emit_runtime_panic("index out of bounds")
                 wl_position_at_end(self.builder, ok_bb)
-            let lane = wl_build_extract_element(self.builder, a, idx64)
-            result = wl_build_icmp(self.builder, wl_int_ne(), lane, wl_const_int(wl_type_of(lane), 0, 0))
+            if intrinsic == MirIntrinsic.SIMD_MASK_LANE:
+                let lane = wl_build_extract_element(self.builder, a, idx64)
+                result = wl_build_icmp(self.builder, wl_int_ne(), lane, wl_const_int(wl_type_of(lane), 0, 0))
+            else:
+                // A true lane is all ones, a false lane zero.
+                let flag = self.mir_intrinsic_arg(body, args_id, 2)
+                let lane_value = wl_build_sext(self.builder, flag, wl_get_element_type(a_ty))
+                result = wl_build_insert_element(self.builder, a, lane_value, idx64)
         else if intrinsic == MirIntrinsic.SIMD_ALL or intrinsic == MirIntrinsic.SIMD_ANY:
             let bits = self.cg_mask_to_bits(a)
             let overloads: Vec[i64] = Vec.new()

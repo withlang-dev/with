@@ -8340,6 +8340,12 @@ impl Sema:
             return self.ty_f64
 
         if kind == NodeKind.NK_BOOL_LIT:
+            // §4.3d (v7.16): a `bool` literal in a mask context broadcasts.
+            let splat_mask = self.mask_literal_context(node)
+            if splat_mask != 0:
+                self.typed_expr_types.insert(node, self.ty_bool as i32)
+                self.vector_splats.insert(node, splat_mask)
+                return splat_mask as TypeId
             return self.ty_bool
 
         if kind == NodeKind.NK_STRING_LIT:
@@ -14166,11 +14172,6 @@ impl Sema:
         // multi-lane swizzle write is not specified.
         if self.ast.kind(target) == NodeKind.NK_FIELD_ACCESS and self.vector_ops.contains(target) and self.vector_swizzle_width(target) != 1:
             self.emit_error("a multi-lane swizzle is read, not assigned; write each lane (`v.x = a`, `v[i] = x`) (§4.3d)", target)
-            return 0
-        // D80 reads a mask lane (`m[i]` is a bool); writing one is not
-        // specified.
-        if self.ast.kind(target) == NodeKind.NK_INDEX and (self.vector_ops.get(target) ?? 0) == VectorOp.MASK_LANE as i32:
-            self.emit_error("a mask lane is read with `m[i]`; writing one is not specified (§4.3d) — build the mask from a comparison or `Mask(...)`", target)
             return 0
         let target_type = self.assignment_target_value_type(target, target_exact_type as i32)
         let value_type = if target_type != 0: self.check_expr_with_owned_demand(value, target_type) else: self.check_expr(value)
@@ -30621,8 +30622,8 @@ impl Sema:
         while tk == TypeKind.TY_REF:
             resolved = self.resolve_alias(self.get_type_d0(resolved) as TypeId)
             tk = self.get_type_kind(resolved)
-        // §4.3d: `v[i] = x` writes lane i.
-        if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE or tk == TypeKind.TY_VECTOR:
+        // §4.3d: `v[i] = x` and (v7.16) `m[i] = b` write lane i.
+        if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE or tk == TypeKind.TY_VECTOR or tk == TypeKind.TY_MASK:
             return 1
         if tk == TypeKind.TY_GENERIC_INST:
             let base_sym = self.get_type_d0(resolved)

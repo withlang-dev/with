@@ -6604,6 +6604,9 @@ impl MirBuilder:
     // view of the place) — read after the store (read_assigned_place); 0 for
     // a statement, and -1 is returned.
     mut fn lower_assign(place_expr: i32, rhs_expr: i32, read_back: i32) -> i32:
+        // §4.3d (v7.16): `m[i] = b` rewrites the mask with lane i set.
+        if self.ast.kind(place_expr) == NodeKind.NK_INDEX and (self.sema.vector_ops.get(place_expr) ?? 0) == VectorOp.MASK_LANE as i32:
+            return self.lower_mask_lane_write(place_expr, rhs_expr, read_back)
         // Multi-index assignment: a[i, j] = value → call multi_index_set
         if self.ast.kind(place_expr) == NodeKind.NK_MULTI_INDEX or self.is_runtime_pair_multi_index(place_expr) != 0:
             // Sema types a multi-index store Unit (check_assign), so it is

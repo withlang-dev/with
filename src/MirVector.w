@@ -173,6 +173,34 @@ impl MirBuilder:
         let lane = (lanes_text[0] - '0') as i32
         self.vector_lane_place(base, lane, self.sema.vector_lane_type(base_ty), self.ast.get_start(node))
 
+    // `m[i] = b`: the mask place gets the mask with lane i set to b. A mask
+    // lane is W bits holding a bool, so it is written as a whole-mask
+    // store, not through a lane place.
+    mut fn lower_mask_lane_write(place_expr: i32, rhs_expr: i32, read_back: i32) -> i32:
+        let span = self.ast.get_start(place_expr)
+        let base_expr = self.ast.get_data0(place_expr)
+        var base = self.lower_expr_place(base_expr)
+        var base_ty = self.expr_type(base_expr)
+        let physical_ty = self.place_local_type(base)
+        if physical_ty != 0 and physical_ty != self.sema.ty_void as i32:
+            base_ty = physical_ty
+        while base_ty > 0 and self.sema.get_type_kind(self.sema.resolve_alias(base_ty as TypeId)) == TypeKind.TY_REF:
+            base = self.new_deref_place(base)
+            base_ty = self.sema.get_type_d0(self.sema.resolve_alias(base_ty as TypeId))
+        let args: Vec[i32] = Vec.new()
+        let idx = self.lower_expr(self.ast.get_data1(place_expr))
+        let value = self.lower_expr(rhs_expr)
+        args.push(self.body.new_operand(OperandKind.OK_COPY, base))
+        args.push(idx)
+        args.push(value)
+        let updated = self.lower_vector_intrinsic(MirIntrinsic.SIMD_MASK_LANE_SET, args, base_ty, place_expr)
+        self.assign_operand_to_place(base, updated, span)
+        if read_back != 0:
+            // A mask lane is no place to read back from (Sema types the
+            // assignment Unit); post-Sema this is a compiler bug.
+            self.mark_unsupported()
+        -1
+
     // `v.x` reads lane 0; `v.wzyx` builds the vector of the named lanes.
     mut fn lower_vector_swizzle(node: i32, ty: i32, span: i32) -> i32:
         let lanes_text = self.sema.vector_swizzles.get(node).unwrap().clone()
