@@ -140,6 +140,7 @@ let CXK_MEMBER_REF: i32 = 102
 let CXK_CALL_EXPR: i32 = 103
 let CXK_ARRAY_SUBSCRIPT: i32 = 113
 let CXK_INIT_LIST: i32 = 119
+let CXK_STMT_EXPR: i32 = 121
 let CXK_UNARY_EXPR: i32 = 136
 let CXK_COMPOUND_LITERAL: i32 = 118
 let CXK_VAR_DECL: i32 = 9
@@ -222,6 +223,7 @@ let UO_PRE_INC: i32 = 7
 let UO_PRE_DEC: i32 = 8
 let UO_POST_INC: i32 = 9
 let UO_POST_DEC: i32 = 10
+let UO_EXTENSION: i32 = 11
 
 // Process a c_import header spec and return synthetic .w source text.
 // Returns "" if the bridge is unavailable or parsing fails.
@@ -414,6 +416,10 @@ fn ci_infer_macro_return_type_from_expr(type_session: i64, translated: &str, kno
     for suffix in ["i64", "u64", "u32"]:
         if stripped.ends_with(suffix) and ci_is_int_literal(stripped.slice(0, stripped.len() - suffix.len())):
             return with_str_clone_ref(suffix)
+    // An operator over typed operands has C's common type (#1911).
+    let operator_type = ci_translated_int_type(translated)
+    if operator_type.len() > 0:
+        return operator_type
     let cast_type = ci_infer_cast_return_type(translated)
     if cast_type.len() > 0:
         return cast_type
@@ -3502,6 +3508,13 @@ pub fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) 
                         var inferred_ret = with_str_clone_ref(ret_type)
                         if ci_translation_is_void_statement(translated):
                             inferred_ret = "Unit"
+                        else if ci_translation_is_bool_valued(translated):
+                            // A C comparison or logical operator yields an
+                            // int 0 or 1, as an object macro's does; its
+                            // With translation is a bool (`fn F() -> i32:
+                            // (a > b)` was a return type mismatch).
+                            translated = "((" ++ ci_strip_parens(ci_trim(translated)) ++ ") as c_int)"
+                            inferred_ret = "c_int"
                         else:
                             inferred_ret = ci_infer_macro_return_type_from_expr(type_session, translated, known_macro_returns, ret_type)
                         if ci_strip_parens(ci_trim(translated)) == "NULL" and ci_infer_cast_return_type(translated).len() == 0:
@@ -3570,6 +3583,7 @@ pub fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) 
             let lit_range_ann = ci_int_annotation_for_value(clean_value)
             if ci_int_type_rank(lit_range_ann) > ci_int_type_rank(int_ty):
                 lit_ann = lit_range_ann
+            ci_record_int_const_type(name, lit_ann)
             let let_line = "let " ++ safe_name ++ ": " ++ lit_ann ++ " = " ++ ci_render_int_value(clean_value)
             if not ci_migrate_shared_decl_add("let", safe_name, let_line):
                 output = output ++ let_line ++ "\n"
@@ -3635,6 +3649,7 @@ pub fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) 
                 let probe_result = if macro_is_system == 0: probes.result(session, macro_source, name) else: ""
                 if probe_result.len() > 0:
                     ci_mark_macro_const_emitted(name)
+                    ci_record_int_const_type(name, ci_let_line_type(probe_result))
                     if not ci_migrate_shared_decl_add("let", ci_escape_reserved(name), probe_result):
                         output = output ++ probe_result ++ "\n"
                     continue
@@ -3696,6 +3711,7 @@ pub fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) 
                         ci_record_untranslated_object_macro(name, macro_is_system)
                         continue
                     ci_mark_macro_const_emitted(name)
+                    ci_record_int_const_type(name, ci_translated_int_type(ref))
                     let ref_line = "let " ++ safe_name ++ " = " ++ ref
                     if not ci_migrate_shared_decl_add("let", safe_name, ref_line):
                         output = output ++ ref_line ++ "\n"
@@ -3733,6 +3749,7 @@ pub fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) 
                 var mac_value = ci_render_int_value(macro_expr_result)
                 if ci_init_type_is_numeric_scalar(type_session, mac_ann, -1) and not ci_text_is_literal_arith(mac_value, true):
                     mac_value = "(" ++ mac_value ++ " as " ++ mac_ann ++ ")"
+                ci_record_int_const_type(name, mac_ann)
                 let let_line = "let " ++ safe_name ++ ": " ++ mac_ann ++ " = " ++ mac_value
                 if not ci_migrate_shared_decl_add("let", safe_name, let_line):
                     output = output ++ let_line ++ "\n"
@@ -3747,6 +3764,7 @@ pub fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) 
                     // 4294967295 via (__INT_MAX__ * 2U + 1U) and is unsigned
                     // int in C; annotating c_int failed the (flip-honest)
                     // literal-fit check for every such limits.h macro.
+                    ci_record_int_const_type(name, ci_int_annotation_for_value(eval_result))
                     let let_line = "let " ++ safe_name ++ ": " ++ ci_int_annotation_for_value(eval_result) ++ " = " ++ ci_render_int_value(eval_result)
                     if not ci_migrate_shared_decl_add("let", safe_name, let_line):
                         output = output ++ let_line ++ "\n"
@@ -3859,7 +3877,7 @@ fn ci_parse_bitor_expr(s: &str, params: &str, known: &str) -> str:
         let lhs = ci_parse_bitor_expr(s.slice(0, pos as i64), params, known)
         let rhs = ci_parse_bitxor_expr(ci_trim(s.slice((pos + 1) as i64, s.len())), params, known)
         if lhs.len() > 0 and rhs.len() > 0:
-            return "(" ++ lhs ++ " | " ++ rhs ++ ")"
+            return ci_c_binary(lhs, "|", rhs)
     ci_parse_bitxor_expr(s, params, known)
 
 // Level 4: Bitwise XOR  ^
@@ -3870,7 +3888,7 @@ fn ci_parse_bitxor_expr(s: &str, params: &str, known: &str) -> str:
         let lhs = ci_parse_bitxor_expr(s.slice(0, pos as i64), params, known)
         let rhs = ci_parse_bitand_expr(ci_trim(s.slice((pos + 1) as i64, s.len())), params, known)
         if lhs.len() > 0 and rhs.len() > 0:
-            return "(" ++ lhs ++ " ^ " ++ rhs ++ ")"
+            return ci_c_binary(lhs, "^", rhs)
     ci_parse_bitand_expr(s, params, known)
 
 // Level 5: Bitwise AND  &  (not &&)
@@ -3881,7 +3899,7 @@ fn ci_parse_bitand_expr(s: &str, params: &str, known: &str) -> str:
         let lhs = ci_parse_bitand_expr(s.slice(0, pos as i64), params, known)
         let rhs = ci_parse_eq_expr(ci_trim(s.slice((pos + 1) as i64, s.len())), params, known)
         if lhs.len() > 0 and rhs.len() > 0:
-            return "(" ++ lhs ++ " & " ++ rhs ++ ")"
+            return ci_c_binary(lhs, "&", rhs)
     ci_parse_eq_expr(s, params, known)
 
 // Level 6: Equality  == !=
@@ -3896,7 +3914,7 @@ fn ci_parse_eq_expr(s: &str, params: &str, known: &str) -> str:
         let rhs = ci_parse_rel_expr(ci_trim(s.slice((pos + 2) as i64, s.len())), params, known)
         if lhs.len() > 0 and rhs.len() > 0:
             let w_op = if op_str == "==": "==" else: "!="
-            return "(" ++ lhs ++ " " ++ w_op ++ " " ++ rhs ++ ")"
+            return ci_c_binary(lhs, w_op, rhs)
     ci_parse_rel_expr(s, params, known)
 
 // Level 7: Relational  < > <= >=
@@ -3933,7 +3951,7 @@ fn ci_parse_rel_expr(s: &str, params: &str, known: &str) -> str:
         let lhs = ci_parse_rel_expr(s.slice(0, best_pos as i64), params, known)
         let rhs = ci_parse_shift_expr(ci_trim(s.slice((best_pos + best_len) as i64, s.len())), params, known)
         if lhs.len() > 0 and rhs.len() > 0:
-            return "(" ++ lhs ++ " " ++ op_str ++ " " ++ rhs ++ ")"
+            return ci_c_binary(lhs, op_str, rhs)
     ci_parse_shift_expr(s, params, known)
 
 // Level 8: Shift  << >>
@@ -3979,7 +3997,7 @@ fn ci_parse_add_expr(s: &str, params: &str, known: &str) -> str:
         let rhs = ci_parse_mul_expr(ci_trim(s.slice((best_pos + 1) as i64, s.len())), params, known)
         if lhs.len() > 0 and rhs.len() > 0:
             let op = if op_char == 43: "+" else: "-"
-            return "(" ++ lhs ++ " " ++ op ++ " " ++ rhs ++ ")"
+            return ci_c_binary(lhs, op, rhs)
     ci_parse_mul_expr(s, params, known)
 
 // Level 10: Multiplicative  * / %
@@ -4004,7 +4022,7 @@ fn ci_parse_mul_expr(s: &str, params: &str, known: &str) -> str:
         let rhs = ci_parse_cast_expr(ci_trim(s.slice((best_pos + 1) as i64, s.len())), params, known)
         if lhs.len() > 0 and rhs.len() > 0:
             let op = if op_char == 42: "*" else if op_char == 47: "/" else: "%"
-            return "(" ++ lhs ++ " " ++ op ++ " " ++ rhs ++ ")"
+            return ci_c_binary(lhs, op, rhs)
     ci_parse_cast_expr(s, params, known)
 
 // Level 11: Cast  (type)expr
@@ -6348,6 +6366,12 @@ impl CiStmtPool:
             i = i + 1
         self.block(start, ids.len() as i32)
 
+    // Both lowered parts in order, or 0 (failure) when either failed.
+    fn merge_both_or_fail_ir(first: CiStmtId, second: CiStmtId) -> CiStmtId:
+        if (first as i32) == 0 or (second as i32) == 0:
+            return 0 as CiStmtId
+        self.merge_ir(first, second)
+
     fn merge_ir(first: CiStmtId, second: CiStmtId) -> CiStmtId:
         if (first as i32) == 0:
             return second
@@ -6890,17 +6914,15 @@ impl CiStmtPool:
         if kind == CXK_BINARY_OP and nc >= 2 and with_ci_binary_op(session, cursor) == BO_COMMA:
             let lhs_stmt = self.lower_discard_expr_side_effects_ir(session, with_ci_child(session, cursor, 0), exprs, types, scope)
             let rhs_stmt = self.lower_discard_expr_side_effects_ir(session, with_ci_child(session, cursor, 1), exprs, types, scope)
-            return self.merge_ir( lhs_stmt, rhs_stmt)
+            return self.merge_both_or_fail_ir(lhs_stmt, rhs_stmt)
 
-        if kind == CXK_CALL_EXPR or kind == CXK_COMPOUND_ASSIGN_OP or kind == CXK_COND_OP:
+        if kind == CXK_CALL_EXPR or kind == CXK_COMPOUND_ASSIGN_OP or kind == CXK_COND_OP or kind == CXK_STMT_EXPR:
             return self.lower_effect_expr_ir(session, cursor, exprs, types, scope)
 
         if kind == CXK_BINARY_OP:
             let op = with_ci_binary_op(session, cursor)
             if op == BO_ASSIGN:
-                let stmt = self.lower_effect_expr_ir(session, cursor, exprs, types, scope)
-                if (stmt as i32) != 0:
-                    return stmt
+                return self.lower_effect_expr_ir(session, cursor, exprs, types, scope)
             // A discarded `a && b` / `a || b` runs b's effects only when a
             // is true / false: mingw-w64's assert() is
             // `(void) ((!!(e)) || (_assert(#e, __FILE__, __LINE__), 0))`.
@@ -6914,14 +6936,21 @@ impl CiStmtPool:
                 if (lhs_truthy as i32) == 0: return 0 as CiStmtId
                 let run_rhs = if op == BO_LAND: lhs_truthy else: exprs.unary(CiUnaryOp.CIUO_LOGICAL_NOT, lhs_truthy, 0 as CiTypeId)
                 return self.merge_ir(lhs.setup_stmt, self.if_stmt(run_rhs, rhs_effects, 0 as CiStmtId))
+            // A discarded operator's value is nothing; its operands' side
+            // effects still happen (`(void)(f() + g())` calls both).
+            if nc >= 2:
+                let lhs_effects = self.lower_discard_expr_side_effects_ir(session, with_ci_child(session, cursor, 0), exprs, types, scope)
+                let rhs_effects = self.lower_discard_expr_side_effects_ir(session, with_ci_child(session, cursor, 1), exprs, types, scope)
+                return self.merge_both_or_fail_ir(lhs_effects, rhs_effects)
             return self.empty_stmt_ir()
 
         if kind == CXK_UNARY_OP:
             let op = with_ci_unary_op(session, cursor)
             if op == UO_PRE_INC or op == UO_PRE_DEC or op == UO_POST_INC or op == UO_POST_DEC:
-                let stmt = self.lower_effect_expr_ir(session, cursor, exprs, types, scope)
-                if (stmt as i32) != 0:
-                    return stmt
+                return self.lower_effect_expr_ir(session, cursor, exprs, types, scope)
+            // `__extension__ ({ ... })`, `(void)-f()`: the operand's effects.
+            if nc >= 1:
+                return self.lower_discard_expr_side_effects_ir(session, with_ci_child(session, cursor, 0), exprs, types, scope)
             return self.empty_stmt_ir()
 
         let lowered = self.lower_value_expr_ir(session, cursor, exprs, types, scope)
@@ -6987,7 +7016,18 @@ impl CiStmtPool:
         if kind == CXK_BINARY_OP and nc >= 2 and with_ci_binary_op(session, cursor) == BO_COMMA:
             let lhs_stmt = self.lower_effect_expr_ir(session, with_ci_child(session, cursor, 0), exprs, types, scope)
             let rhs_stmt = self.lower_effect_expr_ir(session, with_ci_child(session, cursor, 1), exprs, types, scope)
-            return self.merge_ir( lhs_stmt, rhs_stmt)
+            // Zero is a failed operand, never an empty one: merging it
+            // dropped glibc assert's `__extension__ ({ if (e) ; else
+            // __assert_fail(...); })`, so a failed assert ran on (#1911).
+            return self.merge_both_or_fail_ir(lhs_stmt, rhs_stmt)
+
+        // A GNU statement expression whose value is discarded is its
+        // statements, run in a block of their own.
+        if kind == CXK_STMT_EXPR and nc >= 1:
+            return self.lower_stmt_ir(session, with_ci_child(session, cursor, nc - 1), exprs, types, 0, scope)
+
+        if kind == CXK_UNARY_OP and nc >= 1 and with_ci_unary_op(session, cursor) == UO_EXTENSION:
+            return self.lower_effect_expr_ir(session, with_ci_child(session, cursor, 0), exprs, types, scope)
 
         if kind == CXK_UNARY_OP and nc >= 1:
             let op = with_ci_unary_op(session, cursor)
@@ -7014,7 +7054,10 @@ impl CiStmtPool:
         var tail_stmt = 0 as CiStmtId
         if ci_effect_expr_needs_terminal_stmt(session, cursor):
             tail_stmt = self.expr_stmt(lowered.value_expr)
-        self.merge_ir( lowered.setup_stmt, tail_stmt)
+        let effects = self.merge_ir( lowered.setup_stmt, tail_stmt)
+        // A lowered expression with no effect is an empty statement: zero
+        // is failure.
+        if (effects as i32) == 0: self.empty_stmt_ir() else: effects
 
     fn prepare_stmt_subject_ir(session: i64, cursor: i32, exprs: CiExprPool, types: CiTypePool, scope: CiScope, tag: &str) -> CiValueExprIR:
         let lowered = self.lower_value_expr_ir(session, cursor, exprs, types, scope)
@@ -8914,6 +8957,9 @@ impl CiExprPool:
         let op = with_ci_unary_op(session, cursor)
         if op < 0:
             return 0 as CiExprId
+        // `__extension__ e` only silences a pedantic warning: it is e.
+        if op == UO_EXTENSION:
+            return self.lower_expr_ir(session, with_ci_child(session, cursor, 0), types, scope)
 
         if op == UO_PRE_INC or op == UO_PRE_DEC or op == UO_POST_INC or op == UO_POST_DEC:
             let child_cursor = with_ci_child(session, cursor, 0)
@@ -11099,6 +11145,11 @@ impl CiStmtPool:
                     value_expr: lhs.value_expr,
                 }
             return ci_value_ir_invalid()
+
+        // `__extension__ e` is e (glibc's `__ASSERT_FUNCTION` is
+        // `__extension__ __PRETTY_FUNCTION__`).
+        if kind == CXK_UNARY_OP and nc >= 1 and with_ci_unary_op(session, cursor) == UO_EXTENSION:
+            return self.lower_value_expr_ir(session, with_ci_child(session, cursor, 0), exprs, types, scope)
 
         if kind == CXK_UNARY_OP and nc >= 1:
             let operand_cursor = with_ci_child(session, cursor, 0)
@@ -13419,6 +13470,101 @@ fn ci_int_type_rank(t: &str) -> i32:
     if t == "c_long" or t == "c_longlong": return 5
     if t == "c_ulong" or t == "c_ulonglong": return 6
     0
+
+// C's usual arithmetic conversions (C11 6.3.1.8) in a translated binary
+// operator. With converts nothing implicitly but a widening (§4.2.6), so an
+// operator whose operands differ in signedness spells the conversion C
+// makes: glibc's `#define ULLONG_MAX (LLONG_MAX * 2ULL + 1)` is unsigned
+// long long arithmetic, `((LLONG_MAX as u64) * 2u64)`. Rendered as
+// `LLONG_MAX * 2u64`, it was i64 arithmetic that overflowed at run time,
+// then a refused sign change (#1911). An operand of no known type (an
+// unsuffixed literal, a macro parameter) takes its context's type.
+//
+// The With type of each emitted integer macro constant, by C name.
+var g_ci_int_const_types: HashMap[str, str] = HashMap.new()
+// The With type of each translated operator expression, by its text.
+var g_ci_translated_int_types: HashMap[str, str] = HashMap.new()
+
+fn ci_record_int_const_type(name: &str, ty: &str):
+    if ci_c_int_type_width(ty) > 0:
+        g_ci_int_const_types.insert(with_str_clone_ref(name), with_str_clone_ref(ty))
+
+// The annotation of a `let NAME: TYPE = value` line.
+fn ci_let_line_type(line: &str) -> str:
+    let colon = line.index_of(": ")
+    let eq = line.index_of(" = ")
+    if colon < 0 or eq < colon: return ""
+    ci_trim(line.slice(colon + 2, eq))
+
+// c_import's C integer types (the aliases it emits: c_long is i64).
+fn ci_c_int_type_width(t: &str) -> i32:
+    if t == "i8" or t == "u8" or t == "c_char" or t == "c_schar" or t == "c_uchar": return 8
+    if t == "i16" or t == "u16" or t == "c_short" or t == "c_ushort": return 16
+    if t == "i32" or t == "u32" or t == "c_int" or t == "c_uint": return 32
+    if t == "i64" or t == "u64" or t == "isize" or t == "usize" or t == "c_long" or t == "c_ulong" or t == "c_longlong" or t == "c_ulonglong": return 64
+    0
+
+fn ci_c_int_type_is_unsigned(t: &str) -> bool:
+    t == "u8" or t == "u16" or t == "u32" or t == "u64" or t == "usize" or t == "c_uchar" or t == "c_ushort" or t == "c_uint" or t == "c_ulong" or t == "c_ulonglong"
+
+// The integer type of a translated operand, or "" when it has none of its own.
+fn ci_translated_int_type(text: &str) -> str:
+    let t = ci_trim(text)
+    let recorded = g_ci_translated_int_types.get(t)
+    if recorded.is_some():
+        return with_str_clone_ref(recorded.unwrap())
+    let bare = ci_strip_parens(t)
+    let rewrapped = g_ci_translated_int_types.get("(" ++ bare ++ ")")
+    if rewrapped.is_some():
+        return with_str_clone_ref(rewrapped.unwrap())
+    for suffix in ["i64", "u64", "i32", "u32"]:
+        if bare.ends_with(suffix) and ci_is_int_literal(bare.slice(0, bare.len() - suffix.len())):
+            return with_str_clone_ref(suffix)
+    if ci_is_c_ident(bare):
+        let constant = g_ci_int_const_types.get(bare)
+        if constant.is_some():
+            return with_str_clone_ref(constant.unwrap())
+        return ""
+    let cast = ci_infer_cast_return_type(t)
+    if ci_c_int_type_width(cast) > 0:
+        return cast
+    ""
+
+// `lhs op rhs` with C's operand conversions. An arithmetic or bitwise
+// operator's result has the common type; a comparison's is a bool.
+fn ci_c_binary(lhs: &str, op: &str, rhs: &str) -> str:
+    let lt = ci_translated_int_type(lhs)
+    let rt = ci_translated_int_type(rhs)
+    var l = with_str_clone_ref(lhs)
+    var r = with_str_clone_ref(rhs)
+    var common = ""
+    if lt.len() > 0 and rt.len() > 0:
+        // The integer promotions first: a type narrower than int is int.
+        let lp = if ci_c_int_type_width(lt) < 32: "c_int" else: lt
+        let rp = if ci_c_int_type_width(rt) < 32: "c_int" else: rt
+        let lw = ci_c_int_type_width(lp)
+        let rw = ci_c_int_type_width(rp)
+        let lu = ci_c_int_type_is_unsigned(lp)
+        let ru = ci_c_int_type_is_unsigned(rp)
+        // Same signedness: the wider type, which With widens to itself.
+        // Mixed: the unsigned operand's type when it is at least as wide,
+        // else the wider signed one, which holds every value of the other.
+        let unsigned_wins = (lu and lw >= rw) or (ru and rw >= lw)
+        let left_wins = if lu == ru: lw >= rw else if unsigned_wins: lu else: not lu
+        common = if left_wins: lp.clone() else: rp.clone()
+        if lu != ru:
+            if left_wins: r = "(" ++ rhs ++ " as " ++ common ++ ")" else: l = "(" ++ lhs ++ " as " ++ common ++ ")"
+    else if lt.len() > 0 and ci_is_int_literal(ci_strip_parens(ci_trim(rhs))):
+        // An unsuffixed literal takes the other operand's type; an operand
+        // of unknown type (a parameter's T) leaves the result unknown.
+        common = lt
+    else if rt.len() > 0 and ci_is_int_literal(ci_strip_parens(ci_trim(lhs))):
+        common = rt
+    let out = "(" ++ l ++ " " ++ op ++ " " ++ r ++ ")"
+    let is_comparison = op == "==" or op == "!=" or op == "<" or op == ">" or op == "<=" or op == ">="
+    if common.len() > 0 and not is_comparison:
+        g_ci_translated_int_types.insert(out.clone(), common)
+    out
 
 fn ci_int_annotation_for_value(v0: &str) -> str:
     // Hex literals range by digit count; decimals by magnitude compare.
