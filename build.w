@@ -2647,7 +2647,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(windows_sysroot)
 
     // The darwin and linux sysroots come from the Zig source (#1915).
-    let sysroot_host = os() == "Macos" or (os() == "Linux" and arch() == "x86_64")
+    let sysroot_host = os() == "Macos" or (os() == "Linux" and sdk_linux_arch_supported(arch()))
     if sysroot_host:
         out = out.add_target(sdk_source_target("sysroot-zig-source", sdk_zig_source_url(), sdk_zig_source_sha256(), sdk_zig_archive(), sdk_zig_source_root(), sdk_zig_source_dir(), sdk_zig_source_marker()))
     var darwin_sysroot = target_new(.Action, "darwin-sysroot", "").output(sdk_darwin_sysroot_pack())
@@ -2668,13 +2668,27 @@ pub fn build(ctx: BuildCtx) -> Build:
     linux_sysroot.action = run_linux_sysroot_action
     linux_sysroot = linux_sysroot.input("build/sdk.w")
     linux_sysroot = linux_sysroot.input("sdk.lock")
-    if os() == "Linux" and arch() == "x86_64":
+    if os() == "Linux" and sdk_linux_arch_supported(arch()):
         linux_sysroot = linux_sysroot.dep("sysroot-zig-source")
         linux_sysroot = linux_sysroot.input(sdk_zig_source_marker())
     linux_sysroot = linux_sysroot.write_scope(sdk_linux_sysroot_dir())
     linux_sysroot = linux_sysroot.write_scope("out/command/linux-sysroot")
     linux_sysroot = linux_sysroot.timeout(1200000)
     out = out.add_target(linux_sysroot)
+    // A linux-x86_64 host also generates the linux-aarch64 sysroot, for
+    // the cross build of the aarch64 SDK and compiler.
+    if os() == "Linux" and arch() == "x86_64":
+        var linux_sysroot_arm = target_new(.Action, "linux-sysroot-aarch64", "").output(sdk_linux_sysroot_pack_for("aarch64"))
+        linux_sysroot_arm.action = run_linux_sysroot_action
+        linux_sysroot_arm = linux_sysroot_arm.arg("aarch64")
+        linux_sysroot_arm = linux_sysroot_arm.input("build/sdk.w")
+        linux_sysroot_arm = linux_sysroot_arm.input("sdk.lock")
+        linux_sysroot_arm = linux_sysroot_arm.dep("sysroot-zig-source")
+        linux_sysroot_arm = linux_sysroot_arm.input(sdk_zig_source_marker())
+        linux_sysroot_arm = linux_sysroot_arm.write_scope(sdk_linux_sysroot_dir_for("aarch64"))
+        linux_sysroot_arm = linux_sysroot_arm.write_scope("out/command/linux-sysroot-aarch64")
+        linux_sysroot_arm = linux_sysroot_arm.timeout(1200000)
+        out = out.add_target(linux_sysroot_arm)
 
     var linux_link_pack = target_new(.Action, "linux-link-pack", "").output(sdk_linux_link_pack())
     linux_link_pack.action = run_linux_link_pack_action
