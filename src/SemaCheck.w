@@ -21472,79 +21472,7 @@ impl Sema:
 
         // Resolve named arguments: reorder args to match parameter order, fill defaults
         var resolved_extra_start = extra_start
-        var resolved_arg_count = arg_count
-        if self.ast.has_call_named_args(node) != 0 and sig_idx >= 0 and self.fn_decl_nodes.contains(fn_sym):
-            let fn_node: i32 = self.fn_decl_nodes.get(fn_sym).unwrap()
-            let meta = self.ast.find_fn_meta(fn_node)
-            if meta >= 0:
-                let param_count = self.sig_get_param_count(sig_idx)
-                let ps = self.ast.fn_meta_param_start(meta)
-                // Build resolved_args map: param_idx → arg_node
-                let resolved_map: HashMap[i32, i32] = HashMap.new()
-                let resolved_defaults: HashMap[i32, i32] = HashMap.new()
-                // First pass: assign positional args left-to-right
-                var first_named_idx = arg_count
-                for ai in 0..arg_count:
-                    let name_sym = self.ast.get_call_named_arg(node, ai)
-                    if name_sym != 0:
-                        first_named_idx = ai
-                        break
-                    let pi = ai + param_offset
-                    if pi < param_count:
-                        resolved_map.insert(pi, self.ast.get_extra(extra_start + ai))
-                // Second pass: assign named args by matching parameter names
-                for ai in first_named_idx..arg_count:
-                    let name_sym = self.ast.get_call_named_arg(node, ai)
-                    if name_sym == 0:
-                        continue
-                    var matched = -1
-                    for pi in 0..param_count:
-                        let pname = self.ast.fn_param_name(ps, pi)
-                        if pname == name_sym:
-                            matched = pi
-                            break
-                    if matched < 0:
-                        let aname: str = self.pool_resolve(name_sym)
-                        self.emit_error(f"no parameter named '{aname}'", node)
-                        continue
-                    if resolved_map.contains(matched):
-                        let aname: str = self.pool_resolve(name_sym)
-                        self.emit_error(f"parameter '{aname}' specified more than once", node)
-                        continue
-                    resolved_map.insert(matched, self.ast.get_extra(extra_start + ai))
-                // Third pass: fill implicit params from with-implicit scope
-                for pi in 0..param_count:
-                    if resolved_map.contains(pi): continue
-                    let pflags = self.ast.fn_param_flags(ps, pi)
-                    if fn_param_is_implicit(pflags) == 0: continue
-                    let expected_ty = self.sig_param_type(sig_idx, pi)
-                    var si = self.implicit_binding_types.len() as i32 - 1
-                    while si >= 0:
-                        let bind_ty: i32 = self.implicit_binding_types[si]
-                        if self.types_compatible(expected_ty, bind_ty) != 0:
-                            let bind_sym = self.implicit_binding_syms[si]
-                            resolved_map.insert(pi, 0 - bind_sym)
-                            break
-                        si = si - 1
-                // Fourth pass: fill defaults for remaining unresolved params
-                for pi in 0..param_count:
-                    if not resolved_map.contains(pi):
-                        let default_node = self.ast.get_fn_param_default(ps, pi)
-                        if default_node != 0:
-                            resolved_map.insert(pi, default_node)
-                            resolved_defaults.insert(pi, 1)
-                // Store resolved arg order in sema (AST is frozen)
-                let final_args: Vec[i32] = Vec.new()
-                for pi in param_offset..param_count:
-                    if resolved_map.contains(pi):
-                        final_args.push(resolved_map.get(pi).unwrap())
-                    else:
-                        final_args.push(0)
-                self.store_resolved_call_args(node, final_args)
-                for pi in param_offset..param_count:
-                    if resolved_defaults.contains(pi):
-                        self.mark_resolved_call_arg_default(node, pi - param_offset)
-                resolved_arg_count = param_count - param_offset
+        var resolved_arg_count = self.resolve_named_call_args(node, sig_idx, fn_sym, param_offset, extra_start, arg_count)
 
         // Implicit parameter resolution for plain calls (no named args).
         // When the caller provides fewer args than params and the missing
@@ -27041,9 +26969,85 @@ impl Sema:
             return self.check_method_call_parts(expr, target, extra_start, arg_count, node, recv_ty)
         self.check_method_call_parts(expr, field, extra_start, arg_count, node, 0)
 
-    mut fn resolve_method_implicit_default_args(call_node: i32, sig_idx: i32, method_fn_sym: i32, param_offset: i32, extra_start: i32, arg_count: i32) -> i32:
-        if sig_idx < 0 or self.has_resolved_call_args(call_node) != 0:
+    // One named-argument binding rule for free functions, static methods and
+    // instance methods. Bind names before filling omitted parameters; the
+    // number of supplied arguments says nothing about which ones are absent.
+    mut fn resolve_named_call_args(call_node: i32, sig_idx: i32, fn_sym: i32, param_offset: i32, extra_start: i32, arg_count: i32):
+        if self.has_resolved_call_args(call_node) != 0:
+            return self.get_resolved_call_arg_count(call_node)
+        if self.ast.has_call_named_args(call_node) == 0 or sig_idx < 0 or not self.fn_decl_nodes.contains(fn_sym):
             return arg_count
+        let fn_node: i32 = self.fn_decl_nodes.get(fn_sym).unwrap()
+        let meta = self.ast.find_fn_meta(fn_node)
+        if meta < 0: return arg_count
+        let param_count = self.sig_get_param_count(sig_idx)
+        let ps = self.ast.fn_meta_param_start(meta)
+        var resolved_map: HashMap[i32, i32] = HashMap.new()
+        var resolved_defaults: HashMap[i32, i32] = HashMap.new()
+        var first_named_idx = arg_count
+        for ai in 0..arg_count:
+            if self.ast.get_call_named_arg(call_node, ai) != 0:
+                first_named_idx = ai
+                break
+            let pi = ai + param_offset
+            if pi < param_count:
+                resolved_map.insert(pi, self.ast.get_extra(extra_start + ai))
+        for ai in first_named_idx..arg_count:
+            let name_sym = self.ast.get_call_named_arg(call_node, ai)
+            if name_sym == 0: continue
+            var matched = -1
+            for pi in param_offset..param_count:
+                if self.ast.fn_param_name(ps, pi) == name_sym:
+                    matched = pi
+                    break
+            if matched < 0:
+                let aname = self.pool_resolve(name_sym).clone()
+                self.emit_error(f"no parameter named '{aname}'", call_node)
+                continue
+            if resolved_map.contains(matched):
+                let aname = self.pool_resolve(name_sym).clone()
+                self.emit_error(f"parameter '{aname}' specified more than once", call_node)
+                continue
+            resolved_map.insert(matched, self.ast.get_extra(extra_start + ai))
+        for pi in param_offset..param_count:
+            if resolved_map.contains(pi): continue
+            if fn_param_is_implicit(self.ast.fn_param_flags(ps, pi)) == 0: continue
+            let expected_ty = self.sig_param_type(sig_idx, pi)
+            var si = self.implicit_binding_types.len() as i32 - 1
+            while si >= 0:
+                let bind_ty: i32 = self.implicit_binding_types[si]
+                if self.types_compatible(expected_ty, bind_ty) != 0:
+                    resolved_map.insert(pi, 0 - self.implicit_binding_syms[si])
+                    break
+                si -= 1
+        for pi in param_offset..param_count:
+            if resolved_map.contains(pi): continue
+            let default_node = self.ast.get_fn_param_default(ps, pi)
+            if default_node != 0:
+                resolved_map.insert(pi, default_node)
+                resolved_defaults.insert(pi, 1)
+        var final_args: Vec[i32] = Vec.new()
+        for pi in param_offset..param_count:
+            if not resolved_map.contains(pi):
+                if fn_param_is_implicit(self.ast.fn_param_flags(ps, pi)) != 0:
+                    self.emit_error("implicit parameter not provided; add a 'with' binding of the matching type", call_node)
+                else:
+                    let pname = self.pool_resolve(self.ast.fn_param_name(ps, pi)).clone()
+                    self.emit_error(f"missing argument for parameter '{pname}'", call_node)
+            final_args.push(resolved_map.get(pi) ?? 0)
+        self.store_resolved_call_args(call_node, final_args)
+        for pi in param_offset..param_count:
+            if resolved_defaults.contains(pi):
+                self.mark_resolved_call_arg_default(call_node, pi - param_offset)
+        param_count - param_offset
+
+    mut fn resolve_method_implicit_default_args(call_node: i32, sig_idx: i32, method_fn_sym: i32, param_offset: i32, extra_start: i32, arg_count: i32) -> i32:
+        if sig_idx < 0:
+            return arg_count
+        if self.has_resolved_call_args(call_node) != 0:
+            return self.get_resolved_call_arg_count(call_node)
+        if self.ast.has_call_named_args(call_node) != 0:
+            return self.resolve_named_call_args(call_node, sig_idx, method_fn_sym, param_offset, extra_start, arg_count)
         let param_count = self.sig_get_param_count(sig_idx)
         let actual = arg_count + param_offset
         if actual >= param_count:
