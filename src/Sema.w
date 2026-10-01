@@ -8854,9 +8854,7 @@ impl Sema:
     mut fn emit_error_with_suggestion(msg: &str, node: i32, suggestion: &str, origin_file: &str = __FILE__, origin_line: u32 = __LINE__, origin_fn: &str = __FN__):
         if self.suppress_errors != 0:
             return
-        let start = self.ast.get_start(node)
-        let end = self.ast.get_end(node)
-        var diag = Diagnostic.err(msg, Span { file: self.local_file_id, start: start, end: end })
+        var diag = Diagnostic.err(msg, self.diagnostic_node_span(node))
         diag.set_origin(origin_file, origin_fn, origin_line as i32, node)
         if suggestion.len() > 0:
             diag.add_help("did you mean '" ++ suggestion ++ "'?")

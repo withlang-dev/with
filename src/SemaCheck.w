@@ -13686,9 +13686,9 @@ impl Sema:
     mut fn emit_pull_error(msg: &str, site: i32, pull_node: i32):
         if self.suppress_errors != 0:
             return
-        let primary = Span { file: self.local_file_id, start: self.ast.get_start(site), end: self.ast.get_end(site) }
+        let primary = self.diagnostic_node_span(site)
         var diag = Diagnostic.err(msg, primary)
-        diag.add_label(Span { file: self.local_file_id, start: self.ast.get_start(pull_node), end: self.ast.get_end(pull_node) }, "pulled here")
+        diag.add_label(self.diagnostic_node_span(pull_node), "pulled here")
         diag.set_origin(__FILE__, __FN__, __LINE__ as i32, site)
         self.diags.emit(move diag)
 

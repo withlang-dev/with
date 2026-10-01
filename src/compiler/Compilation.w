@@ -1820,7 +1820,7 @@ impl Compilation:
         // last_sema retains the complete declaration/effect state for the flag-day
         // receiver work list and for semantic diagnosis queries.
         if not after_mir and analysis_request_is_semantic_snapshot(inner_request) and self.zcu.last_sema.ast.decl_count() > 0:
-            var snapshot = compiler_analysis_run(self.zcu.last_sema, self.zcu.last_mir_module, self.zcu.pool, self.zcu.current_source_path, self.zcu.current_source_text, inner_request)
+            var snapshot = compiler_analysis_run(self.zcu.last_sema, self.zcu.last_mir_module, self.zcu.pool, self.zcu.current_source_path, self.zcu.current_source_text, inner_request, self.zcu.diagnostics)
             // A snapshot over a failed compilation is still shown (it is what
             // Sema had), but it is never an `ok`: an audit that passes over a
             // program the compiler refused is a tool that stayed silent.
@@ -1830,15 +1830,15 @@ impl Compilation:
             return snapshot
         if pool.decl_count() == 0:
             if inner_request.starts_with("select:") and self.zcu.last_sema.ast.decl_count() > 0:
-                return compiler_analysis_run(self.zcu.last_sema, self.zcu.last_mir_module, self.zcu.pool, self.zcu.current_source_path, self.zcu.current_source_text, inner_request)
+                return compiler_analysis_run(self.zcu.last_sema, self.zcu.last_mir_module, self.zcu.pool, self.zcu.current_source_path, self.zcu.current_source_text, inner_request, self.zcu.diagnostics)
             return CompilerAnalysisResult { text: "error: analysis compilation failed\n", status: 1, needs_codegen: false, codegen_query: "", report: AnalysisReport.init() }
         let active = self.active_pool(pool)
         let _ = self.run_mir_lower(active)
         if self.zcu.last_mir_module.body_count() == 0:
             if after_mir and self.zcu.last_sema.ast.decl_count() > 0:
-                return compiler_analysis_run(self.zcu.last_sema, self.zcu.last_mir_module, self.zcu.pool, self.zcu.current_source_path, self.zcu.current_source_text, inner_request)
+                return compiler_analysis_run(self.zcu.last_sema, self.zcu.last_mir_module, self.zcu.pool, self.zcu.current_source_path, self.zcu.current_source_text, inner_request, self.zcu.diagnostics)
             return CompilerAnalysisResult { text: "error: analysis produced no MIR\n", status: 1, needs_codegen: false, codegen_query: "", report: AnalysisReport.init() }
-        var result = compiler_analysis_run(self.zcu.last_sema, self.zcu.last_mir_module, self.zcu.pool, self.zcu.current_source_path, self.zcu.current_source_text, inner_request)
+        var result = compiler_analysis_run(self.zcu.last_sema, self.zcu.last_mir_module, self.zcu.pool, self.zcu.current_source_path, self.zcu.current_source_text, inner_request, self.zcu.diagnostics)
         if result.needs_codegen:
             let backend = self.zcu.analyze_codegen_backend(self.active_pool(active), self.config.opt_level, result.codegen_query)
             result.report.merge(&backend.report)

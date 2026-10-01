@@ -317,7 +317,9 @@ impl Zcu:
         let label_texts: Vec[str] = Vec.new()
         for li in 0..diag.labels.len() as i32:
             let lab_file = diag.labels[li].span.file
-            if lab_file != 0 and lab_file != diag.primary.file:
+            // File 0 is the root source, and is a cross-file label when the
+            // primary belongs to an imported module.
+            if lab_file != diag.primary.file:
                 var lab_source = self.source_for_file_id_frontend(lab_file)
                 label_paths.push(move lab_source.path)
                 label_texts.push(move lab_source.text)

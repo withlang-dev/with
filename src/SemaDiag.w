@@ -201,21 +201,22 @@ impl Sema:
         let suggestion = self.suggest_type_name(target_name, node)
         self.emit_error_with_suggestion(self.unknown_type_message(sym), node, suggestion)
 
+    fn diagnostic_node_span(node: i32) -> Span:
+        // A deferred judgment can run after another module's body. Each
+        // parser node owns its source identity, independent of that context.
+        Span { file: self.ast.file(node as NodeId) as i32, start: self.ast.get_start(node), end: self.ast.get_end(node) }
+
     mut fn emit_error(msg: &str, node: i32, origin_file: &str = __FILE__, origin_line: u32 = __LINE__, origin_fn: &str = __FN__):
         if self.suppress_errors != 0:
             return
-        let start = self.ast.get_start(node)
-        let end = self.ast.get_end(node)
-        var diag = Diagnostic.err(msg, Span { file: self.local_file_id, start: start, end: end })
+        var diag = Diagnostic.err(msg, self.diagnostic_node_span(node))
         diag.set_origin(origin_file, origin_fn, origin_line as i32, node)
         self.diags.emit(move diag)
 
     mut fn emit_error_code(msg: &str, node: i32, code: &str, origin_file: &str = __FILE__, origin_line: u32 = __LINE__, origin_fn: &str = __FN__):
         if self.suppress_errors != 0:
             return
-        let start = self.ast.get_start(node)
-        let end = self.ast.get_end(node)
-        var diag = Diagnostic.err(msg, Span { file: self.local_file_id, start: start, end: end })
+        var diag = Diagnostic.err(msg, self.diagnostic_node_span(node))
         diag.set_code(code)
         diag.set_origin(origin_file, origin_fn, origin_line as i32, node)
         self.diags.emit(move diag)
@@ -223,25 +224,19 @@ impl Sema:
     mut fn emit_error_with_help(msg: &str, node: i32, help: &str, origin_file: &str = __FILE__, origin_line: u32 = __LINE__, origin_fn: &str = __FN__):
         if self.suppress_errors != 0:
             return
-        let start = self.ast.get_start(node)
-        let end = self.ast.get_end(node)
-        var diag = Diagnostic.err(msg, Span { file: self.local_file_id, start: start, end: end })
+        var diag = Diagnostic.err(msg, self.diagnostic_node_span(node))
         diag.set_origin(origin_file, origin_fn, origin_line as i32, node)
         if help.len() > 0:
             diag.add_help(help)
         self.diags.emit(move diag)
 
     mut fn emit_warning(msg: &str, node: i32, origin_file: &str = __FILE__, origin_line: u32 = __LINE__, origin_fn: &str = __FN__):
-        let start = self.ast.get_start(node)
-        let end = self.ast.get_end(node)
-        var diag = Diagnostic.warn(msg, Span { file: self.local_file_id, start: start, end: end })
+        var diag = Diagnostic.warn(msg, self.diagnostic_node_span(node))
         diag.set_origin(origin_file, origin_fn, origin_line as i32, node)
         self.diags.emit(move diag)
 
     mut fn emit_warning_code(msg: &str, node: i32, code: &str, origin_file: &str = __FILE__, origin_line: u32 = __LINE__, origin_fn: &str = __FN__):
-        let start = self.ast.get_start(node)
-        let end = self.ast.get_end(node)
-        var diag = Diagnostic.warn(msg, Span { file: self.local_file_id, start: start, end: end })
+        var diag = Diagnostic.warn(msg, self.diagnostic_node_span(node))
         diag.set_code(code)
         diag.set_origin(origin_file, origin_fn, origin_line as i32, node)
         self.diags.emit(move diag)

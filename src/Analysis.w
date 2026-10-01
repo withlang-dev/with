@@ -426,18 +426,16 @@ fn analysis_node_subject(sema: &Sema, node: i32, fallback_path: &str, fallback_s
     let result: Vec[str] = Vec.new()
     var path = fallback_path
     var source = with_str_clone_ref(fallback_source)
-    for i in 0..sema.diags.items.len() as i32:
-        let diag = &sema.diags.items[i]
-        if diag.origin_node != node:
-            continue
-        let exact_source = sema.source_text_for_file_id(diag.primary.file)
-        if exact_source.len() > 0:
-            source = exact_source
-        for si in 0..sema.source_text_file_ids.len() as i32:
-            if sema.source_text_file_ids[si] == diag.primary.file:
-                path = sema.source_text_names[si]
-                break
-        break
+    // The parser owns a node's source identity. A diagnostic may itself
+    // have the wrong primary file; it cannot redefine the node's source.
+    let file = sema.ast.file(node as NodeId) as i32
+    let exact_source = sema.source_text_for_file_id(file)
+    if exact_source.len() > 0:
+        source = exact_source
+    for si in 0..sema.source_text_file_ids.len() as i32:
+        if sema.source_text_file_ids[si] == file:
+            path = sema.source_text_names[si]
+            break
     result.push(with_str_clone_ref(path))
     result.push(source)
     result
@@ -671,9 +669,9 @@ fn analysis_collect_method_resolutions(report: &AnalysisReport, sema: &Sema, sou
         fact = analysis_with_node_location(move fact, sema, mres_node, source_path, source_text)
         report.add(move fact)
 
-fn analysis_collect_diagnostics(report: &AnalysisReport, sema: &Sema):
-    for i in 0..sema.diags.items.len() as i32:
-        let diag = &sema.diags.items[i]
+fn analysis_collect_diagnostics(report: &AnalysisReport, sema: &Sema, diagnostics: &DiagnosticList):
+    for i in 0..diagnostics.items.len() as i32:
+        let diag = &diagnostics.items[i]
         var fact = AnalysisFact.new(AnalysisStage.Diagnostic, AnalysisFactKind.Diagnostic)
         fact.id = i
         fact.node = diag.origin_node
@@ -697,7 +695,11 @@ fn analysis_collect_diagnostics(report: &AnalysisReport, sema: &Sema):
             fact.line = analysis_line_for_offset(subject_source, diag.primary.start)
             fact.column = analysis_column_for_offset(subject_source, diag.primary.start)
         fact.path = if subject.len() > 0: subject else: diag.origin_file.clone()
-        fact.detail = diag.origin_fn ++ ": " ++ diag.message ++ f" subject-file={diag.primary.file}"
+        let node_file = sema.ast.file(diag.origin_node as NodeId) as i32
+        fact.detail = diag.origin_fn ++ ": " ++ diag.message ++ f" subject-file={diag.primary.file} origin-node-file={node_file} emitter={diag.origin_file}:{diag.origin_line}"
+        for li in 0..diag.labels.len() as i32:
+            let span = diag.labels[li].span
+            fact.detail = fact.detail ++ f" label[{li}]={span.file}:{span.start}:{span.end}"
         report.add(move fact)
 
 fn analysis_collect_phase(report: &AnalysisReport, sema: &Sema):
@@ -721,7 +723,6 @@ fn analysis_collect_sema(report: &AnalysisReport, sema: &Sema, source_path: &str
     analysis_collect_specializations(report, sema, source_path)
     analysis_collect_resolved_calls(report, sema, source_path, source_text)
     analysis_collect_method_resolutions(report, sema, source_path, source_text)
-    analysis_collect_diagnostics(report, sema)
     analysis_collect_foreign_contracts(report, sema, source_path, source_text)
 
 fn analysis_operand_kind_name(kind: i32) -> str:
@@ -2368,9 +2369,12 @@ pub fn compiler_analysis_render(report: &AnalysisReport, request: &str) -> str:
     if request.starts_with("lldb:"): return analysis_lldb_recipe(report, analysis_slice(request, 5, request.len() as i32))
     "error: unknown analysis request '" ++ request ++ "'\n"
 
-pub fn compiler_analysis_run(sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str, request: &str) -> CompilerAnalysisResult:
+pub fn compiler_analysis_run(sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str, request: &str, diagnostics: &DiagnosticList) -> CompilerAnalysisResult:
     let report = AnalysisReport.init()
     analysis_collect_sema(&report, sema, source_path, source_text)
+    // The frontend moved the diagnostics out of Sema. Read the current
+    // owner's list, including when compilation failed before MIR (#1945).
+    analysis_collect_diagnostics(&report, sema, diagnostics)
     analysis_collect_requested_node(&report, sema, request, source_path, source_text)
     analysis_collect_mir(&report, mir_mod, sema, pool, source_path, source_text)
     var text = ""
