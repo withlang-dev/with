@@ -31,10 +31,11 @@ pub type HashSlot[K, V] { head: HashSlotHead, key: K, value: V }
 /// engine calls it as `cmp(probe, node.data)`; the probe is a slot whose
 /// comparator compares its key with the stored slot's key (#1135: a closure
 /// written in a generic function cannot itself be handed to the engine).
-pub fn hash_slot_compare(probe: *const c_void, data: *const c_void) -> c_int:
+/// The engine must supply a live probe and stored slot owned by the facade.
+pub unsafe fn hash_slot_compare(probe: *const c_void, data: *const c_void) -> c_int:
     // D63: a callable is not Copy; the slot keeps its comparator, this call
     // observes a free clone of the bare function.
-    let compare = unsafe { (*(probe as *const HashSlotHead)).compare.clone() }
+    let compare = (*(probe as *const HashSlotHead)).compare.clone()
     compare(probe as *const u8, data as *const u8) as c_int
 
 /// Keys hash through `Hash.hash_value` and compare through `Eq.eq` (D41).

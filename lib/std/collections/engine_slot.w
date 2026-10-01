@@ -17,8 +17,9 @@ pub type Slot[T] { compare: fn(*const u8, *const u8) -> i32, value: T }
 /// its engine: it reads the With comparator stored in the first slot and
 /// compares the two slots through it. (#1135: a closure written in a
 /// generic function cannot itself be handed to the engine yet.)
-pub fn slot_compare(a: *mut c_void, b: *mut c_void) -> c_int:
-    let compare = unsafe { *(a as *const fn(*const u8, *const u8) -> i32) }
+/// The engine must supply two live slots with the comparator at offset 0.
+pub unsafe fn slot_compare(a: *mut c_void, b: *mut c_void) -> c_int:
+    let compare = *(a as *const fn(*const u8, *const u8) -> i32)
     compare(a as *const u8, b as *const u8) as c_int
 
 /// The comparator of a slot whose engine never compares (Trie).
