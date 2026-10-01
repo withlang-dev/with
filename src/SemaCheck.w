@@ -2287,8 +2287,17 @@ impl Sema:
                 self.global_race_mutated_syms.insert(sym, 1)
                 self.global_race_mutation_nodes.insert(sym, node)
         if self.in_unsafe != 0:
-            if kind == GLOBAL_RACE_ACCESS_WRITE or self.is_mutable_global(sym) != 0 or self.global_race_mutated_syms.contains(sym):
+            if kind == GLOBAL_RACE_ACCESS_WRITE or self.is_mutable_global(sym) != 0:
                 self.note_unsafe_operation()
+            else:
+                // A read's need for unsafe depends on whether any body writes
+                // this global. Keep its lexical scopes; do not read the partial
+                // mutation set while bodies are still being checked.
+                for si in 0..self.unsafe_scope_nodes.len() as i32:
+                    if self.unsafe_scope_used[si] == 0:
+                        self.unsafe_scope_used[si] = 2
+                    self.unsafe_global_scope_reads.push(self.unsafe_scope_nodes[si])
+                    self.unsafe_global_scope_reads.push(sym)
 
     mut fn record_global_place_write(place_node: i32, report_node: i32):
         let root = self.place_root_sym(place_node)
@@ -3565,6 +3574,15 @@ impl Sema:
         let saved_no_alloc_depth: i32 = self.current_no_alloc_depth
         let saved_fn_may_alloc: i32 = self.current_fn_may_alloc
         let saved_current_fn_symbol: i32 = self.current_fn_symbol
+        // A generic or callee-first body is checked inside its caller, but
+        // its operations do not belong to the caller's lexical unsafe block.
+        // The callee's own unsafe declaration/block establishes its context.
+        let saved_body_unsafe: i32 = self.in_unsafe
+        let saved_unsafe_scope_used = move self.unsafe_scope_used
+        let saved_unsafe_scope_nodes = move self.unsafe_scope_nodes
+        self.in_unsafe = 0
+        self.unsafe_scope_used = Vec.new()
+        self.unsafe_scope_nodes = Vec.new()
         self.current_fn_may_alloc = 0
         self.current_fn_symbol = fn_name
         if self.no_alloc_fns.contains(fn_name):
@@ -4065,6 +4083,9 @@ impl Sema:
             self.implicit_binding_types.pop()
             self.implicit_binding_syms.pop()
         self.pop_scope()
+        self.in_unsafe = saved_body_unsafe
+        self.unsafe_scope_used = move saved_unsafe_scope_used
+        self.unsafe_scope_nodes = move saved_unsafe_scope_nodes
         if body_self_tid != 0:
             if saved_body_self != 0:
                 self.named_types.insert(self.syms.self_type, saved_body_self)
@@ -8240,6 +8261,27 @@ impl Sema:
         for i in 0..self.unsafe_scope_used.len() as i32:
             self.unsafe_scope_used[i] = 1
 
+    fn unsafe_scope_has_mutated_global(node: i32) -> bool:
+        var ri = 0
+        while ri + 1 < self.unsafe_global_scope_reads.len() as i32:
+            if self.unsafe_global_scope_reads[ri] == node and self.global_race_mutated_syms.contains(self.unsafe_global_scope_reads[ri + 1]):
+                return true
+            ri = ri + 2
+        false
+
+    mut fn finalize_unsafe_global_scope_checks():
+        let required: HashMap[i32, i32] = sema_new_map_i32_i32()
+        var ri = 0
+        while ri + 1 < self.unsafe_global_scope_reads.len() as i32:
+            if self.global_race_mutated_syms.contains(self.unsafe_global_scope_reads[ri + 1]):
+                required.insert(self.unsafe_global_scope_reads[ri], 1)
+            ri = ri + 2
+        self.unsafe_global_scopes_resolved = 1
+        for ni in 0..self.deferred_unsafe_global_scopes.len() as i32:
+            let node: i32 = self.deferred_unsafe_global_scopes[ni]
+            if not required.contains(node):
+                self.emit_error("unsafe block contains no unsafe operations", node)
+
     mut fn require_unsafe_operation(msg: &str, node: i32) -> i32:
         if self.in_unsafe == 0:
             self.emit_error(msg, node)
@@ -8940,6 +8982,7 @@ impl Sema:
                 self.emit_warning("redundant unsafe prefix inside unsafe context", node)
             if tracks_use != 0:
                 self.unsafe_scope_used.push(0)
+                self.unsafe_scope_nodes.push(node)
             self.in_unsafe = 1
             let body = self.ast.get_data0(node)
             // Propagate expected type through unsafe block
@@ -8949,8 +8992,17 @@ impl Sema:
                 let used_idx = self.unsafe_scope_used.len() as i32 - 1
                 let used = if used_idx >= 0: self.unsafe_scope_used[used_idx] else: 0
                 let _ = self.unsafe_scope_used.pop()
+                let _ = self.unsafe_scope_nodes.pop()
                 if unsafe_result != 0 and used == 0:
                     self.emit_error("unsafe block contains no unsafe operations", node)
+                else if unsafe_result != 0 and used == 2:
+                    // Late generic bodies use completed facts immediately;
+                    // ordinary bodies leave this verdict to the module pass.
+                    if self.unsafe_global_scopes_resolved != 0:
+                        if not self.unsafe_scope_has_mutated_global(node):
+                            self.emit_error("unsafe block contains no unsafe operations", node)
+                    else:
+                        self.deferred_unsafe_global_scopes.push(node)
             if is_prefix and unsafe_result != 0 and self.unsafe_prefix_has_raw_access(body) == 0:
                 self.emit_error("unsafe prefix requires a raw pointer dereference or raw pointer index; use unsafe { ... } for compound unsafe expressions", node)
             return self.wrapper_tail_type(node, body, unsafe_result)

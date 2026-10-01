@@ -1786,7 +1786,13 @@ pub type Sema {
     // than as a standalone value. `2147483648` is not a valid i32, but
     // `-2147483648` is exactly i32::MIN.
     in_negated_literal_context: i32,
+    // Active lexical unsafe blocks: 0 unused, 1 definite unsafe operation,
+    // 2 a global read whose need depends on completed mutation facts.
     unsafe_scope_used: Vec[i32],
+    unsafe_scope_nodes: Vec[i32],
+    unsafe_global_scope_reads: Vec[i32], // [unsafe block node, global symbol]
+    deferred_unsafe_global_scopes: Vec[i32],
+    unsafe_global_scopes_resolved: i32,
     break_value_type: TypeId,
     has_break_value_type: i32,
     loop_depth: i32,
@@ -3238,6 +3244,10 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         in_bitwise_literal_context: 0,
         in_negated_literal_context: 0,
         unsafe_scope_used: Vec.new(),
+        unsafe_scope_nodes: Vec.new(),
+        unsafe_global_scope_reads: Vec.new(),
+        deferred_unsafe_global_scopes: Vec.new(),
+        unsafe_global_scopes_resolved: 0,
         break_value_type: 0,
         has_break_value_type: 0,
         loop_depth: 0,
@@ -8768,6 +8778,7 @@ impl Sema:
         // D5 superseded: free-parameter share-place is no longer inferred from
         // effects — the declared signature is authoritative (&T borrows, T owns).
         self.finalize_call_site_ownership()
+        self.finalize_unsafe_global_scope_checks()
         self.check_reachable_comptime_errors()
         self.diags.sort_from(diags_start)
         if profile:
