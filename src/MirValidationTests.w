@@ -1028,6 +1028,92 @@ pub fn mir_test_moved_drop:
     // A value with no drop glue frees nothing twice (a moved CStr view).
     assert(drop_state_verdict(0, false) == "")
 
+// #1944: a cancelled cleanup can leave no Drop statement anywhere in the
+// body. StorageDead must preserve MirLower's recorded ownership obligation.
+fn omitted_cleanup_verdict(cleanup: i32, dead: bool, owner: i32) -> str:
+    var mir_mod = MirModule.init()
+    for kind in [0, TypeKind.TY_STRUCT]:
+        mir_mod.sema_type_kinds.push(kind)
+        mir_mod.sema_type_d0.push(0)
+        mir_mod.sema_type_d1.push(0)
+        mir_mod.sema_type_d2.push(0)
+    var body = MirBody.init_for_fn(1)
+    body.local_type_ids[0] = 1
+    let local = body.new_temp(1)
+    if owner != 0: body.owned_cleanup_locals.push(local)
+    if owner == 2: body.mark_global_local(local)
+    if owner == 3: body.mark_caller_place_local(local)
+    let place = body.new_place(local)
+    let entry = body.new_block()
+    let fields: Vec[i32] = Vec.new()
+    let table = body.new_agg_fields(&fields, &fields)
+    let init = body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, table, 0)
+    body.push_stmt(entry, StmtKind.StorageLive, local, 0, 0)
+    body.push_stmt(entry, StmtKind.Assign, place, init, 0)
+    if cleanup == 1:
+        body.push_stmt(entry, StmtKind.Drop, place, 0, 0)
+    if cleanup == 2:
+        let return_place = body.new_place(0)
+        let taken = body.new_operand(OperandKind.OK_MOVE, place)
+        let moved = body.new_rvalue(RvalueKind.RK_USE, taken, 0, 0)
+        body.push_stmt(entry, StmtKind.Assign, return_place, moved, 0)
+    if dead: body.push_stmt(entry, StmtKind.StorageDead, local, 0, 0)
+    if cleanup == 3:
+        let return_place = body.new_place(0)
+        let taken = body.new_operand(OperandKind.OK_MOVE, place)
+        let moved = body.new_rvalue(RvalueKind.RK_USE, taken, 0, 0)
+        body.push_stmt(entry, StmtKind.Assign, return_place, moved, 0)
+    body.set_terminator(entry, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    validate_ownership_body(mir_mod, body)
+
+pub fn mir_test_omitted_cleanup:
+    assert(omitted_cleanup_verdict(0, true, 1).contains("still Init at return"))
+    assert(omitted_cleanup_verdict(0, false, 1).contains("still Init at return"))
+    assert(omitted_cleanup_verdict(1, true, 1) == "")
+    assert(omitted_cleanup_verdict(2, true, 1) == "")
+    assert(omitted_cleanup_verdict(3, true, 1) == "")
+    assert(omitted_cleanup_verdict(0, true, 0) == "")
+    assert(omitted_cleanup_verdict(0, true, 2) == "")
+    assert(omitted_cleanup_verdict(0, true, 3) == "")
+
+fn constant_cleanup_verdict(kind: i32, value: i32) -> str:
+    var mir_mod = MirModule.init()
+    for tk in [0, TypeKind.TY_STRUCT]:
+        mir_mod.sema_type_kinds.push(tk)
+        mir_mod.sema_type_d0.push(0)
+        mir_mod.sema_type_d1.push(0)
+        mir_mod.sema_type_d2.push(0)
+    var body = MirBody.init_for_fn(1)
+    body.local_type_ids[0] = 1
+    let local = body.new_temp(1)
+    body.owned_cleanup_locals.push(local)
+    let place = body.new_place(local)
+    let entry = body.new_block()
+    let good = body.new_block()
+    let bad = body.new_block()
+    let fields: Vec[i32] = Vec.new()
+    let table = body.new_agg_fields(&fields, &fields)
+    let init = body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, table, 0)
+    body.push_stmt(entry, StmtKind.Assign, place, init, 0)
+    let cid = body.new_const(kind, value, 0, 0, 1)
+    let flag = body.new_operand(OperandKind.OK_CONSTANT, cid)
+    let vals: Vec[i64] = Vec.new()
+    vals.push(1)
+    let targets: Vec[i32] = Vec.new()
+    targets.push(good)
+    let choices = body.new_switch_table(&vals, &targets)
+    body.set_terminator(entry, TermKind.TK_SWITCH_INT, flag, choices, bad, 0, 0)
+    body.push_stmt(good, StmtKind.Drop, place, 0, 0)
+    body.set_terminator(good, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    body.push_stmt(bad, StmtKind.StorageDead, local, 0, 0)
+    body.set_terminator(bad, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    validate_ownership_body(mir_mod, body)
+
+pub fn mir_test_constant_cleanup:
+    for kind in [ConstKind.CK_BOOL, ConstKind.CK_INT]:
+        assert(constant_cleanup_verdict(kind, 1) == "")
+        assert(constant_cleanup_verdict(kind, 0).contains("still Init at return"))
+
 pub fn mir_test_maybe_uninit_drop:
     assert(drop_state_verdict(4, true).contains("drop of _2 reaches a path where it holds no value"))
     assert(drop_state_verdict(4, true).contains("(Maybe)"))

@@ -11,7 +11,8 @@ fn main:
     let stdout_path = dir ++ "/stdout"
     let stderr_path = dir ++ "/stderr"
     let saved_limit = env("WITH_MEMORY_LIMIT_BYTES")
-    // The old evaluator retains 64 MiB of unchanged input for 2000 updates.
+    // Repeated reads of the 64 KiB receiver exceeded this limit before
+    // branch-local cleanup was restored (#1944).
     // This bounds the actual allocation path, independent of host RSS noise.
     assert(set_env("WITH_MEMORY_LIMIT_BYTES", "33554432") == 0)
     let checked = run_to_files(&[compiler.clone(), "check", "test/behavior/lib/comptime_reader_snapshots.w"], stdout_path, stderr_path, 30000)

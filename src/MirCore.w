@@ -452,6 +452,10 @@ pub type MirBody {
     // a share-place parameter, a Drop body's self). The callee writes through
     // it and the caller drops it: MirLower schedules no drop for it (#1822).
     local_is_caller_place: Vec[i32],
+    // MirLower scheduled owned-value cleanup, even if every emitted drop was
+    // later cancelled. The validator must not infer ownership from surviving
+    // Drop statements: that misses a compiler that omits all of them (#1944).
+    owned_cleanup_locals: Vec[i32],
     n_params: i32,
     // Blocks ending in mutual tail calls (marked by mutual TCO pass).
     mutual_tail_bbs: Vec[i32],
@@ -743,6 +747,7 @@ fn MirBody.init_for_fn(fn_sym: i32) -> MirBody:
         local_is_user_var: Vec.new(),
         local_is_global: Vec.new(),
         local_is_caller_place: Vec.new(),
+        owned_cleanup_locals: Vec.new(),
         n_params: 0,
         mutual_tail_bbs: Vec.new(),
         bb_stmt_starts: Vec.new(),
@@ -1294,6 +1299,9 @@ const MIR_DROP_STATE_CHUNK = 128
 
 pub type MirDropStateKeys {
     names: Vec[str],
+    // Scope-owned values remain ownership obligations after StorageDead;
+    // a block tail can transfer them immediately after that marker.
+    owned_cleanup: Vec[i32],
     // Base local of each key (a local's own key has itself).
     base_local: Vec[i32],
     // Projection keys grouped by base local (CSR over local id): the
@@ -1399,11 +1407,16 @@ pub fn mir_drop_state_keys_new(body: &MirBody) -> MirDropStateKeys:
     var base_local: Vec[i32] = Vec.new()
     var index: HashMap[str, i32] = HashMap.new()
     let local_count = body.local_count()
+    var owned_cleanup: Vec[i32] = Vec.new()
     for li in 0..local_count:
         let name = mir_drop_state_local_key(li)
         index.insert(name ++ "", li)
         names.push(name)
         base_local.push(li)
+        owned_cleanup.push(0)
+    for li in body.owned_cleanup_locals:
+        if li >= 0 and li < local_count:
+            owned_cleanup[li] = 1
     var place_key: Vec[i32] = Vec.new()
     for p in 0..body.place_locals.len() as i32:
         let base: i32 = body.place_locals[p]
@@ -1444,7 +1457,7 @@ pub fn mir_drop_state_keys_new(body: &MirBody) -> MirDropStateKeys:
         fill[base] = slot + 1
     let key_count = names.len() as i32
     let chunk = if key_count >= MIR_DROP_STATE_CHUNK: MIR_DROP_STATE_CHUNK else if key_count > 0: key_count else: 1
-    MirDropStateKeys { names, base_local, child_starts, children, place_key, index, chunk, chunk_data: Vec.new(), chunk_heads: HashMap.new(), chunk_next: Vec.new(), chunk_joins: HashMap.new() }
+    MirDropStateKeys { names, owned_cleanup, base_local, child_starts, children, place_key, index, chunk, chunk_data: Vec.new(), chunk_heads: HashMap.new(), chunk_next: Vec.new(), chunk_joins: HashMap.new() }
 
 // One chunk ref per chunk of keys: `id >= 0` is a stored chunk of the key
 // table, `-(slot + 1)` a chunk private to this map in `own`. The first write
@@ -1612,7 +1625,11 @@ impl MirDropStateMap:
             let initial = if d1 != 0 or (d0 > 0 and d0 <= body.n_params): MirDropState.Init else: MirDropState.Uninit
             self.mark_local(keys, d0, initial)
         else if kind == StmtKind.StorageDead:
-            self.mark_local(keys, d0, MirDropState.Uninit)
+            // Ending a storage scope cannot discharge an owned value. Keep
+            // tracking it until an explicit move or drop, including the tail
+            // move that lowering can emit after the scope's marker (#1944).
+            if d0 < 0 or d0 >= keys.owned_cleanup.len() or keys.owned_cleanup[d0] == 0:
+                self.mark_local(keys, d0, MirDropState.Uninit)
         else if kind == StmtKind.Assign:
             self.note_rvalue(keys, body, d1)
             // The reset-on-move blank (`x = const zst(T)`) stores the sentinel,
@@ -1735,6 +1752,30 @@ fn mir_drop_state_key_is_descendant(key: &str, local_key: &str) -> bool:
     let ch = key[local_key.len()]
     ch == '.' or ch == '[' or ch == '<'
 
+// A literal switch has one executable edge. In particular, the exit edge
+// of `while true` cannot carry an ownership obligation to a return (#1944).
+fn mir_drop_state_constant_switch_target(body: &MirBody, bb: i32) -> i32:
+    if body.term_kind(bb) != TermKind.TK_SWITCH_INT:
+        return -1
+    let operand = body.term_data0(bb)
+    if operand < 0 or operand >= body.operand_kinds.len() or body.operand_kinds[operand] != OperandKind.OK_CONSTANT:
+        return -1
+    let cid = body.operand_d0[operand]
+    if cid < 0 or cid >= body.const_kinds.len():
+        return -1
+    let kind = body.const_kinds[cid]
+    if kind != ConstKind.CK_BOOL and kind != ConstKind.CK_INT:
+        return -1
+    let value = if kind == ConstKind.CK_BOOL: body.const_d0[cid] as i64 else: mir_const_int_value(body, cid)
+    let table = body.term_data1(bb)
+    if table >= 0 and table < body.switch_table_starts.len():
+        let start: i32 = body.switch_table_starts[table]
+        let count: i32 = body.switch_table_counts[table]
+        for i in 0..count:
+            if body.switch_table_vals[start + i] == value:
+                return body.switch_table_targets[start + i]
+    body.term_data2(bb)
+
 pub fn mir_drop_state_block_has_successor(body: &MirBody, pred: i32, target: i32) -> bool:
     let kind = body.term_kind(pred)
     let d0 = body.term_data0(pred)
@@ -1744,6 +1785,9 @@ pub fn mir_drop_state_block_has_successor(body: &MirBody, pred: i32, target: i32
     if kind == TermKind.TK_GOTO:
         return d0 == target
     if kind == TermKind.TK_SWITCH_INT:
+        let chosen = mir_drop_state_constant_switch_target(body, pred)
+        if chosen >= 0:
+            return chosen == target
         if d2 == target:
             return true
         if d1 >= 0 and d1 < body.switch_table_starts.len():
@@ -1771,6 +1815,10 @@ fn mir_drop_state_block_successors(body: &MirBody, bb: i32) -> Vec[i32]:
     if kind == TermKind.TK_GOTO:
         out.push(d0)
     else if kind == TermKind.TK_SWITCH_INT:
+        let chosen = mir_drop_state_constant_switch_target(body, bb)
+        if chosen >= 0:
+            out.push(chosen)
+            return out
         if d1 >= 0 and d1 < body.switch_table_starts.len():
             let start: i32 = body.switch_table_starts[d1]
             let count: i32 = body.switch_table_counts[d1]
@@ -2616,6 +2664,10 @@ pub fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
     var dropped_local: Vec[i32] = Vec.new()
     for _ in 0..body.local_type_ids.len():
         dropped_local.push(0)
+    for li in body.owned_cleanup_locals:
+        if li < 0 or li >= dropped_local.len():
+            return f"fn sym{body.fn_sym}: owned cleanup local _{li} is out of range"
+        dropped_local[li] = 1
     for bb in 0..body.block_count():
         let stmt_start = body.bb_stmt_starts[bb]
         let stmt_count = body.bb_stmt_counts[bb]

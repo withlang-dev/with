@@ -32,6 +32,7 @@ type DropScope {
 // keeps entries and their path storage atomic.
 type MirMoveStateSnapshot {
     moved_values: Vec[i32],
+    drop_kinds: Vec[i32],
     field_base_locals: Vec[i32],
     field_path_starts: Vec[i32],
     field_path_counts: Vec[i32],
@@ -412,7 +413,9 @@ impl MirBuilder:
         self.defer_scope_starts.push(self.defer_nodes.len() as i32)
         self.errdefer_scope_starts.push(self.errdefer_nodes.len() as i32)
 
-    fn schedule_drop(local_id: i32, drop_kind: i32) -> Unit:
+    fn schedule_drop(local_id: i32, drop_kind: i32):
+        if self.drop_kind_owns_value(drop_kind) != 0:
+            self.body.owned_cleanup_locals.push(local_id)
         if self.drop_kind_owns_value(drop_kind) != 0 and self.local_value_moved(local_id) != 0:
             self.drop_local_ids.push(local_id)
             self.drop_kinds.push(DropKind.DK_STORAGE)
@@ -533,6 +536,7 @@ impl MirBuilder:
     fn save_move_state() -> MirMoveStateSnapshot:
         MirMoveStateSnapshot {
             moved_values: mir_clone_i32_vec(&self.moved_value_local_ids),
+            drop_kinds: mir_clone_i32_vec(&self.drop_kinds),
             field_base_locals: mir_clone_i32_vec(&self.moved_field_base_locals),
             field_path_starts: mir_clone_i32_vec(&self.moved_field_path_starts),
             field_path_counts: mir_clone_i32_vec(&self.moved_field_path_counts),
@@ -542,6 +546,12 @@ impl MirBuilder:
 
     mut fn restore_move_state(snapshot: &MirMoveStateSnapshot):
         self.moved_value_local_ids = mir_clone_i32_vec(&snapshot.moved_values)
+        // A return or carrier elimination can retire an outer owner's cleanup
+        // on one arm. That retirement belongs to the arm, just like its move.
+        // Keep later registrations and restore the pre-existing scope prefix.
+        for i in 0..snapshot.drop_kinds.len():
+            if i < self.drop_kinds.len():
+                self.drop_kinds[i] = snapshot.drop_kinds[i]
         self.moved_field_base_locals = mir_clone_i32_vec(&snapshot.field_base_locals)
         self.moved_field_path_starts = mir_clone_i32_vec(&snapshot.field_path_starts)
         self.moved_field_path_counts = mir_clone_i32_vec(&snapshot.field_path_counts)
@@ -798,6 +808,18 @@ impl MirBuilder:
         // before the drop glue runs over it (#1394).
         if self.pending_payload_reset_places.len() > 0 and place >= 0 and place < self.body.place_locals.len():
             self.emit_payload_resets(self.body.place_locals[place])
+        // A custom Drop still receives the whole partially-moved value.
+        // Scope cleanup can precede the enclosing statement's reset flush
+        // (a nested block tail), so blank its moved fields before calling
+        // that destructor, just as for a moved variant payload above.
+        if place >= 0 and place < self.body.place_locals.len():
+            let base_local: i32 = self.body.place_locals[place]
+            for i in 0..self.pending_reset_field_places.len():
+                let field_place: i32 = self.pending_reset_field_places[i]
+                if self.body.place_locals[field_place] == base_local:
+                    let zero = self.body.gen_zero_operand(self.pending_reset_field_types[i])
+                    let reset = self.body.new_rvalue(RvalueKind.RK_USE, zero, 0, 0)
+                    self.body.push_stmt(self.cur_bb, StmtKind.Assign, field_place, reset, 0)
         let stmt_id = self.body.stmt_count()
         let place_text = mir_place_text(&self.body, place)
         let origin = self.pool.intern(f"drop#{stmt_id} {origin_kind} {place_text}")
@@ -845,7 +867,7 @@ impl MirBuilder:
             return 1
         0
 
-    fn register_stmt_temp(local_id: i32, type_id: i32) -> Unit:
+    fn register_stmt_temp(local_id: i32, type_id: i32):
         if self.stmt_temp_starts.len() == 0:
             return
         if self.stmt_temp_needs_drop(type_id) == 0:
@@ -6892,15 +6914,10 @@ impl MirBuilder:
                 if op_kind == OperandKind.OK_COPY or op_kind == OperandKind.OK_MOVE:
                     return self.body.operand_d0[pipeline_op]
 
-        if kind == NodeKind.NK_MOVE_ARG:
-            let inner = self.ast.get_data0(node)
-            let place = self.lower_expr_place(inner)
-            let local_id = mir_place_plain_local(&self.body, place)
-            if local_id >= 0:
-                self.mark_local_value_moved(local_id)
-                self.cancel_scheduled_value_drop_for_local(local_id)
-                self.cancel_stmt_temp_for_local(local_id)
-            return place
+        // D16: `move x` is an owned rvalue even when a caller needs a
+        // borrowed place. It falls through to materialization below: the
+        // source moves into a statement temporary, which owns its cleanup.
+        // Returning x's original place here retired the only cleanup (#1944).
 
         // Transparent pass-through. lower_expr already does this for the rvalue
         // case (line 4043); the place version was missing the same handling, so

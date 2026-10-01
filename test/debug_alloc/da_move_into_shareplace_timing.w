@@ -1,6 +1,6 @@
 //! expect-debug-alloc: leak count=0
 // D16 (rvalue-uniform `move`): moving into a callee whose parameter only
-// borrows (share-place) still MOVES — the value becomes a statement temporary
+// borrows (&T) still MOVES — the value becomes a statement temporary
 // and is destroyed at the end of the call statement, not at scope exit. The
 // assert directly after the call pins the timing: before D16 the drop was
 // silently deferred to scope exit and drops was still 0 here.
@@ -18,7 +18,7 @@ impl Drop for Resource:
 fn new_resource(slot: *mut i32) -> Resource:
     unsafe { Resource { ptr: with_alloc(32), slot } }
 
-fn borrows(x: Resource):
+fn borrows(x: &Resource):
     let _k = x.ptr
 
 fn main:
