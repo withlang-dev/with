@@ -2673,13 +2673,15 @@ impl Sema:
     mut fn collect_impl_decl(node: i32, is_local_impl: i32) -> Unit:
         let type_name = self.ast.get_data0(node)
         let trait_sym = self.ast.get_data2(node)
+        let declared_target = self.lookup_named_type_visible(type_name)
         // §18.3: an impl on another module's private type attaches to nothing;
         // every method's `self` was silently an error type and each use
         // surfaced as "unknown method … for type '&<error>'" far from the
         // cause (#1520 fallout: `impl Codegen:` in CodegenDispatch.w).
-        if self.lookup_named_type_visible(type_name) == 0 and self.private_symbol_path_from_current(type_name).len() > 0:
+        if declared_target == 0 and self.private_symbol_path_from_current(type_name).len() > 0:
             self.emit_private_symbol_error(type_name, node)
             return
+        self.impl_decl_target_types.insert(node, declared_target)
         if trait_sym == 0:
             return
 
@@ -2836,6 +2838,8 @@ impl Sema:
         var exact_generic_impl = 0
         if target_type_node != 0:
             let target_tid = self.resolve_type_expr(target_type_node)
+            if target_tid != 0:
+                self.impl_decl_target_types.insert(node, target_tid as i32)
             if target_tid != 0 and self.get_type_kind(target_tid) == TypeKind.TY_GENERIC_INST:
                 let gi_key = sema_pair_key(target_tid as i32, trait_sym)
                 if self.impl_generic_inst.contains(gi_key):

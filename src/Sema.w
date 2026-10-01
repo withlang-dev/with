@@ -637,6 +637,9 @@ pub type Sema {
     trait_decl_node_cache: HashMap[i32, i32],
     // Exact type binding for each declaration node.
     type_decl_tids: HashMap[i32, i32],
+    // Impl targets resolved in the declaration's lexical module, before any
+    // body can ask which concrete destructor a dynamic value may run.
+    impl_decl_target_types: HashMap[i32, i32],
     // Temporary accumulators for cycle detection (accessed through self)
     cycle_dep_syms: Vec[i32],
     cycle_dep_nodes: Vec[i32],
@@ -2647,6 +2650,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         type_decl_nodes,
         trait_decl_node_cache,
         type_decl_tids,
+        impl_decl_target_types: sema_new_map_i32_i32(),
         cycle_dep_syms: Vec.new(),
         cycle_dep_nodes: Vec.new(),
         pretty_symbol_names,

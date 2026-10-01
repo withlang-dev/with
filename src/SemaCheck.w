@@ -2702,11 +2702,11 @@ impl Sema:
                     if self.ast.kind(decl) != NodeKind.NK_IMPL_DECL or self.ast.get_data2(decl) != trait_sym:
                         continue
                     let target_sym = self.ast.get_data0(decl)
-                    let target = self.lookup_named_type_visible(target_sym)
+                    let target = self.impl_decl_target_types.get(decl) ?? 0
                     self.global_drop_impl_targets.push(t)
                     self.global_drop_impl_targets.push(decl)
                     self.global_drop_impl_targets.push(target)
-                    self.global_drop_impl_contexts.push(self.current_module_path.clone())
+                    self.global_drop_impl_contexts.push(self.decl_source_path_for_node(decl))
                     if target > 0:
                         work.push(self.resolve_alias(target as TypeId) as i32)
                     for ti in 1..self.type_kinds.len() as i32:
