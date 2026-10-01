@@ -7856,7 +7856,9 @@ impl Sema:
         let count = self.sig_param_counts[si]
         if pi < 0 or pi >= count:
             return
-        self.sig_param_effects[(start + pi)] = eff
+        // A validity requirement is stronger than the observational read
+        // category, whether found in the body or added by the fixed point.
+        self.sig_param_effects[(start + pi)] = if (eff & EFF_RAW_PTR_VALIDITY) != 0: eff & ~EFF_READ else: eff
 
     mut fn set_sig_param_direct_effect(si: i32, pi: i32, eff: i32):
         if si < 0 or si >= self.sig_param_eff_starts.len() as i32:
@@ -7953,7 +7955,7 @@ impl Sema:
             // ownership-forcing bit. The origin node is carried in
             // effect_note_origin_node (set by note_place_effect and the other
             // node-bearing noters; 0 when unknown).
-            let new_bits = eff & (EFF_CONSUME | EFF_ESCAPE_VALUE | EFF_WRITE) & (2147483647 - cur)
+            let new_bits = eff & (EFF_CONSUME | EFF_ESCAPE_VALUE | EFF_WRITE | EFF_RAW_PTR_VALIDITY) & (2147483647 - cur)
             if new_bits != 0:
                 self.record_effect_provenance_direct(self.current_fn_sig_idx, pi, new_bits, self.effect_note_origin_node)
             if self.recording_propagated_effect == 0:
@@ -7971,6 +7973,8 @@ impl Sema:
             self.record_effect_provenance_bit(sig, pi, 1, 1, node, self.local_file_id)
         if (bits & EFF_WRITE) != 0:
             self.record_effect_provenance_bit(sig, pi, 2, 1, node, self.local_file_id)
+        if (bits & EFF_RAW_PTR_VALIDITY) != 0:
+            self.record_effect_provenance_bit(sig, pi, 3, 1, node, self.local_file_id)
 
     fn record_effect_provenance_edge(sig: i32, pi: i32, bits: i32, callee_sig: i32, callee_pi: i32):
         if (bits & EFF_CONSUME) != 0:
@@ -7979,6 +7983,8 @@ impl Sema:
             self.record_effect_provenance_bit(sig, pi, 1, 2, callee_sig, callee_pi)
         if (bits & EFF_WRITE) != 0:
             self.record_effect_provenance_bit(sig, pi, 2, 2, callee_sig, callee_pi)
+        if (bits & EFF_RAW_PTR_VALIDITY) != 0:
+            self.record_effect_provenance_bit(sig, pi, 3, 2, callee_sig, callee_pi)
 
     fn record_effect_provenance_bit(sig: i32, pi: i32, bit_idx: i32, kind: i64, a: i32, b: i32):
         let key = effect_prov_key(sig, pi, bit_idx)
@@ -8054,16 +8060,22 @@ impl Sema:
         if caller_sig < 0 or callee_sig < 0 or callee_pi < 0 or arg_node <= 0:
             return
         let root = self.place_root_sym(arg_node)
-        if root == 0:
-            return
-        let caller_pi = self.param_index_for_sym(root)
-        if caller_pi < 0:
-            return
+        let caller_pi = if root != 0: self.param_index_for_sym(root) else: -1
+        if caller_pi >= 0:
+            self.record_effect_edge_for_param(caller_sig, caller_pi, callee_sig, callee_pi, self.effect_arg_is_projection(arg_node))
+        // Raw pointer copies keep the same validity obligation. Snapshot
+        // their parameter origins while the local binding facts are live.
+        let raw_origins = self.raw_pointer_param_origin_mask(arg_node)
+        for pi in 0..self.current_fn_param_syms.len() as i32:
+            if pi != caller_pi and (raw_origins & sema_param_origin_bit(pi)) != 0:
+                self.record_effect_edge_for_param(caller_sig, pi, callee_sig, callee_pi, 1)
+
+    fn record_effect_edge_for_param(caller_sig: i32, caller_pi: i32, callee_sig: i32, callee_pi: i32, projection: i32):
         self.effect_flow_edges.push(caller_sig)
         self.effect_flow_edges.push(caller_pi)
         self.effect_flow_edges.push(callee_sig)
         self.effect_flow_edges.push(callee_pi)
-        self.effect_flow_projections.push(self.effect_arg_is_projection(arg_node))
+        self.effect_flow_projections.push(projection)
 
     // #D5/P0 + D7: complete transitive write/consume/escape_value effects across the whole call
     // graph, so every sig_param_effects entry is final before any share-place
@@ -8089,12 +8101,21 @@ impl Sema:
     // `callee_param_is_copy` is the Copy-ness of the callee parameter's type,
     // supplied by the caller: is_copy (computing, pre-freeze) in the fixpoint,
     // is_copy_frozen (read-only) in the audit.
-    fn effect_edge_transfer(callee_sig: i32, callee_pi: i32, projection: i32, callee_param_is_copy: i32) -> i32:
+    fn effect_edge_transfer(caller_sig: i32, caller_pi: i32, callee_sig: i32, callee_pi: i32, projection: i32, callee_param_is_copy: i32) -> i32:
         let callee_eff = self.sig_param_effect(callee_sig, callee_pi)
-        var trans = callee_eff & (EFF_WRITE | EFF_CONSUME | EFF_ESCAPE_VALUE)
+        var trans = callee_eff & (EFF_WRITE | EFF_CONSUME | EFF_ESCAPE_VALUE | EFF_RAW_PTR_VALIDITY)
         let e_owning = trans & (EFF_CONSUME | EFF_ESCAPE_VALUE)
         if projection != 0 and e_owning != 0 and callee_param_is_copy == 0:
             trans = (trans - e_owning) | EFF_WRITE
+        // References and pointers never own through a parameter. They can
+        // still carry a pointee-validity contract, including &*T.
+        let caller_ty = self.sig_param_type(caller_sig, caller_pi)
+        if caller_ty > 0:
+            let caller_kind = self.get_type_kind(self.resolve_alias(caller_ty))
+            if caller_kind == TypeKind.TY_REF or caller_kind == TypeKind.TY_PTR:
+                trans = trans & EFF_RAW_PTR_VALIDITY
+        if self.type_is_raw_pointer_value(caller_ty) == 0:
+            trans = trans & ~EFF_RAW_PTR_VALIDITY
         trans
 
     mut fn fixpoint_effect_flow():
@@ -8118,14 +8139,9 @@ impl Sema:
                 edge_index = edge_index + 1
                 let edge_arg_ty = self.sig_param_type(callee_sig, callee_pi)
                 let edge_arg_is_copy = if edge_arg_ty > 0: self.is_copy(edge_arg_ty as TypeId) else: 1
-                let trans = self.effect_edge_transfer(callee_sig, callee_pi, projection, edge_arg_is_copy)
+                let trans = self.effect_edge_transfer(caller_sig, caller_pi, callee_sig, callee_pi, projection, edge_arg_is_copy)
                 if trans == 0:
                     continue
-                let p_tid = self.sig_param_type(caller_sig, caller_pi)
-                if p_tid > 0:
-                    let p_tk = self.get_type_kind(self.resolve_alias(p_tid))
-                    if p_tk == TypeKind.TY_REF or p_tk == TypeKind.TY_PTR:
-                        continue
                 let caller_eff = self.sig_param_effect(caller_sig, caller_pi)
                 let merged = caller_eff | trans
                 if merged != caller_eff:
@@ -8719,6 +8735,7 @@ impl Sema:
         // write/consume/escape_value effects across the call graph so sig_param_effects is
         // final before any share-place decision (lowering/ABI) reads it.
         self.fixpoint_effect_flow()
+        self.enforce_raw_pointer_contracts()
         // D63: a callable parameter passed on is invoked as often as the
         // parameter it reaches; settled before closure arguments are judged.
         self.propagate_callable_forwards()

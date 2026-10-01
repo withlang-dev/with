@@ -46,8 +46,8 @@ pub fn ZipArchive.open(path: &str) -> Result[ZipArchive, ZipError]:
     if handle == null: return Err(zip_error(UNZ_BADZIPFILE, "not a readable ZIP archive: " ++ path))
     Ok(ZipArchive { handle: handle })
 
-// The entry the archive's cursor is on.
-fn zip_current_entry(handle: *mut c_void) -> Result[ZipEntry, ZipError]:
+// The entry the archive's cursor is on; handle is a live minizip archive.
+unsafe fn zip_current_entry(handle: *mut c_void) -> Result[ZipEntry, ZipError]:
     var info = unz_file_info64_s { tmu_date: tm_unz_s {} }
     let name_buf = with_alloc(ZIP_NAME_MAX as i64 + 1) as *mut i8
     let rc = unsafe { unzGetCurrentFileInfo64(handle, &raw mut info, name_buf, ZIP_NAME_MAX as c_ulong, null, 0, null, 0) }
@@ -69,7 +69,7 @@ impl ZipArchive:
         var out: Vec[ZipEntry] = Vec.new()
         var rc = unsafe { unzGoToFirstFile(self.handle) }
         while rc == UNZ_OK:
-            out.push(zip_current_entry(self.handle)?)
+            out.push(unsafe { zip_current_entry(self.handle) }?)
             rc = unsafe { unzGoToNextFile(self.handle) }
         if rc != UNZ_END_OF_LIST_OF_FILE: return Err(zip_error(rc, "cannot walk the archive's directory"))
         out
@@ -81,7 +81,7 @@ impl ZipArchive:
             Err(_) => return Err(zip_error(UNZ_PARAMERROR, "an entry name cannot hold a NUL byte"))
         let rc = unsafe { unzLocateFile(self.handle, cname.ptr as *const i8, 1) }
         if rc != UNZ_OK: return Err(zip_error(rc, "no entry named " ++ name))
-        zip_drain_current(self.handle, null)
+        unsafe { zip_drain_current(self.handle, null) }
 
     /// Writes every member under `dest` (created if missing) and returns the
     /// number of files written. An entry whose name would land outside
@@ -91,7 +91,7 @@ impl ZipArchive:
         var written = 0
         var rc = unsafe { unzGoToFirstFile(self.handle) }
         while rc == UNZ_OK:
-            let entry = zip_current_entry(self.handle)?
+            let entry = unsafe { zip_current_entry(self.handle) }?
             if not zip_name_is_contained(entry.name): return Err(zip_error(UNZ_BADZIPFILE, "an entry escapes the destination: " ++ entry.name))
             let target = dest ++ "/" ++ entry.name
             if entry.is_dir:
@@ -99,7 +99,7 @@ impl ZipArchive:
             else:
                 let slash = zip_last_slash(target)
                 if slash > 0 and mkdir_p(target.slice(0, slash)) != 0: return Err(zip_error(UNZ_ERRNO, "cannot create the directory of " ++ target))
-                zip_write_current(self.handle, target)?
+                unsafe { zip_write_current(self.handle, target) }?
                 if (entry.mode & 0o111) != 0: chmod(target, entry.mode)
                 written = written + 1
             rc = unsafe { unzGoToNextFile(self.handle) }
@@ -125,7 +125,7 @@ fn zip_name_is_contained(name: &str) -> bool:
         if part == "..": return false
     true
 
-fn zip_write_current(handle: *mut c_void, target: &str) -> Result[Unit, ZipError]:
+unsafe fn zip_write_current(handle: *mut c_void, target: &str) -> Result[Unit, ZipError]:
     let ctarget = match target.to_cstring():
         Ok(c) => c
         Err(_) => return Err(zip_error(UNZ_PARAMERROR, "an entry name cannot hold a NUL byte"))
@@ -139,7 +139,7 @@ fn zip_write_current(handle: *mut c_void, target: &str) -> Result[Unit, ZipError
 // Decompresses the current member: into `stream` when it is set (the
 // returned bytes are then empty), else into the returned bytes. Closing the
 // member is where minizip checks the CRC-32.
-fn zip_drain_current(handle: *mut c_void, stream: *mut c_void) -> Result[Vec[u8], ZipError]:
+unsafe fn zip_drain_current(handle: *mut c_void, stream: *mut c_void) -> Result[Vec[u8], ZipError]:
     let opened = unsafe { unzOpenCurrentFile(handle) }
     if opened != UNZ_OK: return Err(zip_error(opened, "cannot open an entry (an encrypted or unsupported method)"))
     let buf = with_alloc(ZIP_CHUNK as i64) as *mut u8
@@ -150,7 +150,7 @@ fn zip_drain_current(handle: *mut c_void, stream: *mut c_void) -> Result[Vec[u8]
         if stream != null:
             if fwrite(buf as *const c_void, 1, n as u64, stream) != n as u64: failure = UNZ_ERRNO
         else:
-            for i in 0..n: bytes.push(unsafe *((buf as i64 + i) as *const u8))
+            for i in 0..n: bytes.push(*((buf as i64 + i) as *const u8))
         if failure == 0: n = unsafe { unzReadCurrentFile(handle, buf as *mut c_void, ZIP_CHUNK as c_uint) }
     with_free(buf)
     let closed = unsafe { unzCloseCurrentFile(handle) }

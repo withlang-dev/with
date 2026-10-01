@@ -3955,7 +3955,6 @@ impl Sema:
         // For &T/*T-typed params, clamp to effects they can semantically carry.
         // References may carry returned-view origins; raw pointers carry raw
         // validity preconditions instead. Neither owns through the parameter.
-        var raw_validity_param_sym = 0
         // A facade declared this signature's summary before any body was
         // checked (facade_declare_view_of_param: a constructor's dependency
         // facts, a text/record view's `from param N`); the rendered body
@@ -3998,8 +3997,6 @@ impl Sema:
                     self.set_sig_param_view_origin(sig_idx, pi, self.current_fn_param_origins[pi] | declared_origin)
                 else:
                     self.set_sig_param_view_origin(sig_idx, pi, declared_origin)
-                if raw_validity_param_sym == 0 and (eff & EFF_RAW_PTR_VALIDITY) != 0 and pi < self.current_fn_param_syms.len() as i32:
-                    raw_validity_param_sym = self.current_fn_param_syms[pi]
             // D63 call-once: published for every parameter — a callable
             // parameter that is only invoked accrues no effect bits, so this
             // sits outside the `eff != 0` guard above.
@@ -4012,9 +4009,6 @@ impl Sema:
                     let once_name: str = with_str_clone_ref(self.pool_resolve(invoke_sym))
                     self.emit_error("`" ++ once_name ++ "` is declared `once`, but this body may invoke it more than once — a second call, or a call inside a loop (§12.4)", self.fn_param_many_nodes.get(invoke_sym) ?? node)
 
-        if raw_validity_param_sym != 0 and self.fn_symbol_is_unsafe(fn_name) == 0:
-            let param_name: str = self.pool_resolve(raw_validity_param_sym)
-            self.emit_error(f"safe function relies on caller-guaranteed raw pointer validity for parameter '{param_name}'; declare it unsafe fn or model a safe pointer contract", node)
         if self.current_fn_may_alloc != 0:
             self.fn_may_alloc.insert(fn_name, 1)
         else:
@@ -8268,19 +8262,75 @@ impl Sema:
             return
         if sema_path_is_migrated_regex_implementation(self.current_module_path) != 0:
             return
-        let root = self.place_root_sym(expr_node)
-        if root == 0:
-            return
-        self.note_raw_pointer_validity_param(root)
-        let dep_count = self.binding_view_dep_count(root)
-        for i in 0..dep_count:
-            self.note_raw_pointer_validity_param(self.binding_view_dep_at(root, i))
-        let origin_mask = self.binding_view_origin_mask(root)
-        if origin_mask != 0:
-            for pi in 0..self.current_fn_param_syms.len() as i32:
-                let bit = ((1 as i64) << (pi as u32)) as i32
-                if (origin_mask & bit) != 0:
-                    self.note_raw_pointer_validity_param(self.current_fn_param_syms[pi])
+        let origin_mask = self.raw_pointer_param_origin_mask(expr_node)
+        let saved_origin: i32 = self.effect_note_origin_node
+        self.effect_note_origin_node = expr_node
+        for pi in 0..self.current_fn_param_syms.len() as i32:
+            if (origin_mask & sema_param_origin_bit(pi)) != 0:
+                self.note_raw_pointer_validity_param(self.current_fn_param_syms[pi])
+        self.effect_note_origin_node = saved_origin
+
+    // Pointer-value origins differ from borrow origins: copying an address
+    // does not prove its pointee valid. Resolve local binding facts while
+    // checking the body, before its scope disappears.
+    fn raw_pointer_param_origin_mask(expr_node: i32) -> i32:
+        if self.current_fn_sig_idx < 0:
+            return 0
+        let expr_ty = self.typed_expr_types.get(expr_node) ?? 0
+        if expr_ty > 0 and self.type_is_raw_pointer_value(expr_ty) == 0:
+            return 0
+        var node = expr_node
+        var mask = 0
+        let seen: HashMap[i32, i32] = HashMap.new()
+        while node > 0 and not seen.contains(node):
+            seen.insert(node, 1)
+            let kind = self.ast.kind(node)
+            let root = self.place_root_sym(node)
+            if root != 0:
+                let pi = self.param_index_for_sym(root)
+                if pi >= 0 and self.type_is_raw_pointer_value(self.sig_param_type(self.current_fn_sig_idx, pi)) != 0:
+                    mask = mask | sema_param_origin_bit(pi)
+                mask = mask | self.binding_view_origin_mask(root)
+                for di in 0..self.binding_view_dep_count(root):
+                    let dep_pi = self.param_index_for_sym(self.binding_view_dep_at(root, di))
+                    if dep_pi >= 0 and self.type_is_raw_pointer_value(self.sig_param_type(self.current_fn_sig_idx, dep_pi)) != 0:
+                        mask = mask | sema_param_origin_bit(dep_pi)
+                if kind == NodeKind.NK_IDENT and pi < 0 and self.binding_value_nodes.contains(root):
+                    node = self.binding_value_nodes.get(root).unwrap()
+                    continue
+            if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST:
+                node = self.ast.get_data0(node)
+            else if kind == NodeKind.NK_UNARY and self.ast.get_data0(node) == UnaryOp.UOP_DEREF:
+                node = self.ast.get_data1(node)
+            else:
+                break
+        var raw_params = 0
+        for pi in 0..self.current_fn_param_syms.len() as i32:
+            if self.type_is_raw_pointer_value(self.sig_param_type(self.current_fn_sig_idx, pi)) != 0:
+                raw_params = raw_params | sema_param_origin_bit(pi)
+        mask & raw_params
+
+    // §16.11: callers can be judged only after the transitive effects of
+    // every callee are complete. An unsafe block does not discharge a raw
+    // parameter's requirement for the caller of this function.
+    mut fn enforce_raw_pointer_contracts():
+        let seen: HashMap[i32, i32] = HashMap.new()
+        for si in 0..self.sig_names.len() as i32:
+            let node = self.receiver_decl_node_for_sig(si)
+            if node <= 0 or seen.contains(node) or self.fn_symbol_is_unsafe(self.sig_names[si]) != 0:
+                continue
+            let meta = self.ast.find_fn_meta(node)
+            if meta < 0 or self.ast.get_data1(node) == 0 or self.ast.fn_decl_body_is_interface(node as NodeId):
+                continue
+            let param_start = self.ast.fn_meta_param_start(meta)
+            let param_count = self.ast.fn_meta_param_count(meta)
+            for pi in 0..self.sig_get_param_count(si):
+                if (self.sig_param_effect(si, pi) & EFF_RAW_PTR_VALIDITY) == 0 or pi >= param_count:
+                    continue
+                let param_name: str = self.pool_resolve(self.ast.fn_param_name(param_start, pi))
+                self.emit_error(f"safe function relies on caller-guaranteed raw pointer validity for parameter '{param_name}'; declare it unsafe fn or model a safe pointer contract", node)
+                seen.insert(node, 1)
+                break
 
     fn fn_decl_is_variadic_definition(fn_node: i32) -> bool:
         fn_node != 0 and self.ast.kind(fn_node) == NodeKind.NK_FN_DECL and (self.ast.get_data2(fn_node) / FnFlags.VARIADIC) % 2 == 1
@@ -14078,8 +14128,8 @@ impl Sema:
             self.recording_propagated_effect = self.recording_propagated_effect + 1
             self.note_place_effect(arg_node, trans_bits)
             self.recording_propagated_effect = self.recording_propagated_effect - 1
-        if (param_eff & EFF_RAW_PTR_VALIDITY) != 0:
-            self.note_raw_pointer_validity_precondition(arg_node)
+        // Raw validity follows recorded parameter-origin edges after every
+        // body is complete, never an order-dependent partial callee summary.
 
     mut fn propagate_method_call_param_effects(call_node: i32, sig_idx: i32, param_offset: i32, recv_node: i32, extra_start: i32, arg_count: i32, has_resolved: i32):
         if sig_idx < 0:

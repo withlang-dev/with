@@ -897,16 +897,12 @@ fn analysis_audit_effects(report: &AnalysisReport, sema: &Sema):
         if caller_sig < 0 or callee_sig < 0 or caller_pi < 0 or callee_pi < 0:
             report.fail("effect edge contains a negative signature or parameter")
             continue
-        let caller_ty = sema.sig_param_type(caller_sig, caller_pi)
-        let caller_kind = if caller_ty > 0: sema.get_type_kind(sema.resolve_alias(caller_ty as TypeId)) else: TypeKind.TY_ERR
-        if caller_kind == TypeKind.TY_REF or caller_kind == TypeKind.TY_PTR:
-            continue
         // #927: the same transfer the fixpoint applies — projection edges demote
         // consume/escape to write (D17) — so the audit checks the rule, not a
         // stronger restatement of it.
         let callee_ty = sema.sig_param_type(callee_sig, callee_pi)
         let callee_is_copy = if callee_ty > 0: sema.is_copy_frozen(callee_ty as TypeId) else: 1
-        let propagated = sema.effect_edge_transfer(callee_sig, callee_pi, projection, callee_is_copy)
+        let propagated = sema.effect_edge_transfer(caller_sig, caller_pi, callee_sig, callee_pi, projection, callee_is_copy)
         let caller = sema.sig_param_effect(caller_sig, caller_pi)
         if (caller & propagated) != propagated:
             report.fail(f"effect edge sig {caller_sig}:{caller_pi} -> {callee_sig}:{callee_pi} is not at fixpoint; missing={propagated & ~caller}")
@@ -2168,13 +2164,16 @@ fn analysis_explain_effect(sema: &Sema, target: &str, source_path: &str) -> str:
             if want_pi >= 0 and pi != want_pi:
                 continue
             let eff = sema.sig_param_effect(si, pi)
-            out = out ++ f"  sig={si} param[{pi}] eff=[" ++ sema_effect_bits_text(eff) ++ "]\n"
+            let raw = if (eff & EFF_RAW_PTR_VALIDITY) != 0: "raw_ptr_validity" else: "none"
+            out = out ++ f"  sig={si} param[{pi}] eff=[" ++ sema_effect_bits_text(eff) ++ f"] internal=[{raw}]\n"
             if (eff & EFF_CONSUME) != 0:
                 out = out ++ "  consume:\n" ++ analysis_explain_effect_chain(sema, si, pi, 0, source_path)
             if (eff & EFF_ESCAPE_VALUE) != 0:
                 out = out ++ "  escape_value:\n" ++ analysis_explain_effect_chain(sema, si, pi, 1, source_path)
             if (eff & EFF_WRITE) != 0:
                 out = out ++ "  write:\n" ++ analysis_explain_effect_chain(sema, si, pi, 2, source_path)
+            if (eff & EFF_RAW_PTR_VALIDITY) != 0:
+                out = out ++ "  raw_ptr_validity:\n" ++ analysis_explain_effect_chain(sema, si, pi, 3, source_path)
     if found == 0:
         out = out ++ "  (no signature matched; use the exact finalized name, e.g. Type.method)\n"
     out
