@@ -8319,7 +8319,7 @@ impl Sema:
         let seen: HashMap[i32, i32] = HashMap.new()
         for si in 0..self.sig_names.len() as i32:
             let node = self.receiver_decl_node_for_sig(si)
-            if node <= 0 or seen.contains(node) or self.fn_symbol_is_unsafe(self.sig_names[si]) != 0:
+            if node <= 0 or seen.contains(node) or self.fn_decl_is_unsafe(node) != 0:
                 continue
             let meta = self.ast.find_fn_meta(node)
             if meta < 0 or self.ast.get_data1(node) == 0 or self.ast.fn_decl_body_is_interface(node as NodeId):
@@ -14165,10 +14165,9 @@ impl Sema:
                     self.note_view_store(store_target, arg_node, stored_ty, self.sig_param_type(sig_idx, param_i), call_node, "this call")
                 // #D5/P0: record caller-param → callee-param edge (method path).
                 self.record_effect_edge(sig_idx, param_i, arg_node)
-                // D5/P1 §3.8: method arguments use the same deferred ownership
-                // decision as ordinary calls. A plain value is share-place unless
-                // the callee's FINAL effect makes the parameter owned; only then
-                // does finalize_call_site_ownership require explicit move/copy.
+                // §3.8: the selected parameter type decides ownership: &T
+                // borrows and plain T consumes. Effects do not change that
+                // contract or require a redundant call-site move.
                 let arg_kind = self.ast.kind(arg_node)
                 if arg_kind == NodeKind.NK_MOVE_ARG:
                     if self.slice_coerce_args.contains(arg_node) == 0:
@@ -22086,13 +22085,9 @@ impl Sema:
                 // fixpoint_effect_flow can complete transitive consume/escape even
                 // when this callee is a forward reference (its body not yet checked).
                 self.record_effect_edge(sig_idx, param_i, trans_nd)
-                // #D5/P1 share-place (§3.8): a plain (non-move/copy) non-Copy value
-                // argument is NOT consumed — the caller keeps ownership and drops it
-                // in its own scope. Only an explicit `move`/`copy` transfers. A plain
-                // argument passed to an OWNED (consume/escape_value) parameter is a
-                // compile error requiring `move`/`copy`, enforced post-fixpoint by
-                // finalize_call_site_ownership with COMPLETE effects (recorded here so
-                // a forward-reference owned param cannot slip through as share-place).
+                // §3.8: a plain T parameter consumes a non-Copy argument;
+                // &T borrows it. Final effects validate escape requirements
+                // without changing the signature's ownership contract.
                 // Extern/C params receive a bit-copy and do not own — no transfer.
                 let eff_arg_nd = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
                 let eff_arg_kind = if eff_arg_nd > 0: self.ast.kind(eff_arg_nd) else: 0
@@ -23013,6 +23008,9 @@ impl Sema:
             // closure argument needs — it was never consulted, so a generic
             // callee ran a call-once closure twice.
             if ai < arg_nodes.len() as i32:
+                // The selected concrete signature participates in the same
+                // transitive effect graph as ordinary and method calls.
+                self.record_effect_edge(sig_idx, ai, arg_nodes[ai])
                 self.check_closure_arg_against_param(arg_nodes[ai], fn_sym, sig_idx, ai, call_node)
             let expected_ty = self.sig_param_type(sig_idx, ai)
             let actual_ty = arg_types[ai]
