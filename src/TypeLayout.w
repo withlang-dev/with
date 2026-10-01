@@ -279,8 +279,8 @@ impl Sema:
             if max_size == 0:
                 return 1
             return type_layout_align_up(max_size, max_align)
-        if field_count <= 0:
-            return 0
+        // Empty Drop structs still need D72's liveness byte. Run the same
+        // layout/decision path even when there are no source fields.
         var offset: i64 = 0
         let te_start = self.get_type_d1(resolved)
         for fi in 0..field_count:
@@ -547,4 +547,3 @@ impl Sema:
         if self.unwrapped_type_cache.contains(tid):
             return self.unwrapped_type_cache.get(tid).unwrap()
         sema_phase_bug("BUG: try_unwrapped_type_frozen miss — type not preregistered")
-

@@ -1,6 +1,6 @@
-# The With ABI (version 11)
+# The With ABI (version 12)
 
-Status: DRAFT v11 (2026-09-30), the convention as the compiler implements
+Status: DRAFT v12 (2026-09-30), the convention as the compiler implements
 it today, written down so `.wo` bundles (decisions.md D38,
 `docs/spec/toolchain/wo_bundles.md`) can depend on it. Nothing here is a new rule. The
 sources named in §7 define the ABI; this document describes them, and at
@@ -208,6 +208,13 @@ ABI-owned file when D30's in-unit runtime retirement lands; until then a
 layout change there is caught by the `wo-drift` lane, not by this check.
 
 ## Version history
+
+- **v12** (2026-09-30): empty ordinary `Drop` structs now carry D72's
+  hidden liveness byte, as nonempty live-zero `Drop` structs already did.
+  Their size is one byte rather than zero; containing aggregates and
+  element strides change accordingly. Empty structs without `Drop` retain
+  zero size, and explicit foreign layouts are unchanged. Objects built
+  under v11 that exchange affected values must be rebuilt.
 
 - **v11** (2026-09-30): a struct or array larger than two words is passed
   as a pointer to a caller-made copy and returned through `sret` on every

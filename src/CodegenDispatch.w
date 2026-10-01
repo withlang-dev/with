@@ -3789,7 +3789,10 @@ impl Codegen:
                         with_eprint(f"error: aggregate rvalue missing destination type fn={self.intern.resolve(self.current_function_name_sym)} count={agg_count}")
                         self.had_error = 1
                         return wl_get_undef(fallback_ty)
-                    return self.build_default_value(struct_ty)
+                    // D72: an empty Drop literal is a live value, not reset
+                    // storage. Let the struct path initialize its hidden byte.
+                    if (self.liveness_byte_indices.get(struct_ty) ?? -1) < 0:
+                        return self.build_default_value(struct_ty)
                 if struct_ty != 0 and wl_get_type_kind(struct_ty) == wl_array_type_kind():
                     // Array aggregate: [N x T]
                     let alloca = self.create_entry_alloca(struct_ty)
