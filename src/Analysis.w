@@ -55,7 +55,13 @@ fn analysis_with_node_location(fact: AnalysisFact, sema: &Sema, node: i32, sourc
 
 fn analysis_sig_path(sema: &Sema, sym: i32, fallback: &str) -> str:
     let found = sema.fn_decl_source_paths.get(sym)
-    if found.is_some(): with_str_clone_ref(found.unwrap()) else: with_str_clone_ref(fallback)
+    if found.is_some(): return with_str_clone_ref(found.unwrap())
+    // Generated specialization names have no source-path entry. Sema's
+    // canonical declaration still owns their source identity.
+    let decl = sema.receiver_decl_node_for_sig(sema.get_sig(sym))
+    let di = if decl > 0: sema.find_decl_index(decl) else: -1
+    if di >= 0: return sema.decl_source_path_for_index(di)
+    with_str_clone_ref(fallback)
 
 fn analysis_decl_path(sema: &Sema, decl_index: i32, fallback: &str) -> str:
     let path = sema.decl_source_path_for_index(decl_index)
