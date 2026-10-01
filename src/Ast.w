@@ -1865,8 +1865,16 @@ impl AstPool:
         0
 
     fn mark_non_escaping_closure(node: NodeId):
+        if self.state.non_escaping_closure_set.contains(node as i32): return
         self.state.non_escaping_closure_nodes.push(node as i32)
         self.state.non_escaping_closure_set.insert(node as i32, 1)
+
+    fn unmark_non_escaping_closure(node: NodeId):
+        self.state.non_escaping_closure_set.remove(node as i32)
+        for i in 0..self.state.non_escaping_closure_nodes.len() as i32:
+            if self.state.non_escaping_closure_nodes[i] == node as i32:
+                self.state.non_escaping_closure_nodes.remove(i)
+                return
 
     fn is_non_escaping_closure(node: NodeId) -> i32:
         if self.state.non_escaping_closure_set.contains(node as i32): return 1

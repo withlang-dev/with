@@ -320,6 +320,25 @@ fn analysis_collect_types(report: &AnalysisReport, sema: &Sema):
             field.detail = "owner=" ++ type_name ++ " field-type=" ++ sema.type_name(field_ty) ++ f" default-node={default_node}"
             report.add(move field)
 
+fn analysis_closure_details(sema: &Sema, node: i32) -> str:
+    if sema.ast.kind(node) != NodeKind.NK_CLOSURE:
+        return ""
+    var out = f" closure move={sema.ast.is_move_closure(node as NodeId)} non-escaping={sema.ast.is_non_escaping_closure(node as NodeId)}"
+    for ci in 0..sema.closure_capture_summary_count(node):
+        let sym = sema.closure_capture_summary_sym(node, ci)
+        let ty = sema.closure_capture_summary_type(node, ci)
+        let eff = sema.closure_capture_summary_eff(node, ci)
+        out = out ++ f" capture[{ci}]={sema.pool_resolve(sym)} type={sema.type_name(ty)} ephemeral={sema.type_is_ephemeral_value(ty)} effects={eff}"
+    var at = 0
+    while at + 5 < sema.deferred_closure_arg_checks.len() as i32:
+        if sema.deferred_closure_arg_checks[at] == node:
+            let sym = sema.deferred_closure_arg_checks[(at + 1)]
+            let sig = sema.deferred_closure_arg_checks[(at + 2)]
+            let pi = sema.deferred_closure_arg_checks[(at + 3)]
+            out = out ++ f" callee={sema.pool_resolve(sym)} param={pi} final-effects={sema.sig_param_effect(sig, pi)}"
+        at = at + 6
+    out
+
 fn analysis_collect_expressions(report: &AnalysisReport, sema: &Sema):
     for node in 1..sema.ast.node_count():
         if not sema.typed_expr_types.contains(node):
@@ -332,6 +351,7 @@ fn analysis_collect_expressions(report: &AnalysisReport, sema: &Sema):
         fact.type_id = tid
         fact.name = f"node:{node}"
         fact.detail = f"node-kind={fact.index} type-name={sema.type_name(tid)} start={sema.ast.get_start(node)} end={sema.ast.get_end(node)}"
+        fact.detail = fact.detail ++ analysis_closure_details(sema, node)
         report.add(move fact)
 
 fn analysis_parse_node_id(text: &str) -> i32:
@@ -472,6 +492,7 @@ fn analysis_collect_ast_node_tree(report: &AnalysisReport, sema: &Sema, node: i3
     let symbol_name = if symbol != 0: with_str_clone_ref(sema.pool_resolve(symbol)) else: ""
     let type_name = if typed.is_some(): sema.type_name(typed.unwrap()) else: "<untyped>"
     fact.detail = f"role={role} kind={analysis_ast_node_kind_name(kind)} raw=[{d0},{d1},{d2}] type={type_name} resolved={if resolved.is_some(): resolved.unwrap() else: 0} symbol={symbol_name} start={sema.ast.get_start(node)} end={sema.ast.get_end(node)}"
+    fact.detail = fact.detail ++ analysis_closure_details(sema, node)
     fact = analysis_with_node_location(move fact, sema, node, path, source)
     report.add(move fact)
     if depth <= 0:

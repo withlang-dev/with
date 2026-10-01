@@ -1617,7 +1617,8 @@ pub type Sema {
     current_fn_variadic: i32,          // 1 while checking a `...` definition body (never a closure in it)
     recording_propagated_effect: i32,
 
-    // Closure capture summaries: closure node -> flat [capture_sym, effect_bits]* slice.
+    // Closure capture summaries: closure node -> [capture_sym, effect_bits, type]*.
+    // The type is recorded while the capture's scope is still available.
     closure_capture_summary_starts: HashMap[i32, i32],
     closure_capture_summary_counts: HashMap[i32, i32],
     closure_capture_summary_data: Vec[i32],
@@ -1801,7 +1802,6 @@ pub type Sema {
     current_statement_expr_root: i32,
     current_value_expr_root: i32,
     closure_direct_arg_depth: i32,
-    closure_direct_arg_escape_flags: Vec[i32],
     // > 0 while a closure body is checked: the parameter frame
     // (current_fn_param_syms, current_fn_sig_idx) is then the closure's
     // capture frame, not the enclosing function's.
@@ -3240,7 +3240,6 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         current_statement_expr_root: 0,
         current_value_expr_root: 0,
         closure_direct_arg_depth: 0,
-        closure_direct_arg_escape_flags: Vec.new(),
         closure_body_depth: 0,
         expected_expr_type: 0,
         has_expected_type: 0,
@@ -7713,6 +7712,7 @@ impl Sema:
         for i in 0..count:
             self.closure_capture_summary_data.push(capture_syms[i])
             self.closure_capture_summary_data.push(capture_effs[i])
+            self.closure_capture_summary_data.push(self.scope_lookup(capture_syms[i]))
         self.closure_capture_summary_starts.insert(closure_node, start)
         self.closure_capture_summary_counts.insert(closure_node, count)
 
@@ -7728,7 +7728,7 @@ impl Sema:
         if idx < 0 or idx >= count:
             return 0
         let start = self.closure_capture_summary_starts.get(closure_node).unwrap()
-        self.closure_capture_summary_data[(start + idx * 2)]
+        self.closure_capture_summary_data[(start + idx * 3)]
 
     // 1 when calling the closure moves capture `idx` out of its place (§12.4:
     // the body consumes or returns it) — MirLower keeps that local's drop
@@ -7743,7 +7743,15 @@ impl Sema:
         if idx < 0 or idx >= count:
             return 0
         let start = self.closure_capture_summary_starts.get(closure_node).unwrap()
-        self.closure_capture_summary_data[(start + idx * 2 + 1)]
+        self.closure_capture_summary_data[(start + idx * 3 + 1)]
+
+    fn closure_capture_summary_type(closure_node: i32, idx: i32) -> i32:
+        if not self.closure_capture_summary_starts.contains(closure_node):
+            return 0
+        if idx < 0 or idx >= self.closure_capture_summary_count(closure_node):
+            return 0
+        let start = self.closure_capture_summary_starts.get(closure_node).unwrap()
+        self.closure_capture_summary_data[(start + idx * 3 + 2)]
 
     fn is_mutable_global(sym: i32) -> i32:
         if self.mutable_global_syms.contains(sym): return 1
@@ -8723,6 +8731,7 @@ impl Sema:
         let types_before = self.type_kinds.len()
         let symbols_before = self.pool.state.symbol_texts.len()
         let sigs_before = self.sig_names.len()
+        let diags_start = self.diags.items.len() as i32
         self.check_bodies()
         if profile:
             sema_profile_report("bodies", t)
@@ -8731,9 +8740,8 @@ impl Sema:
             // would have to reproduce.
             with_eprint(f"[profile] sema.bodies.added types={self.type_kinds.len() - types_before} symbols={self.pool.state.symbol_texts.len() - symbols_before} sigs={self.sig_names.len() - sigs_before}")
             t = with_clock_nanos()
-        // #D5/P0: with every top-level body checked, complete transitive
-        // write/consume/escape_value effects across the call graph so sig_param_effects is
-        // final before any share-place decision (lowering/ABI) reads it.
+        // Complete transitive effects before any deferred acceptance verdict
+        // reads a callee's parameter contract.
         self.fixpoint_effect_flow()
         self.enforce_raw_pointer_contracts()
         // D63: a callable parameter passed on is invoked as often as the
@@ -8749,6 +8757,7 @@ impl Sema:
         // effects — the declared signature is authoritative (&T borrows, T owns).
         self.finalize_call_site_ownership()
         self.check_reachable_comptime_errors()
+        self.diags.sort_from(diags_start)
         if profile:
             sema_profile_report("effects_receivers_ownership", t)
 

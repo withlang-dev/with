@@ -2027,7 +2027,6 @@ impl Sema:
     // capture ephemeral references".
     mut fn check_bodies():
         let count = self.ast.decl_count()
-        let diags_start = self.diags.items.len() as i32
         self.prepare_body_order(count)
         // WITH_SEMA_BODY_ORDER=reverse checks top-level bodies last to first
         // (the callee-first dependencies still apply): a program whose facts
@@ -2053,7 +2052,6 @@ impl Sema:
         self.local_file_id = saved_file_id
         self.validate_global_data_race_accesses()
         self.check_calls_against_live_global_views()
-        self.diags.sort_from(diags_start)
 
     // #1473 (§21.1 Rule 6): a function whose declared return is a view — a
     // reference, or a value carrying one (`Option[&T]`, an ephemeral value) —
@@ -19439,7 +19437,7 @@ impl Sema:
                 if by_place_sym == 0 and (self.closure_capture_summary_eff(closure_node, ci) & EFF_CAPTURE_BY_PLACE) != 0:
                     by_place_sym = self.closure_capture_summary_sym(closure_node, ci)
         let consumes = self.closure_expr_consumes_capture(closure_node)
-        if by_place_sym == 0 and consumes == 0:
+        if by_place_sym == 0 and consumes == 0 and self.ast.is_non_escaping_closure(closure_node) == 0:
             return
         self.deferred_closure_arg_checks.push(closure_node)
         self.deferred_closure_arg_checks.push(callee_sym)
@@ -19466,6 +19464,22 @@ impl Sema:
             // Judged after every body: the diagnostic names the closure's own
             // file, not the one checked last.
             self.local_file_id = self.ast.file(closure_node as NodeId) as i32
+            let escapes = (self.sig_param_effect(sig_idx, param_i) & (EFF_ESCAPE_VALUE | EFF_ESCAPE_VIEW)) != 0
+            if escapes and self.ast.is_non_escaping_closure(closure_node) != 0:
+                // Direct arguments borrow captures for the call while their
+                // callee is being checked. Revoke that provisional marker and
+                // judge saved capture types only against the final effects.
+                self.ast.unmark_non_escaping_closure(closure_node)
+                var emitted_ephemeral = false
+                var emitted_capability = false
+                for ci in 0..self.closure_capture_summary_count(closure_node):
+                    let cap_ty = self.closure_capture_summary_type(closure_node, ci)
+                    if not emitted_ephemeral and self.type_is_ephemeral_value(cap_ty) != 0:
+                        self.emit_error("escaping closure cannot capture ephemeral references", closure_node)
+                        emitted_ephemeral = true
+                    if not emitted_capability and self.is_tool_capability_type(cap_ty):
+                        self.emit_error("capability-bearing closure cannot escape into runtime code", closure_node)
+                        emitted_capability = true
             if by_place_sym != 0 and (self.sig_param_effect(sig_idx, param_i) & EFF_ESCAPE_VALUE) != 0:
                 let cap_name: str = with_str_clone_ref(self.pool_resolve(by_place_sym))
                 self.emit_error("closure argument holds `" ++ cap_name ++ "` by place — a view of this frame — and `" ++ callee_name ++ "` stores or returns its parameter (§12.4); pass an owning closure: `move () => ...`", closure_node)
@@ -19858,11 +19872,10 @@ impl Sema:
 
         self.pop_scope()
 
-        var direct_arg_escapes = 0
-        if self.closure_direct_arg_escape_flags.len() > 0:
-            direct_arg_escapes = self.closure_direct_arg_escape_flags[(self.closure_direct_arg_escape_flags.len() - 1)]
-
-        let is_non_escaping = self.closure_direct_arg_depth > 0 and direct_arg_escapes == 0 and self.ast.is_move_closure(node) == 0
+        // Direct non-move arguments borrow for this call. Whether the callee
+        // lets them escape is settled after the effect fixpoint, not from a
+        // possibly empty summary during body checking.
+        let is_non_escaping = self.closure_direct_arg_depth > 0 and self.ast.is_move_closure(node) == 0
 
         // §12.4: "Captures are by place regardless of whether the type is
         // Copy; a read through a capture of a Copy value copies it. `move ||`
@@ -19896,8 +19909,8 @@ impl Sema:
         while self.borrow_kinds.len() as i32 > saved_borrow_len:
             self.remove_borrow_at(self.borrow_refs.len() as i32 - 1)
 
-        // Mark non-escaping if this closure is a direct call argument whose
-        // receiving parameter does not let the closure escape the call.
+        // Provisional for direct arguments; finalize_closure_arg_checks
+        // revokes this marker if the complete receiving contract escapes.
         if is_non_escaping:
             self.ast.mark_non_escaping_closure(node)
             // Register borrows for captured variables for the duration of
@@ -20072,9 +20085,7 @@ impl Sema:
             let arg_node = arg_nodes[ai]
             let expected = self.generic_closure_arg_expected_type(fn_node, &types, types.len() as i32, ai, call_node)
             self.closure_direct_arg_depth = self.closure_direct_arg_depth + 1
-            self.closure_direct_arg_escape_flags.push(0)
             let ty = if expected != 0: self.check_expr_with_expected(arg_node, expected as TypeId) else: self.check_expr_value_context(arg_node)
-            self.closure_direct_arg_escape_flags.pop()
             self.closure_direct_arg_depth = self.closure_direct_arg_depth - 1
             self.apply_closure_capture_consumes(arg_node, call_node)
             self.check_closure_arg_against_param(arg_node, fn_sym, -1, ai, call_node)
@@ -21827,16 +21838,8 @@ impl Sema:
                 arg_types.push(0)
                 continue
             let is_closure_arg = self.ast.kind(arg_node) == NodeKind.NK_CLOSURE
-            var closure_arg_escapes = 0
-            if is_closure_arg and sig_idx >= 0:
-                let param_i_for_effect = ai + param_offset
-                if param_i_for_effect < self.sig_get_param_count(sig_idx):
-                    let param_eff = self.sig_param_effect(sig_idx, param_i_for_effect)
-                    if (param_eff & (EFF_ESCAPE_VALUE | EFF_ESCAPE_VIEW)) != 0:
-                        closure_arg_escapes = 1
             if is_closure_arg:
                 self.closure_direct_arg_depth = self.closure_direct_arg_depth + 1
-                self.closure_direct_arg_escape_flags.push(closure_arg_escapes)
             // #1739: a generic callee's `Vec[T]` parameter names the collection
             // a literal argument builds; its elements decide T.
             if expected_ty == 0 and sig_idx < 0 and generic_hint_meta >= 0 and ai + param_offset < self.ast.fn_meta_param_count(generic_hint_meta):
@@ -21848,7 +21851,6 @@ impl Sema:
                 else: self.check_call_argument_expr(node, ai, fn_sym, arg_node, expected_ty)
             self.display_join_node = saved_display_join_node
             if is_closure_arg:
-                self.closure_direct_arg_escape_flags.pop()
                 self.closure_direct_arg_depth = self.closure_direct_arg_depth - 1
                 self.apply_closure_capture_consumes(arg_node, node)
             // A closure literal or a binding holding one (D63).
@@ -27462,19 +27464,11 @@ impl Sema:
                 continue
 
             let mc_is_closure = self.ast.kind(mc_arg_node) == NodeKind.NK_CLOSURE
-            var mc_closure_arg_escapes = 0
             if mc_is_closure and field == self.syms.spawn_method and ai == 0:
                 if self.ast.kind(expr) == NodeKind.NK_IDENT and self.is_active_sync_scope_symbol(self.ast.get_data0(expr)) != 0:
                     self.ast.mark_by_place_closure(mc_arg_node)
-            if mc_is_closure and mc_sig_idx_for_effect >= 0:
-                let mc_param_i_for_effect = ai + 1
-                if mc_param_i_for_effect < self.sig_get_param_count(mc_sig_idx_for_effect):
-                    let mc_param_eff = self.sig_param_effect(mc_sig_idx_for_effect, mc_param_i_for_effect)
-                    if (mc_param_eff & (EFF_ESCAPE_VALUE | EFF_ESCAPE_VIEW)) != 0:
-                        mc_closure_arg_escapes = 1
             if mc_is_closure:
                 self.closure_direct_arg_depth = self.closure_direct_arg_depth + 1
-                self.closure_direct_arg_escape_flags.push(mc_closure_arg_escapes)
             var mc_expected = self.atomic_method_expected_arg_type(mc_order_type, field, ai)
             if mc_expected == 0:
                 mc_expected = self.method_expected_arg_type(obj_type as i32, field, ai)
@@ -27588,7 +27582,6 @@ impl Sema:
                     self.emit_task_sendability_error(mc_arg_node, "channel send requires Send value")
                 self.mark_moved_if_consumed(mc_arg_node)
             if mc_is_closure:
-                self.closure_direct_arg_escape_flags.pop()
                 self.closure_direct_arg_depth = self.closure_direct_arg_depth - 1
                 self.apply_closure_capture_consumes(mc_arg_node, node)
             // A closure literal or a binding holding one (D63).
