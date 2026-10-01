@@ -43,6 +43,7 @@ pub enum AnalysisFactKind: i32:
     // provenance, under a resource, fn item, domain, callback or convention
     // subject row (AnalysisContract.w).
     ForeignContract = 25
+    GlobalEffect = 26
 
 // Stable analysis-domain receiver modes. Keep tools on this public schema rather
 // than exposing Sema's internal ReceiverMode representation.
@@ -262,6 +263,7 @@ fn analysis_kind_name(kind: AnalysisFactKind) -> str:
     if kind == AnalysisFactKind.MethodRegistration: return "method-registration"
     if kind == AnalysisFactKind.MethodResolution: return "method-resolution"
     if kind == AnalysisFactKind.ForeignContract: return "foreign-contract"
+    if kind == AnalysisFactKind.GlobalEffect: return "global-effect"
     "unknown"
 
 pub fn analysis_slice(text: &str, start: i32, end: i32): text.slice(start as i64, end as i64)
@@ -422,11 +424,12 @@ impl AnalysisReport:
             AnalysisFactKind.Type, AnalysisFactKind.Field, AnalysisFactKind.Expression,
             AnalysisFactKind.AstNode, AnalysisFactKind.MethodRegistration,
             AnalysisFactKind.MethodResolution, AnalysisFactKind.ForeignContract,
+            AnalysisFactKind.GlobalEffect,
         ]
         let stage_counts: Vec[i32] = Vec.new()
         let kind_counts: Vec[i32] = Vec.new()
         for i in 0..8: stage_counts.push(0)
-        for i in 0..26: kind_counts.push(0)
+        for i in 0..27: kind_counts.push(0)
         var total = 0
         for i in 0..self.facts.len() as i32:
             let fact = self.facts[i]

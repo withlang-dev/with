@@ -2703,6 +2703,10 @@ impl Sema:
                         continue
                     let target_sym = self.ast.get_data0(decl)
                     let target = self.lookup_named_type_visible(target_sym)
+                    self.global_drop_impl_targets.push(t)
+                    self.global_drop_impl_targets.push(decl)
+                    self.global_drop_impl_targets.push(target)
+                    self.global_drop_impl_contexts.push(self.current_module_path.clone())
                     if target > 0:
                         work.push(self.resolve_alias(target as TypeId) as i32)
                     for ti in 1..self.type_kinds.len() as i32:
@@ -8334,7 +8338,9 @@ impl Sema:
         fn_node != 0 and self.ast.kind(fn_node) == NodeKind.NK_FN_DECL and (self.ast.get_data2(fn_node) / FnFlags.VARIADIC) % 2 == 1
 
     fn fn_symbol_is_unsafe(fn_sym: i32) -> i32:
-        let fn_node = self.fn_symbol_decl_node(fn_sym)
+        self.fn_decl_is_unsafe(self.fn_symbol_decl_node(fn_sym))
+
+    fn fn_decl_is_unsafe(fn_node: i32) -> i32:
         if fn_node == 0:
             return 0
         // D75 (§16.2b.5): a function defined with a trailing `...` is unsafe

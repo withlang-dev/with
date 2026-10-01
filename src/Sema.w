@@ -1055,6 +1055,10 @@ pub type Sema {
     // #1827: how many of global_dispatchers expand_global_dispatchers has
     // given their call records; the rest are expanded on the next call.
     global_dispatchers_expanded: i32,
+    // Dynamic drop traversal decisions: [dyn type, impl declaration, target
+    // type], with the lookup context retained for the semantic inspector.
+    global_drop_impl_targets: Vec[i32],
+    global_drop_impl_contexts: Vec[str],
     // §21.1 rule 1: each declaration's resolved `writes` clause, keyed by
     // its node, as an index into declared_write_syms_flat holding the count
     // then the global symbols (resolve_declared_global_writes).
@@ -2846,6 +2850,8 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         current_effect_body: -1,
         fn_value_ident_sigs: sema_new_map_i32_i32(),
         global_dispatchers_expanded: 0,
+        global_drop_impl_targets: Vec.new(),
+        global_drop_impl_contexts: Vec.new(),
         declared_write_starts: sema_new_map_i32_i32(),
         declared_write_syms_flat: Vec.new(),
         global_dispatchers: Vec.new(),

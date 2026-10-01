@@ -138,7 +138,15 @@ and the actual LLVM marshalling/prologue branches used for production codegen.
 ./out/stage/bin/with-stage2 analyze repro.w 'lldb:kind=call,name~target_fn'
 ./out/stage/bin/with-stage2 analyze repro.w contract
 ./out/stage/bin/with-stage2 analyze repro.w audit:contract
+./out/stage/bin/with-stage2 analyze repro.w 'select:stage=sema,kind=global-effect'
 ```
+
+The global-effect view reads recorded writes, calls and their expanded targets,
+live-view checks, cached user-drop decisions and dynamic-drop target resolution.
+Its `drop-target` rows retain the lookup context and the actual enqueue/skip
+branch; inspecting the graph does not resolve names or expand it again.
+Signature rows include the canonical declaration and name-based declaration
+lookup, with unsafe status read by the same Sema helper as acceptance checks.
 
 `contract` (D51 stage 10, ruling §63; `src/AnalysisContract.w`) prints the
 effective modeled foreign contract of every `c facade` block the program

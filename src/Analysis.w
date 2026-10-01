@@ -531,7 +531,9 @@ fn analysis_collect_signatures(report: &AnalysisReport, sema: &Sema, source_path
         sig.flags = if sema.sig_variadic[si] != 0: 1 else: 0
         sig.path = analysis_sig_path(sema, sym, source_path)
         sig.name = with_str_clone_ref(name)
-        sig.detail = f"params={sig.index} return={sig.type_id} variadic={sig.flags}"
+        let decl = sema.receiver_decl_node_for_sig(si)
+        sig.node = decl
+        sig.detail = f"params={sig.index} return={sig.type_id} variadic={sig.flags} decl-node={decl} name-decl-node={sema.fn_symbol_decl_node(sym)} declared-unsafe={sema.fn_decl_is_unsafe(decl)} name-unsafe={sema.fn_symbol_is_unsafe(sym)}"
         report.add(sig.owned_copy())
 
         for pi in 0..sema.sig_get_param_count(si):
@@ -590,6 +592,80 @@ fn analysis_collect_effect_edges(report: &AnalysisReport, sema: &Sema):
         report.add(move fact)
         at = at + 4
         edge = edge + 1
+
+fn analysis_global_location(fact: AnalysisFact, sema: &Sema, node: i32, source_path: &str, source_text: &str) -> AnalysisFact:
+    let subject = analysis_node_subject(sema, node, source_path, source_text)
+    var located = analysis_with_node_location(move fact, sema, node, subject[0], subject[1])
+    if node > 0 and node < sema.ast.node_count():
+        located.source_file = sema.ast.file(node as NodeId) as i32
+    located
+
+// Read the kept graph and traversal decisions; do not expand dispatchers or
+// resolve names again in the inspector, which would hide a missing edge.
+fn analysis_collect_global_effects(report: &AnalysisReport, sema: &Sema, source_path: &str, source_text: &str):
+    for wi in 0..sema.global_write_records.len() as i32 / 5:
+        let at = wi * 5
+        var fact = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.GlobalEffect)
+        fact.id = wi
+        fact.owner = sema.global_write_records[at]
+        fact.body_sym = if fact.owner >= 0 and fact.owner < sema.sig_names.len() as i32: sema.sig_names[fact.owner] else: 0
+        fact.symbol = sema.global_write_records[(at + 1)]
+        fact.flags = sema.global_write_records[(at + 4)]
+        fact.name = sema.pool_resolve(fact.symbol).clone()
+        fact.detail = f"write body={sema.global_effect_body_name(fact.owner)} body-id={fact.owner} kind={fact.flags}"
+        report.add(analysis_global_location(move fact, sema, sema.global_write_records[(at + 2)], source_path, source_text))
+    for ci in 0..sema.global_calls.len() as i32 / 8:
+        let at = ci * 8
+        var fact = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.GlobalEffect)
+        fact.id = ci
+        fact.index = 1
+        fact.owner = sema.global_calls[at]
+        fact.body_sym = if fact.owner >= 0 and fact.owner < sema.sig_names.len() as i32: sema.sig_names[fact.owner] else: 0
+        fact.parent = sema.global_calls[(at + 5)]
+        fact.flags = sema.global_calls[(at + 6)]
+        fact.symbol = sema.global_calls[(at + 7)]
+        fact.name = sema.global_effect_body_name(fact.owner)
+        let target_start = sema.global_calls[(at + 3)]
+        let target_count = sema.global_calls[(at + 4)]
+        fact.detail = f"call callee={sema.global_effect_body_name(fact.parent)} site-kind={fact.flags} subject={sema.pool_resolve(fact.symbol)}"
+        for ti in target_start..target_start + target_count:
+            let target = sema.global_call_targets[ti * 3]
+            fact.detail = fact.detail ++ f" target={target}:{sema.global_effect_body_name(target)}"
+        report.add(analysis_global_location(move fact, sema, sema.global_calls[(at + 1)], source_path, source_text))
+    for vi in 0..sema.global_view_call_checks.len() as i32 / 6:
+        let at = vi * 6
+        var fact = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.GlobalEffect)
+        fact.id = vi
+        fact.index = 2
+        fact.parent = sema.global_view_call_checks[at]
+        fact.symbol = sema.global_view_call_checks[(at + 1)]
+        fact.owner = sema.global_view_call_checks[(at + 2)]
+        fact.flags = sema.global_view_call_checks[(at + 5)]
+        fact.name = sema.pool_resolve(fact.symbol).clone()
+        fact.detail = f"live-view call={fact.parent} view={sema.pool_resolve(fact.owner)} last-use={sema.global_view_call_checks[(at + 4)]}"
+        report.add(analysis_global_location(move fact, sema, sema.global_view_call_checks[(at + 3)], source_path, source_text))
+    for di in 0..sema.global_drop_impl_targets.len() as i32 / 3:
+        let at = di * 3
+        let decl = sema.global_drop_impl_targets[(at + 1)]
+        var fact = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.GlobalEffect)
+        fact.id = di
+        fact.index = 3
+        fact.parent = sema.global_drop_impl_targets[at]
+        fact.type_id = sema.global_drop_impl_targets[(at + 2)]
+        fact.symbol = sema.ast.get_data0(decl)
+        fact.name = sema.pool_resolve(fact.symbol).clone()
+        fact.detail = f"drop-target dyn={sema.type_name(fact.parent)} target-type={sema.type_name(fact.type_id)} lookup-context={sema.global_drop_impl_contexts[di]} branch=" ++ (if fact.type_id > 0: "enqueue-target" else: "skip-target")
+        report.add(analysis_global_location(move fact, sema, decl, source_path, source_text))
+    for tid in 1..sema.type_kinds.len() as i32:
+        if not sema.global_user_drop_types.contains(tid): continue
+        var fact = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.GlobalEffect)
+        fact.id = tid
+        fact.index = 4
+        fact.type_id = tid
+        fact.flags = sema.global_user_drop_types.get(tid).unwrap()
+        fact.name = sema.type_name(tid)
+        fact.detail = f"drop-type user-drop={fact.flags}"
+        report.add(move fact)
 
 fn analysis_collect_specializations(report: &AnalysisReport, sema: &Sema, source_path: &str):
     for si in 0..sema.concrete_specialization_nodes.len() as i32:
@@ -741,6 +817,7 @@ fn analysis_collect_sema(report: &AnalysisReport, sema: &Sema, source_path: &str
     analysis_collect_expressions(report, sema)
     analysis_collect_signatures(report, sema, source_path)
     analysis_collect_effect_edges(report, sema)
+    analysis_collect_global_effects(report, sema, source_path, source_text)
     analysis_collect_specializations(report, sema, source_path)
     analysis_collect_resolved_calls(report, sema, source_path, source_text)
     analysis_collect_method_resolutions(report, sema, source_path, source_text)
