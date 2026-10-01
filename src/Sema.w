@@ -1089,7 +1089,8 @@ pub type Sema {
     // self`), keyed by the call node.
     dyn_consuming_calls: HashMap[i32, i32],
     // #1860: a typed binding pattern's view type (`c: &Circle`), keyed by
-    // the pattern node, and the symbols it binds (for the assign help).
+    // the pattern node, and its active binding symbols (for the assign help).
+    // The symbol marker expires when that binding leaves scope.
     dyn_downcast_binding_types: HashMap[i32, i32],
     dyn_downcast_binding_syms: HashMap[i32, i32],
     // The matches Sema proved exhaustive (a value position, a must-use
@@ -6119,6 +6120,7 @@ impl Sema:
             self.binding_decl_nodes.remove(removed_sym)
             self.binding_value_nodes.remove(removed_sym)
             self.binding_closure_nodes.remove(removed_sym)
+            self.dyn_downcast_binding_syms.remove(removed_sym)
             self.clear_binding_view_deps(removed_sym)
         self.scope_starts.pop()
 
