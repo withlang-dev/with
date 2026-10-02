@@ -728,7 +728,8 @@ type AstPoolState {
     // D70 (§18.2): `use m as n` / `use c_import(...) as n` — import decl → n.
     use_alias_map: HashMap[i32, i32],
     // D70: field-access nodes Sema resolved through an import namespace and
-    // rewrote into the declaration's ident (Sema.rewrite_namespace_access).
+    // rewrote into the declaration's ident (Sema.rewrite_namespace_access),
+    // mapped to the module's type when the member is a type (#1757), else 0.
     namespace_bound_set: HashMap[i32, i32],
     frozen: i32,
 }
@@ -1483,15 +1484,21 @@ impl AstPool:
 
     // D70: Sema resolved `ns.member` to the declaration `sym`; the node
     // becomes that ident, marked so no later check re-resolves its short
-    // name by import precedence.
-    mut fn bind_namespace_ident(idx: NodeId, sym: i32):
+    // name by import precedence. A type member carries its identity `tid`
+    // (#1757): types keep their short names, so the ident alone could name
+    // another module's type of that name.
+    mut fn bind_namespace_ident(idx: NodeId, sym: i32, tid: i32):
         self.state.kinds[(idx as i32)] = NodeKind.NK_IDENT
         self.state.data0[(idx as i32)] = sym
         self.state.data1[(idx as i32)] = 0
         self.state.data2[(idx as i32)] = 0
-        self.state.namespace_bound_set.insert(idx as i32, 1)
+        self.state.namespace_bound_set.insert(idx as i32, tid)
 
     fn is_namespace_bound(idx: NodeId) -> bool: self.state.namespace_bound_set.contains(idx as i32)
+
+    // The type a namespace-bound ident names (#1757), 0 when it names a
+    // value or fn, or is no namespace access.
+    fn namespace_bound_type(idx: NodeId) -> i32: self.state.namespace_bound_set.get(idx as i32) ?? 0
 
     mut fn set_data0(idx: NodeId, val: i32):
         self.state.data0[(idx as i32)] = val

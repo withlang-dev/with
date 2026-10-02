@@ -1501,6 +1501,20 @@ impl Sema:
             if base_sym == self.syms.self_type:
                 if self.assoc_type_bindings.contains(assoc_sym):
                     return self.assoc_type_bindings.get(assoc_sym).unwrap() as TypeId
+            // D70 (§18.2) / #1757: `shapes.Pt` names the import's type by
+            // identity, whatever `Pt` resolves to here.
+            let ns_tid = self.namespace_type_annotation(base_sym, assoc_sym)
+            if ns_tid != 0:
+                let ni = self.clause_namespace(self.pool_resolve(base_sym))
+                let assoc_name: str = with_str_clone_ref(self.pool_resolve(assoc_sym))
+                if ns_tid < 0:
+                    self.emit_error(f"{self.namespace_import_text(ni)} provides no type '{assoc_name}' (through the namespace '{self.pool_resolve(base_sym)}')", node)
+                    return 0 as TypeId
+                let path: str = with_str_clone_ref(self.module_paths[self.ns_targets[ni]])
+                if not self.named_type_visible_in(assoc_sym, path):
+                    self.emit_error(f"'{assoc_name}' is private to module '{path}'", node)
+                    return 0 as TypeId
+                return ns_tid as TypeId
             // Type parameter: look up concrete type via generic substitution
             let concrete = self.lookup_generic_subst(base_sym)
             if concrete != 0:
@@ -1780,6 +1794,11 @@ impl Sema:
             let assoc_sym = self.ast.get_data1(node)
             if base_sym == self.syms.self_type and self.assoc_type_bindings.contains(assoc_sym):
                 return self.assoc_type_bindings.get(assoc_sym).unwrap() as TypeId
+            // #1757: a namespaced type annotation resolves by identity, as
+            // the mutable twin did.
+            let ns_tid = self.namespace_type_annotation(base_sym, assoc_sym)
+            if ns_tid > 0:
+                return ns_tid as TypeId
             sema_phase_bug("BUG: frozen associated type resolution needs preregistered type-node answer")
         if kind == NodeKind.NK_TYPE_GENERIC:
             return self.resolve_generic_type_frozen(node) as TypeId
@@ -9607,6 +9626,12 @@ impl Sema:
 // ── Expression checking helpers ──────────────────────────────────
 impl Sema:
     mut fn check_ident(ident_sym: i32, node: i32) -> i32:
+        // D70 / #1757: `ns.T` names the import's type by identity, whatever
+        // the short name resolves to here.
+        let ns_tid = self.ast.namespace_bound_type(node as NodeId)
+        if ns_tid != 0:
+            self.typed_expr_types.insert(node, ns_tid)
+            return ns_tid
         let sym = self.resolve_displaced_fn_ident(ident_sym, node)
         if sym == self.syms.file_magic:
             self.magic_ident_kinds.insert(node, SemaMagicIdentKind.FILE)
@@ -15553,7 +15578,7 @@ impl Sema:
             if static_prim != 0:
                 obj_type = static_prim as TypeId
             else:
-                let static_named = self.lookup_named_type_visible(static_type_sym)
+                let static_named = self.static_receiver_named_type(expr, static_type_sym)
                 if static_named != 0:
                     obj_type = static_named as TypeId
         else if static_type_sym != 0 and self.static_receiver_type_is_known(expr) != 0 and static_expr_kind == NodeKind.NK_INDEX:
@@ -15873,7 +15898,7 @@ impl Sema:
             if static_prim != 0:
                 obj_type = static_prim as TypeId
             else:
-                let static_named = self.lookup_named_type_visible(static_type_sym)
+                let static_named = self.static_receiver_named_type(expr, static_type_sym)
                 if static_named != 0:
                     obj_type = static_named as TypeId
             // docs/completed/mut.md Rev 8 §5.3 / §15.4 — `Vec.push` (etc.) parsed as a
@@ -21334,7 +21359,7 @@ impl Sema:
             let member_name: str = with_str_clone_ref(self.pool_resolve(member))
             self.emit_error(f"{self.namespace_import_text(found)} provides no '{member_name}' (through the namespace '{text}')", node)
             return -1
-        self.ast.bind_namespace_ident(node as NodeId, sym)
+        self.ast.bind_namespace_ident(node as NodeId, sym, self.namespace_type_member(found, member))
         1
 
     // `a` or `a.b.c` when `node` is an identifier or a field-access chain of
@@ -21383,14 +21408,10 @@ impl Sema:
                 if self.decl_visible_from_current(path, self.decl_visibility_pub[i]) == 0:
                     self.emit_error(f"'{member_name}' is private to module '{path}'", node)
                     return -1
-                let decl = self.decl_visibility_nodes[i]
                 // A type keeps its short name (types are not displaced): the
-                // rewritten ident reaches the target's type only when that is
-                // the one the name resolves to here. Otherwise fail loudly
-                // rather than bind another module's type (#1757).
-                if decl != 0 and self.ast.kind(decl) == NodeKind.NK_TYPE_DECL and self.lookup_named_type_visible(member) != self.named_type_candidate_tid_in(member, path):
-                    self.emit_error(f"'{self.ns_names[ni]}.{member_name}' names module '{path}'s type, but '{member_name}' here resolves to another declaration; a namespaced type that another visible declaration shadows is not reachable yet (D70)", node)
-                    return -1
+                // rewritten ident carries the module's type identity
+                // (namespace_type_member, #1757), so `shapes.Pt` reaches
+                // shapes' type where another `Pt` shadows the short name.
                 return member
             i = self.decl_visibility_prev[i]
         i = if self.displaced_fn_index.contains(member): self.displaced_fn_index.get(member).unwrap() else: -1
@@ -21412,6 +21433,36 @@ impl Sema:
                 return -1
             return member
         0
+
+    // The type `member` names in the module import `ni` provides (#1757):
+    // its identity, not its short name. 0 for a value, a fn, a c_import's
+    // member, or no such type.
+    fn namespace_type_member(ni: i32, member: i32) -> i32:
+        let target = self.ns_targets[ni]
+        if target < 0:
+            return 0
+        self.named_type_candidate_tid_in(member, self.module_paths[target])
+
+    // D70 (§18.2) / #1757: a type annotation `ns.T` where `ns` is an import
+    // namespace of the current module — the module's `T` by identity. 0 when
+    // `ns` is no namespace here; -1 when it is one but provides no type `T`
+    // (the caller reports it). Pure, so the frozen twin resolves alike.
+    fn namespace_type_annotation(base_sym: i32, assoc_sym: i32) -> i32:
+        let ni = self.clause_namespace(self.pool_resolve(base_sym))
+        if ni < 0 or self.ns_targets[ni] < 0:
+            return 0
+        let tid = self.namespace_type_member(ni, assoc_sym)
+        if tid == 0: -1 else: tid
+
+    // Whether the current module may name the type `sym` module `path`
+    // declares (its `pub`), for a namespaced type annotation.
+    fn named_type_visible_in(sym: i32, path: &str) -> bool:
+        var i = self.named_type_candidate_head(sym)
+        while i >= 0:
+            if self.named_type_candidate_paths[i] == path:
+                return self.decl_visible_from_current(path, self.named_type_candidate_pub[i]) != 0
+            i = self.named_type_candidate_next[i]
+        false
 
     // The type `sym` names in the module at `path`, 0 when it declares none.
     fn named_type_candidate_tid_in(sym: i32, path: &str) -> i32:
@@ -29139,10 +29190,18 @@ impl Sema:
                 return self.ast.get_data0(base)
         0
 
+    // The named type a static receiver denotes: the import's type by
+    // identity for a namespace-bound ident (#1757), else the visible one.
+    fn static_receiver_named_type(expr: i32, base_sym: i32) -> i32:
+        let ns_tid = self.ast.namespace_bound_type(expr as NodeId)
+        if ns_tid != 0: ns_tid else: self.lookup_named_type_visible(base_sym)
+
     fn static_receiver_type_is_known(expr: i32) -> i32:
         let base_sym = self.static_receiver_base_sym(expr)
         if base_sym == 0:
             return 0
+        if self.ast.namespace_bound_type(expr as NodeId) != 0:
+            return 1
         // A bare identifier that names a bound local/param is a VALUE receiver
         // (instance method call), not a static type reference — the local wins in
         // value position even if a type of the same name is visible (#628). Only
