@@ -13479,6 +13479,17 @@ impl Sema:
             for ti in 0..tuple_count:
                 tuple_mask = tuple_mask | self.compute_expr_view_origin_mask(self.ast.get_extra(tuple_start + ti))
             return tuple_mask
+        // A struct literal carries its field initializers' origins, as a
+        // tuple does its elements' (collect_expr_view_deps already walks
+        // them): `MapStage { g, f }` returned from a stage views what `g`
+        // views (#1737).
+        if kind == NodeKind.NK_STRUCT_LIT:
+            let sl_start = self.ast.get_data1(node)
+            let sl_count = self.ast.get_data2(node)
+            var sl_mask = if self.expr_view_param_origins.contains(node): self.expr_view_origin_mask(node) else: 0
+            for fi in 0..sl_count:
+                sl_mask = sl_mask | self.compute_expr_view_origin_mask(self.ast.get_extra(sl_start + fi * 2 + 1))
+            return sl_mask
         if kind == NodeKind.NK_ENUM_VARIANT:
             let variant_start = self.ast.get_data2(node)
             let variant_count = self.ast.get_extra(variant_start)
@@ -14014,6 +14025,30 @@ impl Sema:
     fn record_call_view_origins(call_node: i32, sig_idx: i32, param_offset: i32, recv_node: i32, extra_start: i32, arg_count: i32, has_resolved: i32):
         if call_node == 0 or sig_idx < 0:
             return
+        // The call's arguments by PARAMETER index: the receiver first when
+        // the signature has one, then the (resolved) argument list.
+        let param_count = self.sig_get_param_count(sig_idx)
+        let args: Vec[i32] = Vec.new()
+        for pi in 0..param_count:
+            var arg = 0
+            if param_offset == 1 and pi == 0:
+                arg = recv_node
+            else:
+                let arg_index = if param_offset == 1: pi - 1 else: pi
+                if arg_index >= 0 and arg_index < arg_count:
+                    arg = if has_resolved != 0: self.get_resolved_call_arg(call_node, arg_index) else: self.ast.get_extra(extra_start + arg_index)
+            args.push(arg)
+        self.record_call_view_origins_args(call_node, sig_idx, param_offset == 1, args)
+        let fx = self.facade_call_effect_for(sig_idx)
+        if fx >= 0:
+            self.facade_apply_call_touches(fx, call_node, sig_idx, param_offset, recv_node, extra_start, arg_count, has_resolved)
+
+    // The result of the call `call_node` views what the signature's
+    // escape_view parameters' arguments view. `args` is the argument node
+    // per parameter (0 for a missing one), the receiver at index 0 when
+    // `has_receiver`. A generic call records through this directly: its
+    // arguments (a pipeline's lhs first) are not a contiguous AST run.
+    fn record_call_view_origins_args(call_node: i32, sig_idx: i32, has_receiver: bool, args: &Vec[i32]):
         let param_count = self.sig_get_param_count(sig_idx)
         var union_mask = 0
         var concrete_deps: Vec[i32] = Vec.new()
@@ -14030,13 +14065,7 @@ impl Sema:
                 let origin_param_ty = self.sig_param_type(sig_idx, origin_pi)
                 if self.param_type_is_by_value(origin_param_ty) != 0 and self.type_is_ephemeral_value(origin_param_ty) == 0:
                     continue
-                var origin_arg = 0
-                if param_offset == 1 and origin_pi == 0:
-                    origin_arg = recv_node
-                else:
-                    let arg_index = if param_offset == 1: origin_pi - 1 else: origin_pi
-                    if arg_index >= 0 and arg_index < arg_count:
-                        origin_arg = if has_resolved != 0: self.get_resolved_call_arg(call_node, arg_index) else: self.ast.get_extra(extra_start + arg_index)
+                let origin_arg = if origin_pi < args.len() as i32: args[origin_pi] else: 0
                 if origin_arg > 0:
                     union_mask = union_mask | self.compute_expr_view_origin_mask(origin_arg)
                     let dep_len_before = concrete_deps.len() as i32
@@ -14054,7 +14083,7 @@ impl Sema:
                     // what self views, never self's own storage — otherwise
                     // `self.finish(move child)` after `self.child()` would
                     // read as mutating self under a live view of it.
-                    let in_place_recv = param_offset == 1 and origin_pi == 0 and self.sig_receiver_mode(sig_idx) != ReceiverMode.Move
+                    let in_place_recv = has_receiver and origin_pi == 0 and self.sig_receiver_mode(sig_idx) != ReceiverMode.Move
                     if not in_place_recv and (concrete_deps.len() as i32 == dep_len_before or self.expr_type_is_value(origin_arg)):
                         concrete_deps = self.push_unique_i32(move concrete_deps, self.place_root_sym(origin_arg))
         // A facade operation (D51 stage 7, ruling §33-§38): its result may
@@ -14068,12 +14097,7 @@ impl Sema:
         // own storage when it is a value, its origins through a reference.
         if fx >= 0 and self.facade_call_effects[fx].borrow_param >= 0 and self.facade_presented_calls.contains(call_node):
             let bp = self.facade_call_effects[fx].borrow_param
-            let arg_index = if param_offset == 1: bp - 1 else: bp
-            var origin_arg = 0
-            if param_offset == 1 and bp == 0:
-                origin_arg = recv_node
-            else if arg_index >= 0 and arg_index < arg_count:
-                origin_arg = if has_resolved != 0: self.get_resolved_call_arg(call_node, arg_index) else: self.ast.get_extra(extra_start + arg_index)
+            let origin_arg = if bp >= 0 and bp < args.len() as i32: args[bp] else: 0
             if origin_arg > 0:
                 union_mask = union_mask | self.compute_expr_view_origin_mask(origin_arg)
                 let dep_len_before = concrete_deps.len() as i32
@@ -14082,8 +14106,6 @@ impl Sema:
                     concrete_deps = self.push_unique_i32(move concrete_deps, self.place_root_sym(origin_arg))
         if union_mask != 0 or concrete_deps.len() > 0:
             self.set_expr_view_deps(call_node, union_mask, concrete_deps)
-        if fx >= 0:
-            self.facade_apply_call_touches(fx, call_node, sig_idx, param_offset, recv_node, extra_start, arg_count, has_resolved)
 
     // Ruling §38: "Unknown effect means invalidate." Every live view borrowed
     // from a resource this call receives without `preserves param N`, or
@@ -23272,6 +23294,11 @@ impl Sema:
                 self.facade_check_callback_arg(fn_sym, ai, actual_ty, arg_node)
         if slice_mut_args.len() > 0:
             self.check_mut_slice_call_exclusivity(slice_mut_args, arg_nodes)
+        // The specialization's returned-view contract reaches the caller as
+        // every other resolved call's does (the generic method path records
+        // through its concrete signature too): `first(&v)` and
+        // `over(&v) |> map(f)` view `v`.
+        self.record_call_view_origins_args(call_node, sig_idx, false, arg_nodes)
         // #1819: the specialization is the body the call runs.
         let args: Vec[i32] = Vec.new()
         let by_place: Vec[bool] = Vec.new()
