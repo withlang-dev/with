@@ -3536,7 +3536,7 @@ impl CCodegen:
         if ck == ConstKind.CK_CLOSURE:
             return self.closure_value_text(body, const_id)
         if ck == ConstKind.CK_ASYNC_BLOCK:
-            self.fail("emit-c does not support an async block (its body runs on a fiber the C backend has no lowering for)")
+            self.fail("emit-c does not support an async block (its body runs on a fiber the C backend has no lowering for; " ++ self.node_site_text(cd) ++ " in " ++ cc_intern_resolve(self.intern, body.fn_sym) ++ ")")
             return "0"
         self.fail(f"unsupported const kind {ck}")
         "0"
@@ -10057,6 +10057,16 @@ impl CCodegen:
     fn closure_body_at(idx: i32) -> &MirBody:
         self.mir_body_at(self.mir_mod.find_body(self.closure_syms[idx]) as i64)
 
+    // "path:line" of an AST node, for a diagnostic that names a construct.
+    fn node_site_text(node: i32) -> str:
+        let file_id = self.sema.ast.file(node as NodeId) as i32
+        var path = self.source_path.clone()
+        for si in 0..self.sema.source_text_file_ids.len() as i32:
+            if self.sema.source_text_file_ids[si] == file_id:
+                path = self.sema.source_text_names[si].clone()
+        let line = self.sema.source_location_for_file_id(file_id, self.ast.get_start(node)).line + 1
+        f"{path}:{line}"
+
     // Register every CK_CLOSURE constant of the module, in body then
     // constant order, so closure numbering is deterministic, and decide
     // each one's environment kind from the facts Sema recorded on its node.
@@ -10070,21 +10080,21 @@ impl CCodegen:
                 if self.closure_index_by_sym.contains(sym):
                     continue
                 let node = body.const_d0[ci]
-                let owner = cc_intern_resolve(self.intern, body.fn_sym)
+                let site = self.node_site_text(node) ++ " in " ++ cc_intern_resolve(self.intern, body.fn_sym)
                 let body_idx = self.mir_mod.find_body(sym)
                 if body_idx < 0:
-                    self.fail(f"emit-c: the closure at node {node} of {owner} has no retained MIR body")
+                    self.fail(f"emit-c: the closure at {site} has no retained MIR body")
                     return
                 let closure_body = self.mir_body_at(body_idx as i64)
                 let kind = self.sema.get_type_kind(self.sema.resolve_alias(closure_body.anonymous_type))
                 if kind == TypeKind.TY_EXTERN_FN:
-                    self.fail(f"emit-c does not support a closure used as a C function pointer (node {node} of {owner})")
+                    self.fail(f"emit-c does not support a closure used as a C function pointer ({site})")
                     return
                 if kind != TypeKind.TY_FN:
-                    self.fail(f"emit-c: the closure at node {node} of {owner} has a non-callable type")
+                    self.fail(f"emit-c: the closure at {site} has a non-callable type")
                     return
                 if self.returns_array(closure_body.local_type_ids[0]):
-                    self.fail(f"emit-c: a closure returning an array has no C lowering (C returns no arrays, #1775; node {node} of {owner})")
+                    self.fail(f"emit-c: a closure returning an array has no C lowering (C returns no arrays, #1775; {site})")
                     return
                 let env_kind = self.closure_env_kind_for(closure_body, node)
                 self.closure_index_by_sym.insert(sym, self.closure_syms.len() as i32)
