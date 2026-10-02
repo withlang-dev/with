@@ -4016,6 +4016,18 @@ impl Sema:
             // reach the importer, its body-only imports (std.libc) do not.
             let corpus_boundary = current != start_idx and self.module_in_bundle_corpus(current)
             let current_engine = if current == start_idx: -1 else: self.engine_corpus_id(self.module_paths[current])
+            // §18.1/§18.2: a name reaches a module only through its own
+            // `use`, never through what an imported user module imported.
+            // The walk followed every module's edges, so `use compiler.Link`
+            // made Link's `use std.string.StringBuilder` resolve
+            // StringBuilder in the importer with no import of its own
+            // (#1955). As in module_is_visible_from_current, the walk
+            // continues only through the std tier (§18.2 tier 5, #752) and,
+            // compiled in-unit, through a bundle corpus's own modules (D39
+            // §3.4 above).
+            let current_is_std = current >= 0 and current < self.module_paths.len() as i32 and sema_tier_path_is_std_implementation(self.module_paths[current]) != 0
+            if current != start_idx and not current_is_std and not self.module_in_bundle_corpus(current):
+                continue
             if current >= 0 and current < self.module_import_starts.len() as i32:
                 let edge_start = self.module_import_starts[current]
                 let edge_count = self.module_import_counts[current]
@@ -4277,6 +4289,24 @@ impl Sema:
             i = self.named_type_candidate_next[i]
         if self.named_types.contains(sym): self.named_types.get(sym).unwrap() else: 0
 
+    // The scoped-binding tier of type-name lookup. `named_types` has two
+    // kinds of writer: record_named_type_with_pub, which also records a
+    // candidate (module path, pub) for every declaration, and the scoped
+    // bindings written straight into the table and removed when their
+    // scope ends: `Self` inside an impl or a method body
+    // (SemaCheck.w bind/restore of syms.self_type, SemaDecl.w, and the
+    // comptime and MIR specializers) and a generic type parameter during
+    // specialization (tp_sym). A scoped binding has no candidate, so it is
+    // the only way `named_types` can name a tid no candidate carries: that
+    // is this tier, and it is not a visibility fallback. A declaration
+    // always has a candidate with its tid, so an unimported module
+    // declaration never resolves here (#1955 was the import walk, not this
+    // tier; `with-stage1 check rt/rt_core.w` under lldb takes it only for
+    // sym `Self`, with saw_recorded = 0). Its inputs are arguments so -O1
+    // keeps them readable in lldb.
+    fn scoped_type_binding(sym: i32, named_tid: i32, saw_recorded: i32, saw_named_tid: i32) -> i32:
+        if named_tid != 0 and (saw_recorded == 0 or saw_named_tid == 0): named_tid else: 0
+
     fn lookup_named_type_filtered(sym: i32, gated: i32) -> i32:
         let named_tid = if self.named_types.contains(sym): self.named_types.get(sym).unwrap() else: 0
         var global_tid = 0
@@ -4321,8 +4351,13 @@ impl Sema:
                     if self.named_type_candidate_paths[i] == bridged:
                         return self.named_type_candidate_tids[i]
                     i = self.named_type_candidate_next[i]
-        if named_tid != 0 and (saw_recorded == 0 or saw_named_tid == 0):
-            return named_tid
+        let scoped = self.scoped_type_binding(sym, named_tid, saw_recorded, saw_named_tid)
+        if scoped != 0:
+            return scoped
+        // The builtin tier: a candidate recorded before any module path
+        // existed (primitives, FieldInfo/VariantInfo) has the empty path and
+        // is visible everywhere, after every module candidate so a module's
+        // own declaration shadows it.
         if global_tid != 0:
             return global_tid
         0
