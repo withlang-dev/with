@@ -28,5 +28,5 @@ fn main:
     }
     let snapshot = Snapshot { items, tag: 7 }
     root.sync(move snapshot)
-    assert(root.active.get(0) == 42)
+    assert(root.active[0] == 42)
     assert(root.snapshot.items.len() == 0)

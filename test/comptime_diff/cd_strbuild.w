@@ -9,7 +9,7 @@ comptime fn build_battery(n: i32) -> str:
     let parts = out.split("-")
     var glued = ""
     for i in 0..parts.len() as i32:
-        glued = glued ++ parts.get(i as i64)
+        glued = glued ++ parts[i as i64]
     glued.replace("evenodd", "X")
 
 const CT_BUILD: str = comptime build_battery(8)

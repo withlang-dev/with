@@ -1471,7 +1471,7 @@ pub fn run_cli_selfhost_one_liner_action(ctx: ActionCtx) -> i32:
     if rc != 0: return rc
     rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-parity-tr-upper", bs_one_liner_args("-p", "line = line.upper()"), parity_in, "ALPHA 10 X\nBETA  20 Y\nGAMMA 30 X\nSTART\nDELTA 40 Y\nEND\nALPHA 10 X")
     if rc != 0: return rc
-    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-parity-printf-align", bs_one_liner_args("-n", "if nr == 1: print(f\"{line.split(\\\" \\\").get(0):<8}|{nr:>5}\")"), parity_in, "alpha   |    1")
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-parity-printf-align", bs_one_liner_args("-n", "if nr == 1: print(f\"{line.split(\\\" \\\")[0]:<8}|{nr:>5}\")"), parity_in, "alpha   |    1")
     if rc != 0: return rc
     rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-parity-e-grep-count", bs_one_liner_args("-e", "var c = 0\nfor l in stdin.lines(): if l.contains(\"alpha\"): c = c + 1\nprint(f\"{c}\")"), parity_in, "2")
     if rc != 0: return rc
@@ -2552,7 +2552,7 @@ fn bs_check_build_cache_tracks_declared_input(ctx: &ActionCtx, compiler_path: &s
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(case_dir, "src/input.txt"), "first", "cache input first")
     if rc != 0: return rc
-    rc = bs_write_fixture(ctx, bs_join(case_dir, "build.w"), "use std.build\n\nfn copy_input(ctx: ActionCtx) -> i32:\n    let fs = ctx.fs()\n    if fs.mkdir_all(\"out\") != 0:\n        return 1\n    let text = fs.read_text(ctx.inputs().get(0))\n    if fs.write_text(ctx.output(), text) != 0:\n        return 1\n    0\n\ncomptime with BuildCtx as ctx:\npub fn build -> Build:\n    var out = ctx.new_build()\n    var stamp = target_new(.Action, \"stamp\", \"\").output(\"out/stamp.txt\")\n    stamp.action = copy_input\n    stamp = stamp.input(\"src/input.txt\")\n    stamp = stamp.write_scope(\"out\")\n    out = out.add_target(stamp)\n    out.default(\"stamp\")\n", "cache input build")
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "build.w"), "use std.build\n\nfn copy_input(ctx: ActionCtx) -> i32:\n    let fs = ctx.fs()\n    if fs.mkdir_all(\"out\") != 0:\n        return 1\n    let text = fs.read_text(ctx.inputs()[0])\n    if fs.write_text(ctx.output(), text) != 0:\n        return 1\n    0\n\ncomptime with BuildCtx as ctx:\npub fn build -> Build:\n    var out = ctx.new_build()\n    var stamp = target_new(.Action, \"stamp\", \"\").output(\"out/stamp.txt\")\n    stamp.action = copy_input\n    stamp = stamp.input(\"src/input.txt\")\n    stamp = stamp.write_scope(\"out\")\n    out = out.add_target(stamp)\n    out.default(\"stamp\")\n", "cache input build")
     if rc != 0: return rc
 
     let first = bs_project_expect_success(ctx, compiler_path, case_dir, "build-cache-input-first", bs_project_args("build"))
@@ -2573,7 +2573,7 @@ fn bs_check_build_cache_tracks_declared_input(ctx: &ActionCtx, compiler_path: &s
 fn bs_check_build_cache_tracks_env_input(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     var rc = bs_write_project_manifest(ctx, case_dir, "cacheenv")
     if rc != 0: return rc
-    rc = bs_write_fixture(ctx, bs_join(case_dir, "build.w"), "use std.build\n\nfn stamp(ctx: ActionCtx) -> i32:\n    let fs = ctx.fs()\n    if fs.mkdir_all(ctx.args().get(0)) != 0:\n        return 1\n    fs.write_text(ctx.output(), \"stamped\")\n\ncomptime with BuildCtx as ctx:\npub fn build -> Build:\n    var out = ctx.new_build()\n    let dir = \"out/\" ++ ctx.env_input(\"CACHE_ENV_DIR\")\n    var t = target_new(.Action, \"stamp\", \"\").output(dir ++ \"/stamp.txt\")\n    t.action = stamp\n    t = t.arg(dir)\n    t = t.write_scope(\"out\")\n    out = out.add_target(t)\n    out.default(\"stamp\")\n", "cache env build")
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "build.w"), "use std.build\n\nfn stamp(ctx: ActionCtx) -> i32:\n    let fs = ctx.fs()\n    if fs.mkdir_all(ctx.args()[0]) != 0:\n        return 1\n    fs.write_text(ctx.output(), \"stamped\")\n\ncomptime with BuildCtx as ctx:\npub fn build -> Build:\n    var out = ctx.new_build()\n    let dir = \"out/\" ++ ctx.env_input(\"CACHE_ENV_DIR\")\n    var t = target_new(.Action, \"stamp\", \"\").output(dir ++ \"/stamp.txt\")\n    t.action = stamp\n    t = t.arg(dir)\n    t = t.write_scope(\"out\")\n    out = out.add_target(t)\n    out.default(\"stamp\")\n", "cache env build")
     if rc != 0: return rc
     let first = bs_run_cli_capture_cwd_with_env(ctx, compiler_path, "build-cache-env-first", bs_project_args("build"), 120000, case_dir, process_env().set("CACHE_ENV_DIR", "first"))
     if first.rc != 0:
@@ -2674,7 +2674,7 @@ fn bs_check_imported_module_diag_location(ctx: &ActionCtx, compiler_path: &str, 
 fn bs_check_build_effects_audit(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     var rc = bs_write_project_manifest(ctx, case_dir, "effectaudit")
     if rc != 0: return rc
-    rc = bs_write_fixture(ctx, bs_join(case_dir, "build.w"), "use std.build\n\nfn generate(ctx: ActionCtx) -> i32:\n    let fs = ctx.fs()\n    if fs.mkdir_all(\"out\") != 0:\n        return 1\n    let value = ctx.env_input(\"WITH_EFFECT_FLAG\")\n    let graph_value = ctx.args().get(1)\n    if fs.write_text(\"out/effect.txt\", value ++ \"/\" ++ graph_value) != 0:\n        return 1\n    let argv: Vec[str] = Vec.new()\n    argv.push(ctx.args().get(0).clone())\n    argv.push(\"version\")\n    let result = ctx.process_runner().run_capture(argv, \"out/proc.stdout\", \"out/proc.stderr\", 120000)\n    result.rc\n\ncomptime with BuildCtx as ctx:\npub fn build -> Build:\n    let graph_value = ctx.env_input(\"WITH_GRAPH_FLAG\")\n    var out = ctx.new_build()\n    var target = target_new(.Action, \"effect\", \"\").output(\"out/effect.txt\")\n    target.action = generate\n    target = target.write_scope(\"out\")\n    target = target.arg(\"" ++ compiler_path ++ "\")\n    target = target.arg(graph_value)\n    out = out.add_target(target)\n    out.default(\"effect\")\n", "effect audit build")
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "build.w"), "use std.build\n\nfn generate(ctx: ActionCtx) -> i32:\n    let fs = ctx.fs()\n    if fs.mkdir_all(\"out\") != 0:\n        return 1\n    let value = ctx.env_input(\"WITH_EFFECT_FLAG\")\n    let graph_value = ctx.args()[1]\n    if fs.write_text(\"out/effect.txt\", value ++ \"/\" ++ graph_value) != 0:\n        return 1\n    let argv: Vec[str] = Vec.new()\n    argv.push(ctx.args()[0].clone())\n    argv.push(\"version\")\n    let result = ctx.process_runner().run_capture(argv, \"out/proc.stdout\", \"out/proc.stderr\", 120000)\n    result.rc\n\ncomptime with BuildCtx as ctx:\npub fn build -> Build:\n    let graph_value = ctx.env_input(\"WITH_GRAPH_FLAG\")\n    var out = ctx.new_build()\n    var target = target_new(.Action, \"effect\", \"\").output(\"out/effect.txt\")\n    target.action = generate\n    target = target.write_scope(\"out\")\n    target = target.arg(\"" ++ compiler_path ++ "\")\n    target = target.arg(graph_value)\n    out = out.add_target(target)\n    out.default(\"effect\")\n", "effect audit build")
     if rc != 0: return rc
 
     var env_one = ProcessEnv { vars: Vec.new() }
@@ -3473,10 +3473,10 @@ fn bs_emit_c_collections_source() -> str:
         "    m.insert(5, \"five\")\n" ++
         "    var opts: Vec[Option[i32]] = Vec.new()\n" ++
         "    opts.push(Some(23))\n" ++
-        "    let opt_view = opts.get(0).unwrap()\n" ++
+        "    let opt_view = opts[0].unwrap()\n" ++
         "    var results: Vec[Result[i32, str]] = Vec.new()\n" ++
         "    results.push(Ok(29))\n" ++
-        "    let result_view = results.get(0).expect(\"present\")\n" ++
+        "    let result_view = results[0].expect(\"present\")\n" ++
         "    let t = pair()\n" ++
         "    var good = s.contains(7) and not s.contains(9)\n" ++
         "    good = good and names.contains(\"alpha\") and not names.contains(\"beta\")\n" ++
@@ -5957,7 +5957,7 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
         "        ctx.diagnostics().error(\"workspace file result name mismatch\")\n" ++
         "    if result.artifacts.len() != 1:\n" ++
         "        ctx.diagnostics().error(\"workspace file artifact count mismatch\")\n" ++
-        "    else if result.artifacts.get(0).path != \"out/bin/workspace-file\":\n" ++
+        "    else if result.artifacts[0].path != \"out/bin/workspace-file\":\n" ++
         "        ctx.diagnostics().error(\"workspace file artifact path mismatch\")\n" ++
         "    ctx.new_build().command(\"run-workspace-file\", \"out/bin/workspace-file\")\n"
     rc = bs_build_w_write_fixture(ctx, bs_join(file_dir, "build.w"), file_build, ctx.target_name(), "workspace file build.w")
@@ -6075,7 +6075,7 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
         "        ctx.diagnostics().error(\"workspace migrate failed\")\n" ++
         "    if result.artifacts.len() != 1:\n" ++
         "        ctx.diagnostics().error(\"workspace migrate artifact count mismatch\")\n" ++
-        "    else if result.artifacts.get(0).kind != ArtifactKind.source_tree or result.artifacts.get(0).path != \"out/migrated\":\n" ++
+        "    else if result.artifacts[0].kind != ArtifactKind.source_tree or result.artifacts[0].path != \"out/migrated\":\n" ++
         "        ctx.diagnostics().error(\"workspace migrate artifact mismatch\")\n" ++
         "    let migrated = ctx.fs().read_text(\"out/migrated/tiny.w\")\n" ++
         "    if not migrated.contains(\"fn answer\"):\n" ++
@@ -6430,7 +6430,7 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
         "    let results = parallel(workspaces)\n" ++
         "    if results.len() != 1:\n" ++
         "        ctx.diagnostics().error(\"parallel single workspace failed\")\n" ++
-        "    let result = results.get(0)\n" ++
+        "    let result = results[0]\n" ++
         "    if result.rc != 0:\n" ++
         "        ctx.diagnostics().error(\"parallel single workspace failed\")\n" ++
         "    ctx.new_build().command(\"run-parallel-single\", \"out/bin/parallel-single\")\n"
@@ -6458,7 +6458,7 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
         "    let results = parallel(workspaces)\n" ++
         "    if results.len() != 2:\n" ++
         "        ctx.diagnostics().error(\"parallel multi result count failed\")\n" ++
-        "    if results.get(0).rc != 0 or results.get(1).rc != 0:\n" ++
+        "    if results[0].rc != 0 or results[1].rc != 0:\n" ++
         "        ctx.diagnostics().error(\"parallel multi workspace failed\")\n" ++
         "    var out = ctx.new_build()\n" ++
         "    out = out.command(\"run-parallel-a\", \"out/bin/parallel-a\")\n" ++
@@ -6521,7 +6521,7 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
         "        ctx.diagnostics().error(\"parallel stress result count failed\")\n" ++
         "    var i = 0\n" ++
         "    while i < results.len():\n" ++
-        "        if results.get(i).rc != 0:\n" ++
+        "        if results[i].rc != 0:\n" ++
         "            ctx.diagnostics().error(\"parallel stress workspace failed\")\n" ++
         "        i = i + 1\n" ++
         "    var out = ctx.new_build()\n" ++
@@ -6573,7 +6573,7 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
         "    let results = parallel(workspaces)\n" ++
         "    if results.len() != 2:\n" ++
         "        ctx.diagnostics().error(\"parallel intercept result count failed\")\n" ++
-        "    if results.get(0).rc != 0 or results.get(1).rc != 0:\n" ++
+        "    if results[0].rc != 0 or results[1].rc != 0:\n" ++
         "        ctx.diagnostics().error(\"parallel intercept workspace failed\")\n" ++
         "    var saw_a = false\n" ++
         "    while not saw_a:\n" ++
@@ -6653,9 +6653,9 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
         "    let results = parallel(workspaces)\n" ++
         "    if results.len() != 2:\n" ++
         "        ctx.diagnostics().error(\"parallel failure result count failed\")\n" ++
-        "    if results.get(0).rc != 0:\n" ++
+        "    if results[0].rc != 0:\n" ++
         "        ctx.diagnostics().error(\"parallel ok workspace failed\")\n" ++
-        "    if results.get(1).rc == 0:\n" ++
+        "    if results[1].rc == 0:\n" ++
         "        ctx.diagnostics().error(\"parallel bad workspace unexpectedly succeeded\")\n" ++
         "    ctx.new_build().command(\"run-parallel-ok\", \"out/bin/parallel-ok\")\n"
     rc = bs_build_w_write_fixture(ctx, bs_join(parallel_failure_dir, "build.w"), parallel_failure_build, ctx.target_name(), "workspace parallel failure build.w")
@@ -6766,7 +6766,7 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
         "        ctx.diagnostics().error(\"payload enum comptime match failed\")\n" ++
         "    var public_matched = false\n" ++
         "    match public_message():\n" ++
-        "        CompilerMessage.Typechecked(decls) => public_matched = decls.len() == 1 and decls.get(0).name == \"build\"\n" ++
+        "        CompilerMessage.Typechecked(decls) => public_matched = decls.len() == 1 and decls[0].name == \"build\"\n" ++
         "        _ => public_matched = false\n" ++
         "    if not public_matched:\n" ++
         "        ctx.diagnostics().error(\"public compiler message comptime match failed\")\n" ++
@@ -6917,7 +6917,7 @@ fn bs_check_build_w_generated_source(ctx: &ActionCtx, compiler_path: &str, base_
     if rc != 0: return rc
     rc = bs_build_w_write_fixture(ctx, bs_join(toolfs_ok_dir, "fixtures/tree/a.txt"), "tree", ctx.target_name(), "toolfs ok tree fixture")
     if rc != 0: return rc
-    rc = bs_build_w_write_fixture(ctx, bs_join(toolfs_ok_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    let fs = ctx.fs()\n    assert(fs.mkdir_all(\"out/toolfs\") == 0)\n    assert(fs.write_text(\"out/toolfs/value.txt\", \"inside\") == 0)\n    assert(fs.read_text(\"out/toolfs/value.txt\") == \"inside\")\n    let bytes: Vec[u8] = Vec.new()\n    bytes.push(0 as u8)\n    bytes.push(65 as u8)\n    bytes.push(255 as u8)\n    assert(fs.write_binary(\"out/toolfs/binary.bin\", bytes) == 0)\n    let loaded = fs.read_binary(\"out/toolfs/binary.bin\")\n    assert(loaded.len() == 3)\n    assert(loaded.get(0) == 0 as u8)\n    assert(loaded.get(1) == 65 as u8)\n    assert(loaded.get(2) == 255 as u8)\n    let archive_entries: Vec[ArchiveEntry] = Vec.new()\n    archive_entries.push(archive_dir_entry(\"pkg\", 0o755))\n    archive_entries.push(archive_dir_entry(\"pkg/nested/\", 0o755))\n    archive_entries.push(archive_file_entry(\"fixtures/tree/a.txt\", \"pkg/nested/a.txt\", 0o644))\n    archive_entries.push(archive_file_entry(\"out/toolfs/binary.bin\", \"pkg/binary.bin\", 0o600))\n    assert(fs.write_tar(\"out/toolfs/archive.tar\", archive_entries) == 0)\n    assert(fs.extract_tar(\"out/toolfs/archive.tar\", \"out/toolfs/extracted\") == 0)\n    assert(fs.read_text(\"out/toolfs/extracted/pkg/nested/a.txt\") == \"tree\")\n    let extracted_bin = fs.read_binary(\"out/toolfs/extracted/pkg/binary.bin\")\n    assert(extracted_bin.len() == 3)\n    assert(extracted_bin.get(0) == 0 as u8)\n    assert(extracted_bin.get(1) == 65 as u8)\n    assert(extracted_bin.get(2) == 255 as u8)\n    let files = fs.list_files(\"fixtures/tree\")\n    assert(files.len() == 1)\n    assert(files.get(0) == \"fixtures/tree/a.txt\")\n    assert(fs.sha256_file(\"fixtures/tree/a.txt\") == \"dc9c5edb8b2d479e697b4b0b8ab874f32b325138598ce9e7b759eb8292110622\")\n    let host_path = ctx.project_info().project_root() ++ \"/fixtures/tree/a.txt\"\n    assert(fs.host_read_text(host_path) == \"tree\")\n    assert(fs.copy_file(\"fixtures/tree/a.txt\", \"out/toolfs/copied-file.txt\") == 0)\n    assert(fs.read_text(\"out/toolfs/copied-file.txt\") == \"tree\")\n    assert(fs.chmod(\"out/toolfs/copied-file.txt\", 0o644) == 0)\n    assert(fs.rename(\"out/toolfs/copied-file.txt\", \"out/toolfs/renamed-file.txt\") == 0)\n    assert(fs.read_text(\"out/toolfs/renamed-file.txt\") == \"tree\")\n    assert(fs.copy_tree(\"fixtures/tree\", \"out/toolfs/tree-copy\") == 0)\n    assert(fs.read_text(\"out/toolfs/tree-copy/a.txt\") == \"tree\")\n    assert(fs.symlink(\"fixtures/tree/a.txt\", \"out/toolfs/link-a.txt\") == 0)\n    assert(fs.read_text(\"out/toolfs/link-a.txt\") == \"tree\")\n    assert(fs.remove_tree(\"out/toolfs/tree-copy\") == 0)\n    assert(not fs.exists(\"out/toolfs/tree-copy/a.txt\"))\n    ctx.new_build().executable(\"toolfs-ok\", \"src/main.w\")\n", ctx.target_name(), "toolfs ok build.w")
+    rc = bs_build_w_write_fixture(ctx, bs_join(toolfs_ok_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    let fs = ctx.fs()\n    assert(fs.mkdir_all(\"out/toolfs\") == 0)\n    assert(fs.write_text(\"out/toolfs/value.txt\", \"inside\") == 0)\n    assert(fs.read_text(\"out/toolfs/value.txt\") == \"inside\")\n    let bytes: Vec[u8] = Vec.new()\n    bytes.push(0 as u8)\n    bytes.push(65 as u8)\n    bytes.push(255 as u8)\n    assert(fs.write_binary(\"out/toolfs/binary.bin\", bytes) == 0)\n    let loaded = fs.read_binary(\"out/toolfs/binary.bin\")\n    assert(loaded.len() == 3)\n    assert(loaded[0] == 0 as u8)\n    assert(loaded[1] == 65 as u8)\n    assert(loaded[2] == 255 as u8)\n    let archive_entries: Vec[ArchiveEntry] = Vec.new()\n    archive_entries.push(archive_dir_entry(\"pkg\", 0o755))\n    archive_entries.push(archive_dir_entry(\"pkg/nested/\", 0o755))\n    archive_entries.push(archive_file_entry(\"fixtures/tree/a.txt\", \"pkg/nested/a.txt\", 0o644))\n    archive_entries.push(archive_file_entry(\"out/toolfs/binary.bin\", \"pkg/binary.bin\", 0o600))\n    assert(fs.write_tar(\"out/toolfs/archive.tar\", archive_entries) == 0)\n    assert(fs.extract_tar(\"out/toolfs/archive.tar\", \"out/toolfs/extracted\") == 0)\n    assert(fs.read_text(\"out/toolfs/extracted/pkg/nested/a.txt\") == \"tree\")\n    let extracted_bin = fs.read_binary(\"out/toolfs/extracted/pkg/binary.bin\")\n    assert(extracted_bin.len() == 3)\n    assert(extracted_bin[0] == 0 as u8)\n    assert(extracted_bin[1] == 65 as u8)\n    assert(extracted_bin[2] == 255 as u8)\n    let files = fs.list_files(\"fixtures/tree\")\n    assert(files.len() == 1)\n    assert(files[0] == \"fixtures/tree/a.txt\")\n    assert(fs.sha256_file(\"fixtures/tree/a.txt\") == \"dc9c5edb8b2d479e697b4b0b8ab874f32b325138598ce9e7b759eb8292110622\")\n    let host_path = ctx.project_info().project_root() ++ \"/fixtures/tree/a.txt\"\n    assert(fs.host_read_text(host_path) == \"tree\")\n    assert(fs.copy_file(\"fixtures/tree/a.txt\", \"out/toolfs/copied-file.txt\") == 0)\n    assert(fs.read_text(\"out/toolfs/copied-file.txt\") == \"tree\")\n    assert(fs.chmod(\"out/toolfs/copied-file.txt\", 0o644) == 0)\n    assert(fs.rename(\"out/toolfs/copied-file.txt\", \"out/toolfs/renamed-file.txt\") == 0)\n    assert(fs.read_text(\"out/toolfs/renamed-file.txt\") == \"tree\")\n    assert(fs.copy_tree(\"fixtures/tree\", \"out/toolfs/tree-copy\") == 0)\n    assert(fs.read_text(\"out/toolfs/tree-copy/a.txt\") == \"tree\")\n    assert(fs.symlink(\"fixtures/tree/a.txt\", \"out/toolfs/link-a.txt\") == 0)\n    assert(fs.read_text(\"out/toolfs/link-a.txt\") == \"tree\")\n    assert(fs.remove_tree(\"out/toolfs/tree-copy\") == 0)\n    assert(not fs.exists(\"out/toolfs/tree-copy/a.txt\"))\n    ctx.new_build().executable(\"toolfs-ok\", \"src/main.w\")\n", ctx.target_name(), "toolfs ok build.w")
     if rc != 0: return rc
     let toolfs_ok = bs_build_w_expect_success(ctx, compiler_path, toolfs_ok_dir, "build-w-toolfs-ok", bs_blob_to_args(bs_argv_append("", "build")))
     if toolfs_ok.rc != 0: return toolfs_ok.rc
@@ -6931,7 +6931,7 @@ fn bs_check_build_w_generated_source(ctx: &ActionCtx, compiler_path: &str, base_
     if rc != 0: return rc
     rc = bs_build_w_write_fixture(ctx, bs_join(toolfs_archive_dir, "fixtures/tree/a.txt"), "tree", ctx.target_name(), "toolfs archive fixture")
     if rc != 0: return rc
-    rc = bs_build_w_write_fixture(ctx, bs_join(toolfs_archive_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    let fs = ctx.fs()\n    assert(fs.mkdir_all(\"out/archive\") == 0)\n    let entries: Vec[ArchiveEntry] = Vec.new()\n    entries.push(archive_dir_entry(\"pkg\", 0o755))\n    entries.push(archive_dir_entry(\"pkg/nested\", 0o755))\n    entries.push(archive_file_entry(\"fixtures/tree/a.txt\", \"pkg/nested/a.txt\", 0o644))\n    entries.push(archive_symlink_entry(\"nested/a.txt\", \"pkg/link-a.txt\", 0o777))\n    // Longer than the 100-byte name field: the USTAR prefix carries the rest,\n    // in the evaluator's writer as in std.build's.\n    entries.push(archive_dir_entry(\"pkg/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\", 0o755))\n    entries.push(archive_file_entry(\"fixtures/tree/a.txt\", \"pkg/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/a.txt\", 0o644))\n    assert(fs.write_tar(\"out/archive/sample.tar\", entries) == 0)\n    assert(fs.write_tar_gz(\"out/archive/sample.tar.gz\", entries) == 0)\n    let gzip = fs.read_binary(\"out/archive/sample.tar.gz\")\n    assert(gzip.len() > 10)\n    assert(gzip.get(0) == 31 as u8)\n    assert(gzip.get(1) == 139 as u8)\n    // Deflated, as std.build's writer does, not stored blocks: the\n    // first block's BTYPE (bits 1-2 of byte 10) is fixed or dynamic Huffman.\n    assert(((gzip.get(10) as i32) >> 1) & 3 != 0)\n    assert(fs.extract_tar(\"out/archive/sample.tar\", \"out/archive/extracted\") == 0)\n    assert(fs.read_text(\"out/archive/extracted/pkg/nested/a.txt\") == \"tree\")\n    assert(fs.read_text(\"out/archive/extracted/pkg/link-a.txt\") == \"tree\")\n    assert(fs.read_text(\"out/archive/extracted/pkg/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/a.txt\") == \"tree\")\n    var out = ctx.new_build().executable(\"toolfs-archive\", \"src/main.w\")\n    out = out.extract_tar_gz(\"extract-gzip\", \"out/archive/sample.tar.gz\", \"out/archive/extracted-gz\")\n    var all = target_new(.Group, \"all\", \"\")\n    all = all.dep(\"toolfs-archive\")\n    all = all.dep(\"extract-gzip\")\n    out = out.add_target(all)\n    out.default(\"all\")\n", ctx.target_name(), "toolfs archive build.w")
+    rc = bs_build_w_write_fixture(ctx, bs_join(toolfs_archive_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    let fs = ctx.fs()\n    assert(fs.mkdir_all(\"out/archive\") == 0)\n    let entries: Vec[ArchiveEntry] = Vec.new()\n    entries.push(archive_dir_entry(\"pkg\", 0o755))\n    entries.push(archive_dir_entry(\"pkg/nested\", 0o755))\n    entries.push(archive_file_entry(\"fixtures/tree/a.txt\", \"pkg/nested/a.txt\", 0o644))\n    entries.push(archive_symlink_entry(\"nested/a.txt\", \"pkg/link-a.txt\", 0o777))\n    // Longer than the 100-byte name field: the USTAR prefix carries the rest,\n    // in the evaluator's writer as in std.build's.\n    entries.push(archive_dir_entry(\"pkg/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\", 0o755))\n    entries.push(archive_file_entry(\"fixtures/tree/a.txt\", \"pkg/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/a.txt\", 0o644))\n    assert(fs.write_tar(\"out/archive/sample.tar\", entries) == 0)\n    assert(fs.write_tar_gz(\"out/archive/sample.tar.gz\", entries) == 0)\n    let gzip = fs.read_binary(\"out/archive/sample.tar.gz\")\n    assert(gzip.len() > 10)\n    assert(gzip[0] == 31 as u8)\n    assert(gzip[1] == 139 as u8)\n    // Deflated, as std.build's writer does, not stored blocks: the\n    // first block's BTYPE (bits 1-2 of byte 10) is fixed or dynamic Huffman.\n    assert(((gzip[10] as i32) >> 1) & 3 != 0)\n    assert(fs.extract_tar(\"out/archive/sample.tar\", \"out/archive/extracted\") == 0)\n    assert(fs.read_text(\"out/archive/extracted/pkg/nested/a.txt\") == \"tree\")\n    assert(fs.read_text(\"out/archive/extracted/pkg/link-a.txt\") == \"tree\")\n    assert(fs.read_text(\"out/archive/extracted/pkg/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/a.txt\") == \"tree\")\n    var out = ctx.new_build().executable(\"toolfs-archive\", \"src/main.w\")\n    out = out.extract_tar_gz(\"extract-gzip\", \"out/archive/sample.tar.gz\", \"out/archive/extracted-gz\")\n    var all = target_new(.Group, \"all\", \"\")\n    all = all.dep(\"toolfs-archive\")\n    all = all.dep(\"extract-gzip\")\n    out = out.add_target(all)\n    out.default(\"all\")\n", ctx.target_name(), "toolfs archive build.w")
     if rc != 0: return rc
     let toolfs_archive = bs_build_w_expect_success(ctx, compiler_path, toolfs_archive_dir, "build-w-toolfs-archive", bs_blob_to_args(bs_argv_append("", "build")))
     if toolfs_archive.rc != 0: return toolfs_archive.rc
@@ -7254,23 +7254,23 @@ fn bs_check_build_w_action_target(ctx: &ActionCtx, compiler_path: &str, case_dir
         "fn generate(ctx: ActionCtx) -> i32:\n" ++
         "    assert(ctx.target_name() == \"generate\")\n" ++
         "    assert(ctx.project_info().package_name() == \"buildwaction\")\n" ++
-        "    assert(ctx.inputs().get(0) == \"src/input.txt\")\n" ++
-        "    assert(ctx.args().get(0) == \"hello\")\n" ++
+        "    assert(ctx.inputs()[0] == \"src/input.txt\")\n" ++
+        "    assert(ctx.args()[0] == \"hello\")\n" ++
         "    assert(ctx.timeout() == 12345)\n" ++
         "    assert(ctx.working_dir() == \"fixtures/work\")\n" ++
         "    assert(ctx.env().len() == 2)\n" ++
-        "    assert(ctx.env().get(0) == \"WITH_DECLARED_ONE=1\")\n" ++
-        "    assert(ctx.env().get(1) == \"WITH_DECLARED_TWO=two\")\n" ++
+        "    assert(ctx.env()[0] == \"WITH_DECLARED_ONE=1\")\n" ++
+        "    assert(ctx.env()[1] == \"WITH_DECLARED_TWO=two\")\n" ++
         "    assert(ctx.network())\n" ++
-        "    assert(ctx.fs().read_text(ctx.inputs().get(0)) == \"input\")\n" ++
+        "    assert(ctx.fs().read_text(ctx.inputs()[0]) == \"input\")\n" ++
         "    let scratch = ctx.fs().scratch_dir()\n" ++
         "    assert(scratch.starts_with(\"out/tmp/action-scratch/generate\"))\n" ++
         "    let stale = ctx.fs().join(scratch, \"stale.txt\")\n" ++
         "    assert(not ctx.fs().exists(stale))\n" ++
         "    assert(ctx.fs().write_text(stale, \"stale\") == 0)\n" ++
         "    assert(ctx.fs().mkdir_all(\"out/action\") == 0)\n" ++
-        "    assert(ctx.fs().write_text(ctx.output(), \"action:\" ++ ctx.args().get(0)) == 0)\n" ++
-        "    assert(ctx.fs().write_text(ctx.outputs().get(1), \"extra:\" ++ ctx.args().get(0)) == 0)\n" ++
+        "    assert(ctx.fs().write_text(ctx.output(), \"action:\" ++ ctx.args()[0]) == 0)\n" ++
+        "    assert(ctx.fs().write_text(ctx.outputs()[1], \"extra:\" ++ ctx.args()[0]) == 0)\n" ++
         "    var env_args: Vec[str] = Vec.new()\n" ++
         "    env_args |> push(\"/usr/bin/env\")\n" ++
         "    var child_env = process_env()\n" ++

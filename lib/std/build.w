@@ -2444,8 +2444,8 @@ fn build_https_fetch_source() -> str:
     "    if argv.len() < 3:\n" ++
     "        print(\"usage: https_fetch <url> <output>\")\n" ++
     "        return 2\n" ++
-    "    let url = argv.get(1) ++ \"\"\n" ++
-    "    let output = argv.get(2) ++ \"\"\n" ++
+    "    let url = argv[1] ++ \"\"\n" ++
+    "    let output = argv[2] ++ \"\"\n" ++
     "    for attempt in 1..ATTEMPTS + 1:\n" ++
     "        if https_download(url.clone(), output.clone()) == 0: return 0\n" ++
     "        if attempt < ATTEMPTS:\n" ++
@@ -2473,7 +2473,7 @@ fn build_zlib_gunzip_source() -> str:
     "    var out = StringBuilder.with_capacity(data.len())\n" ++
     "    var i: i64 = 0\n" ++
     "    while i < data.len():\n" ++
-    "        out.push_byte(data.get(i))\n" ++
+    "        out.push_byte(data[i])\n" ++
     "        i = i + 1\n" ++
     "    out.to_str()\n\n" ++
     "fn main -> i32:\n" ++
@@ -2481,14 +2481,14 @@ fn build_zlib_gunzip_source() -> str:
     "    if argv.len() < 3:\n" ++
     "        print(\"usage: zlib_gunzip <input.tar.gz> <output.tar>\")\n" ++
     "        return 2\n" ++
-    "    let input = read_file(argv.get(1)) ?? \"\"\n" ++
+    "    let input = read_file(argv[1]) ?? \"\"\n" ++
     "    if input.len() == 0:\n" ++
     "        print(\"could not read input archive\")\n" ++
     "        return 1\n" ++
     "    let input_bytes = bytes_from_str(input)\n" ++
     "    match decompress_gzip_with_limit(&input_bytes, MAX_OUTPUT):\n" ++
     "        Ok(tar_bytes) => {\n" ++
-    "            if write_file(argv.get(2), bytes_to_str(&tar_bytes)) != 0:\n" ++
+    "            if write_file(argv[2], bytes_to_str(&tar_bytes)) != 0:\n" ++
     "                print(\"could not write output tar\")\n" ++
     "                return 1\n" ++
     "        }\n" ++

@@ -1,6 +1,8 @@
-//! expect-exit: 1
-//! expect-stderr: Vec index out of bounds
+//! expect-exit: 134
+//! expect-stderr: index out of bounds
 
+// D71: `xs[i]` is the one element spelling on a Vec, and out of range it
+// panics like the array and slice index (behav_array_index_bounds_panics).
 fn main:
     let values: Vec[i32] = Vec.new()
     values.push(1)

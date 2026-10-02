@@ -42,8 +42,8 @@ fn test_await_all_in_input_order():
     tasks.push(delayed_value(20, 0))
     let values = tasks |> await_all
     assert(values.len() == 2)
-    assert(values.get(0) == 10)
-    assert(values.get(1) == 20)
+    assert(values[0] == 10)
+    assert(values[1] == 20)
     assert(unsafe { with_fiber_live_fibers() } == baseline)
 
 fn test_fallible_await_all_in_input_order():
@@ -55,8 +55,8 @@ fn test_fallible_await_all_in_input_order():
     assert(result.is_ok())
     let values = result.unwrap()
     assert(values.len() == 2)
-    assert(values.get(0) == 10)
-    assert(values.get(1) == 20)
+    assert(values[0] == 10)
+    assert(values[1] == 20)
     assert(unsafe { with_fiber_live_fibers() } == baseline)
 
 fn collect_first_error() -> Result[Vec[i32], str]:

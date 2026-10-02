@@ -12,7 +12,7 @@ fn main:
     build_text = build_text ++ "    assert(ctx.fs().read_text(\"src/input.txt\") == \"hello\")\n"
     build_text = build_text ++ "    assert(ctx.fs().mkdir_all(\"out/action\") == 0)\n"
     build_text = build_text ++ "    assert(ctx.fs().write_text(ctx.output(), \"value:\" ++ ctx.fs().read_text(\"src/input.txt\")) == 0)\n"
-    build_text = build_text ++ "    assert(ctx.fs().write_text(ctx.outputs().get(1), \"extra\") == 0)\n"
+    build_text = build_text ++ "    assert(ctx.fs().write_text(ctx.outputs()[1], \"extra\") == 0)\n"
     build_text = build_text ++ "    0\n\n"
     build_text = build_text ++ "pub fn build(ctx: BuildCtx) -> Build:\n"
     build_text = build_text ++ "    var out = ctx.new_build()\n"
