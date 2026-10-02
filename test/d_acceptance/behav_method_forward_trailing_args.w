@@ -1,5 +1,6 @@
 //! expect-stdout: 405
 
+use std.builtins.print_i32
 type Forwarder {}
 
 fn Forwarder.pair(mut self: Self, a: i32, b: i32): a * 100 + b

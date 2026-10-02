@@ -1,5 +1,6 @@
 //! expect-stdout: 60
 use std.iter
+use std.builtins.int_to_string
 
 fn main:
     let v: Vec[i32] = Vec.new()

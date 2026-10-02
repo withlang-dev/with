@@ -3,6 +3,7 @@
 // The #730 rejection must NOT fire for a Copy field read through a view:
 // D22 rule 3 permits contextual Copy materialization.
 
+use std.builtins.int_to_string
 type Outer { v: Vec[i32], n: i32 }
 
 fn main:

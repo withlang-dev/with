@@ -4,6 +4,7 @@
 // removing an element, popping an element, or storing it inside a struct must
 // drop each live Drop element exactly once.
 
+use std.builtins.print_i32
 type W { slot: *mut i32 }
 impl Drop for W:
     fn drop(move self: Self):

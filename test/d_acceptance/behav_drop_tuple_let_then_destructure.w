@@ -5,6 +5,7 @@
 // into a and b (drop once each = 2). If t is not consumed, t's value drop also
 // frees its elements -> count 4 (double-free).
 
+use std.builtins.print_i32
 type W { slot: *mut i32 }
 impl Drop for W:
     fn drop(move self: Self):

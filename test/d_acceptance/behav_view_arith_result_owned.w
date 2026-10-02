@@ -5,6 +5,7 @@
 // Repro shape: AstPool.get_call_named_arg (map get → unwrap view → sum →
 // call argument in return position).
 
+use std.collections.HashMap
 type T {
     m: HashMap[i32, i32],
     extra: Vec[i32],

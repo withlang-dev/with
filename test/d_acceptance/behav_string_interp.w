@@ -4,6 +4,7 @@
 // String interpolation (\{expr}) is not yet implemented.
 // Tests concat (++) and int_to_string for equivalent behavior.
 
+use std.builtins.int_to_string
 fn test_basic_concat:
     let name = "world"
     let s = "hello " ++ name

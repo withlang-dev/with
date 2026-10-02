@@ -4,6 +4,7 @@
 // pattern (`fn value(None: Option[i32])`), never a binding. Meant as a
 // binding, it gets one error naming the rule — not "refutable parameter
 // pattern" plus two "undefined variable"s.
+use std.builtins.print_i32
 fn scale(N: i32) -> i32: N * 2
 
 fn main:

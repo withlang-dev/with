@@ -2,6 +2,7 @@
 
 // Behavior test: if-let pattern matching at runtime
 
+use std.builtins.int_to_string
 fn get_some() -> ?i32:
     Some(42)
 

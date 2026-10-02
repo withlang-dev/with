@@ -3,6 +3,7 @@
 // A5: assigning a new Vec into a mut-self field drops the old Vec tail before
 // replacing it, then drops the new Vec when the owner leaves scope.
 
+use std.builtins.print_i32
 type W { slot: *mut i32 }
 impl Drop for W:
     fn drop(move self: Self):

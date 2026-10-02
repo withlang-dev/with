@@ -1,4 +1,5 @@
 
+use std.builtins.int_to_string
 enum Color: i32 { Red = 1 | Green = 2 | Blue = 4 }
 
 impl Copy for Color

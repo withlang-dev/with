@@ -1,5 +1,6 @@
 //! expect-stdout: ok
 
+use std.collections.HashMap
 comptime fn build_str_str_map() -> HashMap[str, str]:
     var m = HashMap[str, str].new()
     m.insert("name", "alice")

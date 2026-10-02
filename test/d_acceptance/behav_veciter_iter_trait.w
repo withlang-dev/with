@@ -1,6 +1,7 @@
 //! expect-stdout: 15
 //! expect-stdout: 3
 
+use std.builtins.int_to_string
 fn main:
     // VecIter[T] implements Iter[T] — test via for-loop over .iter()
     let nums: Vec[i32] = Vec.new()

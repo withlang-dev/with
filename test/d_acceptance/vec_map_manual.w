@@ -1,4 +1,5 @@
 //! expect-stdout: 3
+use std.builtins.int_to_string
 fn main:
     var items: Vec[i32] = Vec.new()
     items.push(10)

@@ -7,6 +7,7 @@
 // paths after an unconditional move is ill-formed under §3.8 move
 // semantics (the former spelling relied on the superseded D5 share-place
 // reading of `use_s(x)`).
+use std.builtins.print_i32
 var DROPS: i32 = 0
 var PTARGET: i32 = 0
 type S { a: i32, b: i32 }

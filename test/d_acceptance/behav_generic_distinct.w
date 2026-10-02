@@ -1,5 +1,6 @@
 //! expect-stdout: ok
 
+use std.collections.HashMap
 fn check_vec_i32:
     var v: Vec[i32] = Vec.new()
     v.push(42)

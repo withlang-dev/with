@@ -4,6 +4,8 @@
 // (slot.set(Some(x)) and friends) must type as the stored element's enum,
 // not its payload — in generic and non-generic bodies alike.
 
+use std.collections.SlotMap
+use std.collections.HashMap
 fn generic_slot_set[T](x: T) -> T:
     let values: Vec[Option[T]] = Vec.new()
     let empty: Option[T] = None

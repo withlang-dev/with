@@ -1,5 +1,6 @@
 //! expect-stdout: ok
 
+use std.regex.Captures
 fn test_compile_match_find:
     let re = Regex.compile("^(\\w+)\\s+(\\w+)$").unwrap()
     assert(re.is_match("hello world"))

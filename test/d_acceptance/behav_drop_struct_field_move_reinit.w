@@ -4,6 +4,7 @@
 // a tuple field is reassigned, the old tuple elements drop; when the owner
 // leaves scope, the replacement tuple elements drop.
 
+use std.builtins.print_i32
 type W { slot: *mut i32 }
 impl Drop for W:
     fn drop(move self: Self):

@@ -1,5 +1,6 @@
 //! expect-stdout: ok
 
+use std.collections.HashMap
 type NodeId = distinct i32
 type TypeId = distinct i32
 

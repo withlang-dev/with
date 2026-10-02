@@ -4,6 +4,7 @@
 // implicitly (and made the later whole use an error) now errors at the
 // move site itself — the site-local rule subsumes the flow-conditional one.
 
+use std.builtins.print_i64
 type Capability { root: str, name: str }
 
 fn takes_whole(c: &Capability) -> i64: c.root.len()

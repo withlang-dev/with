@@ -1,6 +1,7 @@
 //! expect-stdout: 42
 //! expect-stdout: ok
 
+use std.builtins.int_to_string
 const SMALL_I64: i64 = 42
 const BIG_I64: i64 = 4294967296
 

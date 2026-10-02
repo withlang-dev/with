@@ -4,6 +4,7 @@
 // origin is the caller's live place. Previously rejected; share-place makes it
 // correct.
 
+use std.builtins.print_i32
 type Inner { data: i32 }
 type Buf { inner: Inner }
 

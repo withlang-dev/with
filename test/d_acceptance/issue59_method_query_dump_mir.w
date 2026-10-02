@@ -1,6 +1,7 @@
 //! args: --dump-mir
 //! expect-check-stdout: mir module functions=
 
+use std.collections.HashMap
 type Entry {
     name: str,
     values: Vec[i32],

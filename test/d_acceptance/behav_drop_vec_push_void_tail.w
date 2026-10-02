@@ -4,6 +4,7 @@
 // so `xs` drops its element and buffer exactly once locally. The trailing work
 // in `main` would expose premature or duplicate cleanup via heap corruption.
 
+use std.builtins.print_i32
 var COUNT = 0
 
 type W { tag: i32 }

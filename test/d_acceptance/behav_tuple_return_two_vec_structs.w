@@ -6,6 +6,7 @@
 // call-site store rejected the structurally-identical value. The collection
 // type caches are dual-keyed now; keep the shape pinned.
 
+use std.builtins.int_to_string
 type A { x: i32 }
 type B { y: i32 }
 

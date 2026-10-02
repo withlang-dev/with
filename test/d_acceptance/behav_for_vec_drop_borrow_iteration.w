@@ -5,6 +5,7 @@
 // spec §13 borrow iteration: `for w in xs` now iterates by view, each element
 // drops exactly once when the Vec does, and the collection stays valid.
 
+use std.builtins.print_i32
 type W { tag: i32 }
 impl Drop for W:
     fn drop(move self: Self):

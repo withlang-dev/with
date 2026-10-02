@@ -1,5 +1,6 @@
 //! expect-stdout: ok
 
+use std.collections.HashMap
 type Package {
     values: Vec[i32],
     table: HashMap[str, i32],

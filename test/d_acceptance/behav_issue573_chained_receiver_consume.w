@@ -1,5 +1,6 @@
 //! expect-stdout: 7
 
+use std.builtins.int_to_string
 type S { a: str, b: str }
 
 fn mk(a: str) -> S:

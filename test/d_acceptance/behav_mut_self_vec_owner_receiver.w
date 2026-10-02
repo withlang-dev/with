@@ -3,6 +3,7 @@
 // A5: moving a Vec field out through a move-self receiver transfers ownership
 // to the returned Vec. The consumed owner must not also drop the moved field.
 
+use std.builtins.print_i32
 type W { slot: *mut i32 }
 impl Drop for W:
     fn drop(move self: Self):

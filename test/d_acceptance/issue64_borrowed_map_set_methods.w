@@ -1,3 +1,5 @@
+use std.collections.HashMap
+use std.collections.HashSet
 fn main:
     let map: HashMap[str, i32] = HashMap.new()
     map.insert("a", 1)

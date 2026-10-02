@@ -1,5 +1,6 @@
 //! expect-stdout: val=42
 
+use std.builtins.int_to_string
 enum Val { Num(i32) | Empty }
 
 fn extract(v: Val) -> i32:

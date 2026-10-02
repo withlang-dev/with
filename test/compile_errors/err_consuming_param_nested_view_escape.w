@@ -5,6 +5,7 @@
 // direct-field one does. Replaces behav_byvalue_view_escape_nested.w
 // (retired share-place pin).
 
+use std.builtins.print_i32
 type Inner { data: i32 }
 type Buf { inner: Inner }
 

@@ -9,6 +9,7 @@
 // through a map view is a pending Stage 8 rejection:
 // test/non_compliant/d22/err_d22_map_view_mutation.w.
 
+use std.collections.HashMap
 type Inner {
     tags: Vec[i32],
     label: str,

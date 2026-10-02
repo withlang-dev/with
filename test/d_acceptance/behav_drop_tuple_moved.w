@@ -6,6 +6,7 @@
 // tuple drops its element, the source must be consumed or the counter reaches 2
 // (double-free analogue).
 
+use std.builtins.print_i32
 type W { slot: *mut i32 }
 impl Drop for W:
     fn drop(move self: Self):

@@ -1,3 +1,4 @@
+use std.collections.HashMap
 type PointerNode { children: [2]*mut PointerNode }
 
 unsafe fn has_child(node: *mut PointerNode, index: i32):

@@ -3,6 +3,7 @@
 // Behavior test: type system
 // Tests: struct types, enum types, arrays, function types
 
+use std.builtins.int_to_string
 type Point {
     x: i32,
     y: i32,

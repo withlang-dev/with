@@ -2,6 +2,7 @@
 
 // #606: a Drop value in an enum variant payload is dropped when the enum drops.
 
+use std.builtins.print_i32
 type W { slot: *mut i32 }
 impl Drop for W:
     fn drop(move self: Self):

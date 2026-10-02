@@ -3,6 +3,7 @@
 //! expect-stdout: 1 to 3
 //! expect-stdout: ok
 
+use std.builtins.int_to_string
 fn main:
     let arr = [1, 2, 3]
     // Exhaustive: exact element count match for [3]i32

@@ -3,6 +3,7 @@
 // #606: enum drop is variant-aware -- only the ACTIVE variant's payload drops.
 // B(i32) carries no Drop payload, so constructing B must not drop a phantom W.
 
+use std.builtins.print_i32
 type W { slot: *mut i32 }
 impl Drop for W:
     fn drop(move self: Self):

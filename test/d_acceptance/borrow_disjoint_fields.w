@@ -1,4 +1,5 @@
 //! expect-stdout: 30
+use std.builtins.int_to_string
 type Vec2 { x: i32, y: i32 }
 
 fn add_refs(a: &i32, b: &i32) -> i32: *a + *b

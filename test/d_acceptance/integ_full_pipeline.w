@@ -3,6 +3,7 @@
 // Integration test: full compiler pipeline
 // Exercises: function definition, arithmetic, function call, print
 
+use std.builtins.int_to_string
 fn double(x: i32) -> i32:
     x * 2
 

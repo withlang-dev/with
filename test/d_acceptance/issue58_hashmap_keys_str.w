@@ -1,5 +1,6 @@
 //! expect-stdout: ok
 
+use std.collections.HashMap
 fn main:
     var m: HashMap[str, i32] = HashMap.new()
     m.insert("alpha", 1)

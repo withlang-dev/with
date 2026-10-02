@@ -11,6 +11,7 @@
 // because iterating a Vec[Drop] field hits a distinct, pre-existing double-free under
 // the current collapse move model (a #607-family bug, independent of this reject).
 
+use std.builtins.print_i32
 type W { tag: i32 }
 impl Drop for W:
     fn drop(move self: Self):

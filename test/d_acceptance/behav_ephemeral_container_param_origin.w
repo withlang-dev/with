@@ -1,6 +1,7 @@
 //! expect-stdout: 5
 // §5.2 (#625): a container that borrows a PARAMETER (not a stack local) does
 // not outlive its origin — Rust-legal, and allowed here.
+use std.builtins.print_i32
 type View ephemeral { p: &i32 }
 fn collect_one(src: &i32) -> Vec[View]:
     var v = Vec.new()

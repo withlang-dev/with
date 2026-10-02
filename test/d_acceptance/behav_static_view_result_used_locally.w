@@ -3,6 +3,7 @@
 // A callee's escape_view effect describes the origin of its returned value.
 // Using that value only inside the caller must not make the caller return a
 // view from its own owned parameter.
+use std.builtins.print_i32
 type LocalViewFactory { marker: i32 }
 
 fn LocalViewFactory.borrow(values: &Vec[i32]) -> &Vec[i32]: values

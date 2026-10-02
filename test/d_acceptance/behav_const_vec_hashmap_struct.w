@@ -6,6 +6,7 @@
 // struct was built. The mixed {Vec, HashMap} shape is the one cell of the
 // matrix that failed; keep it pinned.
 
+use std.collections.HashMap
 type P { values: Vec[i32], table: HashMap[str, i32] }
 
 comptime fn build() -> P:

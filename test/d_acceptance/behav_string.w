@@ -3,6 +3,7 @@
 // End-to-end test: string operations
 // Tests: string literals, concatenation (++), len(), comparisons
 
+use std.builtins.int_to_string
 fn test_string_literal:
     let s = "hello"
     assert(s == "hello")

@@ -5,6 +5,7 @@
 // (Uses `match` rather than `.unwrap()` to avoid the unrelated Result-of-Drop
 // unwrap double-free, #648.)
 use c_import("unsigned long strlen(const char* s);\n", retains: ["strlen(0)"])
+use std.builtins.print_i32
 
 fn main:
     match "literal".to_cstring():

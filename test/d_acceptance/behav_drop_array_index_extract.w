@@ -4,6 +4,7 @@
 // Both bindings are views, so the array remains the sole owner and drops its
 // two elements exactly once.
 
+use std.builtins.print_i32
 type W { slot: *mut i32 }
 impl Drop for W:
     fn drop(move self: Self):

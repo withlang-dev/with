@@ -1,5 +1,6 @@
 //! expect-stdout: ok
 
+use std.task.Task
 async fn process(value: &i32) -> i32:
     *value + 1
 

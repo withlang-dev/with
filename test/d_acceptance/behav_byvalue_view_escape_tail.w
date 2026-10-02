@@ -5,6 +5,7 @@
 // points into the caller's live binding and view-origin tracking keeps it safe.
 // Previously rejected as an escape; share-place makes it correct.
 
+use std.builtins.print_i32
 type Buf { data: i32 }
 
 fn first_view(b: Buf) -> &i32: &b.data

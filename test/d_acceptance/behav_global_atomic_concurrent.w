@@ -1,5 +1,6 @@
 //! expect-stdout: ok
 
+use std.collections.Atomic
 var counter: Atomic[i32]
 
 async fn marker() -> i32:

@@ -6,6 +6,7 @@
 // made len() signed so that expression no longer traps — the message is now
 // pinned through a pure u64 underflow on a runtime value.)
 
+use std.builtins.print_i64
 fn main:
     let v: Vec[i32] = Vec.new()
     let zero: u64 = v.len() as u64

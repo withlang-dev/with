@@ -7,6 +7,7 @@
 // superseded D5 share-place design; a plain `Buf` param now consumes, so the
 // borrowing contract lives in the signature.) Prints 1 + 2 = 3.
 
+use std.builtins.print_i32
 type Buf { data: i32 }
 
 fn choose_view(a: &Buf, b: &Buf, take_a: bool) -> &i32:

@@ -1,5 +1,6 @@
 //! expect-stdout: 15
 //! expect-stdout: hello world
+use std.builtins.int_to_string
 fn main:
     let nums: Vec[i32] = Vec.new()
     nums.push(1)

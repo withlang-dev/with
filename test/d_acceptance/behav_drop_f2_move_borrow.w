@@ -2,6 +2,7 @@
 
 // Drop-exactly-once (§21): shape=f2, scenario=move_borrow. Runs the
 // scenario in its own fn so scope-exit drops fire, counts via a global.
+use std.builtins.print_i32
 var DROPS: i32 = 0
 var PTARGET: i32 = 0
 type S { a: i32, b: i32 }

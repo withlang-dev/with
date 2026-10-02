@@ -1,4 +1,5 @@
 use std.box.Box
+use std.collections.HashSet
 global var BOX_DROP_TRACE = ""
 
 type BoxDropGuard { id: str }

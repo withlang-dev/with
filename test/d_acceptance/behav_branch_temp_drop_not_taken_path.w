@@ -5,6 +5,7 @@
 // drop landed in the join block, and the not-taken path freed an
 // uninitialized temp (invalid free of stack garbage; release-only via -O1
 // slot reuse). The else path here must run clean.
+use std.builtins.print_i32
 type Big { a: Vec[str], b: Vec[str] }
 
 fn cl(v: &Vec[str]) -> Vec[str]:

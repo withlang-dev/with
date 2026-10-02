@@ -4,6 +4,7 @@
 // followed by a read leave the single receiver owner live until scope exit,
 // where both elements and the Vec buffer drop exactly once.
 
+use std.builtins.print_i32
 var COUNT = 0
 
 type W { tag: i32 }

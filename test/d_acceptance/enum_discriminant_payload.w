@@ -3,6 +3,7 @@
 //! expect-stdout: write hello
 //! expect-stdout: ok
 
+use std.builtins.int_to_string
 enum Msg: i32:
     Quit = 0
     Move(i32, i32) = 1

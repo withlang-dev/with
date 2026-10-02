@@ -4,6 +4,7 @@
 // array goes out of scope (3 elements -> 3 drops). A missing array element-drop
 // leaks them (counter stays 0).
 
+use std.builtins.print_i32
 type W { slot: *mut i32 }
 impl Drop for W:
     fn drop(move self: Self):

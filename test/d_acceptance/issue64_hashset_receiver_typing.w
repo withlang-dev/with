@@ -1,5 +1,6 @@
 //! check-only
 
+use std.collections.HashSet
 fn shared_contains(set: &HashSet[i32]) -> bool:
     set.contains(1)
 

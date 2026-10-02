@@ -1,5 +1,6 @@
 //! expect-stdout: ok
 
+use std.task.Task
 type Pair[T] { first: T, second: T }
 
 async fn echo[T](value: T) -> T: value

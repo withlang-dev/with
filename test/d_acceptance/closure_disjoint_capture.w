@@ -1,4 +1,5 @@
 //! expect-stdout: 31
+use std.builtins.int_to_string
 type World { x: i32, y: i32 }
 
 fn main:

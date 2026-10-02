@@ -11,6 +11,7 @@
 // / owner_receiver greens don't catch field-vs-local — hence multi-element AND a
 // field receiver here. Consuming `for w in xs` is intentionally NOT exercised (#607).
 
+use std.builtins.print_i32
 var DROPS = 0
 
 type W { tag: i32 }

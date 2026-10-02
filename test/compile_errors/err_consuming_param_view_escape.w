@@ -7,6 +7,7 @@
 // reading ("by-value param is the caller's place; escaping views valid").
 // The borrow spelling (`b: &Buf`) remains the legal way to return a view.
 
+use std.builtins.print_i32
 type Buf { data: i32 }
 
 fn first_view(b: Buf) -> &i32: &b.data

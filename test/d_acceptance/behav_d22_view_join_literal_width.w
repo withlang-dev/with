@@ -4,6 +4,7 @@
 // payload's width — the literal adapts. Regression pin for the i32-anchored
 // join that truncated the materialized pointee to 32 bits (the
 // analyze-audit segfault class: fn_fn_types handles lost bit 32+).
+use std.collections.HashMap
 fn main:
     var m: HashMap[i32, i64] = HashMap.new()
     m.insert(7, 5000000123)

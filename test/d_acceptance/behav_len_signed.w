@@ -5,6 +5,9 @@
 // just work: len()-1 is -1, countdowns run without wrapping, and len() feeds
 // i64 indexing directly.
 
+use std.collections.HashMap
+use std.collections.BTreeSet
+use std.collections.BTreeMap
 fn main:
     let empty: Vec[i32] = Vec.new()
     assert(empty.len() - 1 == -1)

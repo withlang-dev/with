@@ -1,5 +1,6 @@
 //! expect-stdout: x=10 y=20
 
+use std.builtins.int_to_string
 fn main:
     let p = Point { x: 10, y: 20 }
     print("x=" ++ int_to_string(p.x) ++ " y=" ++ int_to_string(p.y))

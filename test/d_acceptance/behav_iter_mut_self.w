@@ -4,6 +4,7 @@
 // P4.1 verification: custom iterator type implementing Iter[T] with
 // mut self: Self next, used in both for-loop and manual while-loop.
 
+use std.builtins.int_to_string
 type CountUp { current: i32, limit: i32 }
 
 fn CountUp.new(limit: i32) -> CountUp:

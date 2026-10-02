@@ -1,6 +1,7 @@
 //! expect-stdout: 15
 //! expect-stdout: done
 
+use std.builtins.int_to_string
 fn main:
     // For-loop over vec.iter() — desugared through hardcoded MIR path
     let nums: Vec[i32] = Vec.new()

@@ -5,6 +5,7 @@
 // element drop, no double free. (Was err_destructure_vec_drop_field before
 // the #607 boundary was lifted.)
 
+use std.builtins.print_i32
 type W { slot: *mut i32 }
 impl Drop for W:
     fn drop(move self: Self):

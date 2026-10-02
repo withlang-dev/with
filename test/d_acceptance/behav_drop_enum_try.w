@@ -4,6 +4,7 @@
 // it into the binding. The Result subject must be consumed so its payload-drop
 // does not also free the extracted value (which would count 2).
 
+use std.builtins.print_i32
 type W { slot: *mut i32 }
 impl Drop for W:
     fn drop(move self: Self):

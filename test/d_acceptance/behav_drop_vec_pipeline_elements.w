@@ -6,6 +6,7 @@
 // no receiver-returning aliases or intermediate owners; `v` drops both elements
 // and the Vec buffer exactly once.
 
+use std.builtins.print_i32
 var COUNT = 0
 
 type W { tag: i32 }

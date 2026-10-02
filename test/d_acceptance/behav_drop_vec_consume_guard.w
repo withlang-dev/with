@@ -7,6 +7,7 @@
 //   - wildcarding a Drop-element Vec field in a pattern (no move)
 // Floor is Vec[Drop]-blind, so this guards the reject's lower edge explicitly.
 
+use std.builtins.print_i32
 type W { tag: i32 }
 impl Drop for W:
     fn drop(move self: Self):

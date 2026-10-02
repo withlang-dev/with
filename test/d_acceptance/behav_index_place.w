@@ -8,6 +8,7 @@
 
 // §2.4 / §6.2 / §6.3 IndexPlace behavioral tests.
 
+use std.builtins.int_to_string
 type Item { value: i32, name: str }
 
 type Counter { val: i32 }
