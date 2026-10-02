@@ -7324,6 +7324,41 @@ impl MirBuilder:
         self.consume_moved_operand(result)
         self.body.new_operand(OperandKind.OK_COPY, moved_place)
 
+    // A want_result tail that is a lazy COPY of a projected place rooted in
+    // a local this scope drops at exit (`let t = table(); t[id].arity`) must
+    // read BEFORE pop_scope_inline: left lazy, the consumer's assignment
+    // reads the element after `drop(t)` — the freed Vec's cleared length
+    // panicked "index out of bounds" in math_fn_arity once `t.get(id).arity`
+    // (a call, materialized) became `t[id].arity` (a place). A view-typed
+    // tail stays lazy: it is a reference value for a `&`-typed destination,
+    // and Sema refuses one that outlives its origin.
+    mut fn materialize_tail_read_of_dropped_local(result: i32, tail_expr: i32) -> i32:
+        if self.body.operand_kinds[result] != OperandKind.OK_COPY:
+            return result
+        let place: i32 = self.body.operand_d0[result]
+        if mir_place_plain_local(&self.body, place) >= 0:
+            return result
+        let root = self.place_base_local(place)
+        if root < 0 or self.drop_scope_starts.len() == 0:
+            return result
+        let drop_start: i32 = self.drop_scope_starts[(self.drop_scope_starts.len() as i32 - 1)]
+        var dropped = false
+        for di in drop_start..self.drop_local_ids.len() as i32:
+            if self.drop_local_ids[di] == root:
+                dropped = true
+        if not dropped:
+            return result
+        let read_ty = self.operand_type(result)
+        let resolved = self.sema.resolve_alias(read_ty as TypeId)
+        let tk = self.sema.get_type_kind(resolved)
+        if tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR:
+            return result
+        let read_tmp = self.new_temp(read_ty)
+        let read_place = self.place_for_local(read_tmp)
+        let read_rv = self.body.new_rvalue(RvalueKind.RK_USE, result, 0, 0)
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, read_place, read_rv, self.ast.get_start(tail_expr))
+        self.body.new_operand(OperandKind.OK_COPY, read_place)
+
     // D69 (§13.4): `yield e` calls the consumer's body with `e` — a plain T
     // moves in, a view is borrowed for the call. When the body answers false
     // the consumer has stopped: the generator leaves right here as if by
@@ -7464,6 +7499,7 @@ impl MirBuilder:
                 if tail_read != 0:
                     self.cancel_scheduled_value_drop_for_receiver_expr(self.ast.get_data0(tail_read))
                 result = self.materialize_tail_field_move(result, tail_expr)
+                result = self.materialize_tail_read_of_dropped_local(result, tail_expr)
             else:
                 let tail_frame = self.push_stmt_temp_frame()
                 result = self.lower_expr_discard(tail_expr)
