@@ -7287,9 +7287,15 @@ impl Sema:
     // sentinel; the compiler appends a hidden liveness byte that a
     // construction sets, the reset-on-move blank clears with the rest of the
     // storage, and the guarded drop reads through the ordinary all-zero test.
-    // A struct with an owning non-null field — a str, a container, a raw
-    // pointer (Box, Rc, a facade resource's repr), a callable, another Drop
-    // value — keeps the storage test and gains no byte. Decided per
+    // A struct with a field that is non-null whenever the value is live and
+    // that nothing can zero while it stays live — a raw pointer (a facade
+    // resource's repr), a reference, an extern callable, a view — keeps the
+    // storage test and gains no byte. D82 (§2.2, #1944): an owning field is
+    // not such a field. An explicit `move v.text` vacates it to its empty
+    // value while `v` stays live and its destructor still runs, so a
+    // droppable field — a str, a container, a Box, a callable, another Drop
+    // value — proves nothing about the whole: a `Drop` struct whose only
+    // non-zero fields can be vacated carries the byte. Decided per
     // declaration, so every instance of a generic struct agrees; a type
     // parameter counts as a live-zero field (the byte is added, never
     // withheld, when the answer depends on the argument). Explicit layouts
@@ -7330,55 +7336,93 @@ impl Sema:
         1
 
     // Whether a field of this declared type is non-zero whenever it holds a
-    // value, so the enclosing struct's zero storage is the sentinel.
+    // value AND can never be zeroed while the enclosing value is live, so
+    // the enclosing struct's zero storage is the sentinel. A droppable field
+    // fails the second half (D82): `move v.field` resets it to its empty
+    // value with `v` live, so it never proves the whole.
     mut fn type_node_zero_is_sentinel(node: i32, decl: i32) -> i32:
         if node == 0:
             return 0
         let kind = self.ast.kind(node)
-        if kind == NodeKind.NK_TYPE_PTR or kind == NodeKind.NK_TYPE_REF or kind == NodeKind.NK_TYPE_FN or kind == NodeKind.NK_TYPE_EXTERN_FN or kind == NodeKind.NK_TYPE_SLICE or kind == NodeKind.NK_TYPE_TRAIT_OBJ:
+        if kind == NodeKind.NK_TYPE_PTR or kind == NodeKind.NK_TYPE_REF or kind == NodeKind.NK_TYPE_EXTERN_FN or kind == NodeKind.NK_TYPE_SLICE or kind == NodeKind.NK_TYPE_TRAIT_OBJ:
             return 1
-        if kind == NodeKind.NK_TYPE_OPTIONAL:
+        // A `fn` value may own a closure environment (D63): droppable.
+        if kind == NodeKind.NK_TYPE_OPTIONAL or kind == NodeKind.NK_TYPE_FN:
             return 0
         if kind == NodeKind.NK_TYPE_ARRAY:
             return self.type_node_zero_is_sentinel(self.ast.get_data0(node), decl)
         if kind == NodeKind.NK_TYPE_TUPLE:
             let start = self.ast.get_data0(node)
-            for ei in 0..self.ast.get_data1(node):
+            let count = self.ast.get_data1(node)
+            for ei in 0..count:
+                if self.type_node_may_need_drop(self.ast.get_extra(start + ei), decl) != 0:
+                    return 0
+            for ei in 0..count:
                 if self.type_node_zero_is_sentinel(self.ast.get_extra(start + ei), decl) != 0:
                     return 1
             return 0
-        if kind == NodeKind.NK_TYPE_NAMED or kind == NodeKind.NK_TYPE_GENERIC:
+        if kind == NodeKind.NK_TYPE_NAMED:
             let sym = self.ast.get_data0(node)
             let tp_start = self.type_decl_tp_start(decl)
             for ti in 0..self.type_decl_tp_count(decl):
                 if self.ast.get_extra(tp_start + ti) == sym:
                     return 0
-            if kind == NodeKind.NK_TYPE_GENERIC:
-                return self.generic_base_zero_is_sentinel(sym)
+            // Every primitive is live at zero (a number) or droppable (str).
+            if self.primitive_type_by_sym(sym) != 0:
+                return 0
+            let named = self.lookup_named_type_visible(sym)
+            if named == 0:
+                return 0
+            return self.type_zero_is_sentinel(named)
+        // A generic instance — a container, a Box, an Rc, a user generic —
+        // is droppable or depends on its argument; a type this walk cannot
+        // classify is treated the same way. The byte is added, never
+        // withheld.
+        0
+
+    // Whether a field of this declared type may need drop glue, so an
+    // explicit `move` of it is a vacate that resets its storage. Answers 1
+    // whenever the walk cannot prove otherwise.
+    mut fn type_node_may_need_drop(node: i32, decl: i32) -> i32:
+        if node == 0:
+            return 0
+        let kind = self.ast.kind(node)
+        if kind == NodeKind.NK_TYPE_PTR or kind == NodeKind.NK_TYPE_REF or kind == NodeKind.NK_TYPE_EXTERN_FN or kind == NodeKind.NK_TYPE_SLICE or kind == NodeKind.NK_TYPE_TRAIT_OBJ:
+            return 0
+        if kind == NodeKind.NK_TYPE_OPTIONAL or kind == NodeKind.NK_TYPE_ARRAY:
+            return self.type_node_may_need_drop(self.ast.get_data0(node), decl)
+        if kind == NodeKind.NK_TYPE_TUPLE:
+            let start = self.ast.get_data0(node)
+            for ei in 0..self.ast.get_data1(node):
+                if self.type_node_may_need_drop(self.ast.get_extra(start + ei), decl) != 0:
+                    return 1
+            return 0
+        if kind == NodeKind.NK_TYPE_NAMED:
+            let sym = self.ast.get_data0(node)
+            let tp_start = self.type_decl_tp_start(decl)
+            for ti in 0..self.type_decl_tp_count(decl):
+                if self.ast.get_extra(tp_start + ti) == sym:
+                    return 1
             let prim = self.primitive_type_by_sym(sym)
             if prim != 0:
                 return if self.get_type_kind(self.resolve_alias(prim as TypeId)) == TypeKind.TY_STR: 1 else: 0
             let named = self.lookup_named_type_visible(sym)
             if named == 0:
-                return 0
-            return self.type_zero_is_sentinel(named)
-        // A type this walk cannot classify keeps the storage test.
+                return 1
+            return self.type_needs_drop(named)
         1
 
-    fn generic_base_zero_is_sentinel(sym: i32) -> i32:
-        if sym == self.syms.vec or sym == self.syms.hashmap or sym == self.syms.hashset or sym == self.syms.slotmap or sym == self.syms.box:
-            return 1
-        let name = self.pool_resolve(sym)
-        if name == "Sender" or name == "Receiver" or name == "Rc" or name == "Arc":
-            return 1
-        0
-
+    // The same for a resolved type: a droppable type proves nothing (D82);
+    // otherwise a pointer-shaped type, or an aggregate holding one, is
+    // non-zero whenever live.
     mut fn type_zero_is_sentinel(tid: i32) -> i32:
         if tid == 0:
             return 0
         let resolved = self.resolve_alias(tid as TypeId)
+        if self.type_needs_drop(resolved as i32) != 0:
+            return 0
         let tk = self.get_type_kind(resolved)
-        if tk == TypeKind.TY_STR or tk == TypeKind.TY_FN or tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF or tk == TypeKind.TY_SLICE or tk == TypeKind.TY_EXTERN_FN or tk == TypeKind.TY_GENERIC_FN or tk == TypeKind.TY_TRAIT_OBJ:
+        if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF or tk == TypeKind.TY_SLICE or tk == TypeKind.TY_EXTERN_FN or tk == TypeKind.TY_GENERIC_FN or tk == TypeKind.TY_TRAIT_OBJ:
             return 1
         if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_RANGE:
             return self.type_zero_is_sentinel(self.get_type_d0(resolved))
@@ -7390,8 +7434,6 @@ impl Sema:
             return 0
         if tk == TypeKind.TY_GENERIC_INST:
             let base_sym = self.get_generic_inst_base(resolved as i32)
-            if self.generic_base_zero_is_sentinel(base_sym) != 0:
-                return 1
             if self.named_types.contains(base_sym) and self.get_type_kind(self.resolve_alias(self.named_types.get(base_sym).unwrap())) == TypeKind.TY_STRUCT:
                 return self.struct_zero_is_sentinel(base_sym)
             return 0
@@ -7399,13 +7441,12 @@ impl Sema:
             return self.struct_zero_is_sentinel(self.get_type_d0(resolved))
         0
 
-    // A Drop struct is never zero when live: it carries the byte, or an
-    // owning field. A plain struct is the sum of its fields.
+    // A plain (non-droppable) struct is the sum of its fields. A Drop
+    // struct never reaches here as a field: it is droppable, so a vacate
+    // can zero it (D82).
     mut fn struct_zero_is_sentinel(name_sym: i32) -> i32:
         if name_sym == 0 or not self.type_decl_nodes.contains(name_sym):
             return 0
-        if self.named_types.contains(name_sym) and self.type_has_drop_impl(self.named_types.get(name_sym).unwrap()) != 0:
-            return 1
         let decl: i32 = self.type_decl_nodes.get(name_sym).unwrap()
         if type_decl_sub_kind(self.ast.get_data2(decl)) != TypeDeclKind.Struct:
             return 0
