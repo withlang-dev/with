@@ -20223,6 +20223,77 @@ impl Sema:
             types[ai] = ty as i32
         types
 
+    // §13.3 (#1746): the std.traits adapter `iter_<name>` a method call
+    // `recv.<name>(…)` on an Iter[T] implementor resolves to — a type with
+    // a declared `next()` and no method of that name of its own; 0 for the
+    // compiler's built-in iterator types (their intrinsics stay) and every
+    // other receiver.
+    mut fn user_iter_adapter_fn(recv_type: i32, method: i32) -> i32:
+        if recv_type == 0 or method == 0:
+            return 0
+        let name: str = with_str_clone_ref(self.pool_resolve(method))
+        if not sema_iter_adapter_name(name):
+            return 0
+        let resolved = self.auto_deref_method_type(recv_type as TypeId, method, 0, 0)
+        var owner = self.method_owner_symbol_for_type(resolved as i32)
+        if owner == 0:
+            return 0
+        if not self.type_decl_nodes.contains(owner):
+            let canon = self.canonical_symbol_by_text(owner)
+            if canon != 0 and self.type_decl_nodes.contains(canon):
+                owner = canon
+        if self.lookup_method_fn(owner, method) != 0 or self.lookup_generic_method_fn(owner, method) != 0 or self.lookup_method_sig(owner, method) >= 0:
+            return 0
+        let next_sym = self.pool_lookup_symbol("next")
+        if next_sym <= 0 or (self.lookup_method_fn(owner, next_sym) == 0 and self.lookup_generic_method_fn(owner, next_sym) == 0 and self.lookup_method_sig(owner, next_sym) < 0):
+            return 0
+        let fn_sym = self.pool_lookup_symbol("iter_" ++ name)
+        if fn_sym <= 0:
+            return 0
+        let fn_node = self.generic_fn_node_for_symbol(fn_sym)
+        let fn_path = self.fn_symbol_source_path(fn_sym)
+        if fn_node == 0 or not (fn_path.ends_with("std/traits.w") or fn_path.ends_with("std/collections.w")):
+            return 0
+        fn_node
+
+    // `recv.<name>(args)` on an Iter[T] implementor: the call
+    // `iter_<name>(recv, args)` (user_iter_adapter_fn), typed as
+    // check_generic_pipeline_call types `recv |> stage(args)`. The
+    // receiver is an ordinary by-value argument (receiver_arg_call_nodes).
+    mut fn check_user_iter_method(node: i32, expr: i32, recv_type: i32, field: i32, extra_start: i32, arg_count: i32) -> i32:
+        let fn_sym = self.pool_lookup_symbol("iter_" ++ self.pool_resolve(field))
+        var arg_types: Vec[i32] = Vec.new()
+        let arg_nodes: Vec[i32] = Vec.new()
+        let deferred: Vec[i32] = Vec.new()
+        arg_types.push(recv_type)
+        arg_nodes.push(expr)
+        for ai in 0..arg_count:
+            let arg_node = self.ast.get_extra(extra_start + ai)
+            arg_nodes.push(arg_node)
+            if self.closure_has_untyped_param(arg_node):
+                deferred.push(ai + 1)
+                arg_types.push(0)
+            else:
+                arg_types.push(self.check_expr_value_context(arg_node) as i32)
+        let fn_node = self.select_generic_fn_node(fn_sym, arg_types, arg_count + 1, node)
+        if fn_node == 0:
+            return 0
+        if deferred.len() > 0:
+            arg_types = self.check_deferred_generic_closure_args(fn_node, fn_sym, &deferred, move arg_types, &arg_nodes, node)
+        self.resolved_generic_call_nodes.insert(node, fn_node)
+        let ret = self.check_generic_call(fn_sym, fn_node, arg_types, arg_nodes, arg_count + 1, node)
+        if ret == 0:
+            return 0
+        // Every adapter takes its iterator by value: the receiver is consumed.
+        self.note_place_effect(expr, EFF_CONSUME)
+        for ai in 0..arg_nodes.len() as i32:
+            if arg_nodes[ai] > 0:
+                self.mark_moved_if_consumed(arg_nodes[ai])
+        self.comp_resolved.insert(node, fn_sym)
+        self.receiver_arg_call_nodes.insert(node, 1)
+        self.typed_expr_types.insert(node, ret)
+        ret
+
     mut fn check_generic_pipeline_call(node: i32, lhs: i32, lhs_ty: i32, rhs: i32) -> i32:
         var callee = rhs
         var args_start = -1
@@ -20322,7 +20393,16 @@ impl Sema:
                     let method = rhs_method
                     if self.pipeline_method_exists(lhs_ty as i32, method) != 0:
                         var ret = 0
-                        if method == self.syms.collect and self.ast.kind(rhs_callee) == NodeKind.NK_INDEX:
+                        if method == self.syms.collect and self.ast.kind(rhs_callee) == NodeKind.NK_INDEX and self.user_iter_adapter_fn(lhs_ty as i32, method) != 0:
+                            // `it |> collect[Vec]()` over an Iter[T] implementor:
+                            // the bracket names what iter_collect builds.
+                            let target_node = self.ast.get_data1(rhs_callee)
+                            let target_sym = if self.ast.kind(target_node) == NodeKind.NK_IDENT: self.ast.get_data0(target_node) else: 0
+                            if target_sym != self.syms.vec:
+                                self.emit_error(f"`collect[{self.pool_resolve(target_sym)}]` over a {self.type_name(lhs_ty as i32)} is not available: an Iter[T] implementor collects into a Vec (§13.3)", rhs_callee)
+                                return 0
+                            ret = self.check_method_call_parts(lhs, method, self.ast.get_data1(rhs), self.ast.get_data2(rhs), node, lhs_ty as i32)
+                        else if method == self.syms.collect and self.ast.kind(rhs_callee) == NodeKind.NK_INDEX:
                             ret = self.collect_target_type_from_callee(rhs_callee, lhs_ty as i32, node)
                         else:
                             ret = self.check_method_call_parts(lhs, method, self.ast.get_data1(rhs), self.ast.get_data2(rhs), node, lhs_ty as i32)
@@ -20551,6 +20631,10 @@ impl Sema:
     mut fn pipeline_method_exists(recv_type: i32, method: i32) -> i32:
         if recv_type == 0 or method == 0:
             return 0
+        // §13.3 (#1746): `it |> map(f)` over an Iter[T] implementor is the
+        // trait adapter, as `it.map(f)` is.
+        if self.user_iter_adapter_fn(recv_type, method) != 0:
+            return 1
         var resolved = self.auto_deref_method_type(recv_type as TypeId, method, 0, 0)
         let owner = self.method_owner_symbol_for_type(resolved as i32)
         if owner == 0:
@@ -27552,6 +27636,11 @@ impl Sema:
         if static_type_sym != 0 and self.is_pending_generic_collection_base(static_type_sym) != 0 and (field == self.syms.new or (static_type_sym == self.syms.vec and early_method_name == "with_capacity")):
             self.note_allocation_site(node, AllocConstructKind.VEC_NEW, 0, 0)
         obj_type = self.adjust_static_receiver_type(expr, obj_type as i32)
+        // §13.3 (#1746): an adapter on any Iter[T] implementor is std.traits'
+        // free fn of that name over the trait, the receiver first — decided
+        // before the arguments are checked, so a closure meets its parameter.
+        if self.user_iter_adapter_fn(obj_type as i32, field) != 0:
+            return self.check_user_iter_method(node, expr, obj_type as i32, field, extra_start, arg_count)
         // D63: `f.clone()` on a callable value. Free for a bare function or
         // a non-move closure (the pair is copied, nothing is owned); a
         // `move ||` closure's owned environment is cloned capture by capture
@@ -32745,3 +32834,8 @@ impl Sema:
         if opt.is_some():
             return opt.unwrap()
         0
+
+// §13.3 (#1746): the operations std.traits defines over any Iter[T], by
+// their method names.
+fn sema_iter_adapter_name(name: &str) -> bool:
+    name == "zip" or name == "map" or name == "filter" or name == "filter_map" or name == "take" or name == "drop" or name == "take_while" or name == "drop_while" or name == "enumerate" or name == "chain" or name == "step_by" or name == "collect" or name == "fold" or name == "count" or name == "for_each" or name == "any" or name == "all" or name == "none" or name == "find" or name == "position"

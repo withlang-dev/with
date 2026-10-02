@@ -534,3 +534,17 @@ pub type IndexSpec {
     has_stop: bool,
     has_step: bool,
 }
+
+// §13.3 (#1746): `it.collect[Vec]()` on any Iter[T] implementor, the one
+// adapter that builds a collection, so it lives with Vec rather than in
+// std.traits (which the core prelude, Vec-less, also loads).
+/// `it.collect[Vec]()`: every element, in order.
+pub fn iter_collect[T, I: Iter[T]](iter: I) -> Vec[T]:
+    var i = iter
+    var out: Vec[T] = Vec.new()
+    while true:
+        match i.next():
+            None => break
+            Some(x) => out.push(x)
+    out
+

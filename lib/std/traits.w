@@ -5,8 +5,13 @@
 // even without explicit import. The source definitions here make them
 // available through the prelude for documentation and tooling.
 
+// The adapters below (§13.3, #1746) spell Option; a module sees only its
+// own imports (§18.2), the core prelude not included.
+use std.option
+
 /// Equality comparison (§11.7): `eq` backs `==` and `!=`; a type may
 /// override `!=` with `ne`. Both operands are observed.
+
 pub trait Eq:
     fn eq(self: &Self, other: &Self) -> bool
 
@@ -341,3 +346,242 @@ pub trait IndexPlace[I, V]:
 // Formal `impl IndexPlace for Vec[T]` cannot be added until the compiler
 // supports compiling generic trait method bodies — currently MIR validation
 // rejects `self[index] = value` for unresolved T.
+
+// ── Adapters over any Iter[T] (§13.3, #1746) ──────────────────────────────
+// The §13.3 operations, written once over the trait: `it.zip(other)`,
+// `it.map(f)`, … on a value of any type implementing Iter[T] is Sema's
+// call of the free fn of that name here, the receiver first
+// (check_user_iter_method). The compiler's built-in iterator types keep
+// their intrinsic lowering; these are the one definition for every other
+// implementor, std's Pulled[T] included.
+
+/// `a.zip(b)`: pairs until the shorter ends.
+pub type Zipped[A, B, L, R] { l: L, r: R }
+
+impl[A, B, L: Iter[A], R: Iter[B]] Iter[(A, B)] for Zipped[A, B, L, R]:
+    mut fn next() -> Option[(A, B)]:
+        match self.l.next():
+            None => None
+            Some(x) =>
+                match self.r.next():
+                    None => None
+                    Some(y) => Some((x, y))
+
+pub fn iter_zip[A, B, L: Iter[A], R: Iter[B]](l: L, r: R) -> Zipped[A, B, L, R]: Zipped { l, r }
+
+/// `it.map(f)`: each element through `f`.
+pub type Mapped[T, U, I] { inner: I, f: fn(T) -> U }
+
+impl[T, U, I: Iter[T]] Iter[U] for Mapped[T, U, I]:
+    mut fn next() -> Option[U]:
+        match self.inner.next():
+            None => None
+            Some(x) => Some((self.f)(x))
+
+pub fn iter_map[T, U, I: Iter[T]](iter: I, f: fn(T) -> U) -> Mapped[T, U, I]: Mapped { inner: iter, f }
+
+/// `it.filter(p)`: the elements for which `p` holds.
+pub type Filtered[T, I] { inner: I, pred: fn(&T) -> bool }
+
+impl[T, I: Iter[T]] Iter[T] for Filtered[T, I]:
+    mut fn next() -> Option[T]:
+        loop:
+            match self.inner.next():
+                None => return None
+                Some(x) =>
+                    if (self.pred)(&x):
+                        return Some(x)
+
+pub fn iter_filter[T, I: Iter[T]](iter: I, pred: fn(&T) -> bool) -> Filtered[T, I]: Filtered { inner: iter, pred }
+
+/// `it.filter_map(f)`: the `Some`s of `f`.
+pub type FilterMapped[T, U, I] { inner: I, f: fn(T) -> Option[U] }
+
+impl[T, U, I: Iter[T]] Iter[U] for FilterMapped[T, U, I]:
+    mut fn next() -> Option[U]:
+        loop:
+            match self.inner.next():
+                None => return None
+                Some(x) =>
+                    match (self.f)(x):
+                        None => {}
+                        Some(y) => return Some(y)
+
+pub fn iter_filter_map[T, U, I: Iter[T]](iter: I, f: fn(T) -> Option[U]) -> FilterMapped[T, U, I]: FilterMapped { inner: iter, f }
+
+/// `it.take(n)`: the first `n` elements.
+pub type Taken[T, I] { inner: I, left: i64 }
+
+impl[T, I: Iter[T]] Iter[T] for Taken[T, I]:
+    mut fn next() -> Option[T]:
+        if self.left <= 0:
+            return None
+        self.left -= 1
+        self.inner.next()
+
+pub fn iter_take[T, I: Iter[T]](iter: I, n: i64) -> Taken[T, I]: Taken { inner: iter, left: n }
+
+/// `it.drop(n)`: everything after the first `n`.
+pub type Dropped[T, I] { inner: I, pending: i64 }
+
+impl[T, I: Iter[T]] Iter[T] for Dropped[T, I]:
+    mut fn next() -> Option[T]:
+        while self.pending > 0:
+            self.pending -= 1
+            if self.inner.next().is_none():
+                return None
+        self.inner.next()
+
+pub fn iter_drop[T, I: Iter[T]](iter: I, n: i64) -> Dropped[T, I]: Dropped { inner: iter, pending: n }
+
+/// `it.take_while(p)`: elements while `p` holds.
+pub type TakenWhile[T, I] { inner: I, pred: fn(&T) -> bool, done: bool }
+
+impl[T, I: Iter[T]] Iter[T] for TakenWhile[T, I]:
+    mut fn next() -> Option[T]:
+        if self.done:
+            return None
+        match self.inner.next():
+            None => None
+            Some(x) =>
+                if (self.pred)(&x):
+                    Some(x)
+                else:
+                    self.done = true
+                    None
+
+pub fn iter_take_while[T, I: Iter[T]](iter: I, pred: fn(&T) -> bool) -> TakenWhile[T, I]: TakenWhile { inner: iter, pred, done: false }
+
+/// `it.drop_while(p)`: elements from the first for which `p` fails.
+pub type DroppedWhile[T, I] { inner: I, pred: fn(&T) -> bool, dropping: bool }
+
+impl[T, I: Iter[T]] Iter[T] for DroppedWhile[T, I]:
+    mut fn next() -> Option[T]:
+        if not self.dropping:
+            return self.inner.next()
+        loop:
+            match self.inner.next():
+                None => return None
+                Some(x) =>
+                    if not (self.pred)(&x):
+                        self.dropping = false
+                        return Some(x)
+
+pub fn iter_drop_while[T, I: Iter[T]](iter: I, pred: fn(&T) -> bool) -> DroppedWhile[T, I]: DroppedWhile { inner: iter, pred, dropping: true }
+
+/// `it.enumerate()`: `(index, element)` pairs.
+pub type Enumerated[T, I] { inner: I, index: i64 }
+
+impl[T, I: Iter[T]] Iter[(i64, T)] for Enumerated[T, I]:
+    mut fn next() -> Option[(i64, T)]:
+        match self.inner.next():
+            None => None
+            Some(x) =>
+                let i: i64 = self.index
+                self.index += 1
+                Some((i, x))
+
+pub fn iter_enumerate[T, I: Iter[T]](iter: I) -> Enumerated[T, I]: Enumerated { inner: iter, index: 0 }
+
+/// `a.chain(b)`: all of `a`, then all of `b`.
+pub type Chained[T, L, R] { l: L, r: R, first_done: bool }
+
+impl[T, L: Iter[T], R: Iter[T]] Iter[T] for Chained[T, L, R]:
+    mut fn next() -> Option[T]:
+        if not self.first_done:
+            match self.l.next():
+                Some(x) => return Some(x)
+                None => self.first_done = true
+        self.r.next()
+
+pub fn iter_chain[T, L: Iter[T], R: Iter[T]](l: L, r: R) -> Chained[T, L, R]: Chained { l, r, first_done: false }
+
+/// `it.step_by(n)`: every n-th element, starting with the first.
+pub type Stepped[T, I] { inner: I, step: i64, started: bool }
+
+impl[T, I: Iter[T]] Iter[T] for Stepped[T, I]:
+    mut fn next() -> Option[T]:
+        if not self.started:
+            self.started = true
+            return self.inner.next()
+        var skipped: i64 = 1
+        while skipped < self.step:
+            if self.inner.next().is_none():
+                return None
+            skipped += 1
+        self.inner.next()
+
+pub fn iter_step_by[T, I: Iter[T]](iter: I, n: i64) -> Stepped[T, I]: Stepped { inner: iter, step: n, started: false }
+
+/// `it.fold(init, f)`.
+pub fn iter_fold[T, U, I: Iter[T]](iter: I, init: U, f: fn(U, T) -> U) -> U:
+    var i = iter
+    var acc = init
+    while true:
+        match i.next():
+            None => break
+            Some(x) => acc = f(acc, x)
+    acc
+
+/// `it.count()`.
+pub fn iter_count[T, I: Iter[T]](iter: I) -> i64:
+    var i = iter
+    var n: i64 = 0
+    while i.next().is_some():
+        n += 1
+    n
+
+/// `it.for_each(f)`.
+pub fn iter_for_each[T, I: Iter[T]](iter: I, f: fn(T) -> Unit):
+    var i = iter
+    while true:
+        match i.next():
+            None => break
+            Some(x) => f(x)
+
+/// `it.any(p)` / `it.all(p)` / `it.none(p)`.
+pub fn iter_any[T, I: Iter[T]](iter: I, pred: fn(&T) -> bool) -> bool:
+    var i = iter
+    while true:
+        match i.next():
+            None => return false
+            Some(x) =>
+                if pred(&x):
+                    return true
+    false
+
+pub fn iter_all[T, I: Iter[T]](iter: I, pred: fn(&T) -> bool) -> bool:
+    var i = iter
+    while true:
+        match i.next():
+            None => return true
+            Some(x) =>
+                if not pred(&x):
+                    return false
+    true
+
+pub fn iter_none[T, I: Iter[T]](iter: I, pred: fn(&T) -> bool) -> bool: not iter_any(iter, pred)
+
+/// `it.find(p)`: the first element for which `p` holds.
+pub fn iter_find[T, I: Iter[T]](iter: I, pred: fn(&T) -> bool) -> Option[T]:
+    var i = iter
+    while true:
+        match i.next():
+            None => return None
+            Some(x) =>
+                if pred(&x):
+                    return Some(x)
+    None
+
+/// `it.position(p)`: the index of the first element for which `p` holds.
+pub fn iter_position[T, I: Iter[T]](iter: I, pred: fn(&T) -> bool) -> Option[i64]:
+    var i = iter
+    var n: i64 = 0
+    while true:
+        match i.next():
+            None => return None
+            Some(x) =>
+                if pred(&x):
+                    return Some(n)
+                n += 1
+    None
