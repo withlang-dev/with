@@ -6975,6 +6975,26 @@ fn bs_check_build_w_generated_source(ctx: &ActionCtx, compiler_path: &str, base_
     rc = bs_assert_contains(ctx, toolfs_escape.stderr, "ToolFs path escapes project root", "build_w_toolfs_escape")
     if rc != 0: return rc
 
+    // out/gen shared with another tree through a symlink is refused: a
+    // build there rewrites this tree's generated modules under its compile
+    // (2026-10-02: a stage2 embedded a sibling worktree's std/task.w).
+    let gen_link_dir = bs_join(base_dir, "gen_link")
+    rc = bs_write_project_manifest(ctx, gen_link_dir, "buildwgenlink")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(gen_link_dir, "src/main.w"), "fn main:\n    print(\"should not build\")\n", ctx.target_name(), "gen link source")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(gen_link_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    ctx.new_build().executable(\"gen-link\", \"src/main.w\")\n", ctx.target_name(), "gen link build.w")
+    if rc != 0: return rc
+    let gen_link_other = bs_join(base_dir, "gen_link_other_gen")
+    if ctx.fs().mkdir_all(gen_link_other) != 0: return bs_fail(ctx, "could not create " ++ gen_link_other)
+    if ctx.fs().mkdir_all(bs_join(gen_link_dir, "out")) != 0: return bs_fail(ctx, "could not create " ++ bs_join(gen_link_dir, "out"))
+    if ctx.fs().symlink(gen_link_other, bs_join(gen_link_dir, "out/gen")) != 0: return bs_fail(ctx, "could not link out/gen in " ++ gen_link_dir)
+    let gen_link = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-gen-link", bs_blob_to_args(bs_argv_append("", "build")), 120000, gen_link_dir)
+    if gen_link.rc == 0:
+        ctx.diagnostics().error("error: build_w_gen_link unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, gen_link.stderr, "out/gen is a symlink", "build_w_gen_link")
+    if rc != 0: return rc
+
     let toolfs_file_escape_dir = bs_join(base_dir, "toolfs_file_escape")
     rc = bs_write_project_manifest(ctx, toolfs_file_escape_dir, "buildwtoolfsfileescape")
     if rc != 0: return rc

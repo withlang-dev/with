@@ -787,6 +787,16 @@ fn target_with_compiler_source_inputs(target: Target, ctx: &BuildCtx) -> Target:
             let path = files[fi]
             if path.ends_with(".w"):
                 out = out.input(build_owned_text(path))
+    // The generated modules the compile imports are inputs, not only the
+    // outputs of a dep: the mid-run guard (#1654) and the freshness check
+    // watch inputs. On 2026-10-02 a sibling worktree sharing out/gen rewrote
+    // EmbeddedStdlibData.w under a stage2 compile; stage2 embedded that
+    // tree's std/task.w, stage3 another's, and the build said nothing
+    // until fixpoint-compare.
+    out = out.input("out/gen/compiler/EmbeddedStdlibData.w")
+    out = out.input("out/gen/compiler/EmbeddedRuntimeData.w")
+    out = out.input("out/gen/compiler/EmbeddedBundlesData.w")
+    out = out.input("out/gen/compiler/EmbeddedClangResourceData.w")
     out
 
 // The sources a compiler's generation stamp is a digest of (#1815,

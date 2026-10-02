@@ -2352,6 +2352,19 @@ fn build_graph_dep_outputs_unchanged(root: &str, graph: &BuildGraph, dep_name: &
     with_eprint("[cutoff] '" ++ dep_name ++ "' re-ran to identical outputs; its dependents stay fresh")
     true
 
+// out/gen holds this tree's generated compiler modules: the embedded stdlib,
+// runtime, bundles and clang resource, and the normalized main.w. A symlink
+// shares them with another tree, and a build there rewrites them under this
+// tree's compile. On 2026-10-02 a stage2 so built embedded a sibling
+// worktree's std/task.w and could not infer a type its own sources infer,
+// read for an afternoon as a self-miscompile. Generated sources are per
+// tree (D50): refuse the link, name it, say what to do instead.
+fn build_graph_refuse_shared_gen_dir(root: &str) -> i32:
+    let link = build_graph_rt_readlink(root ++ "/out/gen")
+    if link.len() == 0: return 0
+    with_eprint("error: out/gen is a symlink to '" ++ link ++ "': generated sources are per tree, and a build in the tree it points at rewrites this tree's embedded stdlib under its compile; copy the directory instead (rm out/gen && cp -R <that tree>/out/gen out/gen)")
+    1
+
 // The first dependency of `target` that failed or was skipped, or "".
 fn build_graph_first_broken_dep(target: &BuildGraphTarget, failed: &Vec[str]) -> str:
     for dep in target.deps:
@@ -2390,6 +2403,9 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
     let output_rc = build_graph_validate_outputs(root, graph, options.output_path)
     if output_rc != 0:
         return output_rc
+    let gen_dir_rc = build_graph_refuse_shared_gen_dir(root)
+    if gen_dir_rc != 0:
+        return gen_dir_rc
     let generated_rc = build_graph_write_generated_sources(root, graph)
     if generated_rc != 0:
         return generated_rc
