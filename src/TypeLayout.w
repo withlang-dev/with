@@ -42,6 +42,21 @@ fn type_layout_int_bytes(bits: i32) -> i64:
         return 1
     bytes as i64
 
+// with-abi.md §2, the one enum layout rule (#1438): a tag, then the payload
+// area at the first offset aligned to the largest payload's alignment; the
+// enum is aligned to the larger of the tag's and the payloads' alignment and
+// its size is rounded up to that. Exactly the layout of the C record
+// `struct { tag; union { variants… }; }`. Sema's model and codegen's LLVM
+// body (`{ tag, [n x unit] }`, `enum_body_from_layout`) are both read from
+// this shape; neither derives a second one.
+pub type SizeAlign { size: i64, align: i64 }
+pub type EnumShape { payload_offset: i64, size: i64, align: i64 }
+
+pub fn type_layout_enum_shape(tag_size: i64, tag_align: i64, payload_size: i64, payload_align: i64) -> EnumShape:
+    let align = if payload_align > tag_align: payload_align else: tag_align
+    let payload_offset = type_layout_align_up(tag_size, payload_align)
+    EnumShape { payload_offset: payload_offset, size: type_layout_align_up(payload_offset + payload_size, align), align: align }
+
 // §4.3d (D78): a vector or mask of `n` lanes of `lane_bits` each occupies
 // N × size(T) rounded up to a power of two — LLVM's `<N x T>` allocation and
 // clang's `vector_size` / `ext_vector_type(N)` on every supported target
@@ -292,67 +307,36 @@ impl Sema:
         offset = offset + self.struct_needs_liveness_byte(name_sym)
         type_layout_align_up(offset, self.type_layout_struct_align_of(resolved as i32))
 
-    mut fn type_layout_enum_align_of(tid: i32) -> i64:
+    // The payload area of an enum (§2): the largest variant's fields laid
+    // out as a struct, and the largest variant alignment. A generic
+    // instance measures its substituted payloads; (0, 1) for a payload-less
+    // enum or a type that is not an enum.
+    mut fn type_layout_enum_payload_area(tid: i32) -> SizeAlign:
         let resolved = self.resolve_alias(tid)
-        if self.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST:
-            let base_sym = self.get_generic_inst_base(resolved as i32)
-            if self.named_types.contains(base_sym):
-                return self.type_layout_enum_align_of(self.named_types.get(base_sym).unwrap())
-            return 4
-        if self.get_type_kind(resolved) != TypeKind.TY_ENUM:
-            return 1
-        let repr = self.enum_repr_type(resolved as i32)
-        if repr != 0:
-            return self.type_layout_align_of(repr)
-        4
-
-    mut fn type_layout_enum_size_of(tid: i32) -> i64:
-        let resolved = self.resolve_alias(tid)
+        var base_tid = resolved as i32
+        var generic = false
         if self.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST:
             let base_sym = self.get_generic_inst_base(resolved as i32)
             if not self.named_types.contains(base_sym):
-                return 0
-            let base_tid: i32 = self.named_types.get(base_sym).unwrap()
-            if self.get_type_kind(base_tid) != TypeKind.TY_ENUM:
-                return 0
-            let te_start = self.get_type_d1(base_tid)
-            let variant_count = self.get_type_d2(base_tid)
-            var max_payload_size: i64 = 0
-            var pos = te_start
-            for _ in 0..variant_count:
-                let name_sym: i32 = self.type_extra[pos]
-                let payload_count: i32 = self.type_extra[(pos + 1)]
-                let payload_types = self.resolve_generic_enum_payload(resolved as i32, base_sym, name_sym, payload_count)
-                if payload_count > 0:
-                    var payload_size: i64 = 0
-                    var payload_align: i64 = 1
-                    for pi in 0..payload_count:
-                        let payload_tid: i32 = if pi < payload_types.len() as i32: payload_types[pi] else: self.type_extra[(pos + 2 + pi)]
-                        let align = self.type_layout_align_of(payload_tid)
-                        payload_align = if align > payload_align: align else: payload_align
-                        payload_size = type_layout_align_up(payload_size, align)
-                        payload_size = payload_size + self.type_layout_size_of(payload_tid)
-                    payload_size = type_layout_align_up(payload_size, payload_align)
-                    if payload_size > max_payload_size:
-                        max_payload_size = payload_size
-                pos = pos + 2 + payload_count
-            let tag_tid = self.enum_repr_type(base_tid)
-            let tag_size = if tag_tid != 0: self.type_layout_size_of(tag_tid) else: 4
-            let enum_align = if tag_tid != 0: self.type_layout_align_of(tag_tid) else: 4
-            return type_layout_align_up(tag_size + max_payload_size, enum_align)
-        if self.get_type_kind(resolved) != TypeKind.TY_ENUM:
-            return 0
-        let te_start = self.get_type_d1(resolved)
-        let variant_count = self.get_type_d2(resolved)
+                return SizeAlign { size: 0, align: 1 }
+            base_tid = self.named_types.get(base_sym).unwrap()
+            generic = true
+        if self.get_type_kind(base_tid) != TypeKind.TY_ENUM:
+            return SizeAlign { size: 0, align: 1 }
+        let te_start = self.get_type_d1(base_tid)
+        let variant_count = self.get_type_d2(base_tid)
         var max_payload_size: i64 = 0
+        var max_payload_align: i64 = 1
         var pos = te_start
         for _ in 0..variant_count:
+            let name_sym: i32 = self.type_extra[pos]
             let payload_count: i32 = self.type_extra[(pos + 1)]
             if payload_count > 0:
+                let payload_types: Vec[i32] = if generic: self.resolve_generic_enum_payload(resolved as i32, self.get_generic_inst_base(resolved as i32), name_sym, payload_count) else: Vec.new()
                 var payload_size: i64 = 0
                 var payload_align: i64 = 1
                 for pi in 0..payload_count:
-                    let payload_tid: i32 = self.type_extra[(pos + 2 + pi)]
+                    let payload_tid: i32 = if pi < payload_types.len() as i32: payload_types[pi] else: self.type_extra[(pos + 2 + pi)]
                     let align = self.type_layout_align_of(payload_tid)
                     payload_align = if align > payload_align: align else: payload_align
                     payload_size = type_layout_align_up(payload_size, align)
@@ -360,11 +344,99 @@ impl Sema:
                 payload_size = type_layout_align_up(payload_size, payload_align)
                 if payload_size > max_payload_size:
                     max_payload_size = payload_size
+                if payload_align > max_payload_align:
+                    max_payload_align = payload_align
             pos = pos + 2 + payload_count
-        let tag_tid = self.enum_repr_type(resolved as i32)
-        let tag_size = if tag_tid != 0: self.type_layout_size_of(tag_tid) else: 4
-        let enum_align = if tag_tid != 0: self.type_layout_align_of(tag_tid) else: 4
-        type_layout_align_up(tag_size + max_payload_size, enum_align)
+        SizeAlign { size: max_payload_size, align: max_payload_align }
+
+    // The tag of an enum: its declared `repr` integer, else 4 bytes (§2).
+    mut fn type_layout_enum_tag(tid: i32) -> SizeAlign:
+        let resolved = self.resolve_alias(tid)
+        var base_tid = resolved as i32
+        if self.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST:
+            let base_sym = self.get_generic_inst_base(resolved as i32)
+            if not self.named_types.contains(base_sym):
+                return SizeAlign { size: 4, align: 4 }
+            base_tid = self.named_types.get(base_sym).unwrap()
+        let repr = self.enum_repr_type(base_tid)
+        if repr != 0:
+            return SizeAlign { size: self.type_layout_size_of(repr), align: self.type_layout_align_of(repr) }
+        SizeAlign { size: 4, align: 4 }
+
+    // §2's whole enum shape: tag, payload area, size and alignment. The one
+    // place the parts meet; codegen's enum bodies read the same numbers
+    // through the frozen size/align twins.
+    mut fn type_layout_enum_layout(tid: i32) -> EnumShape:
+        let tag = self.type_layout_enum_tag(tid)
+        let payload = self.type_layout_enum_payload_area(tid)
+        type_layout_enum_shape(tag.size, tag.align, payload.size, payload.align)
+
+    mut fn type_layout_enum_align_of(tid: i32) -> i64:
+        let resolved = self.resolve_alias(tid)
+        if self.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST:
+            let base_sym = self.get_generic_inst_base(resolved as i32)
+            if not self.named_types.contains(base_sym) or self.get_type_kind(self.named_types.get(base_sym).unwrap()) != TypeKind.TY_ENUM:
+                return 4
+        else if self.get_type_kind(resolved) != TypeKind.TY_ENUM:
+            return 1
+        self.type_layout_enum_layout(resolved as i32).align
+
+    mut fn type_layout_enum_size_of(tid: i32) -> i64:
+        let resolved = self.resolve_alias(tid)
+        if self.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST:
+            let base_sym = self.get_generic_inst_base(resolved as i32)
+            if not self.named_types.contains(base_sym) or self.get_type_kind(self.named_types.get(base_sym).unwrap()) != TypeKind.TY_ENUM:
+                return 0
+        else if self.get_type_kind(resolved) != TypeKind.TY_ENUM:
+            return 0
+        self.type_layout_enum_layout(resolved as i32).size
+
+    // with-abi.md §1: a pointer to a trait object — `&dyn T`, `*dyn T`, the
+    // `*mut dyn T` inside `Box[dyn T]` — is the fat `{ data, vtable }` pair,
+    // two pointer words (codegen's get_dyn_fat_ptr_type). The trait object
+    // type itself is only ever reached through one, so it measures the same.
+    fn type_layout_is_dyn_fat_ptr(tid: i32) -> bool:
+        if tid <= 0:
+            return false
+        let resolved = self.resolve_alias(tid)
+        let tk = self.get_type_kind(resolved)
+        if tk == TypeKind.TY_TRAIT_OBJ:
+            return true
+        if tk != TypeKind.TY_PTR and tk != TypeKind.TY_REF:
+            return false
+        self.get_type_kind(self.resolve_alias(self.get_type_d0(resolved))) == TypeKind.TY_TRAIT_OBJ
+
+    // A value that is exactly one non-null address: a thin raw pointer or
+    // reference (not a `&str` view, not a fat `dyn` pointer), an `extern fn`
+    // value, or a std `Box[T]` (its one field is that pointer). The payload
+    // shapes with-abi.md §3's nullable `Option`.
+    fn type_layout_is_single_address(tid: i32) -> bool:
+        if tid <= 0:
+            return false
+        let resolved = self.resolve_alias(tid)
+        let tk = self.get_type_kind(resolved)
+        if tk == TypeKind.TY_EXTERN_FN:
+            return true
+        if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
+            return not self.type_layout_is_dyn_fat_ptr(resolved as i32) and not self.type_layout_is_str_view(resolved as i32)
+        if tk == TypeKind.TY_GENERIC_INST and self.type_is_std_box_inst(resolved as i32) != 0:
+            return not self.type_layout_is_dyn_fat_ptr(self.get_generic_inst_arg(resolved as i32, 0))
+        false
+
+    // with-abi.md §3 (D22): `Option[T]` over a single-address payload is the
+    // nullable pointer itself — null is None, a live address is Some. Every
+    // other Option is a §2 tagged enum. The one owner of this fact: codegen's
+    // get_or_create_option_type materializes it and never re-derives it from
+    // the payload's LLVM type.
+    fn type_layout_option_is_nullable(tid: i32) -> bool:
+        if tid <= 0:
+            return false
+        let resolved = self.resolve_alias(tid)
+        if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
+            return false
+        if self.get_generic_inst_base(resolved as i32) != self.syms.option or self.get_generic_inst_arg_count(resolved as i32) != 1:
+            return false
+        self.type_layout_is_single_address(self.get_generic_inst_arg(resolved as i32, 0))
 
     // #1810 (D71 §4.8a): a shared `&str` is a view VALUE with str's own
     // layout, `{ptr, len}` — never a pointer to some str header. A range
@@ -401,6 +473,8 @@ impl Sema:
         let tk = self.get_type_kind(resolved)
         if self.type_layout_is_str_view(resolved as i32):
             return 8
+        if self.type_layout_is_dyn_fat_ptr(resolved as i32) or self.type_layout_option_is_nullable(resolved as i32):
+            return target_spec_ptr_bytes()
         if tk == TypeKind.TY_INT:
             return type_layout_int_bytes(self.get_type_d0(resolved))
         if tk == TypeKind.TY_FLOAT:
@@ -466,8 +540,10 @@ impl Sema:
             return 0
         if tk == TypeKind.TY_STR or tk == TypeKind.TY_SLICE or self.type_layout_is_str_view(resolved as i32):
             return 16
-        if tk == TypeKind.TY_FN:
+        if tk == TypeKind.TY_FN or self.type_layout_is_dyn_fat_ptr(resolved as i32):
             return 2 * target_spec_ptr_bytes()
+        if self.type_layout_option_is_nullable(resolved as i32):
+            return target_spec_ptr_bytes()
         if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF or tk == TypeKind.TY_EXTERN_FN or tk == TypeKind.TY_GENERIC_FN or tk == TypeKind.TY_TRAIT_OBJ:
             return target_spec_ptr_bytes()
         if tk == TypeKind.TY_VA_LIST:

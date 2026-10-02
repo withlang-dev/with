@@ -3679,7 +3679,6 @@ impl Codegen:
         // each pushes its own range (#1430).
         let v_start = self.reserve_enum_variants(variant_count)
         var pos = te_start
-        var max_payload_size: i64 = 0
         var invalid_layout = 0
         for vi in 0..variant_count:
             let variant_name: i32 = self.sema.type_extra[pos]
@@ -3693,10 +3692,6 @@ impl Codegen:
                     with_eprint("error: unresolved payload type for generic enum variant '" ++ self.sema_symbol_text(variant_name) ++ "' in '" ++ mono_name ++ "'")
                     self.had_error = 1
                     invalid_layout = 1
-                else:
-                    let sz = self.abi_size_of(payload_ty)
-                    if sz > max_payload_size:
-                        max_payload_size = sz
             let cg_variant_name = self.sema_sym_to_codegen_sym(variant_name)
             self.enum_variant_names[v_start + vi] = if cg_variant_name != 0: cg_variant_name else: variant_name
             self.enum_variant_payloads[v_start + vi] = payload_ty
@@ -3705,11 +3700,10 @@ impl Codegen:
         if invalid_layout != 0:
             return 0
 
-        let body: Vec[i64] = Vec.new()
-        body.push(wl_i32_type(self.context))
-        if max_payload_size > 0:
-            body.push(wl_array_type(wl_i8_type(self.context), max_payload_size))
+        // §2's shape from the model (#1438): { i32 tag, [n x unit] }.
+        let body = self.enum_body_from_layout(wl_i32_type(self.context), self.sema.type_layout_size_of_frozen(resolved), self.sema.type_layout_align_of_frozen(resolved))
         wl_struct_set_body(enum_type, vec_data_i64(&body), body.len() as i32, 0)
+        self.check_enum_layout("generic enum", resolved, enum_type)
         self.enum_variant_starts[enum_idx] = v_start
         self.enum_variant_counts[enum_idx] = variant_count
         enum_type
@@ -4753,6 +4747,51 @@ impl Codegen:
             body.push(wl_array_type(wl_i8_type(self.context), max_size - max_align_size))
         wl_struct_set_body(st_type, vec_data_i64(&body), body.len() as i32, 0)
 
+    // §2 (#1438): the integer whose alignment is `align` — the unit a tagged
+    // enum's payload area is built from, so LLVM aligns the record and places
+    // the payload exactly where TypeLayout's shape says. An alignment above 16
+    // (a SIMD payload on x86_64) is a vector of i64, which LLVM aligns to its
+    // size.
+    fn enum_payload_unit_type(align: i64) -> i64:
+        if align <= 1: return wl_i8_type(self.context)
+        if align == 2: return wl_i16_type(self.context)
+        if align == 4: return wl_i32_type(self.context)
+        if align == 8: return wl_i64_type(self.context)
+        if align == 16: return wl_i128_type(self.context)
+        wl_vector_type(wl_i64_type(self.context), (align / 8) as i32)
+
+    // The LLVM body of a tagged enum, read from TypeLayout's §2 shape
+    // (`type_layout_enum_shape`): the tag, then `[n x unit]` covering the
+    // payload area. LLVM places field 1 at the first unit-aligned offset
+    // after the tag and rounds the record to the unit, which is the shape's
+    // payload_offset and size by construction; check_enum_layout proves it
+    // for every emitted enum. Nothing here measures a payload: the model is
+    // the one owner of enum layout, codegen materializes it.
+    mut fn enum_body_from_layout(tag_ty: i64, size: i64, align: i64) -> Vec[i64]:
+        let body: Vec[i64] = Vec.new()
+        body.push(tag_ty)
+        let unit = self.enum_payload_unit_type(align)
+        let shape = type_layout_enum_shape(self.abi_size_of(tag_ty), self.abi_align_of(tag_ty), 0, align)
+        let units = (size - shape.payload_offset) / align
+        if units > 0:
+            body.push(wl_array_type(unit, units))
+        body
+
+    // #1438: an emitted enum must measure what TypeLayout, the hashed ABI
+    // source, says; every comptime `T.size()`, union member, channel slot and
+    // map tuple is sized from the model, so a disagreement is memory
+    // corruption, never a layout. A compiler bug, reported loudly.
+    mut fn check_enum_layout(what: &str, sema_tid: i32, enum_ty: i64):
+        if sema_tid <= 0 or enum_ty == 0:
+            return
+        let model_size = self.sema.type_layout_size_of_frozen(sema_tid)
+        let model_align = self.sema.type_layout_align_of_frozen(sema_tid)
+        let llvm_size = self.abi_size_of(enum_ty)
+        let llvm_align = self.abi_align_of(enum_ty)
+        if llvm_size != model_size or llvm_align != model_align:
+            with_eprint(f"BUG: {what} '{self.sema.type_name(sema_tid)}' is emitted as {llvm_size} bytes aligned {llvm_align}, but TypeLayout lays it out as {model_size} bytes aligned {model_align} (#1438)")
+            self.had_error = 1
+
     // ── Declare enum type ─────────────────────────────────────────────
 
     mut fn declare_enum_type(name_sym: i32, type_node: i32):
@@ -4760,11 +4799,15 @@ impl Codegen:
         let variant_count = self.pool.get_extra(extra_start)
         let enum_name: str = with_str_clone_ref(self.intern.resolve(name_sym))
 
-        // Find the largest payload to determine enum struct size.
-        // Enum is { i32 tag, [N x i8] payload }. Resolving a payload type
-        // defines its body first (#1430), so the size below is never a
-        // placeholder's; the variant range is reserved before that recursion.
-        var max_payload_size: i64 = 0
+        // The enum's layout is TypeLayout's (#1438); the payload types are
+        // resolved here so each variant's struct exists for its projections
+        // (a payload's body is defined first, #1430), never to measure them.
+        // The variant range is reserved before that recursion.
+        let sema_tid = self.type_decl_sema_tid(type_node)
+        if sema_tid == 0:
+            with_eprint(f"error: enum '{enum_name}' has no checked type")
+            self.had_error = 1
+            return
         var invalid_layout = 0
         let v_starts = self.reserve_enum_variants(variant_count)
         var offset = extra_start + 1
@@ -4786,10 +4829,6 @@ impl Codegen:
                     payload_fields.push(field_ty)
                 if invalid_layout == 0:
                     payload_ty = wl_struct_type(self.context, vec_data_i64(&payload_fields), v_payload_count, 0)
-                if payload_ty != 0:
-                    let sz = self.abi_size_of(payload_ty)
-                    if sz > max_payload_size:
-                        max_payload_size = sz
                 offset = offset + v_payload_count
             self.enum_variant_names[v_starts + vi] = v_name
             self.enum_variant_payloads[v_starts + vi] = payload_ty
@@ -4797,16 +4836,14 @@ impl Codegen:
         if invalid_layout != 0:
             return
 
-        // Build enum struct: { i32, [N x i8] }
+        // The body is §2's shape: { i32 tag, [n x unit] } from the model.
         if not self.enum_type_map.get(name_sym).is_some():
             self.predeclare_enum_type(name_sym)
         let idx: i32 = self.enum_type_map.get(name_sym).unwrap()
-        let enum_type = self.enum_llvm_types[idx]
-        let body: Vec[i64] = Vec.new()
-        body.push(wl_i32_type(self.context))
-        if max_payload_size > 0:
-            body.push(wl_array_type(wl_i8_type(self.context), max_payload_size))
+        let enum_type: i64 = self.enum_llvm_types[idx]
+        let body = self.enum_body_from_layout(wl_i32_type(self.context), self.sema.type_layout_size_of_frozen(sema_tid), self.sema.type_layout_align_of_frozen(sema_tid))
         wl_struct_set_body(enum_type, vec_data_i64(&body), body.len() as i32, 0)
+        self.check_enum_layout("enum", sema_tid, enum_type)
 
         self.enum_variant_starts[idx] = v_starts
         self.enum_variant_counts[idx] = variant_count
@@ -4863,7 +4900,6 @@ impl Codegen:
             with_eprint(f"error: discriminant enum '{self.intern.resolve(name_sym)}' has no checked type")
             self.had_error = 1
             return
-        var max_payload_size: i64 = 0
         var offset = extra_start + 2
         for vi in 0..variant_count:
             let v_name = self.pool.get_extra(offset)
@@ -4879,9 +4915,6 @@ impl Codegen:
                         payload_fields.push(field_ty)
                 if payload_fields.len() as i32 == payload_count:
                     payload_ty = wl_struct_type(self.context, vec_data_i64(&payload_fields), payload_count, 0)
-                    let sz = self.abi_size_of(payload_ty)
-                    if sz > max_payload_size:
-                        max_payload_size = sz
             offset = offset + 3 + payload_count
             self.disc_enum_variant_names[v_start + vi] = v_name
             self.disc_enum_variant_values[v_start + vi] = disc_value
@@ -4893,13 +4926,11 @@ impl Codegen:
             if not self.enum_type_map.get(name_sym).is_some():
                 self.predeclare_enum_type(name_sym)
             let enum_idx: i32 = self.enum_type_map.get(name_sym).unwrap()
-            let enum_type = self.enum_llvm_types[enum_idx]
-            // Build struct: { repr_type, [max_payload_size x i8] }
-            let body: Vec[i64] = Vec.new()
-            body.push(repr_ty)
-            if max_payload_size > 0:
-                body.push(wl_array_type(wl_i8_type(self.context), max_payload_size))
+            let enum_type: i64 = self.enum_llvm_types[enum_idx]
+            // §2's shape from the model (#1438): { repr tag, [n x unit] }.
+            let body = self.enum_body_from_layout(repr_ty, self.sema.type_layout_size_of_frozen(sema_tid), self.sema.type_layout_align_of_frozen(sema_tid))
             wl_struct_set_body(enum_type, vec_data_i64(&body), body.len() as i32, 0)
+            self.check_enum_layout("enum", sema_tid, enum_type)
             // Register variant info in regular enum tables for payload extraction
             let enum_v_start = self.enum_variant_names.len() as i32
             let dv_start = v_start
@@ -4909,11 +4940,11 @@ impl Codegen:
             self.enum_variant_starts[enum_idx] = enum_v_start
             self.enum_variant_counts[enum_idx] = variant_count
 
-    fn gen_disc_enum_from_int_val(de_idx: i32, arg_val: i64, arg_unsigned: bool) -> i64:
-        let repr_ty = self.disc_enum_repr_types[de_idx]
+    mut fn gen_disc_enum_from_int_val(de_idx: i32, arg_val: i64, arg_unsigned: bool) -> i64:
+        let repr_ty: i64 = self.disc_enum_repr_types[de_idx]
         let repr_unsigned = self.disc_enum_repr_unsigned[de_idx] != 0
-        let v_start = self.disc_enum_variant_starts[de_idx]
-        let v_count = self.disc_enum_variant_counts[de_idx]
+        let v_start: i32 = self.disc_enum_variant_starts[de_idx]
+        let v_count: i32 = self.disc_enum_variant_counts[de_idx]
         // §4.4a: an integer outside the repr's range matches no discriminant.
         // Compare at a width that holds both the argument and the repr, each
         // side extended by its own signedness; narrowing the argument to the
@@ -6536,9 +6567,23 @@ impl Codegen:
 
     // ── Option/Result type construction ───────────────────────────────
 
-    fn get_or_create_option_type(sema_tid: i32, payload_ty: i64) -> i64:
-        // Optional pointers are represented as the pointer itself: null = None.
-        if payload_ty != 0 and wl_get_type_kind(payload_ty) == wl_pointer_type_kind():
+    mut fn get_or_create_option_type(sema_tid: i32, payload_ty: i64) -> i64:
+        // with-abi.md §3: an Option over a single address is that nullable
+        // pointer, null = None. TypeLayout owns the verdict
+        // (type_layout_option_is_nullable, #1438); the payload's LLVM shape
+        // only confirms it. Without a Sema type (a container's element Option
+        // built from an LLVM element type) the pointer shape is all there is.
+        let payload_is_ptr = payload_ty != 0 and wl_get_type_kind(payload_ty) == wl_pointer_type_kind()
+        if sema_tid > 0:
+            let nullable = self.sema.type_layout_option_is_nullable(sema_tid)
+            if nullable != payload_is_ptr:
+                let payload_shape = if payload_is_ptr: "a pointer" else: "a non-pointer"
+                let verdict = if nullable: "nullable" else: "a tagged enum"
+                with_eprint(f"BUG: Option '{self.sema.type_name(sema_tid)}' payload lowers to {payload_shape} but TypeLayout says the Option is {verdict} (#1438)")
+                self.had_error = 1
+            if nullable:
+                return payload_ty
+        else if payload_is_ptr:
             return payload_ty
 
         let cache_key = if sema_tid > 0: sema_tid as i64 else: payload_ty
@@ -6553,6 +6598,9 @@ impl Codegen:
             body.push(payload_ty)
         let opt_type = wl_struct_type(self.context, vec_data_i64(&body), body.len() as i32, 0)
         self.option_cache_map.insert(cache_key, opt_type)
+        // `{ i32, T }` is §2's shape (tag, payload at its own alignment);
+        // proven, not assumed.
+        self.check_enum_layout("Option", sema_tid, opt_type)
         opt_type
 
     mut fn get_or_create_result_type(sema_tid: i32, ok_ty: i64, err_ty: i64) -> i64:
@@ -6561,17 +6609,26 @@ impl Codegen:
         if cached.is_some():
             return cached.unwrap()
 
-        let ok_size = self.abi_size_of(ok_ty)
-        let err_size = self.abi_size_of(err_ty)
-        var max_size = ok_size
-        if err_size > max_size: max_size = err_size
-
-        let body: Vec[i64] = Vec.new()
-        body.push(wl_i32_type(self.context))
-        if max_size > 0:
-            body.push(wl_array_type(wl_i8_type(self.context), max_size))
+        // §2's shape (#1438): from the model when the Result has a Sema
+        // type; a Result spelled inside codegen's own generic frame has none,
+        // and takes the same shape over its LLVM payloads.
+        var size: i64 = 0
+        var align: i64 = 4
+        if sema_tid > 0:
+            size = self.sema.type_layout_size_of_frozen(sema_tid)
+            align = self.sema.type_layout_align_of_frozen(sema_tid)
+        else:
+            let ok_size = self.abi_size_of(ok_ty)
+            let err_size = self.abi_size_of(err_ty)
+            let ok_align = if wl_get_type_kind(ok_ty) == wl_void_type_kind(): 1 else: self.abi_align_of(ok_ty)
+            let err_align = if wl_get_type_kind(err_ty) == wl_void_type_kind(): 1 else: self.abi_align_of(err_ty)
+            let shape = type_layout_enum_shape(4, 4, if ok_size > err_size: ok_size else: err_size, if ok_align > err_align: ok_align else: err_align)
+            size = shape.size
+            align = shape.align
+        let body = self.enum_body_from_layout(wl_i32_type(self.context), size, align)
         let res_type = wl_struct_type(self.context, vec_data_i64(&body), body.len() as i32, 0)
         self.result_cache_map.insert(cache_key, res_type)
+        self.check_enum_layout("Result", sema_tid, res_type)
         res_type
 
     mut fn get_or_create_context_error_type(source_ty: i64) -> i64:

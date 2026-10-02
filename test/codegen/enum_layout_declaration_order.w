@@ -1,9 +1,9 @@
-//! expect-stdout: enum 28 28 model 28 28
-//! expect-stdout: inner 20 20 model 20 20
-//! expect-stdout: nested 44 44
-//! expect-stdout: generic 36 36
+//! expect-stdout: enum 32 32 model 32 32
+//! expect-stdout: inner 24 24 model 24 24
+//! expect-stdout: nested 48 48
+//! expect-stdout: generic 40 40
 //! expect-stdout: disc-field 16 16
-//! expect-stdout: disc-payload 20 20
+//! expect-stdout: disc-payload 24 24
 //! expect-stdout: aligned 64 64
 //! expect-stdout: ok
 
@@ -13,9 +13,11 @@
 // Codegen used to size a Late* payload from a bodiless placeholder (0 bytes):
 // LateOuter measured 12 bytes, LateRec 8, LateAligned 16. The §2 enum layout
 // is a 4-byte tag followed by the largest variant's fields laid out as a
-// struct, so the sizes are pinned too, and for these shapes the layout model
-// Sema answers `T.size()` from (TypeLayout) agrees with the LLVM type codegen
-// emits.
+// struct at that payload's own alignment, the enum aligned to the larger of
+// the two (#1438: `B(a: i32, b: i64)` puts its 16-byte, 8-aligned payload at
+// offset 8, so LateInnerE is 24 bytes, not 20), so the sizes are pinned too,
+// and the layout model Sema answers `T.size()` from (TypeLayout) is what the
+// LLVM type codegen emits measures.
 
 // Sema does not yet resolve a generic declared after its user (a separate
 // issue), so the template comes first; its instantiation is still Late.
