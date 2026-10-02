@@ -6,5 +6,6 @@
 // used to be recorded as an AST node type and collided with AstPool.file's
 // integer comparison in the merged compiler-module pool.
 use compiler.Frontend
+use std.builtins.print_i32
 
 fn main: print_i32(0)
