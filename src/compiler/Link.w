@@ -1661,7 +1661,7 @@ fn link_stage_select_embedded_bundles(undef: &str) -> Vec[str]:
             continue
         let name = embedded_bundle_name(bi)
         let bundle_abi = link_stage_bundle_manifest_field(manifest, "abi-sha")
-        if bundle_abi != compiler_abi_sha():
+        if abi_identity_refuses_bundle(compiler_abi_sha(), bundle_abi):
             with_eprint("error: embedded bundle '" ++ name ++ "' was built for ABI " ++ bundle_abi ++ " but this compiler is " ++ compiler_abi_sha() ++ " (a .wo never links across ABI identities; rebuild the bundle)")
             let failed: Vec[str] = Vec.new()
             failed.push(LINK_BUNDLE_FAILED())

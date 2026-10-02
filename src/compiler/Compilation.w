@@ -569,7 +569,7 @@ impl Compilation:
                 with_eprint("error: --link-bundle: missing or empty bundle manifest " ++ manifest_path)
                 return false
             let bundle_abi = link_stage_bundle_manifest_field(manifest, "abi-sha")
-            if compiler_abi_sha_is_stamped() and bundle_abi != compiler_abi_sha():
+            if abi_identity_refuses_bundle(compiler_abi_sha(), bundle_abi):
                 with_eprint("error: --link-bundle: " ++ manifest_path ++ " was built for ABI " ++ bundle_abi ++ " but this compiler is " ++ compiler_abi_sha() ++ " (a .wo never links across ABI identities; rebuild the bundle)")
                 return false
             let prefixes = bundle_manifest_prefixes(manifest)

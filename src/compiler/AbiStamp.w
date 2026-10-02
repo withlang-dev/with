@@ -18,6 +18,17 @@ pub fn compiler_abi_sha() -> str:
 pub fn compiler_abi_sha_is_stamped() -> bool:
     not compiler_abi_sha().starts_with("WITHABISHASTAMP")
 
+// The one rule for linking a .wo bundle against this compiler (D38, #761):
+// a stamped identity refuses a bundle built for another ABI; an unstamped
+// image — linked as a program (`with build main.w`, the failure-diagnostics
+// probe), not by build.w's compiler link, which stamps the slot post-link —
+// has no identity to compare, so it links an explicit --link-bundle and
+// the bundles it embeds unchecked (#1330), as a hand-linked compiler keeps
+// no generation (#1815). Both link paths (Compilation.load_link_bundles,
+// Link.link_stage_select_embedded_bundles) read this; neither re-derives it.
+pub fn abi_identity_refuses_bundle(self_abi: &str, bundle_abi: &str) -> bool:
+    not self_abi.starts_with("WITHABISHASTAMP") and bundle_abi != self_abi
+
 // The compiler's own identity: the sha256 of its unstamped image, patched in
 // post-link by build/compiler.w (comp_patch_version_binary) like the version
 // and ABI stamps. The build cache keys on it (build_cache_current_compiler_
