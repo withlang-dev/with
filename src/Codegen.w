@@ -1500,16 +1500,7 @@ impl Codegen:
             return
         if self.di_current_scope == 0:
             return
-        // Seed-gated (#1349): the natural spelling is
-        // `let (line, col) = if byte_offset > 0: self.debug_line_col(byte_offset) else: (1, 0)`;
-        // the pinned seed rejects a tuple pattern over an `if` subject, and
-        // it builds stage1. Restore it once seed.lock names a release with the fix.
-        var line = 1
-        var col = 0
-        if byte_offset > 0:
-            let lc = self.debug_line_col(byte_offset)
-            line = lc.0
-            col = lc.1
+        let (line, col) = if byte_offset > 0: self.debug_line_col(byte_offset) else: (1, 0)
         let block = wl_di_create_lexical_block(self.di_builder, self.di_current_scope, self.di_fn_file, line, col)
         self.di_current_scope = block
 
