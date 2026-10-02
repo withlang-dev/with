@@ -363,7 +363,28 @@ type CCodegen {
     // (call_args_text): each a `with_cstr_lend` of a str or `&str` view,
     // held in a temp for the call and released after it (emit_term).
     call_lends: Vec[str],
+    // #1766: every closure of the module (a CK_CLOSURE constant: an
+    // NK_CLOSURE, or the NK_FOR whose body is a Gen[T]'s `each` closure,
+    // D69), registered up front in body order so names are deterministic.
+    // Closure N is the static C function __with_closure_N(void* ctx, ...)
+    // over its retained MIR body (closure_syms[N]); its captures are the
+    // body's locals 1..anonymous_capture_count, taken from the creating
+    // body (closure_parents[N]) by the mode Sema decided on the node
+    // (closure_env_kind): the pair {fn, ctx} is the LLVM backend's, tag
+    // bits included (CodegenDispatch.gen_closure, D63).
+    closure_syms: Vec[i32],
+    closure_parents: Vec[i32],
+    closure_nodes: Vec[i32],
+    closure_in_loop: Vec[i32],
+    closure_env_kinds: Vec[i32],
+    closure_index_by_sym: HashMap[i32, i32],
 }
+
+// #1766: how a closure holds its environment (CodegenDispatch D63 tags).
+const CC_CLOSURE_ENV_NONE: i32 = 0      // no captures: ctx is null
+const CC_CLOSURE_ENV_BY_PLACE: i32 = 1  // pointers to the creating frame's slots, tag 00
+const CC_CLOSURE_ENV_INLINE: i32 = 2    // `move`, every capture Copy, in the word's upper 62 bits, tag 01
+const CC_CLOSURE_ENV_CELL: i32 = 3      // `move`, an owned heap cell {drop_fn, clone_fn, env}, tag 10
 
 impl CCodegen:
     fn intern_intern(s: &str) -> i32:
@@ -420,6 +441,12 @@ pub fn c_emit_module(mir_mod: MirModule, ast: AstPool, intern: InternPool, sema:
         global_init_decl_indices: Vec.new(),
         global_init_fn_syms: Vec.new(),
         call_lends: Vec.new(),
+        closure_syms: Vec.new(),
+        closure_parents: Vec.new(),
+        closure_nodes: Vec.new(),
+        closure_in_loop: Vec.new(),
+        closure_env_kinds: Vec.new(),
+        closure_index_by_sym: HashMap.new(),
     }
     for i in 0..cg.mir_mod.body_fn_syms.len() as i32:
         let sym: i32 = cg.mir_mod.body_fn_syms[i]
@@ -1518,9 +1545,55 @@ impl CCodegen:
     fn int_spec_is_128(resolved: i32) -> bool:
         self.sema.get_type_kind(resolved as TypeId) == TypeKind.TY_INT and self.sema.get_type_d0(resolved as TypeId) == 128
 
+    // The C name of a fn type is structural (#1766): Sema gives a closure
+    // its own fn type, distinct from the structurally equal type of the
+    // parameter it is passed to, and two typedef'd structs with different
+    // names are incompatible in C whatever their members. The LLVM backend
+    // has no such problem — every pair is {ptr, ptr}.
     fn fn_type_c_name(tid: i32) -> str:
+        "with_fn_" ++ self.type_c_key(self.sema.resolve_alias(tid) as i32)
+
+    // A structural key for a type, as a C identifier fragment: nominal types
+    // keep their id, every structural type is spelled out.
+    fn type_c_key(tid: i32) -> str:
         let resolved = self.sema.resolve_alias(tid)
-        f"with_fn_{resolved as i32}"
+        if resolved == 0:
+            return "0"
+        let tk = self.sema.get_type_kind(resolved)
+        if tk == TypeKind.TY_INT:
+            return f"i{self.sema.get_type_d0(resolved)}{self.sema.get_type_d1(resolved)}"
+        if tk == TypeKind.TY_BOOL:
+            return "b"
+        if tk == TypeKind.TY_FLOAT:
+            return f"f{self.sema.get_type_d0(resolved)}"
+        if tk == TypeKind.TY_STR:
+            return "s"
+        if tk == TypeKind.TY_VOID:
+            return "v"
+        if tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR:
+            let head = if tk == TypeKind.TY_REF: "R" else: "P"
+            return head ++ f"{self.sema.get_type_d1(resolved)}" ++ self.type_c_key(self.sema.get_type_d0(resolved))
+        if tk == TypeKind.TY_ARRAY:
+            return f"A{self.sema.get_type_d1(resolved)}_" ++ self.type_c_key(self.sema.get_type_d0(resolved))
+        if tk == TypeKind.TY_SLICE:
+            return "S" ++ self.type_c_key(self.sema.get_type_d0(resolved))
+        if tk == TypeKind.TY_TUPLE:
+            let start = self.sema.get_type_d0(resolved)
+            let count = self.sema.get_type_d1(resolved)
+            var out = f"T{count}"
+            for i in 0..count:
+                out = out ++ "_" ++ self.type_c_key(self.sema.type_extra[(start + i)])
+            return out
+        if tk == TypeKind.TY_FN or tk == TypeKind.TY_EXTERN_FN:
+            let start = self.sema.get_type_d0(resolved)
+            let count = self.sema.get_type_d1(resolved)
+            var out = (if tk == TypeKind.TY_FN: "F" else: "E") ++ f"{count}"
+            if tk == TypeKind.TY_EXTERN_FN and self.sema.fn_type_is_variadic(resolved as i32):
+                out = out ++ "V"
+            for i in 0..count:
+                out = out ++ "_" ++ self.type_c_key(self.sema.type_extra[(start + i)])
+            return out ++ "_r" ++ self.type_c_key(self.sema.get_type_d2(resolved))
+        f"t{resolved as i32}"
 
     // With fn VALUES use native codegen's fat-pair convention: a struct
     // {fn_ptr, ctx} whose fn_ptr always takes ctx first (Codegen.w
@@ -2490,9 +2563,9 @@ impl CCodegen:
         let cached = self.local_effective_cache.get(cache_key)
         if cached.is_some():
             return cached.unwrap()
-        let sig_idx = self.body_sig_index(body.fn_sym)
-        let param_count = if sig_idx >= 0: self.sema.sig_get_param_count(sig_idx) else: 0
-        if local_id <= param_count:
+        // A closure body's captures and parameters (locals 1..n_params)
+        // have the types its retained MIR declares (#1766).
+        if local_id <= self.body_param_count(body):
             self.local_effective_cache.insert(cache_key, declared)
             return declared
         let declared_resolved = self.sema.resolve_alias(declared)
@@ -2986,6 +3059,11 @@ impl CCodegen:
                     self.local_value_use_mark_operand(body, self.call_arg_operand(body, args_id, ai))
             else if tk == TermKind.TK_DROP_AND_GOTO:
                 self.local_value_use_mark_place(body, body.term_data0(bb))
+            else if tk == TermKind.TK_RETURN:
+                // The return reads `_0`: a body that returns an aggregate
+                // built straight into its result (a gen fn's state, D69)
+                // is not a dead temp (#1766: nums(3) returned zeroes).
+                self.local_value_use_cache.insert(cc_body_local_cache_key(body.fn_sym, 0), 1)
 
     fn local_has_value_use(body: &MirBody, local_id: i32) -> i32:
         if local_id < 0:
@@ -3035,18 +3113,24 @@ impl CCodegen:
             return false
         self.sema.type_layout_repr_is_str(self.place_ref_target_tid(body, body.rval_d1[rval_id]))
 
+    // The C lvalue of a bare local: a global's name, or the local's own
+    // name, dereferenced when the local holds a pointer to its value — a
+    // value-ref ABI parameter, or a closure capture by place or in an owned
+    // cell (#1766), as the LLVM backend's indirect locals do.
+    fn local_base_text(body: &MirBody, local_id: i32) -> str:
+        let global_sym = self.local_global_sym(body, local_id)
+        if global_sym != 0:
+            return self.global_c_name(global_sym)
+        if self.local_is_c_pointer_param(body, local_id) != 0 or self.local_is_indirect_capture(body, local_id):
+            return f"(*_{local_id})"
+        f"_{local_id}"
+
     mut fn place_text(body: &MirBody, place_id: i32) -> str:
         if place_id < 0 or place_id >= body.place_locals.len() as i32:
             self.fail(f"invalid place id {place_id}")
             return "_0"
         let base_local = body.place_locals[place_id]
-        let global_sym = self.local_global_sym(body, base_local)
-        var out = if global_sym != 0:
-            self.global_c_name(global_sym)
-        else if self.local_is_c_pointer_param(body, base_local) != 0:
-            f"(*_{base_local})"
-        else:
-            f"_{base_local}"
+        var out = self.local_base_text(body, base_local)
         var current_tid = self.local_effective_tid(body, base_local)
         if self.is_void_tid(current_tid) != 0:
             current_tid = self.place_local_tid(body, place_id)
@@ -3449,6 +3533,11 @@ impl CCodegen:
             if body_sym != 0:
                 return self.fn_c_name(body_sym)
             return self.extern_sym_c_name(cd)
+        if ck == ConstKind.CK_CLOSURE:
+            return self.closure_value_text(body, const_id)
+        if ck == ConstKind.CK_ASYNC_BLOCK:
+            self.fail("emit-c does not support an async block (its body runs on a fiber the C backend has no lowering for)")
+            return "0"
         self.fail(f"unsupported const kind {ck}")
         "0"
 
@@ -8640,6 +8729,12 @@ impl CCodegen:
 
         let start = body.switch_table_starts[d1]
         let count = body.switch_table_counts[d1]
+        // A switch with no arms (D69's exit-code switch after a generator
+        // loop whose body neither breaks nor returns) is its default alone.
+        if count == 0:
+            if d2 != 0:
+                return f"    (void)({cond});\n    goto bb{d2};"
+            return f"    (void)({cond});\n    abort();"
         var out = ""
         for i in 0..count:
             let val: i64 = body.switch_table_vals[(start + i)]
@@ -9002,6 +9097,8 @@ impl CCodegen:
     mut fn emit_fn_type_defs() -> str:
         let fn_tids = self.collect_used_fn_types()
         var out = ""
+        // Structurally equal fn types share one C name (#1766): one typedef.
+        var seen_names: HashMap[str, i32] = HashMap.new()
         for i in 0..fn_tids.len() as i32:
             if self.check_interrupted() != 0:
                 return ""
@@ -9009,6 +9106,10 @@ impl CCodegen:
             let tid_kind = self.sema.get_type_kind(tid)
             if tid_kind != TypeKind.TY_FN and tid_kind != TypeKind.TY_EXTERN_FN:
                 continue
+            let c_name = self.fn_type_c_name(tid as i32)
+            if seen_names.contains(c_name):
+                continue
+            seen_names.insert(c_name.clone(), 1)
             let ret_tid = self.sema.get_type_d2(tid)
             if self.returns_array(ret_tid):
                 self.fail("emit-c: a fn value whose type returns an array has no C lowering (C returns no arrays; a named function takes an out-pointer, #1775)")
@@ -9915,8 +10016,288 @@ impl CCodegen:
                     return true
         false
 
+    // ── #1766: closures ────────────────────────────────────────────────
+    //
+    // The retained MIR body is the closure's whole contract (D65: Sema
+    // decided the captures, MirLower their sources): locals 1..captures are
+    // its captures, the rest of its parameters follow, `_0` its result. The
+    // C lowering is the LLVM backend's (CodegenDispatch.gen_closure):
+    //   static R __with_closure_N(void* ctx, params...)
+    // and the value is the fat pair {fn, ctx} of the fn type, whose
+    // context word's low two bits say what it holds (D63):
+    //   00  a `struct __with_env_N` of pointers to the creating frame's
+    //       slots (a non-move closure captures by place, §12.4), or null;
+    //   01  a `move` closure's environment inline in the upper 62 bits
+    //       (every capture Copy, at most 7 bytes);
+    //   10  a `struct __with_cell_N` {drop_fn, clone_fn, env} the value
+    //       owns on the heap (a `move` closure otherwise).
+    // A call through the pair is callee.fn_ptr(callee.ctx, args...), as
+    // for a named function's thunk (fat_fn_literal).
+
+    // Locals 1..count are a body's parameters: the signature's for a named
+    // function, the retained MIR's (captures, then parameters) for a closure.
+    fn body_param_count(body: &MirBody) -> i32:
+        if body.anonymous_type != 0:
+            return body.n_params
+        let sig_idx = self.body_sig_index(body.fn_sym)
+        if sig_idx >= 0: self.sema.sig_get_param_count(sig_idx) else: 0
+
+    fn closure_fn_name(idx: i32) -> str:
+        let _ = self
+        f"__with_closure_{idx}"
+
+    fn closure_env_struct(idx: i32) -> str:
+        let _ = self
+        f"struct __with_env_{idx}"
+
+    fn closure_cell_struct(idx: i32) -> str:
+        let _ = self
+        f"struct __with_cell_{idx}"
+
+    fn closure_body_at(idx: i32) -> &MirBody:
+        self.mir_body_at(self.mir_mod.find_body(self.closure_syms[idx]) as i64)
+
+    // Register every CK_CLOSURE constant of the module, in body then
+    // constant order, so closure numbering is deterministic, and decide
+    // each one's environment kind from the facts Sema recorded on its node.
+    mut fn register_closures():
+        for bi in 0..self.mir_mod.bodies.len() as i32:
+            let body = self.mir_body_at(bi as i64)
+            for ci in 0..body.const_kinds.len() as i32:
+                if body.const_kinds[ci] != ConstKind.CK_CLOSURE:
+                    continue
+                let sym = body.const_d1[ci]
+                if self.closure_index_by_sym.contains(sym):
+                    continue
+                let node = body.const_d0[ci]
+                let owner = cc_intern_resolve(self.intern, body.fn_sym)
+                let body_idx = self.mir_mod.find_body(sym)
+                if body_idx < 0:
+                    self.fail(f"emit-c: the closure at node {node} of {owner} has no retained MIR body")
+                    return
+                let closure_body = self.mir_body_at(body_idx as i64)
+                let kind = self.sema.get_type_kind(self.sema.resolve_alias(closure_body.anonymous_type))
+                if kind == TypeKind.TY_EXTERN_FN:
+                    self.fail(f"emit-c does not support a closure used as a C function pointer (node {node} of {owner})")
+                    return
+                if kind != TypeKind.TY_FN:
+                    self.fail(f"emit-c: the closure at node {node} of {owner} has a non-callable type")
+                    return
+                if self.returns_array(closure_body.local_type_ids[0]):
+                    self.fail(f"emit-c: a closure returning an array has no C lowering (C returns no arrays, #1775; node {node} of {owner})")
+                    return
+                let env_kind = self.closure_env_kind_for(closure_body, node)
+                self.closure_index_by_sym.insert(sym, self.closure_syms.len() as i32)
+                self.closure_syms.push(sym)
+                self.closure_parents.push(body.fn_sym)
+                self.closure_nodes.push(node)
+                self.closure_in_loop.push(body.const_d2[ci])
+                self.closure_env_kinds.push(env_kind)
+
+    // §12.4 / D62: a non-move closure captures every value by place, Copy
+    // or not; `move ||` owns its environment — inline in the context word
+    // when every capture is Copy and the environment fits, else a heap
+    // cell. The C struct layout is computed the way C lays it out.
+    mut fn closure_env_kind_for(body: &MirBody, node: i32) -> i32:
+        let count = body.anonymous_capture_count
+        if count == 0:
+            return CC_CLOSURE_ENV_NONE
+        if self.ast.is_move_closure(node as NodeId) == 0:
+            return CC_CLOSURE_ENV_BY_PLACE
+        var offset: i64 = 0
+        var max_align: i64 = 1
+        for ci in 0..count:
+            let tid = body.local_type_ids[ci + 1]
+            if self.sema.is_copy_frozen(tid as TypeId) == 0:
+                return CC_CLOSURE_ENV_CELL
+            let align = self.sema.type_layout_align_of(tid)
+            let size = self.sema.type_layout_size_of(tid)
+            if align > max_align: max_align = align
+            offset = (offset + align - 1) / align * align + size
+        let env_size = (offset + max_align - 1) / max_align * max_align
+        if env_size <= 7: CC_CLOSURE_ENV_INLINE else: CC_CLOSURE_ENV_CELL
+
+    // A capture by place or in an owned cell is a local holding a pointer
+    // to its value (the LLVM backend's indirect local): it reads as (*_N).
+    fn local_is_indirect_capture(body: &MirBody, local_id: i32) -> bool:
+        if body.anonymous_type == 0 or local_id < 1 or local_id > body.anonymous_capture_count:
+            return false
+        if not self.closure_index_by_sym.contains(body.fn_sym):
+            return false
+        let kind: i32 = self.closure_env_kinds[self.closure_index_by_sym.get(body.fn_sym).unwrap()]
+        kind == CC_CLOSURE_ENV_BY_PLACE or kind == CC_CLOSURE_ENV_CELL
+
+    // The owned cell is clonable when every capture is Copy or a str
+    // (CodegenDispatch.gen_closure_env_clone_fn); otherwise clone_fn is null.
+    fn closure_cell_clonable(idx: i32) -> bool:
+        let body = self.closure_body_at(idx)
+        for ci in 0..body.anonymous_capture_count:
+            let tid = body.local_type_ids[ci + 1]
+            if self.sema.is_copy_frozen(tid as TypeId) == 0 and self.sema.get_type_kind(self.sema.resolve_alias(tid)) != TypeKind.TY_STR:
+                return false
+        true
+
+    mut fn closure_fn_sig(idx: i32) -> str:
+        let body = self.closure_body_at(idx)
+        var params = "void* __with_ctx"
+        for pi in body.anonymous_capture_count..body.n_params:
+            let li = pi + 1
+            params = params ++ ", " ++ self.c_decl(body.local_type_ids[li], f"_{li}")
+        let ret_tid = body.local_type_ids[0]
+        let name = self.closure_fn_name(idx) ++ "(" ++ params ++ ")"
+        if self.type_is_pointer_to_array(ret_tid):
+            return self.c_decl(ret_tid, name)
+        self.c_type(ret_tid, 1) ++ " " ++ name
+
+    // Every closure's environment struct, owned-cell struct and glue, and
+    // prototype: before any body, since a body creates or runs them.
+    mut fn emit_closure_decls() -> str:
+        var out = ""
+        var any_inline = false
+        for idx in 0..self.closure_syms.len() as i32:
+            if self.check_interrupted() != 0:
+                return ""
+            let body = self.closure_body_at(idx)
+            let kind: i32 = self.closure_env_kinds[idx]
+            let count = body.anonymous_capture_count
+            let env = self.closure_env_struct(idx)
+            let name = self.closure_fn_name(idx)
+            if kind != CC_CLOSURE_ENV_NONE:
+                out = out ++ env ++ " " ++ cc_lbrace()
+                for ci in 0..count:
+                    let tid = body.local_type_ids[ci + 1]
+                    let field = f"c{ci}"
+                    let decl = if kind == CC_CLOSURE_ENV_BY_PLACE: self.c_decl(tid, "(*" ++ field ++ ")") else: self.c_decl(tid, field)
+                    out = out ++ " " ++ decl ++ ";"
+                out = out ++ " " ++ cc_rbrace() ++ ";\n"
+            if kind == CC_CLOSURE_ENV_INLINE:
+                any_inline = true
+            if kind == CC_CLOSURE_ENV_CELL:
+                let cell = self.closure_cell_struct(idx)
+                out = out ++ cell ++ " " ++ cc_lbrace() ++ " void (*drop_fn)(void*); void* (*clone_fn)(void*); " ++ env ++ " env; " ++ cc_rbrace() ++ ";\n"
+                // The cell's drop frees it. The C backend destroys no value
+                // anywhere (every drop(...) it emits is a comment), so the
+                // captures are not destroyed here either.
+                out = out ++ "static void " ++ name ++ "_drop(void* cell) " ++ cc_lbrace() ++ " with_free(cell); " ++ cc_rbrace() ++ "\n"
+                if self.closure_cell_clonable(idx):
+                    out = out ++ "static void* " ++ name ++ "_clone(void* old) " ++ cc_lbrace() ++ " " ++ cell ++ "* c = (" ++ cell ++ "*)with_alloc((int64_t)sizeof(" ++ cell ++ ")); memcpy(c, old, sizeof(" ++ cell ++ "));"
+                    for ci in 0..count:
+                        if self.sema.get_type_kind(self.sema.resolve_alias(body.local_type_ids[ci + 1])) == TypeKind.TY_STR:
+                            out = out ++ f" c->env.c{ci} = with_str_clone_ref(c->env.c{ci});"
+                    out = out ++ " return c; " ++ cc_rbrace() ++ "\n"
+            out = out ++ "static " ++ self.closure_fn_sig(idx) ++ ";\n"
+        if any_inline:
+            out = "static inline void* __with_closure_inline_ctx(const void* env, size_t n) " ++ cc_lbrace() ++ " uint64_t w = 0; memcpy(&w, env, n); return (void*)(uintptr_t)((w << 2) | 1u); " ++ cc_rbrace() ++ "\n" ++ out
+        if out.len() > 0:
+            out = out ++ "\n"
+        out
+
+    // A creating body's frame storage for each by-place environment it
+    // builds outside a loop; inside a loop the site allocates per creation
+    // (#1471), and an owned environment lives in the word or on the heap.
+    fn closure_env_locals_text(body: &MirBody) -> str:
+        var out = ""
+        for idx in 0..self.closure_syms.len() as i32:
+            if self.closure_parents[idx] != body.fn_sym:
+                continue
+            if self.closure_env_kinds[idx] != CC_CLOSURE_ENV_BY_PLACE or self.closure_in_loop[idx] != 0:
+                continue
+            out = out ++ "    " ++ self.closure_env_struct(idx) ++ f" __with_env_{idx}_s __attribute__((unused));\n"
+        out
+
+    // The pair for a CK_CLOSURE constant of `body`: a GNU statement
+    // expression that builds the environment from the creating body's
+    // locals (the capture sources MirLower resolved) and yields the pair.
+    mut fn closure_value_text(body: &MirBody, const_id: i32) -> str:
+        let sym = body.const_d1[const_id]
+        if not self.closure_index_by_sym.contains(sym):
+            self.fail(f"emit-c: closure at node {body.const_d0[const_id]} of {cc_intern_resolve(self.intern, body.fn_sym)} was not registered")
+            return "0"
+        let idx: i32 = self.closure_index_by_sym.get(sym).unwrap()
+        let closure_body = self.closure_body_at(idx)
+        let pair_ty = self.fn_type_c_name(body.const_types[const_id])
+        let fn_name = self.closure_fn_name(idx)
+        let kind: i32 = self.closure_env_kinds[idx]
+        let count = closure_body.anonymous_capture_count
+        if kind == CC_CLOSURE_ENV_NONE:
+            return "((" ++ pair_ty ++ ")" ++ cc_lbrace() ++ " " ++ fn_name ++ ", 0 " ++ cc_rbrace() ++ ")"
+        let env = self.closure_env_struct(idx)
+        var out = "(" ++ cc_lbrace()
+        if kind == CC_CLOSURE_ENV_BY_PLACE:
+            if self.closure_in_loop[idx] != 0:
+                out = out ++ " " ++ env ++ "* __with_env = (" ++ env ++ "*)__builtin_alloca(sizeof(" ++ env ++ "));"
+            else:
+                out = out ++ " " ++ env ++ f"* __with_env = &__with_env_{idx}_s;"
+            for ci in 0..count:
+                let src = self.local_base_text(body, closure_body.anonymous_capture_sources[ci])
+                out = out ++ f" __with_env->c{ci} = (__typeof__(__with_env->c{ci}))&(" ++ src ++ ");"
+            return out ++ " (" ++ pair_ty ++ ")" ++ cc_lbrace() ++ " " ++ fn_name ++ ", (void*)__with_env " ++ cc_rbrace() ++ "; " ++ cc_rbrace() ++ ")"
+        if kind == CC_CLOSURE_ENV_INLINE:
+            out = out ++ " " ++ env ++ " __with_env;"
+            for ci in 0..count:
+                let src = self.local_base_text(body, closure_body.anonymous_capture_sources[ci])
+                out = out ++ f" memcpy(&__with_env.c{ci}, &(" ++ src ++ f"), sizeof(__with_env.c{ci}));"
+            return out ++ " (" ++ pair_ty ++ ")" ++ cc_lbrace() ++ " " ++ fn_name ++ ", __with_closure_inline_ctx(&__with_env, sizeof(__with_env)) " ++ cc_rbrace() ++ "; " ++ cc_rbrace() ++ ")"
+        let cell = self.closure_cell_struct(idx)
+        out = out ++ " " ++ cell ++ "* __with_cell = (" ++ cell ++ "*)with_alloc((int64_t)sizeof(" ++ cell ++ "));"
+        out = out ++ " __with_cell->drop_fn = " ++ fn_name ++ "_drop;"
+        out = out ++ " __with_cell->clone_fn = " ++ (if self.closure_cell_clonable(idx): fn_name ++ "_clone;" else: "0;")
+        for ci in 0..count:
+            let src = self.local_base_text(body, closure_body.anonymous_capture_sources[ci])
+            out = out ++ f" memcpy(&__with_cell->env.c{ci}, &(" ++ src ++ f"), sizeof(__with_cell->env.c{ci}));"
+            // D63 / §2.5: `move ||` transfers ownership — the outer binding
+            // is reset so its own drop frees nothing (MirLower marks it moved).
+            if self.sema.type_needs_drop_frozen(closure_body.local_type_ids[ci + 1]) != 0:
+                out = out ++ " memset(&(" ++ src ++ "), 0, sizeof(" ++ src ++ "));"
+        out ++ " (" ++ pair_ty ++ ")" ++ cc_lbrace() ++ " " ++ fn_name ++ ", (void*)((uintptr_t)__with_cell | 2u) " ++ cc_rbrace() ++ "; " ++ cc_rbrace() ++ ")"
+
+    // Closure N's static C function: the context decoded into its capture
+    // locals, then the body like any other.
+    mut fn emit_closure_body(idx: i32) -> str:
+        let body = self.closure_body_at(idx)
+        // Line directives and frozen name resolution follow the named
+        // function the closure sits in, through any enclosing closures.
+        var parent: i32 = self.closure_parents[idx]
+        while self.closure_index_by_sym.contains(parent):
+            parent = self.closure_parents[self.closure_index_by_sym.get(parent).unwrap()]
+        self.enter_line_file(parent)
+        let decl_path = self.sema.fn_body_source_path(parent)
+        if decl_path.len() > 0:
+            self.sema.current_module_path = decl_path
+        let kind: i32 = self.closure_env_kinds[idx]
+        let count = body.anonymous_capture_count
+        let env = self.closure_env_struct(idx)
+        var prologue = ""
+        if kind == CC_CLOSURE_ENV_NONE:
+            prologue = "    (void)__with_ctx;\n"
+        else if kind == CC_CLOSURE_ENV_BY_PLACE:
+            prologue = "    " ++ env ++ "* __with_env = (" ++ env ++ "*)__with_ctx;\n"
+            for ci in 0..count:
+                let li = ci + 1
+                prologue = prologue ++ "    " ++ self.c_decl(body.local_type_ids[li], f"(*_{li})") ++ f" __attribute__((unused)) = __with_env->c{ci};\n"
+        else if kind == CC_CLOSURE_ENV_INLINE:
+            prologue = "    uint64_t __with_env_word = ((uint64_t)(uintptr_t)__with_ctx) >> 2;\n"
+            prologue = prologue ++ "    " ++ env ++ "* __with_env = (" ++ env ++ "*)&__with_env_word;\n"
+            for ci in 0..count:
+                let li = ci + 1
+                prologue = prologue ++ "    " ++ self.c_decl(body.local_type_ids[li], f"_{li}") ++ " __attribute__((unused));\n"
+                prologue = prologue ++ f"    memcpy(&_{li}, &__with_env->c{ci}, sizeof(_{li}));\n"
+        else:
+            // The cell's slot IS the local: reads, writes and a consuming
+            // body's reset all land in the cell.
+            prologue = "    " ++ env ++ "* __with_env = &((" ++ self.closure_cell_struct(idx) ++ "*)((uintptr_t)__with_ctx - 2u))->env;\n"
+            for ci in 0..count:
+                let li = ci + 1
+                prologue = prologue ++ "    " ++ self.c_decl(body.local_type_ids[li], f"(*_{li})") ++ f" __attribute__((unused)) = &__with_env->c{ci};\n"
+        let sig = "static " ++ self.closure_fn_sig(idx)
+        self.emit_body_text(body, sig, body.n_params, prologue)
+
     mut fn emit_fn_body(body: &MirBody) -> str:
         if self.check_interrupted() != 0:
+            return ""
+        // A closure's retained body is emitted by emit_closure_body, after
+        // every named body (#1766).
+        if body.anonymous_type != 0:
             return ""
         let fn_sym = body.fn_sym
         let sig_idx = self.body_sig_index(fn_sym)
@@ -9932,13 +10313,23 @@ impl CCodegen:
         // --emit-c) resolved `sizeof[pcre2_real_code_8]` as if the user had
         // written it, and an engine corpus type is invisible to user code
         // (#1362): the emitter failed before any LLVM-only refusal fired.
-        let decl_path = if init_global != 0: self.decl_source_path(self.global_decl_node(init_global)) else: self.sema.fn_symbol_source_path(fn_sym)
+        let decl_path = if init_global != 0: self.decl_source_path(self.global_decl_node(init_global)) else: self.sema.fn_body_source_path(fn_sym)
         if decl_path.len() > 0:
             self.sema.current_module_path = decl_path
         let fn_sig = self.emit_fn_decl(body)
         let param_count = if sig_idx >= 0: self.sema.sig_get_param_count(sig_idx) else: 0
+        self.emit_body_text(body, fn_sig, param_count, "")
+
+    // The C function over a MIR body: `fn_sig {`, `prologue` (a closure's
+    // capture locals, #1766), the declaration of every local past the
+    // `param_count` parameters, then each basic block under its label.
+    mut fn emit_body_text(body: &MirBody, fn_sig: &str, param_count: i32, prologue: &str) -> str:
+        let fn_sym = body.fn_sym
+        let sig_idx = if body.anonymous_type != 0: -1 else: self.body_sig_index(fn_sym)
         let out = COut.new()
         out.write(fn_sig ++ " " ++ cc_lbrace() ++ "\n")
+        out.write(prologue)
+        out.write(self.closure_env_locals_text(body))
         let call_override_locals: Vec[i32] = Vec.new()
         let call_override_tids: Vec[i32] = Vec.new()
         for bb in 0..body.block_count():
@@ -10264,6 +10655,9 @@ impl CCodegen:
         self.prepare_global_init_bodies()
         if self.had_error != 0:
             return ""
+        self.register_closures()
+        if self.had_error != 0:
+            return ""
         self.prepare_c_type_instantiations()
         if self.had_error != 0:
             return ""
@@ -10292,6 +10686,12 @@ impl CCodegen:
         if self.mir_mod.bodies.len() as i32 > 0:
             out.write("\n")
 
+        // #1766: every closure's environment struct, owned-cell glue and
+        // prototype, before any body that creates or runs one.
+        out.write(self.emit_closure_decls())
+        if self.had_error != 0:
+            return ""
+
         // Function bodies buffer separately: emitting them discovers the fat
         // fn-value thunks, whose static definitions must precede the bodies
         // (all lowered functions already have prototypes above).
@@ -10301,6 +10701,11 @@ impl CCodegen:
                 return ""
             let body = self.mir_body_at(i as i64)
             bodies_out.write(self.emit_fn_body(body))
+            bodies_out.write("\n")
+        for ci in 0..self.closure_syms.len() as i32:
+            if self.check_interrupted() != 0:
+                return ""
+            bodies_out.write(self.emit_closure_body(ci))
             bodies_out.write("\n")
 
         out.write(self.emit_fat_thunk_defs())

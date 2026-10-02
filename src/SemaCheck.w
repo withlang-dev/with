@@ -5568,6 +5568,11 @@ impl Sema:
         let saved_generic_module_path = move self.current_module_path
         let saved_generic_module_has_ci: i32 = self.current_module_has_ci
         self.update_fn_source_context(fn_name, fn_node)
+        // #1766: the instance's code is declared where its template is.
+        if not self.specialization_source_paths.contains(mono_sym):
+            let template_path = self.fn_symbol_source_path(fn_name)
+            if template_path.len() > 0:
+                self.specialization_source_paths.insert(mono_sym, template_path)
 
         let tp_count = tp_syms.len() as i32
 
@@ -13086,6 +13091,17 @@ impl Sema:
         let di = self.find_decl_index(fn_node)
         if di >= 0 and di < self.decl_source_paths.len() as i32:
             return with_str_clone_ref(self.decl_source_paths[di])
+        ""
+
+    // The module whose code a body runs: a named function's declaring
+    // module, or for a specialization its template's (#1766); "" when
+    // neither is recorded.
+    fn fn_body_source_path(fn_sym: i32) -> str:
+        let declared = self.fn_symbol_source_path(fn_sym)
+        if declared.len() > 0:
+            return declared
+        if self.specialization_source_paths.contains(fn_sym):
+            return with_str_clone_ref(self.specialization_source_paths.get(fn_sym).unwrap())
         ""
 
     fn fn_symbol_is_tool_comptime_allowed(fn_sym: i32) -> i32:

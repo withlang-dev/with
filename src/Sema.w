@@ -1571,6 +1571,12 @@ pub type Sema {
     generic_subst_param_syms: Vec[i32],
     generic_subst_type_ids: Vec[i32],
     generic_specialization_cache: HashMap[str, i32],
+    // The declaring module of each specialization's template, by mono
+    // symbol (#1766): a `__sema__` symbol has no declaration node of its
+    // own, and a backend resolving a name in its body frozen (a C emitter's
+    // `sizeof[PullCore]` in gen_pull's instance) needs the module that
+    // declared the code, not the module that instantiated it.
+    specialization_source_paths: HashMap[i32, str],
     // Concrete generic bodies are checked during Sema, then rechecked/lowered
     // into MIR before freeze. Codegen consumes those bodies; it must never
     // reopen Sema. Parallel descriptor arrays are indexed by
@@ -2629,6 +2635,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let ephemeral_task_binding_nodes = sema_new_map_i32_i32()
     let typed_dump_seen_nodes = sema_new_map_i32_i32()
     let generic_specialization_cache = sema_new_map_str_i32()
+    let specialization_source_paths: HashMap[i32, str] = HashMap.new()
     let generic_inst_cache = sema_new_map_i64_i32()
     let layout_size_cache: HashMap[i32, i64] = HashMap.new()
     let layout_align_cache: HashMap[i32, i64] = HashMap.new()
@@ -3133,6 +3140,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         generic_subst_param_syms: Vec.new(),
         generic_subst_type_ids: Vec.new(),
         generic_specialization_cache,
+        specialization_source_paths,
         concrete_specialization_by_sym: sema_new_map_i32_i32(),
         concrete_specialization_nodes: Vec.new(),
         concrete_specialization_syms: Vec.new(),
