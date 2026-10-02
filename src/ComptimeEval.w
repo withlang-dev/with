@@ -2996,18 +2996,6 @@ impl ComptimeEvaluator:
             if arg_count != 0:
                 return self.fail(node, "Vec[u8].len() takes no arguments")
             return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i64 as i32), recv_value.text.len()))
-        if method == "get":
-            if arg_count != 1:
-                return self.fail(node, "Vec[u8].get() expects exactly one argument")
-            let index_signal = self.eval_expr(self.ast.get_extra(extra_start))
-            if index_signal.kind != ComptimeControlKind.CTL_VALUE:
-                return index_signal
-            if comptime_value_is_intlike(index_signal.value) == 0:
-                return self.fail(node, "Vec[u8].get() index must be an integer")
-            let index = comptime_value_intlike(index_signal.value)
-            if index < 0 or index >= recv_value.text.len():
-                return self.fail(node, "Vec[u8].get() index out of bounds in comptime")
-            return comptime_control_value(comptime_value_int(self.sema.ty_u8 as i32, (recv_value.text[index] as i64) & 255))
         if method == "push":
             if arg_count != 1:
                 return self.fail(node, "Vec[u8].push() expects exactly one argument")
@@ -6720,6 +6708,12 @@ impl ComptimeEvaluator:
             // `& 255`: a byte is 0..255 whatever the host compiler that built
             // this evaluator did to the widening (the pre-#1017 seed
             // sign-extended it).
+            return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_u8 as i32), (base.text[index] as i64) & 255))
+        // A Vec[u8] the evaluator holds as bytes (ToolFs.read_binary,
+        // StringBuilder.bytes): `xs[i]` is its one element spelling (D71).
+        if base.kind == ComptimeValueKind.CV_BYTES:
+            if index < 0 or index >= base.text.len():
+                return self.fail(node, "comptime Vec[u8] index out of bounds")
             return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_u8 as i32), (base.text[index] as i64) & 255))
         self.fail(node, "comptime index requires an array, tuple, vec, or str")
 
