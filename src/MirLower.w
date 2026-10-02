@@ -1246,9 +1246,17 @@ impl MirBuilder:
         if drop_kind == DropKind.DK_STORAGE:
             self.body.push_stmt(self.cur_bb, StmtKind.StorageDead, local_id, 0, 0)
             return
+        // A task or scope handle is owned storage (`schedule_drop` recorded it
+        // in `owned_cleanup_locals`) whose release is a runtime call, not a
+        // Drop statement. The call that consumes the handle — detach-cancel,
+        // the cleanup await, the scope destroy — takes it by `move`, so the
+        // MIR records the transfer and the ownership validator reads it (D65:
+        // MirLower decides where the value goes; the validator never infers a
+        // consumption from an intrinsic's name). The settle calls that only
+        // observe the handle (cancel, join-all, await-all) keep `copy`.
         if drop_kind == DropKind.DK_TASK_DETACHED:
             let task_place = self.place_for_local(local_id)
-            let task_op = self.body.new_operand(OperandKind.OK_COPY, task_place)
+            let task_op = self.body.new_operand(OperandKind.OK_MOVE, task_place)
             self.emit_handle_call(task_op, MirIntrinsic.FIBER_DETACH_CANCEL, 0)
             self.body.push_stmt(self.cur_bb, StmtKind.StorageDead, local_id, 0, 0)
             return
@@ -1257,7 +1265,7 @@ impl MirBuilder:
             let cancel_op = self.body.new_operand(OperandKind.OK_COPY, cancel_place)
             self.emit_handle_call(cancel_op, MirIntrinsic.FIBER_CANCEL, 0)
             let await_place = self.place_for_local(local_id)
-            let await_op = self.body.new_operand(OperandKind.OK_COPY, await_place)
+            let await_op = self.body.new_operand(OperandKind.OK_MOVE, await_place)
             self.lower_cleanup_await(await_op, 0)
             self.body.push_stmt(self.cur_bb, StmtKind.StorageDead, local_id, 0, 0)
             return
@@ -1275,7 +1283,7 @@ impl MirBuilder:
             let destroy = if is_async: MirIntrinsic.SCOPE_DESTROY else: MirIntrinsic.THREAD_SCOPE_DESTROY
             let settle_op = self.body.new_operand(OperandKind.OK_COPY, scope_place)
             self.emit_handle_call(settle_op, settle, 0)
-            let destroy_op = self.body.new_operand(OperandKind.OK_COPY, scope_place)
+            let destroy_op = self.body.new_operand(OperandKind.OK_MOVE, scope_place)
             self.emit_handle_call(destroy_op, destroy, 0)
             self.body.push_stmt(self.cur_bb, StmtKind.StorageDead, local_id, 0, 0)
             return
