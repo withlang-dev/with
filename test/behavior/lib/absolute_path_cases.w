@@ -17,7 +17,12 @@ fn accepted_paths(mode: &str):
     p7_write(case_dir, "src/input.txt", "input")
     let action = "use std.build\nfn generate(ctx: ActionCtx) -> i32:\n    let fs = ctx.fs()\n    let root = ctx.project_info().project_root()\n    let input = root ++ \"/src/input.txt\"\n    assert(fs.read_text(input) == \"input\")\n    assert(fs.exists(input))\n    assert(fs.read_text(root ++ \"/src/./input.txt\") == \"input\")\n    assert(fs.write_text(root ++ \"/\" ++ ctx.output(), \"result\") == 0)\n    assert(fs.read_text(ctx.output()) == \"result\")\n    0\npub fn build(ctx: BuildCtx) -> Build:\n    var build = ctx.new_build()\n    var target = target_new(.Action, \"generate\", \"\").input(\"src/input.txt\").output(\"out/result.txt\")\n    target.action = generate\n    build = build.add_target(move target)\n    build.default(\"generate\")\n"
     p7_write(case_dir, "build.w", action)
-    p7_assert_success(p7_run(case_dir, "action_absolute_paths", p7_build_args()), "absolute paths inside project")
+    // The capture label is per mode: the two files that share this case run
+    // in the same test batch, and a label names one capture directory that
+    // each p7_run removes and recreates. Shared, the sibling's removal landed
+    // between this run's mkdir and its child's open of stdout.txt, and the
+    // child died with 127 and nothing captured.
+    p7_assert_success(p7_run(case_dir, "action_absolute_paths_" ++ mode, p7_build_args()), "absolute paths inside project (" ++ mode ++ ")")
     p7_assert_file_contains(case_dir, "out/result.txt", "result")
 
 pub fn run_mode(mode: &str):

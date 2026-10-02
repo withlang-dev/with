@@ -152,6 +152,11 @@ pub fn p7_build_target_no_deps_args(target: &str) -> str:
 pub fn p7_assert_success(result: &P7Run, label: &str):
     if result.rc != 0:
         print(f"FAILED [{label}]: rc={result.rc}")
+        // 127 is the child before exec (rt posix spawn): its stdout or
+        // stderr capture file could not be opened, its cwd was missing, or
+        // the compiler path did not exec. Nothing was captured either way.
+        if result.rc == 127:
+            print("the child never started: a capture file, the case directory or the compiler path was missing")
         print("stdout:\n" ++ result.stdout)
         print("stderr:\n" ++ result.stderr)
     assert(result.rc == 0)
