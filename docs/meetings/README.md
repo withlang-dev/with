@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D82 — A destructor runs after an explicit field vacate; the vacated field is its empty value; the storage sentinel is not a disarm](2026-10-01-D82-a-drop-runs-after-an-explicit-field-vacate-the-field-is-its-empty-value.md)
 - [D81 — Zero dependencies: the compiler carries its SDK per platform; applications bring their own dependencies](2026-09-29-D81-zero-dependencies-the-compiler-carries-its-sdk-per-platform.md)
 - [D80 — SIMD masks and lane selection: `m.select(a, b)`, broadcast on every lane-wise operator, mask operators, `W = 128`](2026-09-29-D80-simd-masks-and-lane-selection-m-select-broadcast-on-every-lane-wise-operator.md)
 - [D79 — A bundle function's global writes are a declared, checked `writes` clause, never an inferred interface fact](2026-09-29-D79-a-bundle-function-s-global-writes-are-a-declared-checked-writes-clause.md)
