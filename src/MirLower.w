@@ -16765,8 +16765,8 @@ impl MirBuilder:
                 // harmless without a destructor.
                 if self.sema.type_needs_drop_frozen(f_ty) != 0:
                     self.consume_moved_operand(f_op)
-            if self.sema.type_decl_nodes.contains(sl_name_sym):
-                let sl_td_node: i32 = self.sema.type_decl_nodes.get(sl_name_sym).unwrap()
+            if self.sema.struct_literal_decl_node(sl_name_sym, sl_struct_ty) != 0:
+                let sl_td_node: i32 = self.sema.struct_literal_decl_node(sl_name_sym, sl_struct_ty)
                 let sl_td_extra = self.ast.get_data1(sl_td_node)
                 let sl_td_packed = self.ast.get_data2(sl_td_node)
                 if type_decl_sub_kind(sl_td_packed) == TypeDeclKind.Struct:

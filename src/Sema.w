@@ -898,6 +898,12 @@ pub type Sema {
     impl_extra_is_std: Vec[i32],
     type_decl_nodes_by_tid: HashMap[i32, i32],
     type_tid_is_std: HashMap[i32, i32],
+    // #751 / #1745: the template declaration (its TY_STRUCT/TY_ENUM tid) a
+    // generic instance was made from — identity, not the short name, since
+    // a user `type PullCore` beside std.task's `PullCore[G]` shares the
+    // symbol. Recorded by resolve_generic_type and carried through
+    // substitution; read by generic_inst_template_tid.
+    generic_inst_templates: HashMap[i32, i32],
     type_sym_tier_mask: HashMap[i32, i32],
     // Generic inst impls: impl Trait for Type[Args]
     // Key: pair(type_id, trait_sym) → 1
@@ -2787,6 +2793,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         impl_extra_is_std: Vec.new(),
         type_decl_nodes_by_tid: HashMap.new(),
         type_tid_is_std: HashMap.new(),
+        generic_inst_templates: HashMap.new(),
         type_sym_tier_mask: HashMap.new(),
         impl_starts: Vec.new(),
         impl_counts: Vec.new(),
@@ -5651,7 +5658,10 @@ impl Sema:
             gi_args.push(gi_arg_tid as i32)
         if self.validate_atomic_payload_type(gi_base_sym, &gi_args, gi_arg_count, node) == 0:
             return 0
-        self.ensure_generic_inst_type(gi_base_sym, gi_args, gi_arg_count) as i32
+        let inst = self.ensure_generic_inst_type(gi_base_sym, gi_args, gi_arg_count) as i32
+        if inst != 0 and gi_base_tid != 0 and not self.generic_inst_templates.contains(inst):
+            self.generic_inst_templates.insert(inst, gi_base_tid)
+        inst
 
     // The inst accessors are kind-guarded: reading base/count/args from a
     // NON-inst type returned whatever number lived in its d-slots — garbage
@@ -5662,6 +5672,38 @@ impl Sema:
         if self.get_type_kind(tid as TypeId) != TypeKind.TY_GENERIC_INST:
             return 0
         self.get_type_d0(tid)
+
+    // The template declaration's tid of a generic instance (#751, #1745):
+    // the one recorded when the instance was resolved, else the symbol's
+    // template as reflection finds it (an instance minted without a type
+    // expression — an intrinsic's result, a builtin container).
+    fn generic_inst_template_tid(tid: i32) -> i32:
+        let resolved = self.resolve_alias(tid as TypeId) as i32
+        if self.get_type_kind(resolved as TypeId) != TypeKind.TY_GENERIC_INST:
+            return 0
+        if self.generic_inst_templates.contains(resolved):
+            return self.generic_inst_templates.get(resolved).unwrap()
+        self.type_reflection_base_template(self.get_type_d0(resolved))
+
+    // The declaring node of a generic instance's template: by the recorded
+    // template's identity first; the flat symbol-keyed map (the newest
+    // declaration of that name in any module) only for an instance with no
+    // recorded template.
+    fn generic_inst_decl_node(tid: i32) -> i32:
+        let resolved = self.resolve_alias(tid as TypeId) as i32
+        let template = self.generic_inst_template_tid(resolved)
+        if template != 0:
+            let template_resolved = self.resolve_alias(template as TypeId) as i32
+            if self.type_decl_nodes_by_tid.contains(template_resolved):
+                return self.type_decl_nodes_by_tid.get(template_resolved).unwrap()
+        var base_sym = self.get_generic_inst_base(resolved)
+        if base_sym == 0:
+            return 0
+        if not self.type_decl_nodes.contains(base_sym):
+            let canonical = self.canonical_symbol_by_text(base_sym)
+            if canonical != 0 and self.type_decl_nodes.contains(canonical):
+                base_sym = canonical
+        if self.type_decl_nodes.contains(base_sym): self.type_decl_nodes.get(base_sym).unwrap() else: 0
 
     fn get_generic_inst_arg_count(tid: i32) -> i32:
         if self.get_type_kind(tid as TypeId) != TypeKind.TY_GENERIC_INST:
@@ -5956,7 +5998,11 @@ impl Sema:
                 if subbed != orig: changed = 1
                 sub_args.push(subbed)
             if changed == 0: return tid
-            return self.ensure_generic_inst_type(d0, sub_args, gi_ac) as i32
+            let subbed_inst = self.ensure_generic_inst_type(d0, sub_args, gi_ac) as i32
+            // The substituted instance is of the same declaration.
+            if subbed_inst != 0 and self.generic_inst_templates.contains(tid) and not self.generic_inst_templates.contains(subbed_inst):
+                self.generic_inst_templates.insert(subbed_inst, self.generic_inst_templates.get(tid).unwrap())
+            return subbed_inst
         // TypeKind.TY_PTR / TypeKind.TY_REF: substitute pointee
         if kind == TypeKind.TY_PTR or kind == TypeKind.TY_REF:
             let pointee = d0

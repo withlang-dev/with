@@ -2348,7 +2348,7 @@ impl CCodegen:
         let base_name = self.generic_inst_base_name(resolved as i32)
         if base_name == "Vec" or base_name == "HashMap" or base_name == "HashSet" or base_name == "SlotMap":
             return false
-        let base_tid = self.sema.type_reflection_base_template(self.sema.get_generic_inst_base(resolved as i32))
+        let base_tid = self.sema.generic_inst_template_tid(resolved as i32)
         base_tid != 0 and self.sema.get_type_kind(self.sema.resolve_alias(base_tid as TypeId)) == TypeKind.TY_STRUCT
 
     // std's `Box[T]` is the pointer to its T, as it is for Sema, MIR (a Box

@@ -298,12 +298,14 @@ unsafe fn pull_yield[T](head: *mut PullHeader, x: T) -> bool:
 pub fn gen_pull[T, G: Gen[T]](g: G) -> Pulled[T]:
     // The coroutine takes the generator out of the cell and consumes it.
     let run = (arg: *mut u8) => unsafe {
-        let held = (*(arg as *mut PullCore[G])).source
+        var cell = *(arg as *mut PullCore[G])
+        let held = move cell.source
         held.each(x => pull_yield(arg as *mut PullHeader, x))
     }
     // A generator that never ran is still in the cell when the Pulled drops.
     let drop_gen = (arg: *mut u8) => unsafe {
-        let held = (*(arg as *mut PullCore[G])).source
+        var cell = *(arg as *mut PullCore[G])
+        let held = move cell.source
         drop(held)
     }
     let core = with_alloc(sizeof[PullCore[G]]() as i64) as *mut PullCore[G]

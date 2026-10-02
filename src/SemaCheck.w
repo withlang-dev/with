@@ -10421,7 +10421,7 @@ impl Sema:
     // collection's body formats the user's element type), so the lookup
     // cannot depend on which names that module imports.
     fn debug_fmt_template(resolved: i32) -> i32:
-        let base_tid = self.type_reflection_base_template(self.get_generic_inst_base(resolved))
+        let base_tid = self.generic_inst_template_tid(resolved)
         if base_tid == 0: 0 else: self.resolve_alias(base_tid as TypeId) as i32
 
     fn debug_fmt_generic_struct(resolved: i32) -> bool:
@@ -13850,6 +13850,36 @@ impl Sema:
             self.gen_pull_view_nodes.insert(node, 1)
         ret
 
+    // §13.4 (#1732): the element a Pulled yields is as ephemeral as the
+    // Pulled. `next()` on a pulled iterator that carries a generator's view
+    // origins (the `g.pull()` call above) returns an element viewing them
+    // when the element type holds views. The Pulled's body cannot say so —
+    // the element crosses the coroutine through a raw slot — so the call
+    // carries the receiver's origins, as the `g.pull()` call carried the
+    // generator's.
+    mut fn note_pulled_next_view_origins(node: i32, recv: i32, method_fn_sym: i32, ret_ty: i32):
+        if recv == 0 or ret_ty == 0 or not self.pool_resolve(method_fn_sym).ends_with("next"):
+            return
+        let recv_ty = self.recorded_expr_type_or_zero(recv)
+        if recv_ty == 0 or self.type_is_std_pulled_inst(recv_ty) == 0:
+            return
+        if self.type_is_ephemeral_value(ret_ty) == 0 or self.type_is_ephemeral_value(recv_ty) == 0:
+            return
+        var deps: Vec[i32] = Vec.new()
+        deps = self.collect_expr_view_deps(recv, move deps)
+        let mask = self.compute_expr_view_origin_mask(recv)
+        if deps.len() == 0 and mask == 0:
+            return
+        self.set_expr_view_deps(node, mask, deps)
+
+    // std.task's `Pulled[T]`, by the instance's recorded declaration.
+    fn type_is_std_pulled_inst(tid: i32) -> i32:
+        let resolved = self.resolve_alias(tid as TypeId) as i32
+        if self.get_type_kind(resolved as TypeId) != TypeKind.TY_GENERIC_INST or self.pool_resolve(self.get_type_d0(resolved)) != "Pulled":
+            return 0
+        let template = self.resolve_alias(self.generic_inst_template_tid(resolved) as TypeId) as i32
+        if self.type_tid_is_std.contains(template): self.type_tid_is_std.get(template).unwrap() else: 0
+
     // D69 (§13.4 Pulling): next() returns an element its caller keeps and
     // resumes the generator on its own fiber, so a generator that yields a
     // view of its own locals, or whose body may suspend (§14.3), cannot be
@@ -15534,8 +15564,10 @@ impl Sema:
             let gi_base_raw = self.get_type_d0(resolved)
             let gi_base_canonical = self.canonical_symbol_by_text(gi_base_raw)
             let gi_base_sym = if self.type_decl_nodes.contains(gi_base_raw): gi_base_raw else: gi_base_canonical
-            if self.type_decl_nodes.contains(gi_base_sym):
-                let td_node: i32 = self.type_decl_nodes.get(gi_base_sym).unwrap()
+            // The instance's own declaration (#1745): a user `type PullCore`
+            // must not answer for std.task's `PullCore[G]` inside std's body.
+            let td_node = self.generic_inst_decl_node(resolved as i32)
+            if td_node != 0:
                 let td_extra = self.ast.get_data1(td_node)
                 let td_packed = self.ast.get_data2(td_node)
                 if type_decl_sub_kind(td_packed) == TypeDeclKind.Struct:
@@ -16858,6 +16890,11 @@ impl Sema:
             let resolved = self.resolve_alias(tid as TypeId) as i32
             if self.type_decl_nodes_by_tid.contains(resolved):
                 return self.type_decl_nodes_by_tid.get(resolved).unwrap()
+            // A generic instance names its own template (#1745).
+            if self.get_type_kind(resolved as TypeId) == TypeKind.TY_GENERIC_INST:
+                let gi_node = self.generic_inst_decl_node(resolved)
+                if gi_node != 0:
+                    return gi_node
         if self.type_decl_nodes.contains(name):
             return self.type_decl_nodes.get(name).unwrap()
         0
@@ -17668,7 +17705,7 @@ impl Sema:
         if tk == TypeKind.TY_STRUCT:
             return self.get_type_d2(r)
         if tk == TypeKind.TY_GENERIC_INST:
-            let base_tid = self.type_reflection_base_template(self.get_generic_inst_base(r as i32))
+            let base_tid = self.generic_inst_template_tid(r as i32)
             if base_tid != 0 and self.get_type_kind(self.resolve_alias(base_tid as TypeId)) == TypeKind.TY_STRUCT:
                 return self.get_type_d2(self.resolve_alias(base_tid as TypeId))
         -1
@@ -25147,6 +25184,7 @@ impl Sema:
             // identical to effect propagation so Option[&T] retains its concrete
             // collection origin at the caller (D22 Rule 10).
             self.record_call_view_origins(node, concrete_sig, recv_param_offset, receiver, extra_start, arg_count, self.has_resolved_call_args(node))
+            self.note_pulled_next_view_origins(node, receiver, method_fn_sym, ret_ty)
             self.note_sig_call_global_effects(node, concrete_sig, recv_param_offset, receiver, extra_start, arg_count, self.has_resolved_call_args(node))
             self.record_generator_call_ref_origins(node, concrete_sig, recv_param_offset, receiver, extra_start, arg_count, self.has_resolved_call_args(node))
         if ret_ty != 0:
@@ -27342,14 +27380,18 @@ impl Sema:
     // Maps each type param name → concrete type arg from the generic instance.
     // Returns 1 on success, 0 on failure (missing type decl, param mismatch, etc).
     mut fn setup_generic_inst_substitution(gi_tid: i32, type_sym: i32) -> i32:
-        var decl_sym = type_sym
-        if not self.type_decl_nodes.contains(decl_sym):
-            let canonical = self.canonical_symbol_by_text(type_sym)
-            if canonical != 0 and self.type_decl_nodes.contains(canonical):
-                decl_sym = canonical
-        if not self.type_decl_nodes.contains(decl_sym):
-            return 0
-        let td_node: i32 = self.type_decl_nodes.get(decl_sym).unwrap()
+        // The instance's own declaration (#1745); the symbol only names a
+        // declaration for an instance that recorded none.
+        var td_node = self.generic_inst_decl_node(gi_tid)
+        if td_node == 0:
+            var decl_sym = type_sym
+            if not self.type_decl_nodes.contains(decl_sym):
+                let canonical = self.canonical_symbol_by_text(type_sym)
+                if canonical != 0 and self.type_decl_nodes.contains(canonical):
+                    decl_sym = canonical
+            if not self.type_decl_nodes.contains(decl_sym):
+                return 0
+            td_node = self.type_decl_nodes.get(decl_sym).unwrap()
         let td_extra_start = self.ast.get_data1(td_node)
         let td_packed = self.ast.get_data2(td_node)
         let td_tp_start = self.type_decl_tp_start(td_node)
@@ -29404,8 +29446,7 @@ impl Sema:
         if tk == TypeKind.TY_STRUCT:
             return self.get_type_d2(resolved)
         if tk == TypeKind.TY_GENERIC_INST:
-            let base_sym = self.get_generic_inst_base(resolved as i32)
-            let base_tid = self.type_reflection_base_template(base_sym)
+            let base_tid = self.generic_inst_template_tid(resolved as i32)
             if base_tid != 0:
                 if self.get_type_kind(self.resolve_alias(base_tid as TypeId)) == TypeKind.TY_STRUCT:
                     return self.get_type_d2(self.resolve_alias(base_tid as TypeId))
@@ -29449,8 +29490,7 @@ impl Sema:
                 return 0
             return self.type_extra[(te_start + field_index * 3)]
         if tk == TypeKind.TY_GENERIC_INST:
-            let base_sym = self.get_generic_inst_base(resolved as i32)
-            let base_tid = self.type_reflection_base_template(base_sym)
+            let base_tid = self.generic_inst_template_tid(resolved as i32)
             if base_tid != 0:
                 let base_resolved = self.resolve_alias(base_tid as TypeId)
                 if self.get_type_kind(base_resolved) == TypeKind.TY_STRUCT:
