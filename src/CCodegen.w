@@ -7977,7 +7977,23 @@ impl CCodegen:
         let kind = self.ast.kind(type_node)
         if kind == NodeKind.NK_IDENT or kind == NodeKind.NK_TYPE_NAMED:
             return cc_intern_resolve(self.intern, self.ast.get_data0(type_node))
+        // `sizeof[PullCore[G]]` parses as an index expression, which the
+        // type renderer does not spell.
+        if kind == NodeKind.NK_INDEX:
+            var text = self.type_arg_text(self.ast.get_data0(type_node)) ++ "[" ++ self.type_arg_text(self.ast.get_data1(type_node))
+            if self.ast.get_data2(type_node) != 0:
+                text = text ++ ", " ++ self.type_arg_text(self.ast.get_data2(type_node))
+            return text ++ "]"
         render_type_expr(self.ast, self.intern, type_node as NodeId)
+
+    // The named function whose module and substitution a body runs under:
+    // itself, or for a closure body the function it sits in, through any
+    // enclosing closures (#1766).
+    fn body_owner_sym(fn_sym: i32) -> i32:
+        var owner = fn_sym
+        while self.closure_index_by_sym.contains(owner):
+            owner = self.closure_parents[self.closure_index_by_sym.get(owner).unwrap()]
+        owner
 
     fn generic_call_type_arg_node(body: &MirBody, args_id: i32) -> i32:
         let call_node = body.call_ast_node(args_id)
@@ -9018,9 +9034,19 @@ impl CCodegen:
                 if call_intr == MirIntrinsic.GENERIC_CALL:
                     // sizeof[T]()/alignof[T]() may name a type no local ever
                     // carries; the emitted C sizeof needs its definition.
+                    // Resolved as the body's emission will resolve it: from
+                    // the owning function's module, under the instance's
+                    // substitution (#1766).
                     let ga_type_node = self.generic_call_type_arg_node(body, args_id)
                     if ga_type_node != 0:
+                        let ga_owner = self.body_owner_sym(body.fn_sym)
+                        let saved_module = move self.sema.current_module_path
+                        let ga_path = self.sema.fn_body_source_path(ga_owner)
+                        self.sema.current_module_path = if ga_path.len() > 0: ga_path else: with_str_clone_ref(saved_module)
+                        let ga_pushed = self.sema.push_specialization_subst(ga_owner)
                         let ga_tid = self.sema.resolve_type_level_arg_expr_frozen(ga_type_node) as i32
+                        self.sema.pop_generic_subst(ga_pushed)
+                        self.sema.current_module_path = saved_module
                         if ga_tid != 0:
                             acc = self.collect_struct_types_from_tid(move acc, ga_tid)
                     continue
@@ -10265,15 +10291,15 @@ impl CCodegen:
     // locals, then the body like any other.
     mut fn emit_closure_body(idx: i32) -> str:
         let body = self.closure_body_at(idx)
-        // Line directives and frozen name resolution follow the named
-        // function the closure sits in, through any enclosing closures.
-        var parent: i32 = self.closure_parents[idx]
-        while self.closure_index_by_sym.contains(parent):
-            parent = self.closure_parents[self.closure_index_by_sym.get(parent).unwrap()]
+        // Line directives, frozen name resolution and the instance
+        // substitution follow the named function the closure sits in,
+        // through any enclosing closures.
+        let parent = self.body_owner_sym(self.closure_parents[idx])
         self.enter_line_file(parent)
         let decl_path = self.sema.fn_body_source_path(parent)
         if decl_path.len() > 0:
             self.sema.current_module_path = decl_path
+        let pushed_subst = self.sema.push_specialization_subst(parent)
         let kind: i32 = self.closure_env_kinds[idx]
         let count = body.anonymous_capture_count
         let env = self.closure_env_struct(idx)
@@ -10300,7 +10326,9 @@ impl CCodegen:
                 let li = ci + 1
                 prologue = prologue ++ "    " ++ self.c_decl(body.local_type_ids[li], f"(*_{li})") ++ f" __attribute__((unused)) = &__with_env->c{ci};\n"
         let sig = "static " ++ self.closure_fn_sig(idx)
-        self.emit_body_text(body, sig, body.n_params, prologue)
+        let text = self.emit_body_text(body, sig, body.n_params, prologue)
+        self.sema.pop_generic_subst(pushed_subst)
+        text
 
     mut fn emit_fn_body(body: &MirBody) -> str:
         if self.check_interrupted() != 0:
@@ -10328,7 +10356,12 @@ impl CCodegen:
             self.sema.current_module_path = decl_path
         let fn_sig = self.emit_fn_decl(body)
         let param_count = if sig_idx >= 0: self.sema.sig_get_param_count(sig_idx) else: 0
-        self.emit_body_text(body, fn_sig, param_count, "")
+        // A specialization's body resolves its type parameters through the
+        // substitution Sema checked it under (`sizeof[PullCore[G]]`, #1766).
+        let pushed_subst = self.sema.push_specialization_subst(fn_sym)
+        let text = self.emit_body_text(body, fn_sig, param_count, "")
+        self.sema.pop_generic_subst(pushed_subst)
+        text
 
     // The C function over a MIR body: `fn_sig {`, `prologue` (a closure's
     // capture locals, #1766), the declaration of every local past the

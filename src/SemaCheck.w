@@ -23742,6 +23742,34 @@ impl Sema:
             return found
         0
 
+    // The substitution a monomorphized instance was checked under
+    // (register_concrete_specialization), installed for the frozen
+    // resolvers a backend runs over the instance's body: `sizeof[PullCore[G]]`
+    // in `gen_pull__sema__…` names G, which no local carries, and the
+    // LLVM backend binds the same record (set_mono_type_bindings). Returns
+    // the number of bindings pushed, for pop_generic_subst; 0 for a symbol
+    // with no record (a non-generic function). A frame still active when
+    // a frozen consumer asks is a checker leak: a stale `T` sized
+    // `Box.new[A]`'s allocation as the last instance's (#1766).
+    mut fn push_specialization_subst(mono_sym: i32) -> i32:
+        let found = self.concrete_specialization_by_sym.get(mono_sym)
+        if found.is_none():
+            return 0
+        if self.generic_subst_param_syms.len() as i32 != 0:
+            sema_phase_bug("BUG: a generic substitution frame is still active at a frozen specialization body")
+        let idx: i32 = found.unwrap()
+        let start = self.concrete_specialization_subst_starts[idx]
+        let count = self.concrete_specialization_subst_counts[idx]
+        for ti in 0..count:
+            self.generic_subst_param_syms.push(self.concrete_specialization_subst_syms[start + ti])
+            self.generic_subst_type_ids.push(self.concrete_specialization_subst_types[start + ti])
+        count
+
+    mut fn pop_generic_subst(count: i32):
+        for _ in 0..count:
+            let _ = self.generic_subst_param_syms.pop()
+            let _ = self.generic_subst_type_ids.pop()
+
     mut fn put_generic_subst(param_sym: i32, tid: i32, node: i32) -> Unit:
         if tid == 0:
             return
