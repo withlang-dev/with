@@ -20300,6 +20300,13 @@ impl Sema:
         if not sema_iter_adapter_name(name):
             return 0
         let resolved = self.auto_deref_method_type(recv_type as TypeId, method, 0, 0)
+        // A built-in iterator (VecIter, the intrinsic adapter types) declares
+        // `next()` in std too, but its adapters are the compiler's intrinsics
+        // (builtin_intrinsic_method_return_type), with their own diagnostics
+        // (`unsupported collect target`) and lowering: this dispatch is only
+        // for a receiver that has no intrinsic adapter.
+        if self.iterator_owner_symbol(resolved as i32) != 0:
+            return 0
         var owner = self.method_owner_symbol_for_type(resolved as i32)
         if owner == 0:
             return 0
