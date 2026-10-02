@@ -3386,7 +3386,19 @@ fn bs_compile_emit_c_output(ctx: &ActionCtx, root: &str, case_dir: &str, c_path:
 
 // The host C compiler's arguments over one emitted unit and the runtime
 // objects. `libm` links libm on Linux (hello, with no prelude, never has).
-fn bs_emit_c_cc_args(root: &str, c_path: &str, bin: &str, platform_obj: &str, libm: bool) -> Vec[str]:
+// The native plan links the fiber runtime when the program's objects
+// reference a with_fiber_ or with_channel_ symbol, and the stubs otherwise
+// (src/compiler/Link.w link_stage_undefined_symbols_need_fiber_runtime).
+// The emitted C carries the same references on its call lines; its
+// `extern` declarations name symbols a program may never call. A `g.pull()`
+// linked against the stubs aborts at its first next() (#1766).
+fn bs_emit_c_needs_fiber_runtime(c_text: &str) -> bool:
+    for line in c_text.split("\n"):
+        if line.starts_with("extern "): continue
+        if line.contains("with_fiber_") or line.contains("with_channel_"): return true
+    false
+
+fn bs_emit_c_cc_args(root: &str, c_path: &str, bin: &str, platform_obj: &str, libm: bool, fibers: bool) -> Vec[str]:
     var cc_args: Vec[str] = Vec.new()
     cc_args.push(bs_c_compiler())
     cc_args.push("-O1")
@@ -3402,7 +3414,14 @@ fn bs_emit_c_cc_args(root: &str, c_path: &str, bin: &str, platform_obj: &str, li
     cc_args.push(bs_abs(root, c_path))
     cc_args.push(bs_abs(root, "out/lib/rt_core.o"))
     cc_args.push(bs_abs(root, "out/lib/" ++ platform_obj))
-    for obj in ["compat_runtime.o", "panic_runtime.o", "fiber_stubs.o", "cimport_stubs.o", "embedded_objects.o"]:
+    for obj in ["compat_runtime.o", "panic_runtime.o"]:
+        cc_args.push(bs_abs(root, "out/lib/" ++ obj))
+    if fibers:
+        for obj in ["channel_runtime.o", "fiber_runtime.o", "fiber.o", "fiber_asm.o"]:
+            cc_args.push(bs_abs(root, "out/lib/" ++ obj))
+    else:
+        cc_args.push(bs_abs(root, "out/lib/fiber_stubs.o"))
+    for obj in ["cimport_stubs.o", "embedded_objects.o"]:
         cc_args.push(bs_abs(root, "out/lib/" ++ obj))
     cc_args.push("-I")
     cc_args.push(bs_abs(root, "runtime"))
@@ -3414,7 +3433,8 @@ fn bs_emit_c_cc_args(root: &str, c_path: &str, bin: &str, platform_obj: &str, li
 fn bs_run_emit_c_compile(ctx: &ActionCtx, root: &str, case_dir: &str, c_path: &str, bin: &str, label: &str, platform_obj: &str) -> ToolProcessResult:
     let stdout_path = bs_capture_path(root, case_dir, label ++ "-compile", "stdout")
     let stderr_path = bs_capture_path(root, case_dir, label ++ "-compile", "stderr")
-    ctx.process_runner().run_capture(bs_emit_c_cc_args(root, c_path, bin, platform_obj, true), stdout_path, stderr_path, 120000)
+    let fibers = bs_emit_c_needs_fiber_runtime(ctx.fs().read_text(c_path))
+    ctx.process_runner().run_capture(bs_emit_c_cc_args(root, c_path, bin, platform_obj, true, fibers), stdout_path, stderr_path, 120000)
 
 fn bs_check_emit_c_receiver_abi(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let root = ctx.project_info().project_root()
@@ -3663,12 +3683,14 @@ fn ec_run_cases(ctx: &ActionCtx, compiler_path: &str, platform_obj: &str, cases:
             failed += 1
             report = report ++ "\n" ++ c.name ++ ": emit-c did not produce " ++ c_path
             continue
-        if c.forbid_in_c.len() > 0 and fs.read_text(c_path).contains(c.forbid_in_c):
+        let c_text = fs.read_text(c_path)
+        if c.forbid_in_c.len() > 0 and c_text.contains(c.forbid_in_c):
             failed += 1
             report = report ++ "\n" ++ c.name ++ ": the emitted C contains forbidden text: " ++ c.forbid_in_c
             continue
         cc_case.push(i)
-        cc_jobs.push(par_job(bs_emit_c_cc_args(root, c_path, ec_bin(c), platform_obj, c.libm), bs_capture_path(root, c.dir, "compile", "stdout"), bs_capture_path(root, c.dir, "compile", "stderr"), 120000))
+        let fibers = bs_emit_c_needs_fiber_runtime(c_text)
+        cc_jobs.push(par_job(bs_emit_c_cc_args(root, c_path, ec_bin(c), platform_obj, c.libm, fibers), bs_capture_path(root, c.dir, "compile", "stdout"), bs_capture_path(root, c.dir, "compile", "stderr"), 120000))
     let cc_rcs = par_run(ctx, &cc_jobs, par_width(&cc_jobs))
 
     for k in 0..cc_case.len() as i32:
