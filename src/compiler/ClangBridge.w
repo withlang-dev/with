@@ -4473,49 +4473,54 @@ pub fn with_ci_type_is_bool(session: i64, cursor_idx: i32) -> i32:
 
 // ── Cursor location and source text ─────────────────────────
 
+// One spelling of a cursor's location, shared by every location query:
+// the presumed file, line and column; a cursor with no presumed file
+// (a builtin) falls back to its file location. Source text given to
+// c_import inline is parsed from a mkstemp file; its random name is no
+// location a reader can use, made the same diagnostic differ from run
+// to run, and (when only one of two queries renamed it) made a
+// declaration's key miss its own reference. It is `<c_import source>`.
+unsafe fn session_cursor_location(s: *mut CImportSession, cursor: CXCursor) -> str:
+    let loc = clang_getCursorLocation(cursor)
+    var presumed_bits: [2]i64 = [0 as i64; 2]
+    var line_val: u32 = 0
+    var col_val: u32 = 0
+    clang_getPresumedLocation(loc, &raw mut presumed_bits as *mut [2]i64 as *mut CXString, &raw mut line_val, &raw mut col_val)
+    let presumed_file = *(&raw mut presumed_bits as *mut [2]i64 as *mut CXString)
+    var fname_str = clang_getCString(presumed_file)
+    var fallback_bits: [2]i64 = [0 as i64; 2]
+    var fallback_active = false
+    if fname_str as i64 == 0 or *fname_str == 0:
+        var file: *mut u8 = 0 as *mut u8
+        clang_getFileLocation(loc, &raw mut file, &raw mut line_val, &raw mut col_val, 0 as *mut u32)
+        if file as i64 == 0:
+            clang_disposeString(presumed_file)
+            return ""
+        let fname = clang_getFileName(file)
+        fname_str = clang_getCString(fname)
+        fallback_bits[0] = fname.data
+        fallback_bits[1] = ((fname.private_flags as u64) | ((fname.pad0 as u64) << 32)) as i64
+        fallback_active = true
+    var buf: [1024]u8 = [0 as u8; 1024]
+    var pos: i64 = 0
+    let is_inline_source = fname_str as i64 != 0 and (*s).tmp_path as i64 != 0 and c_strcmp(fname_str, (*s).tmp_path as *const u8) == 0
+    let shown_name = if is_inline_source: "<c_import source>\0" as *const u8 else: if fname_str as i64 != 0: fname_str else: "?\0" as *const u8
+    buf_append_path(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, shown_name)
+    buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, ":\0" as *const u8)
+    buf_append_i64(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, line_val as i64)
+    buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, ":\0" as *const u8)
+    buf_append_i64(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, col_val as i64)
+    if fallback_active:
+        let fallback_file = *(&raw mut fallback_bits as *mut [2]i64 as *mut CXString)
+        clang_disposeString(fallback_file)
+    clang_disposeString(presumed_file)
+    session_make_str(s, &buf as *const [1024]u8 as *const u8)
+
 pub fn with_ci_cursor_location(session: i64, cursor_idx: i32) -> str:
     unsafe:
         let s = session as *mut CImportSession
         if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return ""
-        let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
-        let loc = clang_getCursorLocation(cursor)
-        var presumed_bits: [2]i64 = [0 as i64; 2]
-        var line_val: u32 = 0
-        var col_val: u32 = 0
-        clang_getPresumedLocation(loc, &raw mut presumed_bits as *mut [2]i64 as *mut CXString, &raw mut line_val, &raw mut col_val)
-        let presumed_file = *(&raw mut presumed_bits as *mut [2]i64 as *mut CXString)
-        var fname_str = clang_getCString(presumed_file)
-        var fallback_bits: [2]i64 = [0 as i64; 2]
-        var fallback_active = false
-        if fname_str as i64 == 0 or *fname_str == 0:
-            var file: *mut u8 = 0 as *mut u8
-            clang_getFileLocation(loc, &raw mut file, &raw mut line_val, &raw mut col_val, 0 as *mut u32)
-            if file as i64 == 0:
-                clang_disposeString(presumed_file)
-                return ""
-            let fname = clang_getFileName(file)
-            fname_str = clang_getCString(fname)
-            fallback_bits[0] = fname.data
-            fallback_bits[1] = ((fname.private_flags as u64) | ((fname.pad0 as u64) << 32)) as i64
-            fallback_active = true
-        var buf: [1024]u8 = [0 as u8; 1024]
-        var pos: i64 = 0
-        // Source text given to c_import inline is parsed from a mkstemp file;
-        // its random name is no location a reader can use, and it made the
-        // same diagnostic differ from run to run.
-        let is_inline_source = fname_str as i64 != 0 and (*s).tmp_path as i64 != 0 and c_strcmp(fname_str, (*s).tmp_path as *const u8) == 0
-        let shown_name = if is_inline_source: "<c_import source>\0" as *const u8 else: if fname_str as i64 != 0: fname_str else: "?\0" as *const u8
-        buf_append_path(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, shown_name)
-        buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, ":\0" as *const u8)
-        buf_append_i64(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, line_val as i64)
-        buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, ":\0" as *const u8)
-        buf_append_i64(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, col_val as i64)
-        if fallback_active:
-            let fallback_file = *(&raw mut fallback_bits as *mut [2]i64 as *mut CXString)
-            clang_disposeString(fallback_file)
-        clang_disposeString(presumed_file)
-        session_make_str(s, &buf as *const [1024]u8 as *const u8)
-
+        session_cursor_location(s, *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor))
 // Whether the cursor names a function parameter. C adjusts an array-spelled
 // parameter (`char *argv[]`, `int v[4]`) to a pointer, while libclang still
 // reports the written array type for a reference to it.
@@ -4530,29 +4535,10 @@ pub fn with_ci_cursor_referenced_location(session: i64, cursor_idx: i32) -> str:
     unsafe:
         let s = session as *mut CImportSession
         if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return ""
-        let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
-        let referenced = clang_getCursorReferenced(cursor)
+        let referenced = clang_getCursorReferenced(*(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor))
         if clang_Cursor_isNull(referenced) != 0:
             return ""
-        let loc = clang_getCursorLocation(referenced)
-        var presumed_bits: [2]i64 = [0 as i64; 2]
-        var line_val: u32 = 0
-        var col_val: u32 = 0
-        clang_getPresumedLocation(loc, &raw mut presumed_bits as *mut [2]i64 as *mut CXString, &raw mut line_val, &raw mut col_val)
-        let presumed_file = *(&raw mut presumed_bits as *mut [2]i64 as *mut CXString)
-        let fname_str = clang_getCString(presumed_file)
-        if fname_str as i64 == 0 or *fname_str == 0:
-            clang_disposeString(presumed_file)
-            return ""
-        var buf: [1024]u8 = [0 as u8; 1024]
-        var pos: i64 = 0
-        buf_append_path(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, fname_str)
-        buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, ":\0" as *const u8)
-        buf_append_i64(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, line_val as i64)
-        buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, ":\0" as *const u8)
-        buf_append_i64(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, col_val as i64)
-        clang_disposeString(presumed_file)
-        session_make_str(s, &buf as *const [1024]u8 as *const u8)
+        session_cursor_location(s, referenced)
 
 pub fn with_ci_cursor_expansion_location(session: i64, cursor_idx: i32) -> str:
     unsafe:
