@@ -1558,6 +1558,10 @@ pub type Sema {
     generator_local_view_yields: HashMap[i32, i32],
     generator_local_view_origins: HashMap[i32, i32],
     gen_pull_nodes: Vec[i32],
+    // The `g.pull()` calls of a generator value that is ephemeral (§13.4,
+    // #1732): the pulled iterator views what the generator's view arguments
+    // view, so the call carries those origins and is an ephemeral value.
+    gen_pull_view_nodes: HashMap[i32, i32],
     // A method-call node Sema resolved to a free function that takes the
     // receiver as its first argument, by that parameter's declared mode
     // (§13.4 `g.pull()` is `gen_pull(g)`); MIR lowers the receiver as an
@@ -3132,6 +3136,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         generator_local_view_yields: sema_new_map_i32_i32(),
         generator_local_view_origins: sema_new_map_i32_i32(),
         gen_pull_nodes: Vec.new(),
+        gen_pull_view_nodes: sema_new_map_i32_i32(),
         receiver_arg_call_nodes: sema_new_map_i32_i32(),
         gen_pull_fns: Vec.new(),
         eph_task_visiting: sema_new_map_i32_i32(),

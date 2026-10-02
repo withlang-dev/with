@@ -1,36 +1,53 @@
 // std.generators — pipeline stages over Gen[T] (§13.3, §13.4, D69).
 //
 // A stage that visits elements in order takes any Gen[T] and is itself a
-// Gen: `g |> map(f) |> filter(p) |> take(n) |> collect[Vec]()`. A stage owns
-// the stage before it inside the callable that runs it, so a pipeline is as
-// lazy as the generator it starts from: nothing runs until the last stage is
-// consumed, and a stage that has what it needs (take) stops the whole chain
-// by answering false.
+// Gen: `g |> map(f) |> filter(p) |> take(n) |> collect[Vec]()`. A stage
+// holds the stage before it as a field, so a pipeline is as lazy as the
+// generator it starts from: nothing runs until the last stage is consumed,
+// and a stage that has what it needs (take) stops the whole chain by
+// answering false. A stage over a generator whose arguments are views holds
+// that ephemeral value, so it is ephemeral itself (§5.2, #1737): it is
+// consumed where its views are live and never captured by an escaping
+// closure (§12.2).
 //
 // Stages that step a sequence themselves (zip, peekable) take an Iter[T];
 // a generator gives one through `g.pull()` (std.task Pulled[T]).
 
-/// A pipeline stage: the Gen[T] that `run` produces when it is handed the
-/// consumer's body.
-pub type GenStage[T] {
-    run: fn(fn(T) -> bool) -> Unit,
-}
-
-impl[T] Gen[T] for GenStage[T]:
-    move fn each(body: fn(T) -> bool): (self.run)(body)
-
 /// `g |> map(f)`: each element of `g` passed through `f`.
-pub fn map[T, U](g: impl Gen[T], f: fn(T) -> U) -> GenStage[U]:
-    GenStage { run: move (body: fn(U) -> bool) => g.each(x => body(f(x))) }
+pub type MapStage[G, T, U] { g: G, f: fn(T) -> U }
+
+impl[G: Gen[T], T, U] Gen[U] for MapStage[G, T, U]:
+    move fn each(body: fn(U) -> bool):
+        var me = self
+        let f = move me.f
+        let g = move me.g
+        g.each(x => body(f(x)))
+
+pub fn map[T, U, G: Gen[T]](g: G, f: fn(T) -> U) -> MapStage[G, T, U]: MapStage { g, f }
 
 /// `g |> filter(p)`: the elements of `g` for which `p` holds.
-pub fn filter[T](g: impl Gen[T], pred: fn(&T) -> bool) -> GenStage[T]:
-    GenStage { run: move (body: fn(T) -> bool) => g.each(x => if pred(&x): body(x) else: true) }
+pub type FilterStage[G, T] { g: G, pred: fn(&T) -> bool }
+
+impl[G: Gen[T], T] Gen[T] for FilterStage[G, T]:
+    move fn each(body: fn(T) -> bool):
+        var me = self
+        let pred = move me.pred
+        let g = move me.g
+        g.each(x => if pred(&x): body(x) else: true)
+
+pub fn filter[T, G: Gen[T]](g: G, pred: fn(&T) -> bool) -> FilterStage[G, T]: FilterStage { g, pred }
 
 /// `g |> take(n)`: the first `n` elements of `g`; the generator stops at the
 /// yield of the n-th.
-pub fn take[T](g: impl Gen[T], n: i32) -> GenStage[T]:
-    GenStage { run: move (body: fn(T) -> bool) => take_each(g, n, body) }
+pub type TakeStage[G, T] { g: G, n: i32 }
+
+impl[G: Gen[T], T] Gen[T] for TakeStage[G, T]:
+    move fn each(body: fn(T) -> bool):
+        var me = self
+        let g = move me.g
+        take_each(g, me.n, body)
+
+pub fn take[T, G: Gen[T]](g: G, n: i32) -> TakeStage[G, T]: TakeStage { g, n }
 
 fn take_each[T](g: impl Gen[T], n: i32, body: fn(T) -> bool):
     if n <= 0:

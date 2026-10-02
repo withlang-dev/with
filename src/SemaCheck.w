@@ -7343,6 +7343,10 @@ impl Sema:
         if kind == NodeKind.NK_SLICE:
             return 1
         if kind == NodeKind.NK_CALL:
+            // §13.4 (#1732): the iterator pulled from an ephemeral generator
+            // value is as ephemeral as that value.
+            if self.gen_pull_view_nodes.contains(node):
+                return 1
             // A variant constructor call carrying an ephemeral payload
             // (`Some(f)`, rule 10) recorded its payload's origins on the
             // call; it is ephemeral as a value whatever its type says.
@@ -12403,6 +12407,14 @@ impl Sema:
                 // Only the body block's tail is the return (#1406): an inner
                 // block's tail escapes just that block's own bindings.
                 self.check_view_escape_origins(tail, tail, if node == self.body_tail_block: -1 else: block_scope_start)
+            else if tail_materializes == 0 and node != self.body_tail_block and tail_is_value != 0 and (self.type_is_ephemeral_value(tail_type as i32) != 0 or self.expr_is_ephemeral_value(tail) != 0):
+                // An inner block's tail that is an ephemeral VALUE — a stage
+                // over a generator viewing the block's `v`, a view-holding
+                // struct — leaves the block exactly as a tail view does: its
+                // origins declared inside the block die at its end (#1737:
+                // `let s = { let v = …; over(&v) |> map(f) }` ran over freed
+                // storage).
+                self.check_view_escape_origins(tail, tail, block_scope_start)
             else if tail_materializes == 0 and (self.type_is_ephemeral_value(tail_type as i32) != 0 or self.expr_is_ephemeral_value(tail) != 0) and tail_is_value != 0 and self.stmt_pos_depth == 0 and self.current_return_type != 0 and self.current_return_type != self.ty_void:
                 // #625 (decisions.md D2): a tail-position return of an ephemeral value
                 // (struct or container) is escape-checked HERE, in-scope, while the
@@ -13262,6 +13274,10 @@ impl Sema:
             if ty > 0:
                 let tk = self.get_type_kind(self.resolve_alias(ty as TypeId))
                 // A callable parameter is a view of itself (§12.4, #1698).
+                // A by-value parameter of an ephemeral type is an origin
+                // through the parameter mask (compute_expr_view_origin_mask),
+                // never a local dep: its views are the caller's, its own
+                // storage dies with the call (#1737).
                 if tk == TypeKind.TY_REF or self.callable_param_is_view(sym, ty):
                     out = self.push_unique_i32(move out, sym)
             return out
@@ -13785,9 +13801,6 @@ impl Sema:
         if arg_count != 0:
             self.emit_error(f"g.pull() takes no arguments, found {arg_count}", node)
             return 0
-        if self.type_is_ephemeral_value(gen_ty as TypeId) != 0:
-            self.emit_error("g.pull() of a generator whose arguments are views is not implemented yet (#1732): the pulled iterator would have to be as ephemeral as the generator value; consume the generator with `for`", node)
-            return 0
         let fn_sym = self.pool_lookup_symbol("gen_pull")
         let fn_node = self.generic_fn_node_for_symbol(fn_sym)
         if fn_node == 0 or not self.fn_symbol_source_path(fn_sym).ends_with("std/task.w"):
@@ -13809,6 +13822,21 @@ impl Sema:
         self.typed_expr_types.insert(node, ret)
         self.gen_pull_nodes.push(node)
         self.gen_pull_fns.push(self.generator_state_fns.get(gen_ty).unwrap())
+        // §13.4, §5.3 (#1732): a generator whose arguments are views is an
+        // ephemeral value, and the iterator pulled from it runs that
+        // generator — an iterator over borrowed data. The Pulled's type
+        // cannot say so (its generator is behind a raw pointer), so the
+        // call carries the generator value's origins: its deps, and the
+        // value's own storage when it is a place (a binding holding the
+        // generator), as record_call_view_origins does for an escaping
+        // view parameter.
+        if self.type_is_ephemeral_value(gen_ty as TypeId) != 0:
+            var deps: Vec[i32] = Vec.new()
+            deps = self.collect_expr_view_deps(recv, move deps)
+            if deps.len() == 0 or self.expr_type_is_value(recv):
+                deps = self.push_unique_i32(move deps, self.place_root_sym(recv))
+            self.set_expr_view_deps(node, self.compute_expr_view_origin_mask(recv), deps)
+            self.gen_pull_view_nodes.insert(node, 1)
         ret
 
     // D69 (§13.4 Pulling): next() returns an element its caller keeps and
@@ -13996,7 +14024,11 @@ impl Sema:
             for origin_pi in 0..param_count:
                 if sema_param_origin_mask_contains(param_origin_mask, origin_pi) == 0:
                     continue
-                if self.param_type_is_by_value(self.sig_param_type(sig_idx, origin_pi)) != 0:
+                // A by-value parameter is no origin — unless its type is
+                // ephemeral: the value holds views, and the result that
+                // views the parameter views what the argument did (#1737).
+                let origin_param_ty = self.sig_param_type(sig_idx, origin_pi)
+                if self.param_type_is_by_value(origin_param_ty) != 0 and self.type_is_ephemeral_value(origin_param_ty) == 0:
                     continue
                 var origin_arg = 0
                 if param_offset == 1 and origin_pi == 0:
@@ -20154,6 +20186,7 @@ impl Sema:
         for pi in 0..arg_count:
             if pi < param_count and pi != arg_index and arg_types[pi] != 0:
                 self.bind_type_params_from_type_expr(self.ast.fn_param_type(param_start, pi), arg_types[pi], tp_start, tp_count, call_node)
+        self.bind_type_params_from_bounds(tp_start, tp_count, call_node)
         let fp_start = self.ast.get_data0(p_node)
         let fp_count = self.ast.get_data1(p_node)
         let ret_node = self.ast.get_data2(p_node)
@@ -23047,6 +23080,7 @@ impl Sema:
         self.clear_generic_substitution()
         for pi in 0..arg_count:
             self.bind_type_params_from_type_expr(self.ast.fn_param_type(param_start, pi), arg_types[pi], tp_start, tp_count, call_node)
+        self.bind_type_params_from_bounds(tp_start, tp_count, call_node)
         self.ensure_generic_substitutions(tp_start, tp_count, param_start, param_count, call_node)
 
         var matches = if self.diags.items.len() as i32 == saved_diag_count: 1 else: 0
@@ -23207,6 +23241,7 @@ impl Sema:
             if arg_ty != 0 and self.type_is_ephemeral_value(arg_ty as TypeId) != 0:
                 let eg_arg_node = if pi < arg_nodes.len() as i32: arg_nodes[pi] else: 0
                 self.check_ephemeral_task_arg_escape(if eg_arg_node > 0: eg_arg_node else: call_node, 0, 0, fn_sym, pi)
+        self.bind_type_params_from_bounds(tp_start, tp_count, call_node)
 
         // Obligation model: collect and solve trait bounds for each bound type parameter.
         let bounds_errors_before = self.diags.count_by_severity(DiagSeverity.Error)
@@ -23559,35 +23594,61 @@ impl Sema:
             let trait_args_idx = self.ast.find_impl_trait_type_args(type_node as NodeId)
             if trait_args_idx < 0:
                 return
-            let trait_arg_start: i32 = self.ast.state.impl_trait_type_args[(trait_args_idx + 1)]
-            let trait_arg_count: i32 = self.ast.state.impl_trait_type_args[(trait_args_idx + 2)]
-            // D69 (§13.4): a generator value implements Gen[T] with no impl
-            // declaration; T is its element type.
-            let gen_state = self.resolve_alias(arg_tid as TypeId) as i32
-            if self.generator_state_yield_types.contains(gen_state) and self.pool_resolve(trait_sym) == "Gen" and trait_arg_count == 1:
-                self.bind_type_params_from_type_expr(self.ast.get_extra(trait_arg_start), self.generator_state_yield_types.get(gen_state).unwrap(), tp_start, tp_count, err_node)
-                return
-            for di in 0..self.ast.decl_count():
-                let decl = self.ast.get_decl(di)
-                if self.ast.kind(decl) != NodeKind.NK_IMPL_DECL:
-                    continue
-                if self.ast.get_data2(decl) != trait_sym:
-                    continue
-                let target_match = self.impl_target_match(decl, arg_tid)
-                if target_match.ok == 0:
-                    continue
-                let impl_args_idx = self.ast.find_impl_trait_type_args(decl as NodeId)
-                if impl_args_idx < 0:
-                    continue
-                let impl_arg_start: i32 = self.ast.state.impl_trait_type_args[(impl_args_idx + 1)]
-                let impl_arg_count = self.ast.state.impl_trait_type_args[(impl_args_idx + 2)]
-                let bind_count = if trait_arg_count < impl_arg_count: trait_arg_count else: impl_arg_count
-                for tai in 0..bind_count:
-                    let param_trait_arg = self.ast.get_extra(trait_arg_start + tai)
-                    let impl_trait_arg = self.ast.get_extra(impl_arg_start + tai)
-                    let actual_trait_arg = self.resolve_impl_trait_arg_for_source(decl, arg_tid, impl_trait_arg, target_match.subst_names, target_match.subst_types)
-                    self.bind_type_params_from_type_expr(param_trait_arg, actual_trait_arg, tp_start, tp_count, err_node)
-                return
+            var trait_args: Vec[i32] = Vec.new()
+            for tai in 0..self.ast.impl_trait_type_args_count(trait_args_idx):
+                trait_args.push(self.ast.get_extra(self.ast.impl_trait_type_args_start(trait_args_idx) + tai))
+            self.bind_type_params_from_trait_args(trait_sym, trait_args, arg_tid, tp_start, tp_count, err_node)
+
+    // `Trait[A, B]` written against a concrete `arg_tid` binds the type
+    // parameters A and B name from the trait arguments of arg_tid's impl
+    // of Trait — for an `impl Trait[A]` parameter and for a bound
+    // `G: Trait[A]` once G is known (#1732).
+    mut fn bind_type_params_from_trait_args(trait_sym: i32, trait_args: Vec[i32], arg_tid: i32, tp_start: i32, tp_count: i32, err_node: i32):
+        let trait_arg_count = trait_args.len() as i32
+        // D69 (§13.4): a generator value implements Gen[T] with no impl
+        // declaration; T is its element type.
+        let gen_state = self.resolve_alias(arg_tid as TypeId) as i32
+        if self.generator_state_yield_types.contains(gen_state) and self.pool_resolve(trait_sym) == "Gen" and trait_arg_count == 1:
+            self.bind_type_params_from_type_expr(trait_args[0], self.generator_state_yield_types.get(gen_state).unwrap(), tp_start, tp_count, err_node)
+            return
+        for di in 0..self.ast.decl_count():
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) != NodeKind.NK_IMPL_DECL:
+                continue
+            if self.ast.get_data2(decl) != trait_sym:
+                continue
+            let target_match = self.impl_target_match(decl, arg_tid)
+            if target_match.ok == 0:
+                continue
+            let impl_args_idx = self.ast.find_impl_trait_type_args(decl as NodeId)
+            if impl_args_idx < 0:
+                continue
+            let impl_arg_start: i32 = self.ast.state.impl_trait_type_args[(impl_args_idx + 1)]
+            let impl_arg_count = self.ast.state.impl_trait_type_args[(impl_args_idx + 2)]
+            let bind_count = if trait_arg_count < impl_arg_count: trait_arg_count else: impl_arg_count
+            for tai in 0..bind_count:
+                let impl_trait_arg = self.ast.get_extra(impl_arg_start + tai)
+                let actual_trait_arg = self.resolve_impl_trait_arg_for_source(decl, arg_tid, impl_trait_arg, target_match.subst_names, target_match.subst_types)
+                self.bind_type_params_from_type_expr(trait_args[tai], actual_trait_arg, tp_start, tp_count, err_node)
+            return
+
+    // A type parameter bound to a concrete type by the arguments binds
+    // what its parameterized bounds name: `[T, G: Gen[T]](g: G)` called
+    // with a generator infers T from G's element type, as `g: impl Gen[T]`
+    // does (#1732). Runs after the arguments are bound; a bound whose
+    // parameter is still unknown binds nothing.
+    mut fn bind_type_params_from_bounds(tp_start: i32, tp_count: i32, err_node: i32):
+        var pos = tp_start
+        for ti in 0..tp_count:
+            let tp_name = self.ast.get_extra(pos)
+            let bound_count = self.ast.get_extra(pos + 1)
+            let concrete_tid = self.lookup_generic_subst(tp_name)
+            if concrete_tid != 0:
+                for bi in 0..bound_count:
+                    let meta = self.ast.find_type_bound_args(pos + 2 + bi)
+                    if meta >= 0:
+                        self.bind_type_params_from_trait_args(self.ast.get_extra(pos + 2 + bi), self.ast.type_bound_arg_nodes(meta), concrete_tid, tp_start, tp_count, err_node)
+            pos = pos + 2 + bound_count
 
     fn generic_specialization_key(fn_sym: i32, fn_node: i32, tp_start: i32, tp_count: i32) -> str:
         var key = f"{fn_sym}:{fn_node}"
@@ -26597,7 +26658,7 @@ impl Sema:
         let root = self.place_root_sym(target)
         if root == 0 or self.scope_has(root) == 0:
             return
-        let value_carries = value_ty <= 0 or self.type_can_carry_view(value_ty) or self.expr_is_ephemeral_task(value) != 0
+        let value_carries = value_ty <= 0 or self.type_can_carry_view(value_ty) or self.expr_is_ephemeral_task(value) != 0 or self.expr_is_ephemeral_value(value) != 0
         if not value_carries and not self.type_can_carry_view(slot_ty):
             return
         var value_deps: Vec[i32] = Vec.new()

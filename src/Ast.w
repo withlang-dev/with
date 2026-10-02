@@ -666,6 +666,11 @@ type AstPoolState {
     impl_type_params: Vec[i32],
     impl_target_type_nodes: Vec[i32],
     impl_trait_type_args: Vec[i32],
+    // A parameterized type-parameter bound's arguments (`G: Gen[T]`):
+    // (extra index of the bound's trait symbol, start in
+    // type_bound_arg_nodes, count) triples.
+    type_bound_args: Vec[i32],
+    type_bound_arg_nodes: Vec[i32],
     fn_meta_map: HashMap[i32, i32],
     // For `x in collection` / `x not in collection` binary nodes: the extra-array
     // index of the pre-reserved `collection.contains(x)` argument. Allocated at
@@ -683,6 +688,7 @@ type AstPoolState {
     impl_type_params_map: HashMap[i32, i32],
     impl_target_type_nodes_map: HashMap[i32, i32],
     impl_trait_type_args_map: HashMap[i32, i32],
+    type_bound_args_map: HashMap[i32, i32],
     fn_param_pattern_meta_map: HashMap[i32, i32],
     for_meta_map: HashMap[i32, i32],
     for_carrier_alt_map: HashMap[i32, i32],
@@ -786,6 +792,8 @@ fn AstPool.new -> AstPool:
             impl_type_params: Vec.new(),
             impl_target_type_nodes: Vec.new(),
             impl_trait_type_args: Vec.new(),
+            type_bound_args: Vec.new(),
+            type_bound_arg_nodes: Vec.new(),
             fn_meta_map: HashMap.new(),
             membership_arg_map: HashMap.new(),
             pattern_binding_keys: HashMap.new(),
@@ -796,6 +804,7 @@ fn AstPool.new -> AstPool:
             impl_type_params_map: HashMap.new(),
             impl_target_type_nodes_map: HashMap.new(),
             impl_trait_type_args_map: HashMap.new(),
+            type_bound_args_map: HashMap.new(),
             fn_param_pattern_meta_map: HashMap.new(),
             for_meta_map: HashMap.new(),
             for_carrier_alt_map: HashMap.new(),
@@ -1961,6 +1970,28 @@ impl AstPool:
         if opt.is_some():
             return opt.unwrap()
         -1
+
+    // A type-parameter bound's trait arguments, keyed by the extra index
+    // that holds the bound's trait symbol: `G: Gen[T]` records `[T]`, so a
+    // call can infer T from the type G is bound to (#1732).
+    fn add_type_bound_args(bound_extra_idx: i32, arg_nodes: Vec[i32]):
+        let idx = self.state.type_bound_args.len() as i32
+        self.state.type_bound_args.push(bound_extra_idx)
+        self.state.type_bound_args.push(self.state.type_bound_arg_nodes.len() as i32)
+        self.state.type_bound_args.push(arg_nodes.len() as i32)
+        for n in arg_nodes:
+            self.state.type_bound_arg_nodes.push(n)
+        self.state.type_bound_args_map.insert(bound_extra_idx, idx)
+
+    fn find_type_bound_args(bound_extra_idx: i32) -> i32: self.state.type_bound_args_map.get(bound_extra_idx) ?? -1
+
+    // The argument type nodes of the bound record `meta`.
+    fn type_bound_arg_nodes(meta: i32) -> Vec[i32]:
+        var out: Vec[i32] = Vec.new()
+        let start: i32 = self.state.type_bound_args[(meta + 1)]
+        for i in 0..self.state.type_bound_args[(meta + 2)]:
+            out.push(self.state.type_bound_arg_nodes[(start + i)])
+        out
 
     fn impl_trait_type_args_start(meta: i32) -> i32: self.state.impl_trait_type_args[(meta + 1)]
     fn impl_trait_type_args_count(meta: i32) -> i32: self.state.impl_trait_type_args[(meta + 2)]

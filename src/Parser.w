@@ -9134,22 +9134,48 @@ impl Parser:
         if self.peek() == TokenKind.TK_COLON:
             self.advance()
             self.skip_newlines()
-            let b = self.parse_type_bound_symbol()
-            self.pool.add_extra(b)
+            self.parse_type_bound()
             bound_count = bound_count + 1
             while self.peek() == TokenKind.TK_PLUS:
                 self.advance()
                 self.skip_newlines()
-                let b2 = self.parse_type_bound_symbol()
-                self.pool.add_extra(b2)
+                self.parse_type_bound()
                 bound_count = bound_count + 1
         self.pool.state.extra[count_idx] = bound_count
         1
 
+    // A type parameter's bound, pushed to extra: its trait symbol. The
+    // arguments of a parameterized bound (`Gen[T]`) are kept beside it
+    // (Ast.add_type_bound_args) so a call infers T from the bound type.
+    mut fn parse_type_bound():
+        if self.peek() == TokenKind.TK_IDENT:
+            let sym = self.expect_ident()
+            let idx = self.pool.add_extra(sym)
+            if self.peek() == TokenKind.TK_L_BRACKET:
+                // The argument nodes live beside the type-parameter list,
+                // never in `extra`, whose (name, count, bounds…) layout a
+                // node between two bounds would break.
+                self.advance()
+                self.skip_newlines()
+                var args: Vec[i32] = Vec.new()
+                while self.peek() != TokenKind.TK_R_BRACKET and self.peek() != TokenKind.TK_EOF:
+                    args.push(self.parse_type_expr() as i32)
+                    self.skip_newlines()
+                    if self.peek() != TokenKind.TK_COMMA:
+                        break
+                    self.advance()
+                    self.skip_newlines()
+                self.skip_newlines()
+                self.expect(TokenKind.TK_R_BRACKET)
+                self.pool.add_type_bound_args(idx, args)
+            return
+        self.pool.add_extra(self.parse_type_bound_symbol())
+
     mut fn parse_type_bound_symbol() -> i32:
         if self.peek() == TokenKind.TK_IDENT:
             let sym = self.expect_ident()
-            // Consume optional parameterized bound: Trait[Item=Type, ...] or Trait[T]
+            // An associated type's parameterized bound: its arguments are
+            // not kept (associated type bound checking is deferred, §11.6).
             if self.peek() == TokenKind.TK_L_BRACKET:
                 self.advance()
                 var depth = 1

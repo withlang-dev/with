@@ -201,6 +201,13 @@ fn astpool_clone_deep(src: AstPool) -> AstPool:
         )
         impl_trait_args = impl_trait_args + 3
 
+    // A type-parameter bound's arguments (`G: Gen[T]`, #1732), keyed by
+    // the extra index copied above.
+    var bound_args = 0
+    while bound_args < src.state.type_bound_args.len() as i32:
+        out.add_type_bound_args(src.state.type_bound_args[bound_args], src.type_bound_arg_nodes(bound_args))
+        bound_args = bound_args + 3
+
     for ni in 1..src.node_count():
         let node = ni as NodeId
         if src.has_call_named_args(node) != 0:

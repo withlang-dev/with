@@ -249,73 +249,92 @@ extern fn with_fiber_coro_finish(co: i64)
 extern fn with_fiber_coro_free(co: i64)
 
 // A pulled generator's state, on the heap so the coroutine's pointer to it
-// stays valid while the Pulled that owns it moves. `run` holds the generator
-// until the coroutine consumes it; `slot` is the Option[T] of the next() in
-// progress.
-type PullCore {
+// stays valid while the Pulled that owns it moves. The header is what the
+// coroutine entry and Pulled[T] — which cannot name the generator's type —
+// read; the generator itself follows it (PullCore[G]). `run` and
+// `drop_gen` are captureless closures specialized for G: they, not an
+// escaping closure holding the generator, reach it (§12.2, #1732). `slot`
+// is the Option[T] of the next() in progress.
+type PullHeader {
+    run: fn(*mut u8) -> Unit,
+    drop_gen: fn(*mut u8) -> Unit,
     co: i64,
-    run: fn(*mut PullCore) -> Unit,
     slot: *mut u8,
     stop: bool,
     done: bool,
 }
 
+type PullCore[G] {
+    head: PullHeader,
+    source: G,
+}
+
 /// A generator stepped by `next()` on its own fiber: what `g.pull()` returns
 /// (§13.4). Dropping it before the end stops the generator as a consumer's
-/// `break` does.
+/// `break` does. Pulled from a generator whose arguments are views, it is
+/// as ephemeral as that generator value (Sema ties it to the views at the
+/// `g.pull()`, #1732).
 pub type Pulled[T] { core: *mut u8 }
 
 // The coroutine's entry: the generator runs to its end or to a stop, then
 // control returns to the resume for good.
 unsafe fn pull_coro_main(arg: *mut u8):
-    let core = arg as *mut PullCore
-    ((*core).run)(core)
-    (*core).done = true
-    with_fiber_coro_finish((*core).co)
+    let head = arg as *mut PullHeader
+    ((*head).run)(arg)
+    (*head).done = true
+    with_fiber_coro_finish((*head).co)
 
 // The generator's consumer body, on the coroutine: hand `x` to the waiting
 // next() and park until the next one; false leaves the generator at its
 // yield (the Pulled is being dropped).
-unsafe fn pull_yield[T](core: *mut PullCore, x: T) -> bool:
-    let slot = (*core).slot as *mut Option[T]
+unsafe fn pull_yield[T](head: *mut PullHeader, x: T) -> bool:
+    let slot = (*head).slot as *mut Option[T]
     *slot = Some(x)
-    with_fiber_coro_suspend((*core).co)
-    not (*core).stop
+    with_fiber_coro_suspend((*head).co)
+    not (*head).stop
 
 /// `g.pull()` (§13.4). Nothing runs, and no fiber stack is taken, until the
 /// first `next()`.
-pub fn gen_pull[T](g: impl Gen[T]) -> Pulled[T]:
-    let run = move (core: *mut PullCore) => g.each(x => unsafe { pull_yield(core, x) })
-    let core = with_alloc(sizeof[PullCore]() as i64) as *mut PullCore
-    unsafe { *core = PullCore { co: 0, run: run, slot: 0 as *mut u8, stop: false, done: false } }
+pub fn gen_pull[T, G: Gen[T]](g: G) -> Pulled[T]:
+    // The coroutine takes the generator out of the cell and consumes it.
+    let run = (arg: *mut u8) => unsafe {
+        let held = (*(arg as *mut PullCore[G])).source
+        held.each(x => pull_yield(arg as *mut PullHeader, x))
+    }
+    // A generator that never ran is still in the cell when the Pulled drops.
+    let drop_gen = (arg: *mut u8) => unsafe {
+        let held = (*(arg as *mut PullCore[G])).source
+        drop(held)
+    }
+    let core = with_alloc(sizeof[PullCore[G]]() as i64) as *mut PullCore[G]
+    unsafe { *core = PullCore { head: PullHeader { run, drop_gen, co: 0, slot: 0 as *mut u8, stop: false, done: false }, source: g } }
     Pulled { core: core as *mut u8 }
 
 impl[T] Iter[T] for Pulled[T]:
     mut fn next() -> Option[T]:
-        let core = self.core as *mut PullCore
-        if (unsafe *core).done:
+        let head = self.core as *mut PullHeader
+        if (unsafe *head).done:
             return None
-        if (unsafe *core).co == 0:
-            let co = with_fiber_coro_new(pull_coro_main as *const u8, core as *mut u8)
+        if (unsafe *head).co == 0:
+            let co = with_fiber_coro_new(pull_coro_main as *const u8, self.core)
             if co == 0:
                 panic("g.pull(): no fiber stack could be allocated for the generator")
-            (unsafe *core).co = co
+            (unsafe *head).co = co
         var item: Option[T] = None
-        (unsafe *core).slot = &raw mut item as *mut u8
-        with_fiber_coro_resume((unsafe *core).co)
-        (unsafe *core).slot = 0 as *mut u8
+        (unsafe *head).slot = &raw mut item as *mut u8
+        with_fiber_coro_resume((unsafe *head).co)
+        (unsafe *head).slot = 0 as *mut u8
         item
 
 impl[T] Drop for Pulled[T]:
     move fn drop():
-        let core = self.core as *mut PullCore
-        let co = (unsafe *core).co
+        let head = self.core as *mut PullHeader
+        let co = (unsafe *head).co
         if co != 0:
-            if not (unsafe *core).done:
-                (unsafe *core).stop = true
+            if not (unsafe *head).done:
+                (unsafe *head).stop = true
                 with_fiber_coro_resume(co)
             with_fiber_coro_free(co)
-        // The generator, if it never ran, still lives in `run`.
-        let state = unsafe *core
-        drop(state)
-        with_free(core as *mut u8)
+        else:
+            ((unsafe *head).drop_gen)(self.core)
+        with_free(self.core)
