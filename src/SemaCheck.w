@@ -14048,8 +14048,14 @@ impl Sema:
                     // Only a reference argument is transparent: its storage
                     // is the pointee, whose origins the collect found. An
                     // ephemeral receiver's deps alone let a view of it
-                    // outlive it (§21.1 Rule 6, §5.5).
-                    if concrete_deps.len() as i32 == dep_len_before or self.expr_type_is_value(origin_arg):
+                    // outlive it (§21.1 Rule 6, §5.5). An in-place receiver
+                    // (`fn`/`mut fn` self) is a borrowed place, not a value
+                    // the call received: an ephemeral self's result views
+                    // what self views, never self's own storage — otherwise
+                    // `self.finish(move child)` after `self.child()` would
+                    // read as mutating self under a live view of it.
+                    let in_place_recv = param_offset == 1 and origin_pi == 0 and self.sig_receiver_mode(sig_idx) != ReceiverMode.Move
+                    if not in_place_recv and (concrete_deps.len() as i32 == dep_len_before or self.expr_type_is_value(origin_arg)):
                         concrete_deps = self.push_unique_i32(move concrete_deps, self.place_root_sym(origin_arg))
         // A facade operation (D51 stage 7, ruling §33-§38): its result may
         // borrow from a foreign-state domain, and the call invalidates the
