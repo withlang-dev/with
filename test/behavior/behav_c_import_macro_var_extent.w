@@ -13,6 +13,7 @@
 
 use pre_d_build_runner
 use std.time
+use std.string.StringBuilder
 
 fn header(filler: i32) -> str:
     var h = StringBuilder.new()

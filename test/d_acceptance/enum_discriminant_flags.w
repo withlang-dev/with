@@ -1,5 +1,6 @@
 //! expect-stdout: 012124
 
+use std.builtins.int_to_string
 enum NotFlags: i32 { A | B | C }
 
 @[flags]

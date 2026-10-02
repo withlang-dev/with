@@ -12,6 +12,7 @@ use compiler.TrackedInputs
 use MirCore
 use MirLower
 use SemaTypes
+use std.collections.HashMap
 
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_eprint(s: &str) -> Unit

@@ -8,6 +8,7 @@
 
 use pre_d_build_runner
 use std.time
+use std.string.StringBuilder
 
 fn check_seconds(case_dir: &str, decls: i32) -> f64:
     var header = StringBuilder.new()

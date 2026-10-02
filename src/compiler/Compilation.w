@@ -34,6 +34,7 @@ use Analysis
 use TargetSpec
 use MirCore
 use AnalysisTypes
+use std.collections.HashMap
 
 extern fn with_alloc(size: i64) -> *mut u8
 extern fn with_free(ptr: *mut u8) -> Unit

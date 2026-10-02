@@ -27,6 +27,7 @@ use Mir
 use Sema
 use MirCore
 use SemaTypes
+use std.collections.HashMap
 
 extern fn with_str_clone_ref(s: &str) -> str
 

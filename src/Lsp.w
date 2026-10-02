@@ -16,6 +16,7 @@ use compiler.Frontend
 use compiler.Zcu
 use compiler.EmbeddedStdlib
 use std.builtins.int_to_string
+use std.collections.HashMap
 
 extern fn with_alloc(size: i64) -> *mut u8
 extern fn with_free(ptr: *mut u8) -> Unit

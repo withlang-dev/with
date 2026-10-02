@@ -24,6 +24,7 @@ use compiler.BundleInterfaces
 use AnalysisTypes
 use MirCore
 use SemaTypes
+use std.collections.HashMap
 
 extern fn exit(code: i32) -> Unit
 extern fn with_fs_read_file(path: &str) -> str

@@ -3,6 +3,7 @@ use issue61_queries.generic
 use issue61_queries.normalize
 use issue61_queries.samples
 use issue61_queries.shared
+use std.collections.HashMap
 
 pub fn mirrored_score(state: State, lookup: HashMap[str, i32]) -> i32:
     var total = 0
