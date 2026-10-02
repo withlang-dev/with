@@ -11,7 +11,7 @@ type Big { a: Vec[str], b: Vec[str] }
 fn cl(v: &Vec[str]) -> Vec[str]:
     var out: Vec[str] = Vec.new()
     for i in 0..v.len() as i32:
-        out.push(v.get(i as i64) ++ "")
+        out.push(v[i as i64] ++ "")
     out
 
 fn clone_big(r: &Big) -> Big:
@@ -32,10 +32,10 @@ fn main:
         results.push(consume(clone_big(&big)))
     else:
         results.push(0)
-    print_i32(results.get(0))
+    print_i32(results[0])
 
     if let Some(v) = some:
         results.push(v)
     else:
         results.push(consume(clone_big(&big)))
-    print_i32(results.get(1))
+    print_i32(results[1])

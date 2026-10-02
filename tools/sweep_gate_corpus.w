@@ -25,10 +25,10 @@ let argv = args()
 if argv.len() < 4:
     eprint("usage: sweep_gate_corpus <stage1> <list> <diag_tmp> [d_corpus_dir]")
     exit_code(2)
-let stage1 = argv.get(1)
-let list_file = argv.get(2)
-let diag_tmp = argv.get(3)
-let d_corpus = if argv.len() > 4: argv.get(4).clone() else: "".clone()
+let stage1 = argv[1]
+let list_file = argv[2]
+let diag_tmp = argv[3]
+let d_corpus = if argv.len() > 4: argv[4].clone() else: "".clone()
 
 var affected = 0
 var fixed = 0

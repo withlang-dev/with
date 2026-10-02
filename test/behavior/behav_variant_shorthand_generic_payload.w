@@ -4,9 +4,9 @@
 // shorthand — trapped the compiler (the call result was typed unit and
 // aggregated into the Option). Both the view and the owned payload shapes
 // must compile and carry the value.
-fn first_view(v: &Vec[i32]) -> Option[&i32]: .Some(v.get(0))
-fn first_owned(v: &Vec[i32]) -> Option[i32]: .Some(v.get(0))
-fn first_str(v: &Vec[str]) -> Option[&str]: .Some(v.get(0))
+fn first_view(v: &Vec[i32]) -> Option[&i32]: .Some(v[0])
+fn first_owned(v: &Vec[i32]) -> Option[i32]: .Some(v[0])
+fn first_str(v: &Vec[str]) -> Option[&str]: .Some(v[0])
 
 fn main:
     let xs: Vec[i32] = [7, 8]

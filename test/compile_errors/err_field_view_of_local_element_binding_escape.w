@@ -11,7 +11,7 @@ type KV { key: str, value: JV }
 fn bad_let() -> &JV:
     var xs: Vec[KV] = Vec.new()
     xs.push(KV { key: "k".clone(), value: .Null })
-    let e = xs.get(0)
+    let e = xs[0]
     &e.value
 
 fn bad_for() -> &JV:

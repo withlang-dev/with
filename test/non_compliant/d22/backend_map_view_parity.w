@@ -13,6 +13,6 @@ fn main:
     stored.push(118)
     map.insert(1, move stored)
     let view: &Vec[i64] = map.get(1).unwrap()
-    assert(view.get(0) == 118)
+    assert(view[0] == 118)
     let owned: Vec[i64] = map.remove(1).unwrap()
-    assert(owned.get(0) == 118)
+    assert(owned[0] == 118)

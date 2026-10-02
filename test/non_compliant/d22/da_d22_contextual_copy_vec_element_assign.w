@@ -19,4 +19,4 @@ fn main:
     slots[0] = view
     map.clear()
 
-    assert(slots.get(0) == 41)
+    assert(slots[0] == 41)

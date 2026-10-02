@@ -13,12 +13,12 @@ fn main:
     let shared = &nums
     assert(shared.len() == 3)
     assert(shared.contains(2))
-    assert(shared.get(1) == 2)
+    assert(shared[1] == 2)
     let doubled = shared.map(x => x * 2)
-    assert(doubled.get(0) == 2)
+    assert(doubled[0] == 2)
     let evens = shared.filter(x => x % 2 == 0)
     assert(evens.len() == 1)
-    assert(evens.get(0) == 2)
+    assert(evens[0] == 2)
 
     let words: Vec[str] = Vec.new()
     words.push("a")
@@ -33,4 +33,4 @@ fn main:
     assert(nums_mut.pop().unwrap() == 9)
     assert(nums_mut.remove(0) == 7)
     assert(nums_mut.len() == 1)
-    assert(nums_mut.get(0) == 8)
+    assert(nums_mut[0] == 8)

@@ -20,10 +20,10 @@ fn test_range_write:
     with xs.range(1..3) as mut r:
         r.set(0, 99)
         r.set(1, 88)
-    assert(xs.get(1) == 99)
-    assert(xs.get(2) == 88)
-    assert(xs.get(0) == 10)
-    assert(xs.get(3) == 40)
+    assert(xs[1] == 99)
+    assert(xs[2] == 88)
+    assert(xs[0] == 10)
+    assert(xs[3] == 40)
 
 fn test_range_len:
     var xs = Vec.new()

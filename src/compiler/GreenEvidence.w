@@ -76,7 +76,7 @@ fn green_worktree_is_clean(root: &str) -> bool:
     args.push("--porcelain")
     let status_lines = green_git_output(root, &args, "status").split("\n")
     for i in 0..status_lines.len() as i32:
-        let line = status_lines.get(i)
+        let line = status_lines[i]
         if line.len() > 0 and not green_untracked_is_not_input(line): return false
     true
 
@@ -98,8 +98,8 @@ pub fn green_by_source_identity(root: &str) -> str:
     let store_dir = if explicit.len() > 0: explicit else: runtime_getenv("HOME") ++ "/.local/with-green"
     let store_lines = runtime_read_file(green_join(store_dir, "green.tsv")).split("\n")
     for i in 0..store_lines.len() as i32:
-        let line = store_lines.get(i)
+        let line = store_lines[i]
         if line.starts_with(identity ++ "\t"):
             let fields = line.split("\t")
-            return if fields.len() > 1: fields.get(1).clone() else: "recorded"
+            return if fields.len() > 1: fields[1].clone() else: "recorded"
     ""

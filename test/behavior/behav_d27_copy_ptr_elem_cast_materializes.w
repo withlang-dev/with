@@ -9,8 +9,8 @@ fn main:
     let p = &raw const x
     v.push(p)
     let direct = p as i64
-    let q = v.get(0)
+    let q = v[0]
     let through = q as i64
     assert(direct == through)
-    let typed: *const i32 = v.get(0)
+    let typed: *const i32 = v[0]
     assert(typed as i64 == direct)

@@ -9,7 +9,7 @@ fn count_kind(tree: &StackifyTree, kind: i32) -> i32:
     var count = 0
     var i = 0
     while i < tree.nodes.len() as i32:
-        if tree.nodes.get(i as i64).kind == kind:
+        if tree.nodes[i as i64].kind == kind:
             count = count + 1
         i = i + 1
     count
@@ -17,7 +17,7 @@ fn count_kind(tree: &StackifyTree, kind: i32) -> i32:
 fn has_node_for_block(tree: &StackifyTree, kind: i32, block: i32) -> bool:
     var i = 0
     while i < tree.nodes.len() as i32:
-        let node = tree.nodes.get(i as i64)
+        let node = tree.nodes[i as i64]
         if node.kind == kind and node.block == block:
             return true
         i = i + 1

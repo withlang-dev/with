@@ -130,7 +130,7 @@ fn test_base64_noncanonical_bits:
 fn test_base64_case_is_significant:
     let upper = base64_decode("Zg==").unwrap()
     let lower = base64_decode("zg==").unwrap()
-    assert(upper.get(0) != lower.get(0))
+    assert(upper[0] != lower[0])
 
 fn main:
     test_base16_rejection()

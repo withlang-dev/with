@@ -43,9 +43,9 @@ fn add_foreach(x: i32):
 
 fn assert_vec_i32(xs: Vec[i32], a: i32, b: i32, c: i32):
     assert(xs.len() == 3)
-    assert(xs.get(0) == a)
-    assert(xs.get(1) == b)
-    assert(xs.get(2) == c)
+    assert(xs[0] == a)
+    assert(xs[1] == b)
+    assert(xs[2] == c)
 
 fn test_reduce:
     let nums = vec_1_to_4()
@@ -75,10 +75,10 @@ fn test_flat_map:
         |> collect[Vec]()
 
     assert(words.len() == 4)
-    assert(words.get(0) == "hello")
-    assert(words.get(1) == "world")
-    assert(words.get(2) == "foo")
-    assert(words.get(3) == "bar")
+    assert(words[0] == "hello")
+    assert(words[1] == "world")
+    assert(words[2] == "foo")
+    assert(words[3] == "bar")
 
 fn test_zip:
     let nums: Vec[i32] = Vec.new()
@@ -94,8 +94,8 @@ fn test_zip:
         |> collect[Vec]()
 
     assert(pairs.len() == 2)
-    let (n0, s0) = pairs.get(0)
-    let (n1, s1) = pairs.get(1)
+    let (n0, s0) = pairs[0]
+    let (n1, s1) = pairs[1]
     assert(n0 == 1)
     assert(s0 == "a")
     assert(n1 == 2)
@@ -107,11 +107,11 @@ fn test_partition:
         |> partition(x => x % 2 == 0)
 
     assert(evens.len() == 2)
-    assert(evens.get(0) == 2)
-    assert(evens.get(1) == 4)
+    assert(evens[0] == 2)
+    assert(evens[1] == 4)
     assert(odds.len() == 2)
-    assert(odds.get(0) == 1)
-    assert(odds.get(1) == 3)
+    assert(odds[0] == 1)
+    assert(odds[1] == 3)
 
 fn test_complex_pipeline:
     let nums = vec_1_to_10()
@@ -159,8 +159,8 @@ fn test_filter_map_and_skip_adapters:
         |> filter_map(maybe_even_double)
         |> collect[Vec]()
     assert(mapped.len() == 2)
-    assert(mapped.get(0) == 4)
-    assert(mapped.get(1) == 8)
+    assert(mapped[0] == 4)
+    assert(mapped[1] == 8)
 
     let window = vec_1_to_10().iter()
         |> drop(2)
@@ -168,16 +168,16 @@ fn test_filter_map_and_skip_adapters:
         |> drop_while(x => x < 5)
         |> collect[Vec]()
     assert(window.len() == 2)
-    assert(window.get(0) == 5)
-    assert(window.get(1) == 6)
+    assert(window[0] == 5)
+    assert(window[1] == 6)
 
 fn test_enumerate_chain_zip_with_step_by:
     let enumerated = vec_123().iter()
         |> enumerate()
         |> collect[Vec]()
     assert(enumerated.len() == 3)
-    let (i0, v0) = enumerated.get(0)
-    let (i2, v2) = enumerated.get(2)
+    let (i0, v0) = enumerated[0]
+    let (i2, v2) = enumerated[2]
     assert(i0 == 0)
     assert(v0 == 1)
     assert(i2 == 2)
@@ -188,10 +188,10 @@ fn test_enumerate_chain_zip_with_step_by:
         |> step_by(2)
         |> collect[Vec]()
     assert(chained.len() == 4)
-    assert(chained.get(0) == 1)
-    assert(chained.get(1) == 3)
-    assert(chained.get(2) == 2)
-    assert(chained.get(3) == 4)
+    assert(chained[0] == 1)
+    assert(chained[1] == 3)
+    assert(chained[2] == 2)
+    assert(chained[3] == 4)
 
     let combined = vec_123().iter()
         |> zip_with(vec_1_to_4().iter(), (a, b) => a * 10 + b)

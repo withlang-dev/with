@@ -26,7 +26,7 @@ fn main:
         if peek_str(s) != 5:
             print("FAIL str bare->fn")
             return
-    if peek_str(ss.get(0)) != 5 or peek_str(ss[0]) != 5:
+    if peek_str(ss[0]) != 5 or peek_str(ss[0]) != 5:
         print("FAIL str get/index->fn")
         return
     var vs: Vec[Vec[i32]] = Vec.new()

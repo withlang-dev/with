@@ -15,19 +15,19 @@ if argv.len() != 14:
     eprint("usage: nightly_release_metadata <event> <requested-channel> <yyyymmdd> <yyyy-mm-dd> <run-id> <attempt> <sha> <server-url> <repository> <version> <github-output> <notes-output> <platforms>")
     exit_code(1)
 
-let event = argv.get(1)
-let requested_channel = argv.get(2)
-let compact_date = argv.get(3)
-let display_date = argv.get(4)
-let run_id = argv.get(5)
-let attempt = argv.get(6)
-let source_sha = argv.get(7)
-let server_url = argv.get(8)
-let repository = argv.get(9)
-let version = argv.get(10)
-let github_output = argv.get(11)
-let notes_output = argv.get(12)
-let platforms = argv.get(13)
+let event = argv[1]
+let requested_channel = argv[2]
+let compact_date = argv[3]
+let display_date = argv[4]
+let run_id = argv[5]
+let attempt = argv[6]
+let source_sha = argv[7]
+let server_url = argv[8]
+let repository = argv[9]
+let version = argv[10]
+let github_output = argv[11]
+let notes_output = argv[12]
+let platforms = argv[13]
 
 if source_sha.len() < 12:
     eprint("error: source commit must contain at least 12 characters")

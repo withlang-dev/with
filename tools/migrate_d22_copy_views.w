@@ -170,7 +170,7 @@ fn main:
     if argv.len() < 2:
         print("usage: migrate_d22_copy_views <candidate-with> [source.w] [--apply]")
         exit_code(2)
-    let candidate = argv.get(1).clone()
+    let candidate = argv[1].clone()
     var source_path = "src/main.w".clone()
     var apply = false
     for ai in 2..argv.len() as i32:

@@ -27,7 +27,7 @@ fn main -> i32:
     var deny_path = ""
     var files: Vec[str] = Vec.new()
     for i in 1..argv.len():
-        let a = argv.get(i)
+        let a = argv[i]
         if a == "--apply": apply = true
         else if deny_path.len() == 0: deny_path = owned_text(a)
         else: files.push(owned_text(a))
@@ -39,7 +39,7 @@ fn main -> i32:
         if line.len() > 0: denied.push(owned_text(line))
     var total = 0
     for fi in 0..files.len():
-        let path = files.get(fi)
+        let path = files[fi]
         let text = read_file(path)
         if text.len() == 0: continue
         var lexer = Lexer.init(text, 0)
@@ -108,7 +108,7 @@ fn main -> i32:
                             var deny = false
                             let key = deny_key(fn_name, pname)
                             for di in 0..denied.len():
-                                if denied.get(di) == key:
+                                if denied[di] == key:
                                     deny = true
                                     break
                             if not deny:
@@ -123,7 +123,7 @@ fn main -> i32:
         total = total + offsets.len() as i32
         if not apply:
             for oi in 0..offsets.len():
-                print(path ++ ": " ++ labels.get(oi))
+                print(path ++ ": " ++ labels[oi])
             continue
         // Apply back-to-front so earlier offsets stay valid.
         var out = owned_text(text)

@@ -354,7 +354,7 @@ pub fn run_no_host_toolchain_action(ctx: ActionCtx) -> i32:
     var verdict = f"link records read: {read}\n"
     let linux = os() == "Linux" and (arch() == "x86_64" or arch() == "aarch64")
     if os() == "Windows":
-        let lines = ht_windows_builds(ctx, root, ht_join(root, inputs.get(0)))
+        let lines = ht_windows_builds(ctx, root, ht_join(root, inputs[0]))
         for l in 0..lines.len() as i32:
             if lines[l].starts_with("problem: "):
                 problems.push(lines[l].slice(9, lines[l].len()))
@@ -370,7 +370,7 @@ pub fn run_no_host_toolchain_action(ctx: ActionCtx) -> i32:
         let home = ht_join(root, ht_join(scratch, "home"))
         if fs.mkdir_all(ht_join(scratch, "home/tmp")) != 0:
             return ht_fail(ctx, "could not create " ++ scratch ++ "/home/tmp")
-        let compiler = ht_join(root, inputs.get(0))
+        let compiler = ht_join(root, inputs[0])
         let profile = if linux: ht_linux_masks(fs) else: ht_sandbox_profile()
         // Each fixture: the repository file its expect-stdout lines come from,
         // the source built, and the binary's name.

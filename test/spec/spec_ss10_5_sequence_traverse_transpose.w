@@ -9,9 +9,9 @@ fn checked_positive(x: i32) -> Result[i32, str]:
 
 fn assert_vec_123(xs: Vec[i32]):
     assert(xs.len() == 3)
-    assert(xs.get(0) == 1)
-    assert(xs.get(1) == 2)
-    assert(xs.get(2) == 3)
+    assert(xs[0] == 1)
+    assert(xs[1] == 2)
+    assert(xs[2] == 3)
 
 fn test_sequence_option_some:
     let xs: Vec[Option[i32]] = Vec.new()

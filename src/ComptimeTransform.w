@@ -1516,6 +1516,9 @@ impl AstPool:
     fn ct_build_field_access(node: i32, base: i32, field: i32) -> i32:
         self.add_node(NodeKind.NK_FIELD_ACCESS, self.get_start(node), self.get_end(node), base, field, 0) as i32
 
+    fn ct_build_index(node: i32, base: i32, index: i32) -> i32:
+        self.add_node(NodeKind.NK_INDEX, self.get_start(node), self.get_end(node), base, index, 0) as i32
+
     fn ct_build_int_lit(node: i32, value: i64) -> i32:
         self.add_node(NodeKind.NK_INT_LIT, self.get_start(node), self.get_end(node), ast_int_part0(value), ast_int_part1(value), ast_int_part2(value)) as i32
 
@@ -1695,7 +1698,6 @@ impl Sema:
         let idx_sym = intern.intern("idx")
         let new_sym = intern.intern("new")
         let push_sym = intern.intern("push")
-        let get_sym = intern.intern("get")
         let len_sym = intern.intern("len")
         let self_type_sym = intern.intern("Self")
         let i64_sym = intern.intern("i64")
@@ -1763,12 +1765,10 @@ impl Sema:
             let field_sym = out.get_extra(type_extra_start + 1 + fi * 3)
             let self_ident = out.ct_build_ident(decl, self_sym)
             let self_field = out.ct_build_field_access(decl, self_ident, field_sym)
-            let get_callee = out.ct_build_field_access(decl, self_field, get_sym)
             let idx_ident = out.ct_build_ident(decl, idx_sym)
-            let get_args: Vec[i32] = Vec.new()
-            get_args.push(idx_ident)
-            var get_call = out.ct_build_call(decl, get_callee, get_args)
-            // #747/D27: column.get(i) returns a VIEW; the rebuilt row's field
+            // D71: a column is read as `self.col[idx]`, the one element spelling.
+            var get_call = out.ct_build_index(decl, self_field, idx_ident)
+            // #747/D27: column[i] denotes a VIEW; the rebuilt row's field
             // demands an owned value. Materialize uniformly with .clone():
             // str clones, primitives copy (traits.w), and a type-param field
             // dispatches per instantiation. Copy CONCRETE fields stay bare

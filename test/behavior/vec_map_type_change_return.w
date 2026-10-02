@@ -36,12 +36,12 @@ fn make_users() -> Vec[U]:
 fn main:
     let ns = names(make_users())
     assert(ns.len() == 2)
-    assert(ns.get(0) == "ada")
-    assert(ns.get(1) == "bob")
+    assert(ns[0] == "ada")
+    assert(ns[1] == "bob")
 
     let ag = ages(make_users())
-    assert(ag.get(0) == 36)
-    assert(ag.get(1) == 24)
+    assert(ag[0] == 36)
+    assert(ag[1] == 24)
 
     assert(first_name(make_users()) == "ada")
     assert(total_age(make_users()) == 60)

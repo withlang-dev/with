@@ -342,7 +342,7 @@ fn ret_expected_test_marker(ctx: &ActionCtx, target_name: &str, entry: &str) -> 
     let comp_hexes = ret_sha256_hex_list(ctx, ret_safe_label(target_name) ++ "-marker-compiler", comp_files)
     if comp_hexes.len() as i32 != 1:
         ctx.diagnostics().error(ctx.target_name() ++ ": could not hash test compiler for marker " ++ target_name)
-    text = text ++ "compiler-sha256:" ++ comp_hexes.get(0) ++ "\n"
+    text = text ++ "compiler-sha256:" ++ comp_hexes[0] ++ "\n"
     let files = ret_direct_w_files(fs, ret_dirname(entry))
     let file_hexes = ret_sha256_hex_list(ctx, ret_safe_label(target_name) ++ "-marker-files", files)
     if file_hexes.len() != files.len():
@@ -545,7 +545,7 @@ fn ret_worktree_is_clean(ctx: &ActionCtx) -> bool:
     args.push("--porcelain")
     let lines = ret_run_lines(ctx, "git-status", args, 60000)
     for i in 0..lines.len() as i32:
-        let line = lines.get(i)
+        let line = lines[i]
         if line.len() == 0: continue
         if ret_untracked_is_not_input(line): continue
         return false
@@ -601,7 +601,7 @@ fn ret_green_store_line(store: &str, identity: &str) -> str:
     if identity.len() == 0: return ""
     let lines = store.split("\n")
     for i in 0..lines.len() as i32:
-        let line = lines.get(i)
+        let line = lines[i]
         if line.starts_with(identity ++ "\t"): return line.clone()
     ""
 
@@ -662,7 +662,7 @@ fn ret_archive_verified_seed(ctx: &ActionCtx, version: &str, commit: &str, sha25
     var entries = ret_manifest_lines_without(ret_seed_manifest_entries(fs), archive)
     entries.push(archive)
     while entries.len() as i32 > RET_SEED_KEEP:
-        let remove_path = entries.get(0)
+        let remove_path = entries[0]
         if fs.exists(remove_path):
             let _remove_old_seed = fs.remove_file(remove_path)
         let trimmed: Vec[str] = Vec.new()
@@ -692,7 +692,7 @@ fn ret_archive_verified_seed(ctx: &ActionCtx, version: &str, commit: &str, sha25
 /// The host seed asset the target was registered with (release_asset_for_host).
 fn ret_seed_asset_arg(ctx: &ActionCtx) -> str:
     let args = ctx.args()
-    if args.len() > 0: args.get(0).clone() else: ""
+    if args.len() > 0: args[0].clone() else: ""
 
 /// The pinned digest for `asset` when the driving compiler is that seed;
 /// "" after a diagnostic naming the driver, its digest and the fix.
@@ -747,7 +747,7 @@ fn ret_driver_ancestry_verdict(ctx: &ActionCtx, expected: &str, version: &str) -
     let ancestors = ret_run_lines(ctx, "driver-ancestry", probe, 30000)
     var seen: Vec[str] = Vec.new()
     for i in 0..ancestors.len() as i32:
-        var exe: str = ancestors.get(i).clone()
+        var exe: str = ancestors[i].clone()
         if exe.len() == 0: continue
         if exe.starts_with("-"): exe = exe.slice(1, exe.len())
         // A bare name is a PATH lookup (`with build`): resolve it the way the
@@ -768,7 +768,7 @@ fn ret_driver_ancestry_verdict(ctx: &ActionCtx, expected: &str, version: &str) -
         print("[" ++ ctx.target_name() ++ "] driver identity unverified: no ancestor process resolves to a file (probe: " ++ ret_join(capture_dir, "driver-ancestry.stdout") ++ ")")
         return 0
     var message = "no ancestor process of this action is the pinned seed " ++ version ++ "; the build system is being evaluated by another compiler:"
-    for i in 0..seen.len() as i32: message = message ++ "\n  " ++ seen.get(i)
+    for i in 0..seen.len() as i32: message = message ++ "\n  " ++ seen[i]
     ret_fail(ctx, ret_pinned_driver_fix(message))
 
 /// `with build :seed-driver` (arg: host seed asset). Fails fast, first in
@@ -783,12 +783,12 @@ pub fn run_seed_driver_action(ctx: ActionCtx) -> i32:
     let drift = seed_lock_workflow_drift(ctx.fs(), lock)
     if drift.len() > 0:
         var message = "these workflow seed pins disagree with seed.lock (" ++ seed_lock_version_for(lock, asset) ++ "); `with run tools/bump_seed_pins.w` rewrites them:"
-        for i in 0..drift.len() as i32: message = message ++ "\n  " ++ drift.get(i)
+        for i in 0..drift.len() as i32: message = message ++ "\n  " ++ drift[i]
         return ret_fail(ctx, message)
     let sdk_drift = sdk_lock_workflow_drift(ctx.fs(), sdk_lock_read(ctx.fs()))
     if sdk_drift.len() > 0:
         var message = "these workflow LLVM SDK pins disagree with sdk.lock (#1826):"
-        for i in 0..sdk_drift.len() as i32: message = message ++ "\n  " ++ sdk_drift.get(i)
+        for i in 0..sdk_drift.len() as i32: message = message ++ "\n  " ++ sdk_drift[i]
         return ret_fail(ctx, message)
     print("[seed-driver] the driver is the pinned seed " ++ seed_lock_version_for(lock, asset) ++ "; workflow pins agree with seed.lock and sdk.lock")
     ret_write_output_stamp(ctx)
@@ -851,18 +851,18 @@ pub fn run_fixpoint_compare_units_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let inputs = ctx.inputs()
     if inputs.len() < 2: return ret_fail(ctx, "requires the two unit-digest files")
-    let left = fs.read_text(inputs.get(0))
-    let right = fs.read_text(inputs.get(1))
-    if left.len() == 0: return ret_fail(ctx, "no unit digests in " ++ inputs.get(0) ++ "; the stage2 build records them")
-    if right.len() == 0: return ret_fail(ctx, "no unit digests in " ++ inputs.get(1) ++ "; the release build records them")
+    let left = fs.read_text(inputs[0])
+    let right = fs.read_text(inputs[1])
+    if left.len() == 0: return ret_fail(ctx, "no unit digests in " ++ inputs[0] ++ "; the stage2 build records them")
+    if right.len() == 0: return ret_fail(ctx, "no unit digests in " ++ inputs[1] ++ "; the release build records them")
     let left_lines = left.split("\n")
     let right_lines = right.split("\n")
     var units = 0
     var differing = ""
     let count = if left_lines.len() > right_lines.len(): left_lines.len() else: right_lines.len()
     for i in 0..count as i32:
-        let a = if i < left_lines.len() as i32: left_lines.get(i).clone() else: ""
-        let b = if i < right_lines.len() as i32: right_lines.get(i).clone() else: ""
+        let a = if i < left_lines.len() as i32: left_lines[i].clone() else: ""
+        let b = if i < right_lines.len() as i32: right_lines[i].clone() else: ""
         if a.len() == 0 and b.len() == 0: continue
         units = units + 1
         if a != b: differing = differing ++ "\n  stage2: " ++ (if a.len() > 0: a else: "(no such unit)") ++ "\n  stage3: " ++ (if b.len() > 0: b else: "(no such unit)")
@@ -998,7 +998,7 @@ fn ret_green_by_identity(ctx: &ActionCtx) -> bool:
     let line = ret_green_store_line(fs.host_read_text(ret_green_store_path()), identity)
     if line.len() == 0: return false
     let fields = line.split("\t")
-    let commit = if fields.len() > 1: fields.get(1).clone() else: ""
+    let commit = if fields.len() > 1: fields[1].clone() else: ""
     print("[" ++ ctx.target_name() ++ "] these sources are green: recorded at commit " ++ commit ++ " (" ++ ret_green_store_path() ++ ")")
     true
 
@@ -1267,7 +1267,7 @@ fn ret_report_large_prune(ctx: &ActionCtx):
         shown = shown + 1
 
 pub fn run_prune_action(ctx: ActionCtx) -> i32:
-    let mode = if ctx.args().len() > 0: retention_owned_text(ctx.args().get(0)) else: "dry-run"
+    let mode = if ctx.args().len() > 0: retention_owned_text(ctx.args()[0]) else: "dry-run"
     if mode == "apply":
         if ret_apply_large_prune(ctx) != 0:
             return 1

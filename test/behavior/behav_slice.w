@@ -28,9 +28,9 @@ fn test_vec_as_dynamic_slice:
     v.push(200)
     v.push(300)
     assert(v.len() == 3)
-    assert(v.get(0) == 100)
-    assert(v.get(1) == 200)
-    assert(v.get(2) == 300)
+    assert(v[0] == 100)
+    assert(v[1] == 200)
+    assert(v[2] == 300)
 
 fn test_empty_array:
     let arr = [0, 0, 0]

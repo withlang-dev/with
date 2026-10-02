@@ -27,8 +27,8 @@ fn test_regex_capture_names_match_bindings:
     let re = /^\[(?<level>ERROR|WARN)\]\s+(?<msg>.*)$/
     let names = re.capture_names()
     assert(names.len() == 2)
-    assert(names.get(0) == "level")
-    assert(names.get(1) == "msg")
+    assert(names[0] == "level")
+    assert(names[1] == "msg")
 
     let line = "[ERROR] db timeout"
     var got = ""

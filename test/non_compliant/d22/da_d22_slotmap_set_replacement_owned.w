@@ -19,4 +19,4 @@ fn main:
     with map.slot(handle) as mut slot:
         slot.set(move replacement)
 
-    assert(map.get(handle).unwrap().get(0) == 37)
+    assert(map.get(handle).unwrap()[0] == 37)

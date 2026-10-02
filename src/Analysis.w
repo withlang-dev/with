@@ -485,8 +485,8 @@ fn analysis_collect_ast_node_tree(report: &AnalysisReport, sema: &Sema, node: i3
     else if resolved.is_some():
         symbol = resolved.unwrap()
     let subject = analysis_node_subject(sema, node, source_path, source_text)
-    let path = subject.get(0)
-    let source = subject.get(1)
+    let path = subject[0]
+    let source = subject[1]
     var fact = AnalysisFact.new(AnalysisStage.Ast, AnalysisFactKind.AstNode)
     fact.id = node
     fact.parent = parent
@@ -2102,7 +2102,7 @@ fn analysis_seam_sites(sema: &Sema, mir_mod: &MirModule, source_path: &str, sour
         let ret_rows = analysis_seam_retention_rows(sema, body, fn_name, fn_path)
         for ri in 0..ret_rows.len() as i32:
             report_lines.push(with_str_clone_ref(ret_rows[ri]))
-            counts[5] = counts.get(5) + 1
+            counts[5] = counts[5] + 1
         // Statements: an operand inside an aggregate or a plain assign is
         // RETAINED by the destination; anything else is a transient read.
         for si in 0..body.stmt_kinds.len() as i32:
@@ -2137,7 +2137,7 @@ fn analysis_seam_sites(sema: &Sema, mir_mod: &MirModule, source_path: &str, sour
                     seen.insert(move r.key, 1)
                     counts[r.class_idx] = counts[r.class_idx] + 1
                     if r.actionable != 0:
-                        counts[6] = counts.get(6) + 1
+                        counts[6] = counts[6] + 1
                     report_lines.push(move r.row)
         // Call arguments: retained when the callee consumes them.
         for bb in 0..body.block_count():
@@ -2176,16 +2176,16 @@ fn analysis_seam_sites(sema: &Sema, mir_mod: &MirModule, source_path: &str, sour
                     seen.insert(move cr.key, 1)
                     counts[cr.class_idx] = counts[cr.class_idx] + 1
                     if cr.actionable != 0:
-                        counts[6] = counts.get(6) + 1
+                        counts[6] = counts[6] + 1
                     report_lines.push(move cr.row)
     for li in 0..report_lines.len() as i32:
         out = out ++ report_lines[li]
-    let moves_ref = counts.get(0)
-    let moves_raw = counts.get(1)
-    let copies_elem = counts.get(2)
-    let copies_view = counts.get(3)
-    let copies_raw = counts.get(4)
-    let retained = counts.get(5)
+    let moves_ref = counts[0]
+    let moves_raw = counts[1]
+    let copies_elem = counts[2]
+    let copies_view = counts[3]
+    let copies_raw = counts[4]
+    let retained = counts[5]
     for si in 0..sema.sig_names.len() as i32:
         for pi in 0..sema.sig_get_param_count(si):
             if (sema.sig_param_effect(si, pi) & EFF_ESCAPE_VIEW) == 0:
@@ -2204,7 +2204,7 @@ fn analysis_seam_sites(sema: &Sema, mir_mod: &MirModule, source_path: &str, sour
     // callee). Read-position copies are operands that never drop — reported
     // as observed so the inventory does not cry wolf. escape-view-consume is
     // always actionable.
-    let actionable = counts.get(6) + escapes
+    let actionable = counts[6] + escapes
     let total = moves_ref + moves_raw + copies_elem + copies_view + copies_raw + escapes
     out ++ f"seam-sites: {total} findings ({actionable} actionable, {total - actionable} observed) — move-through-ref={moves_ref} move-raw-deref={moves_raw} copy-elem-drop={copies_elem} copy-view-drop={copies_view} copy-raw-deref-drop={copies_raw} retained-unowned-copy={retained} escape-view-consume={escapes}\n"
 

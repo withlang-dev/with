@@ -24,7 +24,7 @@ fn main:
     var t = T { xs: Vec.new(), tag: 7 }
     t.xs.push(9)
     let p = &raw const t as i64
-    assert(view(p).xs.get(0) == 9)
+    assert(view(p).xs[0] == 9)
     assert(view(p).xs.len() == 1)
     assert(view(p).tag == 7)
 

@@ -33,11 +33,11 @@ fn main:
     var factory = Factory { made: 0 }
     let independent = factory.make_value()
     assert(factory.made == 1)
-    assert(independent.get(0) == 42)
+    assert(independent[0] == 42)
 
     var holder = Holder { values: Vec[i32].new() |> push(42) }
     let taken = holder.take_values()
-    assert(taken.get(0) == 42)
+    assert(taken[0] == 42)
     assert(holder.values.len() == 0)
 
     var viewed = Viewed { value: 42 }

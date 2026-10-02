@@ -209,8 +209,8 @@ pub fn run_seed_download_action(ctx: ActionCtx) -> i32:
     let root = ctx.project_info().project_root()
     if args.len() < 2 or output_path.len() == 0:
         return seed_fail(ctx, "requires repo arg, asset arg, and output path")
-    let repo = args.get(0)
-    let asset_name = args.get(1)
+    let repo = args[0]
+    let asset_name = args[1]
     let lock = seed_lock_read(fs)
     let pinned = seed_lock_value(lock, asset_name)
     var tag = env("SEED_VERSION")
@@ -281,9 +281,9 @@ pub fn run_deps_download_action(ctx: ActionCtx) -> i32:
     let marker = ctx.output()
     if args.len() < 3 or marker.len() == 0:
         return seed_fail(ctx, "requires repo arg, asset arg, sdk-base arg, and marker output")
-    let repo = args.get(0)
-    let asset_name = args.get(1)
-    let sdk_base = args.get(2)
+    let repo = args[0]
+    let asset_name = args[1]
+    let sdk_base = args[2]
     let sdk_dir = seed_join(".deps", sdk_base)
     // sdk.lock pins the SDK (#1826): a present SDK is kept only when its
     // stamp says it is the pinned release and digest, so a bump of the lock
@@ -406,7 +406,7 @@ pub fn seed_lock_version_for(lock: &str, asset: &str) -> str:
 fn seed_lock_block_asset(lines: &Vec[str], i: i64) -> str:
     var j = i + 1
     while j < lines.len() and j <= i + 4:
-        let line = lines.get(j)
+        let line = lines[j]
         for akey in ["seed_asset:", "WITH_SEED_ASSET:"]:
             let at = line.index_of(akey)
             if at >= 0: return line.slice(at + akey.len(), line.len()).trim()
@@ -425,7 +425,7 @@ pub fn seed_lock_workflow_drift(fs: &ToolFs, lock: &str) -> Vec[str]:
         let lines = fs.read_text(path).split("\n")
         var pending_asset = ""
         for i in 0..lines.len():
-            let line = lines.get(i)
+            let line = lines[i]
             let nr = i + 1
             if line.contains("${{"): continue
             for akey in ["seed_asset:", "WITH_SEED_ASSET:"]:
@@ -459,7 +459,7 @@ pub fn sdk_lock_workflow_drift(fs: &ToolFs, lock: &str) -> Vec[str]:
         let lines = fs.read_text(path).split("\n")
         var pending_asset = ""
         for i in 0..lines.len():
-            let line = lines.get(i)
+            let line = lines[i]
             let nr = i + 1
             if line.contains("${{"): continue
             for akey in ["sdk_asset:", "WITH_SDK_ASSET:"]:
@@ -486,7 +486,7 @@ pub fn sdk_lock_workflow_drift(fs: &ToolFs, lock: &str) -> Vec[str]:
 fn sdk_lock_block_asset(lines: &Vec[str], i: i64) -> str:
     var j = i + 1
     while j < lines.len() and j <= i + 4:
-        let line = lines.get(j)
+        let line = lines[j]
         for akey in ["sdk_asset:", "WITH_SDK_ASSET:"]:
             let at = line.index_of(akey)
             if at >= 0: return line.slice(at + akey.len(), line.len()).trim()

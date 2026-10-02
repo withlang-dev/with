@@ -322,7 +322,7 @@ impl Sema:
             self.module_index_by_path.insert(frontend_owned_text(mod.path), mod.module_id)
         if resolved.modules.len() > 0:
             let global_frontier: Vec[i32] = Vec.new()
-            let root = resolved.modules.get(0)
+            let root = resolved.modules[0]
             for ii in 0..root.import_count:
                 let imp = resolved.imports[(root.import_start + ii)]
                 if imp.target_module < 0:

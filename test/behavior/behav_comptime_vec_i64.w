@@ -65,9 +65,9 @@ const I64_CLEAR_LEN: i64 = comptime i64_clear_len()
 
 fn main:
     assert(I64S.len() == 3)
-    assert(I64S.get(0) == 1000000000000)
-    assert(I64S.get(1) == -9223372036854775807)
-    assert(I64S.get(2) == 9223372036854775807)
+    assert(I64S[0] == 1000000000000)
+    assert(I64S[1] == -9223372036854775807)
+    assert(I64S[2] == 9223372036854775807)
     assert(I64_LEN == 3)
     assert(I64_HIT == true)
     assert(I64_MISS == false)

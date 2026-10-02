@@ -273,7 +273,7 @@ pub fn run_embedded_runtime_regression_action(ctx: ActionCtx) -> i32:
         print("embedded-runtime-regression: skipped on Windows (#811)")
         let _ = fs.write_text(bs_join(output_dir, ".stamp"), "ok")
         return 0
-    let compiler_input = inputs.get(0)
+    let compiler_input = inputs[0]
     if not fs.exists(compiler_input):
         return bs_fail(ctx, "missing compiler: " ++ compiler_input)
 
@@ -344,7 +344,7 @@ pub fn run_runtime_generation_regression_action(ctx: ActionCtx) -> i32:
         return bs_fail(ctx, "could not remove previous output directory: " ++ output_dir)
     if fs.mkdir_all(output_dir) != 0:
         return bs_fail(ctx, "could not create output directory: " ++ output_dir)
-    let compiler = inputs.get(0)
+    let compiler = inputs[0]
 
     var gen_args: Vec[str] = Vec.new()
     gen_args |> push("version")
@@ -870,7 +870,7 @@ pub fn run_cli_selfhost_lsp_action(ctx: ActionCtx) -> i32:
     if fs.mkdir_all(output_dir) != 0:
         return bs_fail(ctx, "could not create output directory: " ++ output_dir)
 
-    let compiler_input = inputs.get(0)
+    let compiler_input = inputs[0]
     if not fs.exists(compiler_input):
         return bs_fail(ctx, "missing compiler: " ++ compiler_input)
     let compiler_path = bs_abs(ctx.project_info().project_root(), compiler_input)
@@ -1239,7 +1239,7 @@ pub fn run_cli_selfhost_smoke_action(ctx: ActionCtx) -> i32:
     if fs.mkdir_all(output_dir) != 0:
         return bs_fail(ctx, "could not create output directory: " ++ output_dir)
 
-    let compiler_input = inputs.get(0)
+    let compiler_input = inputs[0]
     if not fs.exists(compiler_input):
         return bs_fail(ctx, "missing compiler: " ++ compiler_input)
     let compiler_path = bs_abs(ctx.project_info().project_root(), compiler_input)
@@ -1293,7 +1293,7 @@ pub fn run_cli_selfhost_fmt_action(ctx: ActionCtx) -> i32:
         return bs_fail(ctx, "could not remove previous output directory: " ++ output_dir)
     if fs.mkdir_all(output_dir) != 0:
         return bs_fail(ctx, "could not create output directory: " ++ output_dir)
-    let compiler_input = inputs.get(0)
+    let compiler_input = inputs[0]
     if not fs.exists(compiler_input):
         return bs_fail(ctx, "missing compiler: " ++ compiler_input)
     let compiler_path = bs_abs(ctx.project_info().project_root(), compiler_input)
@@ -1343,7 +1343,7 @@ pub fn run_cli_selfhost_one_liner_action(ctx: ActionCtx) -> i32:
     if fs.mkdir_all(output_dir) != 0:
         return bs_fail(ctx, "could not create output directory: " ++ output_dir)
 
-    let compiler_input = inputs.get(0)
+    let compiler_input = inputs[0]
     if not fs.exists(compiler_input):
         return bs_fail(ctx, "missing compiler: " ++ compiler_input)
     let compiler_path = bs_abs(ctx.project_info().project_root(), compiler_input)
@@ -2771,7 +2771,7 @@ pub fn run_cli_selfhost_project_action(ctx: ActionCtx) -> i32:
     if fs.mkdir_all(output_dir) != 0:
         return bs_fail(ctx, "could not create output directory: " ++ output_dir)
 
-    let compiler_input = inputs.get(0)
+    let compiler_input = inputs[0]
     if not fs.exists(compiler_input):
         return bs_fail(ctx, "missing compiler: " ++ compiler_input)
     let compiler_path = bs_abs(ctx.project_info().project_root(), compiler_input)
@@ -3972,7 +3972,7 @@ pub fn run_cli_selfhost_edge_action(ctx: ActionCtx) -> i32:
     if fs.mkdir_all(output_dir) != 0:
         return bs_fail(ctx, "could not create output directory: " ++ output_dir)
 
-    let compiler_input = inputs.get(0)
+    let compiler_input = inputs[0]
     if not fs.exists(compiler_input):
         return bs_fail(ctx, "missing compiler: " ++ compiler_input)
     let compiler_path = bs_abs(ctx.project_info().project_root(), compiler_input)
@@ -4031,7 +4031,7 @@ pub fn run_cli_selfhost_parallel_action(ctx: ActionCtx) -> i32:
     if fs.mkdir_all(output_dir) != 0:
         return bs_fail(ctx, "could not create output directory: " ++ output_dir)
 
-    let compiler_input = inputs.get(0)
+    let compiler_input = inputs[0]
     if not fs.exists(compiler_input):
         return bs_fail(ctx, "missing compiler: " ++ compiler_input)
     let root = ctx.project_info().project_root()
@@ -4853,7 +4853,7 @@ pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     if fs.mkdir_all(output_dir) != 0:
         return bs_fail(ctx, "could not create output directory: " ++ output_dir)
 
-    let compiler_input = inputs.get(0)
+    let compiler_input = inputs[0]
     if not fs.exists(compiler_input):
         return bs_fail(ctx, "missing compiler: " ++ compiler_input)
     let compiler_path = bs_abs(ctx.project_info().project_root(), compiler_input)
@@ -5682,7 +5682,7 @@ pub fn run_cli_selfhost_migrate_core_action(ctx: ActionCtx) -> i32:
     if fs.mkdir_all(output_dir) != 0:
         return bs_fail(ctx, "could not create output directory: " ++ output_dir)
 
-    let compiler_input = inputs.get(0)
+    let compiler_input = inputs[0]
     if not fs.exists(compiler_input):
         return bs_fail(ctx, "missing compiler: " ++ compiler_input)
     let compiler_path = bs_abs(ctx.project_info().project_root(), compiler_input)
@@ -7719,12 +7719,12 @@ pub fn run_build_helper_programs_action(ctx: ActionCtx) -> i32:
     if fs.mkdir_all(output_dir) != 0:
         return bs_fail(ctx, "could not create output directory: " ++ output_dir)
     let root = ctx.project_info().project_root()
-    let compiler_input = inputs.get(0)
+    let compiler_input = inputs[0]
     if not fs.exists(compiler_input):
         return bs_fail(ctx, "missing compiler: " ++ compiler_input)
     let compiler_path = bs_abs(root, compiler_input)
     for i in 1..inputs.len():
-        let source = inputs.get(i)
+        let source = inputs[i]
         if not fs.exists(source):
             return bs_fail(ctx, "missing helper source: " ++ source)
         let base = bs_basename(source)
@@ -7768,7 +7768,7 @@ pub fn run_cli_selfhost_build_w_action(ctx: ActionCtx) -> i32:
         return bs_fail(ctx, "could not remove previous output directory: " ++ output_dir)
     if fs.mkdir_all(output_dir) != 0:
         return bs_fail(ctx, "could not create output directory: " ++ output_dir)
-    let compiler_input = inputs.get(0)
+    let compiler_input = inputs[0]
     if not fs.exists(compiler_input):
         return bs_fail(ctx, "missing compiler: " ++ compiler_input)
     let compiler_path = bs_abs(ctx.project_info().project_root(), compiler_input)
@@ -8047,7 +8047,7 @@ pub fn run_cli_selfhost_pcre2_prep_action(ctx: ActionCtx) -> i32:
     if fs.mkdir_all(output_dir) != 0:
         return bs_fail(ctx, "could not create output directory: " ++ output_dir)
 
-    let compiler_input = inputs.get(0)
+    let compiler_input = inputs[0]
     if not fs.exists(compiler_input):
         return bs_fail(ctx, "missing compiler: " ++ compiler_input)
     let compiler_path = bs_abs(ctx.project_info().project_root(), compiler_input)
@@ -8121,13 +8121,13 @@ fn bs_nm_symbol_name(line: &str) -> str:
     let words = bs_split_words(line)
     if words.len() == 0:
         return ""
-    bs_strip_mach_o_underscore(words.get(words.len() - 1))
+    bs_strip_mach_o_underscore(words[words.len() - 1])
 
 fn bs_nm_symbol_type(line: &str) -> str:
     let words = bs_split_words(line)
     if words.len() < 2:
         return ""
-    selfhost_owned_text(words.get(words.len() - 2))
+    selfhost_owned_text(words[words.len() - 2])
 
 fn bs_nm_output(ctx: &ActionCtx, nm_tool: &str, obj_path: &str, label: &str) -> SelfhostRunResult:
     let root = ctx.project_info().project_root()
@@ -8438,7 +8438,7 @@ fn bs_assert_manifest_field(ctx: &ActionCtx, manifest: &str, key: &str, expected
 // The sha on the first line of a --bundle-fingerprint output file.
 fn bs_fingerprint_sha(ctx: &ActionCtx, path: &str) -> str:
     let lines = bs_split_nonempty_lines(ctx.fs().read_text(path))
-    if lines.len() == 0: "" else: selfhost_owned_text(lines.get(0))
+    if lines.len() == 0: "" else: selfhost_owned_text(lines[0])
 
 // The first line at which two texts differ, for a byte-identity failure.
 fn bs_first_differing_line(expected: &str, actual: &str) -> str:
@@ -8734,7 +8734,7 @@ pub fn run_bundle_interface_action(ctx: ActionCtx) -> i32:
     if fs.mkdir_all(output_dir) != 0:
         return bs_fail(ctx, "could not create output directory: " ++ output_dir)
 
-    let compiler_input = inputs.get(0)
+    let compiler_input = inputs[0]
     if not fs.exists(compiler_input):
         return bs_fail(ctx, "missing compiler: " ++ compiler_input)
     let compiler_path = bs_abs(ctx.project_info().project_root(), compiler_input)
@@ -8742,7 +8742,7 @@ pub fn run_bundle_interface_action(ctx: ActionCtx) -> i32:
     // nm resolves as in run_cli_selfhost_object_symbol_action: $NM, else the
     // target's arg.
     let args = ctx.args()
-    let nm_arg = if args.len() > 0: selfhost_owned_text(args.get(0)) else: "nm"
+    let nm_arg = if args.len() > 0: selfhost_owned_text(args[0]) else: "nm"
     let nm_tool = bs_build_w_tool_from_env("NM", nm_arg)
     bs_check_bundle_interface(ctx, compiler_path, nm_tool, bs_join(output_dir, "cases"))
 
@@ -8760,7 +8760,7 @@ pub fn run_cli_selfhost_object_symbol_action(ctx: ActionCtx) -> i32:
     if fs.mkdir_all(output_dir) != 0:
         return bs_fail(ctx, "could not create output directory: " ++ output_dir)
 
-    let compiler_input = inputs.get(0)
+    let compiler_input = inputs[0]
     if not fs.exists(compiler_input):
         return bs_fail(ctx, "missing compiler: " ++ compiler_input)
     let compiler_path = bs_abs(ctx.project_info().project_root(), compiler_input)
@@ -8770,6 +8770,6 @@ pub fn run_cli_selfhost_object_symbol_action(ctx: ActionCtx) -> i32:
     // else the target's arg ("nm"). The arm64-Windows lane sets NM to the SDK's
     // llvm-nm.exe because the runner's ambient MSYS binutils nm cannot parse
     // COFF-ARM64 ("file format not recognized").
-    let nm_arg = if args.len() > 0: selfhost_owned_text(args.get(0)) else: "nm"
+    let nm_arg = if args.len() > 0: selfhost_owned_text(args[0]) else: "nm"
     let nm_tool = bs_build_w_tool_from_env("NM", nm_arg)
     bs_check_object_symbols(ctx, compiler_path, nm_tool, bs_join(output_dir, "cases"))

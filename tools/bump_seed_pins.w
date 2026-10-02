@@ -50,7 +50,7 @@ fn block_asset(lines: &Vec[str], i: i64) -> str:
     var j = i + 1
     while j < lines.len() and j <= i + 4:
         for akey in ["seed_asset:", "WITH_SEED_ASSET:"]:
-            if lines.get(j).contains(akey): return value_after(lines.get(j), akey)
+            if lines[j].contains(akey): return value_after(lines[j], akey)
         j = j + 1
     ""
 
@@ -80,7 +80,7 @@ fn rewrite(path: &str, text: &str, lock: &str) -> str:
     var pending_asset = ""
     var out = ""
     for i in 0..lines.len():
-        let line = lines.get(i)
+        let line = lines[i]
         let nr = i + 1
         var emitted = line ++ ""
         if not line.contains("${{"):

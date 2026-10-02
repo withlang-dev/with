@@ -719,7 +719,7 @@ fn tool_path_normalize(path: &str) -> str:
             if i > start:
                 let part = path.slice(start as i64, i as i64)
                 if part == "..":
-                    if parts.len() > 0 and parts.get(parts.len() - 1) != "..":
+                    if parts.len() > 0 and parts[parts.len() - 1] != "..":
                         parts.pop()
                     else if not is_absolute:
                         parts.push(part)
@@ -729,7 +729,7 @@ fn tool_path_normalize(path: &str) -> str:
     if start < path.len() as i32:
         let part = path.slice(start as i64, path.len() as i64)
         if part == "..":
-            if parts.len() > 0 and parts.get(parts.len() - 1) != "..":
+            if parts.len() > 0 and parts[parts.len() - 1] != "..":
                 parts.pop()
             else if not is_absolute:
                 parts.push(part)
@@ -1275,7 +1275,7 @@ fn tool_gzip_stored(bytes: &Vec[u8]) -> Vec[u8]:
         out = tool_gzip_append_u16_le(move out, 0xffff - chunk as i32)
         var i: i64 = 0
         while i < chunk:
-            out.push(bytes.get(offset + i))
+            out.push(bytes[offset + i])
             i = i + 1
         offset = offset + chunk
     out = tool_gzip_append_u32_le(move out, tool_gzip_crc32(bytes))
@@ -1442,7 +1442,7 @@ fn tool_tar_block_is_zero(bytes: &Vec[u8], offset: i64) -> bool:
         return false
     var i: i64 = 0
     while i < 512:
-        if bytes.get(offset + i) != 0 as u8:
+        if bytes[offset + i] != 0 as u8:
             return false
         i = i + 1
     true
@@ -1451,7 +1451,7 @@ fn tool_tar_field_str(bytes: &Vec[u8], offset: i64, width: i64) -> str:
     var out = StringBuilder.new()
     var i: i64 = 0
     while i < width:
-        let b = bytes.get(offset + i)
+        let b = bytes[offset + i]
         if b == 0 as u8:
             return out.to_str()
         out.push_byte(b)
@@ -1462,7 +1462,7 @@ fn tool_tar_parse_octal(bytes: &Vec[u8], offset: i64, width: i64) -> i64:
     var value: i64 = 0
     var i: i64 = 0
     while i < width:
-        let b = bytes.get(offset + i)
+        let b = bytes[offset + i]
         if b != 0 as u8 and b != 32 as u8:
             if b < 48 as u8 or b > 55 as u8:
                 return -1
@@ -1477,21 +1477,21 @@ fn tool_tar_header_checksum(bytes: &Vec[u8], offset: i64) -> i64:
         if i >= 148 and i < 156:
             sum = sum + 32
         else:
-            sum = sum + bytes.get(offset + i) as i64
+            sum = sum + bytes[offset + i] as i64
         i = i + 1
     sum
 
 fn tool_tar_magic_ok(bytes: &Vec[u8], offset: i64) -> bool:
-    let ustar = bytes.get(offset + 257) == 117 as u8 and
-        bytes.get(offset + 258) == 115 as u8 and
-        bytes.get(offset + 259) == 116 as u8 and
-        bytes.get(offset + 260) == 97 as u8 and
-        bytes.get(offset + 261) == 114 as u8
+    let ustar = bytes[offset + 257] == 117 as u8 and
+        bytes[offset + 258] == 115 as u8 and
+        bytes[offset + 259] == 116 as u8 and
+        bytes[offset + 260] == 97 as u8 and
+        bytes[offset + 261] == 114 as u8
     if ustar:
         return true
     var i: i64 = 257
     while i < 265:
-        if bytes.get(offset + i) != 0 as u8:
+        if bytes[offset + i] != 0 as u8:
             return false
         i = i + 1
     true
@@ -1512,7 +1512,7 @@ fn tool_tar_payload_text(bytes: &Vec[u8], offset: i64, size: i64) -> str:
     var out = StringBuilder.with_capacity(size)
     var i: i64 = 0
     while i < size:
-        out.push_byte(bytes.get(offset + i))
+        out.push_byte(bytes[offset + i])
         i = i + 1
     out.to_str()
 
@@ -1598,7 +1598,7 @@ pub fn ToolFs.extract_tar(self: &Self, archive_path: &str, output_dir: &str) -> 
         let size = tool_tar_parse_octal(&archive, 124, 12)
         if mode < 0 or size < 0:
             return tool_tar_extract_fail(f"invalid numeric field at offset {offset}")
-        let typeflag = archive.get(156)
+        let typeflag = archive[156]
         let content_start = offset + 512
         if size > archive_len - content_start:
             return tool_tar_extract_fail(f"entry payload extends past archive at offset {offset}")
@@ -1866,7 +1866,7 @@ fn tool_effect_resolve_executable(exe: &str) -> str:
 fn tool_effect_tool_identity(parts: &Vec[str]) -> str:
     if parts.len() == 0:
         return ""
-    let exe = parts.get(0)
+    let exe = parts[0]
     let resolved = tool_effect_resolve_executable(exe)
     if resolved.len() > 0:
         return tool_effect_escape(resolved) ++ ":" ++ tool_sha256_text(with_fs_read_file(resolved))
@@ -2033,7 +2033,7 @@ fn tool_process_basename(path: &str) -> str:
 fn tool_process_requires_network(args: &Vec[str]) -> bool:
     if args.len() == 0:
         return false
-    let name = tool_process_basename(args.get(0))
+    let name = tool_process_basename(args[0])
     name == "curl" or name == "curl.exe" or name == "wget" or name == "wget.exe" or name == "https_fetch" or name == "https_fetch.exe"
 
 fn ProcessRunner.project_relative_path(self: &Self, path: &str) -> str:
@@ -2060,7 +2060,7 @@ fn ProcessRunner.require_network_allowed(self: &Self, args: &Vec[str], method: &
     if self.network:
         return
     let target = if self.target_name.len() > 0: self.target_name.clone() else: "<build>"
-    let tool = tool_process_basename(args.get(0))
+    let tool = tool_process_basename(args[0])
     with_eprint("error: ProcessRunner." ++ method ++ " uses network tool '" ++ tool ++ "' for target '" ++ target ++ "' without target.allow_network()\n")
     exit(1)
 
@@ -2151,7 +2151,7 @@ pub fn ActionCtx.output(self: &Self) -> &str:
     tool_capability_require(self.token, "ActionCtx")
     if self.outputs_value.len() == 0:
         return ""
-    self.outputs_value.get(0)
+    self.outputs_value[0]
 
 pub fn ActionCtx.timeout(self: &Self) -> i32:
     tool_capability_require(self.token, "ActionCtx")
@@ -2505,8 +2505,8 @@ fn build_download_action(ctx: ActionCtx) -> i32:
     let output_path = ctx.output()
     if args.len() < 2 or output_path.len() == 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": download requires url, sha256, and output")
-    let url = args.get(0)
-    let sha256 = args.get(1)
+    let url = args[0]
+    let sha256 = args[1]
     let output_dir = build_path_dirname(output_path)
     if fs.mkdir_all(output_dir) != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": could not create directory: " ++ output_dir)
@@ -2556,7 +2556,7 @@ fn build_extract_tar_gz_action(ctx: ActionCtx) -> i32:
     let output_dir = ctx.output()
     if inputs.len() == 0 or output_dir.len() == 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": extract requires archive input and output dir")
-    let archive = inputs.get(0)
+    let archive = inputs[0]
     if fs.mkdir_all(output_dir) != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": could not create output directory: " ++ output_dir)
     let cmd_dir = "out/command/" ++ ctx.target_name()
@@ -3020,7 +3020,7 @@ fn ws_build_plan(state: &WsState, project_root: &str) -> WorkspaceCompilePlan:
         exit(1)
     var source_path = with_str_clone_ref(state.options.source_path)
     if source_path.len() == 0 and state.files.len() > 0:
-        source_path = with_str_clone_ref(state.files.get(0))
+        source_path = with_str_clone_ref(state.files[0])
     if source_path.len() == 0 and state.string_names.len() == 0:
         with_eprint("error: Workspace.compile requires at least one source file or source string\n")
         exit(1)

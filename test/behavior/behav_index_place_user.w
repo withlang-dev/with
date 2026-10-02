@@ -10,7 +10,7 @@ type Grid {
 
 impl IndexPlace[i32, i32] for Grid:
     fn get(self: &Self, index: i32) -> i32:
-        self.data.get(index)
+        self.data[index]
 
     fn set(mut self: Self, index: i32, value: i32):
         with self.data.slot(index) as mut s:

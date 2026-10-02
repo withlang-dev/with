@@ -70,7 +70,7 @@ fn math_fn_table() -> Vec[MathFnRow]:
 pub fn math_fn_lookup(name: &str) -> i32:
     let t = math_fn_table()
     for i in 0..t.len() as i32:
-        if t.get(i).name == name: return i
+        if t[i].name == name: return i
     -1
 
 /// The number of rows: ids are 0..math_fn_count().
@@ -79,18 +79,18 @@ pub fn math_fn_count() -> i32: math_fn_table().len() as i32
 /// Operand count: 1 or 2. Every operand shares the argument's float type.
 pub fn math_fn_arity(id: i32) -> i32:
     let t = math_fn_table()
-    t.get(id).arity
+    t[id].arity
 
 pub fn math_fn_name(id: i32) -> str:
     let t = math_fn_table()
-    t.get(id).name.clone()
+    t[id].name.clone()
 
 /// LLVM intrinsic base name (`llvm.cos`), or "" when the function is libm-only.
 pub fn math_fn_llvm(id: i32) -> str:
     let t = math_fn_table()
-    t.get(id).llvm.clone()
+    t[id].llvm.clone()
 
 /// libm base symbol; the f32 spelling appends `f` (`cos` -> `cosf`).
 pub fn math_fn_libm(id: i32) -> str:
     let t = math_fn_table()
-    t.get(id).libm.clone()
+    t[id].libm.clone()

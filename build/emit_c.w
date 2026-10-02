@@ -614,7 +614,7 @@ pub fn run_bootstrap_c_emit_sources_action(ctx: ActionCtx) -> i32:
     let out_dir = emitc_dirname(main_c)
     if fs.mkdir_all(out_dir) != 0:
         return emitc_fail(ctx, "could not create output directory: " ++ out_dir)
-    var rc = emitc_build_compiler_c(ctx, args.get(0), main_c)
+    var rc = emitc_build_compiler_c(ctx, args[0], main_c)
     if rc != 0: return rc
     emitc_generate_stub_files(ctx)
 
@@ -819,7 +819,7 @@ pub fn run_emit_c_test_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let out_dir = "out/emit-c-test"
     let stamp_path = ctx.output()
-    let compiler_path = inputs.get(0)
+    let compiler_path = inputs[0]
     if not fs.exists(compiler_path):
         return emitc_fail(ctx, "missing compiler: " ++ compiler_path)
     let _clean = fs.remove_tree(out_dir)
@@ -856,8 +856,8 @@ pub fn run_emit_c_fixpoint_action(ctx: ActionCtx) -> i32:
         return emitc_fail(ctx, "requires emitted C and compiler inputs")
     let fs = ctx.fs()
     let stamp_path = ctx.output()
-    let main_c = inputs.get(0)
-    let compiler_path = inputs.get(1)
+    let main_c = inputs[0]
+    let compiler_path = inputs[1]
     let main2_c = "out/emit-c-test/main2.c"
     if not fs.exists(compiler_path):
         return emitc_fail(ctx, "missing emitted compiler: " ++ compiler_path)
@@ -882,7 +882,7 @@ pub fn run_emit_c_roundtrip_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let out_dir = "out/emit-c-roundtrip"
     let stamp_path = ctx.output()
-    let compiler_path = inputs.get(0)
+    let compiler_path = inputs[0]
     if not fs.exists(compiler_path):
         return emitc_fail(ctx, "missing compiler: " ++ compiler_path)
     let _clean = fs.remove_tree(out_dir)

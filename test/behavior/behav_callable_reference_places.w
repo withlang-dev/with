@@ -18,5 +18,5 @@ fn main:
     var callbacks: Vec[fn(i32) -> i32] = Vec.new()
     callbacks.push(increase)
     assert(callbacks[0](30) == 31)
-    assert(callbacks.get(0)(40) == 41)
+    assert(callbacks[0](40) == 41)
     print("ok")

@@ -8669,7 +8669,7 @@ impl CCodegen:
                 return self.global_init_return_text(body.fn_sym)
             let sig_idx = self.body_sig_index(body.fn_sym)
             let ret_tid = if sig_idx >= 0: self.c_sig_return_type(sig_idx) else:
-                if body.local_type_ids.len() as i32 > 0: body.local_type_ids.get(0) else: self.sema.ty_void
+                if body.local_type_ids.len() as i32 > 0: body.local_type_ids[0] else: self.sema.ty_void
             if self.is_void_tid(ret_tid) != 0:
                 return "    return;"
             if self.returns_array(ret_tid):
@@ -9583,7 +9583,7 @@ impl CCodegen:
             return "static void " ++ fn_name ++ "(void)"
         let sig_idx = self.body_sig_index(fn_sym)
         let ret_tid = if sig_idx >= 0: self.c_sig_return_type(sig_idx) else:
-            if body.local_type_ids.len() > 0: body.local_type_ids.get(0) else: self.sema.ty_void
+            if body.local_type_ids.len() > 0: body.local_type_ids[0] else: self.sema.ty_void
         var params = ""
         let param_count = if sig_idx >= 0: self.sema.sig_get_param_count(sig_idx) else: 0
         for i in 0..param_count:

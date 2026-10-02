@@ -22,4 +22,4 @@ fn main:
     map.insert(1, move replacement)
     let owned = map.remove(1).unwrap()
     map.clear()
-    assert(owned.get(0) == 48)
+    assert(owned[0] == 48)

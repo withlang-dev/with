@@ -104,8 +104,8 @@ pub fn run_zlib_test_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()
     let output = ctx.output()
     if inputs.len() < 3: return corpus_fail(ctx, "requires migrated-dir, example binary and minigzip binary inputs")
-    let example_bin = inputs.get(1)
-    let minigzip_bin = inputs.get(2)
+    let example_bin = inputs[1]
+    let minigzip_bin = inputs[2]
     if not fs.exists(example_bin): return corpus_fail(ctx, "missing zlib example binary: " ++ example_bin)
     if not fs.exists(minigzip_bin): return corpus_fail(ctx, "missing minigzip binary: " ++ minigzip_bin)
     let run_dir = output ++ "/current"

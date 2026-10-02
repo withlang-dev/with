@@ -19,7 +19,7 @@ gen fn two_step -> i32:
 gen fn values_from(source: &Vec[i32]) -> i32:
     var i = 0
     while i < source.len() as i32:
-        yield source.get(i as i64)
+        yield source[i as i64]
         i += 1
 
 fn forward_values_from(source: &Vec[i32]):

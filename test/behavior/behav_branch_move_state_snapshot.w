@@ -9,7 +9,7 @@ fn singleton(value: i32):
     out
 
 fn consume(values: Vec[i32]) -> i32:
-    values.get(0)
+    values[0]
 
 fn main:
     var pair = Pair { a: singleton(1), b: singleton(2) }

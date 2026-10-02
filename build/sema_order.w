@@ -20,7 +20,7 @@ pub fn run_sema_order_check_action(ctx: ActionCtx) -> i32:
     if fs.mkdir_all(out_dir) != 0:
         ctx.diagnostics().error("sema-order-check: could not create " ++ out_dir)
     let root = ctx.project_info().project_root()
-    let compiler = so_abs(root, ctx.inputs().get(0))
+    let compiler = so_abs(root, ctx.inputs()[0])
     var args: Vec[str] = Vec.new()
     args.push(compiler.clone())
     args.push("run")

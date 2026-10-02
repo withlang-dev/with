@@ -28,5 +28,5 @@ fn main:
     assert(count_all(vr) == 2)
     assert(v.len() == 2)
     assert(peek_first(v) == 1)
-    assert(v.get(0) == 1)
+    assert(v[0] == 1)
     print("ok")

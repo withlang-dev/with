@@ -190,15 +190,15 @@ fn linux_aarch64_leg(version: &str, channel: &str) -> i32:
 fn main -> i32:
     let argv = args()
     if argv.len() < 2: return fail("usage: with run tools/release_local.w vX.Y.Z [--channel release|test] [--skip-darwin] [--skip-linux-aarch64]")
-    let version = argv.get(1).clone()
+    let version = argv[1].clone()
     var channel = "release"
     var do_darwin = true
     var do_aarch64 = true
     var i = 2
     while i < argv.len() as i32:
-        let a = argv.get(i).clone()
+        let a = argv[i].clone()
         if a == "--channel" and i + 1 < argv.len() as i32:
-            channel = argv.get(i + 1).clone()
+            channel = argv[i + 1].clone()
             i += 1
         else if a == "--skip-darwin": do_darwin = false
         else if a == "--skip-linux-aarch64": do_aarch64 = false

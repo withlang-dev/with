@@ -22,7 +22,7 @@ impl[T: Clone] Clone for Vec[T]:
         var out: Vec[T] = Vec.new()
         var index: i64 = 0
         while index < self.len():
-            let item = self.get(index)
+            let item = self[index]
             comptime if T.is_copy():
                 out.push(item)
             else:
@@ -135,7 +135,7 @@ impl[K: Ord, V] BTreeMap[K, V]:
         while entry_i < self.entries.len():
             // #773/D27: entries.get yields a view; the owned Vec[K] demand
             // materializes via clone (per-instantiation dispatch).
-            let (key, _) = self.entries.get(entry_i)
+            let (key, _) = self.entries[entry_i]
             out.push(key.clone())
             entry_i = entry_i + 1
         out
@@ -144,7 +144,7 @@ impl[K: Ord, V] BTreeMap[K, V]:
         let out: Vec[V] = Vec.new()
         var entry_i = 0
         while entry_i < self.entries.len():
-            let (_, value) = self.entries.get(entry_i)
+            let (_, value) = self.entries[entry_i]
             out.push(value.clone())
             entry_i = entry_i + 1
         out
@@ -154,7 +154,7 @@ impl[K: Ord, V] BTreeMap[K, V]:
         var entry_i = 0
         while entry_i < self.entries.len():
             // #773/D27: views materialize into the owned tuple.
-            let (key, value) = self.entries.get(entry_i)
+            let (key, value) = self.entries[entry_i]
             out.push((key.clone(), value.clone()))
             entry_i = entry_i + 1
         out
@@ -257,7 +257,7 @@ impl[T: Ord] BTreeSet[T]:
     fn index_of(value: T) -> i64:
         var i = 0
         while i < self.values.len():
-            let existing = self.values.get(i)
+            let existing = self.values[i]
             if not (existing < value) and not (existing > value):
                 return i
             i = i + 1
@@ -266,7 +266,7 @@ impl[T: Ord] BTreeSet[T]:
     pub fn contains(value: &T) -> bool:
         var i = 0
         while i < self.values.len():
-            let existing = self.values.get(i)
+            let existing = self.values[i]
             if not (existing < value) and not (existing > value):
                 return true
             i = i + 1
@@ -275,7 +275,7 @@ impl[T: Ord] BTreeSet[T]:
     pub mut fn insert(value: T) -> Unit:
         var i = 0
         while i < self.values.len():
-            let existing = self.values.get(i)
+            let existing = self.values[i]
             if not (existing < value) and not (existing > value):
                 with self.values.slot(i) as mut slot:
                     slot.set(value)
@@ -287,8 +287,8 @@ impl[T: Ord] BTreeSet[T]:
                     // Typed lets snapshot the elements: a view of slot j-1
                     // would observe the first set() and duplicate it (the
                     // §3.2 view-liveness hazard E3 will reject).
-                    let left: T = self.values.get(j - 1)
-                    let right: T = self.values.get(j)
+                    let left: T = self.values[j - 1]
+                    let right: T = self.values[j]
                     with self.values.slot(j - 1) as mut left_slot:
                         left_slot.set(right)
                     with self.values.slot(j) as mut right_slot:
@@ -304,7 +304,7 @@ impl[T: Ord] BTreeSet[T]:
             return false
         var i = 0
         while i < self.values.len():
-            let existing = self.values.get(i)
+            let existing = self.values[i]
             if not (existing < value) and not (existing > value):
                 let _ = self.values.remove(i)
             else:
@@ -315,7 +315,7 @@ impl[T: Ord] BTreeSet[T]:
         let out: Vec[T] = Vec.new()
         var value_i = 0
         while value_i < self.values.len():
-            let value = self.values.get(value_i)
+            let value = self.values[value_i]
             out.push(value.clone())
             value_i = value_i + 1
         out
@@ -325,12 +325,12 @@ impl[T: Ord] BTreeSet[T]:
         let out: BTreeSet[T] = BTreeSet[T].new()
         var self_i = 0
         while self_i < self.values.len():
-            let value: T = self.values.get(self_i)
+            let value: T = self.values[self_i]
             out.insert(value)
             self_i = self_i + 1
         var other_i = 0
         while other_i < other.values.len():
-            let value2: T = other.values.get(other_i)
+            let value2: T = other.values[other_i]
             out.insert(value2)
             other_i = other_i + 1
         out
@@ -340,7 +340,7 @@ impl[T: Ord] BTreeSet[T]:
         let out: BTreeSet[T] = BTreeSet[T].new()
         var self_i = 0
         while self_i < self.values.len():
-            let value: T = self.values.get(self_i)
+            let value: T = self.values[self_i]
             if other.contains(value):
                 out.insert(value)
             self_i = self_i + 1
@@ -350,7 +350,7 @@ impl[T: Ord] BTreeSet[T]:
         let out: BTreeSet[T] = BTreeSet[T].new()
         var self_i = 0
         while self_i < self.values.len():
-            let value: T = self.values.get(self_i)
+            let value: T = self.values[self_i]
             if not other.contains(value):
                 out.insert(value)
             self_i = self_i + 1

@@ -508,7 +508,7 @@ fn comptime_tool_path_push_part(parts: Vec[str], part: &str, is_absolute: bool, 
     if part != "..":
         out.push(with_str_clone_ref(part))
         return out
-    if out.len() > root_parts and out.get(out.len() - 1) != "..":
+    if out.len() > root_parts and out[out.len() - 1] != "..":
         out.pop()
         return out
     if not is_absolute:
@@ -1571,14 +1571,14 @@ impl ComptimeEvaluator:
     // buffer). Copy the value struct OUT before any push. Materialization
     // may transfer its text into an ordinary owning str, so this read is deep.
     fn extra_value_at(index: i64) -> ComptimeValue:
-        comptime_value_clone(self.extra_values.get(index))
+        comptime_value_clone(self.extra_values[index])
 
     // A persistent snapshot retains ComptimeValues, whose Drop keeps shared
     // immutable text alive. Deep-cloning an unchanged field on every cursor
     // update retains input_size * update_count bytes (#1944). The copied
     // header also survives arena reallocation; no view into the vec escapes.
     fn extra_snapshot_value_at(index: i64) -> ComptimeValue:
-        comptime_value_share(self.extra_values.get(index))
+        comptime_value_share(self.extra_values[index])
 
     fn cleanup_workspace_pending_links():
         for wi in 0..self.workspace_records.len() as i32:
@@ -2125,7 +2125,7 @@ impl ComptimeEvaluator:
     fn effect_tool_identity(parts: &Vec[str]) -> str:
         if parts.len() == 0:
             return ""
-        let exe = parts.get(0)
+        let exe = parts[0]
         let resolved = comptime_effect_resolve_executable(exe)
         let key = if resolved.len() > 0: resolved.clone() else: with_str_clone_ref(exe)
         for i in 0..self.tool_identity_paths.len() as i32:
@@ -2206,7 +2206,7 @@ impl ComptimeEvaluator:
     mut fn require_network_tool_allowed(record: &ComptimeCapabilityRecord, method: &str, parts: &Vec[str], node: i32) -> i32:
         if parts.len() == 0:
             return 0
-        let exe = parts.get(0)
+        let exe = parts[0]
         if not comptime_process_requires_network(exe):
             return 0
         if record.network != 0:
@@ -4783,7 +4783,7 @@ impl ComptimeEvaluator:
         let option_source = self.workspace_str_option(options, "source_path")
         var source_path = option_source
         if source_path.len() == 0 and record.files.len() > 0:
-            source_path = with_str_clone_ref(record.files.get(0))
+            source_path = with_str_clone_ref(record.files[0])
         let output_path = self.workspace_str_option(options, "output_path")
         let output_kind = self.workspace_i32_option(options, "output_kind", 0)
         let target_kind = self.workspace_i32_option(options, "target", 0)
@@ -4945,7 +4945,7 @@ impl ComptimeEvaluator:
         let option_source = self.workspace_str_option(options, "source_path")
         var source_path = option_source
         if source_path.len() == 0 and out.files.len() > 0:
-            source_path = with_str_clone_ref(out.files.get(0))
+            source_path = with_str_clone_ref(out.files[0])
         let output_path = self.workspace_str_option(options, "output_path")
         let output_kind = self.workspace_i32_option(options, "output_kind", 0)
         let target_kind = self.workspace_i32_option(options, "target", 0)
@@ -4986,7 +4986,7 @@ impl ComptimeEvaluator:
             for si in 0..out.string_names.len() as i32:
                 source_paths.push(self.workspace_path(capability.project_root, out.string_names[si]))
                 source_texts.push(with_str_clone_ref(out.string_sources[si]))
-            source_name = with_str_clone_ref(source_paths.get(0))
+            source_name = with_str_clone_ref(source_paths[0])
             pool = comp.compile_entry_source_texts(source_paths, source_texts)
         else:
             let absolute_source = self.workspace_path(capability.project_root, source_path)
@@ -6150,7 +6150,7 @@ impl ComptimeEvaluator:
         if method == "output":
             if record.outputs.len() == 0:
                 return comptime_control_value(comptime_value_str(""))
-            return comptime_control_value(comptime_value_str(record.outputs.get(0)))
+            return comptime_control_value(comptime_value_str(record.outputs[0]))
         if method == "timeout":
             return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), record.timeout_ms as i64))
         if method == "working_dir":
@@ -7662,9 +7662,9 @@ impl ComptimeEvaluator:
         if fn_name == "with_panic" or fn_name == "with_panic_ref":
             if arg_values.len() as i32 != 3:
                 return self.fail(node, "panic runtime call takes three arguments")
-            let message = arg_values.get(0)
-            let location = arg_values.get(1)
-            let line = arg_values.get(2)
+            let message = arg_values[0]
+            let location = arg_values[1]
+            let line = arg_values[2]
             if message.kind != ComptimeValueKind.CV_STR or location.kind != ComptimeValueKind.CV_STR or comptime_value_is_intlike(line) == 0:
                 return self.fail(node, "panic runtime call expects string, string, integer arguments")
             let line_value = comptime_value_intlike(line)
@@ -7680,7 +7680,7 @@ impl ComptimeEvaluator:
         if fn_name == "with_println_str" or fn_name == "with_print_str" or fn_name == "with_eprint" or fn_name == "with_write" or fn_name == "with_ewrite":
             if arg_values.len() as i32 != 1:
                 return self.fail(node, fn_name ++ " takes one argument")
-            let text = arg_values.get(0)
+            let text = arg_values[0]
             if text.kind != ComptimeValueKind.CV_STR:
                 return self.fail(node, fn_name ++ " argument must be a string")
             if fn_name == "with_println_str":
@@ -7697,7 +7697,7 @@ impl ComptimeEvaluator:
         if fn_name == "with_println_i32" or fn_name == "with_println_i64":
             if arg_values.len() as i32 != 1:
                 return self.fail(node, fn_name ++ " takes one argument")
-            let value = arg_values.get(0)
+            let value = arg_values[0]
             if comptime_value_is_intlike(value) == 0:
                 return self.fail(node, fn_name ++ " argument must be an integer")
             if fn_name == "with_println_i32":
@@ -7708,7 +7708,7 @@ impl ComptimeEvaluator:
         if fn_name == "with_println_bool":
             if arg_values.len() as i32 != 1:
                 return self.fail(node, "with_println_bool takes one argument")
-            let value = arg_values.get(0)
+            let value = arg_values[0]
             if value.kind != ComptimeValueKind.CV_BOOL:
                 return self.fail(node, "with_println_bool argument must be a bool")
             with_println_bool(value.data0 != 0)
@@ -7716,7 +7716,7 @@ impl ComptimeEvaluator:
         if fn_name == "with_getenv_str":
             if arg_values.len() as i32 != 1:
                 return self.fail(node, "with_getenv_str takes one argument")
-            let name = arg_values.get(0)
+            let name = arg_values[0]
             if name.kind != ComptimeValueKind.CV_STR:
                 return self.fail(node, "with_getenv_str argument must be a string")
             if self.strict_effects != 0:
@@ -7725,8 +7725,8 @@ impl ComptimeEvaluator:
         if fn_name == "with_setenv_str":
             if arg_values.len() as i32 != 2:
                 return self.fail(node, "with_setenv_str takes two arguments")
-            let name = arg_values.get(0)
-            let value = arg_values.get(1)
+            let name = arg_values[0]
+            let value = arg_values[1]
             if name.kind != ComptimeValueKind.CV_STR or value.kind != ComptimeValueKind.CV_STR:
                 return self.fail(node, "with_setenv_str expects string arguments")
             self.record_runtime_env_set(name.text)
@@ -7734,39 +7734,39 @@ impl ComptimeEvaluator:
         if fn_name == "with_str_clone_ref" or fn_name == "with_str_clone":
             if arg_values.len() as i32 != 1:
                 return self.fail(node, fn_name ++ " takes one argument")
-            let clone_text = arg_values.get(0)
+            let clone_text = arg_values[0]
             if clone_text.kind != ComptimeValueKind.CV_STR:
                 return self.fail(node, fn_name ++ " argument must be a string")
             return comptime_control_value(comptime_value_str(with_str_clone_ref(clone_text.text)))
         if fn_name == "with_str_len":
             if arg_values.len() as i32 != 1:
                 return self.fail(node, "with_str_len takes one argument")
-            let text = arg_values.get(0)
+            let text = arg_values[0]
             if text.kind != ComptimeValueKind.CV_STR:
                 return self.fail(node, "with_str_len argument must be a string")
             return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i64 as i32), with_str_len(text.text)))
         if fn_name == "with_str_byte_at":
             if arg_values.len() as i32 != 2:
                 return self.fail(node, "with_str_byte_at takes two arguments")
-            let text = arg_values.get(0)
-            let index = arg_values.get(1)
+            let text = arg_values[0]
+            let index = arg_values[1]
             if text.kind != ComptimeValueKind.CV_STR or comptime_value_is_intlike(index) == 0:
                 return self.fail(node, "with_str_byte_at expects string and integer arguments")
             return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), with_str_byte_at_ref(with_str_clone_ref(text.text), comptime_value_intlike(index))))
         if fn_name == "with_str_slice":
             if arg_values.len() as i32 != 3:
                 return self.fail(node, "with_str_slice takes three arguments")
-            let text = arg_values.get(0)
-            let start = arg_values.get(1)
-            let end = arg_values.get(2)
+            let text = arg_values[0]
+            let start = arg_values[1]
+            let end = arg_values[2]
             if text.kind != ComptimeValueKind.CV_STR or comptime_value_is_intlike(start) == 0 or comptime_value_is_intlike(end) == 0:
                 return self.fail(node, "with_str_slice expects string and integer arguments")
             return comptime_control_value(comptime_value_str(with_str_slice_ref(with_str_clone_ref(text.text), comptime_value_intlike(start), comptime_value_intlike(end))))
         if fn_name == "with_str_contains" or fn_name == "with_str_starts_with" or fn_name == "with_str_ends_with":
             if arg_values.len() as i32 != 2:
                 return self.fail(node, fn_name ++ " takes two arguments")
-            let text = arg_values.get(0)
-            let needle = arg_values.get(1)
+            let text = arg_values[0]
+            let needle = arg_values[1]
             if text.kind != ComptimeValueKind.CV_STR or needle.kind != ComptimeValueKind.CV_STR:
                 return self.fail(node, fn_name ++ " expects string arguments")
             let result =
@@ -7846,7 +7846,7 @@ impl ComptimeEvaluator:
         if fn_name == "str.to_owned":
             if arg_values.len() as i32 != 1:
                 return self.fail(node, "str.to_owned() takes no arguments")
-            let receiver = arg_values.get(0)
+            let receiver = arg_values[0]
             if receiver.kind != ComptimeValueKind.CV_STR:
                 return self.fail(node, "str.to_owned() receiver must be a string")
             return comptime_control_value(comptime_value_str(receiver.text))
@@ -7863,7 +7863,7 @@ impl ComptimeEvaluator:
                 return comptime_control_value(self.empty_string_builder_value(result_type))
             if arg_values.len() as i32 != 1:
                 return self.fail(node, "StringBuilder.with_capacity() expects exactly one argument in comptime")
-            if comptime_value_is_intlike(arg_values.get(0)) == 0:
+            if comptime_value_is_intlike(arg_values[0]) == 0:
                 return self.fail(node, "StringBuilder.with_capacity() expects an integer capacity")
             return comptime_control_value(self.empty_string_builder_value(result_type))
         let fn_node = self.find_fn_decl_node(fn_sym)
@@ -7884,7 +7884,7 @@ impl ComptimeEvaluator:
                     return comptime_control_value(self.empty_string_builder_value(result_type_from_node))
                 if arg_values.len() as i32 != 1:
                     return self.fail(node, "StringBuilder.with_capacity() expects exactly one argument in comptime")
-                if comptime_value_is_intlike(arg_values.get(0)) == 0:
+                if comptime_value_is_intlike(arg_values[0]) == 0:
                     return self.fail(node, "StringBuilder.with_capacity() expects an integer capacity")
                 return comptime_control_value(self.empty_string_builder_value(result_type_from_node))
             let ret_type_for_constructor = self.comptime_fn_return_type(fn_sym, tp_syms, tp_tys)
@@ -7892,7 +7892,7 @@ impl ComptimeEvaluator:
                 if arg_values.len() as i32 == 0:
                     return comptime_control_value(self.empty_string_builder_value(ret_type_for_constructor))
                 if arg_values.len() as i32 == 1:
-                    if comptime_value_is_intlike(arg_values.get(0)) == 0:
+                    if comptime_value_is_intlike(arg_values[0]) == 0:
                         return self.fail(node, "StringBuilder.with_capacity() expects an integer capacity")
                     return comptime_control_value(self.empty_string_builder_value(ret_type_for_constructor))
         if fn_node == 0 and self.allow_runtime_calls != 0:
@@ -8027,7 +8027,7 @@ impl ComptimeEvaluator:
     mut fn eval_parallel_workspaces_call(arg_values: &Vec[ComptimeValue], node: i32) -> ComptimeControl:
         if arg_values.len() as i32 != 1:
             return self.fail(node, "parallel takes one Vec[Workspace] argument")
-        let workspaces = arg_values.get(0)
+        let workspaces = arg_values[0]
         if workspaces.kind != ComptimeValueKind.CV_VEC and workspaces.kind != ComptimeValueKind.CV_ARRAY:
             return self.fail(node, "parallel expects a Vec[Workspace]")
         let result_type = self.node_type_or(node, 0)

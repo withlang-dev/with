@@ -1,4 +1,4 @@
-//! expect-error: wrong argument type in call to 'Vec.get'
+//! expect-error: Vec has no 'get': element access is spelled 'xs[i]'
 
 fn main:
     let items: Vec[i32] = Vec.new()

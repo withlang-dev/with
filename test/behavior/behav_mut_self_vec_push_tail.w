@@ -8,7 +8,7 @@ fn Holder.add(mut self: Holder, value: i32):
 fn main:
     let holder = Holder { values: Vec.new() }
     holder.add(7)
-    if holder.values.len() == 1 and holder.values.get(0) == 7:
+    if holder.values.len() == 1 and holder.values[0] == 7:
         print("ok")
     else:
         print("bad")

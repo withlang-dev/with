@@ -13,4 +13,4 @@ fn main:
     stored.push(111)
     map.insert(1, move stored)
     let owned: Vec[i64] = map.get(1).unwrap()
-    assert(owned.get(0) == 111)
+    assert(owned[0] == 111)

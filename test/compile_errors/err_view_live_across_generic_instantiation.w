@@ -12,7 +12,7 @@ fn show[T: Display](v: &T): print(v)
 fn main:
     var xs: Vec[KV] = Vec.new()
     xs.push(KV { key: "a".clone(), n: 1 })
-    let e = xs.get(0)
+    let e = xs[0]
     show(e.key)
     xs.push(KV { key: "b".clone(), n: 2 })
     show(e.key)

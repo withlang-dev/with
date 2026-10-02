@@ -117,7 +117,7 @@ fn main -> i32:
     if argv.len() < 3:
         print("usage: zlib_gunzip <input.tar.gz> <output.tar>")
         return 2
-    let input = match read_file(argv.get(1)):
+    let input = match read_file(argv[1]):
         Ok(text) => text
         Err(err) => {
             print("could not read input archive: " ++ err.message())
@@ -127,7 +127,7 @@ fn main -> i32:
         print("input archive is empty")
         return 1
     let input_bytes = bytes_from_str(input)
-    let err = decompress_gzip_to_file(&input_bytes, argv.get(2), ZLIB_MAX_OUTPUT)
+    let err = decompress_gzip_to_file(&input_bytes, argv[2], ZLIB_MAX_OUTPUT)
     if err.len() > 0:
         print(err)
         return 1

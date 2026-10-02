@@ -1256,7 +1256,7 @@ pub fn bundle_interface_render(sema: &Sema, model: &BundleInterfaceModel) -> Bun
             let import_path = sema.module_import_paths[(edge_start + ei)]
             if import_path == "std.prelude" or import_path == "std.prelude_core" or import_path == "std.prelude_alloc":
                 continue
-            let target_index = sema.module_import_targets.get((edge_start + ei) as i64)
+            let target_index = sema.module_import_targets[(edge_start + ei) as i64]
             let target = codegen_canonical_module_path(sema.module_paths[target_index])
             if not bundle_corpus_contains(model.corpus, target) and not model.needed_imports.contains(mod_path ++ "\t" ++ target):
                 continue

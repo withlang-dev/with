@@ -23,4 +23,4 @@ fn main:
     transferred.push(23)
     let transferred_handle = holder.slots.insert(move transferred)
     let owned = holder.slots.remove(transferred_handle).unwrap()
-    assert(owned.get(0) == 23)
+    assert(owned[0] == 23)

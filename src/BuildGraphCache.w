@@ -1193,14 +1193,14 @@ pub fn build_cache_graph_try_read(root: &str, key: &str) -> BuildGraph:
         if nums.len() != 8:
             return empty_build_graph()
         var t = empty_build_graph_target()
-        t.kind = bcg_parse_i64(nums.get(0)) as i32
-        t.target_kind = bcg_parse_i64(nums.get(1)) as i32
-        t.optimize_mode = bcg_parse_i64(nums.get(2)) as i32
-        t.action_fn = bcg_parse_i64(nums.get(3)) as i32
-        t.timeout_ms = bcg_parse_i64(nums.get(4)) as i32
-        t.network = bcg_parse_i64(nums.get(5)) as i32
-        t.parallel = bcg_parse_i64(nums.get(6)) as i32
-        t.rss_limit_bytes = bcg_parse_i64(nums.get(7))
+        t.kind = bcg_parse_i64(nums[0]) as i32
+        t.target_kind = bcg_parse_i64(nums[1]) as i32
+        t.optimize_mode = bcg_parse_i64(nums[2]) as i32
+        t.action_fn = bcg_parse_i64(nums[3]) as i32
+        t.timeout_ms = bcg_parse_i64(nums[4]) as i32
+        t.network = bcg_parse_i64(nums[5]) as i32
+        t.parallel = bcg_parse_i64(nums[6]) as i32
+        t.rss_limit_bytes = bcg_parse_i64(nums[7])
         t.name = r.read_str()
         t.entry = r.read_str()
         t.output = r.read_str()

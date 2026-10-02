@@ -1359,7 +1359,7 @@ impl Sema:
             var stack: Vec[i32] = Vec.new()
             stack.push(name)
             while stack.len() > 0:
-                let cur: i32 = stack.get(stack.len() - 1)
+                let cur: i32 = stack[stack.len() - 1]
                 let cur_color = if color.contains(cur): color.get(cur).unwrap() else: 0
                 if cur_color == 0:
                     // First visit: mark gray.
@@ -1414,7 +1414,7 @@ impl Sema:
         let loop_len = fwd_syms.len() as i32
 
         // Build diagnostic with primary span at first type decl.
-        let first_sym = fwd_syms.get(0)
+        let first_sym = fwd_syms[0]
         let first_node = if self.type_decl_nodes.contains(first_sym): self.type_decl_nodes.get(first_sym).unwrap() else: 0
         let primary_start = self.ast.get_start(first_node)
         let primary_end = self.ast.get_end(first_node)
@@ -1423,7 +1423,7 @@ impl Sema:
         // Add a label for each edge in the loop.
         for i in 0..loop_len:
             let from_sym = fwd_syms[i]
-            let to_sym = if i + 1 < loop_len: fwd_syms[(i + 1)] else: fwd_syms.get(0)
+            let to_sym = if i + 1 < loop_len: fwd_syms[(i + 1)] else: fwd_syms[0]
             let edge_node = fwd_edges[i]
             if edge_node != 0:
                 let from_name = self.pool_resolve_symbol(from_sym)
@@ -1432,7 +1432,7 @@ impl Sema:
                 let e_end = self.ast.get_end(edge_node)
                 diag.add_label(Span { file: self.local_file_id, start: e_start, end: e_end }, "type `" ++ from_name ++ "` depends on `" ++ to_name ++ "` here")
 
-        diag.add_help("break the cycle by using a pointer (`*" ++ self.pool_resolve_symbol(fwd_syms.get(0)) ++ "`) or reference (`&" ++ self.pool_resolve_symbol(fwd_syms.get(0)) ++ "`) for one field")
+        diag.add_help("break the cycle by using a pointer (`*" ++ self.pool_resolve_symbol(fwd_syms[0]) ++ "`) or reference (`&" ++ self.pool_resolve_symbol(fwd_syms[0]) ++ "`) for one field")
         self.diags.emit(move diag)
 
     fn fn_param_uses_value_ref_abi(param_start: i32, param_idx: i32, method_owner_sym: i32, self_type_id: i32) -> i32:

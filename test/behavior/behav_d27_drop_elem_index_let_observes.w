@@ -12,5 +12,5 @@ fn main:
     items.push(Thing { vals: vals })
     let t = items[0]
     assert(t.vals.len() == 1)
-    assert(t.vals.get(0) == 7)
+    assert(t.vals[0] == 7)
     assert(items.len() == 1)

@@ -8,4 +8,4 @@ fn add_one(n: i32) -> i32: n + 1
 fn main:
     var xs: Vec[i32] = Vec.new()
     xs.push(6)
-    assert(add_one(xs.get(0)) == 7)
+    assert(add_one(xs[0]) == 7)

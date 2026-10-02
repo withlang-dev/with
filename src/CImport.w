@@ -6422,11 +6422,11 @@ impl CiStmtPool:
         if ids.len() == 0:
             return 0 as CiStmtId
         if ids.len() == 1:
-            return (ids.get(0)) as CiStmtId
+            return (ids[0]) as CiStmtId
         let start = self.extra_len()
         var i: i64 = 0
         while i < ids.len():
-            let _ = self.add_extra(ids.get(i))
+            let _ = self.add_extra(ids[i])
             i = i + 1
         self.block(start, ids.len() as i32)
 
@@ -6472,7 +6472,7 @@ impl CiStmtPool:
             let new_start = self.extra_len()
             var ri: i64 = 0
             while ri < rewritten_ids.len():
-                let _ = self.add_extra(rewritten_ids.get(ri))
+                let _ = self.add_extra(rewritten_ids[ri])
                 ri = ri + 1
             return self.block(new_start, count)
         if kind == CiStmtKind.CIS_IF:
@@ -6508,7 +6508,7 @@ impl CiStmtPool:
             let new_start = self.extra_len()
             var ri: i64 = 0
             while ri < rewritten_records.len():
-                let _ = self.add_extra(rewritten_records.get(ri))
+                let _ = self.add_extra(rewritten_records[ri])
                 ri = ri + 1
             return self.add(CiStmtKind.CIS_MATCH, subject_id, new_start, arm_count, 0)
         if kind == CiStmtKind.CIS_WHILE or kind == CiStmtKind.CIS_DO_WHILE or kind == CiStmtKind.CIS_FOR:
@@ -6537,7 +6537,7 @@ impl CiStmtPool:
             let new_start = self.extra_len()
             var ri: i64 = 0
             while ri < rewritten_ids.len():
-                let _ = self.add_extra(rewritten_ids.get(ri))
+                let _ = self.add_extra(rewritten_ids[ri])
                 ri = ri + 1
             return self.block(new_start, count)
         if kind == CiStmtKind.CIS_IF:
@@ -6573,7 +6573,7 @@ impl CiStmtPool:
             let new_start = self.extra_len()
             var ri: i64 = 0
             while ri < rewritten_records.len():
-                let _ = self.add_extra(rewritten_records.get(ri))
+                let _ = self.add_extra(rewritten_records[ri])
                 ri = ri + 1
             return self.add(CiStmtKind.CIS_MATCH, subject_id, new_start, arm_count, 0)
         if kind == CiStmtKind.CIS_WHILE or kind == CiStmtKind.CIS_DO_WHILE or kind == CiStmtKind.CIS_FOR:
@@ -6677,7 +6677,7 @@ impl CiStmtPool:
             let new_start = self.extra_len()
             var ri: i64 = 0
             while ri < rewritten_records.len():
-                let _ = self.add_extra(rewritten_records.get(ri))
+                let _ = self.add_extra(rewritten_records[ri])
                 ri = ri + 1
             return self.add(CiStmtKind.CIS_MATCH, subject_id, new_start, arm_count, 0)
         stmt_id
@@ -6920,19 +6920,19 @@ impl CiStmtPool:
             ai = ai + 1
 
         let begin_args: Vec[i32] = Vec.new()
-        begin_args.push(arg_ids.get(0))
-        begin_args.push(arg_ids.get(1))
+        begin_args.push(arg_ids[0])
+        begin_args.push(arg_ids[1])
         let begin_call = exprs.build_named_call_expr("colour_begin", &begin_args)
 
         let fprintf_args: Vec[i32] = Vec.new()
         var fi: i64 = 1
         while fi < arg_ids.len():
-            fprintf_args.push(arg_ids.get(fi))
+            fprintf_args.push(arg_ids[fi])
             fi = fi + 1
         let fprintf_call = exprs.build_named_call_expr("fprintf", &fprintf_args)
 
         let end_args: Vec[i32] = Vec.new()
-        end_args.push(arg_ids.get(1))
+        end_args.push(arg_ids[1])
         let end_call = exprs.build_named_call_expr("colour_end", &end_args)
 
         let begin_stmt = self.expr_stmt(begin_call)
@@ -8156,8 +8156,8 @@ impl CiExprPool:
         let fields_start = self.extra_len() as i32
         var pj: i64 = 0
         while pj < pair_names.len():
-            let _ = self.add_extra(pair_names.get(pj))
-            let _ = self.add_extra(pair_values.get(pj))
+            let _ = self.add_extra(pair_names[pj])
+            let _ = self.add_extra(pair_values[pj])
             pj = pj + 1
         ci_trace_port("STRUCTURAL[b11.11.init_list]")
         self.designated_init(fields_start, pair_names.len() as i32, init_ty_id)
@@ -8254,8 +8254,8 @@ impl CiExprPool:
                     let fields_start = self.extra_len() as i32
                     var fj: i64 = 0
                     while fj < field_names.len():
-                        let _ = self.add_extra(field_names.get(fj))
-                        let _ = self.add_extra(field_values.get(fj))
+                        let _ = self.add_extra(field_names[fj])
+                        let _ = self.add_extra(field_values[fj])
                         fj = fj + 1
                     item_id = self.designated_init(fields_start, elem_field_count, elem_ty_id)
                     ai = ai + elem_field_count
@@ -8270,7 +8270,7 @@ impl CiExprPool:
             let items_start = self.extra_len() as i32
             var ii: i64 = 0
             while ii < item_ids.len():
-                let _ = self.add_extra(item_ids.get(ii))
+                let _ = self.add_extra(item_ids[ii])
                 ii = ii + 1
             return self.init_list(items_start, item_ids.len() as i32, init_ty_id)
         let aggregate_field_count = ci_init_list_record_field_count(session, ty_str, init_ty)
@@ -8300,7 +8300,7 @@ impl CiExprPool:
         let items_start = self.extra_len() as i32
         var ij: i64 = 0
         while ij < item_ids.len():
-            let _ = self.add_extra(item_ids.get(ij))
+            let _ = self.add_extra(item_ids[ij])
             ij = ij + 1
         self.init_list(items_start, item_ids.len() as i32, init_ty_id)
 
@@ -10057,7 +10057,7 @@ impl CiExprPool:
         let args_start = self.extra_len() as i32
         var i: i64 = 0
         while i < arg_ids.len():
-            let _ = self.add_extra(arg_ids.get(i))
+            let _ = self.add_extra(arg_ids[i])
             i = i + 1
         var call = self.add(CiExprKind.CIE_CALL, callee_id as i32, args_start, arg_ids.len() as i32, result_ty)
         if ci_migrate_call_requires_unsafe_wrapper(name):
@@ -10628,9 +10628,9 @@ impl CiExprPool:
             return self.reject_builtin_call(session, cursor, callee_text, "could not materialize the integer type")
         let canonical_ptr_ty = types.ty_pointer(canonical_ty, 0)
         let args: Vec[i32] = Vec.new()
-        args.push(self.cast(canonical_ty, (arg_ids.get(0)) as CiExprId) as i32)
-        args.push(self.cast(canonical_ty, (arg_ids.get(1)) as CiExprId) as i32)
-        args.push(self.cast(canonical_ptr_ty, (arg_ids.get(2)) as CiExprId) as i32)
+        args.push(self.cast(canonical_ty, (arg_ids[0]) as CiExprId) as i32)
+        args.push(self.cast(canonical_ty, (arg_ids[1]) as CiExprId) as i32)
+        args.push(self.cast(canonical_ptr_ty, (arg_ids[2]) as CiExprId) as i32)
         // The helpers return bool (C `_Bool`); typing the call is what lets an
         // `int f() { return __builtin_mul_overflow(...); }` coerce at the return.
         let helper = ci_overflow_helper_name(op, out_ty)
@@ -10646,9 +10646,9 @@ impl CiExprPool:
             if (size_ty as i32) == 0:
                 return 0 as CiExprId
             let sized_args: Vec[i32] = Vec.new()
-            sized_args.push(arg_ids.get(0))
-            sized_args.push(arg_ids.get(1))
-            sized_args.push((self.cast(size_ty, (arg_ids.get(2)) as CiExprId)) as i32)
+            sized_args.push(arg_ids[0])
+            sized_args.push(arg_ids[1])
+            sized_args.push((self.cast(size_ty, (arg_ids[2]) as CiExprId)) as i32)
             return self.build_named_call_expr("strncmp", &sized_args)
         let renamed = ci_libc_simple_rename(callee_text)
         if renamed.len() > 0:
@@ -10662,7 +10662,7 @@ impl CiExprPool:
             let c_void_ty = types.named_type_from_text("c_void")
             if (i64_ty as i32) == 0 or (c_void_ty as i32) == 0:
                 return 0 as CiExprId
-            let arg_as_i64 = self.cast(i64_ty, (arg_ids.get(0)) as CiExprId)
+            let arg_as_i64 = self.cast(i64_ty, (arg_ids[0]) as CiExprId)
             let wa_idx = self.add_string("with_alloc")
             let wa_callee = self.ident(wa_idx, 0 as CiTypeId)
             let args_start = self.extra_len() as i32
@@ -10678,7 +10678,7 @@ impl CiExprPool:
             let free_ptr_ty = types.named_type_from_text(ci_rt_ptr_mut())
             if (free_ptr_ty as i32) == 0:
                 return 0 as CiExprId
-            let arg_cast = self.cast(free_ptr_ty, (arg_ids.get(0)) as CiExprId)
+            let arg_cast = self.cast(free_ptr_ty, (arg_ids[0]) as CiExprId)
             let wf_idx = self.add_string("with_free")
             let wf_callee = self.ident(wf_idx, 0 as CiTypeId)
             let args_start = self.extra_len() as i32
@@ -10694,8 +10694,8 @@ impl CiExprPool:
             let c_void_ty = types.named_type_from_text("c_void")
             if (i64_ty as i32) == 0 or (c_void_ty as i32) == 0:
                 return 0 as CiExprId
-            let count_as_i64 = self.cast(i64_ty, (arg_ids.get(0)) as CiExprId)
-            let size_as_i64 = self.cast(i64_ty, (arg_ids.get(1)) as CiExprId)
+            let count_as_i64 = self.cast(i64_ty, (arg_ids[0]) as CiExprId)
+            let size_as_i64 = self.cast(i64_ty, (arg_ids[1]) as CiExprId)
             let wz_idx = self.add_string("with_alloc_zeroed")
             let wz_callee = self.ident(wz_idx, 0 as CiTypeId)
             let args_start = self.extra_len() as i32
@@ -10714,11 +10714,11 @@ impl CiExprPool:
             let c_void_ty = types.named_type_from_text("c_void")
             if (realloc_ptr_ty as i32) == 0 or (i64_ty as i32) == 0 or (c_void_ty as i32) == 0:
                 return 0 as CiExprId
-            let arg_ptr = self.cast(realloc_ptr_ty, (arg_ids.get(0)) as CiExprId)
+            let arg_ptr = self.cast(realloc_ptr_ty, (arg_ids[0]) as CiExprId)
             let zero_idx = self.add_string("0")
             let zero_id = self.int_lit(zero_idx, 0 as CiTypeId)
             let old_size = self.cast(i64_ty, zero_id)
-            let new_size = self.cast(i64_ty, (arg_ids.get(1)) as CiExprId)
+            let new_size = self.cast(i64_ty, (arg_ids[1]) as CiExprId)
             let realloc_args: Vec[i32] = Vec.new()
             realloc_args.push(arg_ptr as i32)
             realloc_args.push(old_size as i32)
@@ -10733,25 +10733,25 @@ impl CiExprPool:
             if arg_ids.len() != 3 or (i64_ty as i32) == 0 or (mut_ptr_ty as i32) == 0 or (const_ptr_ty as i32) == 0:
                 return 0 as CiExprId
             let cast_args: Vec[i32] = Vec.new()
-            cast_args.push((self.cast(mut_ptr_ty, (arg_ids.get(0)) as CiExprId)) as i32)
-            cast_args.push((self.cast(const_ptr_ty, (arg_ids.get(1)) as CiExprId)) as i32)
-            cast_args.push((self.cast(i64_ty, (arg_ids.get(2)) as CiExprId)) as i32)
+            cast_args.push((self.cast(mut_ptr_ty, (arg_ids[0]) as CiExprId)) as i32)
+            cast_args.push((self.cast(const_ptr_ty, (arg_ids[1]) as CiExprId)) as i32)
+            cast_args.push((self.cast(i64_ty, (arg_ids[2]) as CiExprId)) as i32)
             return self.build_named_call_expr(if callee_text == "memcpy" or callee_text == "with_memcpy": "with_memcpy" else: "with_memmove", &cast_args)
         if callee_text == "memset" or callee_text == "with_memset":
             if arg_ids.len() != 3 or (i64_ty as i32) == 0 or (mut_ptr_ty as i32) == 0:
                 return 0 as CiExprId
             let cast_args: Vec[i32] = Vec.new()
-            cast_args.push((self.cast(mut_ptr_ty, (arg_ids.get(0)) as CiExprId)) as i32)
-            cast_args.push(arg_ids.get(1))
-            cast_args.push((self.cast(i64_ty, (arg_ids.get(2)) as CiExprId)) as i32)
+            cast_args.push((self.cast(mut_ptr_ty, (arg_ids[0]) as CiExprId)) as i32)
+            cast_args.push(arg_ids[1])
+            cast_args.push((self.cast(i64_ty, (arg_ids[2]) as CiExprId)) as i32)
             return self.build_named_call_expr("with_memset", &cast_args)
         if callee_text == "memcmp" or callee_text == "with_memcmp":
             if arg_ids.len() != 3 or (i64_ty as i32) == 0 or (const_ptr_ty as i32) == 0:
                 return 0 as CiExprId
             let cast_args: Vec[i32] = Vec.new()
-            cast_args.push((self.cast(const_ptr_ty, (arg_ids.get(0)) as CiExprId)) as i32)
-            cast_args.push((self.cast(const_ptr_ty, (arg_ids.get(1)) as CiExprId)) as i32)
-            cast_args.push((self.cast(i64_ty, (arg_ids.get(2)) as CiExprId)) as i32)
+            cast_args.push((self.cast(const_ptr_ty, (arg_ids[0]) as CiExprId)) as i32)
+            cast_args.push((self.cast(const_ptr_ty, (arg_ids[1]) as CiExprId)) as i32)
+            cast_args.push((self.cast(i64_ty, (arg_ids[2]) as CiExprId)) as i32)
             return self.build_named_call_expr("with_memcmp", &cast_args)
         if callee_text == "memchr":
             if arg_ids.len() != 3 or (i64_ty as i32) == 0:
@@ -10761,9 +10761,9 @@ impl CiExprPool:
                 return 0 as CiExprId
             let cvoid_ptr = types.ty_pointer(c_void_ty, 0)
             let cast_args: Vec[i32] = Vec.new()
-            cast_args.push((self.cast(cvoid_ptr, (arg_ids.get(0)) as CiExprId)) as i32)
-            cast_args.push(arg_ids.get(1))
-            cast_args.push((self.cast(i64_ty, (arg_ids.get(2)) as CiExprId)) as i32)
+            cast_args.push((self.cast(cvoid_ptr, (arg_ids[0]) as CiExprId)) as i32)
+            cast_args.push(arg_ids[1])
+            cast_args.push((self.cast(i64_ty, (arg_ids[2]) as CiExprId)) as i32)
             let call_id = self.build_named_call_expr("memchr", &cast_args)
             let u8_ty = types.named_type_from_text("u8")
             let u8_ptr = types.ty_pointer(u8_ty, 1)
@@ -10772,7 +10772,7 @@ impl CiExprPool:
             if arg_ids.len() != 1:
                 return 0 as CiExprId
             let print_args: Vec[i32] = Vec.new()
-            print_args.push(arg_ids.get(0))
+            print_args.push(arg_ids[0])
             let print_call = self.build_named_call_expr("is_print", &print_args)
             let space_call = self.build_named_call_expr("is_space", &print_args)
             let not_space = self.unary(CiUnaryOp.CIUO_LOGICAL_NOT, space_call, 0 as CiTypeId)
@@ -10782,7 +10782,7 @@ impl CiExprPool:
             if arg_ids.len() != 1:
                 return 0 as CiExprId
             let shared_args: Vec[i32] = Vec.new()
-            shared_args.push(arg_ids.get(0))
+            shared_args.push(arg_ids[0])
             let print_call = self.build_named_call_expr("is_print", &shared_args)
             let alnum_call = self.build_named_call_expr("is_alnum", &shared_args)
             let space_call = self.build_named_call_expr("is_space", &shared_args)
@@ -10794,7 +10794,7 @@ impl CiExprPool:
         if callee_text == "iscntrl":
             if arg_ids.len() != 1:
                 return 0 as CiExprId
-            let arg_id = (arg_ids.get(0)) as CiExprId
+            let arg_id = (arg_ids[0]) as CiExprId
             let lit32 = self.int_lit(self.add_string("32"), 0 as CiTypeId)
             let lit127 = self.int_lit(self.add_string("127"), 0 as CiTypeId)
             let lt_32 = self.binary(CiBinOp.CIBO_LT, arg_id, lit32, 0 as CiTypeId)
@@ -10805,17 +10805,17 @@ impl CiExprPool:
             if arg_ids.len() != 4:
                 return 0 as CiExprId
             let first_three: Vec[i32] = Vec.new()
-            first_three.push(arg_ids.get(0))
-            first_three.push(arg_ids.get(1))
-            first_three.push(arg_ids.get(2))
+            first_three.push(arg_ids[0])
+            first_three.push(arg_ids[1])
+            first_three.push(arg_ids[2])
             return self.build_libc_call_value_expr(session, cursor, if callee_text == "__builtin___memcpy_chk": "memcpy" else: "memmove", &first_three, types)
         if callee_text == "__builtin___memset_chk":
             if arg_ids.len() != 4:
                 return 0 as CiExprId
             let first_three: Vec[i32] = Vec.new()
-            first_three.push(arg_ids.get(0))
-            first_three.push(arg_ids.get(1))
-            first_three.push(arg_ids.get(2))
+            first_three.push(arg_ids[0])
+            first_three.push(arg_ids[1])
+            first_three.push(arg_ids[2])
             return self.build_libc_call_value_expr(session, cursor, "memset", &first_three, types)
         if callee_text == "__builtin_object_size":
             let zero_idx = self.add_string("0")
@@ -10831,7 +10831,7 @@ impl CiExprPool:
             let result_ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
             if (result_ty as i32) == 0:
                 return self.reject_builtin_call(session, cursor, callee_text, "missing branch prediction hint result type")
-            return self.cast(result_ty, arg_ids.get(0) as CiExprId)
+            return self.cast(result_ty, arg_ids[0] as CiExprId)
         if callee_text == "__builtin_add_overflow" or callee_text == "__builtin_sub_overflow" or callee_text == "__builtin_mul_overflow":
             return self.build_overflow_builtin_call(session, cursor, callee_text, arg_ids, types)
         let bit_method = ci_builtin_bit_method(callee_text)
@@ -10845,7 +10845,7 @@ impl CiExprPool:
             let operand_ty = types.named_type_from_text(ci_builtin_bit_operand_type(callee_text))
             if (operand_ty as i32) == 0:
                 return self.reject_builtin_call(session, cursor, callee_text, "could not materialize the operand type")
-            let operand = self.cast(operand_ty, arg_ids.get(0) as CiExprId)
+            let operand = self.cast(operand_ty, arg_ids[0] as CiExprId)
             let method_idx = self.add_string(bit_method)
             // d2 = 2: a method selected on the VALUE (the printer renders
             // `base.method` and never borrows the operand as a place).
@@ -11533,7 +11533,7 @@ impl CiStmtPool:
             let args_start = exprs.extra_len()
             var j: i64 = 0
             while j < arg_ids.len():
-                let _ = exprs.add_extra(arg_ids.get(j))
+                let _ = exprs.add_extra(arg_ids[j])
                 j = j + 1
             var call_id = exprs.add(CiExprKind.CIE_CALL, callee.value_expr as i32, args_start, arg_ids.len() as i32, 0 as CiTypeId)
             // A local identifier can denote a function pointer just as a field
@@ -12122,7 +12122,7 @@ impl CiStmtPool:
                     arm_records.push(value_ids.len() as i32)
                     var vi: i64 = 0
                     while vi < value_ids.len():
-                        arm_records.push(value_ids.get(vi))
+                        arm_records.push(value_ids[vi])
                         vi = vi + 1
                     arm_records.push(body_id as i32)
                     arm_count = arm_count + 1
@@ -12190,7 +12190,7 @@ impl CiStmtPool:
         let arms_start = self.extra_len()
         var ri: i64 = 0
         while ri < arm_records.len():
-            let _ = self.add_extra(arm_records.get(ri))
+            let _ = self.add_extra(arm_records[ri])
             ri = ri + 1
         let match_id = self.add(CiStmtKind.CIS_MATCH, subject_id as i32, arms_start, arm_count, 0)
         let switch_id = self.wrap_switch_match_breaks_ir(session, body_cursor, exprs, types, match_id, -1)
@@ -12406,7 +12406,7 @@ impl CiStmtPool:
             let count = child_ids.len() as i32
             var cj: i64 = 0
             while cj < child_ids.len():
-                let _ = self.add_extra(child_ids.get(cj))
+                let _ = self.add_extra(child_ids[cj])
                 cj = cj + 1
             let block_id = self.block(extra_start, count)
             let _ = ci_scope_restore(block_scope, block_mark)
@@ -12968,8 +12968,8 @@ fn ci_realpath_cached(path: &str) -> str:
         return ""
     var i: i64 = 0
     while i < g_ci_realpath_cache_paths.len():
-        if g_ci_realpath_cache_paths.get(i) == path:
-            return with_str_clone_ref(g_ci_realpath_cache_values.get(i))
+        if g_ci_realpath_cache_paths[i] == path:
+            return with_str_clone_ref(g_ci_realpath_cache_values[i])
         i = i + 1
     let resolved = with_cimport_realpath(path)
     g_ci_realpath_cache_paths.push(with_str_clone_ref(path))
@@ -13249,12 +13249,12 @@ impl CiStmtPool:
         let count = child_stmt_ids.len() as i32
         var stmt_id: CiStmtId = 0 as CiStmtId
         if count == 1:
-            stmt_id = (child_stmt_ids.get(0)) as CiStmtId
+            stmt_id = (child_stmt_ids[0]) as CiStmtId
         else if count > 1:
             let extra_start = self.extra_len()
             var cj: i64 = 0
             while cj < child_stmt_ids.len():
-                let _ = self.add_extra(child_stmt_ids.get(cj))
+                let _ = self.add_extra(child_stmt_ids[cj])
                 cj = cj + 1
             stmt_id = self.block(extra_start, count)
         else if deferred_va_list:
@@ -14509,7 +14509,7 @@ fn ci_source_has_pp_directive(src: &str) -> bool:
     let lines = src.split("\n")
     var i = 0i64
     while i < lines.len() as i64:
-        let t = ci_trim(lines.get(i))
+        let t = ci_trim(lines[i])
         if t.len() > 0 and t[0] == 35:
             if ci_starts_with(t, "#if") or ci_starts_with(t, "#else") or ci_starts_with(t, "#elif") or ci_starts_with(t, "#endif"):
                 return true
@@ -14530,7 +14530,7 @@ fn ci_resolve_pp_conditionals(src: &str) -> str:
     var out = ""
     var i = 0i64
     while i < lines.len() as i64:
-        let line = lines.get(i)
+        let line = lines[i]
         let t = ci_trim(line)
         let is_dir = t.len() > 0 and t[0] == 35 and (ci_starts_with(t, "#if") or ci_starts_with(t, "#else") or ci_starts_with(t, "#elif") or ci_starts_with(t, "#endif"))
         if is_dir:
@@ -15309,7 +15309,7 @@ fn ci_translate_c_initializer_for_cursor_type(session: i64, init_src: &str, ty: 
                     if macro_items.len() > 1:
                         var mi: i64 = 0
                         while mi < macro_items.len():
-                            expanded_items.push(with_str_clone_ref(macro_items.get(mi)))
+                            expanded_items.push(with_str_clone_ref(macro_items[mi]))
                             mi = mi + 1
                         expanded_any = true
             if not expanded_any:
@@ -16062,11 +16062,11 @@ fn ci_aggregate_kind_vec(v: &Vec[i32], label: &str):
     var counts: Vec[i32] = Vec.new()
     var i: i64 = 0
     while i < v.len():
-        let k = v.get(i)
+        let k = v[i]
         var j: i64 = 0
         var found = false
         while j < unique.len():
-            if unique.get(j) == k:
+            if unique[j] == k:
                 // Reconstruct-and-replace: push the current counts
                 // then rebuild into a fresh vector. Avoids using
                 // Vec.set which codegens poorly right now.
@@ -16079,9 +16079,9 @@ fn ci_aggregate_kind_vec(v: &Vec[i32], label: &str):
             var m: i64 = 0
             while m < counts.len():
                 if m == j:
-                    new_counts.push(counts.get(m) + 1)
+                    new_counts.push(counts[m] + 1)
                 else:
-                    new_counts.push(counts.get(m))
+                    new_counts.push(counts[m])
                 m = m + 1
             counts = new_counts
         else:
@@ -16091,8 +16091,8 @@ fn ci_aggregate_kind_vec(v: &Vec[i32], label: &str):
     eprint(with_str_clone_ref(label))
     var u: i64 = 0
     while u < unique.len():
-        let k = unique.get(u)
-        let c = counts.get(u)
+        let k = unique[u]
+        let c = counts[u]
         eprint(f"  kind={k} count={c}")
         u = u + 1
 
@@ -16469,7 +16469,7 @@ impl CiGotoCfgContext:
 fn ci_goto_cfg_top_target(stack: &Vec[i32]) -> i32:
     if stack.len() == 0:
         return -1
-    stack.get(stack.len() - 1)
+    stack[stack.len() - 1]
 
 fn ci_goto_cursor_is_noreturn_call(session: i64, cursor: i32) -> bool:
     var call_cursor = cursor
@@ -17054,11 +17054,11 @@ impl CiStmtPool:
         if ids.len() == 0:
             return 0 as CiStmtId
         if ids.len() == 1:
-            return ids.get(0) as CiStmtId
+            return ids[0] as CiStmtId
         let start = self.extra_len()
         var i: i64 = 0
         while i < ids.len():
-            let _ = self.add_extra(ids.get(i))
+            let _ = self.add_extra(ids[i])
             i = i + 1
         self.block(start, ids.len() as i32)
 
@@ -17067,8 +17067,8 @@ impl CiStackEmitContext:
         let ids: Vec[i32] = Vec.new()
         var i: i64 = 0
         while i < self.cfg.stmt_ids.len():
-            if self.cfg.stmt_blocks.get(i) == block:
-                ids.push(self.cfg.stmt_ids.get(i))
+            if self.cfg.stmt_blocks[i] == block:
+                ids.push(self.cfg.stmt_ids[i])
             i = i + 1
         stmts.stack_emit_stmt_block(&ids)
 
@@ -17121,7 +17121,7 @@ impl CiStackEmitContext:
             let start = stmts.extra_len()
             var i: i64 = 0
             while i < ids.len():
-                let _ = stmts.add_extra(ids.get(i))
+                let _ = stmts.add_extra(ids[i])
                 i = i + 1
             return stmts.block_labeled(start, ids.len() as i32, label_sym)
         if node.kind == StackifyNodeKind.Loop:
@@ -17194,8 +17194,8 @@ fn ci_native_goto_collect_leaf_ids(cfg: &CiGotoCfg, block: i32) -> Vec[i32]:
     var out: Vec[i32] = Vec.new()
     var i: i64 = 0
     while i < cfg.stmt_ids.len():
-        if cfg.stmt_blocks.get(i) == block:
-            out.push(cfg.stmt_ids.get(i))
+        if cfg.stmt_blocks[i] == block:
+            out.push(cfg.stmt_ids[i])
         i = i + 1
     out
 
@@ -17218,7 +17218,7 @@ fn ci_goto_cfg_reachable_blocks(cfg: &CiGotoCfg) -> Vec[i32]:
 
     var wi: i64 = 0
     while wi < worklist.len():
-        let current = worklist.get(wi)
+        let current = worklist[wi]
         let block = cfg.graph.blocks[current]
         var si = 0
         while si < block.succs_count:
@@ -17235,7 +17235,7 @@ fn ci_goto_cfg_reachable_blocks(cfg: &CiGotoCfg) -> Vec[i32]:
 fn ci_goto_cfg_block_ends_noreturn(cfg: &CiGotoCfg, block: i32) -> bool:
     var i: i64 = 0
     while i < cfg.noreturn_blocks.len():
-        if cfg.noreturn_blocks.get(i) == block:
+        if cfg.noreturn_blocks[i] == block:
             return true
         i = i + 1
     false
@@ -17328,13 +17328,13 @@ impl CiStmtPool:
         let ids: Vec[i32] = Vec.new()
         var hi: i64 = 0
         while hi < hoisted_stmt_ids.len():
-            ids.push(hoisted_stmt_ids.get(hi))
+            ids.push(hoisted_stmt_ids[hi])
             hi = hi + 1
 
         let replace_ids: Vec[i32] = Vec.new()
         var ri: i64 = 0
         while ri < cfg.stmt_ids.len():
-            let sid = cfg.stmt_ids.get(ri) as CiStmtId
+            let sid = cfg.stmt_ids[ri] as CiStmtId
             if self.kind(sid) == CiStmtKind.CIS_VAR_DECL:
                 let name_sym = self.get_d0(sid)
                 let ty_id = self.get_d1(sid) as CiTypeId
@@ -17364,12 +17364,12 @@ impl CiStmtPool:
             let block_ids: Vec[i32] = Vec.new()
             var li: i64 = 0
             while li < cfg.stmt_ids.len():
-                if cfg.stmt_blocks.get(li) == block:
-                    let rep = replace_ids.get(li)
+                if cfg.stmt_blocks[li] == block:
+                    let rep = replace_ids[li]
                     if rep != 0:
                         block_ids.push(rep)
-                    else if self.kind(cfg.stmt_ids.get(li) as CiStmtId) != CiStmtKind.CIS_VAR_DECL:
-                        block_ids.push(cfg.stmt_ids.get(li))
+                    else if self.kind(cfg.stmt_ids[li] as CiStmtId) != CiStmtKind.CIS_VAR_DECL:
+                        block_ids.push(cfg.stmt_ids[li])
                 li = li + 1
             if not ci_goto_cfg_block_ends_noreturn(cfg, block):
                 let term = self.native_goto_emit_terminator(cfg, block, &labels, exprs)
@@ -17380,7 +17380,7 @@ impl CiStmtPool:
             let start = self.extra_len()
             var bi: i64 = 0
             while bi < block_ids.len():
-                let _ = self.add_extra(block_ids.get(bi))
+                let _ = self.add_extra(block_ids[bi])
                 bi = bi + 1
             ids.push(self.block_labeled(start, block_ids.len() as i32, labels[block]) as i32)
             block = block + 1
@@ -17471,7 +17471,7 @@ impl CiStmtPool:
         var ids: Vec[i32] = Vec.new()
         var hi: i64 = 0
         while hi < hoisted_stmt_ids.len():
-            ids.push(hoisted_stmt_ids.get(hi))
+            ids.push(hoisted_stmt_ids[hi])
             hi = hi + 1
         let body_ids = ci_stmt_collect_flat_ids(self.val(), body_id)
         var bi: i32 = 0
@@ -18081,7 +18081,7 @@ impl CiExprPool:
             let args_start = self.extra_len() as i32
             var j: i64 = 0
             while j < arg_ids.len():
-                let _ = self.add_extra(arg_ids.get(j))
+                let _ = self.add_extra(arg_ids[j])
                 j = j + 1
             return self.add(CiExprKind.CIE_CALL, renamed_callee as i32, args_start, arg_count, 0 as CiTypeId)
         // malloc(N) → (with_alloc(N as i64) as *mut c_void)

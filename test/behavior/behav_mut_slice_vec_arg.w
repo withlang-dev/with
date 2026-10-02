@@ -15,5 +15,5 @@ fn main:
     v.push(2)
     v.push(3)
     fill(v, 5)
-    assert(v.get(0) == 5 and v.get(1) == 5 and v.get(2) == 5)
+    assert(v[0] == 5 and v[1] == 5 and v[2] == 5)
     print("ok")

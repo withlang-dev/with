@@ -1684,7 +1684,7 @@ impl Codegen:
         assert(i >= 0 and i < body_count)
         unsafe { ((*mir).bodies.ptr + (i as usize)) as &MirBody }
     fn mir_fn_syms_len() -> i64: unsafe { (*(self.mir_ptr as *const MirModule)).body_fn_syms.len() }
-    fn mir_fn_sym_at(i: i64) -> i32: unsafe { (*(self.mir_ptr as *const MirModule)).body_fn_syms.get(i) }
+    fn mir_fn_sym_at(i: i64) -> i32: unsafe { (*(self.mir_ptr as *const MirModule)).body_fn_syms[i] }
     fn mir_find_body_idx(sym: i32) -> i32: unsafe { (*(self.mir_ptr as *const MirModule)).find_body(sym) }
     fn mir_resolve_alias_at(tid: i32) -> i32: unsafe { (*(self.mir_ptr as *const MirModule)).mir_resolve_alias(tid) }
     fn mir_type_kind_at(tid: i32) -> i32: unsafe { (*(self.mir_ptr as *const MirModule)).mir_get_type_kind(tid) }
@@ -1698,8 +1698,8 @@ impl Codegen:
     fn mir_type_d2_len() -> i64: unsafe { (*(self.mir_ptr as *const MirModule)).sema_type_d2.len() }
     fn mir_type_extra_len() -> i64: unsafe { (*(self.mir_ptr as *const MirModule)).sema_type_extra.len() }
     fn mir_type_name_at(tid: i32) -> i32: unsafe { (*(self.mir_ptr as *const MirModule)).mir_get_type_name(tid) }
-    fn mir_type_kinds_get(i: i64) -> i32: unsafe { (*(self.mir_ptr as *const MirModule)).sema_type_kinds.get(i) }
-    fn mir_type_d0_get(i: i64) -> i32: unsafe { (*(self.mir_ptr as *const MirModule)).sema_type_d0.get(i) }
+    fn mir_type_kinds_get(i: i64) -> i32: unsafe { (*(self.mir_ptr as *const MirModule)).sema_type_kinds[i] }
+    fn mir_type_d0_get(i: i64) -> i32: unsafe { (*(self.mir_ptr as *const MirModule)).sema_type_d0[i] }
 
     fn unit_owns(sym: i32) -> bool:
         if self.unit_total <= 1:
@@ -2621,7 +2621,7 @@ impl Codegen:
         let map_idx = (f_start + source_fi) as i64
         if map_idx >= self.struct_llvm_field_indices.len() as i64:
             return source_fi
-        self.struct_llvm_field_indices.get(map_idx)
+        self.struct_llvm_field_indices[map_idx]
 
     fn vec_contains_i32(values: &Vec[i32], needle: i32) -> bool:
         for i in 0..values.len() as i32:
@@ -3612,7 +3612,7 @@ impl Codegen:
         if count <= 0:
             return 0
         if count == 1:
-            return self.sema_type_to_llvm(payload_tys.get(0))
+            return self.sema_type_to_llvm(payload_tys[0])
         let fields: Vec[i64] = Vec.new()
         for pi in 0..count:
             var field_ty = self.sema_type_to_llvm(payload_tys[pi])

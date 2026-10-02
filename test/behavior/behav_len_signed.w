@@ -31,10 +31,10 @@ fn main:
     var i = v.len() - 1
     var sum = 0
     while i >= 0:
-        sum = sum + v.get(i)
+        sum = sum + v[i]
         i = i - 1
     assert(sum == 6)
-    assert(v.get(v.len() - 1) == 3)
+    assert(v[v.len() - 1] == 3)
 
     // The declared type is Int (i64).
     let n: Int = v.len()

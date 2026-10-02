@@ -38,6 +38,6 @@ fn main:
     assert(pick_field(false).id == 7)
     assert(pick_field(true).id == 7)
     assert(pick_whole(false).id == 9)
-    assert(pick_vec(false).get(1) == 2)
-    assert(pick_vec(true).get(0) == 1)
+    assert(pick_vec(false)[1] == 2)
+    assert(pick_vec(true)[0] == 1)
     print("ok")

@@ -15,11 +15,11 @@ fn main:
 
     let modules = project.modules()
     assert(modules.len() == 1)
-    assert(modules.get(0).name == "main")
+    assert(modules[0].name == "main")
 
     let functions = project.functions()
     assert(functions.len() == 1)
-    let f = functions.get(0)
+    let f = functions[0]
     assert(f.name == "run")
     assert(f.is_pub())
     assert(not f.has_docs())
@@ -28,7 +28,7 @@ fn main:
 
     let types = project.types()
     assert(types.len() == 1)
-    let t = types.get(0)
+    let t = types[0]
     assert(t.name == "Runner")
     assert(t.is_pub())
     assert(t.has_docs())

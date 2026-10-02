@@ -368,9 +368,9 @@ fn main:
     if argv.len() < 2:
         eprint("usage: with run tools/move_audit.w <candidate-with> [baseline-with]")
         exit_code(2)
-    let candidate = argv.get(1)
+    let candidate = argv[1]
     // BOOTSTRAP INTERIM: materialize the argv view out of the ""-join (#762).
-    let baseline = if argv.len() as i32 >= 3: argv.get(2) ++ "" else: ""
+    let baseline = if argv.len() as i32 >= 3: argv[2] ++ "" else: ""
     let dir = "/tmp/move-audit-cells"
     let _ = mkdirs(dir)
     let cells = build_cells()

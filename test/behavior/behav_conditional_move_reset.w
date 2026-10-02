@@ -20,7 +20,7 @@ fn transfer(flag: bool) -> i32:
         bag.emit(move pending)
     if bag.items.len() != 1:
         return 1
-    if bag.items.get(0).values.get(0) != 42:
+    if bag.items[0].values[0] != 42:
         return 2
     0
 

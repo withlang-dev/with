@@ -38,8 +38,8 @@ pub fn run_abi_hash_check_action(ctx: ActionCtx) -> i32:
         let parts = line.split("  ")
         if parts.len() != 2:
             ctx.diagnostics().error("abi-hash-check: malformed line in " ++ record_path ++ ": " ++ line)
-        let expected = abi_owned_text(parts.get(0))
-        let path = abi_owned_text(parts.get(1))
+        let expected = abi_owned_text(parts[0])
+        let path = abi_owned_text(parts[1])
         let actual = fs.sha256_file(path)
         if actual.len() == 0:
             ctx.diagnostics().error("abi-hash-check: cannot hash " ++ path)

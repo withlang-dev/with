@@ -65,14 +65,14 @@ impl Arena:
     pub fn kind(id: ArenaId) -> i32:
         if not self.contains(id):
             return ARENA_SLOT_EMPTY()
-        self.slots.get(arena_id_raw(id) as i64).kind
+        self.slots[arena_id_raw(id) as i64].kind
 
     pub fn get_i32(id: ArenaId) -> i32:
         if self.kind(id) != ARENA_SLOT_I32():
             return 0
-        self.slots.get(arena_id_raw(id) as i64).int_value
+        self.slots[arena_id_raw(id) as i64].int_value
 
     pub fn get_str(id: ArenaId) -> str:
         if self.kind(id) != ARENA_SLOT_STR():
             return ""
-        self.slots.get(arena_id_raw(id) as i64).str_value.clone()
+        self.slots[arena_id_raw(id) as i64].str_value.clone()

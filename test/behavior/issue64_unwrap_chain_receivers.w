@@ -27,7 +27,7 @@ fn option_binding:
     let item = opt.unwrap()
     item.tags.push(11)
     assert(item.tags.len() == 1)
-    assert(item.tags.get(0) == 11)
+    assert(item.tags[0] == 11)
 
 fn result_direct_no_crash:
     let res: Result[Inner, str] = Ok(make_inner("result-direct"))
@@ -38,7 +38,7 @@ fn result_binding:
     let item = res.unwrap()
     item.tags.push(22)
     assert(item.tags.len() == 1)
-    assert(item.tags.get(0) == 22)
+    assert(item.tags[0] == 22)
 
 fn iter_view_binding:
     var items: Vec[Inner] = Vec.new()

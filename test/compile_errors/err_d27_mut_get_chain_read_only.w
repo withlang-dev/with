@@ -8,5 +8,5 @@ type Thing { vals: Vec[i32] }
 fn main:
     var items: Vec[Thing] = Vec.new()
     items.push(Thing { vals: Vec.new() })
-    items.get(0).vals.push(9)
-    assert(items.get(0).vals.len() == 1)
+    items[0].vals.push(9)
+    assert(items[0].vals.len() == 1)

@@ -74,9 +74,9 @@ const STR_CLEAR_LEN: i64 = comptime str_clear_len()
 
 fn main:
     assert(STRS.len() == 3)
-    assert(STRS.get(0) == "hello")
-    assert(STRS.get(1) == "world")
-    assert(STRS.get(2) == "foo")
+    assert(STRS[0] == "hello")
+    assert(STRS[1] == "world")
+    assert(STRS[2] == "foo")
     assert(STR_LEN == 2)
     assert(STR_HIT == true)
     assert(STR_MISS == false)

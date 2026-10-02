@@ -32,7 +32,7 @@ fn get_idx(val: &JV, key: str) -> Option[&JV]:
     match val:
         .Object(entries) =>
             for i in 0..entries.len():
-                let entry = entries.get(i)
+                let entry = entries[i]
                 if entry.key == key:
                     return Some(&entry.value)
             None
@@ -40,7 +40,7 @@ fn get_idx(val: &JV, key: str) -> Option[&JV]:
 
 fn key_for(v: &Vec[KV], i: i32) -> &str:
     for e in v:
-        if e.key == v.get(i).key:
+        if e.key == v[i].key:
             return &e.key
     panic("missing")
 
@@ -57,7 +57,7 @@ extend Bag:
         panic("empty")
     fn value_of(key: str) -> Option[&JV]:
         for i in 0..self.items.len():
-            let e = self.items.get(i)
+            let e = self.items[i]
             if e.key == key:
                 return Some(&e.value)
         None

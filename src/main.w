@@ -2054,11 +2054,11 @@ impl PoolState:
     mut fn retire_oldest() -> PoolRetireResult:
         let idx = self.oldest as i64
         self.sweep()
-        if self.done.get(idx) == 0:
-            let deadline = with_clock_nanos() + self.timeouts.get(idx) as i64 * 1000000
-            while self.done.get(idx) == 0:
+        if self.done[idx] == 0:
+            let deadline = with_clock_nanos() + self.timeouts[idx] as i64 * 1000000
+            while self.done[idx] == 0:
                 if with_clock_nanos() >= deadline:
-                    let killed_rc = build_graph_rt_exec_wait(self.pids.get(idx), 1)
+                    let killed_rc = build_graph_rt_exec_wait(self.pids[idx], 1)
                     self.done[idx] = 1
                     self.done_rcs[idx] = killed_rc
                     self.done_ats[idx] = with_clock_nanos()
@@ -2067,19 +2067,19 @@ impl PoolState:
                 build_graph_rt_usleep(10000)
                 self.sweep()
         self.oldest = self.oldest + 1
-        let name = self.names.get(idx)
-        let rc = self.done_rcs.get(idx)
-        let spent = self.done_ats.get(idx) - self.t0s.get(idx)
-        let child_rss = self.done_rsss.get(idx)
-        let out_text = with_fs_read_file(self.outs.get(idx))
+        let name = self.names[idx]
+        let rc = self.done_rcs[idx]
+        let spent = self.done_ats[idx] - self.t0s[idx]
+        let child_rss = self.done_rsss[idx]
+        let out_text = with_fs_read_file(self.outs[idx])
         if out_text.len() > 0:
             with_write(out_text)
-        let err_text = with_fs_read_file(self.errs.get(idx))
+        let err_text = with_fs_read_file(self.errs[idx])
         if err_text.len() > 0:
             with_ewrite(err_text)
         build_graph_time_eprint("[time] " ++ name ++ " " ++ build_graph_time_fmt(spent))
-        let ran_via_runner = self.via_runner.get(idx)
-        let effects_path = with_str_clone_ref(self.effects_paths.get(idx))
+        let ran_via_runner = self.via_runner[idx]
+        let effects_path = with_str_clone_ref(self.effects_paths[idx])
         if rc == 124:
             with_eprint("error: build.w target '" ++ name ++ "' timed out")
             return PoolRetireResult { rc: 124, name: with_str_clone_ref(name), spent, maxrss: child_rss, via_runner: ran_via_runner, effects_path }
@@ -3186,7 +3186,7 @@ fn run_build_command(options: BuildCommandOptions, graph_options: &BuildGraphCom
                 with_eprint("error: " ++ selected_graph.error_msg)
                 return 1
             if graph_options.no_deps:
-                if selected_graph.targets.len() == 0 or (selected_graph.targets.get(0).kind != 23 and selected_graph.targets.get(0).kind != 2):
+                if selected_graph.targets.len() == 0 or (selected_graph.targets[0].kind != 23 and selected_graph.targets[0].kind != 2):
                     with_eprint("error: --no-deps is only supported for build.w action and test targets")
                     return 1
             if graph_options.explain_target.len() > 0:
@@ -4736,7 +4736,7 @@ fn migrate_apply_std_use_fixits(output_path: &str) -> i32:
             let parts = fact.name.split("; add: use ")
             if parts.len() < 2:
                 continue
-            let use_line = "use " ++ parts.get(1)
+            let use_line = "use " ++ parts[1]
             if not ("\n" ++ block).contains("\n" ++ use_line ++ "\n"):
                 block = block ++ use_line ++ "\n"
         if block.len() == 0:

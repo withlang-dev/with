@@ -1097,7 +1097,7 @@ impl MirBuilder:
     mut fn materialize_str_views_of_consumed_base(local_id: i32) -> Unit:
         if self.sema.type_needs_drop_frozen(self.local_type(local_id)) == 0:
             return
-        let cap_scope_start = if self.alias_scope_starts.len() > 0: self.alias_scope_starts.get(self.alias_scope_starts.len() - 1) else: 0
+        let cap_scope_start = if self.alias_scope_starts.len() > 0: self.alias_scope_starts[self.alias_scope_starts.len() - 1] else: 0
         var cap_ai = self.alias_places.len() as i32 - 1
         while cap_ai >= cap_scope_start:
             let cap_sym: i32 = self.alias_syms[cap_ai]
@@ -5023,7 +5023,7 @@ impl MirBuilder:
         let parts = self.collect_left_string_concat_parts(rhs_expr)
         if parts.len() < 2:
             return -1
-        if self.same_string_place_expr(place_expr, parts.get(0)) == 0:
+        if self.same_string_place_expr(place_expr, parts[0]) == 0:
             return -1
 
         let dest_place = self.lower_expr_place(place_expr)
@@ -6618,7 +6618,7 @@ impl MirBuilder:
             // iteration and clobber the saved value — that residue class keeps
             // the old drop-before-overwrite (recorded in the #747 handoff).
             var alias_took_old_value = 0
-            let cap_scope_start = if self.alias_scope_starts.len() > 0: self.alias_scope_starts.get(self.alias_scope_starts.len() - 1) else: 0
+            let cap_scope_start = if self.alias_scope_starts.len() > 0: self.alias_scope_starts[self.alias_scope_starts.len() - 1] else: 0
             var cap_ai = self.alias_places.len() as i32 - 1
             while cap_ai >= cap_scope_start:
                 if self.places_are_identical(place, self.alias_places[cap_ai]) != 0:
@@ -10104,7 +10104,7 @@ impl MirBuilder:
     // The enclosing function's return type. Inside a gen-loop closure (D69)
     // a `return` belongs to the function that owns the loop.
     fn fn_return_type() -> i32:
-        if self.gen_loop_flag_local >= 0: self.gen_loop_ret_ty else: self.body.local_type_ids.get(0)
+        if self.gen_loop_flag_local >= 0: self.gen_loop_ret_ty else: self.body.local_type_ids[0]
 
     // Where a returned value goes: local 0, or, in a gen-loop closure, the
     // owning frame's return slot through its capture.
@@ -13571,7 +13571,7 @@ impl MirBuilder:
 
         let variant_place = self.body.new_downcast_place(enum_place, variant_index)
         if payload_count == 1:
-            let payload_ty = payloads.get(0)
+            let payload_ty = payloads[0]
             let field_place = self.body.new_field_place(variant_place, 0, payload_ty)
             if accessor_kind == 3 or accessor_kind == 4:
                 let borrow_kind = if accessor_kind == 4: BorrowKind.EXCLUSIVE else: BorrowKind.SHARED
@@ -17434,7 +17434,7 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> Lowered
     // Typed let: body lowering GROWS local_type_ids (every new_temp pushes),
     // so an element view here dangles by the time the implicit-Ok wrap
     // decision reads it — stage2's build() returned unwrapped Config bits.
-    let ret_ty: i32 = builder.body.local_type_ids.get(0)
+    let ret_ty: i32 = builder.body.local_type_ids[0]
     builder.expected_type = ret_ty
 
     let ret_is_void = ret_ty == builder.sema.ty_void
@@ -18593,7 +18593,7 @@ impl MirModule:
                 continue
 
             var compatible = 1
-            let leader_sym = scc_syms.get(0)
+            let leader_sym = scc_syms[0]
             for si in 1..scc_syms.len() as i32:
                 let member_sym = scc_syms[si]
                 if mir_tailrec_sig_compatible(*sema, ast_pool, leader_sym, member_sym) == 0:

@@ -32,7 +32,7 @@ fn recipe_fixture() -> str:
 
 fn vec_has(values: &Vec[str], value: str) -> bool:
     for i in 0..values.len() as i32:
-        if values.get(i as i64) == value:
+        if values[i as i64] == value:
             return true
     false
 
@@ -40,7 +40,7 @@ fn main:
     let mac = conan_extract_recipe_link_metadata(recipe_fixture(), "Macos")
     assert(mac.libs.len() == 0)
     assert(mac.lib_paths.len() == 6)
-    assert(mac.lib_paths.get(0) == "-framework")
+    assert(mac.lib_paths[0] == "-framework")
     assert(vec_has(&mac.lib_paths, "CoreFoundation"))
     assert(vec_has(&mac.lib_paths, "CoreServices"))
     assert(vec_has(&mac.lib_paths, "SystemConfiguration"))

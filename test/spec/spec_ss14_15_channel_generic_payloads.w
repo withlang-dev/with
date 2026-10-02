@@ -24,7 +24,7 @@ fn main:
     vec_tx.send(values)
     let received = vec_rx.recv().unwrap()
     assert(received.len() == 2)
-    assert(received.get(0) == 3)
-    assert(received.get(1) == 5)
+    assert(received[0] == 3)
+    assert(received[1] == 5)
 
     print("ok")

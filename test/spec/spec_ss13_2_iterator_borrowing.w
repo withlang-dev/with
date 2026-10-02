@@ -71,8 +71,8 @@ fn test_collect_owned_tokens_from_custom_iterator:
         for tok in stream:
             toks.push(tok)
     assert(tokens.len() == 2)
-    assert(tokens.get(0).text == "let")
-    assert(tokens.get(1).text == "value")
+    assert(tokens[0].text == "let")
+    assert(tokens[1].text == "value")
 
 fn test_unannotated_user_iterator_does_not_retain_receiver:
     var bag = OwnedIterBag { count: 1 }

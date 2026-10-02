@@ -10,9 +10,9 @@ fn test_basic_swap:
         let tmp = a.get()
         a.set(b.get())
         b.set(tmp)
-    assert(xs.get(0) == 30)
-    assert(xs.get(1) == 20)
-    assert(xs.get(2) == 10)
+    assert(xs[0] == 30)
+    assert(xs[1] == 20)
+    assert(xs[2] == 10)
 
 fn test_independent_mutation:
     var xs = Vec.new()
@@ -22,9 +22,9 @@ fn test_independent_mutation:
     with xs.get_disjoint(0, 1) as mut (a, b):
         a.set(100)
         b.set(200)
-    assert(xs.get(0) == 100)
-    assert(xs.get(1) == 200)
-    assert(xs.get(2) == 3)
+    assert(xs[0] == 100)
+    assert(xs[1] == 200)
+    assert(xs[2] == 3)
 
 fn test_read_only:
     var xs = Vec.new()

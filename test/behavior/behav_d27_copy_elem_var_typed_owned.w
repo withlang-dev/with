@@ -6,10 +6,10 @@
 fn main:
     var xs: Vec[i32] = Vec.new()
     xs.push(50)
-    var off: i32 = xs.get(0)
+    var off: i32 = xs[0]
     off = off + 1
     assert(off == 51)
     xs.push(3)
-    var pos: i32 = xs.get(1)
+    var pos: i32 = xs[1]
     pos = pos + 2
     assert(pos == 5)

@@ -9,9 +9,9 @@ fn test_vec_basic:
     v.push(20)
     v.push(30)
     assert(v.len() == 3)
-    assert(v.get(0) == 10)
-    assert(v.get(1) == 20)
-    assert(v.get(2) == 30)
+    assert(v[0] == 10)
+    assert(v[1] == 20)
+    assert(v[2] == 30)
 
 fn test_vec_empty:
     var v = Vec[i32].new()
@@ -22,9 +22,9 @@ fn test_vec_large:
     for i in 0..100:
         v.push(i)
     assert(v.len() == 100)
-    assert(v.get(0) == 0)
-    assert(v.get(50) == 50)
-    assert(v.get(99) == 99)
+    assert(v[0] == 0)
+    assert(v[50] == 50)
+    assert(v[99] == 99)
 
 fn test_vec_push_pop_pattern:
     // Simulate stack behavior with Vec
@@ -33,7 +33,7 @@ fn test_vec_push_pop_pattern:
     stack.push(2)
     stack.push(3)
     assert(stack.len() == 3)
-    assert(stack.get(2) == 3)  // top of stack
+    assert(stack[2] == 3)  // top of stack
 
 fn main:
     test_vec_basic()

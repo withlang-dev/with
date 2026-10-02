@@ -5,4 +5,4 @@
 fn main:
     var xs: Vec[i32] = Vec.new()
     xs.push(41)
-    assert(xs.get(0) + 1 == 42)
+    assert(xs[0] + 1 == 42)

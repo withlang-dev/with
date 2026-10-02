@@ -562,7 +562,7 @@ impl MirBlockStack:
     fn pop_top() -> i32:
         let st = self.state
         unsafe {
-            let top: i32 = st.xs.get(st.xs.len() - 1)
+            let top: i32 = st.xs[st.xs.len() - 1]
             let _ = st.xs.pop()
             top
         }
@@ -3330,7 +3330,7 @@ impl Codegen:
             return false
 
         // Verify the first argument is f64
-        let first_arg = args.get(0)
+        let first_arg = args[0]
         let arg_ty = wl_type_of(first_arg)
         if wl_get_type_kind(arg_ty) != wl_double_type_kind():
             return false
@@ -3401,7 +3401,7 @@ impl Codegen:
         if func == 0:
             func = wl_add_function(self.llmod, intrinsic_name, ft)
         let call_args: Vec[i64] = Vec.new()
-        call_args.push(args.get(0))
+        call_args.push(args[0])
         let _ = wl_build_call(self.builder, ft, func, vec_data_i64(&call_args), 1)
         if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
             wl_build_br(self.builder, self.mir_bb_values[next_bb])
@@ -6046,7 +6046,7 @@ impl Codegen:
 
     fn mir_default_unreachable_bb_value() -> i64:
         if self.mir_default_unreachable_bbs.len() as i32 > 0:
-            return self.mir_default_unreachable_bbs.get(0)
+            return self.mir_default_unreachable_bbs[0]
         let bb = wl_append_bb(self.context, self.current_function, "mir.default.unreachable")
         self.mir_default_unreachable_bbs.push(bb)
         bb
@@ -6070,7 +6070,7 @@ impl Codegen:
     // so an `or`/`if` in a module `let` failed LLVM verification (#1483).
     fn mir_terminate_default_unreachable():
         if self.mir_default_unreachable_bbs.len() as i32 > 0:
-            let ubb = self.mir_default_unreachable_bbs.get(0)
+            let ubb = self.mir_default_unreachable_bbs[0]
             if wl_get_bb_terminator(ubb) == 0:
                 wl_position_at_end(self.builder, ubb)
                 wl_build_unreachable(self.builder)
@@ -10888,7 +10888,7 @@ impl Codegen:
                                 asm_ret_ty = wl_i64_type(self.context)
                         else if asm_input_vals.len() > 0:
                             // Read-write ("+r"): return type is the input value type.
-                            asm_ret_ty = wl_type_of(asm_input_vals.get(0))
+                            asm_ret_ty = wl_type_of(asm_input_vals[0])
                     if asm_out_count > 1:
                         // Multiple outputs: LLVM returns an anonymous struct
                         // {T0, T1, ...}, which is identical to the With tuple type
@@ -16891,7 +16891,7 @@ impl Codegen:
             self.mir_bb_values.push(llbb)
 
         if self.mir_bb_values.len() as i32 > 0:
-            wl_build_br(self.builder, self.mir_bb_values.get(0))
+            wl_build_br(self.builder, self.mir_bb_values[0])
         else:
             let fallthrough_has_sret_opt = self.fn_abi_has_sret(name_sym)
             let fallthrough_has_sret = if fallthrough_has_sret_opt.is_some(): fallthrough_has_sret_opt.unwrap() else: 0
@@ -17354,7 +17354,7 @@ impl Codegen:
             self.mir_bb_values.push(llbb)
 
         if self.mir_bb_values.len() as i32 > 0:
-            wl_build_br(self.builder, self.mir_bb_values.get(0))
+            wl_build_br(self.builder, self.mir_bb_values[0])
         else:
             let fallthrough_has_sret_opt = self.fn_abi_has_sret(mono_sym)
             let fallthrough_has_sret = if fallthrough_has_sret_opt.is_some(): fallthrough_has_sret_opt.unwrap() else: 0
@@ -17952,9 +17952,9 @@ impl Codegen:
         if arg_count <= 0:
             return wl_get_undef(wl_i32_type(self.context))
         if payload_ty == 0:
-            return args.get(0)
+            return args[0]
         if arg_count == 1:
-            return self.coerce_value_to_type(args.get(0), payload_ty)
+            return self.coerce_value_to_type(args[0], payload_ty)
         if wl_get_type_kind(payload_ty) == wl_struct_type_kind():
             var payload = wl_get_undef(payload_ty)
             let field_count = wl_count_struct_elem_types(payload_ty)
@@ -17965,7 +17965,7 @@ impl Codegen:
                 payload = wl_build_insert_value(self.builder, payload, coerced, ai)
                 ai = ai + 1
             return payload
-        self.coerce_value_to_type(args.get(0), payload_ty)
+        self.coerce_value_to_type(args[0], payload_ty)
 
     mut fn gen_enum_variant_call_val(enum_owner_sym: i32, variant_sym: i32, args: &Vec[i64], arg_count: i32) -> i64:
         let variant_name = self.intern.resolve(variant_sym)
@@ -18457,7 +18457,7 @@ impl Codegen:
 
         // Branch from entry to first MIR BB
         if self.mir_bb_values.len() as i32 > 0:
-            wl_build_br(self.builder, self.mir_bb_values.get(0))
+            wl_build_br(self.builder, self.mir_bb_values[0])
         else:
             let _ = wl_build_ret(self.builder, wl_const_int(ret_ty, 0, 0))
 
@@ -19805,7 +19805,7 @@ impl Codegen:
             let bb = wl_append_bb(ctx, tramp_fn, "bb")
             self.mir_bb_values.push(bb)
         if bb_count > 0:
-            wl_build_br(self.builder, self.mir_bb_values.get(0))
+            wl_build_br(self.builder, self.mir_bb_values[0])
 
         // Emit MIR statements and terminators
         for bi in 0..bb_count:

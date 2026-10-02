@@ -338,7 +338,7 @@ pub fn generate_compat_runtime_action(ctx: ActionCtx) -> i32:
         return br_fail(ctx, "requires compat source, primary output, embedded stdlib output, embedded runtime output, and embedded bundles output")
 
     let fs = ctx.fs()
-    let compat_source = inputs.get(0)
+    let compat_source = inputs[0]
     if not fs.exists(compat_source):
         return br_fail(ctx, "missing source: " ++ compat_source)
 
@@ -355,9 +355,9 @@ pub fn generate_compat_runtime_action(ctx: ActionCtx) -> i32:
     if embedded_rt.len() == 0:
         return 1
 
-    let compat_output = outputs.get(0)
-    let embedded_output = outputs.get(1)
-    let embedded_rt_output = outputs.get(2)
+    let compat_output = outputs[0]
+    let embedded_output = outputs[1]
+    let embedded_rt_output = outputs[2]
     if fs.mkdir_all(br_dirname(compat_output)) != 0:
         return br_fail(ctx, "could not create output directory: " ++ br_dirname(compat_output))
     if fs.mkdir_all(br_dirname(embedded_output)) != 0:
@@ -371,7 +371,7 @@ pub fn generate_compat_runtime_action(ctx: ActionCtx) -> i32:
     var bundle_names: Vec[str] = Vec.new()
     for arg in ctx.args():
         if not arg.starts_with("exclude="): bundle_names.push(arg.clone())
-    let embedded_bundles_output = outputs.get(3)
+    let embedded_bundles_output = outputs[3]
     if fs.write_text(embedded_bundles_output, br_generate_embedded_bundles(bundle_names)) != 0:
         return br_fail(ctx, "could not write: " ++ embedded_bundles_output)
     if fs.write_text(compat_output, fs.read_text(compat_source)) != 0:

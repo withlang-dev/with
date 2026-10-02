@@ -8,8 +8,8 @@ fn test_vec_filter_uses_element_type:
 
     let short = words.filter(s => s.len32() == 1)
     assert(short.len() == 2)
-    assert(short.get(0) == "a")
-    assert(short.get(1) == "c")
+    assert(short[0] == "a")
+    assert(short[1] == "c")
 
 fn test_vec_fold_uses_accumulator_and_element_types:
     let nums: Vec[i64] = Vec.new()

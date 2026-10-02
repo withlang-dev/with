@@ -152,9 +152,9 @@ pub fn run_examples_tests_action(ctx: ActionCtx) -> i32:
     if fs.mkdir_all(out_dir) != 0:
         ctx.diagnostics().error("examples-tests: could not create output directory: " ++ out_dir)
     let root = ctx.project_info().project_root()
-    if not fs.exists(inputs.get(0)):
-        ctx.diagnostics().error("examples-tests: missing compiler: " ++ inputs.get(0))
-    let compiler = ex_abs(root, inputs.get(0))
+    if not fs.exists(inputs[0]):
+        ctx.diagnostics().error("examples-tests: missing compiler: " ++ inputs[0])
+    let compiler = ex_abs(root, inputs[0])
     var failures = ex_facade_copy_failures(ctx)
 
     for source in ex_checked():

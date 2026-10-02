@@ -201,7 +201,7 @@ impl StackifyGraph:
         let start = self.target_args.len() as i32
         var i: i64 = 0
         while i < args.len():
-            self.target_args.push(args.get(i))
+            self.target_args.push(args[i])
             i = i + 1
         let id = self.targets.len() as i32
         self.targets.push(StackifyTarget {
@@ -219,7 +219,7 @@ impl StackifyGraph:
         self.blocks[block].succs_count = succs.len() as i32
         var i: i64 = 0
         while i < succs.len():
-            self.succs.push(succs.get(i))
+            self.succs.push(succs[i])
             i = i + 1
 
     pub mut fn set_br(block: i32, target_block: i32, args: &Vec[i32]):
@@ -255,7 +255,7 @@ impl StackifyGraph:
         var i: i64 = 0
         while i < target_blocks.len():
             let empty: Vec[i32] = Vec.new()
-            let _ = self.add_target(target_blocks.get(i), empty)
+            let _ = self.add_target(target_blocks[i], empty)
             i = i + 1
         let default_empty: Vec[i32] = Vec.new()
         let default_target = self.add_target(default_block, default_empty)
@@ -267,7 +267,7 @@ impl StackifyGraph:
         let succs: Vec[i32] = Vec.new()
         var si: i64 = 0
         while si < target_blocks.len():
-            succs.push(target_blocks.get(si))
+            succs.push(target_blocks[si])
             si = si + 1
         succs.push(default_block)
         self.set_succs(block, succs)
@@ -298,7 +298,7 @@ impl StackifyGraph:
         self.blocks[block].return_values_count = values.len() as i32
         var i: i64 = 0
         while i < values.len():
-            self.return_values.push(values.get(i))
+            self.return_values.push(values[i])
             i = i + 1
         let no_succs: Vec[i32] = Vec.new()
         self.set_succs(block, no_succs)
@@ -396,8 +396,8 @@ impl StackifyDfsState:
         stack_idx.push(0)
         while stack_block.len() > 0:
             let top = stack_block.len() - 1
-            let blk: i32 = stack_block.get(top)
-            let idx: i32 = stack_idx.get(top)
+            let blk: i32 = stack_block[top]
+            let idx: i32 = stack_idx[top]
             let b = graph.blocks[blk]
             if idx < b.succs_count:
                 // #183: succ must be computed before set_i32 — codegen re-reads idx after mutation
@@ -637,7 +637,7 @@ impl StackifyContext:
         let child_start = self.tree.children.len() as i32
         var i: i64 = 0
         while i < children.len():
-            self.tree.children.push(children.get(i))
+            self.tree.children.push(children[i])
             i = i + 1
         child_start
 
@@ -645,7 +645,7 @@ impl StackifyContext:
         let start = self.tree.values.len() as i32
         var i: i64 = 0
         while i < values.len():
-            self.tree.values.push(values.get(i))
+            self.tree.values.push(values[i])
             i = i + 1
         start
 
@@ -822,7 +822,7 @@ impl StackifyContext:
             idx = idx + 1
         var bi: i64 = 0
         while bi < body.len():
-            self.result_push(body.get(bi))
+            self.result_push(body[bi])
             bi = bi + 1
 
     mut fn handle_dom_subtree(block: i32):

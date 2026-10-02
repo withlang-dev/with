@@ -813,13 +813,13 @@ fn comp_parse_nonnegative_i32(text: &str) -> i32:
 
 fn comp_stack_binary_format(bytes: Vec[u8]) -> str:
     if bytes.len() >= 2:
-        if bytes.get(0) == 77 as u8 and bytes.get(1) == 90 as u8:
+        if bytes[0] == 77 as u8 and bytes[1] == 90 as u8:
             return "pe"
     if bytes.len() >= 4:
-        let b0 = bytes.get(0)
-        let b1 = bytes.get(1)
-        let b2 = bytes.get(2)
-        let b3 = bytes.get(3)
+        let b0 = bytes[0]
+        let b1 = bytes[1]
+        let b2 = bytes[2]
+        let b3 = bytes[3]
         if b0 == 127 as u8 and b1 == 69 as u8 and b2 == 76 as u8 and b3 == 70 as u8:
             return "elf"
         if b0 == 254 as u8 and b1 == 237 as u8 and b2 == 250 as u8 and b3 == 207 as u8:
@@ -1865,7 +1865,7 @@ pub fn run_stack_budget_check_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()
     if inputs.len() == 0:
         return comp_fail(ctx, "requires a binary input")
-    let binary_path = inputs.get(0)
+    let binary_path = inputs[0]
     let fs = ctx.fs()
     if not fs.exists(binary_path):
         return comp_fail(ctx, "missing binary: " ++ binary_path)
@@ -1946,7 +1946,7 @@ pub fn run_debug_lines_check_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()
     if inputs.len() == 0:
         return comp_fail(ctx, "requires a binary input")
-    let binary_path = inputs.get(0)
+    let binary_path = inputs[0]
     let fs = ctx.fs()
     if not fs.exists(binary_path):
         return comp_fail(ctx, "missing binary: " ++ binary_path)
@@ -3003,7 +3003,7 @@ pub fn run_with_compiler_build_action(ctx: ActionCtx) -> i32:
     let compiler_arg = comp_arg_value(ctx.args(), "compiler=")
     if compiler_arg.len() == 0:
         return comp_fail(ctx, "requires compiler= argument")
-    let source_path = inputs.get(0)
+    let source_path = inputs[0]
     let compiler_path = comp_compiler_path(ctx, compiler_arg)
     let fs = ctx.fs()
     if not fs.exists(source_path):
@@ -3085,7 +3085,7 @@ pub fn run_with_compiler_ir_action(ctx: ActionCtx) -> i32:
     let compiler_arg = comp_arg_value(ctx.args(), "compiler=")
     if compiler_arg.len() == 0:
         return comp_fail(ctx, "requires compiler= argument")
-    let source_path = inputs.get(0)
+    let source_path = inputs[0]
     let compiler_path = comp_compiler_path(ctx, compiler_arg)
     let fs = ctx.fs()
     if not fs.exists(source_path):

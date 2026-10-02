@@ -4184,7 +4184,7 @@ impl Sema:
         if modules.len() as i32 == 0:
             return ""
         if modules.len() as i32 == 1:
-            return "; add: use " ++ modules.get(0) ++ "." ++ name
+            return "; add: use " ++ modules[0] ++ "." ++ name
         var listed = ""
         for mi in 0..modules.len() as i32:
             if mi > 0:
@@ -5559,7 +5559,7 @@ impl Sema:
         if arg_count != 1:
             self.emit_error("Atomic[T] expects exactly one type argument", node)
             return 0
-        if self.atomic_payload_type_is_valid(args.get(0)) == 0:
+        if self.atomic_payload_type_is_valid(args[0]) == 0:
             self.emit_error("Atomic[T] requires integer or pointer T", node)
             return 0
         1
@@ -5899,10 +5899,10 @@ impl Sema:
             return 0
         let ok_payloads = self.enum_variant_payload_types(tid, self.syms.ok)
         if ok_payloads.len() as i32 == 1:
-            return ok_payloads.get(0)
+            return ok_payloads[0]
         let some_payloads = self.enum_variant_payload_types(tid, self.syms.some)
         if some_payloads.len() as i32 == 1:
-            return some_payloads.get(0)
+            return some_payloads[0]
         0
 
     // substitute_type: walk a TypeId, replacing type parameters with concrete types.
@@ -6129,7 +6129,7 @@ impl Sema:
         // Remove bindings from map and parallel arrays
         let reported_pending_calls: Vec[i32] = Vec.new()
         while self.bind_names.len() as i32 > start:
-            let removed_sym: i32 = self.bind_names.get(self.bind_names.len() - 1)
+            let removed_sym: i32 = self.bind_names[self.bind_names.len() - 1]
             let removed_node = self.binding_decl_node(removed_sym)
             self.check_live_views_for_origin(removed_sym, removed_node)
             self.poison_live_views_for_origin(removed_sym, removed_node)
@@ -8937,7 +8937,7 @@ impl Sema:
         var best_dist = max_dist + 1
         // Search scope bindings
         for idx in 0..self.bind_names.len():
-            let sym = self.bind_names.get(idx)
+            let sym = self.bind_names[idx]
             let name = self.pool_resolve(sym)
             if name.len() > 0:
                 let d = sema_levenshtein(target, name, max_dist)
@@ -8946,7 +8946,7 @@ impl Sema:
                     best_name = with_str_clone_ref(name)
         // Search function signatures
         for si in 0..self.sig_names.len():
-            let sym = self.sig_names.get(si)
+            let sym = self.sig_names[si]
             if self.is_ci_visible(sym) != 0:
                 let name = self.pool_resolve(sym)
                 if name.len() > 0:
@@ -8964,9 +8964,9 @@ impl Sema:
         var best_dist = max_dist + 1
         // Search named types by scanning type table
         for ti in 1..self.type_kinds.len():
-            let tk = self.type_kinds.get(ti)
+            let tk = self.type_kinds[ti]
             if tk == TypeKind.TY_STRUCT as i32 or tk == TypeKind.TY_ENUM as i32:
-                let sym = self.type_d0.get(ti)
+                let sym = self.type_d0[ti]
                 if sym > 0 and sym < self.pool.state.symbol_texts.len() as i32:
                     let name = self.pool_resolve(sym)
                     if sema_str_has_data(name) != 0 and not sema_str_contains_char(name, 46) != 0:

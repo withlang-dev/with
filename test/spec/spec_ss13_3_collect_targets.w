@@ -30,9 +30,9 @@ fn test_collect_vec:
     let xs = numbers()
     let copied = xs.iter().collect[Vec[i32]]()
     assert(copied.len() == 3)
-    assert(copied.get(0) == 1)
-    assert(copied.get(1) == 2)
-    assert(copied.get(2) == 3)
+    assert(copied[0] == 1)
+    assert(copied[1] == 2)
+    assert(copied[2] == 3)
 
 fn test_collect_hashset:
     let xs = numbers()
@@ -57,9 +57,9 @@ fn test_collect_btreeset:
     assert(set.contains(2))
     assert(set.contains(3))
     let items = set.items()
-    assert(items.get(0) == 1)
-    assert(items.get(1) == 2)
-    assert(items.get(2) == 3)
+    assert(items[0] == 1)
+    assert(items[1] == 2)
+    assert(items[2] == 3)
 
 fn test_collect_btreemap:
     let xs = pairs()
@@ -68,8 +68,8 @@ fn test_collect_btreemap:
     assert(map.get("a").unwrap() == 3)
     assert(map.get("b").unwrap() == 2)
     let keys = map.keys()
-    assert(keys.get(0) == "a")
-    assert(keys.get(1) == "b")
+    assert(keys[0] == "a")
+    assert(keys[1] == "b")
 
 fn test_collect_string:
     let xs = bytes()
