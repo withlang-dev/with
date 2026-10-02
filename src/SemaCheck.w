@@ -7339,6 +7339,18 @@ impl Sema:
             let op = self.ast.get_data0(node)
             if op == UnaryOp.UOP_REF or op == UnaryOp.UOP_RAW_REF_CONST or op == UnaryOp.UOP_RAW_REF_MUT:
                 return 1
+            // `*r` is the pointee read out as a value: it holds a view only
+            // when its own type can (`**rr`, `*r` of a `&Vec[&T]`). A Copy
+            // read through a reference (`*r` of a `&i32`) owns what it holds
+            // (#1783); the operand's reference is not the value's.
+            if op == UnaryOp.UOP_DEREF:
+                let operand = self.ast.get_data1(node)
+                let operand_ty = if self.ast.kind(operand) == NodeKind.NK_IDENT: self.scope_lookup(self.ast.get_data0(operand)) else: self.typed_expr_types.get(operand) ?? 0
+                if operand_ty > 0:
+                    let resolved_operand = self.resolve_alias(operand_ty as TypeId)
+                    let operand_tk = self.get_type_kind(resolved_operand)
+                    if operand_tk == TypeKind.TY_REF or operand_tk == TypeKind.TY_PTR:
+                        return self.type_is_ephemeral_value(self.get_type_d0(resolved_operand))
             return self.expr_is_ephemeral_value(self.ast.get_data1(node))
         if kind == NodeKind.NK_SLICE:
             return 1
