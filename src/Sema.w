@@ -66,6 +66,11 @@ pub enum VarState: i32:
 
 pub type BindingProvenance {
     view_origin_mask: i32,
+    // The subset of view_origin_mask whose parameters' OWN storage the
+    // binding may point into (SemaCheck.compute_expr_storage_origin_mask);
+    // set_binding_view_deps resets it to the whole mask (unproven is
+    // storage), record_view_binding_from_expr narrows it.
+    view_storage_mask: i32,
     view_dep_start: i32,
     view_dep_count: i32,
     effect_dep_sym: i32,
@@ -79,7 +84,7 @@ pub type BindingProvenance {
 impl Copy for BindingProvenance
 
 fn binding_provenance_empty -> BindingProvenance:
-    BindingProvenance { view_origin_mask: 0, view_dep_start: 0, view_dep_count: 0, effect_dep_sym: 0, is_ephemeral_value: 0, is_ephemeral_task: 0, is_non_send_task: 0, poisoned_origin_sym: 0, poisoned_origin_node: 0, poisoned_binding_node: 0 }
+    BindingProvenance { view_origin_mask: 0, view_storage_mask: 0, view_dep_start: 0, view_dep_count: 0, effect_dep_sym: 0, is_ephemeral_value: 0, is_ephemeral_task: 0, is_non_send_task: 0, poisoned_origin_sym: 0, poisoned_origin_node: 0, poisoned_binding_node: 0 }
 
 // D39 declared view origin (SemaCheck.declared_view_origin): a parameter
 // index, or one of these.
@@ -670,6 +675,12 @@ pub type Sema {
     // Parallel to sig_param_effects: bitmask of signature parameter indices that a returned
     // view may originate from when this parameter participates in escape_view.
     sig_param_view_origins: Vec[i32],
+    // Parallel to sig_param_view_origins: the origin parameters whose own
+    // storage the returned view provably never points into — the result
+    // views only what they view (SemaCheck.compute_expr_storage_origin_mask;
+    // §21.1 Rule 6). A call records such a parameter's argument by its views
+    // alone, never by its own place; 0 (unproven) keeps the place an origin.
+    sig_param_view_through: Vec[i32],
     // D63 call-once: 1 when the body invokes this parameter more than once
     // (twice, or once inside a loop) — a consuming closure may not be
     // passed to it.
@@ -1636,6 +1647,7 @@ pub type Sema {
     current_fn_param_effs: Vec[i32],   // accumulated effect bits per param
     current_fn_param_direct_effs: Vec[i32], // body-local effects, excluding propagated calls
     current_fn_param_origins: Vec[i32],// accumulated escape_view origin masks per param
+    current_fn_param_storage_origins: Vec[i32], // the subset of those whose own storage the returned view may point into
     current_fn_param_view_nodes: Vec[i32], // representative return/view node for escape_view diagnostics
     current_fn_sig_idx: i32,           // sig index of current function (-1 if not in a fn body)
     current_fn_variadic: i32,          // 1 while checking a `...` definition body (never a closure in it)
@@ -1666,6 +1678,11 @@ pub type Sema {
     binding_view_dep_data: Vec[i32],
     // Expression-level view metadata for call expressions and view-producing nodes.
     expr_view_param_origins: HashMap[i32, i32],
+    // The subset of a node's expr_view_param_origins whose parameters' own
+    // storage the value may point into, recorded only where a recorder
+    // proved it narrower (compute_expr_storage_origin_mask); absent means
+    // the whole mask.
+    expr_view_storage_origins: HashMap[i32, i32],
     // #962: a view produced from a statement temporary (`split(..).get(1)`,
     // `split(..)[1]`): node → the temporary's type. Fine inside the statement,
     // a use-after-free once bound or returned.
@@ -2692,6 +2709,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         sig_param_effects: Vec.new(),
         sig_param_direct_effects: Vec.new(),
         sig_param_view_origins: Vec.new(),
+        sig_param_view_through: Vec.new(),
         sig_param_invoke_many: Vec.new(),
         fn_param_invocations: sema_new_map_i32_i32(),
         fn_param_many_nodes: sema_new_map_i32_i32(),
@@ -3185,6 +3203,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         current_fn_param_effs: Vec.new(),
         current_fn_param_direct_effs: Vec.new(),
         current_fn_param_origins: Vec.new(),
+        current_fn_param_storage_origins: Vec.new(),
         current_fn_param_view_nodes: Vec.new(),
         current_fn_sig_idx: -1,
         current_fn_variadic: 0,
@@ -3198,6 +3217,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         deferred_callable_forwards: Vec.new(),
         binding_view_dep_data: Vec.new(),
         expr_view_param_origins: sema_new_map_i32_i32(),
+        expr_view_storage_origins: sema_new_map_i32_i32(),
         expr_view_into_temporary: sema_new_map_i32_i32(),
         expr_view_dep_starts: sema_new_map_i32_i32(),
         expr_view_dep_counts: sema_new_map_i32_i32(),
@@ -7084,6 +7104,7 @@ impl Sema:
             with self.bind_provenance.slot(slot_idx) as mut slot:
                 var provenance = slot.get()
                 provenance.view_origin_mask = 0
+                provenance.view_storage_mask = 0
                 provenance.view_dep_start = 0
                 provenance.view_dep_count = 0
                 provenance.poisoned_origin_sym = 0
@@ -7107,12 +7128,32 @@ impl Sema:
             with self.bind_provenance.slot(slot_idx) as mut slot:
                 var provenance = slot.get()
                 provenance.view_origin_mask = param_mask
+                provenance.view_storage_mask = param_mask
                 provenance.view_dep_start = start
                 provenance.view_dep_count = deps.len() as i32
                 provenance.poisoned_origin_sym = 0
                 provenance.poisoned_origin_node = 0
                 provenance.poisoned_binding_node = 0
                 slot.set(provenance)
+
+    // Narrows the storage subset of a binding's origin mask; called after
+    // set_binding_view_deps, which resets it to the whole mask.
+    fn set_binding_view_storage_mask(sym: i32, storage_mask: i32):
+        let opt = self.scope_name_map.get(sym)
+        if opt.is_none():
+            return
+        let slot_idx = opt.unwrap() as i64
+        with self.bind_provenance.slot(slot_idx) as mut slot:
+            var provenance = slot.get()
+            if provenance.view_origin_mask >= 0 and storage_mask >= 0:
+                provenance.view_storage_mask = storage_mask & provenance.view_origin_mask
+                slot.set(provenance)
+
+    fn binding_view_storage_mask(sym: i32) -> i32:
+        let opt = self.scope_name_map.get(sym)
+        if opt.is_some():
+            return self.bind_provenance[opt.unwrap()].view_storage_mask
+        0
 
     // #625 (viral-escape): union additional view origins into a binding that
     // already exists — used when a store (Vec.push / HashMap.insert) adds the
@@ -7828,6 +7869,7 @@ impl Sema:
     fn set_expr_view_deps(expr_node: i32, param_mask: i32, deps: &Vec[i32]):
         if expr_node == 0:
             return
+        self.expr_view_storage_origins.remove(expr_node)
         if param_mask == 0 and deps.len() == 0:
             self.expr_view_param_origins.remove(expr_node)
             self.expr_view_dep_starts.remove(expr_node)
@@ -7844,6 +7886,21 @@ impl Sema:
         if self.expr_view_param_origins.contains(expr_node):
             return self.expr_view_param_origins.get(expr_node).unwrap()
         0
+
+    // Narrows the storage subset of a node's recorded origins; called after
+    // set_expr_view_deps, which resets it to the whole mask.
+    fn set_expr_view_storage_mask(expr_node: i32, storage_mask: i32):
+        if expr_node == 0 or not self.expr_view_param_origins.contains(expr_node):
+            return
+        let whole = self.expr_view_origin_mask(expr_node)
+        if whole < 0 or storage_mask < 0:
+            return
+        self.expr_view_storage_origins.insert(expr_node, storage_mask & whole)
+
+    fn expr_view_storage_mask(expr_node: i32) -> i32:
+        if self.expr_view_storage_origins.contains(expr_node):
+            return self.expr_view_storage_origins.get(expr_node).unwrap()
+        self.expr_view_origin_mask(expr_node)
 
     fn expr_view_dep_count(expr_node: i32) -> i32:
         if self.expr_view_dep_counts.contains(expr_node):
@@ -7957,6 +8014,7 @@ impl Sema:
             self.sig_param_effects.push(0)
             self.sig_param_direct_effects.push(0)
             self.sig_param_view_origins.push(0)
+            self.sig_param_view_through.push(0)
             self.sig_param_invoke_many.push(0)
             self.sig_value_ref_abi_params.push(0)
         self.sig_receiver_modes.push(ReceiverMode.None as i32)
@@ -8092,6 +8150,24 @@ impl Sema:
             return
         self.sig_param_view_origins[(start + pi)] = mask
 
+    fn sig_param_view_through(si: i32, pi: i32) -> i32:
+        if si < 0 or si >= self.sig_param_eff_starts.len() as i32:
+            return 0
+        let start = self.sig_param_eff_starts[si]
+        let count = self.sig_param_counts[si]
+        if pi < 0 or pi >= count:
+            return 0
+        self.sig_param_view_through[(start + pi)]
+
+    mut fn set_sig_param_view_through(si: i32, pi: i32, mask: i32):
+        if si < 0 or si >= self.sig_param_eff_starts.len() as i32:
+            return
+        let start: i32 = self.sig_param_eff_starts[si]
+        let count = self.sig_param_counts[si]
+        if pi < 0 or pi >= count:
+            return
+        self.sig_param_view_through[(start + pi)] = mask
+
     fn param_index_for_sym(sym: i32) -> i32:
         let name = self.pool_resolve(sym)
         for pi in 0..self.current_fn_param_syms.len() as i32:
@@ -8157,13 +8233,17 @@ impl Sema:
             return
         self.effect_prov.insert(key, effect_prov_val(kind, a, b))
 
-    mut fn note_param_view_origin(sym: i32, mask: i32, origin_node: i32):
+    // `mask`: the parameters the returned view may originate from;
+    // `storage_mask`: the subset whose own storage it may point into.
+    mut fn note_param_view_origin(sym: i32, mask: i32, storage_mask: i32, origin_node: i32):
         if self.current_fn_sig_idx < 0 or sym == 0 or mask == 0:
             return
         let pi = self.param_index_for_sym(sym)
         if pi >= 0:
             let cur: i32 = self.current_fn_param_origins[pi]
             self.current_fn_param_origins[pi] = cur | mask
+            let cur_storage: i32 = self.current_fn_param_storage_origins[pi]
+            self.current_fn_param_storage_origins[pi] = cur_storage | storage_mask
             if origin_node != 0 and self.current_fn_param_view_nodes[pi] == 0:
                 self.current_fn_param_view_nodes[pi] = origin_node
             return
@@ -8809,6 +8889,7 @@ impl Sema:
         for pi in 0..param_count:
             self.set_sig_param_effect(alias_sig, pi, self.sig_param_effect(source_sig, pi))
             self.set_sig_param_view_origin(alias_sig, pi, self.sig_param_view_origin(source_sig, pi))
+            self.set_sig_param_view_through(alias_sig, pi, self.sig_param_view_through(source_sig, pi))
             self.set_sig_param_value_ref_abi(alias_sig, pi, self.sig_param_uses_value_ref_abi(source_sig, pi))
 
     fn signatures_match(a_sig: i32, b_sig: i32) -> i32:

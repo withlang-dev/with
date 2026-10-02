@@ -2271,6 +2271,12 @@ fn analysis_explain_effect(sema: &Sema, target: &str, source_path: &str) -> str:
             let eff = sema.sig_param_effect(si, pi)
             let raw = if (eff & EFF_RAW_PTR_VALIDITY) != 0: "raw_ptr_validity" else: "none"
             out = out ++ f"  sig={si} param[{pi}] eff=[" ++ sema_effect_bits_text(eff) ++ f"] internal=[{raw}]\n"
+            // The returned view's origins (§21.1): which parameters it may
+            // view, and which of those it views only through what they
+            // view, never their own storage (a call keeps such an
+            // argument's place out of the result's origins).
+            if (eff & EFF_ESCAPE_VIEW) != 0:
+                out = out ++ "  escape_view: origins=[" ++ analysis_param_mask_text(sema.sig_param_view_origin(si, pi), pc) ++ "] through=[" ++ analysis_param_mask_text(sema.sig_param_view_through(si, pi), pc) ++ "]\n"
             if (eff & EFF_CONSUME) != 0:
                 out = out ++ "  consume:\n" ++ analysis_explain_effect_chain(sema, si, pi, 0, source_path)
             if (eff & EFF_ESCAPE_VALUE) != 0:
@@ -2559,3 +2565,17 @@ pub fn compiler_analysis_run(sema: &Sema, mir_mod: &MirModule, pool: &InternPool
     if not report.ok():
         status = 1
     CompilerAnalysisResult { text, status, needs_codegen, codegen_query, report }
+
+// The parameter indices a view-origin mask names (explain:effect's
+// escape_view line); a receiver is index 0.
+fn analysis_param_mask_text(mask: i32, param_count: i32) -> str:
+    if mask < 0:
+        return "all"
+    var out = ""
+    for pi in 0..param_count:
+        if sema_param_origin_mask_contains(mask, pi) == 0:
+            continue
+        if out.len() > 0:
+            out = out ++ ","
+        out = out ++ f"{pi}"
+    out

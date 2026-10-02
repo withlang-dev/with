@@ -3733,6 +3733,7 @@ impl Sema:
         let saved_eff_param_effs = sema_clone_i32_vec(&self.current_fn_param_effs)
         let saved_eff_param_direct_effs = sema_clone_i32_vec(&self.current_fn_param_direct_effs)
         let saved_eff_param_origins = sema_clone_i32_vec(&self.current_fn_param_origins)
+        let saved_eff_param_storage_origins = sema_clone_i32_vec(&self.current_fn_param_storage_origins)
         let saved_eff_param_view_nodes = sema_clone_i32_vec(&self.current_fn_param_view_nodes)
         // D63: the invocation counts are this body's. A generic callee's
         // specialization is checked in the middle of its caller's body, and
@@ -3746,6 +3747,7 @@ impl Sema:
             self.current_fn_param_effs.pop()
             self.current_fn_param_direct_effs.pop()
             self.current_fn_param_origins.pop()
+            self.current_fn_param_storage_origins.pop()
             self.current_fn_param_view_nodes.pop()
         if meta >= 0:
             let eff_ps = self.ast.fn_meta_param_start(meta)
@@ -3759,6 +3761,7 @@ impl Sema:
                 self.current_fn_param_effs.push(0)
                 self.current_fn_param_direct_effs.push(0)
                 self.current_fn_param_origins.push(0)
+                self.current_fn_param_storage_origins.push(0)
                 self.current_fn_param_view_nodes.push(0)
         self.current_fn_sig_idx = sig_idx
         self.current_fn_variadic = self.sig_is_variadic(sig_idx)
@@ -3926,7 +3929,7 @@ impl Sema:
                 self.note_returned_transparent_view_effects(body)
                 let body_root = self.place_root_sym(body)
                 if body_root != 0:
-                    self.note_param_view_origin(body_root, self.compute_expr_view_origin_mask(body), body)
+                    self.note_param_view_origin(body_root, self.compute_expr_view_origin_mask(body), self.compute_expr_storage_origin_mask(body), body)
                 self.check_returned_view_origins(body, body)
             else if body_materializes_copy == 0 and (self.type_is_ephemeral_value(body_ty as i32) != 0 or self.expr_is_ephemeral_value(body) != 0):
                 self.note_returned_transparent_view_effects(body)
@@ -4033,9 +4036,19 @@ impl Sema:
                 self.set_sig_param_direct_effect(sig_idx, pi, direct_eff)
                 let declared_origin = if facade_declared: self.sig_param_view_origin(sig_idx, pi) else: 0
                 if (eff & EFF_ESCAPE_VIEW) != 0:
-                    self.set_sig_param_view_origin(sig_idx, pi, self.current_fn_param_origins[pi] | declared_origin)
+                    let body_origins: i32 = self.current_fn_param_origins[pi]
+                    let body_storage: i32 = self.current_fn_param_storage_origins[pi]
+                    self.set_sig_param_view_origin(sig_idx, pi, body_origins | declared_origin)
+                    // The origins the body's returned views reach only
+                    // through what the parameter views, never its own
+                    // storage (§21.1 Rule 6). A declared origin (facade,
+                    // interface) is the parameter's storage; an overflowed
+                    // mask proves nothing.
+                    let through = if body_origins < 0 or body_storage < 0 or declared_origin < 0: 0 else: body_origins & ~body_storage & ~declared_origin
+                    self.set_sig_param_view_through(sig_idx, pi, through)
                 else:
                     self.set_sig_param_view_origin(sig_idx, pi, declared_origin)
+                    self.set_sig_param_view_through(sig_idx, pi, 0)
             // D63 call-once: published for every parameter — a callable
             // parameter that is only invoked accrues no effect bits, so this
             // sits outside the `eff != 0` guard above.
@@ -4083,12 +4096,14 @@ impl Sema:
             self.current_fn_param_effs.pop()
             self.current_fn_param_direct_effs.pop()
             self.current_fn_param_origins.pop()
+            self.current_fn_param_storage_origins.pop()
             self.current_fn_param_view_nodes.pop()
         for i in 0..saved_eff_param_syms.len() as i32:
             self.current_fn_param_syms.push(saved_eff_param_syms[i])
             self.current_fn_param_effs.push(saved_eff_param_effs[i])
             self.current_fn_param_direct_effs.push(saved_eff_param_direct_effs[i])
             self.current_fn_param_origins.push(saved_eff_param_origins[i])
+            self.current_fn_param_storage_origins.push(saved_eff_param_storage_origins[i])
             self.current_fn_param_view_nodes.push(saved_eff_param_view_nodes[i])
         self.current_return_type = saved_ret
         self.current_gen_yield_type = saved_gen_yield_type
@@ -4155,6 +4170,7 @@ impl Sema:
             self.set_sig_param_effect(sig_idx, pi, eff)
             self.set_sig_param_direct_effect(sig_idx, pi, eff)
             self.set_sig_param_view_origin(sig_idx, pi, 0)
+            self.set_sig_param_view_through(sig_idx, pi, 0)
         let origin = self.declared_view_origin(sig_idx)
         if origin == DECLARED_ORIGIN_NONE:
             return
@@ -5672,6 +5688,7 @@ impl Sema:
                 self.sig_param_effects.push(0)
                 self.sig_param_direct_effects.push(0)
                 self.sig_param_view_origins.push(0)
+                self.sig_param_view_through.push(0)
                 self.sig_param_invoke_many.push(0)
                 self.sig_value_ref_abi_params.push(0)
             for svi in 0..saved_vra_count:
@@ -13520,6 +13537,164 @@ impl Sema:
             return self.expr_view_origin_mask(node)
         0
 
+    // ── Storage origins (§21.1 Rule 6, §5.5) ──────────────────────────────
+    //
+    // compute_expr_view_origin_mask names every parameter a value may view
+    // THROUGH: the parameter's own storage and the views the parameter
+    // carries alike. These three split out the first: the parameters whose
+    // own storage the value may point into. `&self.n`, `self` held as a
+    // reference, a non-Copy field place of self view self's storage;
+    // `self.src` read out of a `&i32` field views what self views, never
+    // self. The in-place receiver's bit is what decides whether a call's
+    // result dies with its receiver (record_call_view_origins_args): a
+    // `mut fn` child built from self's references outlives self, a facade
+    // child or a view of self's fields does not. Every shape these do not
+    // prove is answered as the origin mask answers it: unproven is storage.
+
+    // Whether a value of this type is a handle read out of a place — a
+    // reference, slice or raw pointer — rather than the place's contents.
+    fn type_is_view_handle(tid: i32) -> bool:
+        tid > 0 and self.param_type_is_by_value(tid) == 0
+
+    // The parameters whose own storage the VALUE of `node` may point into.
+    fn compute_expr_storage_origin_mask(node: i32) -> i32:
+        if node == 0:
+            return 0
+        if self.has_contextual_copy_adjustment(node) != 0:
+            return 0
+        let kind = self.ast.kind(node)
+        if kind == NodeKind.NK_IDENT:
+            let sym = self.ast.get_data0(node)
+            let direct_pi = self.param_index_for_sym(sym)
+            if direct_pi >= 0:
+                let param_ty = self.scope_lookup(sym)
+                var param_mask = self.binding_view_storage_mask(sym)
+                if param_ty > 0 and (self.type_is_ephemeral_value(param_ty) != 0 or self.callable_param_is_view(sym, param_ty)):
+                    param_mask = param_mask | sema_param_origin_bit(direct_pi)
+                return param_mask
+            if self.binding_view_origin_mask(sym) != 0:
+                return self.binding_view_storage_mask(sym)
+            return self.expr_view_storage_mask(node)
+        if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_UNSAFE_BLOCK or kind == NodeKind.NK_NO_SUSPEND:
+            return self.compute_expr_storage_origin_mask(self.ast.get_data0(node))
+        if kind == NodeKind.NK_ASSIGN:
+            return self.compute_expr_storage_origin_mask(self.ast.get_data0(node)) | self.compute_expr_storage_origin_mask(self.ast.get_data1(node))
+        if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_INDEX:
+            // A handle read out of the place views what the place holds.
+            if self.type_is_view_handle(self.typed_expr_types.get(node) ?? 0):
+                return 0
+            return self.compute_place_storage_origin_mask(node)
+        if kind == NodeKind.NK_UNARY:
+            let op = self.ast.get_data0(node)
+            if op == UnaryOp.UOP_REF or op == UnaryOp.UOP_RAW_REF_CONST or op == UnaryOp.UOP_RAW_REF_MUT:
+                return self.compute_place_storage_origin_mask(self.ast.get_data1(node))
+            if op == UnaryOp.UOP_DEREF:
+                if self.type_is_view_handle(self.typed_expr_types.get(node) ?? 0):
+                    return 0
+                return self.compute_place_storage_origin_mask(node)
+            return self.compute_expr_storage_origin_mask(self.ast.get_data1(node))
+        if kind == NodeKind.NK_BINARY:
+            return self.compute_expr_storage_origin_mask(self.ast.get_data1(node)) | self.compute_expr_storage_origin_mask(self.ast.get_data2(node))
+        if kind == NodeKind.NK_BLOCK:
+            return self.compute_expr_storage_origin_mask(self.ast.get_data2(node))
+        if kind == NodeKind.NK_IF_EXPR:
+            return self.compute_expr_storage_origin_mask(self.ast.get_data1(node)) | self.compute_expr_storage_origin_mask(self.ast.get_data2(node))
+        if kind == NodeKind.NK_TUPLE:
+            let tuple_start = self.ast.get_data0(node)
+            var tuple_mask = 0
+            for ti in 0..self.ast.get_data1(node):
+                tuple_mask = tuple_mask | self.compute_expr_storage_origin_mask(self.ast.get_extra(tuple_start + ti))
+            return tuple_mask
+        if kind == NodeKind.NK_STRUCT_LIT:
+            let sl_start = self.ast.get_data1(node)
+            var sl_mask = if self.expr_view_param_origins.contains(node): self.expr_view_storage_mask(node) else: 0
+            for fi in 0..self.ast.get_data2(node):
+                sl_mask = sl_mask | self.compute_expr_storage_origin_mask(self.ast.get_extra(sl_start + fi * 2 + 1))
+            return sl_mask
+        if kind == NodeKind.NK_ENUM_VARIANT:
+            let variant_start = self.ast.get_data2(node)
+            var variant_mask = 0
+            for vi in 0..self.ast.get_extra(variant_start):
+                variant_mask = variant_mask | self.compute_expr_storage_origin_mask(self.ast.get_extra(variant_start + 1 + vi))
+            return variant_mask
+        if kind == NodeKind.NK_VARIANT_SHORTHAND:
+            let shorthand_start = self.ast.get_data1(node)
+            var shorthand_mask = 0
+            for vi in 0..self.ast.get_data2(node):
+                shorthand_mask = shorthand_mask | self.compute_expr_storage_origin_mask(self.ast.get_extra(shorthand_start + vi))
+            return shorthand_mask
+        if self.expr_view_param_origins.contains(node):
+            return self.expr_view_storage_mask(node)
+        0
+
+    // The parameters whose own storage the PLACE `node` lies in: a field
+    // reached through a handle lies in what the handle's value views.
+    fn compute_place_storage_origin_mask(node: i32) -> i32:
+        if node == 0:
+            return 0
+        let kind = self.ast.kind(node)
+        if kind == NodeKind.NK_GROUPED:
+            return self.compute_place_storage_origin_mask(self.ast.get_data0(node))
+        if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_INDEX:
+            let base = self.ast.get_data0(node)
+            if self.type_is_view_handle(self.typed_expr_types.get(base) ?? 0):
+                return self.compute_expr_storage_origin_mask(base)
+            return self.compute_place_storage_origin_mask(base)
+        if kind == NodeKind.NK_UNARY and self.ast.get_data0(node) == UnaryOp.UOP_DEREF:
+            return self.compute_expr_storage_origin_mask(self.ast.get_data1(node))
+        self.compute_expr_storage_origin_mask(node)
+
+    // The parameters whose own storage the CONTENTS of the place `node`
+    // may view: what a receiver place holds, which a callee that views
+    // only "what self views" hands back. A parameter's contents are the
+    // caller's (its origin bit says so), a local's are its own storage
+    // mask; through a handle the pointee's contents are unknown, so the
+    // handle's own answer stands.
+    fn compute_contents_storage_origin_mask(node: i32) -> i32:
+        if node == 0:
+            return 0
+        let kind = self.ast.kind(node)
+        if kind == NodeKind.NK_GROUPED:
+            return self.compute_contents_storage_origin_mask(self.ast.get_data0(node))
+        if kind == NodeKind.NK_IDENT:
+            if self.param_index_for_sym(self.ast.get_data0(node)) >= 0:
+                return 0
+            return self.compute_expr_storage_origin_mask(node)
+        if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_INDEX:
+            let base = self.ast.get_data0(node)
+            if self.type_is_view_handle(self.typed_expr_types.get(base) ?? 0):
+                return self.compute_expr_storage_origin_mask(base)
+            return self.compute_contents_storage_origin_mask(base)
+        self.compute_expr_storage_origin_mask(node)
+
+    // The storage a call argument hands the callee's parameter: a receiver
+    // place (auto-dereferenced through a handle), any other argument by its
+    // value — `&x` is x's storage, a reference local's is what it views.
+    fn arg_storage_origin_mask(arg: i32, is_receiver: bool) -> i32:
+        if is_receiver and not self.type_is_view_handle(self.typed_expr_types.get(arg) ?? 0):
+            return self.compute_place_storage_origin_mask(arg)
+        self.compute_expr_storage_origin_mask(arg)
+
+    // What a call argument's parameter VIEWS, for a callee whose result
+    // views only that: the receiver place's contents; the pointee's
+    // contents behind `&place`; nothing behind a parameter handed on.
+    fn arg_viewed_storage_origin_mask(arg: i32, is_receiver: bool) -> i32:
+        if arg == 0:
+            return 0
+        if is_receiver:
+            return self.compute_contents_storage_origin_mask(arg)
+        var peeled = arg
+        while peeled != 0 and self.ast.kind(peeled) == NodeKind.NK_GROUPED:
+            peeled = self.ast.get_data0(peeled)
+        if peeled == 0:
+            return 0
+        let kind = self.ast.kind(peeled)
+        if kind == NodeKind.NK_UNARY and self.ast.get_data0(peeled) == UnaryOp.UOP_REF:
+            return self.compute_contents_storage_origin_mask(self.ast.get_data1(peeled))
+        if kind == NodeKind.NK_IDENT and self.param_index_for_sym(self.ast.get_data0(peeled)) >= 0:
+            return 0
+        self.compute_expr_storage_origin_mask(peeled)
+
     mut fn record_transparent_view_origins(result_node: i32, source_node: i32):
         if result_node == 0 or source_node == 0 or self.has_contextual_copy_adjustment(result_node) != 0:
             return
@@ -13527,6 +13702,7 @@ impl Sema:
         var deps: Vec[i32] = Vec.new()
         deps = self.collect_expr_view_deps(source_node, move deps)
         self.set_expr_view_deps(result_node, param_mask, deps)
+        self.set_expr_view_storage_mask(result_node, self.compute_expr_storage_origin_mask(source_node))
         // #962: a carrier of a view into a temporary is a view into it too.
         let temp_ty = self.view_into_temporary_type(source_node)
         if temp_ty != 0:
@@ -13561,13 +13737,16 @@ impl Sema:
         if result_node == 0 or self.has_contextual_copy_adjustment(result_node) != 0:
             return
         var param_mask = 0
+        var storage_mask = 0
         var deps: Vec[i32] = Vec.new()
         for si in 0..source_nodes.len() as i32:
             let source_node = source_nodes[si]
             if source_node > 0:
                 param_mask = param_mask | self.compute_expr_view_origin_mask(source_node)
+                storage_mask = storage_mask | self.compute_expr_storage_origin_mask(source_node)
                 deps = self.collect_expr_view_deps(source_node, move deps)
         self.set_expr_view_deps(result_node, param_mask, deps)
+        self.set_expr_view_storage_mask(result_node, storage_mask)
 
     mut fn record_view_producer_origins(result_node: i32, receiver_node: i32):
         if result_node == 0 or receiver_node == 0:
@@ -13578,6 +13757,9 @@ impl Sema:
         if deps.len() == 0:
             deps = self.push_unique_i32(move deps, self.place_root_sym(receiver_node))
         self.set_expr_view_deps(result_node, param_mask, deps)
+        // The view points into the receiver place (an element of `self.items`);
+        // through a handle, into what the handle views.
+        self.set_expr_view_storage_mask(result_node, self.arg_storage_origin_mask(receiver_node, true))
         // #962: the receiver is a temporary (a call result, not a place) that
         // owns storage: it is freed when this statement ends, so the view has
         // no origin that outlives the statement. Remember it; a binding or a
@@ -13627,6 +13809,7 @@ impl Sema:
                 if root != 0 and root != sym:
                     deps = self.push_unique_i32(move deps, root)
         self.set_binding_view_deps(sym, param_mask, deps)
+        self.set_binding_view_storage_mask(sym, self.compute_expr_storage_origin_mask(expr_node))
         self.register_view_binding_borrows(sym, expr_node)
 
     // #1302 (§2.2, §9.7, D22/D27/D32): a pattern is structural projection, so a
@@ -14038,6 +14221,10 @@ impl Sema:
         if expr_node == 0 or self.current_fn_sig_idx < 0:
             return
         var origin_mask = self.compute_expr_view_origin_mask(expr_node)
+        // The parameters whose own storage the carrier may point into. A
+        // parameter the structural walk did not reach, found only as a
+        // concrete dep below, is unproven: storage.
+        var storage_mask = self.compute_expr_storage_origin_mask(expr_node)
         var deps: Vec[i32] = Vec.new()
         deps = self.collect_expr_view_deps(expr_node, move deps)
         for pi in 0..self.current_fn_param_syms.len() as i32:
@@ -14049,6 +14236,7 @@ impl Sema:
                 let dep_sym = deps[di]
                 if dep_sym == param_sym or self.pool_resolve(dep_sym) == param_name:
                     origin_mask = origin_mask | sema_param_origin_bit(pi)
+                    storage_mask = storage_mask | sema_param_origin_bit(pi)
                     break
         if origin_mask == 0:
             return
@@ -14059,7 +14247,7 @@ impl Sema:
             self.effect_note_origin_node = expr_node
             self.note_param_effect(param_sym, EFF_ESCAPE_VIEW)
             self.effect_note_origin_node = 0
-            self.note_param_view_origin(param_sym, origin_mask, expr_node)
+            self.note_param_view_origin(param_sym, origin_mask, storage_mask, expr_node)
 
     mut fn record_builtin_receiver_view_origins(call_node: i32, recv_node: i32):
         self.record_view_producer_origins(call_node, recv_node)
@@ -14093,11 +14281,13 @@ impl Sema:
     fn record_call_view_origins_args(call_node: i32, sig_idx: i32, has_receiver: bool, args: &Vec[i32]):
         let param_count = self.sig_get_param_count(sig_idx)
         var union_mask = 0
+        var storage_mask = 0
         var concrete_deps: Vec[i32] = Vec.new()
         for pi in 0..param_count:
             if (self.sig_param_effect(sig_idx, pi) & EFF_ESCAPE_VIEW) == 0:
                 continue
             let param_origin_mask = self.sig_param_view_origin(sig_idx, pi)
+            let param_through_mask = self.sig_param_view_through(sig_idx, pi)
             for origin_pi in 0..param_count:
                 if sema_param_origin_mask_contains(param_origin_mask, origin_pi) == 0:
                     continue
@@ -14109,7 +14299,14 @@ impl Sema:
                     continue
                 let origin_arg = if origin_pi < args.len() as i32: args[origin_pi] else: 0
                 if origin_arg > 0:
+                    let is_recv = has_receiver and origin_pi == 0
+                    // Whether the callee's result points into this
+                    // parameter's own storage, or only into what the
+                    // parameter views (the signature's through mask, from
+                    // the callee's body; unproven is storage).
+                    let views_storage = sema_param_origin_mask_contains(param_through_mask, origin_pi) == 0
                     union_mask = union_mask | self.compute_expr_view_origin_mask(origin_arg)
+                    storage_mask = storage_mask | (if views_storage: self.arg_storage_origin_mask(origin_arg, is_recv) else: self.arg_viewed_storage_origin_mask(origin_arg, is_recv))
                     let dep_len_before = concrete_deps.len() as i32
                     concrete_deps = self.collect_expr_view_deps(origin_arg, move concrete_deps)
                     // The result may reference the origin argument's own
@@ -14119,14 +14316,18 @@ impl Sema:
                     // Only a reference argument is transparent: its storage
                     // is the pointee, whose origins the collect found. An
                     // ephemeral receiver's deps alone let a view of it
-                    // outlive it (§21.1 Rule 6, §5.5). An in-place receiver
-                    // (`fn`/`mut fn` self) is a borrowed place, not a value
-                    // the call received: an ephemeral self's result views
-                    // what self views, never self's own storage — otherwise
-                    // `self.finish(move child)` after `self.child()` would
-                    // read as mutating self under a live view of it.
-                    let in_place_recv = has_receiver and origin_pi == 0 and self.sig_receiver_mode(sig_idx) != ReceiverMode.Move
-                    if not in_place_recv and (concrete_deps.len() as i32 == dep_len_before or self.expr_type_is_value(origin_arg)):
+                    // outlive it (§21.1 Rule 6, §5.5). The exception is an
+                    // in-place receiver (`fn`/`mut fn` self: a borrowed
+                    // place, not a value the call received) whose callee
+                    // proved its result views only what self views, never
+                    // self's own storage (`var c = Builder.mk(self.src); c`):
+                    // that result outlives the receiver, and
+                    // `self.finish(move child)` after `self.child()` is no
+                    // mutation under a live view. A result that views self's
+                    // storage — `V { origin: self }`, `&self.n`, a facade
+                    // child `borrows param 0` — dies with the receiver place.
+                    let in_place_recv = is_recv and self.sig_receiver_mode(sig_idx) != ReceiverMode.Move
+                    if (not in_place_recv or views_storage) and (concrete_deps.len() as i32 == dep_len_before or self.expr_type_is_value(origin_arg)):
                         concrete_deps = self.push_unique_i32(move concrete_deps, self.place_root_sym(origin_arg))
         // A facade operation (D51 stage 7, ruling §33-§38): its result may
         // borrow from a foreign-state domain, and the call invalidates the
@@ -14142,12 +14343,14 @@ impl Sema:
             let origin_arg = if bp >= 0 and bp < args.len() as i32: args[bp] else: 0
             if origin_arg > 0:
                 union_mask = union_mask | self.compute_expr_view_origin_mask(origin_arg)
+                storage_mask = storage_mask | self.arg_storage_origin_mask(origin_arg, has_receiver and bp == 0)
                 let dep_len_before = concrete_deps.len() as i32
                 concrete_deps = self.collect_expr_view_deps(origin_arg, move concrete_deps)
                 if concrete_deps.len() as i32 == dep_len_before or self.expr_type_is_value(origin_arg):
                     concrete_deps = self.push_unique_i32(move concrete_deps, self.place_root_sym(origin_arg))
         if union_mask != 0 or concrete_deps.len() > 0:
             self.set_expr_view_deps(call_node, union_mask, concrete_deps)
+            self.set_expr_view_storage_mask(call_node, storage_mask)
 
     // Ruling §38: "Unknown effect means invalidate." Every live view borrowed
     // from a resource this call receives without `preserves param N`, or
@@ -14422,7 +14625,7 @@ impl Sema:
                 self.note_returned_transparent_view_effects(value)
                 let root = self.place_root_sym(value)
                 if root != 0:
-                    self.note_param_view_origin(root, self.compute_expr_view_origin_mask(value), value)
+                    self.note_param_view_origin(root, self.compute_expr_view_origin_mask(value), self.compute_expr_storage_origin_mask(value), value)
                 self.check_returned_view_origins(value, node)
             else if self.has_contextual_copy_adjustment(value) == 0 and (self.type_is_ephemeral_value(val_type as i32) != 0 or self.expr_is_ephemeral_value(value) != 0):
                 self.note_returned_transparent_view_effects(value)
@@ -19843,18 +20046,21 @@ impl Sema:
         let saved_capture_effs: Vec[i32] = Vec.new()
         let saved_capture_direct_effs: Vec[i32] = Vec.new()
         let saved_capture_origins: Vec[i32] = Vec.new()
+        let saved_capture_storage_origins: Vec[i32] = Vec.new()
         let saved_capture_view_nodes: Vec[i32] = Vec.new()
         for i in 0..self.current_fn_param_syms.len() as i32:
             saved_capture_syms.push(self.current_fn_param_syms[i])
             saved_capture_effs.push(self.current_fn_param_effs[i])
             saved_capture_direct_effs.push(self.current_fn_param_direct_effs[i])
             saved_capture_origins.push(self.current_fn_param_origins[i])
+            saved_capture_storage_origins.push(self.current_fn_param_storage_origins[i])
             saved_capture_view_nodes.push(self.current_fn_param_view_nodes[i])
         while self.current_fn_param_syms.len() > 0:
             self.current_fn_param_syms.pop()
             self.current_fn_param_effs.pop()
             self.current_fn_param_direct_effs.pop()
             self.current_fn_param_origins.pop()
+            self.current_fn_param_storage_origins.pop()
             self.current_fn_param_view_nodes.pop()
         let closure_capture_syms: Vec[i32] = Vec.new()
         for ci in 0..outer_count:
@@ -19867,6 +20073,7 @@ impl Sema:
                 self.current_fn_param_effs.push(0)
                 self.current_fn_param_direct_effs.push(0)
                 self.current_fn_param_origins.push(0)
+                self.current_fn_param_storage_origins.push(0)
                 self.current_fn_param_view_nodes.push(0)
         self.current_fn_sig_idx = if closure_capture_syms.len() > 0: 0 else: saved_capture_sig_idx
         // #1819: the body's writes and calls are the closure's: they happen
@@ -20038,6 +20245,7 @@ impl Sema:
                 self.current_fn_param_effs.push(0)
                 self.current_fn_param_direct_effs.push(0)
                 self.current_fn_param_origins.push(0)
+                self.current_fn_param_storage_origins.push(0)
                 self.current_fn_param_view_nodes.push(0)
         if expected_ret_ty != 0 and expected_ret_ty != self.ty_void and body_ty != 0 and body_ty != self.ty_never:
             if body_ty == self.ty_void:
@@ -20073,7 +20281,7 @@ impl Sema:
                 self.note_returned_transparent_view_effects(body)
                 let body_root = self.place_root_sym(body)
                 if body_root != 0:
-                    self.note_param_view_origin(body_root, self.compute_expr_view_origin_mask(body), body)
+                    self.note_param_view_origin(body_root, self.compute_expr_view_origin_mask(body), self.compute_expr_storage_origin_mask(body), body)
             else if self.type_is_ephemeral_value(body_ty as i32) != 0:
                 self.note_returned_transparent_view_effects(body)
 
@@ -20100,12 +20308,14 @@ impl Sema:
             self.current_fn_param_effs.pop()
             self.current_fn_param_direct_effs.pop()
             self.current_fn_param_origins.pop()
+            self.current_fn_param_storage_origins.pop()
             self.current_fn_param_view_nodes.pop()
         for i in 0..saved_capture_syms.len() as i32:
             self.current_fn_param_syms.push(saved_capture_syms[i])
             self.current_fn_param_effs.push(saved_capture_effs[i])
             self.current_fn_param_direct_effs.push(saved_capture_direct_effs[i])
             self.current_fn_param_origins.push(saved_capture_origins[i])
+            self.current_fn_param_storage_origins.push(saved_capture_storage_origins[i])
             self.current_fn_param_view_nodes.push(saved_capture_view_nodes[i])
         self.current_fn_sig_idx = saved_capture_sig_idx
         self.current_fn_variadic = saved_capture_fn_variadic
