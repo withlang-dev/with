@@ -6,4 +6,4 @@ fn main:
     v.push(10)
     v.push(20)
     let idx = 1
-    print_i32(v.get(idx as i64))
+    print_i32(v[idx])

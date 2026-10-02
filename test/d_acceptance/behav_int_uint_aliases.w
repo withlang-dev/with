@@ -30,7 +30,7 @@ fn test_generic_arguments:
     xs.push(3)
     let counts: HashMap[str, UInt] = HashMap.new()
     counts.insert("answer", 42 as UInt)
-    assert(xs.get(2) == 3)
+    assert(xs[2] == 3)
     assert(counts.get("answer").unwrap() == 42u64)
 
 fn main:

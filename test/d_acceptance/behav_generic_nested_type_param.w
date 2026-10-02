@@ -21,7 +21,7 @@ fn cleanup_remaining[T](tasks: Vec[Task[T]], start: i32):
     let total = tasks.len() as i32
     var i = start
     while i < total:
-        tasks.get(i).join_cleanup()
+        tasks[i].join_cleanup()
         i = i + 1
 
 async fn child() -> i32:

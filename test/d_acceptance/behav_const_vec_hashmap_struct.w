@@ -18,6 +18,6 @@ comptime fn build() -> P:
 const PK: P = comptime build()
 
 fn main:
-    assert(PK.values.get(0) == 4)
+    assert(PK.values[0] == 4)
     assert(PK.table.get("left").unwrap() == 11)
     print("ok")

@@ -6,6 +6,6 @@
 fn main:
     var xs: Vec[i32] = Vec.new()
     xs.push(50)
-    var off = xs.get(0)
+    var off = xs[0]
     off = off + 1
     assert(off == 51)

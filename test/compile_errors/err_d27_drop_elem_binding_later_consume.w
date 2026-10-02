@@ -10,5 +10,5 @@ fn consume(t: Thing) -> i64: t.vals.len()
 fn main:
     var items: Vec[Thing] = Vec.new()
     items.push(Thing { vals: Vec.new() })
-    let t = items.get(0)
+    let t = items[0]
     assert(consume(t) == 0)

@@ -18,9 +18,9 @@ fn test_compile_match_find:
 
     let all = digits.find_all("a1b22c333")
     assert(all.len() == 3)
-    assert(all.get(0).text == "1")
-    assert(all.get(1).text == "22")
-    assert(all.get(2).text == "333")
+    assert(all[0].text == "1")
+    assert(all[1].text == "22")
+    assert(all[2].text == "333")
 
 fn test_captures:
     let re = Regex.compile("^(?<key>\\w+)=(?<value>\\w+)$").unwrap()
@@ -62,14 +62,14 @@ fn test_replace_split:
 
     let parts = digits.split("a1b22c")
     assert(parts.len() == 3)
-    assert(parts.get(0) == "a")
-    assert(parts.get(1) == "b")
-    assert(parts.get(2) == "c")
+    assert(parts[0] == "a")
+    assert(parts[1] == "b")
+    assert(parts[2] == "c")
 
     let limited = digits.splitn("a1b22c333d", 2)
     assert(limited.len() == 2)
-    assert(limited.get(0) == "a")
-    assert(limited.get(1) == "b22c333d")
+    assert(limited[0] == "a")
+    assert(limited[1] == "b22c333d")
 
 fn test_literals_and_operators:
     let re = /\d+/

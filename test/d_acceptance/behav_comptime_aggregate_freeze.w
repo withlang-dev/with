@@ -31,8 +31,8 @@ const PACKAGE_RIGHT: i32 = comptime PACKAGE.table.get("right").unwrap()
 
 fn main:
     assert(PACKAGE.total == 2)
-    assert(PACKAGE.values.get(0) == 4)
-    assert(PACKAGE.values.get(1) == 8)
+    assert(PACKAGE.values[0] == 4)
+    assert(PACKAGE.values[1] == 8)
     assert(PACKAGE.table.get("left").unwrap() == 11)
     assert(PACKAGE.table.get("right").unwrap() == 22)
     assert(PACKAGE_TOTAL == 2)

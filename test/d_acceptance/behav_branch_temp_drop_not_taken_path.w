@@ -10,7 +10,7 @@ type Big { a: Vec[str], b: Vec[str] }
 fn cl(v: &Vec[str]) -> Vec[str]:
     let out: Vec[str] = Vec.new()
     for i in 0..v.len() as i32:
-        out.push(v.get(i as i64))
+        out.push(v[i].clone())
     out
 
 fn clone_big(r: &Big) -> Big:
@@ -28,4 +28,4 @@ fn main:
         results.push(consume(clone_big(&big)))
     else:
         results.push(0)
-    print_i32(results.get(0))
+    print_i32(results[0])

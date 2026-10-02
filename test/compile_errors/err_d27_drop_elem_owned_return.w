@@ -5,7 +5,7 @@
 
 type Thing { vals: Vec[i32] }
 
-fn take_first(items: &Vec[Thing]) -> Thing: items.get(0)
+fn take_first(items: &Vec[Thing]) -> Thing: items[0]
 
 fn main:
     var items: Vec[Thing] = Vec.new()

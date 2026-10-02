@@ -12,7 +12,7 @@ type T {
 
 impl T:
     fn extra_at(i: i32) -> i32:
-        self.extra.get(i as i64)
+        self.extra[i]
 
     fn lookup(k: i32, idx: i32) -> i32:
         if self.m.contains(k):

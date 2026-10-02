@@ -9,7 +9,7 @@ type KV { key: str, value: JV }
 fn bad() -> &JV:
     var xs: Vec[KV] = Vec.new()
     xs.push(KV { key: "k".clone(), value: .Null })
-    &xs.get(0).value
+    &xs[0].value
 
 fn main:
     print("unreachable")

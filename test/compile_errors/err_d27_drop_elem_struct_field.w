@@ -8,5 +8,5 @@ type Holder { t: Thing }
 fn main:
     var items: Vec[Thing] = Vec.new()
     items.push(Thing { vals: Vec.new() })
-    let h = Holder { t: items.get(0) }
+    let h = Holder { t: items[0] }
     assert(h.t.vals.len() == 0)

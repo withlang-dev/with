@@ -8,4 +8,4 @@ fn fill(buf: []mut i32, n: i32): ()
 fn main:
     let v: Vec[i32] = Vec.new()
     v.push(1)
-    fill(v, v.get(0))
+    fill(v, v[0])
