@@ -31,7 +31,7 @@ fn main:
     var b = make(1)
     b.reset(2)
     assert(b.tag == 2)
-    assert(b.data.get(0) == 2)
+    assert(b.data[0] == 2)
 
     // Branch: replaced only on the taken path.
     b.reset_if(3, false)

@@ -120,8 +120,8 @@ fn main:
     if argv.len() < 2:
         print("usage: with run tools/migrate_shareplace.w <entry.w> [--apply]")
         exit_code(1)
-    let entry = argv.get(1)
-    let apply = argv.len() as i32 >= 3 and argv.get(2) == "--apply"
+    let entry = argv[1]
+    let apply = argv.len() as i32 >= 3 and argv[2] == "--apply"
     let collected = collect_targets(entry)
     let targets = collected.targets
     let decls = collected.decls

@@ -15,4 +15,4 @@ fn consume(t: Thing) -> i64:
 fn main:
     var items: Vec[Thing] = Vec.new()
     items.push(Thing { vals: Vec.new() })
-    print(int_to_string(consume(items.get(0))))
+    print(int_to_string(consume(items[0])))

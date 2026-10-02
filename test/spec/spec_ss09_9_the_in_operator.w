@@ -115,8 +115,8 @@ fn test_comprehension_membership_filter:
     let primes = [2, 3, 5, 7, 11, 13]
     let prime_squares = [x * x for x in 1..=15 if x in primes]
     assert(prime_squares.len() == 6)
-    assert(prime_squares.get(0) == 4)
-    assert(prime_squares.get(5) == 169)
+    assert(prime_squares[0] == 4)
+    assert(prime_squares[5] == 169)
 
 fn test_pipeline_membership_filter:
     let nums: Vec[i32] = Vec.new()
@@ -129,8 +129,8 @@ fn test_pipeline_membership_filter:
         |> map(x => *x)
         |> collect[Vec]()
     assert(evens.len() == 2)
-    assert(evens.get(0) == 2)
-    assert(evens.get(1) == 4)
+    assert(evens[0] == 2)
+    assert(evens[1] == 4)
 
 fn test_match_in_pattern_array:
     let method = "filter"

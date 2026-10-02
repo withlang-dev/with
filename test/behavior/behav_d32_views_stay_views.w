@@ -16,5 +16,5 @@ fn main:
     let view = h.v
     assert(view.len() == 1)
     assert(h.peek().len() == 1)
-    assert(h.v.get(0) == 7)
+    assert(h.v[0] == 7)
     print("ok")

@@ -62,9 +62,9 @@ const BOOL_CLEAR_LEN: i64 = comptime bool_clear_len()
 
 fn main:
     assert(BOOLS.len() == 3)
-    assert(BOOLS.get(0) == true)
-    assert(BOOLS.get(1) == false)
-    assert(BOOLS.get(2) == true)
+    assert(BOOLS[0] == true)
+    assert(BOOLS[1] == false)
+    assert(BOOLS[2] == true)
     assert(BOOL_LEN == 2)
     assert(BOOL_HIT == true)
     assert(BOOL_MISS == false)

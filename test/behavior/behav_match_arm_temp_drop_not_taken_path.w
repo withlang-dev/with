@@ -15,7 +15,7 @@ type Big { a: Vec[str], b: Vec[str] }
 fn cl(v: &Vec[str]) -> Vec[str]:
     var out: Vec[str] = Vec.new()
     for i in 0..v.len() as i32:
-        out.push(v.get(i as i64) ++ "")
+        out.push(v[i as i64] ++ "")
     out
 
 fn clone_big(r: &Big) -> Big:
@@ -38,14 +38,14 @@ fn main:
     match n:
         99 => results.push(consume(clone_big(&big)))
         _ => results.push(0)
-    print_i32(results.get(0))
+    print_i32(results[0])
 
     // Taken arm first, temp-bearing arm second (the drop of the second arm's
     // temp is what the tail-position match scheduled at function exit).
     match n:
         1 => results.push(1)
         _ => results.push(consume(clone_big(&big)))
-    print_i32(results.get(1))
+    print_i32(results[1])
 
     // Default-argument temporaries (assert's message shape) in both arms of a
     // tail-position match over an Option view, plus a guard with a temp.

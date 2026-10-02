@@ -23,8 +23,8 @@ if separator < 0 or separator + 1 >= argv.len() as i32:
     print("error: expected '--' followed by a command")
     exit_code(2)
 
-let candidate = read_file(argv.get(1)).unwrap_or("".clone())
-let materialized = argv.get(2).clone()
+let candidate = read_file(argv[1]).unwrap_or("".clone())
+let materialized = argv[2].clone()
 if write_file(materialized, candidate) != 0:
     print(f"error: could not materialize candidate at {materialized}")
     exit_code(2)

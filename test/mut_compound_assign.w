@@ -15,9 +15,9 @@ fn test_compound_assign_single_eval:
     // xs[counter()] += 1 should call counter() exactly once
     xs[counter()] += 1
     assert(counter_state == 1)
-    assert(xs.get(0) == 11)
-    assert(xs.get(1) == 20)
-    assert(xs.get(2) == 30)
+    assert(xs[0] == 11)
+    assert(xs[1] == 20)
+    assert(xs[2] == 30)
 
 fn test_compound_assign_variable_index:
     var xs = Vec.new()
@@ -25,5 +25,5 @@ fn test_compound_assign_variable_index:
     xs.push(200)
     var i = 1
     xs[i] += 50
-    assert(xs.get(0) == 100)
-    assert(xs.get(1) == 250)
+    assert(xs[0] == 100)
+    assert(xs[1] == 250)

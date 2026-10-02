@@ -20,7 +20,7 @@ fn assert_bytes_eq(actual: &Vec[u8], expected: &Vec[u8]):
     assert(actual.len() == expected.len())
     var i: i64 = 0
     while i < expected.len():
-        assert(actual.get(i) == expected.get(i))
+        assert(actual[i] == expected[i])
         i = i + 1
 
 fn assert_base16_vector(input: &str, encoded: &str):
@@ -48,12 +48,12 @@ fn test_base16_alphabet_and_case:
         assert(encoded.byte_at(0) == 48)
         assert(encoded.byte_at(1) == alphabet.byte_at(value as i64))
         value = value + 1
-    assert(base16_decode("aa").unwrap().get(0) == 170 as u8)
-    assert(base16_decode("bb").unwrap().get(0) == 187 as u8)
-    assert(base16_decode("cc").unwrap().get(0) == 204 as u8)
-    assert(base16_decode("dd").unwrap().get(0) == 221 as u8)
-    assert(base16_decode("ee").unwrap().get(0) == 238 as u8)
-    assert(base16_decode("ff").unwrap().get(0) == 255 as u8)
+    assert(base16_decode("aa").unwrap()[0] == 170 as u8)
+    assert(base16_decode("bb").unwrap()[0] == 187 as u8)
+    assert(base16_decode("cc").unwrap()[0] == 204 as u8)
+    assert(base16_decode("dd").unwrap()[0] == 221 as u8)
+    assert(base16_decode("ee").unwrap()[0] == 238 as u8)
+    assert(base16_decode("ff").unwrap()[0] == 255 as u8)
     let expected = ascii_bytes("foo")
     let decoded = base16_decode("666f6f").unwrap()
     assert_bytes_eq(&decoded, &expected)
@@ -67,7 +67,7 @@ fn test_base16_all_octets:
         let decoded = base16_decode(encoded).unwrap()
         assert(encoded.len() == 2)
         assert(decoded.len() == 1)
-        assert(decoded.get(0) == value as u8)
+        assert(decoded[0] == value as u8)
         value = value + 1
 
 fn assert_base32_vector(input: &str, encoded: &str, encoded_hex: &str):
@@ -107,8 +107,8 @@ fn test_base32_alphabets:
         let lower_hex = ascii_lower(encoded_hex)
         assert(encoded.byte_at(0) == alphabet.byte_at(value as i64))
         assert(encoded_hex.byte_at(0) == alphabet_hex.byte_at(value as i64))
-        assert(base32_decode(lower).unwrap().get(0) == input[0])
-        assert(base32hex_decode(lower_hex).unwrap().get(0) == input[0])
+        assert(base32_decode(lower).unwrap()[0] == input[0])
+        assert(base32hex_decode(lower_hex).unwrap()[0] == input[0])
         value = value + 1
 
 fn test_base32_terminal_quanta_and_case:
@@ -180,10 +180,10 @@ fn test_base64_terminal_quanta_and_examples:
     let decoded_url = base64url_decode("-_8=").unwrap()
     assert(decoded.len() == 2)
     assert(decoded_url.len() == 2)
-    assert(decoded.get(0) == 251 as u8)
-    assert(decoded.get(1) == 255 as u8)
-    assert(decoded_url.get(0) == 251 as u8)
-    assert(decoded_url.get(1) == 255 as u8)
+    assert(decoded[0] == 251 as u8)
+    assert(decoded[1] == 255 as u8)
+    assert(decoded_url[0] == 251 as u8)
+    assert(decoded_url[1] == 255 as u8)
 
 fn main:
     test_base16_vectors()

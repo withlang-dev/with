@@ -12,9 +12,9 @@ fn test_fixed_array_default:
 fn test_vec_expected_type:
     let xs: Vec[i32] = [1, 2, 3]
     assert(xs.len() == 3)
-    assert(xs.get(0) == 1)
-    assert(xs.get(1) == 2)
-    assert(xs.get(2) == 3)
+    assert(xs[0] == 1)
+    assert(xs[1] == 2)
+    assert(xs[2] == 3)
 
     let empty: Vec[i32] = []
     assert(empty.len() == 0)

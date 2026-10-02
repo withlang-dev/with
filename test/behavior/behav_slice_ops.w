@@ -9,9 +9,9 @@ fn test_vec_basic:
     v.push(20)
     v.push(30)
     assert(v.len() == 3)
-    assert(v.get(0) == 10)
-    assert(v.get(1) == 20)
-    assert(v.get(2) == 30)
+    assert(v[0] == 10)
+    assert(v[1] == 20)
+    assert(v[2] == 30)
 
 fn test_vec_empty:
     let v: Vec[i32] = Vec.new()
@@ -21,7 +21,7 @@ fn test_vec_single:
     let v: Vec[i32] = Vec.new()
     v.push(42)
     assert(v.len() == 1)
-    assert(v.get(0) == 42)
+    assert(v[0] == 42)
 
 fn test_vec_many_pushes:
     let v: Vec[i32] = Vec.new()
@@ -30,8 +30,8 @@ fn test_vec_many_pushes:
         v.push(i)
         i = i + 1
     assert(v.len() == 100)
-    assert(v.get(0) == 0)
-    assert(v.get(99) == 99)
+    assert(v[0] == 0)
+    assert(v[99] == 99)
 
 fn test_vec_sum:
     let v: Vec[i32] = Vec.new()
@@ -43,7 +43,7 @@ fn test_vec_sum:
     var sum = 0
     var i = 0
     while i < v.len():
-        sum = sum + v.get(i)
+        sum = sum + v[i]
         i = i + 1
     assert(sum == 15)
 

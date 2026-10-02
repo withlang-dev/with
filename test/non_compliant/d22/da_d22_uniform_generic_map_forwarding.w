@@ -29,9 +29,9 @@ fn main:
     stored.push(72)
     jobs.insert(1, move stored)
     let job: Option[&Vec[i64]] = find(&jobs, 1)
-    assert(job.unwrap().get(0) == 72)
+    assert(job.unwrap()[0] == 72)
     let patterned_job: Option[&Vec[i64]] = find_through_pattern(&jobs, 1)
-    assert(patterned_job.unwrap().get(0) == 72)
+    assert(patterned_job.unwrap()[0] == 72)
 
     let owned = jobs.remove(1).unwrap()
-    assert(owned.get(0) == 72)
+    assert(owned[0] == 72)

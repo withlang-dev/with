@@ -1501,7 +1501,7 @@ pub fn resolve_canonical_module_key(path: &str) -> str:
                     keep = false
                 if part == "..":
                     keep = false
-                    if parts.len() > root_parts and parts.get(parts.len() - 1) != "..":
+                    if parts.len() > root_parts and parts[parts.len() - 1] != "..":
                         parts.pop()
                     else if not is_abs:
                         parts.push(with_str_clone_ref(part))

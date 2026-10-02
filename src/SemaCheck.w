@@ -1744,7 +1744,7 @@ impl Sema:
         if self.pool_resolve_symbol(gi_base_sym) == "Atomic":
             if gi_arg_count != 1:
                 sema_phase_bug("BUG: frozen Atomic type has wrong arg count")
-            if self.atomic_payload_type_is_valid(gi_args.get(0)) == 0:
+            if self.atomic_payload_type_is_valid(gi_args[0]) == 0:
                 sema_phase_bug("BUG: frozen Atomic type has invalid payload")
         self.find_generic_inst_type(gi_base_sym, gi_args, gi_arg_count) as i32
 
@@ -18492,7 +18492,7 @@ impl Sema:
         if chain.variant_syms.len() as i32 == 0:
             return 0
         if chain.variant_syms.len() as i32 == 1:
-            return chain.variant_syms.get(0)
+            return chain.variant_syms[0]
         -1
 
     mut fn enum_variant_payload_types(enum_tid: i32, variant_name: i32) -> Vec[i32]:
@@ -18738,7 +18738,7 @@ impl Sema:
                 elem_ty = self.ensure_exact_type(TypeKind.TY_REF, elem_ty, 1, 0) as i32
             elem_tys.push(elem_ty)
         let payload_ty = if payload_count == 1:
-            elem_tys.get(0)
+            elem_tys[0]
         else:
             self.ensure_tuple_type(elem_tys, payload_count) as i32
         let opt_args: Vec[i32] = Vec.new()
@@ -19165,8 +19165,8 @@ impl Sema:
             var unit_elided_payload_pattern = 0
             if bind_count == 0 and payload_count == 1:
                 var only_payload_ty = self.type_extra[payload_start]
-                if gi_payload_types.len() as i32 > 0 and gi_payload_types.get(0) != 0:
-                    only_payload_ty = gi_payload_types.get(0)
+                if gi_payload_types.len() as i32 > 0 and gi_payload_types[0] != 0:
+                    only_payload_ty = gi_payload_types[0]
                 if self.type_is_unit(only_payload_ty) != 0:
                     unit_elided_payload_pattern = 1
             if unit_elided_payload_pattern == 0 and bind_count != payload_count:
@@ -21822,7 +21822,7 @@ impl Sema:
                     if self.try_unit_elide_call_arg(node, arg_count, expected_callable_ty) != 0:
                         resolved_arg_count = 1
             else if variant_payload_tys.len() as i32 == 1:
-                let expected_variant_unit_ty = variant_payload_tys.get(0)
+                let expected_variant_unit_ty = variant_payload_tys[0]
                 if self.try_unit_elide_call_arg(node, arg_count, expected_variant_unit_ty) != 0:
                     resolved_arg_count = 1
             else:
@@ -22268,7 +22268,7 @@ impl Sema:
                 self.emit_error("distinct type constructor requires exactly 1 argument", node)
                 return 0
             let dt_inner = self.unwrap_builtin_arg_distinct(dt_tid)
-            let dt_arg_ty = arg_types.get(0)
+            let dt_arg_ty = arg_types[0]
             let dt_arg_node = if has_resolved != 0: self.get_resolved_call_arg(node, 0) else: self.ast.get_extra(resolved_extra_start)
             let dt_materializes_copy = self.record_contextual_copy_adjustment(dt_arg_node, dt_inner, dt_arg_ty)
             if self.types_compatible(dt_inner, dt_arg_ty) == 0 and dt_materializes_copy == 0:
@@ -23093,7 +23093,7 @@ impl Sema:
         let meta = self.ast.find_fn_meta(fn_node)
         if meta < 0:
             if arg_count > 0:
-                return arg_types.get(0)
+                return arg_types[0]
             return 0
         if self.task_fns.contains(fn_sym):
             self.record_global_concurrency_evidence(call_node, "async function call")
@@ -25075,7 +25075,7 @@ impl Sema:
         let args: Vec[i32] = Vec.new()
         if base_sym == self.syms.vec:
             if (field == self.syms.push or field == self.syms.contains) and arg_count >= 1:
-                let elem_ty = arg_types.get(0)
+                let elem_ty = arg_types[0]
                 if elem_ty != 0 and elem_ty != self.ty_void:
                     args.push(elem_ty)
                     let concrete = self.ensure_generic_inst_type(base_sym, args, 1) as i32
@@ -25086,15 +25086,15 @@ impl Sema:
                 return self.settle_pending_generic_binding(sym, concrete2, expr)
         if base_sym == self.syms.hashset:
             if (field == self.syms.insert or field == self.syms.contains or field == self.syms.remove) and arg_count >= 1:
-                let elem_ty2 = arg_types.get(0)
+                let elem_ty2 = arg_types[0]
                 if elem_ty2 != 0 and elem_ty2 != self.ty_void:
                     args.push(elem_ty2)
                     let concrete3 = self.ensure_generic_inst_type(base_sym, args, 1) as i32
                     return self.settle_pending_generic_binding(sym, concrete3, expr)
         if base_sym == self.syms.hashmap:
             if field == self.syms.insert and arg_count >= 2:
-                let key_ty = arg_types.get(0)
-                let val_ty = arg_types.get(1)
+                let key_ty = arg_types[0]
+                let val_ty = arg_types[1]
                 if key_ty != 0 and key_ty != self.ty_void and val_ty != 0 and val_ty != self.ty_void:
                     args.push(key_ty)
                     args.push(val_ty)
@@ -25461,7 +25461,7 @@ impl Sema:
         if arg_count != 1:
             self.emit_error("Vec.traverse() expects exactly one argument", node)
             return 0
-        let mapped_wrapper_ty = self.callable_return_type(arg_types.get(0))
+        let mapped_wrapper_ty = self.callable_return_type(arg_types[0])
         if mapped_wrapper_ty == 0:
             self.emit_error("Vec.traverse() expects a function argument", node)
             return 0
@@ -25508,7 +25508,7 @@ impl Sema:
             if arg_count != 1:
                 self.emit_error("Option.map() expects exactly one argument", node)
                 return 0
-            let mapped_ty = self.fn_return_type(arg_types.get(0))
+            let mapped_ty = self.fn_return_type(arg_types[0])
             if mapped_ty == 0:
                 self.emit_error("Option.map() expects a function argument", node)
                 return 0
@@ -25517,7 +25517,7 @@ impl Sema:
             if arg_count != 1:
                 self.emit_error("Option.and_then() expects exactly one argument", node)
                 return 0
-            let chained_ty = self.fn_return_type(arg_types.get(0))
+            let chained_ty = self.fn_return_type(arg_types[0])
             if chained_ty == 0:
                 self.emit_error("Option.and_then() expects a function argument", node)
                 return 0
@@ -25530,7 +25530,7 @@ impl Sema:
             if arg_count != 1:
                 self.emit_error("Option.or_else() expects exactly one argument", node)
                 return 0
-            let fn_ty = self.callable_fn_type(arg_types.get(0) as TypeId)
+            let fn_ty = self.callable_fn_type(arg_types[0] as TypeId)
             if fn_ty == 0:
                 self.emit_error("Option.or_else() expects a function argument", node)
                 return 0
@@ -25549,7 +25549,7 @@ impl Sema:
             if arg_count != 1:
                 self.emit_error("Option.unwrap_or_else() expects exactly one argument", node)
                 return 0
-            let fn_ty2 = self.callable_fn_type(arg_types.get(0) as TypeId)
+            let fn_ty2 = self.callable_fn_type(arg_types[0] as TypeId)
             if fn_ty2 == 0:
                 self.emit_error("Option.unwrap_or_else() expects a function argument", node)
                 return 0
@@ -25565,7 +25565,7 @@ impl Sema:
             if arg_count != 1:
                 self.emit_error("Option.zip() expects exactly one argument", node)
                 return 0
-            let other_ty = self.resolve_alias(arg_types.get(0) as TypeId)
+            let other_ty = self.resolve_alias(arg_types[0] as TypeId)
             if self.get_type_kind(other_ty) != TypeKind.TY_GENERIC_INST or self.get_generic_inst_base(other_ty as i32) != self.syms.option:
                 self.emit_error("Option.zip() expects an Option argument", node)
                 return 0
@@ -25618,7 +25618,7 @@ impl Sema:
             if arg_count != 1:
                 self.emit_error("Option.inspect() expects exactly one argument", node)
                 return 0
-            let inspect_fn = self.callable_fn_type(arg_types.get(0) as TypeId)
+            let inspect_fn = self.callable_fn_type(arg_types[0] as TypeId)
             if inspect_fn == 0:
                 self.emit_error("Option.inspect() expects a function argument", node)
                 return 0
@@ -25663,12 +25663,12 @@ impl Sema:
         let ok_ty = self.get_generic_inst_arg(recv_type, 0)
         let err_ty = self.get_generic_inst_arg(recv_type, 1)
         if method_name == "context":
-            let msg_ty = arg_types.get(0)
+            let msg_ty = arg_types[0]
             let msg_node = if self.has_resolved_call_args(node) != 0: self.get_resolved_call_arg(node, 0) else: self.ast.get_extra(self.ast.get_data1(node))
             let _ = self.check_builtin_method_call_arg("Result.context", 0, self.ty_str as i32, msg_ty, msg_node)
             return self.ensure_result_type_for(ok_ty, self.ensure_context_error_type_for(err_ty))
         if method_name == "with_context":
-            let fn_ty = self.callable_fn_type(arg_types.get(0) as TypeId)
+            let fn_ty = self.callable_fn_type(arg_types[0] as TypeId)
             if fn_ty == 0:
                 self.emit_error("Result.with_context() expects a function argument", node)
                 return 0
@@ -25679,7 +25679,7 @@ impl Sema:
             if msg_ty2 != 0 and self.builtin_arg_type_compatible(self.ty_str as i32, msg_ty2) == 0:
                 self.emit_argument_type_mismatch("Result.with_context", 0, 0, 0, self.ty_str as i32, msg_ty2, node)
             return self.ensure_result_type_for(ok_ty, self.ensure_context_error_type_for(err_ty))
-        let mapped_ty = self.fn_return_type(arg_types.get(0))
+        let mapped_ty = self.fn_return_type(arg_types[0])
         if mapped_ty == 0:
             self.emit_error("Result." ++ method_name ++ "() expects a function argument", node)
             return 0
@@ -25708,10 +25708,10 @@ impl Sema:
         if method_name == "unwrap_or_else":
             let join_expected = if self.has_expected_type != 0: self.expected_expr_type as i32 else: 0
             let joined = self.resolve_contextual_default_join(join_expected, recv_node, ok_ty, 0, self.lazy_default_origin_node(default_node), mapped_ty, D22_JOIN_ROLE_LAZY_RESULT, node, "Result.unwrap_or_else")
-            self.complete_lazy_fallback_result(default_node, self.callable_fn_type(arg_types.get(0) as TypeId), joined)
+            self.complete_lazy_fallback_result(default_node, self.callable_fn_type(arg_types[0] as TypeId), joined)
             return joined
         if method_name == "inspect":
-            let inspect_fn = self.callable_fn_type(arg_types.get(0) as TypeId)
+            let inspect_fn = self.callable_fn_type(arg_types[0] as TypeId)
             let ok_ref_ty = self.ensure_exact_type(TypeKind.TY_REF, ok_ty, 0, 0) as i32
             if self.get_type_d1(inspect_fn) != 1:
                 self.emit_error("Result.inspect() expects a one-argument function", node)
@@ -25721,7 +25721,7 @@ impl Sema:
                     self.emit_argument_type_mismatch("Result.inspect", 0, 0, 0, ok_ref_ty, inspect_param, node)
             return recv_type
         if method_name == "inspect_err":
-            let inspect_err_fn = self.callable_fn_type(arg_types.get(0) as TypeId)
+            let inspect_err_fn = self.callable_fn_type(arg_types[0] as TypeId)
             let err_ref_ty = self.ensure_exact_type(TypeKind.TY_REF, err_ty, 0, 0) as i32
             if self.get_type_d1(inspect_err_fn) != 1:
                 self.emit_error("Result.inspect_err() expects a one-argument function", node)
@@ -27488,7 +27488,7 @@ impl Sema:
             if mc_unit_expected == 0 and self.static_receiver_type_is_known(expr) != 0 and self.enum_has_variant(obj_type, field) != 0:
                 let mc_payload_tys = self.enum_variant_payload_types(obj_type, field)
                 if mc_payload_tys.len() as i32 == 1:
-                    let mc_payload_ty: i32 = mc_payload_tys.get(0)
+                    let mc_payload_ty: i32 = mc_payload_tys[0]
                     mc_unit_expected = mc_payload_ty
             if self.try_unit_elide_call_arg(node, arg_count, mc_unit_expected) != 0:
                 mc_resolved_arg_count = 1
@@ -27543,7 +27543,7 @@ impl Sema:
                         self.get_generic_inst_arg(fold_resolved as i32, 0)
                     else:
                         0
-                let fold_acc = arg_types.get(0)
+                let fold_acc = arg_types[0]
                 if fold_elem != 0 and fold_acc != 0:
                     let fold_params: Vec[i32] = Vec.new()
                     fold_params.push(fold_acc)
@@ -27682,7 +27682,7 @@ impl Sema:
             let task_arg = self.ast.get_extra(extra_start)
             if self.expr_is_task_value(task_arg) == 0:
                 self.emit_error("track() requires a Task value", task_arg)
-            let task_ty = arg_types.get(0)
+            let task_ty = arg_types[0]
             let scoped_args: Vec[i32] = Vec.new()
             scoped_args.push(self.unwrap_task_type(task_ty as TypeId) as i32)
             return self.ensure_generic_inst_type(self.syms.scoped_task, scoped_args, 1) as i32
@@ -27696,7 +27696,7 @@ impl Sema:
             if mc_resolved_arg_count != 1:
                 self.emit_error("spawn() requires one worker closure", node)
                 return 0
-            let worker_ty = if arg_types.len() > 0: arg_types.get(0) else: 0
+            let worker_ty = if arg_types.len() > 0: arg_types[0] else: 0
             let worker_fn_ty = self.callable_fn_type(worker_ty as TypeId)
             if worker_fn_ty == 0:
                 self.emit_error("spawn() requires a fn() -> i32 worker", node)
@@ -27954,7 +27954,7 @@ impl Sema:
                     self.emit_error("from_int() expects exactly one argument", node)
                     return 0
                 if arg_types.len() > 0:
-                    let from_int_arg_ty = arg_types.get(0)
+                    let from_int_arg_ty = arg_types[0]
                     if from_int_arg_ty != 0 and self.get_type_kind(self.resolve_alias(from_int_arg_ty as TypeId)) != TypeKind.TY_INT:
                         self.emit_error("from_int() argument must be an integer", self.ast.get_extra(extra_start))
                         return 0
@@ -28150,7 +28150,7 @@ impl Sema:
                 // Vec.push(value: T) / HashSet.insert(value: T) — arg[0] must be T
                 if arg_count >= 1:
                     let elem_ty = self.get_generic_inst_arg(recv_type, 0)
-                    let a0_ty = arg_types.get(0)
+                    let a0_ty = arg_types[0]
                     if elem_ty != 0 and a0_ty != 0:
                         let _ = self.check_builtin_method_call_arg(mc_call_name, 0, elem_ty, a0_ty, self.ast.get_extra(extra_start))
             else if field == self.syms.insert:
@@ -28159,8 +28159,8 @@ impl Sema:
                 if gi_argc >= 2 and arg_count >= 2:
                     let key_ty = self.get_generic_inst_arg(recv_type, 0)
                     let val_ty = self.get_generic_inst_arg(recv_type, 1)
-                    let a0_ty = arg_types.get(0)
-                    let a1_ty = arg_types.get(1)
+                    let a0_ty = arg_types[0]
+                    let a1_ty = arg_types[1]
                     if key_ty != 0 and a0_ty != 0:
                         let _ = self.check_builtin_method_call_arg(mc_call_name, 0, key_ty, a0_ty, self.ast.get_extra(extra_start))
                     if val_ty != 0 and a1_ty != 0:
@@ -28168,7 +28168,7 @@ impl Sema:
             else if type_name_sym == self.syms.vec and (field == self.syms.get or field == self.syms.remove):
                 // Vec.get(index) / Vec.remove(index) — arg[0] must be integer-ish
                 if arg_count >= 1:
-                    let a0_ty = arg_types.get(0)
+                    let a0_ty = arg_types[0]
                     if a0_ty != 0:
                         let index_ty = self.ty_i64 as i32
                         let _ = self.check_builtin_method_call_arg(mc_call_name, 0, index_ty, a0_ty, self.ast.get_extra(extra_start))
@@ -28176,7 +28176,7 @@ impl Sema:
                 if arg_count != 1:
                     self.emit_error(mc_method_name_raw ++ "() expects exactly one index argument", node)
                 else:
-                    let split_arg_ty = arg_types.get(0)
+                    let split_arg_ty = arg_types[0]
                     if split_arg_ty != 0:
                         let split_index_ty = self.ty_i64 as i32
                         let _ = self.check_builtin_method_call_arg(mc_call_name, 0, split_index_ty, split_arg_ty, self.ast.get_extra(extra_start))
@@ -28185,7 +28185,7 @@ impl Sema:
                 // owned argument auto-refs at the call site.
                 if arg_count >= 1:
                     let elem_ty = self.get_generic_inst_arg(recv_type, 0)
-                    let a0_ty = arg_types.get(0)
+                    let a0_ty = arg_types[0]
                     if elem_ty != 0 and a0_ty != 0:
                         let elem_ref_ty = self.ensure_exact_type(TypeKind.TY_REF, elem_ty, 0, 0) as i32
                         let _ = self.check_builtin_method_call_arg(mc_call_name, 0, elem_ref_ty, a0_ty, self.ast.get_extra(extra_start))
@@ -28194,7 +28194,7 @@ impl Sema:
                 // an owned argument auto-refs at the call site.
                 if arg_count >= 1:
                     let key_ty = self.get_generic_inst_arg(recv_type, 0)
-                    let a0_ty = arg_types.get(0)
+                    let a0_ty = arg_types[0]
                     if key_ty != 0 and a0_ty != 0:
                         let key_ref_ty = self.ensure_exact_type(TypeKind.TY_REF, key_ty, 0, 0) as i32
                         let _ = self.check_builtin_method_call_arg(mc_call_name, 0, key_ref_ty, a0_ty, self.ast.get_extra(extra_start))
@@ -28203,31 +28203,31 @@ impl Sema:
                 // arg[0] stays owned K.
                 if arg_count >= 1:
                     let key_ty = self.get_generic_inst_arg(recv_type, 0)
-                    let a0_ty = arg_types.get(0)
+                    let a0_ty = arg_types[0]
                     if key_ty != 0 and a0_ty != 0:
                         let _ = self.check_builtin_method_call_arg(mc_call_name, 0, key_ty, a0_ty, self.ast.get_extra(extra_start))
             else if type_name_sym == self.syms.hashmap and (mc_method_name_raw == "increment" or mc_method_name_raw == "decrement"):
                 // HashMap.increment/decrement(key: K) — arg[0] must be K
                 if arg_count >= 1:
                     let inc_key_ty = self.get_generic_inst_arg(recv_type, 0)
-                    let inc_a0_ty = arg_types.get(0)
+                    let inc_a0_ty = arg_types[0]
                     if inc_key_ty != 0 and inc_a0_ty != 0:
                         let _ = self.check_builtin_method_call_arg(mc_call_name, 0, inc_key_ty, inc_a0_ty, self.ast.get_extra(extra_start))
             else if type_name_sym == self.syms.hashmap and mc_method_name_raw == "update":
                 // HashMap.update(key: K, default: V, f: fn(V) -> V)
                 if arg_count >= 1:
                     let update_key_ty = self.get_generic_inst_arg(recv_type, 0)
-                    let update_a0_ty = arg_types.get(0)
+                    let update_a0_ty = arg_types[0]
                     if update_key_ty != 0 and update_a0_ty != 0:
                         let _ = self.check_builtin_method_call_arg(mc_call_name, 0, update_key_ty, update_a0_ty, self.ast.get_extra(extra_start))
                 if arg_count >= 2:
                     let update_val_ty = self.get_generic_inst_arg(recv_type, 1)
-                    let update_a1_ty = arg_types.get(1)
+                    let update_a1_ty = arg_types[1]
                     if update_val_ty != 0 and update_a1_ty != 0:
                         let _ = self.check_builtin_method_call_arg(mc_call_name, 1, update_val_ty, update_a1_ty, self.ast.get_extra(extra_start + 1))
                 if arg_count >= 3:
                     let update_val_ty2 = self.get_generic_inst_arg(recv_type, 1)
-                    let updater_ty = self.resolve_alias(arg_types.get(2) as TypeId)
+                    let updater_ty = self.resolve_alias(arg_types[2] as TypeId)
                     if self.get_type_kind(updater_ty) != TypeKind.TY_FN:
                         self.emit_error("HashMap.update() expects a function as its third argument", self.ast.get_extra(extra_start + 2))
                     else:
@@ -28238,7 +28238,7 @@ impl Sema:
                 // HashSet.insert/contains/remove(value: T) — arg[0] must be T
                 if arg_count >= 1:
                     let elem_ty = self.get_generic_inst_arg(recv_type, 0)
-                    let a0_ty = arg_types.get(0)
+                    let a0_ty = arg_types[0]
                     if elem_ty != 0 and a0_ty != 0:
                         let _ = self.check_builtin_method_call_arg(mc_call_name, 0, elem_ty, a0_ty, self.ast.get_extra(extra_start))
             else if type_name_sym == self.syms.slotmap:
@@ -28246,21 +28246,21 @@ impl Sema:
                 let sm_handle_ty = self.ensure_handle_type_for(sm_elem_ty)
                 if field == self.syms.insert:
                     if arg_count >= 1:
-                        let a0_ty = arg_types.get(0)
+                        let a0_ty = arg_types[0]
                         if sm_elem_ty != 0 and a0_ty != 0:
                             let _ = self.check_builtin_method_call_arg(mc_call_name, 0, sm_elem_ty, a0_ty, self.ast.get_extra(extra_start))
                 else if field == self.syms.get or field == self.syms.slot or field == self.syms.remove or field == self.syms.contains:
                     if arg_count >= 1:
-                        let h_ty = arg_types.get(0)
+                        let h_ty = arg_types[0]
                         if sm_handle_ty != 0 and h_ty != 0:
                             let _ = self.check_builtin_method_call_arg(mc_call_name, 0, sm_handle_ty, h_ty, self.ast.get_extra(extra_start))
                 else if field == self.syms.replace:
                     if arg_count >= 1:
-                        let h_ty2 = arg_types.get(0)
+                        let h_ty2 = arg_types[0]
                         if sm_handle_ty != 0 and h_ty2 != 0:
                             let _ = self.check_builtin_method_call_arg(mc_call_name, 0, sm_handle_ty, h_ty2, self.ast.get_extra(extra_start))
                     if arg_count >= 2:
-                        let v_ty = arg_types.get(1)
+                        let v_ty = arg_types[1]
                         if sm_elem_ty != 0 and v_ty != 0:
                             let _ = self.check_builtin_method_call_arg(mc_call_name, 1, sm_elem_ty, v_ty, self.ast.get_extra(extra_start + 1))
                 else if field == self.syms.get_disjoint:
@@ -28272,7 +28272,7 @@ impl Sema:
             else if type_name_sym == self.syms.slotmapslot:
                 if mc_method_name_raw == "set" and arg_count >= 1:
                     let slot_elem_ty = self.get_generic_inst_arg(recv_type, 0)
-                    let set_arg_ty = arg_types.get(0)
+                    let set_arg_ty = arg_types[0]
                     if slot_elem_ty != 0 and set_arg_ty != 0:
                         let _ = self.check_builtin_method_call_arg(mc_call_name, 0, slot_elem_ty, set_arg_ty, self.ast.get_extra(extra_start))
             else if type_name_sym == self.syms.fixed_string:
@@ -28280,13 +28280,13 @@ impl Sema:
                     if arg_count != 1:
                         self.emit_error("FixedString.push_byte() expects exactly one argument", node)
                     else:
-                        let fs_byte_ty = arg_types.get(0)
+                        let fs_byte_ty = arg_types[0]
                         let _ = self.check_builtin_method_call_arg(mc_call_name, 0, self.ty_u8 as i32, fs_byte_ty, self.ast.get_extra(extra_start))
                 else if mc_method_name_raw == "push_str" or mc_method_name_raw == "equals":
                     if arg_count != 1:
                         self.emit_error("FixedString." ++ mc_method_name_raw ++ "() expects exactly one argument", node)
                     else:
-                        let fs_str_ty = arg_types.get(0)
+                        let fs_str_ty = arg_types[0]
                         let _ = self.check_builtin_method_call_arg(mc_call_name, 0, self.ty_str_view as i32, fs_str_ty, self.ast.get_extra(extra_start))
                 else if mc_method_name_raw == "clear" or mc_method_name_raw == "is_empty" or mc_method_name_raw == "as_view" or mc_method_name_raw == "capacity" or mc_method_name_raw == "len_i32" or mc_method_name_raw == "len_i64" or self.is_collection_len_method(field):
                     if arg_count != 0:
@@ -28316,9 +28316,10 @@ impl Sema:
                 if field == self.syms.clear:
                     return self.ty_void as i32
                 if field == self.syms.get:
-                    // D27 (docs/proposals/d27-implementation-plan.md E1): element access
-                    // observes — get returns a view of vec-owned storage.
-                    // remove below stays owned: removal transfers.
+                    // D71 (§ Element access): a positional collection has no
+                    // `get`; `xs[i]` is the one spelling. The call still types
+                    // as the element view so checking continues past the error.
+                    self.emit_error("Vec has no 'get': element access is spelled 'xs[i]' (§ Element access, D71)", node)
                     self.record_builtin_receiver_view_origins(node, expr)
                     return self.ensure_exact_type(TypeKind.TY_REF, self.get_generic_inst_arg(recv_type, 0), 0, 0) as i32
                 if field == self.syms.remove:
@@ -28383,7 +28384,7 @@ impl Sema:
                     return recv_type as i32
                 if field == self.syms.map:
                     if arg_count >= 1:
-                        let mapper_ty = self.resolve_alias(arg_types.get(0) as TypeId)
+                        let mapper_ty = self.resolve_alias(arg_types[0] as TypeId)
                         if self.get_type_kind(mapper_ty) == TypeKind.TY_FN:
                             let mapped_elem_ty = self.get_type_d2(mapper_ty)
                             let mapped_tid = self.find_generic_inst(self.syms.vec, mapped_elem_ty)
@@ -28395,7 +28396,7 @@ impl Sema:
                     return recv_type as i32
                 if field == self.syms.fold:
                     if arg_count >= 1:
-                        return arg_types.get(0)
+                        return arg_types[0]
                     return self.get_generic_inst_arg(recv_type, 0)
                 if field == self.syms.sequence:
                     return self.vec_sequence_return_type(recv_type, mc_resolved_arg_count, node)
@@ -28445,7 +28446,7 @@ impl Sema:
                         return self.ensure_option_type_for(iter_elem_ty)
                     if field == self.syms.map:
                         if arg_count >= 1:
-                            let mapper_ty = self.resolve_alias(arg_types.get(0) as TypeId)
+                            let mapper_ty = self.resolve_alias(arg_types[0] as TypeId)
                             if self.get_type_kind(mapper_ty) == TypeKind.TY_FN:
                                 let mapped_elem_ty = self.get_type_d2(mapper_ty)
                                 return self.ensure_mapiter_type_for(recv_type, iter_elem_ty, mapped_elem_ty)
@@ -28462,7 +28463,7 @@ impl Sema:
                         return self.ensure_dropwhileiter_type_for(recv_type, iter_elem_ty)
                     if field == self.syms.filter_map:
                         if arg_count >= 1:
-                            let fm_filter_ty = self.resolve_alias(arg_types.get(0) as TypeId)
+                            let fm_filter_ty = self.resolve_alias(arg_types[0] as TypeId)
                             if self.get_type_kind(fm_filter_ty) == TypeKind.TY_FN:
                                 let opt_ty = self.resolve_alias(self.get_type_d2(fm_filter_ty) as TypeId)
                                 if self.get_type_kind(opt_ty) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(opt_ty as i32) == self.syms.option:
@@ -28472,16 +28473,16 @@ impl Sema:
                         return self.ensure_enumerateiter_type_for(recv_type, iter_elem_ty)
                     if field == self.syms.chain:
                         if arg_count >= 1:
-                            let other_chain_ty = arg_types.get(0)
+                            let other_chain_ty = arg_types[0]
                             let other_chain_elem = self.iterator_element_type(other_chain_ty)
                             if other_chain_elem != 0 and self.types_compatible(iter_elem_ty as TypeId, other_chain_elem as TypeId) != 0:
                                 return self.ensure_chainiter_type_for(recv_type, other_chain_ty, iter_elem_ty)
                         return 0
                     if field == self.syms.zip_with:
                         if arg_count >= 2:
-                            let zw_other_ty = arg_types.get(0)
+                            let zw_other_ty = arg_types[0]
                             let zw_other_elem = self.iterator_element_type(zw_other_ty)
-                            let zw_fn_ty = self.resolve_alias(arg_types.get(1) as TypeId)
+                            let zw_fn_ty = self.resolve_alias(arg_types[1] as TypeId)
                             if zw_other_elem != 0 and self.get_type_kind(zw_fn_ty) == TypeKind.TY_FN:
                                 return self.ensure_zipwithiter_type_for(recv_type, zw_other_ty, iter_elem_ty, zw_other_elem, self.get_type_d2(zw_fn_ty))
                         return 0
@@ -28489,14 +28490,14 @@ impl Sema:
                         return self.ensure_stepbyiter_type_for(recv_type, iter_elem_ty)
                     if field == self.syms.zip:
                         if arg_count >= 1:
-                            let other_iter_ty = arg_types.get(0)
+                            let other_iter_ty = arg_types[0]
                             let other_elem_ty = self.iterator_element_type(other_iter_ty)
                             if other_elem_ty != 0:
                                 return self.ensure_zipiter_type_for(recv_type, other_iter_ty, iter_elem_ty, other_elem_ty)
                         return 0
                     if field == self.syms.flat_map:
                         if arg_count >= 1:
-                            let fm_ty = self.resolve_alias(arg_types.get(0) as TypeId)
+                            let fm_ty = self.resolve_alias(arg_types[0] as TypeId)
                             if self.get_type_kind(fm_ty) == TypeKind.TY_FN:
                                 let fm_inner_ty = self.get_type_d2(fm_ty)
                                 var fm_iter_ty = fm_inner_ty
@@ -28511,7 +28512,7 @@ impl Sema:
                         return 0
                     if field == self.syms.fold:
                         if arg_count >= 1:
-                            return arg_types.get(0)
+                            return arg_types[0]
                         return iter_elem_ty
                     if field == self.syms.reduce:
                         return self.ensure_option_type_for(iter_elem_ty)
@@ -28656,7 +28657,7 @@ impl Sema:
                     if mc_resolved_arg_count != 1:
                         self.emit_error("Option.expect() expects exactly one argument", node)
                         return 0
-                    let msg_ty = arg_types.get(0)
+                    let msg_ty = arg_types[0]
                     if self.check_builtin_method_call_arg("Option.expect", 0, self.ty_str as i32, msg_ty, self.ast.get_extra(extra_start)) == 0:
                         return 0
                     let option_expected = self.get_generic_inst_arg(recv_type, 0)
@@ -28676,7 +28677,7 @@ impl Sema:
                         self.emit_error("Option.unwrap_or() expects exactly one argument", node)
                         return 0
                     let option_payload = self.get_generic_inst_arg(recv_type, 0)
-                    let option_default_ty = arg_types.get(0)
+                    let option_default_ty = arg_types[0]
                     let option_join_expected = if self.has_expected_type != 0: self.expected_expr_type as i32 else: 0
                     return self.resolve_contextual_default_join(option_join_expected, expr, option_payload, option_default_node, option_default_node, option_default_ty, D22_JOIN_ROLE_EXPR, node, "Option.unwrap_or")
                 if field == self.syms.is_some or field == self.syms.is_none:
@@ -28687,7 +28688,7 @@ impl Sema:
                         return 0
                     // §10.5 `(fn(&T) -> bool)`: an explicitly typed owned
                     // parameter would claim a payload the predicate only sees.
-                    let filter_fn = self.callable_fn_type(arg_types.get(0) as TypeId)
+                    let filter_fn = self.callable_fn_type(arg_types[0] as TypeId)
                     if filter_fn == 0:
                         self.emit_error("Option.filter() expects a function argument", node)
                         return 0
@@ -28714,7 +28715,7 @@ impl Sema:
                     if mc_resolved_arg_count != 1:
                         self.emit_error("Result.expect() expects exactly one argument", node)
                         return 0
-                    let res_msg_ty = arg_types.get(0)
+                    let res_msg_ty = arg_types[0]
                     if self.check_builtin_method_call_arg("Result.expect", 0, self.ty_str as i32, res_msg_ty, self.ast.get_extra(extra_start)) == 0:
                         return 0
                     let result_expected = self.get_generic_inst_arg(recv_type, 0)
@@ -28735,7 +28736,7 @@ impl Sema:
                         self.emit_error("Result.unwrap_or() expects exactly one argument", node)
                         return 0
                     let result_payload = self.get_generic_inst_arg(recv_type, 0)
-                    let result_default_ty = arg_types.get(0)
+                    let result_default_ty = arg_types[0]
                     let result_join_expected = if self.has_expected_type != 0: self.expected_expr_type as i32 else: 0
                     return self.resolve_contextual_default_join(result_join_expected, expr, result_payload, result_default_node, result_default_node, result_default_ty, D22_JOIN_ROLE_EXPR, node, "Result.unwrap_or")
                 if field == self.syms.is_ok or field == self.syms.is_err:
@@ -28769,7 +28770,7 @@ impl Sema:
                     self.emit_error(self.pool_resolve(field) ++ "() expects exactly one index argument", node)
                     return 0
                 if arg_types.len() > 0:
-                    let split_idx_ty = arg_types.get(0)
+                    let split_idx_ty = arg_types[0]
                     let split_idx_node = if mc_has_resolved_args != 0: self.get_resolved_call_arg(node, 0) else: self.ast.get_extra(extra_start)
                     if self.check_builtin_method_call_arg(self.pool_resolve(field), 0, self.ty_i64 as i32, split_idx_ty, split_idx_node) == 0:
                         return 0
@@ -28910,7 +28911,7 @@ impl Sema:
                 self.emit_error("Channel() expects zero or one capacity argument", node)
                 return 0
             if arg_count == 1:
-                let cap_ty = arg_types.get(0)
+                let cap_ty = arg_types[0]
                 if cap_ty != 0:
                     let cap_kind = self.get_type_kind(self.resolve_alias(cap_ty))
                     if cap_kind != TypeKind.TY_INT:
@@ -28921,14 +28922,14 @@ impl Sema:
             if arg_count != 2:
                 self.emit_error("send() expects exactly two arguments", node)
                 return 0
-            let ch_ty = arg_types.get(0)
+            let ch_ty = arg_types[0]
             if ch_ty != 0:
                 let ch_kind = self.get_type_kind(self.resolve_alias(ch_ty))
                 if ch_kind != TypeKind.TY_INT:
                     self.emit_error("send() expects channel handle as integer value", self.ast.get_extra(args_start))
                     return 0
             let payload_node = self.ast.get_extra(args_start + 1)
-            let payload_ty = arg_types.get(1)
+            let payload_ty = arg_types[1]
             if self.expr_is_ephemeral_value(payload_node) != 0 or self.expr_is_ephemeral_task(payload_node) != 0 or self.expr_creates_non_send_task(payload_node) != 0 or self.type_is_send(payload_ty) == 0:
                 self.emit_task_sendability_error(payload_node, "channel send requires Send value")
                 return 0
@@ -28942,7 +28943,7 @@ impl Sema:
             if arg_count != 1:
                 self.emit_error("recv() expects exactly one argument", node)
                 return 0
-            let ch_ty = arg_types.get(0)
+            let ch_ty = arg_types[0]
             if ch_ty != 0:
                 let ch_kind = self.get_type_kind(self.resolve_alias(ch_ty))
                 if ch_kind != TypeKind.TY_INT:
@@ -28953,7 +28954,7 @@ impl Sema:
             if arg_count != 1:
                 self.emit_error("close() expects exactly one argument", node)
                 return 0
-            let ch_ty = arg_types.get(0)
+            let ch_ty = arg_types[0]
             if ch_ty != 0:
                 let ch_kind = self.get_type_kind(self.resolve_alias(ch_ty))
                 if ch_kind != TypeKind.TY_INT:
@@ -28973,7 +28974,7 @@ impl Sema:
             if arg_count != 1:
                 self.emit_error("embed_file() takes exactly one string argument", node)
                 return self.ty_str as i32
-            let path_ty = arg_types.get(0)
+            let path_ty = arg_types[0]
             if path_ty != 0 and self.types_compatible(self.ty_str as i32, path_ty) == 0:
                 self.emit_error("embed_file() argument must be str-compatible", self.ast.get_extra(args_start))
                 return self.ty_str as i32
@@ -29006,7 +29007,7 @@ impl Sema:
             // in With (`f(2)`, `let x: f64 = n`). Two floats must agree.
             var target: TypeId = 0
             for ai in 0..math_arity:
-                let arg_ty = arg_types.get(ai)
+                let arg_ty = arg_types[ai]
                 if arg_ty == 0:
                     return 0
                 let arg_resolved = self.resolve_alias(arg_ty)

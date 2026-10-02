@@ -209,7 +209,7 @@ pub fn format_source_styled(source: &str, style: i32) -> str:
         // brace body this pass converted to `: expr`.
         if style == 1 and tag == TokenKind.TK_R_BRACE and not at_line_start:
             let inline_after = brace_depth - 1
-            if suppress_stack.len() > 0 and suppress_stack.get(suppress_stack.len() - 1) == inline_after:
+            if suppress_stack.len() > 0 and suppress_stack[suppress_stack.len() - 1] == inline_after:
                 let _ = suppress_stack.pop()
                 brace_depth = inline_after
                 i = i + 1
@@ -246,7 +246,7 @@ pub fn format_source_styled(source: &str, style: i32) -> str:
             // prefer-brace: close blocks when indent drops
             if style == 2:
                 while close_stack.len() > 0:
-                    let top: i32 = close_stack.get(close_stack.len() - 1)
+                    let top: i32 = close_stack[close_stack.len() - 1]
                     if line_indent > top:
                         break
                     let _ = close_stack.pop()
@@ -266,7 +266,7 @@ pub fn format_source_styled(source: &str, style: i32) -> str:
             // prefer-colon: suppress } at line start
             if style == 1 and at_line_start and tag == TokenKind.TK_R_BRACE:
                 let after_brace = brace_depth - 1
-                if suppress_stack.len() > 0 and suppress_stack.get(suppress_stack.len() - 1) == after_brace:
+                if suppress_stack.len() > 0 and suppress_stack[suppress_stack.len() - 1] == after_brace:
                     let _ = suppress_stack.pop()
                     brace_depth = after_brace
                     var j = i + 1

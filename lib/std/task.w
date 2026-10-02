@@ -38,8 +38,8 @@ fn task_first_completed[T](pending: &Vec[Task[T]], finished: &Vec[i32]) -> i32:
     var winner_sequence: i64 = 0
     var i = 0
     while i < pending.len() as i32:
-        if finished.get(i) == 0:
-            let sequence = with_runtime_fiber_completion_sequence(pending.get(i).fiber_id)
+        if finished[i] == 0:
+            let sequence = with_runtime_fiber_completion_sequence(pending[i].fiber_id)
             if sequence > 0 and (winner < 0 or sequence < winner_sequence):
                 winner = i
                 winner_sequence = sequence
@@ -71,7 +71,7 @@ pub fn await_all[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> Result[Vec[T
         // finished/order, so everything still here is un-awaited and the
         // bound is the live length (the await_first pattern).
         while cleanup_i < pending.len() as i32:
-            pending.get(cleanup_i).join_cleanup()
+            pending[cleanup_i].join_cleanup()
             cleanup_i = cleanup_i + 1
 
     while pending.len() > 0:
@@ -84,7 +84,7 @@ pub fn await_all[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> Result[Vec[T
 
         // D27/D33: remove transfers — await needs the owned Task; `order`
         // remembers the original slot for in-order results.
-        let orig: i32 = order.get(ready)
+        let orig: i32 = order[ready]
         order.remove(ready)
         finished.remove(ready)
         let result = pending.remove(ready).await
@@ -110,7 +110,7 @@ pub fn await_all[T](tasks: impl IntoIter[Task[T]]) -> Vec[T]:
     defer:
         // Awaited tasks were removed, so everything live is un-awaited.
         while cleanup_i < pending.len() as i32:
-            pending.get(cleanup_i).join_cleanup()
+            pending[cleanup_i].join_cleanup()
             cleanup_i = cleanup_i + 1
 
     // D27/D33: remove transfers — await needs the owned Task.
@@ -139,8 +139,8 @@ pub fn await_first[T](tasks: impl IntoIter[Task[T]]) -> T:
         // The winner was removed from BOTH vecs, so indices stay aligned and
         // the bound must be the live length, not the captured total.
         while cleanup_i < pending.len() as i32:
-            if finished.get(cleanup_i) == 0:
-                pending.get(cleanup_i).join_cleanup()
+            if finished[cleanup_i] == 0:
+                pending[cleanup_i].join_cleanup()
             cleanup_i = cleanup_i + 1
 
     while true:
@@ -182,7 +182,7 @@ pub fn await_any[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> Result[T, Ve
         // Awaited tasks are removed in lockstep, so everything live is
         // un-awaited and the bound is the live length.
         while cleanup_i < pending.len() as i32:
-            pending.get(cleanup_i).join_cleanup()
+            pending[cleanup_i].join_cleanup()
             cleanup_i = cleanup_i + 1
 
     while pending.len() > 0:
@@ -194,7 +194,7 @@ pub fn await_any[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> Result[T, Ve
             continue
 
         // D27/D33: remove transfers — await needs the owned Task.
-        let orig: i32 = order.get(ready)
+        let orig: i32 = order[ready]
         order.remove(ready)
         finished.remove(ready)
         let result = pending.remove(ready).await
@@ -219,7 +219,7 @@ pub fn await_settled[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> Vec[Resu
     defer:
         // Awaited tasks were removed, so everything live is un-awaited.
         while cleanup_i < pending.len() as i32:
-            pending.get(cleanup_i).join_cleanup()
+            pending[cleanup_i].join_cleanup()
             cleanup_i = cleanup_i + 1
 
     // D27/D33: remove transfers — await needs the owned Task.

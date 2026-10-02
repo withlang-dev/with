@@ -5,16 +5,16 @@ fn check_vec_i32:
     var v: Vec[i32] = Vec.new()
     v.push(42)
     v.push(99)
-    assert(v.get(0) == 42)
-    assert(v.get(1) == 99)
+    assert(v[0] == 42)
+    assert(v[1] == 99)
     assert(v.len() == 2)
 
 fn check_vec_str:
     var v: Vec[str] = Vec.new()
     v.push("hello")
     v.push("world")
-    assert(v.get(0) == "hello")
-    assert(v.get(1) == "world")
+    assert(v[0] == "hello")
+    assert(v[1] == "world")
     assert(v.len() == 2)
 
 fn check_both:
@@ -27,10 +27,10 @@ fn check_both:
     strs.push("b")
     assert(ints.len() == 2)
     assert(strs.len() == 2)
-    assert(ints.get(0) == 1)
-    assert(ints.get(1) == 2)
-    assert(strs.get(0) == "a")
-    assert(strs.get(1) == "b")
+    assert(ints[0] == 1)
+    assert(ints[1] == 2)
+    assert(strs[0] == "a")
+    assert(strs[1] == "b")
 
 fn check_hashmap:
     var m: HashMap[str, i32] = HashMap.new()

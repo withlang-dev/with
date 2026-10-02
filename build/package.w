@@ -166,7 +166,7 @@ fn pkg_tool_from_env(ctx: &ActionCtx, primary: &str, legacy: &str, fallback: &st
 
 fn pkg_llvm_prefix(ctx: &ActionCtx) -> str:
     let args = ctx.args()
-    let fallback = if args.len() > 3: package_owned_text(args.get(3)) else: ""
+    let fallback = if args.len() > 3: package_owned_text(args[3]) else: ""
     pkg_env_or(ctx, "LLVM_PREFIX", fallback)
 
 fn pkg_llvm_tool(ctx: &ActionCtx, primary: &str, legacy: &str, name: &str) -> str:
@@ -496,7 +496,7 @@ pub fn run_package_bootstrap_c_action(ctx: ActionCtx) -> i32:
     let version = pkg_version(ctx)
     if version.len() == 0:
         return 1
-    let compiler_path = args.get(0)
+    let compiler_path = args[0]
     let fs = ctx.fs()
     if not fs.exists(compiler_path):
         return pkg_fail(ctx, "missing release compiler: " ++ compiler_path)
@@ -577,9 +577,9 @@ pub fn run_package_platform_release_action(ctx: ActionCtx) -> i32:
     let args = ctx.args()
     if args.len() < 4:
         return pkg_fail(ctx, "requires asset name, platform tag, compiler path, and default LLVM prefix")
-    let asset = args.get(0)
-    let platform = args.get(1)
-    let compiler_path = args.get(2)
+    let asset = args[0]
+    let platform = args[1]
+    let compiler_path = args[2]
     let current = pkg_current_platform()
     if current.len() == 0:
         return pkg_fail(ctx, "unsupported release packaging host: " ++ os() ++ "/" ++ arch())
@@ -610,7 +610,7 @@ pub fn run_package_platform_release_action(ctx: ActionCtx) -> i32:
     if rc != 0: return rc
     rc = pkg_write_release_checksum(ctx, asset_path)
     if rc != 0: return rc
-    rc = pkg_write_windows_notice(ctx, asset, platform, args.get(3))
+    rc = pkg_write_windows_notice(ctx, asset, platform, args[3])
     if rc != 0: return rc
     let output = ctx.output()
     if output.len() > 0:

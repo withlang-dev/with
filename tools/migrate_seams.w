@@ -60,9 +60,9 @@ fn main:
     if argv.len() < 4:
         print("usage: with run tools/migrate_seams.w <compiler> <root.w> <class> [--apply]")
         return
-    let compiler = argv.get(1)
-    let root = argv.get(2)
-    let want_class = argv.get(3)
+    let compiler = argv[1]
+    let root = argv[2]
+    let want_class = argv[3]
     var apply = false
     for i in 4..argv.len() as i32:
         if argv[i] == "--apply": apply = true
@@ -93,17 +93,17 @@ fn main:
         let cols = split_tabs(line)
         if cols.len() < 7:
             continue
-        let class = cols.get(3)
+        let class = cols[3]
         if class != want_class:
             continue
         considered = considered + 1
-        let context = cols.get(4)
+        let context = cols[4]
         if context != "read":
             deferred = deferred + 1
             continue
         actionable = actionable + 1
-        let offset = parse_int(cols.get(1))
-        print(cols.get(0) ++ "\t" ++ cols.get(2) ++ "\t" ++ context ++ "\toffset=" ++ f"{offset}" ++ "\t" ++ cols.get(5))
+        let offset = parse_int(cols[1])
+        print(cols[0] ++ "\t" ++ cols[2] ++ "\t" ++ context ++ "\toffset=" ++ f"{offset}" ++ "\t" ++ cols[5])
 
     print("migrate-seams: class=" ++ want_class ++ " considered=" ++ f"{considered}" ++ " read-context(auto-eligible)=" ++ f"{actionable}" ++ " store/move(needs decision)=" ++ f"{deferred}")
     if not apply:

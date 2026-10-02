@@ -952,12 +952,12 @@ impl Compilation:
             let fields = compilation_split_escaped_fields(lines[li])
             if fields.len() != 5:
                 continue
-            if fields.get(0) != "error":
+            if fields[0] != "error":
                 continue
-            let path = fields.get(1)
-            let start = compilation_parse_i32(fields.get(2))
-            let end = compilation_parse_i32(fields.get(3))
-            let message = fields.get(4)
+            let path = fields[1]
+            let start = compilation_parse_i32(fields[2])
+            let end = compilation_parse_i32(fields[3])
+            let message = fields[4]
             let file_id = compilation_span_file_id_for_path(zcu, path)
             zcu.diagnostics.emit(Diagnostic.err(message, Span { file: file_id, start, end }))
             emitted = emitted + 1
@@ -1161,8 +1161,8 @@ impl Compilation:
         if not self.load_link_bundles():
             return AstPool.new()
         var zcu = move self.zcu
-        let source_path = source_paths.get(0)
-        let source_text = source_texts.get(0)
+        let source_path = source_paths[0]
+        let source_text = source_texts[0]
         let source_dir = frontend_dirname(source_path)
         zcu.reset_for_new_invocation(source_dir, source_path, "")
         zcu.project_config = self.project_config_for_source(source_path)
@@ -1209,7 +1209,7 @@ impl Compilation:
         let pool = self.compile_entry_source_texts(source_paths, source_texts)
         if source_paths.len() == 0:
             return false
-        self.check_pool(pool, source_paths.get(0))
+        self.check_pool(pool, source_paths[0])
 
     mut fn prepare_binary_link_from_pool(pool: AstPool, source_path: &str, obj_path: &str, bin_path: &str) -> CompilationBinaryLinkPlan:
         self.last_link_command_available = 0
@@ -1575,9 +1575,9 @@ impl Compilation:
         if source_paths.len() == 0 or source_texts.len() == 0 or source_paths.len() != source_texts.len():
             runtime_eprint("error: build_entry_binary_from_sources_to_path requires matching non-empty source paths and texts")
             return ""
-        let source_path = source_paths.get(0)
+        let source_path = source_paths[0]
         if bin_path.len() == 0:
-            return self.build_binary_from_source(source_path, source_texts.get(0))
+            return self.build_binary_from_source(source_path, source_texts[0])
         let obj_path = bin_path ++ ".o"
         let output_dir = link_stage_dirname(bin_path)
         if not compilation_ensure_output_dir(output_dir):

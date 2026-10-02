@@ -9,6 +9,6 @@ fn main:
     var inners: Vec[Inner] = Vec.new()
     inners.push(Inner { tags: Vec.new() })
     inners[0].tags.push(99)
-    let item = inners.get(0)
+    let item = inners[0]
     assert(item.tags.len() == 1)
-    assert(inners.get(0).tags.get(0) == 99)
+    assert(inners[0].tags[0] == 99)

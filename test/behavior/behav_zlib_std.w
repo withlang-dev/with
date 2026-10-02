@@ -14,7 +14,7 @@ fn assert_bytes_eq(actual: &Vec[u8], expected: &Vec[u8]):
     assert(actual.len() == expected.len())
     var i: i64 = 0
     while i < expected.len():
-        assert(actual.get(i) == expected.get(i))
+        assert(actual[i] == expected[i])
         i = i + 1
 
 fn gzip_hello_fixture() -> Vec[u8]:
@@ -64,8 +64,8 @@ fn test_gzip_round_trip:
     let original = bytes_from_str("gzip gzip gzip gzip gzip with zlib")
     let compressed = compress_gzip(&original).unwrap()
     assert(compressed.len() > 10)
-    assert(compressed.get(0) == 31 as u8)
-    assert(compressed.get(1) == 139 as u8)
+    assert(compressed[0] == 31 as u8)
+    assert(compressed[1] == 139 as u8)
     let restored = decompress_gzip(&compressed).unwrap()
     assert_bytes_eq(&restored, &original)
 

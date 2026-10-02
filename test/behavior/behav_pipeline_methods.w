@@ -24,8 +24,8 @@ fn test_vec_methods_in_pipeline:
     v |> push("a")
     v |> push("b")
     assert((v |> len()) == 2)
-    assert((v |> get(0)) == "a")
-    assert((v |> get(1)) == "b")
+    assert(v[0] == "a")
+    assert(v[1] == "b")
 
 fn test_string_methods_in_pipeline:
     assert(("hello" |> to_upper()) == "HELLO")

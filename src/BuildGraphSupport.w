@@ -382,14 +382,14 @@ pub fn build_graph_times_report(root: &str, names: &Vec[str], ns_list: &Vec[i64]
         var best: i64 = -1
         for i in 0..names.len() as i32:
             if not build_graph_time_picked(&picked, i as i64):
-                if best < 0 or ns_list[i] > ns_list.get(best):
+                if best < 0 or ns_list[i] > ns_list[best]:
                     best = i as i64
         picked.push(best)
-        summary = summary ++ " " ++ names.get(best) ++ " " ++ build_graph_time_fmt(ns_list.get(best))
+        summary = summary ++ " " ++ names[best] ++ " " ++ build_graph_time_fmt(ns_list[best])
     var rss_best: i64 = -1
     for i in 0..rss_list.len() as i32:
-        if rss_best < 0 or rss_list[i] > rss_list.get(rss_best):
+        if rss_best < 0 or rss_list[i] > rss_list[rss_best]:
             rss_best = i as i64
-    if rss_best >= 0 and rss_best < names.len() as i32 and rss_list.get(rss_best) > 0:
-        summary = summary ++ "; peak rss " ++ build_graph_rss_fmt(rss_list.get(rss_best)) ++ " (" ++ names.get(rss_best) ++ ")"
+    if rss_best >= 0 and rss_best < names.len() as i32 and rss_list[rss_best] > 0:
+        summary = summary ++ "; peak rss " ++ build_graph_rss_fmt(rss_list[rss_best]) ++ " (" ++ names[rss_best] ++ ")"
     build_graph_rt_eprint(summary ++ " (out/.build-state/build-times.tsv)")

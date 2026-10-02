@@ -8,5 +8,5 @@ fn main:
     let parts = s.split(",")
     print(int_to_string(parts.len() as i32))
     for i in 0..parts.len():
-        let p = parts.get(i)
+        let p = parts[i]
         print(p)

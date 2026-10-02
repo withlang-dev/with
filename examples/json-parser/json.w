@@ -347,7 +347,7 @@ fn json_get_field(val: &JsonValue, key: str) -> Option[&JsonValue]:
 
 fn json_get_index(val: &JsonValue, idx: i32) -> Option[&JsonValue]:
     match val:
-        .Array(items) if idx < items.len() => Some(items.get(idx))
+        .Array(items) if idx < items.len() => Some(items[idx])
         _ => None
 
 // --- Main Demo ---

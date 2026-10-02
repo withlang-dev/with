@@ -14,7 +14,7 @@ fn ruat_compiler_input_rel(ctx: &ActionCtx) -> str:
     let inputs = ctx.inputs()
     if inputs.len() == 0:
         return ""
-    inputs.get(0) ++ ""
+    inputs[0] ++ ""
 
 // Produce the platform-named release asset from the verified release
 // compiler. The release UATs consume this asset; producing it in the build

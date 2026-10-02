@@ -13,7 +13,7 @@ fn cl(v: &Vec[str]) -> Vec[str]:
     for i in 0..v.len() as i32:
         // D22: get observes; push stores an owned value — materialize
         // (`++ ""`; .clone() on a &str view is #762).
-        out.push(v.get(i as i64) ++ "")
+        out.push(v[i as i64] ++ "")
     out
 
 fn clone_big(r: &Big) -> Big:
@@ -31,4 +31,4 @@ fn main:
         results.push(consume(clone_big(&big)))
     else:
         results.push(0)
-    print_i32(results.get(0))
+    print_i32(results[0])

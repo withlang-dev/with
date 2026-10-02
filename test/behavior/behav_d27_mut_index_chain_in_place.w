@@ -15,9 +15,9 @@ fn main:
     items.push(Thing { vals: Vec.new() })
     items[0].vals.push(9)
     assert(items[0].vals.len() == 1)
-    assert(items[0].vals.get(0) == 9)
+    assert(items[0].vals[0] == 9)
 
     var owner = Owner { items: Vec.new() }
     owner.items.push(Thing { vals: Vec.new() })
     owner.push_into(10)
-    assert(owner.items[0].vals.get(0) == 10)
+    assert(owner.items[0].vals[0] == 10)

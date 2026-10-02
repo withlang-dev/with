@@ -15,8 +15,8 @@ fn one(value: i64) -> Vec[i64]:
 fn main:
     let option: Option[Vec[i64]] = Some(one(125))
     let from_option = option.unwrap()
-    assert(from_option.get(0) == 125)
+    assert(from_option[0] == 125)
 
     let result: Result[Vec[i64], str] = Ok(one(126))
     let from_result = result.unwrap()
-    assert(from_result.get(0) == 126)
+    assert(from_result[0] == 126)

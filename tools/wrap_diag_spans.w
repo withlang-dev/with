@@ -179,8 +179,8 @@ fn collect_sites(dlines: &Vec[str]) -> Vec[Site]:
             continue
         if (i as i64) + 3 >= dlines.len():
             break
-        let loc = dlines.get(i as i64 + 1)
-        let caret_line = dlines.get(i as i64 + 3)
+        let loc = dlines[i as i64 + 1]
+        let caret_line = dlines[i as i64 + 3]
         let caret_idx = i + 3
         i = i + 1
         if not loc.starts_with(" --> "):
@@ -189,9 +189,9 @@ fn collect_sites(dlines: &Vec[str]) -> Vec[Site]:
         let parts = loc_body.split(":")
         if parts.len() != 3:
             continue
-        let path = source_path(parts.get(0))
-        let line_no = parse_int(parts.get(1))
-        let col = parse_int(parts.get(2))
+        let path = source_path(parts[0])
+        let line_no = parse_int(parts[1])
+        let col = parse_int(parts[2])
         let span_len = count_carets(caret_line)
         if line_no <= 0 or col <= 0 or span_len <= 0:
             continue
@@ -250,8 +250,8 @@ fn plan_edits(path: &str, text: &str, sites: &Vec[Site], skips: &Vec[str]) -> Ed
         if site.line_no as i64 > offsets.len():
             print("skip-line-range " ++ tag)
             continue
-        let line_start = offsets.get(site.line_no as i64 - 1)
-        let line_len = flines.get(site.line_no as i64 - 1).len()
+        let line_start = offsets[site.line_no as i64 - 1]
+        let line_len = flines[site.line_no as i64 - 1].len()
         if site.col as i64 - 1 + site.span_len as i64 > line_len:
             print("skip-multiline " ++ tag ++ " kind=" ++ kind_name(site.kind))
             continue
@@ -343,9 +343,9 @@ fn apply_edits(text_in: str, plan: &EditPlan) -> str:
             order.slot(best as i64).set(tmp)
     for oi in 0..edit_count:
         let ei = order[oi] as i64
-        let s = plan.starts.get(ei)
-        let e = plan.ends.get(ei)
-        text = splice(text, s, e, plan.texts.get(ei))
+        let s = plan.starts[ei]
+        let e = plan.ends[ei]
+        text = splice(text, s, e, plan.texts[ei])
     text
 
 fn ensure_decl(path: &str, text_in: str) -> str:
@@ -412,7 +412,7 @@ fn main -> i32:
     var skip_path = ""
     var ai: i64 = 1
     while ai < argv.len():
-        let arg = argv.get(ai)
+        let arg = argv[ai]
         if arg == "--apply":
             apply = 1
         else if arg == "--finalize-existing":
@@ -422,9 +422,9 @@ fn main -> i32:
             if ai >= argv.len():
                 print("wrap-diag-spans: --skip needs a file argument")
                 return 1
-            skip_path = argv.get(ai) ++ ""
+            skip_path = argv[ai] ++ ""
         else:
-            diag_path = argv.get(ai) ++ ""
+            diag_path = argv[ai] ++ ""
         ai = ai + 1
     if diag_path.len() == 0:
         print("usage: wrap_diag_spans [--apply] [--skip skips.txt] diags.txt")

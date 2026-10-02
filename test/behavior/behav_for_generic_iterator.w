@@ -36,9 +36,9 @@ fn main:
     var it4 = Backwards { items: v3 }
     let doubled: Vec[i64] = [x * 2 for x in it4]
     assert(doubled.len() == 2)
-    assert(doubled.get(0) + doubled.get(1) == 6)
+    assert(doubled[0] + doubled[1] == 6)
     var v4: Vec[i32] = Vec.new()
     v4.push(10)
     let bumped: Vec[i32] = [x + 1 for x in v4.into_iter()]
-    assert(bumped.get(0) == 11)
+    assert(bumped[0] == 11)
     print("ok")

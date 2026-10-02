@@ -25,8 +25,8 @@ fn take_param(b: Body) -> Vec[i32]:
 fn main:
     let v1 = take_tail()
     assert(v1.len() == 2)
-    assert(v1.get(1) == 42)
+    assert(v1[1] == 42)
     let v2 = take_param(mk())
     assert(v2.len() == 2)
-    assert(v2.get(0) == 41)
+    assert(v2[0] == 41)
     print("ok")

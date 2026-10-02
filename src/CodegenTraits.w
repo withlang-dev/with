@@ -775,7 +775,7 @@ impl Codegen:
             let dtm_p_local = dtm_builder.body.new_local(dtm_p_sema_ty, 1, dtm_p_name, 1)
             dtm_builder.bind_local(dtm_p_name, dtm_p_local)
 
-        dtm_builder.expected_type = dtm_builder.body.local_type_ids.get(0)
+        dtm_builder.expected_type = dtm_builder.body.local_type_ids[0]
 
         // Default-method tails need the same temporary lifetime as ordinary
         // functions: capture the result, then release borrowed call operands.
@@ -821,7 +821,7 @@ impl Codegen:
 
         // Branch from entry to first MIR BB
         if self.mir_bb_values.len() as i32 > 0:
-            wl_build_br(self.builder, self.mir_bb_values.get(0))
+            wl_build_br(self.builder, self.mir_bb_values[0])
         else:
             let _ = wl_build_ret(self.builder, wl_const_int(final_ret_ty, 0, 0))
 
@@ -1718,7 +1718,7 @@ impl Codegen:
             self.mir_bb_values.push(llbb)
 
         if self.mir_bb_values.len() as i32 > 0:
-            wl_build_br(self.builder, self.mir_bb_values.get(0))
+            wl_build_br(self.builder, self.mir_bb_values[0])
         else:
             let _ = wl_build_ret(self.builder, wl_const_null(ret_ty))
 

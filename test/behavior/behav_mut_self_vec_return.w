@@ -30,8 +30,8 @@ fn main:
     t = t.add("hello")
     t = t.add("world")
     assert(t.items.len() == 2)
-    assert(t.items.get(0) == "hello")
-    assert(t.items.get(1) == "world")
+    assert(t.items[0] == "hello")
+    assert(t.items[1] == "world")
 
     var w = Wrapper { label: "scalar", value: 0 }
     w = w.set_value(42)

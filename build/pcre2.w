@@ -379,8 +379,8 @@ pub fn run_pcre2_migrate_smoke_action(ctx: ActionCtx) -> i32:
     let output_dir = ctx.output()
     if inputs.len() < 2 or output_dir.len() == 0:
         return pcre2_fail(ctx, "requires pcre2_compile.c input, source-dir input, and output directory")
-    let compile_c = inputs.get(0)
-    let source_dir = inputs.get(1)
+    let compile_c = inputs[0]
+    let source_dir = inputs[1]
     if not fs.exists(compile_c):
         return pcre2_fail(ctx, "missing pcre2_compile.c: " ++ compile_c)
     if not fs.is_dir(source_dir):
@@ -412,9 +412,9 @@ pub fn run_pcre2_test_smoke_action(ctx: ActionCtx) -> i32:
     let output_dir = ctx.output()
     if inputs.len() < 2 or args.len() == 0 or output_dir.len() == 0:
         return pcre2_fail(ctx, "requires pcre2test source, RunTest input, reference arg, and output directory")
-    let pcre2test_src = inputs.get(0)
-    let run_test_path = inputs.get(1)
-    let ref_dir = args.get(0)
+    let pcre2test_src = inputs[0]
+    let run_test_path = inputs[1]
+    let ref_dir = args[0]
     if not fs.exists(pcre2test_src):
         return pcre2_fail(ctx, "missing pcre2test source: " ++ pcre2test_src)
     if not fs.exists(run_test_path):
@@ -463,7 +463,7 @@ pub fn run_pcre2_build_action(ctx: ActionCtx) -> i32:
     let output_dir = ctx.output()
     if inputs.len() == 0 or output_dir.len() == 0:
         return pcre2_fail(ctx, "requires migrated-dir input and output directory")
-    let migrated_dir = inputs.get(0)
+    let migrated_dir = inputs[0]
     if not fs.is_dir(migrated_dir):
         return pcre2_fail(ctx, "missing migrated PCRE2 directory: " ++ migrated_dir ++ " - run pcre2-migrate deliberately")
     let scratch_dir = pcre2_scratch_dir(ctx)
@@ -516,9 +516,9 @@ pub fn run_pcre2_test_action(ctx: ActionCtx) -> i32:
     let output_dir = ctx.output()
     if inputs.len() < 3 or args.len() == 0 or output_dir.len() == 0:
         return pcre2_fail(ctx, "requires migrated-dir, pcre2test, RunTest inputs, reference arg, and output directory")
-    let pcre2test_path = inputs.get(1)
-    let run_test_path = inputs.get(2)
-    let ref_dir = args.get(0)
+    let pcre2test_path = inputs[1]
+    let run_test_path = inputs[2]
+    let ref_dir = args[0]
     if not fs.exists(pcre2test_path):
         return pcre2_fail(ctx, "missing pcre2test binary: " ++ pcre2test_path)
     if not fs.exists(run_test_path):

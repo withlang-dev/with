@@ -11,7 +11,7 @@ fn join_args(v: &Vec[str]) -> str:
     var out = ""
     for i in 0..v.len() as i32:
         if i > 0: out = out ++ " "
-        out = out ++ v.get(i as i64)
+        out = out ++ v[i as i64]
     out
 
 fn main:

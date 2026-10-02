@@ -24,5 +24,5 @@ fn main:
     let cloned: Vec[i64] = clone_out(&source)
     let fallback: Vec[i64] = Vec.new()
     let borrowed: &Vec[i64] = borrow_or(Some(&source), &fallback)
-    assert(cloned.get(0) == 116)
-    assert(borrowed.get(0) == 116)
+    assert(cloned[0] == 116)
+    assert(borrowed[0] == 116)

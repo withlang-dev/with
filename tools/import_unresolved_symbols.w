@@ -35,12 +35,12 @@ fn declared_name(line: &str) -> str:
     let body = if line.starts_with("pub "): line.slice(4, line.len()) else: line.clone()
     let words = body.split(" ")
     var i = 0
-    while i < words.len() and is_qualifier(words.get(i)): i = i + 1
-    if i >= words.len() or not is_decl_keyword(words.get(i)): return ""
+    while i < words.len() and is_qualifier(words[i]): i = i + 1
+    if i >= words.len() or not is_decl_keyword(words[i]): return ""
     i = i + 1
-    if i < words.len() and words.get(i) == "var": i = i + 1
+    if i < words.len() and words[i] == "var": i = i + 1
     if i >= words.len(): return ""
-    let word = words.get(i)
+    let word = words[i]
     var end = 0 as i64
     while end < word.len() and is_name_char(word[end]): end = end + 1
     if end == 0: return ""
@@ -50,14 +50,14 @@ fn declared_name(line: &str) -> str:
 fn quoted_after(line: &str, prefix: &str) -> str:
     let parts = line.split(prefix)
     if parts.len() < 2: return ""
-    let rest = parts.get(1)
+    let rest = parts[1]
     let close = rest.find("'")
     if close < 0: return ""
     rest.slice(0, close)
 
 fn vec_contains(v: &Vec[str], s: &str) -> bool:
     for i in 0..v.len():
-        if v.get(i) == s: return true
+        if v[i] == s: return true
     false
 
 fn source_files(dir: &str) -> Vec[str]:
@@ -85,7 +85,7 @@ fn ident_at(path: &str, nr: i32, col: i32) -> str:
     let text = read_file(path) ?? ""
     let lines = text.split("\n")
     if nr < 1 or nr > lines.len() as i32: return ""
-    let line = lines.get(nr - 1)
+    let line = lines[nr - 1]
     var start = (col - 1) as i64
     if start < 0 or start >= line.len(): return ""
     var end = start
@@ -115,11 +115,11 @@ var log_path = ""
 var roots: Vec[str] = Vec.new()
 var ai = 1
 while ai < argv.len():
-    let a = argv.get(ai)
+    let a = argv[ai]
     if a == "--apply": apply = true
     else if a == "--root" and ai + 1 < argv.len():
         ai = ai + 1
-        roots.push(argv.get(ai).clone())
+        roots.push(argv[ai].clone())
     else: log_path = a.clone()
     ai = ai + 1
 if log_path.len() == 0:
@@ -151,20 +151,20 @@ var seen_keys: Vec[str] = Vec.new()
 let log_lines = (read_file(log_path) ?? "").split("\n")
 var li = 0
 while li < log_lines.len() as i32:
-    let line = log_lines.get(li)
+    let line = log_lines[li]
     li = li + 1
     if not line.starts_with("error:"): continue
     // The location is the next ` --> path:line:col`.
     var loc = ""
-    if li < log_lines.len() as i32 and log_lines.get(li).starts_with(" --> "):
-        loc = log_lines.get(li).slice(5, log_lines.get(li).len())
+    if li < log_lines.len() as i32 and log_lines[li].starts_with(" --> "):
+        loc = log_lines[li].slice(5, log_lines[li].len())
     if loc.len() == 0: continue
     let parts = loc.split(":")
     if parts.len() < 3: continue
-    let file = source_path(parts.get(0))
+    let file = source_path(parts[0])
     let hint = quoted_after(line, "; add: use ")
     if line.contains("requires an explicit import (§18.1); add: use "):
-        let use_line = "use " ++ line.split("; add: use ").get(1).trim()
+        let use_line = "use " ++ line.split("; add: use ")[1].trim()
         let key = "use\t" ++ file ++ "\t" ++ use_line
         if not vec_contains(&seen_keys, key):
             seen_keys.push(key)
@@ -173,7 +173,7 @@ while li < log_lines.len() as i32:
         continue
     var name = ""
     if line.ends_with("undefined variable"):
-        name = ident_at(file, parse(parts.get(1)), parse(parts.get(2)))
+        name = ident_at(file, parse(parts[1]), parse(parts[2]))
     else if line.contains("unknown type '"):
         name = quoted_after(line, "unknown type '")
     else if line.contains("' is not visible from this module"):
@@ -183,13 +183,13 @@ while li < log_lines.len() as i32:
     var owner_pub = false
     var owners = 0
     for k in 0..decl_names.len():
-        if decl_names.get(k) == name:
-            if owner != decl_paths.get(k): owners = owners + 1
-            owner = decl_paths.get(k).clone()
-            owner_pub = decl_pub.get(k)
+        if decl_names[k] == name:
+            if owner != decl_paths[k]: owners = owners + 1
+            owner = decl_paths[k].clone()
+            owner_pub = decl_pub[k]
     if owners != 1 or owner == file:
         let why = if owners == 0: "no top-level owner" else: if owners > 1: "several owners" else: "declared in the referencing module"
-        let rep = f"{file}:{parts.get(1)}: '{name}': {why}"
+        let rep = f"{file}:{parts[1]}: '{name}': {why}"
         if not vec_contains(&reports, rep): reports.push(rep)
         continue
     let use_line = "use " ++ module_name(owner)
@@ -217,7 +217,7 @@ for owner in touched:
         let name = declared_name(line)
         if name.len() > 0 and not line.starts_with("pub "):
             for k in 0..pub_owners.len():
-                if pub_owners.get(k) == owner and pub_names.get(k) == name:
+                if pub_owners[k] == owner and pub_names[k] == name:
                     emitted = "pub " ++ line
                     published = published + 1
                     print(f"{owner}: pub {name}")
@@ -239,11 +239,11 @@ for file in files:
         if line.starts_with("use "): present.push(line.trim().clone())
     var added = ""
     for k in 0..import_files.len():
-        if import_files.get(k) == file and not vec_contains(&present, import_lines.get(k)):
-            added = added ++ import_lines.get(k) ++ "\n"
-            present.push(import_lines.get(k).clone())
+        if import_files[k] == file and not vec_contains(&present, import_lines[k]):
+            added = added ++ import_lines[k] ++ "\n"
+            present.push(import_lines[k].clone())
             imported = imported + 1
-            print(f"{file}: {import_lines.get(k)}")
+            print(f"{file}: {import_lines[k]}")
     if added.len() == 0: continue
     let at = header_insert_offset(text)
     let out = text.slice(0, at) ++ added ++ text.slice(at, text.len())

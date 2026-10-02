@@ -14,7 +14,7 @@ impl Drop for Holder:
         drop_count = drop_count + 1
         assert(self.v.len() == 0)
 
-fn consume(v: Vec[i32]): assert(v.get(0) == 7)
+fn consume(v: Vec[i32]): assert(v[0] == 7)
 
 fn scope_it:
     var xs: Vec[i32] = Vec.new()

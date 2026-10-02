@@ -958,7 +958,7 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, ci: &Vec[i32], item
         if keeps:
             // The retaining origin never outlives what it retains (§25):
             // the destroyer has run; now the retained values are released.
-            out = out ++ "        for facade_i in 0..self.retained_ptrs.len():\n            let facade_free = self.retained_frees.get(facade_i)\n            facade_free(self.retained_ptrs[facade_i])\n"
+            out = out ++ "        for facade_i in 0..self.retained_ptrs.len():\n            let facade_free = self.retained_frees[facade_i]\n            facade_free(self.retained_ptrs[facade_i])\n"
     if destroyers.len() > 0 or methods.len() > 0:
         out = out ++ "impl " ++ name ++ ":\n" ++ methods
         for di in 0..destroyers.len() as i32:

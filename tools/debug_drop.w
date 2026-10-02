@@ -90,11 +90,11 @@ fn main:
     if a.len() < 4:
         print("usage: debug_drop <run|check> <with-bin> <target.w> [more fixtures...]")
         exit_code(2)
-    let mode = a.get(1)
-    let with_bin = a.get(2)
+    let mode = a[1]
+    let with_bin = a[2]
 
     if mode == "run":
-        let repro = a.get(3)
+        let repro = a[3]
         let filter = line_after_prefix(read_file(repro), "debug-alloc-filter:")
         let (rc, report) = run_under_debug_alloc(with_bin, repro, filter)
         print("=== debug-alloc: " ++ repro ++ " (exit " ++ f"{rc}" ++ ") ===")
@@ -121,7 +121,7 @@ fn main:
         var failed: i64 = 0
         var i: i64 = 3
         while i < a.len():
-            let fx = a.get(i)
+            let fx = a[i]
             let want = line_after_prefix(read_file(fx), "expect-debug-alloc:")
             let filter = line_after_prefix(read_file(fx), "debug-alloc-filter:")
             print("START " ++ fx)

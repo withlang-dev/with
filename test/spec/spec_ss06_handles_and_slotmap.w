@@ -62,5 +62,5 @@ fn test_handles_in_containers:
     handles.push(h1)
     handles.push(h2)
     assert(handles.len() == 2)
-    assert(map.contains(handles.get(0)))
-    assert(map.contains(handles.get(1)))
+    assert(map.contains(handles[0]))
+    assert(map.contains(handles[1]))

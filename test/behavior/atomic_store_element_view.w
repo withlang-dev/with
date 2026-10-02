@@ -23,7 +23,7 @@ fn main:
     order.push(10)
     a.store(order[2], .SeqCst)
     print(f"a={a.load(.SeqCst)}")
-    a.store(order.get(1), .SeqCst)
+    a.store(order[1], .SeqCst)
     print(f"a={a.load(.SeqCst)}")
     let b: Atomic[i32] = Atomic.new(0)
     b.store(order[2], .SeqCst)

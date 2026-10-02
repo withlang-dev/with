@@ -22,4 +22,4 @@ fn main:
     let cloned: Option[Vec[i64]] = jobs.get(1).cloned()
     jobs.clear()
     let owned = cloned.unwrap()
-    assert(owned.get(0) == 62)
+    assert(owned[0] == 62)

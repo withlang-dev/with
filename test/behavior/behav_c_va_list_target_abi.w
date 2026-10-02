@@ -4,8 +4,8 @@ use pre_d_build_runner
 
 fn va_ir_body(ir: &str, name: &str) -> str:
     for section in ir.split("define "):
-        if section.split("\n").get(0).contains("@" ++ name ++ "("):
-            return section.split("\n}").get(0).to_owned()
+        if section.split("\n")[0].contains("@" ++ name ++ "("):
+            return section.split("\n}")[0].to_owned()
     ""
 
 fn main:

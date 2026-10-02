@@ -64,7 +64,7 @@ fn liveness_lookup(tsv: &str, key: &str) -> str:
             if line.starts_with(key ++ "\t"):
                 let cols = line.split("\t")
                 if cols.len() >= 5:
-                    return cols.get(4).clone()
+                    return cols[4].clone()
             line_start = i + 1
         i = i + 1
     ""
@@ -111,17 +111,17 @@ fn collect_sites_from_tsv(tsv: &str) -> Vec[OwnershipSite]:
             line_start = i + 1
             if line.contains("\t") and not line.starts_with("file:"):
                 let cols = line.split("\t")
-                if cols.len() >= 5 and cols.get(4) == "last-use":
-                    let loc = cols.get(0).split(":")
+                if cols.len() >= 5 and cols[4] == "last-use":
+                    let loc = cols[0].split(":")
                     if loc.len() >= 3:
-                        let path = loc.get(0).clone()
+                        let path = loc[0].clone()
                         let text = read_file(path).unwrap_or("".clone())
                         if text.len() == 0:
                             print("migrate-method-arg-moves: cannot read " ++ path)
                             exit_code(1)
-                        let offset = line_col_offset(text, bcm_parse_i64(loc.get(1)), bcm_parse_i64(loc.get(2)))
+                        let offset = line_col_offset(text, bcm_parse_i64(loc[1]), bcm_parse_i64(loc[2]))
                         if offset < 0:
-                            print("migrate-method-arg-moves: bad tsv location " ++ cols.get(0))
+                            print("migrate-method-arg-moves: bad tsv location " ++ cols[0])
                             exit_code(1)
                         sites.push(OwnershipSite { path, offset })
         i = i + 1

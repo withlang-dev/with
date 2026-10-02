@@ -7,7 +7,7 @@
 
 type P { data: Vec[i32] }
 
-fn head(p: &P): *p.data.get(0)
+fn head(p: &P): *p.data[0]
 
 fn mk(n: i32) -> P:
     var d: Vec[i32] = Vec.new()
@@ -26,14 +26,14 @@ fn main:
     assert(sink.len() == 3)
     var total = 0
     for p in sink:
-        total = total + p.data.get(0)
+        total = total + p.data[0]
     assert(total == 6)
 
     // borrow default unchanged: source intact after the implicit form
     var ys: Vec[P] = Vec.new()
     ys.push(mk(7))
     for p in ys:
-        assert(p.data.get(0) == 7)
+        assert(p.data[0] == 7)
     assert(ys.len() == 1)
 
     // empty source: zero iterations

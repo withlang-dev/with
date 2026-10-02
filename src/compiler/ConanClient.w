@@ -704,11 +704,11 @@ fn conan_recipe_eval_condition(cond_raw: &str, target_os: &str) -> i32:
     if conan_find_text(cond, "!=") >= 0:
         if quoted.len() as i32 != 1:
             return -1
-        return if quoted.get(0) == target_os: 0 else: 1
+        return if quoted[0] == target_os: 0 else: 1
     if conan_find_text(cond, "==") >= 0:
         if quoted.len() as i32 != 1:
             return -1
-        return if quoted.get(0) == target_os: 1 else: 0
+        return if quoted[0] == target_os: 1 else: 0
     -1
 
 // Pull the string values out of an attribute line:
@@ -780,13 +780,13 @@ pub fn conan_extract_recipe_link_metadata(recipe: &str, target_os: &str) -> Cona
         var prev_chain_unknown = false
         while frame_indent.len() > 0:
             let top = frame_indent.len() - 1
-            let top_indent = frame_indent.get(top)
+            let top_indent = frame_indent[top]
             if top_indent < indent as i64:
                 break
             if top_indent == indent as i64:
                 popped_same_indent = true
-                prev_chain_taken = frame_chain_taken.get(top) != 0
-                prev_chain_unknown = frame_chain_unknown.get(top) != 0
+                prev_chain_taken = frame_chain_taken[top] != 0
+                prev_chain_unknown = frame_chain_unknown[top] != 0
             let _a = frame_indent.pop()
             let _b = frame_active.pop()
             let _c = frame_unknown.pop()

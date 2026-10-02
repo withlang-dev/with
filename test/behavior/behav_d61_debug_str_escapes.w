@@ -82,8 +82,8 @@ fn main:
     assert(all.len() == 33 and want.len() == 33)
     var joined = ""
     for i in 0..all.len():
-        let s = all.get(i)
-        let esc = want.get(i)
+        let s = all[i]
+        let esc = want[i]
         check(f"{s:?}", f"\"{esc}\"")
         joined = joined ++ (if i > 0: ", " else: "") ++ f"\"{esc}\""
     // Depth 1: the same strings as Vec elements.

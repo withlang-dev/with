@@ -65,7 +65,7 @@ fn runtime_producer_target(name: &str, compiler: &str, dir: &str, object_targets
 
 fn run_cross_unsupported_action(ctx: ActionCtx) -> i32:
     let args = ctx.args()
-    let target = if args.len() > 0: build_owned_text(args.get(0)) else: ""
+    let target = if args.len() > 0: build_owned_text(args[0]) else: ""
     if target.len() == 0:
         ctx.diagnostics().error("cross: cross-target compilation is not implemented yet; set CROSS_TARGET=<triple> or use `with build --target <triple>` for the compiler diagnostic")
     else:
@@ -420,7 +420,7 @@ fn add_stage1_runtime_targets(out0: Build, host_runtime: &HostRuntimeSpec, corpu
 fn run_cross_linux_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let args = ctx.args()
-    let tag = if args.len() > 0: build_owned_text(args.get(0)) else: "linux_x86_64"
+    let tag = if args.len() > 0: build_owned_text(args[0]) else: "linux_x86_64"
     let output_path = ctx.output()
     let lib_dir = cross_llvm_prefix(tag) ++ "/lib"
     let libclang = lib_dir ++ "/libclang.a"
@@ -1592,9 +1592,9 @@ fn issue61_regression_action(ctx: ActionCtx) -> i32:
         return 0
 
     let root = ctx.project_info().project_root()
-    let compiler_path = build_project_abs(root, inputs.get(0))
-    if not fs.exists(inputs.get(0)):
-        return issue61_fail(ctx, "missing compiler: " ++ inputs.get(0))
+    let compiler_path = build_project_abs(root, inputs[0])
+    if not fs.exists(inputs[0]):
+        return issue61_fail(ctx, "missing compiler: " ++ inputs[0])
 
     let repo_copy = build_project_join(output_dir, "repo")
     if fs.exists(repo_copy) and fs.remove_tree(repo_copy) != 0:
@@ -1686,7 +1686,7 @@ fn invariance_variant_action(ctx: ActionCtx) -> i32:
     let args = ctx.args()
     if args.len() == 0:
         return invariance_fail(ctx, "missing variant label argument")
-    let label = args.get(0)
+    let label = args[0]
     var file = ""
     var payload = ""
     if label == "comment-sema":
@@ -1724,9 +1724,9 @@ fn invariance_variant_action(ctx: ActionCtx) -> i32:
         let _ = fs.write_text(build_project_join(output_dir, ".stamp"), "ok")
         return 0
     let root = ctx.project_info().project_root()
-    let compiler_path = build_project_abs(root, inputs.get(0))
-    if not fs.exists(inputs.get(0)):
-        return invariance_fail(ctx, "missing compiler: " ++ inputs.get(0))
+    let compiler_path = build_project_abs(root, inputs[0])
+    if not fs.exists(inputs[0]):
+        return invariance_fail(ctx, "missing compiler: " ++ inputs[0])
 
     let repo_copy = build_project_join(output_dir, "repo")
     if fs.exists(repo_copy) and fs.remove_tree(repo_copy) != 0:
@@ -1771,7 +1771,7 @@ fn run_debug_alloc_tests_action(ctx: ActionCtx) -> i32:
         let _ = fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
         return 0
     let root = ctx.project_info().project_root()
-    let compiler = build_project_abs(root, inputs.get(0))
+    let compiler = build_project_abs(root, inputs[0])
     let driver_bin = build_project_abs(root, build_project_join(out_dir, "debug_drop"))
 
     var build_args: Vec[str] = Vec.new()
@@ -1901,7 +1901,7 @@ fn run_uat_tests_action(ctx: ActionCtx) -> i32:
     if fs.copy_tree("test/uat/uat", build_project_join(out_dir, "uat")) != 0:
         ctx.diagnostics().error("uat-tests: could not copy test/uat/uat")
     let root = ctx.project_info().project_root()
-    let compiler = build_project_abs(root, inputs.get(0))
+    let compiler = build_project_abs(root, inputs[0])
     var errors = 0
     let (rc, report) = uat_tests_run(ctx, root, compiler, out_dir, "report.stdout", false)
     if rc != 1:
@@ -1940,7 +1940,7 @@ fn run_release_uat_action(ctx: ActionCtx) -> i32:
     if fs.mkdir_all(out_dir) != 0:
         ctx.diagnostics().error("release-uat: could not create output dir: " ++ out_dir)
     let root = ctx.project_info().project_root()
-    let compiler = build_project_abs(root, inputs.get(0))
+    let compiler = build_project_abs(root, inputs[0])
     let args: Vec[str] = Vec.new()
     args.push(compiler.clone())
     args.push("uat")
@@ -1985,7 +1985,7 @@ fn run_contract_view_tests_action(ctx: ActionCtx) -> i32:
     if fs.mkdir_all(out_dir) != 0:
         ctx.diagnostics().error("contract-view-tests: could not create output dir: " ++ out_dir)
     let root = ctx.project_info().project_root()
-    let compiler = build_project_abs(root, inputs.get(0))
+    let compiler = build_project_abs(root, inputs[0])
     let fixtures = fs.list_files("test/contract")
     var checked = 0
     var errors = 0
@@ -2050,7 +2050,7 @@ fn run_drop_audit_action(ctx: ActionCtx) -> i32:
     if fs.mkdir_all(out_dir) != 0:
         ctx.diagnostics().error("drop-audit: could not create output dir: " ++ out_dir)
     let root = ctx.project_info().project_root()
-    let candidate = build_project_abs(root, ctx.inputs().get(0))
+    let candidate = build_project_abs(root, ctx.inputs()[0])
     let baseline = build_project_abs(root, "src/main")
     var args: Vec[str] = Vec.new()
     args.push(build_owned_text(candidate))
@@ -2092,10 +2092,10 @@ fn run_unit_return_review_action(ctx: ActionCtx) -> i32:
     if untracked.rc != 0 or untracked.stdout.trim().len() > 0:
         ctx.diagnostics().error("unit-return-review: stage new source files so they are included in the review diff\n" ++ untracked.stdout ++ untracked.stderr)
     var args: Vec[str] = Vec.new()
-    args.push(build_project_abs(root, ctx.inputs().get(0)))
+    args.push(build_project_abs(root, ctx.inputs()[0]))
     args.push("run")
     args.push("tools/unit_return_review.w")
-    args.push(ctx.args().get(0) ++ "")
+    args.push(ctx.args()[0] ++ "")
     let stdout_rel = build_project_join(out_dir, "review.stdout")
     let stderr_rel = build_project_join(out_dir, "review.stderr")
     let result = ctx.process_runner().run_capture_cwd(args, build_project_abs(root, stdout_rel), build_project_abs(root, stderr_rel), 600000, root)
@@ -2110,7 +2110,7 @@ fn run_rt_decl_audit_action(ctx: ActionCtx) -> i32:
     if fs.mkdir_all(out_dir) != 0:
         ctx.diagnostics().error("rt-decl-audit: could not create output dir: " ++ out_dir)
     let root = ctx.project_info().project_root()
-    let compiler = build_project_abs(root, ctx.inputs().get(0))
+    let compiler = build_project_abs(root, ctx.inputs()[0])
     var args: Vec[str] = Vec.new()
     args.push(build_owned_text(compiler))
     args.push("run")
@@ -2140,7 +2140,7 @@ fn run_move_audit_action(ctx: ActionCtx) -> i32:
     if fs.mkdir_all(out_dir) != 0:
         ctx.diagnostics().error("move-audit: could not create output dir: " ++ out_dir)
     let root = ctx.project_info().project_root()
-    let candidate = build_project_abs(root, ctx.inputs().get(0))
+    let candidate = build_project_abs(root, ctx.inputs()[0])
     let baseline = build_project_abs(root, "src/main")
     var args: Vec[str] = Vec.new()
     args.push(build_owned_text(candidate))
@@ -2330,7 +2330,7 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
     if fs.mkdir_all(out_dir) != 0:
         ctx.diagnostics().error("deep-debug-tool-tests: could not create output dir: " ++ out_dir)
     let root = ctx.project_info().project_root()
-    let compiler = build_project_abs(root, inputs.get(0))
+    let compiler = build_project_abs(root, inputs[0])
     let reduce_input = build_project_join(out_dir, "reduce-input.w")
     let reduce_output = build_project_join(out_dir, "reduce-output.w")
     let reduce_source =

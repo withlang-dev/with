@@ -5,7 +5,7 @@
 
 type Holder { v: Vec[i32], n: i32 }
 
-fn consume(v: Vec[i32]): assert(v.get(0) == 7)
+fn consume(v: Vec[i32]): assert(v[0] == 7)
 
 impl Holder:
     mut fn take_it(): consume(move self.v)

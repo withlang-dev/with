@@ -6,9 +6,9 @@ fn main:
     values.push(20)
     values.push(30)
 
-    let before: i32 = values.get(1)
+    let before: i32 = values[1]
     values[1] = before + 1
 
     assert(before == 20)
-    assert(values.get(1) == 21)
+    assert(values[1] == 21)
     print("ok")

@@ -23,8 +23,8 @@ fn test_unit_call_tail_returns_builder:
         v.push(2)
         v.push(3)
     assert(v.len() == 3)
-    assert(v.get(0) == 1)
-    assert(v.get(2) == 3)
+    assert(v[0] == 1)
+    assert(v[2] == 3)
 
 fn test_non_unit_tail_returns_builder:
     let v = with Vec.new() as mut v:
@@ -32,8 +32,8 @@ fn test_non_unit_tail_returns_builder:
         v.push(2)
         v.len()
     assert(v.len() == 2)
-    assert(v.get(0) == 1)
-    assert(v.get(1) == 2)
+    assert(v[0] == 1)
+    assert(v[1] == 2)
 
 fn test_non_unit_hashmap_tail_returns_builder:
     let m = with HashMap[str, i32].new() as mut m:

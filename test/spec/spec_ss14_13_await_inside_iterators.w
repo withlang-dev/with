@@ -16,9 +16,9 @@ fn numbers -> Vec[i32]:
 fn test_await_inside_map:
     let doubled = numbers().map(n => double(n).await)
     assert(doubled.len() == 3)
-    assert(doubled.get(0) == 2)
-    assert(doubled.get(1) == 4)
-    assert(doubled.get(2) == 6)
+    assert(doubled[0] == 2)
+    assert(doubled[1] == 4)
+    assert(doubled[2] == 6)
 
 fn test_await_inside_fold:
     let total = numbers().fold(0, (sum, id) => sum + count_for(id).await)

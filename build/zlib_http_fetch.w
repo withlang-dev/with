@@ -74,12 +74,12 @@ fn main -> i32:
     if argv.len() < 3:
         print("usage: zlib_http_fetch <url> <output>")
         return 2
-    match http_get_body(argv.get(1)):
+    match http_get_body(argv[1]):
         Ok(body) => {
             if body.len() == 0:
                 print("HTTP response body was empty")
                 return 1
-            if write_file(argv.get(2), body) != 0:
+            if write_file(argv[2], body) != 0:
                 print("could not write output archive")
                 return 1
         }

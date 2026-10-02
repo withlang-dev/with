@@ -15,7 +15,7 @@ use std.collections.{BTreeMap}
 type Stack[T] { items: Vec[T] }
 impl[T] Stack[T]:
     fn count() -> i32: self.items.len() as i32
-    fn first() -> &T: self.items.get(0)
+    fn first() -> &T: self.items[0]
 
 type Tally[K, V] { seen: BTreeMap[K, V], total: i64 }
 impl[K, V] Tally[K, V]:
@@ -25,7 +25,7 @@ fn count_all[T](xs: Vec[T]) -> i64: xs.len()
 
 fn main:
     let st = Stack { items: ["p".clone(), "q".clone()] }
-    print(f"{st.count()} {st.first()}{st.items.get(1)}")
+    print(f"{st.count()} {st.first()}{st.items[1]}")
     let nums = Stack { items: [1, 2, 3] }
     var sum = 0
     for n in nums.items: sum = sum + n

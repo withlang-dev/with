@@ -840,8 +840,8 @@ fn main:
     if argv.len() < 2:
         eprint("usage: with run tools/drop_audit.w <candidate-with> [baseline-with]")
         exit_code(2)
-    let candidate = argv.get(1)
-    let baseline = if argv.len() >= 3: argv.get(2) ++ "" else: ""
+    let candidate = argv[1]
+    let baseline = if argv.len() >= 3: argv[2] ++ "" else: ""
     // Keep both sides' diagnostics; the baseline must not overwrite the
     // failing candidate's stderr. A separate directory per run also keeps
     // concurrent invocations from replacing one another's probes.

@@ -11,10 +11,10 @@ fn test_vec_split_at_mut:
     left.set(1, 12)
     right.set(0, 13)
     right.set(1, 14)
-    assert(xs.get(0) == 11)
-    assert(xs.get(1) == 12)
-    assert(xs.get(2) == 13)
-    assert(xs.get(3) == 14)
+    assert(xs[0] == 11)
+    assert(xs[1] == 12)
+    assert(xs[2] == 13)
+    assert(xs[3] == 14)
 
 fn test_array_split_at_mut:
     var xs = [5, 6, 7, 8]
@@ -49,10 +49,10 @@ fn test_range_split_at_mut:
         let (left, right) = middle.split_at_mut(1)
         left.set(0, 201)
         right.set(1, 401)
-    assert(xs.get(0) == 100)
-    assert(xs.get(1) == 201)
-    assert(xs.get(2) == 300)
-    assert(xs.get(3) == 401)
+    assert(xs[0] == 100)
+    assert(xs[1] == 201)
+    assert(xs[2] == 300)
+    assert(xs[3] == 401)
 
 fn main:
     test_vec_split_at_mut()

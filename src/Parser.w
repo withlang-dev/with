@@ -391,11 +391,11 @@ impl Parser:
         if self.top_level_stmts.len() as i32 == 0:
             return
         if self.explicit_main_decl != 0:
-            self.emit_explicit_main_conflict(self.top_level_stmts.get(0) as NodeId)
+            self.emit_explicit_main_conflict(self.top_level_stmts[0] as NodeId)
             return
         let main_sym = self.intern.intern("main")
         let stmt_count = self.top_level_stmts.len() as i32
-        let first_stmt = self.top_level_stmts.get(0) as NodeId
+        let first_stmt = self.top_level_stmts[0] as NodeId
         let last_stmt = self.top_level_stmts[(stmt_count - 1)] as NodeId
         let extra_start = self.pool.extra_len()
         for i in 0..stmt_count - 1:
@@ -7619,7 +7619,7 @@ impl Parser:
             let extra_start = self.pool.extra_len()
             let count = tuple_patterns.len() as i32
             if count == 1 and not saw_comma:
-                return tuple_patterns.get(0) as NodeId
+                return tuple_patterns[0] as NodeId
             for ti in 0..count:
                 self.pool.add_extra(tuple_patterns[ti])
             return self.pool.add_node(NodeKind.NK_PAT_TUPLE, start, self.prev_end(), extra_start, count, 0)
@@ -8008,7 +8008,7 @@ impl Parser:
         for i in 0..stmts.len() as i32:
             self.pool.add_extra(stmts[i])
         let stmt_count = stmts.len() as i32
-        let first = if stmt_count > 0: stmts.get(0) else: last_expr as i32
+        let first = if stmt_count > 0: stmts[0] else: last_expr as i32
         self.pool.add_node(NodeKind.NK_BLOCK, self.pool.get_start(first), self.pool.get_end(last_expr), extra_start, stmt_count, last_expr)
 
     // A statement whose effect belongs to its enclosing scope: a binding
@@ -8471,7 +8471,7 @@ impl Parser:
             self.pool.add_extra(stmts[i])
 
         let stmt_count = stmts.len() as i32
-        let blk_node = self.pool.add_node(NodeKind.NK_BLOCK, self.pool.get_start(stmts.get(0)), self.pool.get_end(last_expr), extra_start, stmt_count, last_expr)
+        let blk_node = self.pool.add_node(NodeKind.NK_BLOCK, self.pool.get_start(stmts[0]), self.pool.get_end(last_expr), extra_start, stmt_count, last_expr)
         blk_node
 
     mut fn parse_braced_body() -> NodeId:
@@ -8515,7 +8515,7 @@ impl Parser:
         for i in 0..stmts.len() as i32:
             self.pool.add_extra(stmts[i])
         let stmt_count = stmts.len() as i32
-        self.pool.add_node(NodeKind.NK_BLOCK, self.pool.get_start(stmts.get(0)), self.pool.get_end(last_expr), extra_start, stmt_count, last_expr)
+        self.pool.add_node(NodeKind.NK_BLOCK, self.pool.get_start(stmts[0]), self.pool.get_end(last_expr), extra_start, stmt_count, last_expr)
 
     // ── Type expression parsing ──────────────────────────────────────
 

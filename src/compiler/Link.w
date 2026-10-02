@@ -2073,7 +2073,7 @@ pub fn link_stage_link_object_to_binary_plan_with_units(obj_path: &str, extra_ob
     // objects carry every such reference: a facade (std.regex) compiles in
     // the unit and calls the corpus by its module link names.
     let bundle_objects = link_stage_select_embedded_bundles(undef)
-    if bundle_objects.len() == 1 and bundle_objects.get(0) == LINK_BUNDLE_FAILED():
+    if bundle_objects.len() == 1 and bundle_objects[0] == LINK_BUNDLE_FAILED():
         return link_stage_plan_fail()
     for boi in 0..bundle_objects.len() as i32:
         extras.push(with_str_clone_ref(bundle_objects[boi]))

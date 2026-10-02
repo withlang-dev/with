@@ -132,9 +132,9 @@ fn main:
     assert(record.value == 120)
     assert(tuple.0 == 120)
     assert(array[0] == 120)
-    assert(collection.get(0) == 120)
-    assert(direct_collection.get(0) == 120)
-    assert(comprehended.get(0) == 120)
+    assert(collection[0] == 120)
+    assert(direct_collection[0] == 120)
+    assert(comprehended[0] == 120)
     assert(comprehended_map.get(120).unwrap() == 120)
     match wrapped:
         Value(inner) => assert(inner == 120)

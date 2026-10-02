@@ -17,7 +17,7 @@ fn main:
     let q = p + 1
     print(q)
     print(f(3000000000))
-    let r: i64 = v.get(0) + 1
+    let r: i64 = v[0] + 1
     print(r)
     print(p * 2)
     let k: i32 = 1

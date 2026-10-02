@@ -34,7 +34,7 @@ fn build_graph_read_input(what: &str, path: &str) -> Option[str]:
 pub fn build_graph_compare_files(root: &str, target: &BuildGraphTarget, operation_name: &str) -> i32:
     let left_path = build_graph_target_input_path(root, target, 0)
     let right_path = if target.args.len() > 0:
-        build_graph_resolve_project_path(root, target.args.get(0))
+        build_graph_resolve_project_path(root, target.args[0])
     else:
         build_graph_target_input_path(root, target, 1)
     if left_path.len() == 0 or right_path.len() == 0:
@@ -175,7 +175,7 @@ pub fn build_graph_assemble_to_object(root: &str, target: &BuildGraphTarget) -> 
     // instead of the host (cross-target runtime objects).
     var asm_triple = ""
     if target.args.len() > 0:
-        let arg0 = target.args.get(0)
+        let arg0 = target.args[0]
         if arg0.starts_with("triple="):
             asm_triple = arg0.slice(7, arg0.len())
     let rc = if asm_triple.len() > 0:
@@ -600,9 +600,9 @@ pub fn build_graph_copy_file(root: &str, target: &BuildGraphTarget) -> i32:
     let arg_rc = build_graph_validate_process_args(target)
     if arg_rc != 0:
         return arg_rc
-    let mode = if target.args.len() == 0: -1 else: build_graph_parse_octal_mode(target.args.get(0))
+    let mode = if target.args.len() == 0: -1 else: build_graph_parse_octal_mode(target.args[0])
     if target.args.len() > 0 and mode < 0:
-        build_graph_rt_eprint("error: copy_file target '" ++ target.name ++ "' has invalid octal mode: " ++ target.args.get(0))
+        build_graph_rt_eprint("error: copy_file target '" ++ target.name ++ "' has invalid octal mode: " ++ target.args[0])
         return 1
     let source_path = build_graph_resolve_project_path(root, target.entry)
     let dest_path = build_graph_resolve_project_path(root, target.output)
@@ -625,10 +625,10 @@ pub fn build_graph_install_file(root: &str, target: &BuildGraphTarget) -> i32:
         return 1
     // args: [mode] [verify=<subcommand>] — the second runs `<dest> <subcommand>`
     // after the rename and proves the installed executable starts.
-    if target.args.len() > 2 or (target.args.len() == 2 and not target.args.get(1).starts_with("verify=")):
+    if target.args.len() > 2 or (target.args.len() == 2 and not target.args[1].starts_with("verify=")):
         build_graph_rt_eprint("error: install target '" ++ target.name ++ "' accepts a mode and an optional verify=<subcommand>")
         return 1
-    let verify_subcommand = if target.args.len() == 2: target.args.get(1).slice("verify=".len(), target.args.get(1).len()) else: ""
+    let verify_subcommand = if target.args.len() == 2: target.args[1].slice("verify=".len(), target.args[1].len()) else: ""
     let arg_rc = build_graph_validate_process_args(target)
     if arg_rc != 0:
         return arg_rc
@@ -640,9 +640,9 @@ pub fn build_graph_install_file(root: &str, target: &BuildGraphTarget) -> i32:
     if dest_path.len() == 0 or dest_path == target.output and dest_path.starts_with("$HOME/"):
         build_graph_rt_eprint("error: install target '" ++ target.name ++ "' could not resolve destination: " ++ target.output)
         return 1
-    let mode = if target.args.len() == 0: 0o644 else: build_graph_parse_octal_mode(target.args.get(0))
+    let mode = if target.args.len() == 0: 0o644 else: build_graph_parse_octal_mode(target.args[0])
     if mode < 0:
-        build_graph_rt_eprint("error: install target '" ++ target.name ++ "' has invalid octal mode: " ++ target.args.get(0))
+        build_graph_rt_eprint("error: install target '" ++ target.name ++ "' has invalid octal mode: " ++ target.args[0])
         return 1
     let what = "install target '" ++ target.name ++ "'"
     let contents = build_graph_read_input(what, source_path) ?? return 1

@@ -2,5 +2,5 @@
 
 fn main:
     let line = "x\tdocs"
-    let path = line.split("\t").get(1)
+    let path = line.split("\t")[1]
     print(path)

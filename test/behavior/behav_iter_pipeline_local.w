@@ -29,6 +29,6 @@ fn main:
     assert(sum_iter(make_iter(&xs)) == 10)
     let evens = make_filtered(&xs) |> collect[Vec]()
     assert(evens.len() == 2)
-    assert(evens.get(0) == 2)
-    assert(evens.get(1) == 4)
+    assert(evens[0] == 2)
+    assert(evens[1] == 4)
     print("ok")

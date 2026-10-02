@@ -21,5 +21,5 @@ fn main:
     v.push(0)
     v.push(0)
     assert(fill_then_read(v) == 4)
-    assert(v.get(1) == 4)
+    assert(v[1] == 4)
     print("ok")

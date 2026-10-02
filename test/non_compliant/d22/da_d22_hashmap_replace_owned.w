@@ -18,7 +18,7 @@ fn main:
     var values_by_id: HashMap[i32, Vec[i64]] = HashMap.new()
     values_by_id.insert(1, values(1))
     values_by_id.insert(1, values(2))
-    assert(values_by_id.get(1).unwrap().get(0) == 2)
+    assert(values_by_id.get(1).unwrap()[0] == 2)
 
     var counts: HashMap[str, i32] = HashMap.new()
     let first = "owned" ++ "-key"

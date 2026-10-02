@@ -14,8 +14,8 @@ fn main -> i32:
     if argv.len() < 3:
         print("usage: https_fetch <url> <output>")
         return 2
-    let url = argv.get(1) ++ ""
-    let output = argv.get(2) ++ ""
+    let url = argv[1] ++ ""
+    let output = argv[2] ++ ""
     for attempt in 1..ATTEMPTS + 1:
         if https_download(url.clone(), output.clone()) == 0: return 0
         if attempt < ATTEMPTS:

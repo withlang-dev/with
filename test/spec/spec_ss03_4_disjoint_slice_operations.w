@@ -14,9 +14,9 @@ fn test_get_disjoint_mutates_distinct_elements:
     with xs.get_disjoint(0, 2) as mut (left, right):
         left.set(10)
         right.set(30)
-    assert(xs.get(0) == 10)
-    assert(xs.get(1) == 2)
-    assert(xs.get(2) == 30)
+    assert(xs[0] == 10)
+    assert(xs[1] == 2)
+    assert(xs[2] == 30)
 
 fn test_get_disjoint_read_only_slots:
     var xs = filled_vec()

@@ -258,7 +258,7 @@ pub fn driver_link_bundle_args(argc: i32) -> Vec[str]:
 
 fn driver_first_flag_value(argc: i32, flag: &str) -> str:
     let values = driver_flag_values(argc, flag)
-    if values.len() == 0: "" else: with_str_clone_ref(values.get(0))
+    if values.len() == 0: "" else: with_str_clone_ref(values[0])
 
 // D39: `--bundle-corpus <rel>` and `--bundle-fingerprint <path>` — the
 // fingerprint pass runs on a source root and on an emitted .wi root through
@@ -528,7 +528,7 @@ pub fn parse_build_command_options(argc: i32) -> BuildCommandParseResult:
                 build,
                 graph,
             }
-        build.bundle_manifest_path = with_str_clone_ref(manifest_paths.get(0))
+        build.bundle_manifest_path = with_str_clone_ref(manifest_paths[0])
     build.bundle_interface_path = driver_first_flag_value(argc, "--emit-bundle-interface")
     build.bundle_fingerprint_path = driver_bundle_fingerprint_arg(argc)
     build.bundle_corpus = driver_bundle_corpus_arg(argc)

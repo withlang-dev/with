@@ -35,7 +35,7 @@ fn FndInternStringArena.store(mut self: FndInternStringArena, s: &str) -> str:
         let page = with_alloc(page_size)
         self.pages.push(page)
         self.offset = 0
-    let page = self.pages.get(self.pages.len() - 1)
+    let page = self.pages[self.pages.len() - 1]
     let dest = (page as i64 + self.offset) as *mut u8
     with_memcpy(dest, src, len)
     unsafe *((dest as i64 + len) as *mut u8) = 0

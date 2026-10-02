@@ -239,11 +239,11 @@ pub fn parse_build_graph(text: &str) -> BuildGraph:
     if lines.len() == 0:
         graph.error_msg = "build.w produced an empty build graph"
         return graph
-    let header = build_graph_split_fields(lines.get(0))
-    if header.len() != 2 or header.get(0) != "WITH_BUILD_GRAPH" or (header.get(1) != "1" and header.get(1) != "2"):
+    let header = build_graph_split_fields(lines[0])
+    if header.len() != 2 or header[0] != "WITH_BUILD_GRAPH" or (header[1] != "1" and header[1] != "2"):
         graph.error_msg = "build.w produced an invalid build graph header"
         return graph
-    let graph_version = build_graph_parse_i32(header.get(1))
+    let graph_version = build_graph_parse_i32(header[1])
 
     var has_current = false
     var current = build_graph_target_new(0, "", "", 0, 0, "")
@@ -253,36 +253,36 @@ pub fn parse_build_graph(text: &str) -> BuildGraph:
         if fields.len() == 0:
             i = i + 1
             continue
-        let tag = fields.get(0)
+        let tag = fields[0]
         if tag == "package":
             if fields.len() != 3:
                 graph.error_msg = "invalid package line in build graph"
                 return graph
-            graph.package_name = with_str_clone_ref(fields.get(1))
-            graph.package_version = with_str_clone_ref(fields.get(2))
+            graph.package_name = with_str_clone_ref(fields[1])
+            graph.package_version = with_str_clone_ref(fields[2])
         else if tag == "default_target":
             if fields.len() != 2:
                 graph.error_msg = "invalid default_target line in build graph"
                 return graph
-            graph.default_target = with_str_clone_ref(fields.get(1))
+            graph.default_target = with_str_clone_ref(fields[1])
         else if tag == "generated_source":
             if fields.len() != 3:
                 graph.error_msg = "invalid generated_source line in build graph"
                 return graph
-            graph.generated_sources.push(build_graph_generated_source_new(fields.get(1), fields.get(2)))
+            graph.generated_sources.push(build_graph_generated_source_new(fields[1], fields[2]))
         else if tag == "target":
             if (graph_version == 1 and fields.len() != 6) or (graph_version == 2 and fields.len() != 7):
                 graph.error_msg = "invalid target line in build graph"
                 return graph
             if has_current:
                 graph.targets.push(move current)
-            let output = if graph_version == 2: with_str_clone_ref(fields.get(6)) else: ""
+            let output = if graph_version == 2: with_str_clone_ref(fields[6]) else: ""
             current = build_graph_target_new(
-                build_graph_parse_i32(fields.get(1)),
-                fields.get(2),
-                fields.get(3),
-                build_graph_parse_i32(fields.get(4)),
-                build_graph_parse_i32(fields.get(5)),
+                build_graph_parse_i32(fields[1]),
+                fields[2],
+                fields[3],
+                build_graph_parse_i32(fields[4]),
+                build_graph_parse_i32(fields[5]),
                 output,
             )
             has_current = true
@@ -290,12 +290,12 @@ pub fn parse_build_graph(text: &str) -> BuildGraph:
             if fields.len() != 3 or not has_current:
                 graph.error_msg = "invalid system_lib line in build graph"
                 return graph
-            current.system_libs.push(with_str_clone_ref(fields.get(2)))
+            current.system_libs.push(with_str_clone_ref(fields[2]))
         else if tag == "include_path":
             if fields.len() != 3 or not has_current:
                 graph.error_msg = "invalid include_path line in build graph"
                 return graph
-            current.include_paths.push(with_str_clone_ref(fields.get(2)))
+            current.include_paths.push(with_str_clone_ref(fields[2]))
         else if tag == "library_path":
             if fields.len() != 3 or not has_current:
                 graph.error_msg = "invalid library_path line in build graph"
@@ -310,52 +310,52 @@ pub fn parse_build_graph(text: &str) -> BuildGraph:
             if fields.len() != 3 or not has_current:
                 graph.error_msg = "invalid define line in build graph"
                 return graph
-            current.defines.push(with_str_clone_ref(fields.get(2)))
+            current.defines.push(with_str_clone_ref(fields[2]))
         else if tag == "input":
             if fields.len() != 3 or not has_current:
                 graph.error_msg = "invalid input line in build graph"
                 return graph
-            current.inputs.push(with_str_clone_ref(fields.get(2)))
+            current.inputs.push(with_str_clone_ref(fields[2]))
         else if tag == "extra_output":
             if fields.len() != 3 or not has_current:
                 graph.error_msg = "invalid extra_output line in build graph"
                 return graph
-            current.extra_outputs.push(with_str_clone_ref(fields.get(2)))
+            current.extra_outputs.push(with_str_clone_ref(fields[2]))
         else if tag == "write_scope":
             if fields.len() != 3 or not has_current:
                 graph.error_msg = "invalid write_scope line in build graph"
                 return graph
-            current.write_scopes.push(with_str_clone_ref(fields.get(2)))
+            current.write_scopes.push(with_str_clone_ref(fields[2]))
         else if tag == "dep":
             if fields.len() != 3 or not has_current:
                 graph.error_msg = "invalid dep line in build graph"
                 return graph
-            current.deps.push(with_str_clone_ref(fields.get(2)))
+            current.deps.push(with_str_clone_ref(fields[2]))
         else if tag == "arg":
             if fields.len() != 3 or not has_current:
                 graph.error_msg = "invalid arg line in build graph"
                 return graph
-            current.args.push(with_str_clone_ref(fields.get(2)))
+            current.args.push(with_str_clone_ref(fields[2]))
         else if tag == "timeout_ms":
             if fields.len() != 3 or not has_current:
                 graph.error_msg = "invalid timeout_ms line in build graph"
                 return graph
-            current.timeout_ms = build_graph_parse_i32(fields.get(2))
+            current.timeout_ms = build_graph_parse_i32(fields[2])
         else if tag == "cwd":
             if fields.len() != 3 or not has_current:
                 graph.error_msg = "invalid cwd line in build graph"
                 return graph
-            current.cwd = with_str_clone_ref(fields.get(2))
+            current.cwd = with_str_clone_ref(fields[2])
         else if tag == "env":
             if fields.len() != 3 or not has_current:
                 graph.error_msg = "invalid env line in build graph"
                 return graph
-            current.env.push(with_str_clone_ref(fields.get(2)))
+            current.env.push(with_str_clone_ref(fields[2]))
         else if tag == "network":
             if fields.len() != 3 or not has_current:
                 graph.error_msg = "invalid network line in build graph"
                 return graph
-            current.network = build_graph_parse_i32(fields.get(2))
+            current.network = build_graph_parse_i32(fields[2])
         else:
             graph.error_msg = "unknown build graph line: " ++ tag
             return graph
@@ -478,7 +478,7 @@ pub fn build_graph_complete_edges(graph: BuildGraph) -> BuildGraph:
             let producer_idx = build_graph_output_index(&out_paths, consumed[ci])
             if producer_idx < 0:
                 continue
-            let producer = out_owners.get(producer_idx)
+            let producer = out_owners[producer_idx]
             if producer == t.name or t.deps.contains(producer) or to_add.contains(producer):
                 continue
             if with_getenv_str("WITH_TRACE_GRAPH").len() > 0:

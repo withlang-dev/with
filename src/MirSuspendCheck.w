@@ -34,7 +34,7 @@ extern fn with_alloc(size: i64) -> *mut u8
 impl SuspendBits:
     fn vget(idx: i64) -> i32:
         let st = self.state
-        unsafe { st.w.get(idx) }
+        unsafe { st.w[idx] }
 
     fn vset(idx: i32, value: i32):
         let st = self.state

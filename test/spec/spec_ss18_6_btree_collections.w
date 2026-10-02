@@ -16,19 +16,19 @@ fn test_btreemap_operations:
     assert(map.get("z").is_none())
 
     let keys = map.keys()
-    assert(keys.get(0) == "a")
-    assert(keys.get(1) == "b")
-    assert(keys.get(2) == "c")
+    assert(keys[0] == "a")
+    assert(keys[1] == "b")
+    assert(keys[2] == "c")
 
     let values = map.values()
-    assert(values.get(0) == 1)
-    assert(values.get(1) == 20)
-    assert(values.get(2) == 3)
+    assert(values[0] == 1)
+    assert(values[1] == 20)
+    assert(values[2] == 3)
 
     let items = map.items()
-    let (k0, v0) = items.get(0)
-    let (k1, v1) = items.get(1)
-    let (k2, v2) = items.get(2)
+    let (k0, v0) = items[0]
+    let (k1, v1) = items[1]
+    let (k2, v2) = items[2]
     assert(k0 == "a" and v0 == 1)
     assert(k1 == "b" and v1 == 20)
     assert(k2 == "c" and v2 == 3)
@@ -48,9 +48,9 @@ fn test_btreeset_operations:
     set.insert(2)
     assert(set.len() == 3)
     let items = set.items()
-    assert(items.get(0) == 1)
-    assert(items.get(1) == 2)
-    assert(items.get(2) == 3)
+    assert(items[0] == 1)
+    assert(items[1] == 2)
+    assert(items[2] == 3)
     assert(set.remove(2))
     assert(not set.contains(2))
     assert(not set.remove(9))

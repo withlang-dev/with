@@ -26,7 +26,7 @@ fn is_ident_char(c: i32) -> bool: is_alnum(c) or c == '_' or c == '.'
 fn quoted_after(line: &str, prefix: &str) -> str:
     let parts = line.split(prefix)
     if parts.len() < 2: return ""
-    let rest = parts.get(1)
+    let rest = parts[1]
     let close = rest.find("'")
     if close < 0: return ""
     rest.slice(0, close)
@@ -42,17 +42,17 @@ fn declares(line: &str, sym: &str) -> bool:
     if line.len() == 0 or line.starts_with(" ") or line.starts_with("\t") or line.starts_with("pub "): return false
     let words = line.split(" ")
     var i = 0
-    while i < words.len() and is_qualifier(words.get(i)): i = i + 1
-    if i >= words.len() or not is_decl_keyword(words.get(i)): return false
+    while i < words.len() and is_qualifier(words[i]): i = i + 1
+    if i >= words.len() or not is_decl_keyword(words[i]): return false
     i = i + 1
     if i >= words.len(): return false
-    let name_word = words.get(i)
+    let name_word = words[i]
     if not name_word.starts_with(sym): return false
     name_word.len() == sym.len() or not is_ident_char(name_word[sym.len()])
 
 fn vec_contains(v: &Vec[str], s: &str) -> bool:
     for i in 0..v.len():
-        if v.get(i) == s: return true
+        if v[i] == s: return true
     false
 
 // Every `.w` file under `dir`, recursively. (A plain file lists as itself,
@@ -86,11 +86,11 @@ var log_path = ""
 var roots: Vec[str] = Vec.new()
 var i = 1
 while i < argv.len():
-    let a = argv.get(i)
+    let a = argv[i]
     if a == "--apply": apply = true
     else if a == "--root" and i + 1 < argv.len():
         i = i + 1
-        roots.push(argv.get(i).clone())
+        roots.push(argv[i].clone())
     else: log_path = a.clone()
     i = i + 1
 if log_path.len() == 0:
@@ -123,7 +123,7 @@ for line in log.split("\n"):
         continue
     var seen = false
     for k in 0..pair_owners.len():
-        if pair_owners.get(k) == owner and pair_symbols.get(k) == sym: seen = true
+        if pair_owners[k] == owner and pair_symbols[k] == sym: seen = true
     if not seen:
         pair_owners.push(owner)
         pair_symbols.push(sym)
@@ -138,7 +138,7 @@ var missing = 0
 for owner in owners:
     var wanted: Vec[str] = Vec.new()
     for k in 0..pair_owners.len():
-        if pair_owners.get(k) == owner: wanted.push(pair_symbols.get(k).clone())
+        if pair_owners[k] == owner: wanted.push(pair_symbols[k].clone())
     let text = match read_file(owner):
         Ok(t) => t
         Err(e) =>

@@ -9,8 +9,8 @@ fn observe(map: &HashMap[i32, Vec[i64]]):
     assert(found.is_some())
     let values = found.unwrap()
     assert(values.len() == 2)
-    assert(values.get(0) == 7)
-    assert(values.get(1) == 9)
+    assert(values[0] == 7)
+    assert(values[1] == 9)
 
     let missing: Option[&Vec[i64]] = map.get(2)
     assert(missing.is_none())

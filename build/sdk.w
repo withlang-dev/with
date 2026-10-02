@@ -624,11 +624,11 @@ pub fn run_package_llvm_sdk_action(ctx: ActionCtx) -> i32:
     let args = ctx.args()
     if args.len() < 5:
         return sdk_fail(ctx, "requires platform, prefix, build-cache, asset, and sdk-base args")
-    let platform = args.get(0)
-    let prefix = args.get(1)
-    let build_cache = args.get(2)
-    let asset = args.get(3)
-    let sdk_base = args.get(4)
+    let platform = args[0]
+    let prefix = args[1]
+    let build_cache = args[2]
+    let asset = args[3]
+    let sdk_base = args[4]
     var rc = sdk_validate_package_prefix(ctx, platform, prefix, build_cache)
     if rc != 0:
         return rc
@@ -729,11 +729,11 @@ pub fn run_sdk_source_tar_gz_action(ctx: ActionCtx) -> i32:
     let marker = ctx.output()
     if args.len() < 5 or marker.len() == 0:
         return sdk_fail(ctx, "requires url, sha256, archive, source-root, and source-dir args")
-    let url = args.get(0)
-    let expected_sha = args.get(1)
-    let archive = args.get(2)
-    let source_root = args.get(3)
-    let source_dir = args.get(4)
+    let url = args[0]
+    let expected_sha = args[1]
+    let archive = args[2]
+    let source_root = args[3]
+    let source_dir = args[4]
     if expected_sha.len() == 0:
         return sdk_fail(ctx, "source download requires pinned SHA-256")
     let fs = ctx.fs()
@@ -899,7 +899,7 @@ fn sdk_run_capture(ctx: &ActionCtx, label: &str, argv: Vec[str], timeout_ms: i32
     let _mkdir = ctx.fs().mkdir_all(command_dir)
     if argv.len() == 0:
         return sdk_fail(ctx, label ++ ": empty command")
-    var spec = process_spec(argv.get(0).clone()).timeout(timeout_ms)
+    var spec = process_spec(argv[0].clone()).timeout(timeout_ms)
     for i in 1..argv.len() as i32:
         spec = (move spec).arg(argv[i].clone())
     for name in sdk_scrubbed_env_names():
@@ -928,11 +928,11 @@ pub fn run_sdk_ninja_action(ctx: ActionCtx) -> i32:
     let args = ctx.args()
     if args.len() < 5:
         return sdk_fail(ctx, "requires bootstrap-prefix, output-prefix, source-dir, build-dir, and jobs args")
-    let bootstrap_prefix = args.get(0)
-    let output_prefix = args.get(1)
-    let source_dir = args.get(2)
-    let build_dir = args.get(3)
-    let jobs = args.get(4)
+    let bootstrap_prefix = args[0]
+    let output_prefix = args[1]
+    let source_dir = args[2]
+    let build_dir = args[3]
+    let jobs = args[4]
     var rc = sdk_validate_staged_paths(ctx, bootstrap_prefix, output_prefix)
     if rc != 0:
         return rc
@@ -964,7 +964,7 @@ pub fn run_sdk_ninja_action(ctx: ActionCtx) -> i32:
     configure.push("-DCMAKE_MAKE_PROGRAM=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, "ninja")))
     configure.push("-DBUILD_TESTING=OFF")
     // args[5]: the target architecture of a cross build.
-    let ninja_arch = if args.len() > 5: sdk_owned_text(args.get(5)) else: arch()
+    let ninja_arch = if args.len() > 5: sdk_owned_text(args[5]) else: arch()
     if os() == "Linux" and sdk_linux_arch_supported(ninja_arch):
         let linux_flags = sdk_linux_toolchain_flags(root, output_prefix, build_dir, ninja_arch)
         for i in 0..linux_flags.len() as i32: configure.push(sdk_owned_text(linux_flags[i]))
@@ -995,11 +995,11 @@ pub fn run_sdk_cmake_action(ctx: ActionCtx) -> i32:
     let args = ctx.args()
     if args.len() < 5:
         return sdk_fail(ctx, "requires bootstrap-prefix, output-prefix, source-dir, build-dir, and jobs args")
-    let bootstrap_prefix = args.get(0)
-    let output_prefix = args.get(1)
-    let source_dir = args.get(2)
-    let build_dir = args.get(3)
-    let jobs = args.get(4)
+    let bootstrap_prefix = args[0]
+    let output_prefix = args[1]
+    let source_dir = args[2]
+    let build_dir = args[3]
+    let jobs = args[4]
     var rc = sdk_validate_staged_paths(ctx, bootstrap_prefix, output_prefix)
     if rc != 0:
         return rc
@@ -1041,7 +1041,7 @@ pub fn run_sdk_cmake_action(ctx: ActionCtx) -> i32:
         configure.push("-DCMAKE_CXX_COMPILER=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, "clang++")))
     // args[6]: the target architecture of a cross build, which runs the
     // bootstrap's ninja (the new one is the target's).
-    let cmake_arch = if args.len() > 6: sdk_owned_text(args.get(6)) else: arch()
+    let cmake_arch = if args.len() > 6: sdk_owned_text(args[6]) else: arch()
     let make_prefix = if cmake_arch != arch(): sdk_owned_text(bootstrap_prefix) else: sdk_owned_text(output_prefix)
     configure.push("-DCMAKE_MAKE_PROGRAM=" ++ sdk_abs(root, sdk_tool(make_prefix, "ninja")))
     configure.push("-DBUILD_TESTING=OFF")
@@ -1164,16 +1164,16 @@ pub fn run_sdk_llvm_action(ctx: ActionCtx) -> i32:
     let args = ctx.args()
     if args.len() < 8:
         return sdk_fail(ctx, "requires bootstrap-prefix, output-prefix, source-dir, build-dir, jobs, targets, sdkroot, and deployment-target args")
-    let bootstrap_prefix = args.get(0)
-    let output_prefix = args.get(1)
-    let source_dir = args.get(2)
-    let build_dir = args.get(3)
-    let jobs = args.get(4)
-    let targets = sdk_llvm_targets_arg(ctx, args.get(5))
+    let bootstrap_prefix = args[0]
+    let output_prefix = args[1]
+    let source_dir = args[2]
+    let build_dir = args[3]
+    let jobs = args[4]
+    let targets = sdk_llvm_targets_arg(ctx, args[5])
     if not sdk_targets_include_wasm(targets):
         return sdk_fail(ctx, "LLVM_TARGETS_TO_BUILD must include WebAssembly for the With SDK")
-    let sdkroot = args.get(6)
-    let deployment_target = if args.get(7).len() > 0: sdk_owned_text(args.get(7)) else: "11.0"
+    let sdkroot = args[6]
+    let deployment_target = if args[7].len() > 0: sdk_owned_text(args[7]) else: "11.0"
     // Windows builds cmake after LLVM (its resources need the SDK's own
     // llvm-windres, #1915), so LLVM configures with the bootstrap's cmake.
     let cmake_prefix = if os() == "Windows": sdk_owned_text(bootstrap_prefix) else: sdk_owned_text(output_prefix)
@@ -1190,8 +1190,8 @@ pub fn run_sdk_llvm_action(ctx: ActionCtx) -> i32:
     let root = ctx.project_info().project_root()
     // A cross build (args[9]) runs the bootstrap's cmake and ninja; the new
     // ones are the target's.
-    let tools_prefix = if args.len() > 9 and args.get(9) != arch(): sdk_owned_text(bootstrap_prefix) else: sdk_owned_text(output_prefix)
-    let run_cmake_prefix = if args.len() > 9 and args.get(9) != arch(): sdk_owned_text(bootstrap_prefix) else: sdk_owned_text(cmake_prefix)
+    let tools_prefix = if args.len() > 9 and args[9] != arch(): sdk_owned_text(bootstrap_prefix) else: sdk_owned_text(output_prefix)
+    let run_cmake_prefix = if args.len() > 9 and args[9] != arch(): sdk_owned_text(bootstrap_prefix) else: sdk_owned_text(cmake_prefix)
     let cmake = sdk_abs(root, sdk_tool(run_cmake_prefix, "cmake"))
     let configure: Vec[str] = Vec.new()
     configure.push(sdk_owned_text(cmake))
@@ -1258,8 +1258,8 @@ pub fn run_sdk_llvm_action(ctx: ActionCtx) -> i32:
                 return sdk_fail(ctx, "unsupported macOS arch: " ++ arch())
     // args[9]/[10]: a cross build's target architecture and the host SDK
     // build's tools directory.
-    let llvm_arch = if args.len() > 9: sdk_owned_text(args.get(9)) else: arch()
-    let native_tools = if args.len() > 10: sdk_owned_text(args.get(10)) else: ""
+    let llvm_arch = if args.len() > 9: sdk_owned_text(args[9]) else: arch()
+    let native_tools = if args.len() > 10: sdk_owned_text(args[10]) else: ""
     if os() == "Linux" and sdk_linux_arch_supported(llvm_arch):
         if not fs.exists(sdk_join(output_prefix, "lib/" ++ sdk_linux_triple(llvm_arch) ++ "/libc++.a")):
             return sdk_fail(ctx, "the SDK's runtimes are not built: run :sdk-runtimes")
@@ -1974,7 +1974,7 @@ pub fn run_linux_sysroot_action(ctx: ActionCtx) -> i32:
     // compiler embeds its own; a Linux host also generates another
     // architecture's for a cross build. Off Linux the pack is empty (and
     // nothing is fetched).
-    let a = if ctx.args().len() > 0: sdk_owned_text(ctx.args().get(0)) else: arch()
+    let a = if ctx.args().len() > 0: sdk_owned_text(ctx.args()[0]) else: arch()
     if not sdk_linux_arch_supported(a) or (ctx.args().len() == 0 and os() != "Linux"):
         return sdk_write_text(ctx, pack_path, "")
     let root = ctx.project_info().project_root()
@@ -2165,7 +2165,7 @@ pub fn run_linux_link_pack_action(ctx: ActionCtx) -> i32:
     // directory the target's links read (args); a host build takes its own.
     let args = ctx.args()
     let cross = args.len() >= 3
-    let a = if cross: sdk_owned_text(args.get(0)) else: arch()
+    let a = if cross: sdk_owned_text(args[0]) else: arch()
     if not sdk_linux_arch_supported(a) or (not cross and os() != "Linux"):
         return sdk_write_text(ctx, pack_path, "")
     let base = fs.read_text(sdk_linux_sysroot_pack_for(a))
@@ -2174,9 +2174,9 @@ pub fn run_linux_link_pack_action(ctx: ActionCtx) -> i32:
     // The SDK the compiler links against: LLVM_PREFIX when a lane names one.
     let named = ctx.env_input("LLVM_PREFIX")
     let root = ctx.project_info().project_root()
-    let prefix = if cross: sdk_owned_text(args.get(1)) else if named.len() == 0: compiler_default_llvm_prefix() else if named.starts_with(root ++ "/"): sdk_rel_path(root, named) else: sdk_owned_text(named)
+    let prefix = if cross: sdk_owned_text(args[1]) else if named.len() == 0: compiler_default_llvm_prefix() else if named.starts_with(root ++ "/"): sdk_rel_path(root, named) else: sdk_owned_text(named)
     // The unpacked copy a cross link reads (Link.w's cross sysroot).
-    let unpack = if cross: sdk_owned_text(args.get(2)) else: ""
+    let unpack = if cross: sdk_owned_text(args[2]) else: ""
     if cross:
         let _old = fs.remove_tree(unpack)
         if fs.copy_tree(sdk_linux_sysroot_dir_for(a), unpack) != 0:
@@ -2248,14 +2248,14 @@ pub fn run_sdk_runtimes_action(ctx: ActionCtx) -> i32:
     let args = ctx.args()
     if args.len() < 5:
         return sdk_fail(ctx, "requires bootstrap-prefix, output-prefix, source-dir, build-dir, and jobs args")
-    let bootstrap_prefix = args.get(0)
-    let output_prefix = args.get(1)
+    let bootstrap_prefix = args[0]
+    let output_prefix = args[1]
     let rc = sdk_validate_staged_paths(ctx, bootstrap_prefix, output_prefix)
     if rc != 0: return rc
     let root = ctx.project_info().project_root()
     // The target architecture: args[5] for a cross build, else the host's.
-    let target_arch = if args.len() > 5: sdk_owned_text(args.get(5)) else: arch()
-    sdk_linux_runtimes(ctx, root, bootstrap_prefix, output_prefix, args.get(2), args.get(3), args.get(4), sdk_abs(root, sdk_tool(bootstrap_prefix, "cmake")), target_arch)
+    let target_arch = if args.len() > 5: sdk_owned_text(args[5]) else: arch()
+    sdk_linux_runtimes(ctx, root, bootstrap_prefix, output_prefix, args[2], args[3], args[4], sdk_abs(root, sdk_tool(bootstrap_prefix, "cmake")), target_arch)
 
 pub fn sdk_linux_runtimes(ctx: &ActionCtx, root: &str, bootstrap_prefix: &str, output_prefix: &str, source_dir: &str, build_dir: &str, jobs: &str, cmake: &str, a: &str) -> i32:
     let fs = ctx.fs()
@@ -2394,7 +2394,7 @@ pub fn run_sdk_build_tools_pack_action(ctx: ActionCtx) -> i32:
     if pack_path.len() == 0:
         return sdk_fail(ctx, "requires an output path")
     // args[0]: a cross target's SDK (its cmake and ninja run on the target).
-    let cross_prefix = if ctx.args().len() > 0: sdk_owned_text(ctx.args().get(0)) else: ""
+    let cross_prefix = if ctx.args().len() > 0: sdk_owned_text(ctx.args()[0]) else: ""
     if cross_prefix.len() == 0 and os() != "Macos" and not (os() == "Linux" and sdk_linux_arch_supported(arch())):
         return sdk_write_text(ctx, pack_path, "")
     // The in-project SDK path: the build's file sandbox reads under the
@@ -3215,11 +3215,11 @@ pub fn run_sdk_windows_libc_action(ctx: ActionCtx) -> i32:
     let args = ctx.args()
     if args.len() < 5:
         return sdk_fail(ctx, "requires tools-prefix, output-prefix, mingw-w64 source dir, arch, and build-dir args")
-    let tools_prefix = args.get(0)
-    let output_prefix = args.get(1)
-    let source_dir = args.get(2)
-    let arch_name = args.get(3)
-    let build_dir = args.get(4)
+    let tools_prefix = args[0]
+    let output_prefix = args[1]
+    let source_dir = args[2]
+    let arch_name = args[3]
+    let build_dir = args[4]
     if sdk_mingw_makefile_prefix(arch_name).len() == 0:
         return sdk_fail(ctx, "unsupported Windows libc architecture: " ++ arch_name)
     let leaks = sdk_clang_env_leaks(&ctx)
@@ -3390,11 +3390,11 @@ pub fn run_sdk_compiler_rt_builtins_action(ctx: ActionCtx) -> i32:
     let args = ctx.args()
     if args.len() < 5:
         return sdk_fail(ctx, "requires tools-prefix, output-prefix, LLVM source dir, arch, and build-dir args")
-    let tools_prefix = args.get(0)
-    let output_prefix = args.get(1)
-    let source_dir = args.get(2)
-    let arch_name = args.get(3)
-    let build_dir = args.get(4)
+    let tools_prefix = args[0]
+    let output_prefix = args[1]
+    let source_dir = args[2]
+    let arch_name = args[3]
+    let build_dir = args[4]
     if sdk_mingw_makefile_prefix(arch_name).len() == 0:
         return sdk_fail(ctx, "unsupported Windows architecture: " ++ arch_name)
     let leaks = sdk_clang_env_leaks(&ctx)
@@ -3551,11 +3551,11 @@ pub fn run_sdk_libcxx_action(ctx: ActionCtx) -> i32:
     let args = ctx.args()
     if args.len() < 5:
         return sdk_fail(ctx, "requires tools-prefix, output-prefix, LLVM source dir, arch, and build-dir args")
-    let tools_prefix = args.get(0)
-    let output_prefix = args.get(1)
-    let source_dir = args.get(2)
-    let arch_name = args.get(3)
-    let build_dir = args.get(4)
+    let tools_prefix = args[0]
+    let output_prefix = args[1]
+    let source_dir = args[2]
+    let arch_name = args[3]
+    let build_dir = args[4]
     let leaks = sdk_clang_env_leaks(&ctx)
     if leaks.len() > 0:
         return sdk_fail(ctx, "the environment sets" ++ leaks ++ ", which clang would add to every compile; unset it")

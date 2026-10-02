@@ -10,6 +10,6 @@ use std.sysinfo
 fn main:
     let argv = args()
     print(f"argc={argv.len()}")
-    print(f"arg0 set: {argv.get(0).len() > 0}")
+    print(f"arg0 set: {argv[0].len() > 0}")
     print(f"env={env("WITH_WASM_FIXTURE")}")
     print(f"os={os()} arch={arch()}")

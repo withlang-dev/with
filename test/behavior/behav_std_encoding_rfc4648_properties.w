@@ -20,7 +20,7 @@ fn assert_bytes_eq(actual: &Vec[u8], expected: &Vec[u8]):
     assert(actual.len() == expected.len())
     var i: i64 = 0
     while i < expected.len():
-        assert(actual.get(i) == expected.get(i))
+        assert(actual[i] == expected[i])
         i = i + 1
 
 fn assert_base16_round_trip(data: Vec[u8]):
@@ -69,10 +69,10 @@ fn test_base32hex_ordering:
         let decoded_hex = base32hex_decode(current).unwrap()
         assert(decoded.len() == 2)
         assert(decoded_hex.len() == 2)
-        assert(decoded.get(0) == bytes[0])
-        assert(decoded.get(1) == bytes[1])
-        assert(decoded_hex.get(0) == bytes[0])
-        assert(decoded_hex.get(1) == bytes[1])
+        assert(decoded[0] == bytes[0])
+        assert(decoded[1] == bytes[1])
+        assert(decoded_hex[0] == bytes[0])
+        assert(decoded_hex[1] == bytes[1])
         if value > 0:
             assert(string_cmp(previous, current) < 0)
         previous = current
@@ -88,8 +88,8 @@ fn test_base32_all_single_octets:
         let decoded_hex = base32hex_decode(encoded_hex).unwrap()
         assert(decoded.len() == 1)
         assert(decoded_hex.len() == 1)
-        assert(decoded.get(0) == value as u8)
-        assert(decoded_hex.get(0) == value as u8)
+        assert(decoded[0] == value as u8)
+        assert(decoded_hex[0] == value as u8)
         value = value + 1
 
 fn test_base32_borrowed_inputs:
@@ -127,8 +127,8 @@ fn test_base64_exhaustive_short_inputs:
         let decoded_url = base64url_decode(encoded_url).unwrap()
         assert(decoded.len() == 1)
         assert(decoded_url.len() == 1)
-        assert(decoded.get(0) == input[0])
-        assert(decoded_url.get(0) == input[0])
+        assert(decoded[0] == input[0])
+        assert(decoded_url[0] == input[0])
         value = value + 1
     value = 0
     while value < 65536:
@@ -139,10 +139,10 @@ fn test_base64_exhaustive_short_inputs:
         let decoded_url = base64url_decode(encoded_url).unwrap()
         assert(decoded.len() == 2)
         assert(decoded_url.len() == 2)
-        assert(decoded.get(0) == input[0])
-        assert(decoded.get(1) == input[1])
-        assert(decoded_url.get(0) == input[0])
-        assert(decoded_url.get(1) == input[1])
+        assert(decoded[0] == input[0])
+        assert(decoded[1] == input[1])
+        assert(decoded_url[0] == input[0])
+        assert(decoded_url[1] == input[1])
         value = value + 1
 
 fn test_base64_borrowed_inputs:

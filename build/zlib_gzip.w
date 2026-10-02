@@ -18,7 +18,7 @@ fn main -> i32:
     if argv.len() < 3:
         print("usage: zlib_gzip <input.tar> <output.tar.gz>")
         return 2
-    let input = match read_file(argv.get(1)):
+    let input = match read_file(argv[1]):
         Ok(text) => text
         Err(err) => {
             print("could not read input tar: " ++ err.message())
@@ -30,7 +30,7 @@ fn main -> i32:
     let input_bytes = bytes_from_str(input)
     match compress_gzip(&input_bytes):
         Ok(gzip_bytes) => {
-            if write_file(argv.get(2), bytes_to_str(gzip_bytes)) != 0:
+            if write_file(argv[2], bytes_to_str(gzip_bytes)) != 0:
                 print("could not write gzip output")
                 return 1
         }

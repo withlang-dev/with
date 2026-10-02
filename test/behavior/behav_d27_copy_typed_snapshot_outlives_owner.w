@@ -6,7 +6,7 @@
 fn snapshot() -> i32:
     var values: Vec[i32] = Vec.new()
     values.push(41)
-    let value: i32 = values.get(0)
+    let value: i32 = values[0]
     values.push(42)
     value
 

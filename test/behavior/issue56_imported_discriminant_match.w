@@ -11,6 +11,6 @@ fn main:
     let kinds: Vec[i32] = Vec.new()
     kinds.push(TypeKind.TY_INT as i32)
     kinds.push(TypeKind.TY_STR as i32)
-    assert(decode(kinds.get(0)) == "int")
-    assert(decode(kinds.get(1)) == "str")
+    assert(decode(kinds[0]) == "int")
+    assert(decode(kinds[1]) == "str")
     print("ok")

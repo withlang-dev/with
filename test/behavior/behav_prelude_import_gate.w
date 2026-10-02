@@ -17,7 +17,7 @@ fn main:
     assert(sb.to_str() == "42", "gated names work through explicit imports")
     let xs: Vec[i32] = Vec.new()
     xs.push(7)
-    assert(xs.get(0) == 7, "§18.2 names stay ambient")
+    assert(xs[0] == 7, "§18.2 names stay ambient")
     let r = /ab+c/
     assert(r.is_match("abbc"), "regex literal lowers without an import")
     print("ok")

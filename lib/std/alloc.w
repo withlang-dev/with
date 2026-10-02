@@ -191,8 +191,8 @@ pub fn Arena.reset(mut self: Arena) -> Unit:
 pub fn FrameArena.reset(mut self: FrameArena) -> Unit:
     if self.blocks.len() == 0:
         return
-    let first: i64 = self.blocks.get(0)
-    let first_size: i32 = self.block_sizes.get(0)
+    let first: i64 = self.blocks[0]
+    let first_size: i32 = self.block_sizes[0]
     for i in 1..self.blocks.len() as i32:
         let raw = self.blocks[i]
         if raw != 0:

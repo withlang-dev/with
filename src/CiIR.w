@@ -379,7 +379,7 @@ impl CiExprPool:
         self.state.data2[(id as i32)]
 
     fn get_type(id: CiExprId) -> CiTypeId:
-        (self.state.types.get((id as i32) as i64)) as CiTypeId
+        (self.state.types[(id as i32) as i64]) as CiTypeId
 
     fn set_type(id: CiExprId, ty: CiTypeId):
         let st = self.state
@@ -393,7 +393,7 @@ impl CiExprPool:
             if i == idx:
                 out.push(ty as i32)
             else:
-                out.push(st.types.get(i))
+                out.push(st.types[i])
             i = i + 1
         st.types = out
 

@@ -100,8 +100,8 @@ fn test_await_any_all_fail_is_input_ordered():
     assert(result.is_err())
     let errors = result.err().unwrap()
     assert(errors.len() == 2)
-    assert(errors.get(0) == "slow")
-    assert(errors.get(1) == "fast")
+    assert(errors[0] == "slow")
+    assert(errors[1] == "fast")
     assert(unsafe { with_fiber_live_fibers() } == baseline)
 
 fn test_await_any_empty():

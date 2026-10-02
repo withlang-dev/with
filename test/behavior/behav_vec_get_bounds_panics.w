@@ -4,4 +4,4 @@
 fn main:
     let values: Vec[i32] = Vec.new()
     values.push(1)
-    let _ = values.get(1)
+    let _ = values[1]

@@ -7,7 +7,7 @@ var g: Vec[str] = Vec.new()
 
 fn snapshot() -> Vec[str]: g.clone()
 
-fn first() -> &str: g.get(0)
+fn first() -> &str: g[0]
 
 fn main:
     g.push("a")

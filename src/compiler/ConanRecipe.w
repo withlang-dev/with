@@ -106,13 +106,13 @@ fn cr_default_option(recipe: &str, name: &str) -> str:
         block = block ++ raw.slice(0, if hash >= 0: hash else: raw.len()) ++ "\n"
     for entry in block.split(","):
         let pair = entry.split(":")
-        if pair.len() >= 2 and cr_unquote(pair.get(0).split("{").get(pair.get(0).split("{").len() - 1)) == name:
-            return pair.get(1).trim().to_owned()
+        if pair.len() >= 2 and cr_unquote(pair[0].split("{")[pair[0].split("{").len() - 1]) == name:
+            return pair[1].trim().to_owned()
     ""
 
 fn cr_version_component(version: &str, index: i32) -> str:
     let parts = version.split(".")
-    if index < parts.len() as i32: parts.get(index).to_owned() else: "0"
+    if index < parts.len() as i32: parts[index].to_owned() else: "0"
 
 
 // ── Recipe expressions ───────────────────────────────────────────────

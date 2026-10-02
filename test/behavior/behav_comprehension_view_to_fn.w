@@ -13,11 +13,11 @@ fn peek_i32(x: &i32) -> i64: *x as i64
 fn main:
     let ints: Vec[i32] = [1, 2, 3]
     let doubled: Vec[i32] = [x * 2 for x in ints]
-    if ints.len() != 3 or doubled.len() != 3 or doubled.get(2) != 6:
+    if ints.len() != 3 or doubled.len() != 3 or doubled[2] != 6:
         print("FAIL copy-class source moved")
         return
     let via_fn: Vec[i64] = [peek_i32(x) for x in ints.iter()]
-    if ints.len() != 3 or via_fn.get(0) != 1:
+    if ints.len() != 3 or via_fn[0] != 1:
         print("FAIL i32 iter->fn")
         return
     var ss: Vec[str] = Vec.new()
@@ -28,7 +28,7 @@ fn main:
     if ss.len() != 1:
         print("FAIL str source moved")
         return
-    if a.get(0) != 5 or b.get(0) != 5 or c.get(0) != 5:
+    if a[0] != 5 or b[0] != 5 or c[0] != 5:
         print("FAIL str view")
         return
     var vs: Vec[Vec[i32]] = Vec.new()
@@ -38,13 +38,13 @@ fn main:
     vs.push(move inner)
     let d: Vec[i64] = [peek_vec(v) for v in vs]
     let e: Vec[i64] = [peek_vec(v) for v in vs.iter()]
-    if vs.len() != 1 or d.get(0) != 2 or e.get(0) != 2:
+    if vs.len() != 1 or d[0] != 2 or e[0] != 2:
         print("FAIL vec view")
         return
     var ps: Vec[Pair] = Vec.new()
     ps.push(Pair { a: 3, b: 4 })
     let f: Vec[i64] = [peek_pair(p) for p in ps.iter()]
-    if ps.len() != 1 or f.get(0) != 7:
+    if ps.len() != 1 or f[0] != 7:
         print("FAIL pair view")
         return
     print("ok")

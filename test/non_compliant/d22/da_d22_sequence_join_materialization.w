@@ -16,5 +16,5 @@ fn main:
     map.clear()
     assert(values[0] == 65)
     assert(values[1] == 66)
-    assert(collected.get(0) == 65)
-    assert(collected.get(1) == 67)
+    assert(collected[0] == 65)
+    assert(collected[1] == 67)

@@ -19,13 +19,13 @@ fn source_path(path: &str) -> str:
 fn gate_use_line(message: &str) -> str:
     let parts = message.split("; add: use ")
     if parts.len() < 2: return ""
-    "use " ++ parts.get(1)
+    "use " ++ parts[1]
 
 fn diag_path(loc_line: &str) -> str:
     // " --> src/Foo.w:74:17" → "src/Foo.w"
     let parts = loc_line.split("--> ")
     if parts.len() < 2: return ""
-    let with_pos = parts.get(1)
+    let with_pos = parts[1]
     var cut = with_pos.len()
     var colons = 0
     var i = with_pos.len() - 1
@@ -55,14 +55,14 @@ fn header_insert_offset(text: &str) -> i64:
 
 fn vec_contains(v: &Vec[str], s: &str) -> bool:
     for i in 0..v.len():
-        if v.get(i) == s: return true
+        if v[i] == s: return true
     false
 
 let argv = args()
 var apply = false
 var diags_file = ""
 for i in 1..argv.len():
-    let a = argv.get(i)
+    let a = argv[i]
     if a == "--apply": apply = true
     else: diags_file = a
 if diags_file.len() == 0:

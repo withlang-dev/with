@@ -8,7 +8,7 @@ type Big { a: Vec[i32], names: Vec[i32] }
 
 fn find_in(big: &Big, x: i32) -> i32:
     for i in 0..big.names.len() as i32:
-        if big.names.get(i as i64) == x:
+        if big.names[i as i64] == x:
             return i
     -1
 
@@ -26,6 +26,6 @@ fn main:
     let i2 = b.poke(7)
     assert(i2 == 0)
     assert(b.a.len() == 2)
-    assert(b.a.get(0) == 9)
-    assert(b.a.get(1) == 7)
+    assert(b.a[0] == 9)
+    assert(b.a[1] == 7)
     print("ok")

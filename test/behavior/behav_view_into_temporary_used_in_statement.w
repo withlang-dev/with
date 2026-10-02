@@ -6,7 +6,7 @@
 fn main:
     let line = "x\tdocs"
     assert(line.split("\t")[1] == "docs")
-    assert(line.split("\t").get(1) != "x" and line.split("\t")[1].ends_with("cs"))
+    assert(line.split("\t")[1] != "x" and line.split("\t")[1].ends_with("cs"))
     let parts = line.split("\t")
     let path = parts[1]
     assert(path == "docs" and path != "x" and not path.ends_with(".md"))
