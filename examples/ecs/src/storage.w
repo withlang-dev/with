@@ -43,7 +43,7 @@ extend[T] DenseStorage[T]:
 
     pub fn get(entity: Entity) -> Option[&T]:
         let idx = self.sparse.get(entity.id) ?? return None
-        Some(self.dense_data.get(idx))
+        Some(self.dense_data[idx])
 
     // Transfers the component out (`Vec.remove`, D27) and re-indexes the
     // entities that shifted down behind it.

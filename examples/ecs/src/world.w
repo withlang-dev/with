@@ -104,7 +104,7 @@ extend World:
     // keeps it.
     pub fn entity_name(entity: Entity) -> Option[&str]:
         if self.is_alive(entity):
-            Some(self.entity_names.get(entity.id))
+            Some(self.entity_names[entity.id])
         else:
             None
 
