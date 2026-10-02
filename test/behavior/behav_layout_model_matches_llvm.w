@@ -61,6 +61,12 @@
 //! expect-stdout: Range[i32] 12/4 12/4 ok
 //! expect-stdout: P 16/8 16/8 ok
 //! expect-stdout: Big 16/16 16/16 ok
+//! expect-stdout: Option[Al32] 96/32 96/32 ok
+//! expect-stdout: Option[Option[Al32]] 128/32 128/32 ok
+//! expect-stdout: Option[V4] 32/16 32/16 ok
+//! expect-stdout: Option[Option[V4]] 48/16 48/16 ok
+//! expect-stdout: Result[Al32,i8] 96/32 96/32 ok
+//! expect-stdout: Gen[Al32] 96/32 96/32 ok
 
 // #1438 (docs/spec/abi/with-abi.md §1–§3): TypeLayout, the hashed ABI source
 // that answers `comptime T.size()`/`T.align()` and sizes union members,
@@ -89,6 +95,11 @@ trait Shape:
 type P { x: i64, y: i32 }
 type Q { a: i8, b: i8 }
 type Big { v: i128 }
+// #1958: a payload the model aligns above its LLVM body (an `@[align(N)]`
+// record, §16.4) or below it (a SIMD vector, §4.3d); Option takes §2's
+// body like every enum.
+type Al32 { a: i8, @[align(32)] b: i64 }
+type V4 = Vector[4, f32]
 enum E0 { A | B }
 enum E8 { A(v: i8) | B }
 enum E64 { A(v: i64) | B }
@@ -121,6 +132,12 @@ type TOptVec = Option[Vec[i32]]
 type TOptStr = Option[str]
 type TOptHM = Option[HashMap[i32, i32]]
 type TOptE64 = Option[E64]
+type TOptAl32 = Option[Al32]
+type TOptOptAl32 = Option[Option[Al32]]
+type TOptV4 = Option[V4]
+type TOptOptV4 = Option[Option[V4]]
+type TResAl32I8 = Result[Al32, i8]
+type TGenAl32 = Gen[Al32]
 type TBoxP = Box[P]
 type TBoxDyn = Box[dyn Shape]
 type TRefDyn = &dyn Shape
@@ -184,6 +201,12 @@ type W_TOptVec = (i8, TOptVec)
 type W_TOptStr = (i8, TOptStr)
 type W_TOptHM = (i8, TOptHM)
 type W_TOptE64 = (i8, TOptE64)
+type W_TOptAl32 = (i8, TOptAl32)
+type W_TOptOptAl32 = (i8, TOptOptAl32)
+type W_TOptV4 = (i8, TOptV4)
+type W_TOptOptV4 = (i8, TOptOptV4)
+type W_TResAl32I8 = (i8, TResAl32I8)
+type W_TGenAl32 = (i8, TGenAl32)
 type W_TBoxP = (i8, TBoxP)
 type W_TBoxDyn = (i8, TBoxDyn)
 type W_TRefDyn = (i8, TRefDyn)
@@ -292,4 +315,10 @@ fn main:
     row("Range[i32]", comptime TRange.size(), comptime TRange.align(), size_of[TRange](), size_of[W_TRange]())
     row("P", comptime P.size(), comptime P.align(), size_of[P](), size_of[W_P]())
     row("Big", comptime Big.size(), comptime Big.align(), size_of[Big](), size_of[W_Big]())
+    row("Option[Al32]", comptime TOptAl32.size(), comptime TOptAl32.align(), size_of[TOptAl32](), size_of[W_TOptAl32]())
+    row("Option[Option[Al32]]", comptime TOptOptAl32.size(), comptime TOptOptAl32.align(), size_of[TOptOptAl32](), size_of[W_TOptOptAl32]())
+    row("Option[V4]", comptime TOptV4.size(), comptime TOptV4.align(), size_of[TOptV4](), size_of[W_TOptV4]())
+    row("Option[Option[V4]]", comptime TOptOptV4.size(), comptime TOptOptV4.align(), size_of[TOptOptV4](), size_of[W_TOptOptV4]())
+    row("Result[Al32,i8]", comptime TResAl32I8.size(), comptime TResAl32I8.align(), size_of[TResAl32I8](), size_of[W_TResAl32I8]())
+    row("Gen[Al32]", comptime TGenAl32.size(), comptime TGenAl32.align(), size_of[TGenAl32](), size_of[W_TGenAl32]())
 

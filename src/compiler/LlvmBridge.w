@@ -991,6 +991,13 @@ pub fn wl_set_volatile(inst: i64, is_volatile: i32):
     unsafe:
         LLVMSetVolatile(inst as *mut u8, if is_volatile != 0: 1 else: 0)
 
+// The alignment a load, store or alloca promises for its address (#1958:
+// an Option payload accessed at the model's alignment, below LLVM's for
+// its type).
+pub fn wl_set_alignment(inst: i64, align: i64):
+    unsafe:
+        LLVMSetAlignment(inst as *mut u8, align as u32)
+
 pub fn wl_build_load_volatile(b: i64, ty: i64, ptr: i64) -> i64:
     unsafe:
         let load = LLVMBuildLoad2(b as *mut u8, ty as *mut u8, ptr as *mut u8, empty_cstr())

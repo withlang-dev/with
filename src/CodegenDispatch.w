@@ -1633,8 +1633,9 @@ impl Codegen:
                 if not dc_handled:
                     let builtin_payload = self.mir_builtin_variant_payload_llvm_type(cur_sema_ty, pd)
                     if builtin_payload != 0:
-                        if wl_count_struct_elem_types(cur_ty) > 1:
-                            cur_ptr = wl_build_struct_gep(self.builder, cur_ty, cur_ptr, 1)
+                        let area = self.option_payload_ptr(cur_ty, cur_ptr)
+                        if area != 0:
+                            cur_ptr = area
                         let wrap: Vec[i64] = Vec.new()
                         wrap.push(builtin_payload)
                         cur_ty = wl_struct_type(self.context, vec_data_i64(&wrap), 1, 0)
@@ -1662,8 +1663,9 @@ impl Codegen:
                     let dc_pp_sema = self.mir_builtin_variant_payload_sema_type(cur_sema_ty, pd)
                     if dc_pp_sema > 0:
                         let dc_pp_llvm = self.mir_sema_type_to_llvm(dc_pp_sema)
-                        if wl_count_struct_elem_types(cur_ty) > 1:
-                            cur_ptr = wl_build_struct_gep(self.builder, cur_ty, cur_ptr, 1)
+                        let area = self.option_payload_ptr(cur_ty, cur_ptr)
+                        if area != 0:
+                            cur_ptr = area
                         if dc_pp_llvm != 0:
                             let wrap: Vec[i64] = Vec.new()
                             wrap.push(dc_pp_llvm)
@@ -6803,12 +6805,15 @@ impl Codegen:
     // out of the slot — a null address is never dereferenced.
     mut fn mir_option_ref_from_slot_ptr(slot_ptr: i64, opt_sema_ty: i32) -> i64:
         let opt_ty = self.mir_sema_type_to_llvm(opt_sema_ty)
-        self.option_ref_from_slot_ptr(slot_ptr, opt_ty)
+        let view_ty = self.mir_builtin_variant_payload_llvm_type(opt_sema_ty, 0)
+        self.option_ref_from_slot_ptr(slot_ptr, opt_ty, view_ty)
 
-    mut fn option_ref_from_slot_ptr(slot_ptr: i64, opt_ty: i64) -> i64:
+    // `view_ty` is the Some payload's LLVM type (from Sema: the Option's
+    // body does not name it, #1958).
+    mut fn option_ref_from_slot_ptr(slot_ptr: i64, opt_ty: i64, view_ty: i64) -> i64:
         if opt_ty == 0 or wl_get_type_kind(opt_ty) == wl_pointer_type_kind():
             return if opt_ty != 0: self.coerce_value_to_type(slot_ptr, opt_ty) else: slot_ptr
-        if wl_get_type_kind(opt_ty) != wl_struct_type_kind() or wl_count_struct_elem_types(opt_ty) < 2 or not self.is_str_type(wl_struct_get_type_at(opt_ty, 1)):
+        if wl_get_type_kind(opt_ty) != wl_struct_type_kind() or wl_count_struct_elem_types(opt_ty) < 2 or view_ty == 0 or not self.is_str_type(view_ty):
             sema_phase_bug("BUG: a slot lookup's Option is tagged but does not carry a `&str` view")
         let result_slot = self.create_entry_alloca(opt_ty)
         let none_bb = wl_append_bb(self.context, self.current_function, "slot.opt.none")
@@ -6820,7 +6825,7 @@ impl Codegen:
         wl_build_store(self.builder, self.build_option_none(opt_ty), result_slot)
         wl_build_br(self.builder, merge_bb)
         wl_position_at_end(self.builder, some_bb)
-        let view = wl_build_load(self.builder, wl_struct_get_type_at(opt_ty, 1), slot_ptr)
+        let view = wl_build_load(self.builder, view_ty, slot_ptr)
         wl_build_store(self.builder, self.build_option_some(view, opt_ty), result_slot)
         wl_build_br(self.builder, merge_bb)
         wl_position_at_end(self.builder, merge_bb)
@@ -9973,7 +9978,7 @@ impl Codegen:
             let recv = self.mir_intrinsic_arg(body, args_id, 0)
             let recv_tk = wl_get_type_kind(wl_type_of(recv))
             if recv_tk == wl_struct_type_kind():
-                let disc = wl_build_extract_value(self.builder, recv, 0)
+                let disc = self.option_tag_value(recv)
                 // Some = tag 0, None = tag 1. is_some → tag == 0.
                 result = wl_build_icmp(self.builder, wl_int_eq(), disc, wl_const_int(wl_type_of(disc), 0, 0))
             else if recv_tk == wl_pointer_type_kind():
@@ -10106,7 +10111,14 @@ impl Codegen:
                             payload_ty = self.mir_sema_type_to_llvm(res_ok_sema)
                     result = self.extract_result_payload(recv, payload_ty)
                 else:
-                    result = wl_build_extract_value(self.builder, recv, 1)
+                    // The Some payload, as the type Sema gave the destination
+                    // (the Option's body does not name it, #1958).
+                    var payload_ty = self.mir_sema_type_to_llvm(self.mir_intrinsic_dest_sema_type(body, dest_place))
+                    if payload_ty == 0:
+                        payload_ty = self.mir_builtin_variant_payload_llvm_type(carrier_sema, 0)
+                    if payload_ty == 0:
+                        sema_phase_bug(f"BUG: unwrap of Option type {recv_sema} has no payload type")
+                    result = self.option_payload_value(recv, payload_ty)
             else if recv_tk == wl_pointer_type_kind():
                 let non_null = wl_build_icmp(self.builder, wl_int_ne(), recv, wl_const_null(recv_ty))
                 let ptr_panic_bb = wl_append_bb(self.context, self.current_function, "unwrap.ptr.panic")
@@ -11326,7 +11338,7 @@ impl Codegen:
             let recv = self.mir_intrinsic_arg(body, args_id, 0)
             let tk = wl_get_type_kind(wl_type_of(recv))
             if tk == wl_struct_type_kind():
-                let disc = wl_build_extract_value(self.builder, recv, 0)
+                let disc = self.option_tag_value(recv)
                 // None = tag 1. is_none → tag != 0.
                 result = wl_build_icmp(self.builder, wl_int_ne(), disc, wl_const_int(wl_type_of(disc), 0, 0))
             else if tk == wl_pointer_type_kind():
@@ -12136,8 +12148,10 @@ impl Codegen:
             // exists; a zero-sized element channel writes nowhere useful, so
             // fall back to the slot itself (elem_size covers the copy length).
             var recv_payload_ptr = recv_slot
-            if wl_get_type_kind(recv_opt_ty) == wl_struct_type_kind() and wl_count_struct_elem_types(recv_opt_ty) > 1:
-                recv_payload_ptr = wl_build_struct_gep(self.builder, recv_opt_ty, recv_slot, 1)
+            if wl_get_type_kind(recv_opt_ty) == wl_struct_type_kind():
+                let area = self.option_payload_ptr(recv_opt_ty, recv_slot)
+                if area != 0:
+                    recv_payload_ptr = area
             // Call with_channel_recv(handle, &payload) → i32 status (0 = got value)
             let cr_fn_name = "with_channel_recv"
             var cr_fn = wl_get_named_function(self.llmod, cr_fn_name)
@@ -12163,8 +12177,7 @@ impl Codegen:
                 let recv_tag_ty = wl_struct_get_type_at(recv_opt_ty, 0)
                 let recv_ok = wl_build_icmp(self.builder, wl_int_eq(), recv_status, wl_const_int(wl_i32_type(self.context), 0, 0))
                 let recv_tag = wl_build_select(self.builder, recv_ok, wl_const_int(recv_tag_ty, recv_some_disc, 0), wl_const_int(recv_tag_ty, recv_none_disc, 0))
-                let recv_tag_ptr = wl_build_struct_gep(self.builder, recv_opt_ty, recv_slot, 0)
-                wl_build_store(self.builder, recv_tag, recv_tag_ptr)
+                wl_build_store(self.builder, recv_tag, self.option_tag_ptr(recv_opt_ty, recv_slot))
             result = wl_build_load(self.builder, recv_opt_ty, recv_slot)
 
         else if intrinsic == MirIntrinsic.CHAN_CLOSE:
@@ -12474,7 +12487,8 @@ impl Codegen:
         let recv_tk = wl_get_type_kind(obj_ty)
         if recv_tk != wl_struct_type_kind() and recv_tk != wl_pointer_type_kind():
             return recv
-        // Get payload type: sema first, then LLVM struct field fallback
+        // The payload type is Sema's (the Option's body does not name it,
+        // #1958); a nullable Option's payload is the pointer itself.
         var payload_ty: i64 = 0
         if recv_tk == wl_pointer_type_kind():
             payload_ty = obj_ty
@@ -12483,13 +12497,13 @@ impl Codegen:
             let recv_op_id = body.call_arg_operands[arg_start_of]
             let recv_sema = self.mir_operand_sema_type(body, recv_op_id)
             payload_ty = self.mir_builtin_variant_payload_llvm_type(recv_sema, 0)
-            if payload_ty == 0 and wl_count_struct_elem_types(obj_ty) > 1:
-                payload_ty = wl_struct_get_type_at(obj_ty, 1)
-        let elem_ty = if payload_ty != 0: payload_ty else: self.type_fallback()
+            if payload_ty == 0:
+                sema_phase_bug(f"BUG: Option.filter receiver type {recv_sema} has no payload type")
+        let elem_ty = payload_ty
         let is_some = if recv_tk == wl_pointer_type_kind():
             wl_build_icmp(self.builder, wl_int_ne(), recv, wl_const_null(obj_ty))
         else:
-            let disc = wl_build_extract_value(self.builder, recv, 0)
+            let disc = self.option_tag_value(recv)
             wl_build_icmp(self.builder, wl_int_eq(), disc, wl_const_int(wl_type_of(disc), 0, 0))
         let fn_val = self.mir_intrinsic_arg(body, args_id, 1)
         let cty = wl_type_of(fn_val)
@@ -12514,7 +12528,7 @@ impl Codegen:
         let filt_merge = wl_append_bb(self.context, self.current_function, "of.merge")
         wl_build_cond_br(self.builder, is_some, filt_then, filt_else)
         wl_position_at_end(self.builder, filt_then)
-        let payload = if recv_tk == wl_pointer_type_kind(): recv else: wl_build_extract_value(self.builder, recv, 1)
+        let payload = self.option_payload_value(recv, elem_ty)
         let filt_args: Vec[i64] = Vec.new()
         if is_fat != 0:
             filt_args.push(ctx_ptr)
@@ -12663,17 +12677,8 @@ impl Codegen:
         let opt_ty = wl_type_of(opt_val)
         if wl_get_type_kind(opt_ty) == wl_pointer_type_kind():
             return wl_build_icmp(self.builder, wl_int_ne(), opt_val, wl_const_null(opt_ty))
-        let tag = wl_build_extract_value(self.builder, opt_val, 0)
+        let tag = self.option_tag_value(opt_val)
         wl_build_icmp(self.builder, wl_int_eq(), tag, wl_const_int(wl_type_of(tag), 0, 0))
-
-    mut fn mir_option_payload_value(opt_val: i64, payload_ty: i64) -> i64:
-        let opt_ty = wl_type_of(opt_val)
-        if wl_get_type_kind(opt_ty) == wl_pointer_type_kind():
-            return self.coerce_value_to_type(opt_val, payload_ty)
-        if wl_count_struct_elem_types(opt_ty) > 1:
-            let payload = wl_build_extract_value(self.builder, opt_val, 1)
-            return self.coerce_value_to_type(payload, payload_ty)
-        self.build_default_value(payload_ty)
 
     mut fn mir_call_fn_value(fn_val: i64, ret_ty: i64, args: &Vec[i64], arg_count: i32) -> i64:
         let ptr_ty = wl_ptr_type(self.context)
@@ -12800,7 +12805,7 @@ impl Codegen:
             let raw_elem_tid = self.mir_generic_arg_tid(iter_sema, 0)
             let raw_elem_ty0 = self.mir_sema_type_to_llvm(raw_elem_tid)
             let raw_elem_ty = if raw_elem_ty0 != 0: raw_elem_ty0 else: self.type_fallback()
-            return self.option_ref_from_slot_ptr(self.mir_emit_veciterref_next_from_ptr(iter_ptr, raw_elem_ty), opt_type)
+            return self.option_ref_from_slot_ptr(self.mir_emit_veciterref_next_from_ptr(iter_ptr, raw_elem_ty), opt_type, elem_ty)
         let iter_ty = self.mir_sema_type_to_llvm(iter_sema)
         if iter_ty == 0:
             with_eprint("error: iterator codegen missing LLVM type for iterator '" ++ name ++ "'")
@@ -12822,7 +12827,7 @@ impl Codegen:
             let merge_bb = wl_append_bb(self.context, self.current_function, "map.merge")
             wl_build_cond_br(self.builder, cond, some_bb, none_bb)
             wl_position_at_end(self.builder, some_bb)
-            let payload = self.mir_option_payload_value(next, in_ty)
+            let payload = self.option_payload_value(next, in_ty)
             let call_args: Vec[i64] = Vec.new()
             call_args.push(payload)
             let mapped = self.mir_call_fn_value(fn_val, elem_ty, call_args, 1)
@@ -12860,7 +12865,7 @@ impl Codegen:
             let cond2 = self.mir_option_is_some_value(next2)
             wl_build_cond_br(self.builder, cond2, test_bb, none_bb2)
             wl_position_at_end(self.builder, test_bb)
-            let payload2 = self.mir_option_payload_value(next2, elem_ty)
+            let payload2 = self.option_payload_value(next2, elem_ty)
             let pred_args: Vec[i64] = Vec.new()
             pred_args.push(payload2)
             let pred_raw = self.mir_call_fn_value(pred_val, wl_i1_type(self.context), pred_args, 1)
@@ -12943,7 +12948,7 @@ impl Codegen:
             let next_fm = self.mir_emit_iter_next_from_ptr(up_ptr_fm, upstream_tid_fm, in_tid_fm)
             wl_build_cond_br(self.builder, self.mir_option_is_some_value(next_fm), map_bb_fm, none_bb_fm)
             wl_position_at_end(self.builder, map_bb_fm)
-            let payload_fm = self.mir_option_payload_value(next_fm, in_ty_fm)
+            let payload_fm = self.option_payload_value(next_fm, in_ty_fm)
             let call_args_fm: Vec[i64] = Vec.new()
             call_args_fm.push(payload_fm)
             let mapped_fm = self.mir_call_fn_value(fn_val_fm, opt_type, call_args_fm, 1)
@@ -13022,7 +13027,7 @@ impl Codegen:
             let next_tw = self.mir_emit_iter_next_from_ptr(up_ptr_tw, upstream_tid_tw, elem_tid)
             wl_build_cond_br(self.builder, self.mir_option_is_some_value(next_tw), pred_bb_tw, none_bb_tw)
             wl_position_at_end(self.builder, pred_bb_tw)
-            let payload_tw = self.mir_option_payload_value(next_tw, elem_ty)
+            let payload_tw = self.option_payload_value(next_tw, elem_ty)
             let pred_args_tw: Vec[i64] = Vec.new()
             pred_args_tw.push(payload_tw)
             let pred_raw_tw = self.mir_call_fn_value(pred_val_tw, wl_i1_type(self.context), pred_args_tw, 1)
@@ -13066,7 +13071,7 @@ impl Codegen:
             let next_dw = self.mir_emit_iter_next_from_ptr(up_ptr_dw, upstream_tid_dw, elem_tid)
             wl_build_cond_br(self.builder, self.mir_option_is_some_value(next_dw), pred_bb_dw, none_bb_dw)
             wl_position_at_end(self.builder, pred_bb_dw)
-            let payload_dw = self.mir_option_payload_value(next_dw, elem_ty)
+            let payload_dw = self.option_payload_value(next_dw, elem_ty)
             let dropping_dw = wl_build_load(self.builder, wl_i1_type(self.context), dropping_ptr_dw)
             let check_bb_dw = wl_append_bb(self.context, self.current_function, "dropwhile.check")
             wl_build_cond_br(self.builder, dropping_dw, check_bb_dw, some_bb_dw)
@@ -13123,8 +13128,8 @@ impl Codegen:
             let rsome = self.mir_option_is_some_value(rn)
             wl_build_cond_br(self.builder, rsome, some_bb4, none_bb4)
             wl_position_at_end(self.builder, some_bb4)
-            let lv = self.mir_option_payload_value(ln, left_ty)
-            let rv = self.mir_option_payload_value(rn, right_ty)
+            let lv = self.option_payload_value(ln, left_ty)
+            let rv = self.option_payload_value(rn, right_ty)
             let pair_alloc = self.create_entry_alloca(elem_ty)
             wl_build_store(self.builder, self.build_default_value(elem_ty), pair_alloc)
             let p0 = wl_build_struct_gep(self.builder, elem_ty, pair_alloc, 0)
@@ -13163,7 +13168,7 @@ impl Codegen:
             wl_build_cond_br(self.builder, self.mir_option_is_some_value(next_en), some_bb_en, none_bb_en)
             wl_position_at_end(self.builder, some_bb_en)
             let idx_val_en = wl_build_load(self.builder, wl_i64_type(self.context), idx_ptr_en)
-            let payload_en = self.mir_option_payload_value(next_en, raw_elem_ty_en)
+            let payload_en = self.option_payload_value(next_en, raw_elem_ty_en)
             let pair_alloc_en = self.create_entry_alloca(elem_ty)
             wl_build_store(self.builder, self.build_default_value(elem_ty), pair_alloc_en)
             let en0 = wl_build_struct_gep(self.builder, elem_ty, pair_alloc_en, 0)
@@ -13247,8 +13252,8 @@ impl Codegen:
             let rn_zw = self.mir_emit_iter_next_from_ptr(right_ptr_zw, right_tid_zw, right_elem_tid_zw)
             wl_build_cond_br(self.builder, self.mir_option_is_some_value(rn_zw), some_bb_zw, none_bb_zw)
             wl_position_at_end(self.builder, some_bb_zw)
-            let lv_zw = self.mir_option_payload_value(ln_zw, left_ty_zw)
-            let rv_zw = self.mir_option_payload_value(rn_zw, right_ty_zw)
+            let lv_zw = self.option_payload_value(ln_zw, left_ty_zw)
+            let rv_zw = self.option_payload_value(rn_zw, right_ty_zw)
             let call_args_zw: Vec[i64] = Vec.new()
             call_args_zw.push(lv_zw)
             call_args_zw.push(rv_zw)
@@ -13358,7 +13363,7 @@ impl Codegen:
             let outer_next = self.mir_emit_iter_next_from_ptr(outer_ptr, outer_tid, in_tid)
             wl_build_cond_br(self.builder, self.mir_option_is_some_value(outer_next), produce_bb5, none_bb5)
             wl_position_at_end(self.builder, produce_bb5)
-            let outer_payload = self.mir_option_payload_value(outer_next, in_ty)
+            let outer_payload = self.option_payload_value(outer_next, in_ty)
             let fm_args: Vec[i64] = Vec.new()
             fm_args.push(outer_payload)
             let produced = self.mir_call_fn_value(fn_val5, collection_ty, fm_args, 1)
@@ -13462,7 +13467,7 @@ impl Codegen:
         let next = self.mir_emit_iter_next_from_ptr(recv_ptr, recv_sema, elem_tid)
         wl_build_cond_br(self.builder, self.mir_option_is_some_value(next), body_bb, end_bb)
         wl_position_at_end(self.builder, body_bb)
-        let elem = self.mir_option_payload_value(next, elem_ty)
+        let elem = self.option_payload_value(next, elem_ty)
         let cur = wl_build_load(self.builder, acc_ty, acc_ptr)
         let call_args: Vec[i64] = Vec.new()
         call_args.push(cur)
@@ -13515,7 +13520,7 @@ impl Codegen:
             let next = self.mir_emit_iter_next_from_ptr(recv_ptr, recv_sema, elem_tid)
             wl_build_cond_br(self.builder, self.mir_option_is_some_value(next), push_bb, end_bb)
             wl_position_at_end(self.builder, push_bb)
-            let elem = self.mir_option_payload_value(next, elem_ty)
+            let elem = self.option_payload_value(next, elem_ty)
             wl_build_store(self.builder, elem, tmp)
             let push_fn = self.ensure_vec_runtime_fn("with_vec_push", void_ty, 2)
             let push_ty = self.get_vec_fn_type("with_vec_push", void_ty, 2)
@@ -13592,7 +13597,7 @@ impl Codegen:
             let next2 = self.mir_emit_iter_next_from_ptr(recv_ptr, recv_sema, elem_tid)
             wl_build_cond_br(self.builder, self.mir_option_is_some_value(next2), insert_bb, end_bb2)
             wl_position_at_end(self.builder, insert_bb)
-            let elem2 = self.mir_option_payload_value(next2, elem_ty)
+            let elem2 = self.option_payload_value(next2, elem_ty)
             var key_val = elem2
             var val_val = wl_const_int(byte_ty, 1, 0)
             if dest_base_sym == self.sym_hashmap:
@@ -13658,7 +13663,7 @@ impl Codegen:
             wl_build_cond_br(self.builder, self.mir_option_is_some_value(next_b), item_bb_b, end_bb_b)
 
             wl_position_at_end(self.builder, item_bb_b)
-            let elem_b = self.mir_option_payload_value(next_b, elem_ty)
+            let elem_b = self.option_payload_value(next_b, elem_ty)
             var key_b = elem_b
             if dest_base_sym == self.sym_btreemap:
                 key_b = wl_build_extract_value(self.builder, elem_b, 0)
@@ -13758,7 +13763,7 @@ impl Codegen:
         let next = self.mir_emit_iter_next_from_ptr(recv_ptr, recv_sema, elem_tid)
         wl_build_cond_br(self.builder, self.mir_option_is_some_value(next), push_bb, end_bb)
         wl_position_at_end(self.builder, push_bb)
-        let elem = self.mir_option_payload_value(next, elem_ty)
+        let elem = self.option_payload_value(next, elem_ty)
         wl_build_store(self.builder, elem, tmp)
         let push_fn = self.ensure_vec_runtime_fn("with_vec_push", void_ty, 2)
         let push_ty = self.get_vec_fn_type("with_vec_push", void_ty, 2)
@@ -13815,7 +13820,7 @@ impl Codegen:
         let next = self.mir_emit_iter_next_from_ptr(recv_ptr, recv_sema, elem_tid)
         wl_build_cond_br(self.builder, self.mir_option_is_some_value(next), add_bb, end_bb)
         wl_position_at_end(self.builder, add_bb)
-        let elem = self.mir_option_payload_value(next, elem_ty)
+        let elem = self.option_payload_value(next, elem_ty)
         let cur = wl_build_load(self.builder, elem_ty, acc_ptr)
         let next_acc = if wl_get_type_kind(elem_ty) == wl_float_type_kind():
             wl_build_fadd(self.builder, cur, elem)
@@ -13848,7 +13853,7 @@ impl Codegen:
         let next = self.mir_emit_iter_next_from_ptr(recv_ptr, recv_sema, elem_tid)
         wl_build_cond_br(self.builder, self.mir_option_is_some_value(next), mul_bb, end_bb)
         wl_position_at_end(self.builder, mul_bb)
-        let elem = self.mir_option_payload_value(next, elem_ty)
+        let elem = self.option_payload_value(next, elem_ty)
         let cur = wl_build_load(self.builder, elem_ty, acc_ptr)
         let next_acc = self.mir_build_bin_op(BinaryOp.OP_MUL, cur, elem, self.mir_sema_type_is_unsigned(elem_tid), elem_tid, elem_tid)
         wl_build_store(self.builder, self.coerce_value_to_type(next_acc, elem_ty), acc_ptr)
@@ -13880,7 +13885,7 @@ impl Codegen:
         let next = self.mir_emit_iter_next_from_ptr(recv_ptr, recv_sema, elem_tid)
         wl_build_cond_br(self.builder, self.mir_option_is_some_value(next), body_bb, end_bb)
         wl_position_at_end(self.builder, body_bb)
-        let elem = self.mir_option_payload_value(next, elem_ty)
+        let elem = self.option_payload_value(next, elem_ty)
         let seen = wl_build_load(self.builder, wl_i1_type(self.context), seen_ptr)
         wl_build_cond_br(self.builder, seen, compare_bb, first_bb)
         wl_position_at_end(self.builder, first_bb)
@@ -13949,7 +13954,7 @@ impl Codegen:
         let next = self.mir_emit_iter_next_from_ptr(recv_ptr, recv_sema, elem_tid)
         wl_build_cond_br(self.builder, self.mir_option_is_some_value(next), body_bb, end_bb)
         wl_position_at_end(self.builder, body_bb)
-        let elem = self.mir_option_payload_value(next, elem_ty)
+        let elem = self.option_payload_value(next, elem_ty)
         let seen = wl_build_load(self.builder, wl_i1_type(self.context), seen_ptr)
         wl_build_cond_br(self.builder, seen, compare_bb, first_bb)
         wl_position_at_end(self.builder, first_bb)
@@ -14021,7 +14026,7 @@ impl Codegen:
         let next = self.mir_emit_iter_next_from_ptr(recv_ptr, recv_sema, elem_tid)
         wl_build_cond_br(self.builder, self.mir_option_is_some_value(next), test_bb, none_bb)
         wl_position_at_end(self.builder, test_bb)
-        let elem = self.mir_option_payload_value(next, elem_ty)
+        let elem = self.option_payload_value(next, elem_ty)
         let pred_args: Vec[i64] = Vec.new()
         pred_args.push(elem)
         let pred_raw = self.mir_call_fn_value(pred_val, wl_i1_type(self.context), pred_args, 1)
@@ -14073,7 +14078,7 @@ impl Codegen:
         let next = self.mir_emit_iter_next_from_ptr(recv_ptr, recv_sema, elem_tid)
         wl_build_cond_br(self.builder, self.mir_option_is_some_value(next), test_bb, none_bb)
         wl_position_at_end(self.builder, test_bb)
-        let elem = self.mir_option_payload_value(next, elem_ty)
+        let elem = self.option_payload_value(next, elem_ty)
         let pred_args: Vec[i64] = Vec.new()
         pred_args.push(elem)
         let pred_raw = self.mir_call_fn_value(pred_val, wl_i1_type(self.context), pred_args, 1)
@@ -14127,7 +14132,7 @@ impl Codegen:
         let next = self.mir_emit_iter_next_from_ptr(recv_ptr, recv_sema, elem_tid)
         wl_build_cond_br(self.builder, self.mir_option_is_some_value(next), test_bb, end_bb)
         wl_position_at_end(self.builder, test_bb)
-        let elem = self.mir_option_payload_value(next, elem_ty)
+        let elem = self.option_payload_value(next, elem_ty)
         let pred_args: Vec[i64] = Vec.new()
         pred_args.push(elem)
         let pred_raw = self.mir_call_fn_value(pred_val, i1_ty, pred_args, 1)
@@ -14162,7 +14167,7 @@ impl Codegen:
         let next = self.mir_emit_iter_next_from_ptr(recv_ptr, recv_sema, elem_tid)
         wl_build_cond_br(self.builder, self.mir_option_is_some_value(next), body_bb, end_bb)
         wl_position_at_end(self.builder, body_bb)
-        let elem = self.mir_option_payload_value(next, elem_ty)
+        let elem = self.option_payload_value(next, elem_ty)
         let call_args: Vec[i64] = Vec.new()
         call_args.push(elem)
         let _ = self.mir_call_fn_value(fn_val, wl_void_type(self.context), call_args, 1)
@@ -14212,7 +14217,7 @@ impl Codegen:
         let next = self.mir_emit_iter_next_from_ptr(recv_ptr, recv_sema, elem_tid)
         wl_build_cond_br(self.builder, self.mir_option_is_some_value(next), push_bb, end_bb)
         wl_position_at_end(self.builder, push_bb)
-        let elem = self.mir_option_payload_value(next, elem_ty)
+        let elem = self.option_payload_value(next, elem_ty)
         wl_build_store(self.builder, wl_build_extract_value(self.builder, elem, 0), left_tmp)
         wl_build_store(self.builder, wl_build_extract_value(self.builder, elem, 1), right_tmp)
         let push_fn = self.ensure_vec_runtime_fn("with_vec_push", void_ty, 2)
@@ -14252,7 +14257,7 @@ impl Codegen:
         let next = self.mir_emit_iter_next_from_ptr(recv_ptr, recv_sema, elem_tid)
         wl_build_cond_br(self.builder, self.mir_option_is_some_value(next), body_bb, end_bb)
         wl_position_at_end(self.builder, body_bb)
-        let elem = self.mir_option_payload_value(next, elem_ty)
+        let elem = self.option_payload_value(next, elem_ty)
         let seen = wl_build_load(self.builder, wl_i1_type(self.context), seen_ptr)
         wl_build_cond_br(self.builder, seen, combine_bb, first_bb)
         wl_position_at_end(self.builder, first_bb)
@@ -14332,7 +14337,7 @@ impl Codegen:
         let next = self.mir_emit_iter_next_from_ptr(recv_ptr, recv_sema, elem_tid)
         wl_build_cond_br(self.builder, self.mir_option_is_some_value(next), pred_bb, end_bb)
         wl_position_at_end(self.builder, pred_bb)
-        let elem = self.mir_option_payload_value(next, elem_ty)
+        let elem = self.option_payload_value(next, elem_ty)
         wl_build_store(self.builder, elem, tmp)
         let pred_args: Vec[i64] = Vec.new()
         pred_args.push(elem)
