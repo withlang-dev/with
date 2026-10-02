@@ -57,6 +57,7 @@ use MirCore
 use AnalysisTypes
 use compiler.ConanClient
 use compiler.LockFile
+use std.string.StringBuilder
 
 extern fn with_arg_count() -> i32
 extern fn with_str_clone_ref(s: &str) -> str

@@ -32,6 +32,7 @@ use compiler.TrackedInputs
 use compiler.Zcu
 use compiler.Link
 use InternPool
+use std.string.StringBuilder
 // Frontend pipeline: lex -> parse -> import resolution -> sema.
 
 var frontend_cimport_compiler_fingerprint_ready: i32 = 0
