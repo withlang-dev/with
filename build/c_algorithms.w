@@ -200,6 +200,7 @@ fn calg_lanes(out: Build, ctx: &BuildCtx, corpus: &Corpus, release_compiler: &st
     migrate_tests.action = run_calg_migrate_tests_action
     migrate_tests = migrate_tests.input(corpus.upstream.reference.clone()).dep("c-algorithms-prepare-reference")
     migrate_tests = migrate_tests.write_scope("out/tmp/action-scratch/c-algorithms-migrate-tests")
+    migrate_tests = corpus_migrating_target(move migrate_tests, release_compiler)
     graph = graph.add_target(migrate_tests)
     var promote_tests = target_new(.Action, "c-algorithms-promote-tests", "").output(CALG_TESTS_DIR)
     promote_tests.action = run_calg_promote_tests_action
