@@ -4677,15 +4677,22 @@ fn run_test_file_with_build_settings_inner(target: &str, opt_level: i32, no_std:
 // lane sees invalid ownership MIR that runs green: a drop of a moved place,
 // a read of a released handle. A test that expects a check or build failure,
 // or is skipped here, is not judged.
+fn test_flag_configures_compilation(token: &str) -> bool:
+    if token == "-h" or token == "--help" or token == "--debug-alloc" or token == "--trace-alloc":
+        return false
+    cli_one_liner_known_flag(token) or token.starts_with("--prelude=") or token.starts_with("--overflow=")
+
 fn run_test_validate_all(target: &str, directives: &TestDirectives) -> i32:
     if directives.skip or directives.expect_check_fail.len() > 0 or directives.expect_build_fail.len() > 0:
         return 0
     var vd = parse_test_directives_for_target(target)
-    // The fixture's configuration flags (`--no-prelude`, `--alloc`) apply;
-    // its dump/trace/explain flags would print in place of the validation.
+    // Only the fixture's flags that configure how it compiles (prelude tier,
+    // std, runtime, overflow, optimization) apply; a dump or trace request
+    // would print in place of the verdict, and its value would be read as a
+    // file.
     var kept = ""
     for token in vd.extra_args.split(" "):
-        if token.len() > 0 and not token.starts_with("--dump") and not token.starts_with("--trace") and not token.starts_with("--explain"):
+        if test_flag_configures_compilation(token):
             kept = kept ++ " " ++ token
     vd.extra_args = kept ++ " --validate-all"
     let result = run_test_compiler_command(target, "check", &vd)
