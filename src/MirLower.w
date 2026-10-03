@@ -11866,7 +11866,7 @@ impl MirBuilder:
         let bc_resolved = self.sema.comp_resolved.get(node)
         let bc_callee_sym: i32 = if bc_resolved.is_some(): bc_resolved.unwrap() else: 0
         if self.sema.precondition_form_calls.contains(node):
-            return self.lower_precondition_form(fn_op, sig_idx, self.sema.precondition_form_calls.get(node).unwrap(), actual_ret_type_id, arg_exprs_start, arg_exprs_count, node)
+            return self.lower_precondition_form(fn_op, sig_idx, self.sema.precondition_form_calls.get(node).unwrap(), actual_ret_type_id, 0, arg_exprs_start, arg_exprs_count, node)
 
         let args: Vec[i32] = Vec.new()
         // Use sema-resolved arg order for named-arg and implicit-arg calls
@@ -11940,10 +11940,15 @@ impl MirBuilder:
     // called, which reports the failure and does not return. The passing
     // path never runs the message: its effects do not happen, and what it
     // would move stays owned (Sema checked it so: SemaCheck.w check_call).
-    mut fn lower_precondition_form(fn_op: i32, sig_idx: i32, form_sym: i32, ret_ty: i32, arg_exprs_start: i32, arg_exprs_count: i32, node: i32) -> i32:
+    // `lead` is a pipeline's piped condition (`c |> require(msg)`), else 0;
+    // `node` is the call.
+    mut fn lower_precondition_form(fn_op: i32, sig_idx: i32, form_sym: i32, ret_ty: i32, lead: i32, arg_exprs_start: i32, arg_exprs_count: i32, node: i32) -> i32:
         // The operands in parameter order; whether each is its default.
         let arg_nodes: Vec[i32] = Vec.new()
         let arg_defaults: Vec[bool] = Vec.new()
+        if lead != 0:
+            arg_nodes.push(lead)
+            arg_defaults.push(false)
         if self.sema.has_resolved_call_args(node) != 0:
             for i in 0..self.sema.get_resolved_call_arg_count(node):
                 arg_nodes.push(self.sema.get_resolved_call_arg(node, i))
@@ -11956,7 +11961,7 @@ impl MirBuilder:
             let meta = if fn_node != 0: self.ast.find_fn_meta(fn_node) else: -1
             if meta >= 0:
                 let param_start = self.ast.fn_meta_param_start(meta)
-                for di in arg_exprs_count..self.ast.fn_meta_param_count(meta):
+                for di in arg_nodes.len() as i32..self.ast.fn_meta_param_count(meta):
                     let def_node = self.ast.get_fn_param_default(param_start, di)
                     if def_node != 0:
                         arg_nodes.push(def_node)
@@ -11973,15 +11978,16 @@ impl MirBuilder:
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, cond_op, table, fail_bb, 0)
 
-        // The failing path, as an `if` arm that does not return (lower_if).
-        let entry_move_state = self.save_move_state()
+        // The failing path: a lazy arm, as `??`'s default (D86 states the
+        // message follows its rules), that does not return. Its pending
+        // source-resets flush inside it (lower_if): left pending they would
+        // blank, on the passing path, a value the message did not move.
         let str_entry = self.save_string_flow_facts()
         let pending_reset_start = self.pending_reset_locals.len() as i32
         let pending_reset_field_start = self.pending_reset_field_places.len() as i32
         let pending_move_temp_start = self.pending_move_temp_locals.len() as i32
         self.switch_to(fail_bb)
-        self.field_move_in_branch = self.field_move_in_branch + 1
-        let fail_frame = self.push_stmt_temp_frame()
+        let fail_arm = self.begin_lazy_arm()
         let args: Vec[i32] = Vec.new()
         // The condition is false on this path.
         args.push(self.lower_bool_lit(0))
@@ -12002,13 +12008,11 @@ impl MirBuilder:
         self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, after_bb)
         self.switch_to(after_bb)
         self.register_stmt_temp(result_local, ret_ty)
-        self.finish_stmt_temp_frame(fail_frame)
         self.flush_pending_resets_since(pending_reset_start, pending_reset_field_start, pending_move_temp_start)
-        self.field_move_in_branch = self.field_move_in_branch - 1
+        self.end_lazy_arm(&fail_arm)
         // The declaration does not return on a false condition.
         self.terminate(TermKind.TK_UNREACHABLE, 0, 0, 0, 0)
         self.restore_string_flow_facts(&str_entry)
-        self.restore_move_state(&entry_move_state)
 
         self.switch_to(pass_bb)
         self.unit_operand()
@@ -16940,6 +16944,15 @@ impl MirBuilder:
         if kind == NodeKind.NK_PIPELINE:
             let rhs = self.ast.get_data1(node)
             if self.ast.kind(rhs) == NodeKind.NK_CALL:
+                // D86 (§18.2): `c |> require(msg)` is the form with `c` as
+                // its condition.
+                if self.sema.precondition_form_calls.contains(rhs):
+                    let form_sym: i32 = self.sema.precondition_form_calls.get(rhs).unwrap()
+                    let recorded = self.sema.resolved_call_sigs.get(rhs).copied()
+                    let form_sig = if recorded.is_some(): recorded.unwrap() else: self.call_sig_for_sym(form_sym)
+                    let form_fn_op = self.lower_callable_expr(self.ast.get_data0(rhs))
+                    let form_ret = if form_sig >= 0: self.sema.sig_return_type(form_sig) else: 0
+                    return self.lower_precondition_form(form_fn_op, form_sig, form_sym, form_ret, self.ast.get_data0(node), self.ast.get_data1(rhs), self.ast.get_data2(rhs), rhs)
                 return self.lower_pipeline(self.ast.get_data0(node), self.ast.get_data0(rhs), self.ast.get_data1(rhs), self.ast.get_data2(rhs), node)
             return self.lower_pipeline(self.ast.get_data0(node), rhs, 0, 0, node)
 

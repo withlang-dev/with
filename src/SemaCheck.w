@@ -11759,9 +11759,18 @@ impl Sema:
             // The payload type is not an expectation for the fallback. Only an
             // enclosing expectation is independent of this join; otherwise the
             // fallback's exact type participates as an owned anchor.
+            // The fallback runs only on the failure path: a move inside it
+            // is a conditional move (§18.2 names it the model for D86's
+            // messages). When that path does not return, nothing it moved
+            // or invalidated reaches the join, as for a diverging `if` arm.
+            let dq_entry_states = self.save_scope_states()
+            let dq_entry_mf = self.save_moved_field_state()
             rhs = if join_expected != 0: self.check_expr_with_expected(rhs_node, join_expected as TypeId) else: self.check_expr_value_context(rhs_node)
             if rhs == 0:
                 return 0
+            if self.get_type_kind(self.resolve_alias(rhs)) == TypeKind.TY_NEVER:
+                self.restore_scope_states(&dq_entry_states)
+                self.restore_moved_field_state(&dq_entry_mf)
             let dj = self.resolve_contextual_default_join(join_expected, lhs_node, unwrapped, rhs_node, rhs_node, rhs as i32, D22_JOIN_ROLE_EXPR, node, "`??`")
             // Record the sidecar (per-arm recording, same gap as the async
             // block): without it MirLower's fallback types the ?? node as
