@@ -836,6 +836,12 @@ the gate. An agent:
   (`test/behavior/behav_*.w`): the spellings are `type T:`,
   `impl Drop for T:` with `move fn drop()`, `//! expect-stdout:` headers,
   and statements never sit beside `fn main`;
+- never wraps commands in an opaque script — `sh -c "…"`, `bash -c`,
+  `nohup sh -c`, `eval`, `xargs <cmd>`, or a quoted multi-command script
+  inside `ssh host '…'`. The permission checker cannot read inside them, so
+  each one stops the whole campaign for Eric's approval, even in bypass mode.
+  Run a long command as its own background Bash call (no `nohup`, no `&`),
+  and put loops or multi-step logic in a With script (`with run`);
 - commits locally and does not push unless told. A pushed branch always has a
   PR in the stack (`gh stack link --base main …`).
 
