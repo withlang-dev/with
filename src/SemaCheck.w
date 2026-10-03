@@ -28935,6 +28935,17 @@ impl Sema:
                     if split_arg_ty != 0:
                         let split_index_ty = self.ty_i64 as i32
                         let _ = self.check_builtin_method_call_arg(mc_call_name, 0, split_index_ty, split_arg_ty, self.ast.get_extra(extra_start))
+            else if type_name_sym == self.syms.vec and field == self.syms.range_method:
+                // Vec.range(r: Range): the one argument is a range. Two
+                // integers passed Sema and the VEC_RANGE lowering read a
+                // Range field off an i64, crashing the compiler at build
+                // (#1954).
+                if arg_count != 1:
+                    self.emit_error("range() expects exactly one range argument, `v.range(start..end)`", node)
+                else:
+                    let range_arg_ty = arg_types[0]
+                    if range_arg_ty != 0 and self.get_type_kind(self.resolve_alias(range_arg_ty as TypeId)) != TypeKind.TY_RANGE:
+                        self.emit_error("range() expects a range argument, `v.range(start..end)`, found " ++ self.type_name(range_arg_ty), self.ast.get_extra(extra_start))
             else if type_name_sym == self.syms.vec and field == self.syms.contains:
                 // D22: Vec.contains(value: &T) observes — arg[0] is &T; an
                 // owned argument auto-refs at the call site.
