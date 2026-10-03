@@ -24,7 +24,6 @@ pub enum ComptimeValueKind: i32:
     CV_ENUM = 13
     CV_BYTES = 14
     CV_STRING_BUILDER = 15
-    CV_STRING_CHUNK = 16
     CV_FLOAT = 17
 
 pub type ComptimeValue {
@@ -280,7 +279,9 @@ pub fn comptime_value_bytes(type_id: i32, data: &str) -> ComptimeValue:
         extra_count: 0,
     }
 
-pub fn comptime_value_string_builder(type_id: i32, head: i32, chunk_count: i32, byte_count: i64) -> ComptimeValue:
+// `builder` indexes the evaluator's buffer table (#1944); `byte_count` is
+// the length at the time of the read, for display.
+pub fn comptime_value_string_builder(type_id: i32, builder: i32, byte_count: i64) -> ComptimeValue:
     ComptimeValue {
         kind: ComptimeValueKind.CV_STRING_BUILDER,
         type_id,
@@ -289,20 +290,7 @@ pub fn comptime_value_string_builder(type_id: i32, head: i32, chunk_count: i32, 
         real: 0.0,
         text: "",
         text_refs: 0 as *mut i64,
-        extra_start: head,
-        extra_count: chunk_count,
-    }
-
-pub fn comptime_value_string_chunk(prev: i32, data: &str) -> ComptimeValue:
-    ComptimeValue {
-        kind: ComptimeValueKind.CV_STRING_CHUNK,
-        type_id: 0,
-        data0: prev as i64,
-        data1: 0,
-        real: 0.0,
-        text: with_str_clone_ref(data),
-        text_refs: comptime_text_refs(data),
-        extra_start: 0,
+        extra_start: builder,
         extra_count: 0,
     }
 
@@ -342,7 +330,6 @@ pub fn comptime_value_kind_name(kind: i32) -> str:
     if kind == ComptimeValueKind.CV_ENUM: return "enum"
     if kind == ComptimeValueKind.CV_BYTES: return "bytes"
     if kind == ComptimeValueKind.CV_STRING_BUILDER: return "StringBuilder"
-    if kind == ComptimeValueKind.CV_STRING_CHUNK: return "string chunk"
     if kind == ComptimeValueKind.CV_FLOAT: return "float"
     "invalid"
 
@@ -419,8 +406,6 @@ fn comptime_value_format(value: &ComptimeValue, extras: &Vec[ComptimeValue], sem
         return f"Vec[u8]({value.text.len()} bytes)"
     if value.kind == ComptimeValueKind.CV_STRING_BUILDER:
         return f"StringBuilder({value.data0} bytes)"
-    if value.kind == ComptimeValueKind.CV_STRING_CHUNK:
-        return "<string chunk>"
     if value.type_id != 0:
         return "<" ++ sema.type_name(value.type_id) ++ ">"
     "<invalid>"
@@ -507,12 +492,9 @@ pub fn comptime_values_equal(lhs: &ComptimeValue, rhs: &ComptimeValue, extras: &
     if lhs.kind == ComptimeValueKind.CV_BYTES:
         return with_str_eq_ref(with_str_clone_ref(lhs.text), with_str_clone_ref(rhs.text))
     if lhs.kind == ComptimeValueKind.CV_STRING_BUILDER:
-        if lhs.type_id == rhs.type_id and lhs.extra_start == rhs.extra_start and lhs.extra_count == rhs.extra_count and lhs.data0 == rhs.data0:
+        // One buffer, one builder: the length is a snapshot, not identity.
+        if lhs.type_id == rhs.type_id and lhs.extra_start == rhs.extra_start:
             return 1
-        return 0
-    if lhs.kind == ComptimeValueKind.CV_STRING_CHUNK:
-        if lhs.data0 == rhs.data0:
-            return with_str_eq_ref(with_str_clone_ref(lhs.text), with_str_clone_ref(rhs.text))
         return 0
     0
 

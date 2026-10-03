@@ -264,6 +264,11 @@ type ComptimeEvaluator {
     step_budget: i32,
     string_bytes_allocated: i64,
     string_byte_budget: i64,
+    // Every comptime StringBuilder is one growable buffer here, named by
+    // its index from the value header (#1944): a push appends in place and a
+    // read never clones the contents. A chunk-per-push chain cost three
+    // allocations per byte and never released one until the evaluator did.
+    builders: Vec[StringBuilder],
     source_text_cache_path: str,
     source_text_cache: str,
     recursion_limit: i32,
@@ -365,6 +370,7 @@ fn ComptimeEvaluator.init(sema: Sema, ast: AstPool, pool: InternPool, require_su
         step_budget: COMPTIME_STEP_LIMIT,
         string_bytes_allocated: 0,
         string_byte_budget: comptime_configured_string_budget(COMPTIME_STRING_BYTE_BUDGET),
+        builders: Vec.new(),
         source_text_cache_path: "",
         source_text_cache: "",
         recursion_limit: COMPTIME_RECURSION_LIMIT,
@@ -1565,13 +1571,15 @@ fn comptime_action_capability_record(package_name: &str, package_version: &str, 
     }
 
 impl ComptimeEvaluator:
-    // Owned read of the value arena. extra_values GROWS during almost
-    // every evaluation step; a `let x = extra_values.get(i)` view dangles
-    // as soon as a push reallocates (stage2's map-insert loop read a freed
-    // buffer). Copy the value struct OUT before any push. Materialization
-    // may transfer its text into an ordinary owning str, so this read is deep.
+    // Read of the value arena. extra_values GROWS during almost every
+    // evaluation step; a `let x = extra_values.get(i)` view dangles as soon
+    // as a push reallocates (stage2's map-insert loop read a freed buffer).
+    // Copy the value header OUT before any push. The text is shared, never
+    // cloned: a field read in a loop deep-cloned the 248 KB abilists text
+    // on every `self.bytes[i]` of the sysroot action (#1944). A boundary
+    // that transfers the text into an ordinary owning str clones it there.
     fn extra_value_at(index: i64) -> ComptimeValue:
-        comptime_value_clone(self.extra_values[index])
+        comptime_value_share(self.extra_values[index])
 
     // A persistent snapshot retains ComptimeValues, whose Drop keeps shared
     // immutable text alive. Deep-cloning an unchanged field on every cursor
@@ -2356,8 +2364,12 @@ impl ComptimeEvaluator:
     // — module context switches to the callee before defaults evaluate), and
     // the uncached read re-hit the disk per call: ~35 GB of never-freed str
     // and most of an action's wall clock in open/read (#741).
-    mut fn current_source_text() -> str:
-        let path = self.current_source_path()
+    mut fn current_source_text() -> str: self.source_text_for_path(self.current_source_path())
+
+    // Only a call-site default (`#line`, `#src`) needs the caller's text, so
+    // a call reads it then, not on every call: the eager read cloned the
+    // 187 KB build.sdk source per user function call (#1944).
+    mut fn source_text_for_path(path: &str) -> str:
         if path != "<unknown>":
             if path == self.source_text_cache_path:
                 return with_str_clone_ref(self.source_text_cache)
@@ -2478,35 +2490,41 @@ impl ComptimeEvaluator:
             return self.is_string_builder_type(value.type_id)
         false
 
-    fn empty_string_builder_value(type_id: i32) -> ComptimeValue:
-        comptime_value_string_builder(type_id, -1, 0, 0)
+    // A fresh buffer; the header names it by index. The header is a plain
+    // value the evaluator copies between slots, so two headers may name one
+    // buffer — only after a move, which Sema has already checked, so the
+    // source header is dead.
+    mut fn empty_string_builder_value(type_id: i32, capacity: i64) -> ComptimeValue:
+        let id = self.builders.len() as i32
+        self.builders.push(StringBuilder.with_capacity(capacity))
+        comptime_value_string_builder(type_id, id, 0)
+
+    fn string_builder_len(builder: &ComptimeValue) -> i64: self.builders[builder.extra_start].len()
 
     mut fn string_builder_append_chunk(builder: ComptimeValue, chunk: &str, node: i32) -> ComptimeValue:
         if chunk.len() == 0:
             return builder
         if self.reserve_string_bytes(node, chunk.len()) == 0:
             return comptime_value_invalid()
-        let chunk_index = self.extra_values.len() as i32
-        self.extra_values.push(comptime_value_string_chunk(builder.extra_start, chunk))
-        comptime_value_string_builder(builder.type_id, chunk_index, builder.extra_count + 1, builder.data0 + chunk.len())
+        self.builders[builder.extra_start].push_str(chunk)
+        comptime_value_string_builder(builder.type_id, builder.extra_start, self.string_builder_len(&builder))
 
     mut fn string_builder_from_struct(value: &ComptimeValue, node: i32) -> ComptimeValue:
-        var builder = self.empty_string_builder_value(value.type_id)
         let bytes_value = self.struct_field_value_by_name(value, "bytes")
         if bytes_value.kind == ComptimeValueKind.CV_BYTES:
+            let builder = self.empty_string_builder_value(value.type_id, bytes_value.text.len())
             return self.string_builder_append_chunk(builder, bytes_value.text, node)
         if bytes_value.kind == ComptimeValueKind.CV_VEC:
-            let parts: Vec[str] = Vec.new()
+            if self.reserve_string_bytes(node, bytes_value.extra_count) == 0:
+                return comptime_value_invalid()
+            let builder = self.empty_string_builder_value(value.type_id, bytes_value.extra_count)
             for i in 0..bytes_value.extra_count:
                 let elem = self.extra_value_at((bytes_value.extra_start + i) as i64)
                 if comptime_value_is_intlike(elem) == 0:
                     let _ = self.fail(node, "StringBuilder bytes field must contain u8 values")
                     return comptime_value_invalid()
-                parts.push(with_str_from_byte(comptime_value_intlike(elem) as i32))
-            let assembled_signal = self.concat_comptime_string_parts(node, parts)
-            if assembled_signal.kind != ComptimeControlKind.CTL_VALUE:
-                return comptime_value_invalid()
-            return self.string_builder_append_chunk(builder, assembled_signal.value.text, node)
+                self.builders[builder.extra_start].push_byte(comptime_value_intlike(elem) as u8)
+            return comptime_value_string_builder(builder.type_id, builder.extra_start, self.string_builder_len(&builder))
         if bytes_value.kind == ComptimeValueKind.CV_INVALID:
             let _ = self.fail(node, "StringBuilder comptime value is missing its bytes field")
             return comptime_value_invalid()
@@ -2521,40 +2539,20 @@ impl ComptimeEvaluator:
         let _ = self.fail(node, "StringBuilder method requires a StringBuilder value")
         comptime_value_invalid()
 
+    // The one copy a materialization makes: an owned str of the buffer.
     mut fn materialize_string_builder(value: ComptimeValue, node: i32) -> str:
         let builder = self.string_builder_from_value(value, node)
         if builder.kind != ComptimeValueKind.CV_STRING_BUILDER:
             return ""
-        if self.reserve_string_bytes(node, builder.data0) == 0:
+        if self.reserve_string_bytes(node, self.string_builder_len(&builder)) == 0:
             return ""
-        if builder.extra_count == 0:
-            return ""
-        let rev: Vec[str] = Vec.new()
-        var head = builder.extra_start
-        var visited = 0
-        while head >= 0 and visited < builder.extra_count:
-            let chunk = self.extra_value_at(head as i64)
-            if chunk.kind != ComptimeValueKind.CV_STRING_CHUNK:
-                let _ = self.fail(node, "invalid StringBuilder comptime chunk")
-                return ""
-            rev.push(with_str_clone_ref(chunk.text))
-            head = chunk.data0 as i32
-            visited = visited + 1
-        if visited != builder.extra_count:
-            let _ = self.fail(node, "invalid StringBuilder comptime chunk chain")
-            return ""
-        let parts: Vec[str] = Vec.new()
-        var i = rev.len() as i32 - 1
-        while i >= 0:
-            parts.push(with_str_clone_ref(rev[i]))
-            i = i - 1
-        with_str_concat_n(parts.ptr, parts.len())
+        self.builders[builder.extra_start].to_str()
 
     mut fn eval_static_string_builder_method_call(result_type: i32, method: &str, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
         if method == "new":
             if arg_count != 0:
                 return self.fail(node, "StringBuilder.new() takes no arguments in comptime")
-            return comptime_control_value(self.empty_string_builder_value(result_type))
+            return comptime_control_value(self.empty_string_builder_value(result_type, 0))
         if method == "with_capacity":
             if arg_count != 1:
                 return self.fail(node, "StringBuilder.with_capacity() expects exactly one argument in comptime")
@@ -2563,7 +2561,7 @@ impl ComptimeEvaluator:
                 return capacity_signal
             if comptime_value_is_intlike(capacity_signal.value) == 0:
                 return self.fail(node, "StringBuilder.with_capacity() expects an integer capacity")
-            return comptime_control_value(self.empty_string_builder_value(result_type))
+            return comptime_control_value(self.empty_string_builder_value(result_type, comptime_value_intlike(capacity_signal.value)))
         self.fail(node, "StringBuilder static method '" ++ method ++ "' is not comptime-evaluable yet")
 
 // The builtin collection method surface the evaluator implements itself
@@ -2613,11 +2611,11 @@ impl ComptimeEvaluator:
         if method == "len":
             if arg_count != 0:
                 return self.fail(node, "StringBuilder.len() takes no arguments")
-            return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i64 as i32), builder.data0))
+            return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i64 as i32), self.string_builder_len(&builder)))
         if method == "is_empty":
             if arg_count != 0:
                 return self.fail(node, "StringBuilder.is_empty() takes no arguments")
-            return comptime_control_value(comptime_value_bool(if builder.data0 == 0: 1 else: 0))
+            return comptime_control_value(comptime_value_bool(if self.string_builder_len(&builder) == 0: 1 else: 0))
         if method == "to_str":
             if arg_count != 0:
                 return self.fail(node, "StringBuilder.to_str() takes no arguments")
@@ -5888,9 +5886,10 @@ impl ComptimeEvaluator:
             let resolved = self.capability_resolve_project_path(record, path, method, node)
             if self.had_error != 0:
                 return comptime_control_error()
-            var bytes_value = self.extra_value_at((args_signal.value.extra_start + 1) as i64)
+            let bytes_value = self.extra_value_at((args_signal.value.extra_start + 1) as i64)
             let data = if bytes_value.kind == ComptimeValueKind.CV_BYTES:
-                move bytes_value.text
+                // The arena shares this text; the file write takes its own.
+                with_str_clone_ref(bytes_value.text)
             else:
                 if bytes_value.kind == ComptimeValueKind.CV_VEC:
                     let parts: Vec[str] = Vec.new()
@@ -6431,15 +6430,15 @@ impl ComptimeEvaluator:
             return 1
         if self.magic_ident_kind(default_node) != SemaMagicIdentKind.NONE: 1 else: 0
 
-    fn eval_call_site_default_arg(default_node: i32, call_node: i32, caller_path: &str, caller_text: &str, caller_fn_sym: i32) -> ComptimeControl:
+    mut fn eval_call_site_default_arg(default_node: i32, call_node: i32, caller_path: &str, caller_fn_sym: i32) -> ComptimeControl:
         if self.node_is_src_call(default_node) != 0:
-            let loc = comptime_source_loc(caller_text, self.ast.get_start(call_node))
+            let loc = comptime_source_loc(self.source_text_for_path(caller_path), self.ast.get_start(call_node))
             return comptime_control_value(comptime_value_str(f"{caller_path}:{loc.line}:{loc.col}"))
         let kind = self.magic_ident_kind(default_node)
         if kind == SemaMagicIdentKind.FILE:
             return comptime_control_value(comptime_value_str(caller_path))
         if kind == SemaMagicIdentKind.LINE:
-            let loc = comptime_source_loc(caller_text, self.ast.get_start(call_node))
+            let loc = comptime_source_loc(self.source_text_for_path(caller_path), self.ast.get_start(call_node))
             return comptime_control_value(comptime_value_int(self.sema.ty_u32 as i32, loc.line as i64))
         if kind == SemaMagicIdentKind.FN:
             let name = if caller_fn_sym != 0: with_str_clone_ref(self.pool.resolve(caller_fn_sym)) else: ""
@@ -7626,7 +7625,7 @@ impl ComptimeEvaluator:
                 result_type2 = self.named_type_id("StringBuilder", node)
             if result_type2 == 0:
                 return comptime_control_error()
-            return comptime_control_value(self.empty_string_builder_value(result_type2))
+            return comptime_control_value(self.empty_string_builder_value(result_type2, 0))
         let callee_slot = self.lookup_slot_index(fn_sym)
         if callee_slot >= 0:
             let callee_value: ComptimeValue = comptime_value_clone(self.slot_values[callee_slot])
@@ -7858,12 +7857,12 @@ impl ComptimeEvaluator:
             if string_builder_constructor == "new":
                 if arg_values.len() as i32 != 0:
                     return self.fail(node, "StringBuilder.new() takes no arguments in comptime")
-                return comptime_control_value(self.empty_string_builder_value(result_type))
+                return comptime_control_value(self.empty_string_builder_value(result_type, 0))
             if arg_values.len() as i32 != 1:
                 return self.fail(node, "StringBuilder.with_capacity() expects exactly one argument in comptime")
             if comptime_value_is_intlike(arg_values[0]) == 0:
                 return self.fail(node, "StringBuilder.with_capacity() expects an integer capacity")
-            return comptime_control_value(self.empty_string_builder_value(result_type))
+            return comptime_control_value(self.empty_string_builder_value(result_type, comptime_value_intlike(arg_values[0])))
         let fn_node = self.find_fn_decl_node(fn_sym)
         // D39: an interface declaration has no body to evaluate.
         if fn_node != 0 and self.ast.fn_decl_body_is_interface(fn_node):
@@ -7879,20 +7878,20 @@ impl ComptimeEvaluator:
                 if fn_name == "new":
                     if arg_values.len() as i32 != 0:
                         return self.fail(node, "StringBuilder.new() takes no arguments in comptime")
-                    return comptime_control_value(self.empty_string_builder_value(result_type_from_node))
+                    return comptime_control_value(self.empty_string_builder_value(result_type_from_node, 0))
                 if arg_values.len() as i32 != 1:
                     return self.fail(node, "StringBuilder.with_capacity() expects exactly one argument in comptime")
                 if comptime_value_is_intlike(arg_values[0]) == 0:
                     return self.fail(node, "StringBuilder.with_capacity() expects an integer capacity")
-                return comptime_control_value(self.empty_string_builder_value(result_type_from_node))
+                return comptime_control_value(self.empty_string_builder_value(result_type_from_node, comptime_value_intlike(arg_values[0])))
             let ret_type_for_constructor = self.comptime_fn_return_type(fn_sym, tp_syms, tp_tys)
             if self.is_string_builder_type(ret_type_for_constructor) and self.decl_path(fn_node).ends_with("string.w"):
                 if arg_values.len() as i32 == 0:
-                    return comptime_control_value(self.empty_string_builder_value(ret_type_for_constructor))
+                    return comptime_control_value(self.empty_string_builder_value(ret_type_for_constructor, 0))
                 if arg_values.len() as i32 == 1:
                     if comptime_value_is_intlike(arg_values[0]) == 0:
                         return self.fail(node, "StringBuilder.with_capacity() expects an integer capacity")
-                    return comptime_control_value(self.empty_string_builder_value(ret_type_for_constructor))
+                    return comptime_control_value(self.empty_string_builder_value(ret_type_for_constructor, comptime_value_intlike(arg_values[0])))
         if fn_node == 0 and self.allow_runtime_calls != 0:
             let runtime_signal = self.eval_allowed_runtime_call(fn_sym, arg_values, node)
             if runtime_signal.kind != ComptimeControlKind.CTL_ERROR or self.had_error != 0:
@@ -7918,7 +7917,6 @@ impl ComptimeEvaluator:
             return self.fail(node, "wrong argument count in comptime call")
 
         let caller_path = self.current_source_path()
-        let caller_text = self.current_source_text()
         let caller_fn_sym = if self.active_fn_syms.len() > 0: self.active_fn_syms[(self.active_fn_syms.len() - 1)] else: 0
 
         let saved_file: i32 = self.sema.local_file_id
@@ -7964,7 +7962,7 @@ impl ComptimeEvaluator:
                         self.restore_generic_substitutions(generic_snapshot)
                     return self.fail(node, "wrong argument count in comptime call")
                 var default_signal = if self.default_arg_uses_call_site(default_node) != 0:
-                    self.eval_call_site_default_arg(default_node, node, caller_path, caller_text, caller_fn_sym)
+                    self.eval_call_site_default_arg(default_node, node, caller_path, caller_fn_sym)
                 else:
                     self.eval_expr(default_node)
                 if default_signal.kind != ComptimeControlKind.CTL_VALUE:
