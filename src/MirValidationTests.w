@@ -428,6 +428,62 @@ pub fn mir_test_generic_call_missing_borrow() -> Unit:
     // A direct call may pass the place value; codegen takes its address.
     assert(missing_borrow_verdict(false, false) == "")
 
+// #2023: `"ab".slice(0, xs[0])` passed the element view `&i64` as the end
+// index where with_str_slice_ref takes the owned i64, and every validator
+// passed it to codegen. Types: 1 str, 2 i64, 3 `&i64`. `direct` builds the
+// same shape as a direct call to a body whose parameter is the owned i64.
+fn unmaterialized_view_verdict(arg_is_view: bool, direct: bool) -> str:
+    var mir_mod = MirModule.init()
+    for kind in [0, TypeKind.TY_STR, TypeKind.TY_INT, TypeKind.TY_REF]:
+        mir_mod.sema_type_kinds.push(kind)
+        mir_mod.sema_type_d0.push(0)
+        mir_mod.sema_type_d1.push(0)
+        mir_mod.sema_type_d2.push(0)
+    let str_ty = 1
+    let i64_ty = 2
+    let ref_ty = 3
+    mir_mod.sema_type_d0[i64_ty] = 64
+    mir_mod.sema_type_d0[ref_ty] = i64_ty
+    mir_mod.sema_callable_syms.insert(2, MirCallableClass.Signature as i32)
+    if direct:
+        var callee = MirBody.init_for_fn(2)
+        callee.new_local(i64_ty, 0, 0, 0)
+        callee.n_params = 1
+        let callee_entry = callee.new_block()
+        callee.set_terminator(callee_entry, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+        mir_mod.add_body(callee)
+    var body = MirBody.init_for_fn(1)
+    let text_local = body.new_temp(str_ty)
+    let text_place = body.new_place(text_local)
+    let view_local = body.new_temp(ref_ty)
+    let view_place = body.new_place(view_local)
+    let deref_place = body.new_deref_place(view_place, i64_ty)
+    let end_place = if arg_is_view: view_place else: deref_place
+    let result_local = body.new_temp(str_ty)
+    let result_place = body.new_place(result_local)
+    let entry = body.new_block()
+    let done = body.new_block()
+    let callee_const = body.new_const(ConstKind.CK_FN, 2, 0, 0, str_ty)
+    let callee_operand = body.new_operand(OperandKind.OK_CONSTANT, callee_const)
+    let args: Vec[i32] = Vec.new()
+    if not direct:
+        args.push(body.new_operand(OperandKind.OK_COPY, text_place))
+        args.push(body.new_operand(OperandKind.OK_COPY, deref_place))
+    args.push(body.new_operand(OperandKind.OK_COPY, end_place))
+    let call_id = body.new_call_args(&args)
+    if not direct:
+        body.set_call_intrinsic(call_id, MirIntrinsic.STR_SLICE)
+    body.set_terminator(entry, TermKind.TK_CALL, callee_operand, call_id, result_place, done, 0)
+    body.set_terminator(done, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    let err = validate_typed_mir_body(mir_mod, body)
+    with_str_clone_ref(err.message)
+
+pub fn mir_test_call_unmaterialized_view() -> Unit:
+    assert(unmaterialized_view_verdict(true, false).contains("call argument 2 is a Copy view (&T) where the callee parameter is the owned scalar T"))
+    assert(unmaterialized_view_verdict(false, false) == "")
+    assert(unmaterialized_view_verdict(true, true).contains("call argument 0 is a Copy view (&T) where the callee parameter is the owned scalar T"))
+    assert(unmaterialized_view_verdict(false, true) == "")
+
 // #1394: a variant payload moved out on one arm and the whole enum dropped
 // at the join, with no reset-on-move blank of the payload. This is #1363's
 // MIR (`_8 = move _6<as v0>.f0`, then `drop(_6)`): the enum drop glue frees

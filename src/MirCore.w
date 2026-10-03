@@ -3938,6 +3938,47 @@ fn mir_validate_call_missing_borrow(mir_mod: &MirModule, body: &MirBody, callee_
         if arg_resolved == mir_mod.mir_resolve_alias(mir_mod.mir_get_type_d0(param_ty)): return ai
     -1
 
+// #2023 (D22/D27): a Copy view (`&T`, T scalar) passed where the callee's
+// parameter is the owned scalar `T` was never materialized: Sema records the
+// owned demand and MIR reads the pointee (`copy _n.*`). `"ab".slice(0, xs[0])`
+// passed the element view itself, the validators said ok, and codegen failed
+// ("wrong argument type actual=ptr expected=i64"). A str intrinsic's index or
+// count parameters are i64 (with_str_slice_ref, with_str_byte_at_ref,
+// with_str_repeat_ref); a direct call's parameters are its callee body's.
+// Returns the argument index, else -1.
+fn mir_validate_call_unmaterialized_view(mir_mod: &MirModule, body: &MirBody, callee_operand: i32, call_id: i32) -> i32:
+    if call_id < 0 or call_id >= body.call_arg_starts.len(): return -1
+    let arg_start = body.call_arg_starts[call_id]
+    let arg_count = body.call_arg_counts[call_id]
+    let intrinsic = body.call_intrinsic(call_id)
+    let str_index_args = if intrinsic == MirIntrinsic.STR_SLICE: 2 else if intrinsic == MirIntrinsic.STR_BYTE_AT or intrinsic == MirIntrinsic.STR_REPEAT: 1 else: 0
+    if str_index_args > 0:
+        for ai in 1..(str_index_args + 1):
+            if ai >= arg_count: break
+            if mir_validate_is_scalar_view(mir_mod, mir_validate_operand_type(mir_mod, body, body.call_arg_operands[arg_start + ai])): return ai
+        return -1
+    if intrinsic != MirIntrinsic.NONE: return -1
+    if callee_operand < 0 or callee_operand >= body.operand_kinds.len() or body.operand_kinds[callee_operand] != OperandKind.OK_CONSTANT: return -1
+    let callee_const = body.operand_d0[callee_operand]
+    if callee_const < 0 or callee_const >= body.const_kinds.len() or body.const_kinds[callee_const] != ConstKind.CK_FN: return -1
+    let callee_idx = mir_mod.find_body(body.const_d0[callee_const])
+    if callee_idx < 0: return -1
+    let callee = &mir_mod.bodies[callee_idx]
+    for ai in 0..arg_count:
+        if ai >= callee.n_params: break
+        let param_kind = mir_mod.mir_get_type_kind(mir_mod.mir_resolve_alias(callee.local_type_ids[ai + 1]))
+        if param_kind != TypeKind.TY_INT and param_kind != TypeKind.TY_FLOAT and param_kind != TypeKind.TY_BOOL: continue
+        if mir_validate_is_scalar_view(mir_mod, mir_validate_operand_type(mir_mod, body, body.call_arg_operands[arg_start + ai])): return ai
+    -1
+
+// A `&T` whose pointee is an int, float or bool.
+fn mir_validate_is_scalar_view(mir_mod: &MirModule, ty: i32) -> bool:
+    if ty <= 0: return false
+    let resolved = mir_mod.mir_resolve_alias(ty)
+    if mir_mod.mir_get_type_kind(resolved) != TypeKind.TY_REF: return false
+    let pointee_kind = mir_mod.mir_get_type_kind(mir_mod.mir_resolve_alias(mir_mod.mir_get_type_d0(resolved)))
+    pointee_kind == TypeKind.TY_INT or pointee_kind == TypeKind.TY_FLOAT or pointee_kind == TypeKind.TY_BOOL
+
 // #1627: the enum aggregate's form of a missing borrow — a payload operand
 // that is a value where the variant's payload is a reference to it.
 // `Option[&Ctx].Some(ctx)` stored `move ctx` into the `&Ctx` slot and every
@@ -4424,6 +4465,9 @@ pub fn validate_typed_mir_body(mir_mod: &MirModule, body: &MirBody) -> MirValida
             let unborrowed = mir_validate_call_missing_borrow(mir_mod, body, d0, d1)
             if unborrowed >= 0:
                 return mir_validation_fail(body.fn_sym, span, f"call argument {unborrowed} is a value where the callee parameter is a reference to it (a missing borrow)")
+            let unmaterialized = mir_validate_call_unmaterialized_view(mir_mod, body, d0, d1)
+            if unmaterialized >= 0:
+                return mir_validation_fail(body.fn_sym, span, f"call argument {unmaterialized} is a Copy view (&T) where the callee parameter is the owned scalar T: the owned demand was not materialized (#2023)")
             let unknown_callee = mir_validate_call_callee_known(mir_mod, body, d0, d1)
             if unknown_callee.len() > 0:
                 return mir_validation_fail(body.fn_sym, span, unknown_callee)
