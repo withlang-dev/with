@@ -1633,6 +1633,29 @@ pub type Sema {
     // set, fn_symbol_may_suspend reads this table instead of walking.
     suspend_fact_nodes: HashMap[i32, i32],
     suspend_facts_settling: i32,
+    // #1985 (§14.3 INVARIANT 5): the callable summary — whether invoking a
+    // callable value may suspend the calling fiber. While checking, an
+    // identifier naming a callable binding records what it holds, keyed by
+    // the identifier's node: a callable `let` (callable_ident_decls → its
+    // declaration, whose values callable_value_* chain: the initializer and
+    // every assignment), a parameter of the fn being checked (the caller
+    // passed it, and answers for it), or a value Sema cannot see through (a
+    // closure's parameter, a capture of one, a global). A fn declaration's
+    // name needs no record.
+    callable_ident_decls: HashMap[i32, i32],
+    callable_param_idents: HashMap[i32, i32],
+    callable_opaque_idents: HashMap[i32, i32],
+    callable_let_decls: HashMap[i32, i32],
+    callable_value_heads: HashMap[i32, i32],
+    callable_value_nodes: Vec[i32],
+    callable_value_next: Vec[i32],
+    callable_value_visiting: HashMap[i32, i32],
+    // Settled with suspend_fact_nodes: the (trait, method) pairs whose `dyn`
+    // call may suspend (an implementation or the default body may), and the
+    // call nodes that reach a may-suspend callable — through the callee
+    // value, a `dyn` method, or a callable argument handed over.
+    dyn_suspend_methods: HashMap[i64, i32],
+    suspend_call_sites: HashMap[i32, i32],
     // §13.4 `g.pull()`: the generator value's type → its gen fn; a gen fn → its
     // first `yield` that hands out a view of its own locals (and that local);
     // each checked `g.pull()` node and its gen fn, judged once bodies are done.
@@ -3287,6 +3310,16 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         suspend_site_node: 0,
         suspend_fact_nodes: sema_new_map_i32_i32(),
         suspend_facts_settling: 0,
+        callable_ident_decls: sema_new_map_i32_i32(),
+        callable_param_idents: sema_new_map_i32_i32(),
+        callable_opaque_idents: sema_new_map_i32_i32(),
+        callable_let_decls: sema_new_map_i32_i32(),
+        callable_value_heads: sema_new_map_i32_i32(),
+        callable_value_nodes: Vec.new(),
+        callable_value_next: Vec.new(),
+        callable_value_visiting: sema_new_map_i32_i32(),
+        dyn_suspend_methods: HashMap.new(),
+        suspend_call_sites: sema_new_map_i32_i32(),
         generator_state_fns: sema_new_map_i32_i32(),
         generator_local_view_yields: sema_new_map_i32_i32(),
         generator_local_view_origins: sema_new_map_i32_i32(),
