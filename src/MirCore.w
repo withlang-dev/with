@@ -557,6 +557,10 @@ pub type MirBody {
     // validator and audit:resolution recognize the call by this mark; the
     // unresolved-bare-function branch that produced #1635 never sets it.
     call_machinery_dispatch: Vec[i32],
+    // #2019: an intrinsic call that invokes a closure Sema says may suspend
+    // (call_site_may_suspend): codegen leaves its loop when an invocation
+    // left by a cancellation unwind, and MirLower checks after the call.
+    call_may_cancel: Vec[i32],
     // D65 (#1647): call nodes Sema resolved that this body materializes
     // without a call — `for x in v.iter()` and a comprehension over it are
     // the index loop (`.iter()` is the implicit form, §13). MIR states the
@@ -837,6 +841,7 @@ fn MirBody.init_for_fn(fn_sym: i32) -> MirBody:
         call_contract_required: Vec.new(),
         call_pipeline_receiver_places: Vec.new(),
         call_machinery_dispatch: Vec.new(),
+        call_may_cancel: Vec.new(),
         elided_call_nodes: Vec.new(),
         field_place_nodes: Vec.new(),
         field_place_places: Vec.new(),
@@ -1094,6 +1099,7 @@ impl MirBody:
         self.call_contract_required.push(0)
         self.call_pipeline_receiver_places.push(-1)
         self.call_machinery_dispatch.push(0)
+        self.call_may_cancel.push(0)
         for i in 0..count:
             self.call_arg_operands.push(operands[i])
         id
@@ -1163,6 +1169,13 @@ impl MirBody:
         self.field_place_nodes.push(node)
         self.field_place_places.push(place)
         self.field_place_bases.push(base)
+
+    mut fn set_call_may_cancel(call_id: i32):
+        if call_id >= 0 and call_id < self.call_may_cancel.len():
+            self.call_may_cancel[call_id] = 1
+
+    fn call_is_may_cancel(call_id: i32) -> bool:
+        call_id >= 0 and call_id < self.call_may_cancel.len() and self.call_may_cancel[call_id] != 0
 
     mut fn set_call_machinery_dispatch(call_id: i32):
         if call_id >= 0 and call_id < self.call_machinery_dispatch.len():
@@ -4295,6 +4308,12 @@ fn mir_validate_aggregate_missing_borrow(mir_mod: &MirModule, body: &MirBody, en
         if arg_kind == TypeKind.TY_REF or arg_kind == TypeKind.TY_PTR: continue
         if arg_resolved == mir_mod.mir_resolve_alias(mir_mod.mir_get_type_d0(payload_ty)): return fi
     -1
+
+// #2019: the eager intrinsics whose codegen loop invokes a closure argument
+// on the calling fiber once per element (and stops at an invocation that
+// left by a cancellation unwind, when MIR marks the call).
+pub fn mir_intrinsic_invokes_closure(intrinsic: MirIntrinsic) -> bool:
+    intrinsic == MirIntrinsic.VEC_MAP or intrinsic == MirIntrinsic.VEC_FILTER or intrinsic == MirIntrinsic.VEC_FOLD
 
 // The `const fn` symbol a call terminator invokes, or 0 when the callee is
 // a place (an indirect call) or a unit operand (an intrinsic with no callee).
