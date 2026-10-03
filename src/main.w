@@ -1747,10 +1747,15 @@ fn build_runner_runtime_dirs_present(root: &str) -> bool:
     with_fs_file_exists(resolve_join(root, "out/bootstrap-lib/cimport_stubs.o")) != 0 or with_fs_file_exists(resolve_join(root, "out/lib/cimport_stubs.o")) != 0
 
 // The runner's absence is said once, naming the dependency that builds its
-// root.
-fn build_runner_explain_no_root(root: &str, target_name: &str) -> i32:
+// root: with --no-deps the action then evaluates in the driver's comptime
+// evaluator, which may not evaluate every action of this tree (#1835), and
+// a `--no-deps` run refuses rather than silently change worlds.
+fn build_runner_explain_no_root(root: &str, target_name: &str, no_deps: bool) -> i32:
     let generation = if compiler_generation_is_stamped(): compiler_generation() else: "unstamped"
     let message = "no runtime objects of this driver's generation (" ++ generation ++ ") under out/bootstrap-lib or out/lib to link the action runner against; `prepare-bootstrap-link-root` (a dependency of '" ++ target_name ++ "') builds them"
+    if no_deps:
+        with_eprint("error: --no-deps: " ++ message ++ " and --no-deps skipped it; run `with build :" ++ target_name ++ "` without --no-deps, or `with build :prepare-bootstrap-link-root` first")
+        return 1
     with_eprint("[build] " ++ message ++ "; until then actions evaluate in the driver's comptime evaluator")
     0
 
@@ -2416,7 +2421,7 @@ fn build_graph_enforce_rss(root: &str, graph: &BuildGraph, name: &str, peak: i64
         with_eprint("error: could not invalidate build cache for '" ++ name ++ "'")
     1
 
-unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, action_sema: *mut Sema, options: &BuildCommandOptions, survey: bool) -> i32:
+unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, action_sema: *mut Sema, options: &BuildCommandOptions, survey: bool, no_deps: bool) -> i32:
     let no_strings: Vec[str] = Vec.new()
     if graph.targets.len() == 0:
         with_eprint("error: build.w did not declare any targets")
@@ -2608,7 +2613,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                 runner_path = build_runner_ensure(root, options)
             else if prepare_done:
                 runner_checked = true
-                if build_runner_explain_no_root(root, target.name) != 0: return 1
+                if build_runner_explain_no_root(root, target.name, no_deps) != 0: return 1
             if runner_path.len() > 0:
                 runner_fallback = build_runner_load_fallback(root)
                 let _e1 = with_setenv_str("WITH_BUILD_RUNNER_ROOT", root)
@@ -3252,7 +3257,7 @@ fn run_build_command(options: BuildCommandOptions, graph_options: &BuildGraphCom
                 return 0
             if not repo_lock_acquire(selected_target_name):
                 return 1
-            let build_rc = unsafe { run_build_graph(root, cfg, selected_graph, &raw mut load_result.sema as *mut Sema, actual_options, graph_options.survey) }
+            let build_rc = unsafe { run_build_graph(root, cfg, selected_graph, &raw mut load_result.sema as *mut Sema, actual_options, graph_options.survey, graph_options.no_deps) }
             repo_lock_release()
             link_stage_cleanup_current_process_temp_archives()
             build_report_wall(selected_target_name, cmd_t0)
@@ -3359,7 +3364,7 @@ fn run_run_project_command(selected_target_hint: &str, opt_level: i32, no_std: b
     if not repo_lock_acquire(selected_target_name):
         return 1
     build_graph_quiet_times = true
-    let build_rc = unsafe { run_build_graph(root, cfg, selected_graph, &raw mut load_result.sema as *mut Sema, options, false) }
+    let build_rc = unsafe { run_build_graph(root, cfg, selected_graph, &raw mut load_result.sema as *mut Sema, options, false, false) }
     build_graph_quiet_times = false
     repo_lock_release()
     if build_rc != 0:
