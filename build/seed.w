@@ -135,28 +135,52 @@ fn seed_gunzip_to_tar(ctx: &ActionCtx, scratch_dir: &str, archive_path: &str, ta
         return seed_fail(ctx, f"gunzip helper failed with exit code {result.rc}: " ++ result.stdout ++ result.stderr)
     0
 
-fn seed_release_from_api(ctx: &ActionCtx, repo: &str, asset_name: &str) -> str:
+// #1888: which release carries `asset_name` — the newest one, searched page
+// by page (100 releases a page, at most SEED_RELEASE_PAGES pages; one page of
+// 10 lost the darwin SDK as soon as ten newer nightlies sat on top of it,
+// and lost the windows-aarch64 SDK outright). Every response is kept under
+// out/tmp/seed-download/releases-<page>.json, and a miss says which it was:
+// the request failed, the response was not a release list, or none of the
+// releases scanned carries the asset. The scan reads the body as one text,
+// not by lines: each release's assets follow its tag_name.
+type SeedReleaseLookup { tag: str, why: str }
+
+const SEED_RELEASE_PAGES: i32 = 10
+
+fn seed_release_from_api(ctx: &ActionCtx, repo: &str, asset_name: &str) -> SeedReleaseLookup:
     let fs = ctx.fs()
     let tmp_dir = seed_join("out/tmp", "seed-download")
     if fs.mkdir_all(tmp_dir) != 0:
-        return ""
-    let body_path = seed_join(tmp_dir, "releases.json")
-    let fetch_rc = seed_fetch_to_file(ctx, tmp_dir, "release-api", "https://api.github.com/repos/" ++ repo ++ "/releases?per_page=10", body_path, 120000)
-    if fetch_rc != 0:
-        return ""
-    let body = fs.read_text(body_path)
-    let _remove_body = fs.remove_file(body_path)
-    let lines = seed_split_nonempty_lines(body)
-    var current_tag = ""
-    for li in 0..lines.len() as i32:
-        let line = lines[li]
-        let tag = seed_json_line_value(line, "tag_name")
-        if tag.len() > 0:
-            current_tag = tag
-        let name = seed_json_line_value(line, "name")
-        if current_tag.len() > 0 and name == asset_name:
-            return current_tag
-    ""
+        return SeedReleaseLookup { tag: "", why: "could not create " ++ tmp_dir }
+    let quoted_asset = "\"" ++ asset_name ++ "\""
+    var scanned = 0
+    for page in 1..SEED_RELEASE_PAGES + 1:
+        let body_path = seed_join(tmp_dir, f"releases-{page}.json")
+        let url = "https://api.github.com/repos/" ++ repo ++ f"/releases?per_page=100&page={page}"
+        if seed_fetch_to_file(ctx, tmp_dir, "release-api", url, body_path, 120000) != 0:
+            return SeedReleaseLookup { tag: "", why: "the release list request failed: " ++ url }
+        let body = fs.read_text(body_path)
+        let releases = body.split("\"tag_name\"")
+        if releases.len() < 2:
+            if seed_is_empty_json_array(body): break
+            return SeedReleaseLookup { tag: "", why: "the response to " ++ url ++ " is not a release list (kept at " ++ body_path ++ ")" }
+        for ri in 1..releases.len() as i32:
+            scanned = scanned + 1
+            let release = releases[ri]
+            if release.contains(quoted_asset):
+                let tag = seed_json_line_value("\"tag_name\"" ++ release, "tag_name")
+                if tag.len() == 0:
+                    return SeedReleaseLookup { tag: "", why: "a release carrying the asset has no readable tag_name (kept at " ++ body_path ++ ")" }
+                return SeedReleaseLookup { tag: tag, why: "" }
+        if releases.len() - 1 < 100: break
+    SeedReleaseLookup { tag: "", why: f"none of the {scanned} newest releases of " ++ repo ++ " carries it (responses kept under " ++ tmp_dir ++ ")" }
+
+fn seed_is_empty_json_array(text: &str) -> bool:
+    var inner = ""
+    for i in 0..text.len() as i32:
+        let ch = text[i]
+        if not seed_is_space(ch): inner = inner ++ text.slice(i as i64, (i + 1) as i64)
+    inner == "[]"
 
 fn seed_is_space(ch: i32) -> bool:
     ch == 9 or ch == 10 or ch == 13 or ch == 32
@@ -234,9 +258,10 @@ pub fn run_seed_download_action(ctx: ActionCtx) -> i32:
         // when the helper's build then failed (exit 127).
         print(output_path ++ " is not the pinned seed; refetching")
     if tag.len() == 0:
-        tag = seed_release_from_api(ctx, repo, asset_name)
-        if tag.len() == 0:
-            ctx.diagnostics().error("seed: could not find a release containing asset '" ++ asset_name ++ "'\nset SEED_VERSION to a release tag to download a specific seed")
+        var lookup = seed_release_from_api(ctx, repo, asset_name)
+        if lookup.tag.len() == 0:
+            return seed_fail(ctx, "seed: could not find a release containing asset '" ++ asset_name ++ "': " ++ lookup.why ++ "\nset SEED_VERSION to a release tag to download a specific seed")
+        tag = move lookup.tag
         print("latest seed release: " ++ tag)
     let url = "https://github.com/" ++ repo ++ "/releases/download/" ++ tag ++ "/" ++ asset_name
     let output_dir = seed_dirname(output_path)
@@ -309,9 +334,10 @@ pub fn run_deps_download_action(ctx: ActionCtx) -> i32:
         tag = lock_value(lock, asset_name ++ ".version")
         print_str("pinned SDK release (sdk.lock): " ++ tag ++ "\n")
     if tag.len() == 0:
-        tag = seed_release_from_api(ctx, repo, asset_name)
-        if tag.len() == 0:
-            ctx.diagnostics().error("deps: could not find a release containing asset '" ++ asset_name ++ "'\nset WITH_LLVM_SDK_VERSION to a release tag, or build it from source: tools/build-static-llvm.sh")
+        var lookup = seed_release_from_api(ctx, repo, asset_name)
+        if lookup.tag.len() == 0:
+            return seed_fail(ctx, "deps: could not find a release containing asset '" ++ asset_name ++ "': " ++ lookup.why ++ "\nset WITH_LLVM_SDK_VERSION to a release tag, or build it from source: tools/build-static-llvm.sh")
+        tag = move lookup.tag
         print_str("latest SDK release: " ++ tag ++ "\n")
 
     let url = "https://github.com/" ++ repo ++ "/releases/download/" ++ tag ++ "/" ++ asset_name
