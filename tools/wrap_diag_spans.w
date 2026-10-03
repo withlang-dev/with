@@ -319,12 +319,6 @@ fn plan_edits(path: &str, text: &str, sites: &Vec[Site], skips: &Vec[str]) -> Ed
         texts.push(new_text)
     EditPlan { starts, ends, texts }
 
-// #2023 workaround: the str.slice call path passes a Vec element view
-// (`plan.starts[ei]`) as a pointer where it takes i64 and codegen fails;
-// a user fn's i64 parameters materialize it. Inline when #2023 is fixed.
-fn splice(t: str, s: i64, e: i64, piece: &str) -> str:
-    t.slice(0, s) ++ piece ++ t.slice(e, t.len())
-
 fn apply_edits(text_in: str, plan: &EditPlan) -> str:
     var text = text_in
     let edit_count = plan.starts.len() as i32
@@ -345,7 +339,7 @@ fn apply_edits(text_in: str, plan: &EditPlan) -> str:
         let ei = order[oi] as i64
         let s = plan.starts[ei]
         let e = plan.ends[ei]
-        text = splice(text, s, e, plan.texts[ei])
+        text = text.slice(0, s) ++ plan.texts[ei] ++ text.slice(e, text.len())
     text
 
 fn ensure_decl(path: &str, text_in: str) -> str:
