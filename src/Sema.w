@@ -1000,6 +1000,18 @@ pub type Sema {
     // by the NK_FOR node, and a comprehension clause's by its iterable node.
     // MIR reads it; it re-derived one from the iterable's type.
     for_elem_types: HashMap[i32, i32],
+    // §13.5 (#1837): the `.iter()` the compiler inserts for a loop over a
+    // collection that is no Iter[T] — the callee, its signature, its
+    // specialization symbol (a generic impl) and the iterator type it
+    // returns, keyed like for_elem_types. MIR lowers exactly this call and
+    // steps its result with `next()`.
+    for_iter_fn_syms: HashMap[i32, i32],
+    for_iter_sigs: HashMap[i32, i32],
+    for_iter_monos: HashMap[i32, i32],
+    for_iter_types: HashMap[i32, i32],
+    // The concrete `next()` of a non-generic iterator that `.iter()`
+    // returns (a generic one is demanded into iter_next_sigs/monos).
+    for_iter_next_fns: HashMap[i32, i32],
     mutable_global_syms: HashMap[i32, i32],
     // docs/completed/mut.md Rev 8 §12 / §15.12 — symbols declared via `global X = ...`
     // (stable) recorded here. Used by check_assign to emit a specific
@@ -2626,6 +2638,11 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let gen_for_each_sigs = sema_new_map_i32_i32()
     let gen_for_each_monos = sema_new_map_i32_i32()
     let for_elem_types = sema_new_map_i32_i32()
+    let for_iter_fn_syms = sema_new_map_i32_i32()
+    let for_iter_sigs = sema_new_map_i32_i32()
+    let for_iter_monos = sema_new_map_i32_i32()
+    let for_iter_types = sema_new_map_i32_i32()
+    let for_iter_next_fns = sema_new_map_i32_i32()
     let mutable_global_syms = sema_new_map_i32_i32()
     let stable_global_syms = sema_new_map_i32_i32()
     let global_value_decl_kinds = sema_new_map_i32_i32()
@@ -2869,6 +2886,11 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         gen_for_each_sigs,
         gen_for_each_monos,
         for_elem_types,
+        for_iter_fn_syms,
+        for_iter_sigs,
+        for_iter_monos,
+        for_iter_types,
+        for_iter_next_fns,
         mutable_global_syms,
         stable_global_syms,
         global_value_decl_kinds,

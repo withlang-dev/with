@@ -8099,16 +8099,25 @@ impl MirBuilder:
         let recorded_sig = self.sema.iter_next_sigs.get(for_node)
         var recorded_sig_idx = -1
         if recorded_sig.is_some(): recorded_sig_idx = recorded_sig.unwrap()
-        let callee_sym = if recorded_mono_sym != 0: recorded_mono_sym else: self.resolve_method_callee_sym(iter_expr, next_sym)
+        // §13.5 (#1837): over a collection Sema resolved an implicit `.iter()`
+        // for (for_iter_*), the loop steps the iterator that call returns —
+        // a generic iterator's next() through the recorded specialization,
+        // a concrete one through the callee Sema recorded.
+        let implicit_next_fn: i32 = self.sema.for_iter_next_fns.get(for_node) ?? 0
+        let callee_sym = if recorded_mono_sym != 0: recorded_mono_sym else if implicit_next_fn != 0: implicit_next_fn else: self.resolve_method_callee_sym(iter_expr, next_sym)
         if callee_sym == next_sym:
             self.mark_unsupported()
 
-        let iter_op = self.lower_expr(iter_expr)
-        let iter_place = self.materialize_operand(iter_op, iter_ty, self.ast.get_start(iter_expr))
+        let stepped_ty = self.sema.for_iter_types.get(for_node) ?? iter_ty
+        let iter_place = if self.sema.for_iter_sigs.contains(for_node):
+            self.lower_for_implicit_iter_call(for_node, iter_expr)
+        else:
+            let iter_op = self.lower_expr(iter_expr)
+            self.materialize_operand(iter_op, iter_ty, self.ast.get_start(iter_expr))
         let elem_ty = self.loop_element_type(for_node)
 
         // Determine next()'s return type (Option[T]) from the method signature.
-        let resolved_iter = self.sema.resolve_alias(iter_ty)
+        let resolved_iter = self.sema.resolve_alias(stepped_ty)
         let owner_sym = self.sema.method_owner_symbol_for_type(resolved_iter as i32)
         let sema_next_sym = self.sema.pool_lookup_symbol("next")
         var next_ret_ty = 0
@@ -8119,7 +8128,7 @@ impl MirBuilder:
             if sig_idx >= 0:
                 next_ret_ty = self.sema.sig_return_type(sig_idx)
         if next_ret_ty == 0:
-            next_ret_ty = iter_ty
+            next_ret_ty = stepped_ty
 
         let fn_op = self.const_operand(ConstKind.CK_FN, callee_sym, self.sema.ty_void)
 
@@ -8187,6 +8196,43 @@ impl MirBuilder:
         self.switch_to(exit_bb)
         self.forget_string_flow_facts()
         self.unit_operand()
+
+    // §13.5 (#1837): the `.iter()` Sema inserted for the loop keyed by
+    // `key_node` (for_iter_*), lowered as the spelled call is: the receiver
+    // by the callee's mode (a `move fn iter()` consumes the collection;
+    // anything else observes its place, auto-dereferenced, as
+    // lower_method_call's GENERIC_CALL arm passes it), the contract Sema
+    // recorded, the result in a statement temp that drops with the
+    // statement — after the loop. Returns the iterator's place.
+    mut fn lower_for_implicit_iter_call(key_node: i32, iterable: i32) -> i32:
+        let iter_fn: i32 = self.sema.for_iter_fn_syms.get(key_node).unwrap()
+        let iter_sig: i32 = self.sema.for_iter_sigs.get(key_node).unwrap()
+        let iter_mono: i32 = self.sema.for_iter_monos.get(key_node) ?? 0
+        let iterator_ty: i32 = self.sema.for_iter_types.get(key_node).unwrap()
+        var recv_op = -1
+        if self.callee_has_move_self(iter_fn):
+            recv_op = self.body.new_operand(OperandKind.OK_MOVE, self.lower_expr_place(iterable))
+            self.consume_moved_operand(recv_op)
+        else:
+            recv_op = self.lower_generic_receiver_arg(iterable, self.pool.intern("iter"), iter_sig)
+        let args: Vec[i32] = Vec.new()
+        args.push(recv_op)
+        let args_id = self.body.new_call_args(args)
+        self.body.set_call_ast_node(args_id, key_node)
+        if iter_mono != 0:
+            self.body.set_call_intrinsic(args_id, MirIntrinsic.GENERIC_CALL)
+            self.body.set_call_contract(args_id, iter_sig, iter_mono)
+            self.body.require_call_contract(args_id)
+        else:
+            self.body.set_call_contract(args_id, iter_sig, self.sema.sig_names[iter_sig])
+        let fn_op = self.const_operand(ConstKind.CK_FN, if iter_mono != 0: iter_mono else: iter_fn, self.sema.ty_void)
+        let result_local = self.new_temp(iterator_ty)
+        let result_place = self.place_for_local(result_local)
+        let after_bb = self.new_block()
+        self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, after_bb)
+        self.switch_to(after_bb)
+        self.register_stmt_temp(result_local, iterator_ty)
+        result_place
 
     // D69 (§13.4): `for x in g` over a Gen[T] is `g.each(body)`; the loop
     // body runs as the closure `body: fn(T) -> bool`, capturing the enclosing
@@ -8934,16 +8980,23 @@ impl MirBuilder:
         let recorded_sig = self.sema.iter_next_sigs.get(iter_expr)
         var recorded_sig_idx = -1
         if recorded_sig.is_some(): recorded_sig_idx = recorded_sig.unwrap()
-        let callee_sym = if recorded_mono_sym != 0: recorded_mono_sym else: self.resolve_method_callee_sym(iter_expr, next_sym)
+        // §13.5 (#1837): over a collection Sema resolved an implicit `.iter()`
+        // for, the clause steps the iterator that call returns.
+        let implicit_next_fn: i32 = self.sema.for_iter_next_fns.get(iter_expr) ?? 0
+        let callee_sym = if recorded_mono_sym != 0: recorded_mono_sym else if implicit_next_fn != 0: implicit_next_fn else: self.resolve_method_callee_sym(iter_expr, next_sym)
         if callee_sym == next_sym:
             self.mark_unsupported()
             return
 
-        let iter_op = self.lower_expr(iter_expr)
-        let iter_place = self.materialize_operand(iter_op, iter_ty, self.ast.get_start(iter_expr))
+        let stepped_ty = self.sema.for_iter_types.get(iter_expr) ?? iter_ty
+        let iter_place = if self.sema.for_iter_sigs.contains(iter_expr):
+            self.lower_for_implicit_iter_call(iter_expr, iter_expr)
+        else:
+            let iter_op = self.lower_expr(iter_expr)
+            self.materialize_operand(iter_op, iter_ty, self.ast.get_start(iter_expr))
         let elem_ty = self.clause_element_type(comp_node, clause_index)
 
-        let resolved_iter = self.sema.resolve_alias(iter_ty)
+        let resolved_iter = self.sema.resolve_alias(stepped_ty)
         let owner_sym = self.sema.method_owner_symbol_for_type(resolved_iter as i32)
         let sema_next_sym = self.sema.pool_lookup_symbol("next")
         var next_ret_ty = 0
@@ -8954,7 +9007,7 @@ impl MirBuilder:
             if sig_idx >= 0:
                 next_ret_ty = self.sema.sig_return_type(sig_idx)
         if next_ret_ty == 0:
-            next_ret_ty = iter_ty
+            next_ret_ty = stepped_ty
 
         let fn_op = self.const_operand(ConstKind.CK_FN, callee_sym, self.sema.ty_void)
         let header_bb = self.new_block()

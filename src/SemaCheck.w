@@ -15100,9 +15100,18 @@ impl Sema:
         // D69 (§13.4): a Gen[T] iterable runs the body as the closure its
         // `each` calls; the generator value is consumed by `each`.
         let gen_elem = self.resolve_gen_for(node, iterable, iter_type as i32)
-        let elem_type = if gen_elem != 0: gen_elem else: self.for_loop_element_type(iterable, iter_type as i32)
+        var elem_type = if gen_elem != 0: gen_elem else: self.for_loop_element_type(iterable, iter_type as i32)
+        // §13.5 (#1837): no Iter[T], no Gen[T], no built-in traversal — the
+        // compiler inserts `.iter()`, and the loop steps the iterator it
+        // returns.
+        var stepped_type = iter_type as i32
+        if elem_type == 0 and gen_elem == 0:
+            let implicit_iter_type = self.resolve_implicit_iter_for(node, iterable, iter_type as i32)
+            if implicit_iter_type != 0:
+                stepped_type = implicit_iter_type
+                elem_type = self.infer_for_element_type(implicit_iter_type)
         if elem_type == 0:
-            self.report_not_iterable(iterable, iter_type as i32)
+            self.report_not_iterable(iterable, iter_type as i32, node)
         else if gen_elem == 0:
             self.for_elem_types.insert(node, elem_type)
         let outer_binding_count = self.bind_names.len() as i32
@@ -15112,8 +15121,8 @@ impl Sema:
             // #912: the for-desugar over a generic iterator IS a next() call, but
             // no spelled call ever demands the specialization — register it here,
             // keyed by the for node, so MIR dispatches the concrete next().
-            self.demand_generic_iter_next(iter_type, iterable, node)
-            self.note_iter_next_global_effects(iter_type as i32, iterable, node)
+            self.demand_generic_iter_next(stepped_type as TypeId, iterable, node)
+            self.note_iter_next_global_effects(stepped_type, iterable, node)
 
         // §13 implicit iteration: `for x in vec` borrows the collection (the
         // compiler-inserted .iter() form), so no consuming gate applies. Drop-
@@ -15123,8 +15132,9 @@ impl Sema:
         // docs/completed/mut.md Rev 8 §11.4 / §15.17 — when the iterable is a .iter()
         // call (or any iter_of_self method), the iterator yields &T views.
         // Mark the binding as a view-bound variable so check_assign can emit
-        // §15.17 when mutation through it is attempted.
-        let yields_views = self.for_iterable_yields_views(iterable)
+        // §15.17 when mutation through it is attempted. The inserted
+        // `.iter()` of §13.5 is that call (#1837).
+        let yields_views = if self.for_iter_fn_syms.contains(node): self.implicit_iter_yields_views(node) else: self.for_iterable_yields_views(iterable)
 
         self.push_move_control_flow_context(1)
         // Snapshot the outer move-state BEFORE binding the loop variable, so the
@@ -15253,19 +15263,28 @@ impl Sema:
         if gen_elem != 0:
             self.mark_moved_if_consumed(iterable)
             return gen_elem
-        self.demand_generic_iter_next(iter_ty, iterable, iterable)
-        let elem = self.for_loop_element_type(iterable, iter_ty as i32)
+        var elem = self.for_loop_element_type(iterable, iter_ty as i32)
+        var stepped_type = iter_ty as i32
         if elem == 0:
-            self.report_not_iterable(iterable, iter_ty as i32)
+            // §13.5 (#1837): the inserted `.iter()`, keyed by the iterable.
+            let implicit_iter_type = self.resolve_implicit_iter_for(iterable, iterable, iter_ty as i32)
+            if implicit_iter_type != 0:
+                stepped_type = implicit_iter_type
+                elem = self.infer_for_element_type(implicit_iter_type)
+        self.demand_generic_iter_next(stepped_type as TypeId, iterable, iterable)
+        if elem == 0:
+            self.report_not_iterable(iterable, iter_ty as i32, iterable)
         else:
             self.for_elem_types.insert(iterable, elem)
         elem
 
     // §13.5 (#1828): a `for` iterable is an Iter[T] (a `next()` returning
     // Option[T]), a Gen[T], a range, an array or slice, or a collection the
-    // loop borrows. Anything else has no element type, and Sema refuses it:
-    // MIR lowering cannot, and a loop that passed check used to fail there.
-    mut fn report_not_iterable(iterable: i32, iter_type: i32):
+    // loop borrows, or a type whose `iter()` returns an Iter[T] (#1837).
+    // Anything else has no element type, and Sema refuses it: MIR lowering
+    // cannot, and a loop that passed check used to fail there. `key_node`
+    // is the loop's (the NK_FOR, a comprehension clause's iterable).
+    mut fn report_not_iterable(iterable: i32, iter_type: i32, key_node: i32):
         if iter_type == 0 or self.get_type_kind(self.resolve_alias(iter_type as TypeId)) == TypeKind.TY_ERR:
             return
         let shown = self.type_name(iter_type)
@@ -15278,9 +15297,12 @@ impl Sema:
         if next_sig >= 0:
             self.emit_error(f"cannot iterate over `{shown}`: its `next()` returns `{self.type_name(self.sig_return_type(next_sig))}`, not `Option[T]` (§13.2)", iterable)
             return
-        let iter_sym = self.pool_lookup_symbol("iter")
-        if owner != 0 and iter_sym > 0 and (self.lookup_method_fn(owner, iter_sym) != 0 or self.lookup_generic_method_fn(owner, iter_sym) != 0):
-            self.emit_error(f"`for` over `{shown}` needs the implicit `.iter()` of §13.5, which is not implemented yet for this type (#1837); write `.iter()`", iterable)
+        // §13.5: the type has an `iter()`, but what it returns is no Iter[T]
+        // (resolve_implicit_iter_for left the result type under key_node).
+        if self.for_iter_types.contains(key_node):
+            let iter_result: i32 = self.for_iter_types.get(key_node).unwrap()
+            self.for_iter_types.remove(key_node)
+            self.emit_error(f"cannot iterate over `{shown}`: the `.iter()` §13.5 inserts returns `{self.type_name(iter_result)}`, which is not an `Iter[T]` (a `next()` returning `Option[T]`, §13.2)", iterable)
             return
         self.emit_error(f"cannot iterate over `{shown}`: a `for` iterable implements `Iter[T]` (a `next()` returning `Option[T]`), is a `Gen[T]`, a range, an array, a slice or a collection (§13.5)", iterable)
 
@@ -15365,6 +15387,135 @@ impl Sema:
         else:
             self.resolved_call_mono_syms.remove(key_node)
         each_sig
+
+    // §13.5 (#1837): "When it does not implement `Iter[T]` but has an
+    // `.iter()` method that returns an `Iter[T]`, the compiler inserts
+    // `.iter()` automatically." The iterable (or the `&T` it views) has no
+    // `next()`, is no Gen[T] and no built-in traversal (the caller tried
+    // those first), and has an `iter()` taking no argument whose result has
+    // a `next()` returning Option[T]: the loop is `iterable.iter()` stepped
+    // by `next()`. The call is resolved exactly as the spelled one — a
+    // generic impl's specialization through check_generic_method_call, a
+    // `mut fn iter()` needing a mutable place, a `move fn iter()` consuming
+    // the collection, the call's global effects — and recorded under
+    // `key_node` (for_iter_*); MIR lowers what is recorded (D65). Returns
+    // the iterator type, 0 when the rule does not apply. An `iter()` whose
+    // result is no Iter[T] leaves that result type under key_node for
+    // report_not_iterable to name.
+    mut fn resolve_implicit_iter_for(key_node: i32, iterable: i32, iter_type: i32) -> i32:
+        if iter_type == 0:
+            return 0
+        var resolved = self.resolve_alias(iter_type as TypeId) as i32
+        if self.get_type_kind(resolved as TypeId) == TypeKind.TY_REF:
+            resolved = self.resolve_alias(self.get_type_d0(resolved as TypeId) as TypeId) as i32
+        let owner_sym = self.method_owner_symbol_for_type(resolved)
+        if owner_sym == 0:
+            return 0
+        let next_sym = self.pool_lookup_symbol("next")
+        if next_sym > 0 and (self.lookup_method_fn(owner_sym, next_sym) != 0 or self.lookup_generic_method_fn(owner_sym, next_sym) != 0):
+            return 0
+        let iter_sym = self.pool_lookup_symbol("iter")
+        if iter_sym <= 0:
+            return 0
+        var iter_fn = self.lookup_method_fn(owner_sym, iter_sym)
+        var iter_sig = self.lookup_method_sig(owner_sym, iter_sym)
+        var iter_mono = 0
+        var iterator_type = if iter_sig >= 0: self.sig_return_type(iter_sig) else: 0
+        if iter_sig < 0 and self.get_type_kind(resolved as TypeId) == TypeKind.TY_GENERIC_INST:
+            var generic_owner = owner_sym
+            if not self.type_decl_nodes.contains(generic_owner):
+                let canon = self.canonical_symbol_by_text(generic_owner)
+                if canon != 0 and self.type_decl_nodes.contains(canon):
+                    generic_owner = canon
+            iter_fn = self.lookup_generic_method_fn(generic_owner, iter_sym)
+            if iter_fn == 0:
+                return 0
+            iter_sig = self.demand_generic_implicit_iter(generic_owner, resolved, iter_fn, iterable, key_node)
+            if iter_sig < 0:
+                return 0
+            iter_mono = self.sig_names[iter_sig]
+            iterator_type = self.for_iter_types.get(key_node) ?? 0
+        if iter_fn == 0 or iter_sig < 0 or iterator_type == 0 or self.sig_get_param_count(iter_sig) != 1:
+            self.for_iter_types.remove(key_node)
+            return 0
+        // "an `.iter()` method that returns an `Iter[T]`": the result steps
+        // through a `next()` returning Option[T].
+        let it_owner = self.method_owner_symbol_for_type(self.resolve_alias(iterator_type as TypeId) as i32)
+        let it_has_next = it_owner != 0 and next_sym > 0 and (self.lookup_method_fn(it_owner, next_sym) != 0 or self.lookup_generic_method_fn(it_owner, next_sym) != 0)
+        if not it_has_next or self.infer_for_element_type(iterator_type) == 0:
+            self.for_iter_types.insert(key_node, iterator_type)
+            return 0
+        // A non-generic iterator's `next()` is a concrete method: the callee
+        // MIR steps with (a generic one is demanded by the caller through
+        // demand_generic_iter_next, as for a spelled iterator).
+        let next_fn = self.lookup_method_fn(it_owner, next_sym)
+        if next_fn != 0 and self.lookup_method_sig(it_owner, next_sym) >= 0:
+            self.for_iter_next_fns.insert(key_node, next_fn)
+        // The receiver, as check_method_call_parts treats a spelled call's.
+        let mode = self.sig_receiver_mode(iter_sig)
+        if mode == ReceiverMode.Mut:
+            self.note_place_effect(iterable, EFF_WRITE)
+            let recv_packed = self.classify_place(iterable)
+            if unpack_place_kind(recv_packed) == PlaceKind.PK_NotPlace:
+                self.emit_error("mutating method requires a place receiver (§15.3)", iterable)
+            else if unpack_place_mut(recv_packed) == PlaceMut.PM_ReadOnly or self.place_base_is_read_only_ref(iterable) != 0:
+                self.emit_error("cannot call mutating method through a read-only place (§15.2)", iterable)
+            else:
+                self.check_mutation_against_views(iterable, iterable)
+            self.reject_mutation_through_view_binding(self.place_root_sym(iterable), iterable)
+        else if mode == ReceiverMode.Move and self.is_copy(iter_type as TypeId) == 0:
+            self.note_place_effect(iterable, EFF_CONSUME)
+            self.mark_moved_if_consumed(iterable)
+        self.for_iter_fn_syms.insert(key_node, iter_fn)
+        self.for_iter_sigs.insert(key_node, iter_sig)
+        if iter_mono != 0:
+            self.for_iter_monos.insert(key_node, iter_mono)
+        self.for_iter_types.insert(key_node, iterator_type)
+        let no_args: Vec[i32] = Vec.new()
+        let no_places: Vec[bool] = Vec.new()
+        self.note_call_global_effects(key_node, iter_sig, 1, iterable, mode == ReceiverMode.Read or mode == ReceiverMode.Mut, no_args, no_places)
+        iterator_type
+
+    // The concrete `iter()` of a generic impl, demanded through the ordinary
+    // generic-method machinery with the receiver alone deciding the
+    // substitution (as demand_generic_gen_each does for `each`); the call
+    // contract it records under `key_node` moves to for_iter_types (the
+    // result type) and the returned signature.
+    mut fn demand_generic_implicit_iter(owner_sym: i32, owner_type: i32, iter_fn: i32, iterable: i32, key_node: i32) -> i32:
+        let had_ty = self.typed_expr_types.contains(key_node)
+        let saved_ty: i32 = if had_ty: self.typed_expr_types.get(key_node).unwrap() else: 0
+        let had_sig = self.resolved_call_sigs.contains(key_node)
+        let saved_sig: i32 = if had_sig: self.resolved_call_sigs.get(key_node).unwrap() else: 0
+        let had_mono = self.resolved_call_mono_syms.contains(key_node)
+        let saved_mono: i32 = if had_mono: self.resolved_call_mono_syms.get(key_node).unwrap() else: 0
+        let no_args: Vec[i32] = Vec.new()
+        let iterator_type = self.check_generic_method_call(owner_sym, owner_type, iter_fn, 0, iterable, no_args, 0, 0, key_node)
+        let iter_sig: i32 = if self.resolved_call_sigs.contains(key_node): self.resolved_call_sigs.get(key_node).unwrap() else: -1
+        if iterator_type != 0:
+            self.for_iter_types.insert(key_node, iterator_type)
+        if had_ty:
+            self.typed_expr_types.insert(key_node, saved_ty)
+        else:
+            self.typed_expr_types.remove(key_node)
+        if had_sig:
+            self.resolved_call_sigs.insert(key_node, saved_sig)
+        else:
+            self.resolved_call_sigs.remove(key_node)
+        if had_mono:
+            self.resolved_call_mono_syms.insert(key_node, saved_mono)
+        else:
+            self.resolved_call_mono_syms.remove(key_node)
+        iter_sig
+
+    // Whether the `.iter()` §13.5 inserted for the loop keyed by `key_node`
+    // is an `@[iter_of_self]` method, so its elements are views of the
+    // collection (what for_iterable_yields_views answers for the spelled
+    // call).
+    fn implicit_iter_yields_views(key_node: i32) -> i32:
+        let iter_fn: i32 = self.for_iter_fn_syms.get(key_node) ?? 0
+        if iter_fn == 0:
+            return 0
+        self.fn_symbol_is_iter_of_self(iter_fn)
 
     // #1297 / D44: `for x in xs` is `xs.iter()`, so the loop binding is a view
     // produced from the iterated place and carries its origins the way
