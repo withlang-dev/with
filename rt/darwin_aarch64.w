@@ -1389,6 +1389,24 @@ pub fn rt_compat_self_maxrss() -> i64:
         return 0
     posix_rusage_maxrss(ru_base as *const u8)
 
+// #1998: CPU time (user + system, ns) of this process and of every child it
+// has reaped — what a measured piece of work costs, whatever else the
+// machine runs. struct rusage on Darwin opens with ru_utime and ru_stime,
+// each a struct timeval { tv_sec: long, tv_usec: int32 + pad } (16 bytes).
+fn posix_rusage_cpu_ns(buf: *const u8) -> i64:
+    let user = unsafe { *(buf as *const i64) * 1000000000 + (*((buf as i64 + 8) as *const i32)) as i64 * 1000 }
+    let system = unsafe { *((buf as i64 + 16) as *const i64) * 1000000000 + (*((buf as i64 + 24) as *const i32)) as i64 * 1000 }
+    user + system
+
+pub fn rt_cpu_time_ns() -> i64:
+    var ru: [160]u8 = [0 as u8; 160]
+    let ru_base = (&raw mut ru) as *mut [160]u8 as *mut u8
+    // RUSAGE_SELF (0), then RUSAGE_CHILDREN (-1): every reaped child.
+    if rt_libc_getrusage(0, ru_base) != 0: return -1
+    let own = posix_rusage_cpu_ns(ru_base as *const u8)
+    if rt_libc_getrusage(-1, ru_base) != 0: return -1
+    own + posix_rusage_cpu_ns(ru_base as *const u8)
+
 // ── Foreign-state domain rows (ruling §52, spec §16.2b.14) ────────────────
 // The runtime is not exempt from the foreign-state model: every foreign
 // call above is described here, and the `runtime-domain-audit` lane

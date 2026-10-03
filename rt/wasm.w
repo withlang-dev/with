@@ -1309,6 +1309,10 @@ pub fn rt_compat_exec_child_maxrss() -> i64: 0
 
 pub fn rt_compat_self_maxrss() -> i64: 0
 
+// #1998: no process clock on wasm; 0 reads as no time spent, which a
+// timing that asserts a positive duration refuses.
+pub fn rt_cpu_time_ns() -> i64: 0
+
 // ── the memcmp family ─────────────────────────────────────────────────
 //
 // LLVM may call these by name from comparison merging; with bulk-memory

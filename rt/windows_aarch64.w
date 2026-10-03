@@ -31,6 +31,7 @@ extern fn WaitForSingleObject(handle: i64, ms: u32) -> u32
 extern fn GetExitCodeProcess(handle: i64, code: *mut u32) -> i32
 extern fn GetCurrentProcess() -> i64
 extern fn K32GetProcessMemoryInfo(process: i64, counters: *mut u8, cb: u32) -> i32
+extern fn GetProcessTimes(process: i64, creation: *mut u64, exit: *mut u64, kernel: *mut u64, user: *mut u64) -> i32
 extern fn CreateProcessW(app: *const u16, cmd: *mut u16, proc_attrs: *mut u8, thread_attrs: *mut u8, inherit_handles: i32, flags: u32, env: *mut u8, cwd: *const u16, startup: *mut u8, proc_info: *mut u8) -> i32
 extern fn GetEnvironmentVariableW(name: *const u16, buf: *mut u16, size: u32) -> u32
 extern fn SetEnvironmentVariableW(name: *const u16, value: *const u16) -> i32
@@ -1140,6 +1141,19 @@ fn win_process_alloc(handle: i64, pid: i32) -> i32:
 // each), then PeakWorkingSetSize at offset 8; 72 bytes on 64-bit Windows.
 var win_last_child_maxrss: i64 = 0
 
+// #1998: a process's CPU time (kernel + user, ns), the counterpart of
+// ru_utime + ru_stime: GetProcessTimes reports FILETIMEs in 100 ns units.
+// The children's share is summed at reap, as RUSAGE_CHILDREN does.
+var win_reaped_children_cpu_ns: i64 = 0
+
+fn win_process_cpu_ns(process: i64) -> i64:
+    var creation: u64 = 0 as u64
+    var exit: u64 = 0 as u64
+    var kernel: u64 = 0 as u64
+    var user: u64 = 0 as u64
+    if GetProcessTimes(process, &raw mut creation, &raw mut exit, &raw mut kernel, &raw mut user) == 0: return -1
+    (kernel + user) as i64 * 100
+
 fn win_process_peak_rss(process: i64) -> i64:
     var counters: [72]u8 = [0 as u8; 72]
     let base = (&raw mut counters) as *mut [72]u8 as *mut u8
@@ -1160,6 +1174,8 @@ fn win_wait_process_slot(slot: i32, timeout_ms: i32, consume: bool) -> i32:
         let _term = TerminateProcess(h, CAPTURE_TIMEOUT_RC as u32)
         let _wait = WaitForSingleObject(h, INFINITE)
         win_last_child_maxrss = win_process_peak_rss(h)
+        let child_cpu = win_process_cpu_ns(h)
+        if child_cpu > 0: win_reaped_children_cpu_ns = win_reaped_children_cpu_ns + child_cpu
         if consume:
             let _close = CloseHandle(h)
             process_handles[slot] = 0
@@ -1170,6 +1186,8 @@ fn win_wait_process_slot(slot: i32, timeout_ms: i32, consume: bool) -> i32:
     var code: u32 = 1 as u32
     let _ = GetExitCodeProcess(h, &raw mut code)
     win_last_child_maxrss = win_process_peak_rss(h)
+    let child_cpu = win_process_cpu_ns(h)
+    if child_cpu > 0: win_reaped_children_cpu_ns = win_reaped_children_cpu_ns + child_cpu
     if consume:
         let _close = CloseHandle(h)
         process_handles[slot] = 0
@@ -1445,6 +1463,8 @@ pub fn rt_compat_exec_try_wait(pid: i32) -> i32:
     var code: u32 = 1 as u32
     let _ = GetExitCodeProcess(h, &raw mut code)
     win_last_child_maxrss = win_process_peak_rss(h)
+    let child_cpu = win_process_cpu_ns(h)
+    if child_cpu > 0: win_reaped_children_cpu_ns = win_reaped_children_cpu_ns + child_cpu
     let _close = CloseHandle(h)
     process_handles[pid] = 0
     process_ids[pid] = 0
@@ -1454,6 +1474,11 @@ pub fn rt_compat_exec_try_wait(pid: i32) -> i32:
 pub fn rt_compat_exec_child_maxrss() -> i64: win_last_child_maxrss
 
 pub fn rt_compat_self_maxrss() -> i64: win_process_peak_rss(GetCurrentProcess())
+
+pub fn rt_cpu_time_ns() -> i64:
+    let own = win_process_cpu_ns(GetCurrentProcess())
+    if own < 0: return -1
+    own + win_reaped_children_cpu_ns
 
 // ---------------------------------------------------------------------------
 // Networking (Winsock2 / ws2_32). Mirrors the POSIX backend in
@@ -1758,6 +1783,7 @@ c facade win32:
     fn GetExitCodeProcess
     fn GetCurrentProcess
     fn K32GetProcessMemoryInfo
+    fn GetProcessTimes
     fn CreateProcessW
     fn GetEnvironmentVariableW
     fn SetEnvironmentVariableW

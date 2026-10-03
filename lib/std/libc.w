@@ -29,6 +29,15 @@ extern fn with_libc_stderr() -> *mut c_void
 pub fn libc_stdin() -> *mut c_void: with_libc_stdin()
 pub fn libc_stdout() -> *mut c_void: with_libc_stdout()
 pub fn libc_stderr() -> *mut c_void: with_libc_stderr()
+
+// #1998: CPU time (user + system, ns) of this process and of every child it
+// has reaped; -1 where the platform cannot say. One body per backend under
+// the seam (getrusage SELF + CHILDREN; GetProcessTimes, children summed at
+// reap), so it means the same on every target — unlike C's clock(), which
+// leaves children out and on the UCRT counts wall time. A timing that must
+// not count the rest of a loaded machine reads this, not a wall clock.
+extern fn with_libc_cpu_time_ns() -> i64
+pub fn cpu_time_ns() -> i64: with_libc_cpu_time_ns()
 // The UCRT's stream table by index (`__acrt_iob_func`), for code migrated on Windows.
 pub fn libc_iob(index: i32) -> *mut c_void:
     if index == 0: return libc_stdin()

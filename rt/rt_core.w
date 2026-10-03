@@ -25,6 +25,7 @@ extern fn rt_libc_stderr() -> *mut c_void
 extern fn rt_errno_ptr() -> *mut i32
 extern fn rt_fileno(stream: *mut c_void) -> i32
 extern fn rt_isatty(fd: i32) -> i32
+extern fn rt_cpu_time_ns() -> i64
 extern fn rt_fseek(stream: *mut c_void, offset: i64, whence: i32) -> i32
 extern fn rt_ftell(stream: *mut c_void) -> i64
 extern fn rt_getrlimit(resource: i32, lim: *mut u8) -> i32
@@ -4125,6 +4126,9 @@ pub fn with_libc_isatty(fd: i32) -> i32: rt_isatty(fd)
 pub fn with_libc_fseek(stream: *mut c_void, offset: i64, whence: i32) -> i32: rt_fseek(stream, offset, whence)
 pub fn with_libc_ftell(stream: *mut c_void) -> i64: rt_ftell(stream)
 pub fn with_libc_getrlimit(resource: i32, lim: *mut u8) -> i32: rt_getrlimit(resource, lim)
+// #1998: std.libc cpu_time_ns — CPU time (user + system, ns) of this process
+// and every child it has reaped; -1 when the platform cannot say.
+pub fn with_libc_cpu_time_ns() -> i64: rt_cpu_time_ns()
 pub fn with_libc_setrlimit(resource: i32, lim: *const u8) -> i32: rt_setrlimit(resource, lim)
 pub fn with_libc_mkstemp(template_path: *mut i8) -> i32: rt_mkstemp(template_path as *mut u8)
 pub fn with_libc_realpath(path: *const i8, resolved_path: *mut i8) -> *mut i8:

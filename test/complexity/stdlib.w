@@ -11,6 +11,10 @@ use std.fs
 use std.string
 
 extern fn with_exec_argv_capture_input(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32, stdin_path: &str) -> i32
+// std.libc cpu_time_ns's seam, declared here because importing std.libc into
+// this file trips #2000; switch to `use std.libc.cpu_time_ns` when it is fixed.
+extern fn with_libc_cpu_time_ns() -> i64
+fn cpu_time_ns() -> i64: with_libc_cpu_time_ns()
 
 fn slotmap_work(n: i32):
     var slots = SlotMap[i32].new()
@@ -193,15 +197,32 @@ fn read_all_child(n: i32):
         if text[i] == '\n': newlines = newlines + 1
     assert(newlines == n and text.ends_with(stdin_line(n - 1) ++ "\r\n"))
 
+// Quadratic by construction: each step scans everything pushed so far.
+fn quadratic_work(n: i32):
+    var seen: Vec[i32] = Vec.new()
+    var hits = 0
+    for i in 0..n:
+        let probe = (i * 7) % n
+        for j in 0..seen.len() as i32:
+            if seen[j] == probe: hits = hits + 1
+        seen.push(i)
+    hits + 1
+
 fn btree_map_ascending(n: i32): btree_map_work(n, false)
 fn btree_map_descending(n: i32): btree_map_work(n, true)
 fn btree_set_ascending(n: i32): btree_set_work(n, false)
 fn btree_set_descending(n: i32): btree_set_work(n, true)
 
+// #1998: CPU time, not wall time: on a loaded machine (two batteries and six
+// agents, load 36) a wall clock read contention as super-linear growth and
+// failed a linear row. This process's CPU plus its reaped children's (the
+// stdin rows' work is a child) counts only the work measured.
 fn elapsed(work: &fn(i32) -> i32, n: i32):
-    let start = now_ns()
+    let start = cpu_time_ns()
     let result = work(n)
-    let duration = now_ns() - start
+    let finish = cpu_time_ns()
+    assert(start >= 0 and finish >= 0, "cpu_time_ns: this platform reports no CPU time")
+    let duration = finish - start
     assert(result > 0 and duration > 0)
     duration
 
@@ -223,6 +244,11 @@ fn measure(name: &str, work: &fn(i32) -> i32, n: i32, issue: i32):
     if issue == 0:
         assert(within_bound)
         print(f"PASS {name}")
+    else if issue < 0:
+        // The control: work that is quadratic by construction must miss the
+        // bound, or the clock no longer measures growth.
+        assert(not within_bound, "the quadratic control met the linear bound: the measurement is broken")
+        print(f"CONTROL {name}: quadratic, outside the bound")
     else:
         // A correctness assertion or crash above always fails. Only the
         // measured complexity verdict can be an expected failure.
@@ -273,3 +299,4 @@ else:
     measure("stdin-lines", stdin_lines_work, 10000, 0)
     measure("stdin-read-all", read_all_work, 100000, 0)
     measure("hash-index", hash_index_work, 4000, 0)
+    measure("quadratic-control", quadratic_work, 2000, -1)
