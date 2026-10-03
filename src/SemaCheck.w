@@ -977,6 +977,17 @@ impl Sema:
         if final_type == 0:
             self.emit_error(join_name ++ " expressions do not establish one compatible result type", report_node)
             return 0
+        // #1856 (§9.7, §21.1): `Ok(a)` alone fixes only `A` and `Err(b)`
+        // alone only `B`, so each arm is typed as the bare `Result` and the
+        // join agreed on the bare enum — an uninstantiated type no binding
+        // may hold (`:?` reached MIR for type 0). With no outer demand, the
+        // arms together name one `Result[A, B]`: `A` from the `Ok` arms' payloads,
+        // `B` from the `Err` arms'. (`Some(x)`/`None` already joins by the
+        // generic-instance-beside-base rule above.)
+        if expected == 0:
+            let result_join = self.infer_result_join_from_variant_arms(final_type, arm_nodes)
+            if result_join != 0:
+                final_type = result_join
 
         // The untyped literal arms take the typed arms' type, checked again
         // under that demand so their recorded type and constant fold agree
@@ -22712,6 +22723,15 @@ impl Sema:
                 if arg_node > 0:
                     self.mark_moved_if_consumed(arg_node)
 
+        // #1856: a variant constructor's payload keeps the type this call
+        // checked it at. check_expr does not self-record every node kind (a
+        // `++` result is unrecorded), and the join that names
+        // `Result[A, B]` from bare `Ok(a)`/`Err(b)` arms reads it here.
+        if variant_payload_owner != 0 and resolved_arg_count == 1 and arg_types.len() as i32 >= 1 and arg_types[0] != 0:
+            let payload_node = if has_resolved != 0: self.get_resolved_call_arg(node, 0) else: self.ast.get_extra(resolved_extra_start)
+            if payload_node > 0 and not self.typed_expr_types.contains(payload_node):
+                self.typed_expr_types.insert(payload_node, arg_types[0])
+
         if self.check_comptime_call_restriction(fn_sym, node) != 0:
             return 0
         if self.fn_symbol_is_std_thread_spawn_os(fn_sym) != 0:
@@ -23270,6 +23290,53 @@ impl Sema:
         if node > 0 and self.ast.kind(node) == NodeKind.NK_BLOCK and self.ast.get_data2(node) != 0:
             return self.join_arm_value_node(self.ast.get_data2(node))
         node
+
+    // #1856: the `Result[A, B]` a join of bare-`Result` arms names, or 0
+    // when some reaching arm is not an `Ok(..)`/`Err(..)` constructor call
+    // or the arms do not fix both arguments (all `Ok`: the binding stays
+    // pending for a later demand, as before). The constructor calls are
+    // retyped to the instance, which MIR then lowers.
+    mut fn infer_result_join_from_variant_arms(join_ty: i32, arm_nodes: &Vec[i32]) -> i32:
+        let resolved = self.resolve_alias(join_ty as TypeId)
+        if self.get_type_kind(resolved) != TypeKind.TY_ENUM or self.get_type_d0(resolved) != self.syms.result:
+            return 0
+        var ok_ty = 0
+        var err_ty = 0
+        let retyped: Vec[i32] = Vec.new()
+        for ai in 0..arm_nodes.len() as i32:
+            let arm = arm_nodes[ai]
+            if arm <= 0 or self.body_can_fall_through(arm) == 0:
+                continue
+            let leaf = self.join_arm_value_node(arm)
+            if leaf <= 0 or self.ast.kind(leaf) != NodeKind.NK_CALL or self.ast.get_data2(leaf) != 1:
+                return 0
+            let callee = self.ast.get_data0(leaf)
+            if self.ast.kind(callee) != NodeKind.NK_IDENT:
+                return 0
+            let variant: str = self.pool_resolve(self.ast.get_data0(callee))
+            let payload = self.ast.get_extra(self.ast.get_data1(leaf))
+            let payload_ty = self.typed_expr_types.get(payload) ?? 0
+            if payload_ty == 0:
+                return 0
+            if variant == "Ok":
+                ok_ty = self.merge_contextual_owned_join_types(ok_ty, payload_ty)
+                if ok_ty == 0:
+                    return 0
+            else if variant == "Err":
+                err_ty = self.merge_contextual_owned_join_types(err_ty, payload_ty)
+                if err_ty == 0:
+                    return 0
+            else:
+                return 0
+            retyped.push(leaf)
+            if arm != leaf:
+                retyped.push(arm)
+        if ok_ty == 0 or err_ty == 0:
+            return 0
+        let inst = self.ensure_result_type_for(ok_ty, err_ty)
+        for ri in 0..retyped.len() as i32:
+            self.typed_expr_types.insert(retyped[ri], inst)
+        inst
 
     mut fn reject_implicit_numeric_narrowing(node: i32, expected: i32, actual: i32) -> bool:
         if node <= 0 or expected == 0 or actual == 0:
