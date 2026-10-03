@@ -1432,7 +1432,14 @@ impl MirBuilder:
             self.emit_drop_entry(self.drop_local_ids[i], self.drop_kinds[i])
             i = i - 1
 
+    // Leave every scope down to `target`, innermost first: each scope's
+    // defers, then its drops. A scope's drops, once emitted on this path,
+    // leave the pending set until the path ends: a cancellation unwind in an
+    // outer scope's defer (§14.7, #1986) runs only the drops still pending,
+    // never one this exit already ran. Sibling paths keep every record.
     mut fn emit_cleanup_to_target(target: LoopInfo):
+        let ran_ids: Vec[i32] = Vec.new()
+        let ran_kinds: Vec[i32] = Vec.new()
         var scope_idx = self.drop_scope_starts.len() as i32 - 1
         var lowest_drop_start = self.drop_local_ids.len() as i32
         var lowest_defer_start = self.defer_nodes.len() as i32
@@ -1446,10 +1453,16 @@ impl MirBuilder:
             let drop_end = if scope_idx + 1 < self.drop_scope_starts.len(): self.drop_scope_starts[(scope_idx + 1)] else: self.drop_local_ids.len() as i32
             lowest_drop_start = drop_start
             self.emit_drops_for_range(drop_start, drop_end)
+            while self.drop_local_ids.len() as i32 > drop_start:
+                ran_ids.push(self.drop_local_ids.pop().unwrap())
+                ran_kinds.push(self.drop_kinds.pop().unwrap())
             scope_idx = scope_idx - 1
 
         self.emit_defers_for_range(target.break_defer_depth, lowest_defer_start)
         self.emit_drops_for_range(target.break_drop_depth, lowest_drop_start)
+        while ran_ids.len() > 0:
+            self.drop_local_ids.push(ran_ids.pop().unwrap())
+            self.drop_kinds.push(ran_kinds.pop().unwrap())
 
     mut fn emit_drops_for_return():
         // A return crosses all statement frames. Merge their temporaries into
