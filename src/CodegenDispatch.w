@@ -12750,28 +12750,6 @@ impl Codegen:
             return with_str_clone_ref(text)
         self.sema_symbol_text(sym)
 
-    fn mir_llvm_type_is_scoped_join_handle(ty: i64) -> bool:
-        if ty == 0 or wl_get_type_kind(ty) != wl_struct_type_kind():
-            return false
-        let name = wl_get_struct_name(ty)
-        if name == "ScopedJoinHandle":
-            return true
-        if wl_count_struct_elem_types(ty) != 3:
-            return false
-        let f0 = wl_struct_get_type_at(ty, 0)
-        let f1 = wl_struct_get_type_at(ty, 1)
-        let f2 = wl_struct_get_type_at(ty, 2)
-        let f0_is_i64 = wl_get_type_kind(f0) == wl_integer_type_kind() and wl_get_int_type_width(f0) == 64
-        let f1_is_i32 = wl_get_type_kind(f1) == wl_integer_type_kind() and wl_get_int_type_width(f1) == 32
-        let f2_is_i64 = wl_get_type_kind(f2) == wl_integer_type_kind() and wl_get_int_type_width(f2) == 64
-        f0_is_i64 and f1_is_i32 and f2_is_i64
-
-    mut fn mir_operand_is_scoped_join_handle(body: &MirBody, operand_id: i32) -> bool:
-        let sema_ty = self.mir_operand_sema_type(body, operand_id)
-        if self.mir_type_name(sema_ty) == "ScopedJoinHandle":
-            return true
-        self.mir_llvm_type_is_scoped_join_handle(self.mir_sema_type_to_llvm(sema_ty))
-
     fn mir_generic_arg_tid(sema_ty: i32, idx: i32) -> i32:
         if sema_ty <= 0:
             return 0
@@ -14969,26 +14947,13 @@ impl Codegen:
                 // spelling of the callee never decides it.
                 let gc_call_builtin = self.sema.call_builtin(gc_node)
                 let gc_name = if gc_callee_sym > 0: self.codegen_symbol_text(gc_callee_sym) else: "?"
-                if gc_name == "track":
+                if gc_call_builtin == CallBuiltin.ScopeTrack:
                     if self.mir_emit_async_scope_track_call(body, args_id, dest_place, next_bb):
                         return true
-                var gc_tail_name = with_str_clone_ref(gc_name)
-                for gc_tail_i in 0..gc_name.len() as i32:
-                    if gc_name[gc_tail_i] == 46:
-                        gc_tail_name = gc_name.slice((gc_tail_i + 1) as i64, gc_name.len() as i64)
-                        break
-                if gc_tail_name == "send" or gc_tail_name == "recv" or gc_tail_name == "close":
-                    let gc_endpoint_arg_start = body.call_arg_starts[args_id]
-                    let gc_endpoint_arg_count = body.call_arg_counts[args_id]
-                    if gc_endpoint_arg_count > 0:
-                        let gc_endpoint_recv_op = body.call_arg_operands[gc_endpoint_arg_start]
-                        let gc_endpoint_kind = self.mir_channel_endpoint_kind(self.mir_operand_sema_type(body, gc_endpoint_recv_op))
-                        if gc_endpoint_kind == 1 and (gc_tail_name == "send" or gc_tail_name == "close"):
-                            let gc_endpoint_intrinsic = if gc_tail_name == "send": MirIntrinsic.CHAN_SEND else: MirIntrinsic.CHAN_CLOSE
-                            return self.mir_emit_intrinsic_call(body, gc_endpoint_intrinsic, args_id, dest_place, next_bb)
-                        if gc_endpoint_kind == 2 and (gc_tail_name == "recv" or gc_tail_name == "close"):
-                            let gc_endpoint_intrinsic = if gc_tail_name == "recv": MirIntrinsic.CHAN_RECV else: MirIntrinsic.CHAN_CLOSE
-                            return self.mir_emit_intrinsic_call(body, gc_endpoint_intrinsic, args_id, dest_place, next_bb)
+                // A channel endpoint's send/recv/close (Sema's record, #2043).
+                if gc_call_builtin == CallBuiltin.EndpointSend or gc_call_builtin == CallBuiltin.EndpointRecv or gc_call_builtin == CallBuiltin.EndpointClose:
+                    let gc_endpoint_intrinsic = if gc_call_builtin == CallBuiltin.EndpointSend: MirIntrinsic.CHAN_SEND else if gc_call_builtin == CallBuiltin.EndpointRecv: MirIntrinsic.CHAN_RECV else: MirIntrinsic.CHAN_CLOSE
+                    return self.mir_emit_intrinsic_call(body, gc_endpoint_intrinsic, args_id, dest_place, next_bb)
 
                 if self.sema.try_branch_fns.contains(gc_node):
                     let try_branch_sym: i32 = self.sema.try_branch_fns.get(gc_node).unwrap()
@@ -15029,18 +14994,16 @@ impl Codegen:
                                 wl_build_br(self.builder, self.mir_bb_values[next_bb])
                             return true
 
-                let gc_callee_name_for_box = self.sema_symbol_text(gc_callee_sym)
-                if (gc_callee_name_for_box == "Box.new" or self.intern.resolve(gc_callee_sym) == "Box.new") and self.sema.fn_symbol_is_std_box_member(gc_callee_sym) != 0:
+                // std Box and Atomic constructors (Sema's record, #2043).
+                if gc_call_builtin == CallBuiltin.BoxNew:
                     return self.mir_emit_box_new_call(body, args_id, dest_place, next_bb)
-                if (gc_callee_name_for_box == "Box.into_inner" or self.intern.resolve(gc_callee_sym) == "Box.into_inner") and self.sema.fn_symbol_is_std_box_member(gc_callee_sym) != 0:
+                if gc_call_builtin == CallBuiltin.BoxIntoInner:
                     return self.mir_emit_box_into_inner_call(body, args_id, dest_place, next_bb)
-                if gc_callee_name_for_box == "new" or self.intern.resolve(gc_callee_sym) == "new":
+                if gc_call_builtin == CallBuiltin.AtomicNew:
                     let gc_atomic_dest_sema = self.mir_place_sema_type(body, dest_place)
-                    let gc_atomic_resolved = if gc_atomic_dest_sema > 0: self.mir_resolve_alias_at(gc_atomic_dest_sema) else: 0
-                    let gc_atomic_base = if gc_atomic_resolved > 0 and self.mir_type_kind_at(gc_atomic_resolved) == TypeKind.TY_GENERIC_INST: self.sema_sym_to_codegen_sym(self.mir_type_d0_at(gc_atomic_resolved)) else: 0
                     let gc_atomic_mir_start = body.call_arg_starts[args_id]
                     let gc_atomic_mir_count = body.call_arg_counts[args_id]
-                    if self.intern.resolve(gc_atomic_base) == "Atomic" and gc_atomic_mir_count == 1:
+                    if gc_atomic_mir_count == 1:
                         let gc_atomic_ty = self.mir_sema_type_to_llvm(gc_atomic_dest_sema)
                         let gc_atomic_elem_ty = wl_struct_get_type_at(gc_atomic_ty, 0)
                         let gc_atomic_arg_op = body.call_arg_operands[gc_atomic_mir_start]
@@ -15123,14 +15086,9 @@ impl Codegen:
                 let gc_fallback_ast_count = if self.pool.kind(gc_node) == NodeKind.NK_CALL: self.pool.get_data2(gc_node) else: -1
                 var gc_is_static_field_access_call = false
                 var gc_is_static_generic_struct_method_call = false
-                var gc_is_sync_scope_spawn_call = false
-                var gc_is_scoped_join_call = false
-                if gc_fallback_mir_count > 0:
-                    let gc_fallback_start = body.call_arg_starts[args_id]
-                    let gc_fallback_recv_op = body.call_arg_operands[gc_fallback_start]
-                    let gc_fallback_recv_sema = self.mir_operand_sema_type(body, gc_fallback_recv_op)
-                    gc_is_sync_scope_spawn_call = gc_name == "spawn" and gc_fallback_recv_sema == self.sema.ty_i64
-                    gc_is_scoped_join_call = gc_name == "join" and self.mir_operand_is_scoped_join_handle(body, gc_fallback_recv_op)
+                // Scoped spawn/join are Sema's builtin record (#2043).
+                let gc_is_sync_scope_spawn_call = gc_call_builtin == CallBuiltin.ScopeSpawn
+                let gc_is_scoped_join_call = gc_call_builtin == CallBuiltin.ScopedJoin
                 if self.pool.kind(gc_node) == NodeKind.NK_CALL:
                     let gc_static_probe_callee = self.pool.get_data0(gc_node)
                     if self.pool.kind(gc_static_probe_callee) == NodeKind.NK_FIELD_ACCESS:
@@ -15819,10 +15777,8 @@ impl Codegen:
                                     let gc_fb_try_sym = self.intern.intern(gc_fb_q2)
                                     if self.fn_values.get(gc_fb_try_sym).is_some():
                                         gc_fb_fn_sym = gc_fb_try_sym
-                    if gc_fb_fn_sym != 0 and gc_fb_mir_count > 0 and gc_fb_method == "join":
-                        let gc_fb_recv_op = body.call_arg_operands[gc_fb_mir_start]
-                        if self.mir_operand_is_scoped_join_handle(body, gc_fb_recv_op):
-                            gc_fb_fn_sym = 0
+                    if gc_fb_fn_sym != 0 and gc_call_builtin == CallBuiltin.ScopedJoin:
+                        gc_fb_fn_sym = 0
                     if gc_fb_fn_sym != 0 and gc_fb_mir_count > 0:
                         let gc_fb_fv = self.fn_values.get(gc_fb_fn_sym)
                         let gc_fb_ft = self.fn_fn_types.get(gc_fb_fn_sym)
@@ -15887,8 +15843,8 @@ impl Codegen:
                                             wl_build_br(self.builder, self.mir_bb_values[next_bb])
                                         return true
 
-                // async scope s.track(task_expr) — register task with scope
-                if gc_name == "spawn":
+                // a sync scope's s.spawn(worker) (Sema's record)
+                if gc_call_builtin == CallBuiltin.ScopeSpawn:
                     let gc_mir_start_spawn = body.call_arg_starts[args_id]
                     let gc_mir_count_spawn = body.call_arg_counts[args_id]
                     if gc_mir_count_spawn > 1:
@@ -15966,12 +15922,12 @@ impl Codegen:
                             wl_build_br(self.builder, self.mir_bb_values[next_bb])
                         return true
 
-                if gc_name == "join":
+                if gc_call_builtin == CallBuiltin.ScopedJoin:
                     let join_mir_start = body.call_arg_starts[args_id]
                     let join_mir_count = body.call_arg_counts[args_id]
                     if join_mir_count > 0:
                         let join_recv_op = body.call_arg_operands[join_mir_start]
-                        if self.mir_operand_is_scoped_join_handle(body, join_recv_op):
+                        if join_recv_op >= 0:
                             let join_recv_val = self.mir_eval_operand(body, join_recv_op, 0)
                             let join_recv_ty = wl_type_of(join_recv_val)
                             let join_alloca = self.create_entry_alloca(join_recv_ty)
@@ -16010,42 +15966,15 @@ impl Codegen:
                                 wl_build_br(self.builder, self.mir_bb_values[next_bb])
                             return true
 
-                // Generic method bodies can lower `self.method()` as a bare
-                // generic call when sema resolved the callee but the MIR call
-                // node no longer preserves field-access shape. Use the current
-                // monomorphized owner to recover the declared generic method.
-                if self.current_method_owner_sym != 0 and gc_name.len() > 0 and gc_name != "?":
-                    let gc_bare_base_sym: i32 = self.mono_struct_base.get(self.current_method_owner_sym) ?? 0
-                    if gc_bare_base_sym != 0:
-                        let gc_bare_base_name = self.intern.resolve(gc_bare_base_sym)
-                        let gc_bare_qualified = gc_bare_base_name ++ "." ++ gc_name
-                        let gc_bare_fn_sym = self.intern.intern(gc_bare_qualified)
-                        var gc_bare_decl = self.lookup_generic_struct_method_decl(gc_bare_fn_sym)
-                        if not gc_bare_decl.is_some():
-                            let gc_bare_sema_fn_sym = self.sema.pool_lookup_symbol(gc_bare_qualified)
-                            if gc_bare_sema_fn_sym != 0:
-                                gc_bare_decl = self.lookup_generic_struct_method_decl(gc_bare_sema_fn_sym)
-                        let gc_bare_mir_start = body.call_arg_starts[args_id]
-                        let gc_bare_mir_count = body.call_arg_counts[args_id]
-                        if gc_bare_decl.is_some() and gc_bare_decl.unwrap() > 0 and gc_bare_mir_count > 0:
-                            let gc_bare_recv_op = body.call_arg_operands[gc_bare_mir_start]
-                            let gc_bare_recv_val = self.mir_eval_operand(body, gc_bare_recv_op, 0)
-                            let gc_bare_recv_ty = wl_type_of(gc_bare_recv_val)
-                            let gc_bare_recv_ref_ptr = self.marshal_ref_addr(body, gc_bare_recv_op, gc_bare_recv_val)
-                            let gc_bare_pre_args = self.mir_eval_call_arg_range(body, args_id, 1, gc_bare_mir_count - 1, 1)
-                            let gc_bare_call_args_start = if self.pool.kind(gc_node) == NodeKind.NK_CALL: self.pool.get_data1(gc_node) else: 0
-                            let gc_bare_result = self.monomorphize_struct_method_core(self.current_method_owner_sym, gc_name, gc_bare_decl.unwrap(), gc_bare_recv_val, gc_bare_recv_ref_ptr, 0, gc_bare_recv_ty, gc_bare_call_args_start, gc_bare_mir_count - 1, gc_node, body.call_sig_index(args_id), body.call_mono_sym(args_id), gc_bare_pre_args)
-                            if dest_place >= 0 and gc_bare_result != 0:
-                                let gc_bare_ret_ty = wl_type_of(gc_bare_result)
-                                if gc_bare_ret_ty != wl_void_type(self.context):
-                                    let gc_bare_local = body.place_locals[dest_place]
-                                    let gc_bare_alloca = self.create_entry_alloca(gc_bare_ret_ty)
-                                    wl_build_store(self.builder, gc_bare_result, gc_bare_alloca)
-                                    self.mir_local_ptrs.insert(gc_bare_local, gc_bare_alloca)
-                                    self.mir_local_types.insert(gc_bare_local, gc_bare_ret_ty)
-                            if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
-                                wl_build_br(self.builder, self.mir_bb_values[next_bb])
-                            return true
+                // #2043: a generic struct method reached here without Sema's
+                // contract (call_requires_contract handles the resolved
+                // ones above). The name-built fallback that recovered it from
+                // the callee's spelling and the current owner is gone; a
+                // call that reaches this point is a compiler bug.
+                if self.current_method_owner_sym != 0 and self.lookup_generic_struct_method_decl(gc_callee_sym).is_some():
+                    with_eprint(f"error: BUG: generic method call `{gc_name}` reached codegen without Sema's resolved contract in {self.intern.resolve(self.current_function_name_sym)} (node {gc_node})")
+                    self.had_error = 1
+                    return false
 
                 // All patterns should be handled above. If we reach here, it's a genuine error
                 // (unless we're in a blanket impl body where T-method calls can't be resolved).

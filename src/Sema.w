@@ -404,6 +404,16 @@ pub enum CallBuiltin: i32:
     Send = 9
     Recv = 10
     Close = 11
+    // Method-call builtins (check_method_call_parts records them).
+    BoxNew = 12
+    BoxIntoInner = 13
+    AtomicNew = 14
+    EndpointSend = 15
+    EndpointRecv = 16
+    EndpointClose = 17
+    ScopeTrack = 18
+    ScopeSpawn = 19
+    ScopedJoin = 20
 
 impl Copy for CallBuiltin
 
