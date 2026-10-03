@@ -1899,6 +1899,13 @@ pub type Sema {
     // same-name declarations chained through body_typed_next.
     body_order_state: Vec[i32],
     body_order_lower: Vec[i32],
+    // §9.5 (#1930): the struct or union declaration whose fields are in scope
+    // by bare name in the body being checked (AstPool.receiver_field_owner),
+    // 0 outside its own module's instance methods; and the field names a
+    // binding in that body was refused for, whose bare uses then say nothing
+    // more.
+    receiver_field_owner: i32,
+    receiver_field_shadowed: HashMap[i32, i32],
     body_typed_decls: HashMap[i32, i32],
     body_typed_next: Vec[i32],
     // §13.6a: one for-comprehension's desugar (AstPool.build_comprehension_match)
@@ -3430,6 +3437,8 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         discarded_stmt_node: 0,
         body_order_state: Vec.new(),
         body_order_lower: Vec.new(),
+        receiver_field_owner: 0,
+        receiver_field_shadowed: sema_new_map_i32_i32(),
         body_typed_decls: sema_new_map_i32_i32(),
         body_typed_next: Vec.new(),
         comprehension_chain_roots: sema_new_map_i32_i32(),
@@ -6469,9 +6478,21 @@ impl Sema:
         self.bind_provenance.push(binding_provenance_empty())
         self.scope_name_map.insert(sym, idx)
 
+    // §9.5 (#1930), §29.8: in its type's own module's instance method a
+    // receiver field is in scope by its bare name, so a parameter or local
+    // binding of that name would shadow it.
+    mut fn refuse_receiver_field_shadow(sym: i32, node: i32):
+        if self.receiver_field_owner == 0 or not self.ast.receiver_type_has_field(self.receiver_field_owner, sym):
+            return
+        let name: str = with_str_clone_ref(self.pool_resolve(sym))
+        let owner: str = with_str_clone_ref(self.pool_resolve(self.ast.get_data0(self.receiver_field_owner)))
+        self.receiver_field_shadowed.insert(sym, 1)
+        self.emit_error_with_help(f"shadowing is not allowed for '{name}': it names a field of the receiver `{owner}`, which this method reaches by its bare name (§9.5)", node, f"rename the binding, e.g. `new_{name}`; the field is `{name}` or `self.{name}`")
+
     mut fn scope_put_at(sym: i32, tid: i32, is_mut: i32, node: i32):
         if self.is_discard_binding_symbol(sym) != 0:
             return
+        self.refuse_receiver_field_shadow(sym, node)
         let existing = self.scope_name_map.get(sym)
         if existing.is_some():
             let idx: i32 = existing.unwrap()
@@ -6536,6 +6557,7 @@ impl Sema:
     mut fn scope_put_consuming_rebind_at(sym: i32, tid: i32, is_mut: i32, node: i32) -> i32:
         if self.is_discard_binding_symbol(sym) != 0:
             return 1
+        self.refuse_receiver_field_shadow(sym, node)
         let existing = self.scope_name_map.get(sym)
         if not existing.is_some():
             self.scope_insert_at(sym, tid, is_mut)
