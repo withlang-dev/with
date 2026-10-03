@@ -274,6 +274,7 @@ impl Zcu:
         cg.audit_trait_table_contracts()
         cg.audit_codegen_call_coverage()
         cg.audit_mode_provenance()
+        cg.audit_ast_derivations()
         if rc != 0:
             cg.analysis_fail("code generation failed during integrated analysis")
         let status = if rc != 0: 1 else: cg.analysis_status()
