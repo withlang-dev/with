@@ -326,6 +326,9 @@ impl Codegen:
                 return str_ty
         self.mir_sema_type_to_llvm(elem_tid)
 
+// `offset` rounded up to `align` (a power of two), TypeLayout's rule.
+fn closure_align_up(offset: i64, align: i64): if align <= 1: offset else: (offset + align - 1) / align * align
+
 fn codegen_regex_flag_options(flags: &str) -> i32:
     var options: i32 = 0
     var i: i64 = 0
@@ -8624,15 +8627,6 @@ impl Codegen:
         self.mir_finish_intrinsic_call(body, dest_place, next_bb, wl_build_load(self.builder, tuple_ty, tuple_alloca))
         true
 
-    fn ensure_box_alloc_fn() -> i64:
-        var alloc_fn = wl_get_named_function(self.llmod, "with_alloc")
-        if alloc_fn != 0:
-            return alloc_fn
-        let params: Vec[i64] = Vec.new()
-        params.push(wl_i64_type(self.context))
-        let fn_ty = wl_function_type(wl_ptr_type(self.context), vec_data_i64(&params), 1, 0)
-        wl_add_function(self.llmod, "with_alloc", fn_ty)
-
     fn ensure_box_alloc_aligned_fn() -> i64:
         var alloc_fn = wl_get_named_function(self.llmod, "with_alloc_aligned")
         if alloc_fn != 0:
@@ -12565,21 +12559,18 @@ impl Codegen:
         let entry = wl_append_bb(self.context, clone_fn, "entry")
         wl_position_at_end(self.builder, entry)
         let old_cell = wl_get_param(clone_fn, 0)
-        let alloc_fn = self.ensure_box_alloc_fn()
-        let alloc_args: Vec[i64] = Vec.new()
+        // #2042: the copy is at the cell's model alignment, as the original.
+        let alloc_fn = self.ensure_box_alloc_aligned_fn()
         let cell_size = self.abi_size_of(cell_ty)
-        alloc_args.push(wl_const_int(i64_ty, cell_size, 0))
-        let new_cell = wl_build_call(self.builder, wl_global_get_value_type(alloc_fn), alloc_fn, vec_data_i64(&alloc_args), 1)
+        let alloc_args: Vec[i64] = [wl_const_int(i64_ty, cell_size, 0), wl_const_int(i64_ty, self.declared_align_of(cell_ty), 0)]
+        let new_cell = wl_build_call(self.builder, wl_global_get_value_type(alloc_fn), alloc_fn, vec_data_i64(&alloc_args), 2)
         self.emit_llvm_memcpy(new_cell, old_cell, cell_size)
-        let old_env = wl_build_struct_gep(self.builder, cell_ty, old_cell, 2)
-        let new_env = wl_build_struct_gep(self.builder, cell_ty, new_cell, 2)
-        for ci in 0..cap_sema_types.len():
+        let old_env = self.tuple_elem_ptr(cell_ty, old_cell, 2)
+        let new_env = self.tuple_elem_ptr(cell_ty, new_cell, 2)
+        for ci in 0..cap_sema_types.len() as i32:
             if self.sema.get_type_kind(self.sema.resolve_alias(cap_sema_types[ci] as TypeId)) == TypeKind.TY_STR:
-                let indices: Vec[i64] = Vec.new()
-                indices.push(wl_const_int(i32_ty, 0, 0))
-                indices.push(wl_const_int(i32_ty, ci as i64, 0))
-                let old_slot = wl_build_gep(self.builder, cap_struct_type, old_env, vec_data_i64(&indices), 2)
-                let new_slot = wl_build_gep(self.builder, cap_struct_type, new_env, vec_data_i64(&indices), 2)
+                let old_slot = self.tuple_elem_ptr(cap_struct_type, old_env, ci)
+                let new_slot = self.tuple_elem_ptr(cap_struct_type, new_env, ci)
                 wl_build_store(self.builder, self.gen_str_clone_ref(wl_build_load(self.builder, self.str_llvm_type(), old_slot)), new_slot)
         let _ = wl_build_ret(self.builder, new_cell)
         self.current_function = saved_fn
@@ -18186,13 +18177,40 @@ impl Codegen:
         wl_struct_type(self.context, vec_data_i64(&fat_types), 2, 0)
 
     // The owned cell: {drop_fn, clone_fn, env}.
-    fn closure_cell_llvm_type(cap_struct_type: i64) -> i64:
+    // #2042: a closure's (or async block's) environment, its captures placed
+    // as TypeLayout places a tuple of them (type_layout_tuple_elem_offset's
+    // rule): a by-value capture at its Sema type's model size and alignment,
+    // a by-place capture as a pointer. The literal struct of their LLVM types
+    // put an `@[align(32)]` capture at LLVM's offset (its i8-padded body
+    // reports 8). Accesses go through tuple_elem_ptr.
+    mut fn closure_env_llvm_type(cap_types: &Vec[i64], cap_sema_types: &Vec[i32], by_place: &Vec[i32]) -> i64:
+        let ptr_bytes = self.abi_size_of(wl_ptr_type(self.context))
+        let offsets: Vec[i64] = Vec.new()
+        var at: i64 = 0
+        var align: i64 = 1
+        for ci in 0..cap_types.len() as i32:
+            let place = ci < by_place.len() as i32 and by_place[ci] != 0
+            let elem_size = if place: ptr_bytes else: self.sema.type_layout_size_of_frozen(cap_sema_types[ci])
+            let elem_align = if place: ptr_bytes else: self.sema.type_layout_align_of_frozen(cap_sema_types[ci])
+            if elem_align > align:
+                align = elem_align
+            let off = closure_align_up(at, elem_align)
+            offsets.push(off)
+            at = off + elem_size
+        self.tuple_type_from_layout(cap_types, &offsets, closure_align_up(at, align), align)
+
+    // An owned closure's heap cell {drop_fn, clone_fn, env}, the environment
+    // at its own alignment (#2042).
+    mut fn closure_cell_llvm_type(cap_struct_type: i64) -> i64:
         let ptr_ty = wl_ptr_type(self.context)
-        let cell_types: Vec[i64] = Vec.new()
-        cell_types.push(ptr_ty)
-        cell_types.push(ptr_ty)
-        cell_types.push(cap_struct_type)
-        wl_struct_type(self.context, vec_data_i64(&cell_types), 3, 0)
+        let ptr_bytes = self.abi_size_of(ptr_ty)
+        let cell_types: Vec[i64] = [ptr_ty, ptr_ty, cap_struct_type]
+        let env_align = self.declared_align_of(cap_struct_type)
+        let align = if env_align > ptr_bytes: env_align else: ptr_bytes
+        let env_off = closure_align_up(2 * ptr_bytes, env_align)
+        let offsets: Vec[i64] = [0, ptr_bytes, env_off]
+        let size = closure_align_up(env_off + self.abi_size_of(cap_struct_type), align)
+        self.tuple_type_from_layout(&cell_types, &offsets, size, align)
 
     // drop(f) for a callable value at `pair_ptr`: an owned cell is handed to
     // its drop fn (which drops the captures and frees the cell) and the
@@ -18257,14 +18275,11 @@ impl Codegen:
         let entry = wl_append_bb(self.context, drop_fn, "entry")
         wl_position_at_end(self.builder, entry)
         let cell = wl_get_param(drop_fn, 0)
-        let env_ptr = wl_build_struct_gep(self.builder, cell_ty, cell, 2)
-        for ci in 0..cap_sema_types.len():
+        let env_ptr = self.tuple_elem_ptr(cell_ty, cell, 2)
+        for ci in 0..cap_sema_types.len() as i32:
             let cap_sema_ty = cap_sema_types[ci]
             if cap_sema_ty > 0 and self.sema.type_needs_drop_frozen(cap_sema_ty) != 0:
-                let indices: Vec[i64] = Vec.new()
-                indices.push(wl_const_int(i32_ty, 0, 0))
-                indices.push(wl_const_int(i32_ty, ci as i64, 0))
-                let slot = wl_build_gep(self.builder, cap_struct_type, env_ptr, vec_data_i64(&indices), 2)
+                let slot = self.tuple_elem_ptr(cap_struct_type, env_ptr, ci)
                 self.mir_emit_drop_ptr_for_sema_type(slot, cap_llvm_types[ci], cap_sema_ty)
         self.mir_emit_with_free_ptr(cell)
         let _ = wl_build_ret_void(self.builder)
@@ -18367,7 +18382,10 @@ impl Codegen:
             cap_orig_types.push(capture_ty)
         var cap_struct_type: i64 = 0
         if capture_count > 0:
-            cap_struct_type = wl_struct_type(self.context, vec_data_i64(&cap_types), capture_count, 0)
+            let env_sema_types: Vec[i32] = Vec.new()
+            for ci in 0..capture_count:
+                env_sema_types.push(closure_body.local_type_ids[ci + 1])
+            cap_struct_type = self.closure_env_llvm_type(&cap_types, &env_sema_types, &capture_ref_modes)
 
         // Build parameter types: context ptr first, then user params. Keep the
         // semantic types in lockstep with the LLVM signature so closure-local MIR
@@ -18463,14 +18481,11 @@ impl Codegen:
             else if owned_cell:
                 let raw_bits = wl_build_ptr_to_int(self.builder, raw_ctx, i64_ty)
                 let cell = wl_build_int_to_ptr(self.builder, wl_build_sub(self.builder, raw_bits, wl_const_int(i64_ty, self.closure_ctx_tag_owned(), 0)), ptr_ty)
-                cap_ptr = wl_build_struct_gep(self.builder, cell_ty, cell, 2)
+                cap_ptr = self.tuple_elem_ptr(cell_ty, cell, 2)
             for ci in 0..capture_count:
                 let sym = captures[ci]
                 let cap_ty = cap_types[ci]
-                let indices: Vec[i64] = Vec.new()
-                indices.push(wl_const_int(i32_ty, 0, 0))
-                indices.push(wl_const_int(i32_ty, ci as i64, 0))
-                let gep = wl_build_gep(self.builder, cap_struct_type, cap_ptr, vec_data_i64(&indices), 2)
+                let gep = self.tuple_elem_ptr(cap_struct_type, cap_ptr, ci)
                 if owned_cell:
                     // The cell's slot IS the local: reads, writes and the
                     // reset-on-move of a consuming body all land in the cell.
@@ -18672,7 +18687,10 @@ impl Codegen:
             // non-escaping mark cannot select this: a direct argument is
             // non-escaping by §12.3 even when the callee stores it (#1566).
             let cap_alloca = if self.closure_created_in_loop(parent, node) and not owned_env:
-                wl_build_alloca(self.builder, cap_struct_type)
+                // #2042: at the environment's model alignment, as an entry slot is.
+                let loop_slot = wl_build_alloca(self.builder, cap_struct_type)
+                wl_set_alignment(loop_slot, self.declared_align_of(cap_struct_type))
+                loop_slot
             else:
                 self.create_entry_alloca(cap_struct_type)
             for ci in 0..capture_count:
@@ -18686,10 +18704,7 @@ impl Codegen:
                 if alloca == 0:
                     sema_phase_bug(f"BUG: closure capture {ci} has no storage in its creating body: node={node} parent={parent.fn_sym}")
                 if alloca != 0:
-                    let indices: Vec[i64] = Vec.new()
-                    indices.push(wl_const_int(i32_ty, 0, 0))
-                    indices.push(wl_const_int(i32_ty, ci as i64, 0))
-                    let gep = wl_build_gep(self.builder, cap_struct_type, cap_alloca, vec_data_i64(&indices), 2)
+                    let gep = self.tuple_elem_ptr(cap_struct_type, cap_alloca, ci)
                     if capture_ref_modes[ci] != 0:
                         // Store pointer to outer alloca (not the value)
                         wl_build_store(self.builder, alloca, gep)
@@ -18717,13 +18732,13 @@ impl Codegen:
                 // context word carries its address with tag 10.
                 let env_drop_fn = self.gen_closure_env_drop_fn(cell_ty, cap_struct_type, cap_sema_types, cap_orig_types)
                 let env_clone_fn = self.gen_closure_env_clone_fn(cell_ty, cap_struct_type, cap_sema_types, cap_orig_types)
-                let alloc_fn = self.ensure_box_alloc_fn()
-                let alloc_args: Vec[i64] = Vec.new()
-                alloc_args.push(wl_const_int(i64_ty, self.abi_size_of(cell_ty), 0))
-                let cell = wl_build_call(self.builder, wl_global_get_value_type(alloc_fn), alloc_fn, vec_data_i64(&alloc_args), 1)
-                wl_build_store(self.builder, env_drop_fn, wl_build_struct_gep(self.builder, cell_ty, cell, 0))
-                wl_build_store(self.builder, if env_clone_fn != 0: env_clone_fn else: wl_const_null(ptr_ty), wl_build_struct_gep(self.builder, cell_ty, cell, 1))
-                self.emit_llvm_memcpy(wl_build_struct_gep(self.builder, cell_ty, cell, 2), cap_alloca, env_size)
+                // #2042: the cell at its model alignment (its environment's).
+                let alloc_fn = self.ensure_box_alloc_aligned_fn()
+                let alloc_args: Vec[i64] = [wl_const_int(i64_ty, self.abi_size_of(cell_ty), 0), wl_const_int(i64_ty, self.declared_align_of(cell_ty), 0)]
+                let cell = wl_build_call(self.builder, wl_global_get_value_type(alloc_fn), alloc_fn, vec_data_i64(&alloc_args), 2)
+                wl_build_store(self.builder, env_drop_fn, self.tuple_elem_ptr(cell_ty, cell, 0))
+                wl_build_store(self.builder, if env_clone_fn != 0: env_clone_fn else: wl_const_null(ptr_ty), self.tuple_elem_ptr(cell_ty, cell, 1))
+                self.emit_llvm_memcpy(self.tuple_elem_ptr(cell_ty, cell, 2), cap_alloca, env_size)
                 let tagged = wl_build_or(self.builder, wl_build_ptr_to_int(self.builder, cell, i64_ty), wl_const_int(i64_ty, self.closure_ctx_tag_owned(), 0))
                 ctx_ptr = wl_build_int_to_ptr(self.builder, tagged, ptr_ty)
 
@@ -19854,7 +19869,10 @@ impl Codegen:
             cap_types.push(ty)
         var cap_struct_type: i64 = 0
         if capture_count > 0:
-            cap_struct_type = wl_struct_type(ctx, vec_data_i64(&cap_types), capture_count, 0)
+            let env_sema_types: Vec[i32] = Vec.new()
+            for ci in 0..capture_count:
+                env_sema_types.push(ab_body.local_type_ids[ci + 1])
+            cap_struct_type = self.closure_env_llvm_type(&cap_types, &env_sema_types, &Vec.new())
 
         let ret_sema_ty_id = ab_body.local_type_ids[0]
         let ret_ty = self.sema_type_to_llvm(ret_sema_ty_id)
@@ -19904,7 +19922,7 @@ impl Codegen:
             for ci in 0..capture_count:
                 let sym = captures[ci]
                 let cap_ty = cap_types[ci]
-                let field_ptr = wl_build_struct_gep(self.builder, cap_struct_type, env_arg, ci)
+                let field_ptr = self.tuple_elem_ptr(cap_struct_type, env_arg, ci)
                 let val = wl_build_load(self.builder, cap_ty, field_ptr)
                 let alloca = self.create_entry_alloca(cap_ty)
                 wl_build_store(self.builder, val, alloca)
@@ -19994,16 +20012,10 @@ impl Codegen:
         var env_ptr = wl_const_null(ptr_ty)
         if capture_count > 0 and cap_struct_type != 0:
             let cap_size = self.abi_size_of(cap_struct_type)
-            var alloc_fn = wl_get_named_function(self.llmod, "with_alloc")
-            if alloc_fn == 0:
-                let ap: Vec[i64] = Vec.new()
-                ap.push(i64_ty)
-                let aft = wl_function_type(ptr_ty, vec_data_i64(&ap), 1, 0)
-                alloc_fn = wl_add_function(self.llmod, "with_alloc", aft)
-            let alloc_ft = wl_global_get_value_type(alloc_fn)
-            let alloc_args: Vec[i64] = Vec.new()
-            alloc_args.push(wl_const_int(i64_ty, cap_size, 0))
-            env_ptr = wl_build_call(self.builder, alloc_ft, alloc_fn, vec_data_i64(&alloc_args), 1)
+            // #2042: the environment at its model alignment.
+            let alloc_fn = self.ensure_box_alloc_aligned_fn()
+            let alloc_args: Vec[i64] = [wl_const_int(i64_ty, cap_size, 0), wl_const_int(i64_ty, self.declared_align_of(cap_struct_type), 0)]
+            env_ptr = wl_build_call(self.builder, wl_global_get_value_type(alloc_fn), alloc_fn, vec_data_i64(&alloc_args), 2)
             // Store captures into heap struct
             for ci in 0..capture_count:
                 let sym = captures[ci]
@@ -20011,7 +20023,7 @@ impl Codegen:
                 if src_opt.is_some():
                     let cap_ty = cap_types[ci]
                     let val = wl_build_load(self.builder, cap_ty, src_opt.unwrap() as i64)
-                    let fld = wl_build_struct_gep(self.builder, cap_struct_type, env_ptr, ci)
+                    let fld = self.tuple_elem_ptr(cap_struct_type, env_ptr, ci)
                     wl_build_store(self.builder, val, fld)
 
         // 9. Heap-allocate result buffer
