@@ -62,6 +62,22 @@ const GEN_LOOP_ERR_RETURN: i32 = 2
 const GEN_LOOP_CANCEL: i32 = 3
 const GEN_LOOP_LABEL_BASE: i32 = 4
 
+// §14.17.1: the ordering an Atomic method uses when the call omits it —
+// `Order.SeqCst` (lib/std/sync.w), the value codegen's AtomicOrdering.SEQ_CST
+// names. MirLower materializes the omitted argument (#1861).
+const ATOMIC_ORDER_SEQ_CST: i64 = 4
+
+// The argument count (receiver excluded) of an Atomic method intrinsic, the
+// ordering(s) included: load(order), store/swap/fetch_*(value, order),
+// compare_exchange[_weak](expected, new, success, failure); 0 for any other
+// intrinsic. Codegen reads each argument by this position.
+fn mir_atomic_intrinsic_arg_count(intrinsic: MirIntrinsic) -> i32:
+    if intrinsic == MirIntrinsic.ATOMIC_LOAD: return 1
+    if intrinsic == MirIntrinsic.ATOMIC_STORE or intrinsic == MirIntrinsic.ATOMIC_SWAP: return 2
+    if intrinsic == MirIntrinsic.ATOMIC_FETCH_ADD or intrinsic == MirIntrinsic.ATOMIC_FETCH_SUB or intrinsic == MirIntrinsic.ATOMIC_FETCH_AND or intrinsic == MirIntrinsic.ATOMIC_FETCH_OR or intrinsic == MirIntrinsic.ATOMIC_FETCH_XOR or intrinsic == MirIntrinsic.ATOMIC_FETCH_MIN or intrinsic == MirIntrinsic.ATOMIC_FETCH_MAX: return 2
+    if intrinsic == MirIntrinsic.ATOMIC_CAS or intrinsic == MirIntrinsic.ATOMIC_CAS_WEAK: return 4
+    0
+
 // How a gen-loop closure's exit to a label outside it continues in the
 // owning frame (MirBuilder.gen_loop_exit_kinds).
 const GEN_EXIT_BREAK: i32 = 0
@@ -13588,6 +13604,19 @@ impl MirBuilder:
             call_args.push(arg_op)
         if intrinsic == MirIntrinsic.OPT_UNWRAP or intrinsic == MirIntrinsic.OPT_EXPECT:
             call_args.push(self.source_location_operand(node))
+        // §14.17.1 (#1861): an Atomic method's omitted ordering is SeqCst.
+        // Both backends read the ordering by position from the flat operand
+        // table, so an absent operand read the NEXT call's first operand (an
+        // f-string's literal text as the ordering: "wrong argument type
+        // actual=i32 expected=ptr") or ran off the table's end (a global
+        // initializer: "index out of bounds"). The omitted argument is
+        // materialized here, once, as this call's own operand.
+        let atomic_arg_count = mir_atomic_intrinsic_arg_count(intrinsic)
+        if atomic_arg_count > 0:
+            let order_tid = self.sema.resolve_atomic_order_type(recv_type_for_args)
+            let order_const_tid = if order_tid != 0: order_tid else: self.sema.ty_i32 as i32
+            while call_args.len() as i32 < 1 + atomic_arg_count:
+                call_args.push(self.int_const_operand(ATOMIC_ORDER_SEQ_CST, order_const_tid))
 
         let args_id = self.body.new_call_args(call_args)
         // D65: the intrinsic materializes this call node (a static
