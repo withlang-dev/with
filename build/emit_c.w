@@ -275,6 +275,7 @@ fn emitc_find_matching_paren(text: &str, open_at: i32) -> i32:
     -1
 
 fn emitc_c_type(with_type: &str) -> str:
+    if with_type == "bool": return "bool"
     if with_type == "u8": return "uint8_t"
     if with_type == "i32": return "int32_t"
     if with_type == "i64": return "int64_t"
@@ -282,8 +283,10 @@ fn emitc_c_type(with_type: &str) -> str:
     if with_type == "u64": return "uint64_t"
     if with_type == "f64": return "double"
     if with_type == "str": return "with_str"
-    // #785: a &str param is a borrowed header pointer at the C ABI.
-    if with_type == "&str": return "const with_str *"
+    // A shared &str is a view value with str's own layout (with-abi.md §1,
+    // #1810), as the emitted definitions declare it; #785's header pointer
+    // predates that and made every call conflict with this prototype.
+    if with_type == "&str": return "with_str"
     if with_type == "WithVec": return "with_vec"
     if with_type == "*const WithVec": return "const with_vec *"
     if with_type == "*mut WithVec": return "with_vec *"
@@ -317,7 +320,10 @@ fn emitc_parse_param(param_text: &str) -> EmitCParam:
     if colon < 0:
         return EmitCParam { name: "", c_type: "" }
     let name = emitc_trim(trimmed.slice(0, colon as i64))
-    let with_type = emitc_trim(trimmed.slice((colon + 1) as i64, trimmed.len()))
+    // A default (`packed: bool = false`) is not part of the C prototype.
+    let default_at = emitc_index_of(trimmed, "=")
+    let type_end = if default_at > colon: default_at else: trimmed.len() as i32
+    let with_type = emitc_trim(trimmed.slice((colon + 1) as i64, type_end as i64))
     EmitCParam { name, c_type: emitc_c_type(with_type) }
 
 fn emitc_parse_params(text: &str) -> Vec[EmitCParam]:
