@@ -25719,8 +25719,13 @@ impl Sema:
         // gates. Route each ephemeral arg through the same escape check.
         for egi in 0..arg_count:
             if egi < arg_types.len() as i32 and arg_types[egi] != 0 and self.type_is_ephemeral_value(arg_types[egi] as TypeId) != 0:
-                let eg_extra = self.ast.get_data1(node)
-                let eg_arg = if self.has_resolved_call_args(node) != 0: self.get_resolved_call_arg(node, egi) else: self.ast.get_extra(eg_extra + egi)
+                // The argument nodes sit at the caller's `extra_start`: a
+                // call's own list (its d1), or the one slot an `in` or `|>`
+                // node records for the operand it passes (#2009). Only a call
+                // node has a resolved (reordered) argument list; reading an
+                // `in` node's d1 as an argument list took its lhs node id
+                // for an extra index and checked an unrelated node.
+                let eg_arg = if self.ast.kind(node) == NodeKind.NK_CALL and self.has_resolved_call_args(node) != 0: self.get_resolved_call_arg(node, egi) else: self.ast.get_extra(extra_start + egi)
                 if eg_arg > 0:
                     self.check_ephemeral_task_arg_escape(eg_arg, 0, 0, method_fn_sym, egi)
 
