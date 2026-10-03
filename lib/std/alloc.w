@@ -269,16 +269,16 @@ pub fn scratch_arena() -> TempArena:
 
 // Every block carries a 16-byte header (alignment kept) whose first word
 // links the block allocated before it; the arena's cell holds the newest.
-fn temp_arena_link(head: *mut i64, block: *i8) -> *i8:
-    unsafe *(block as *mut i64) = unsafe *head
-    unsafe *head = block as i64
+unsafe fn temp_arena_link(head: *mut i64, block: *i8) -> *i8:
+    *(block as *mut i64) = *head
+    *head = block as i64
     (block as i64 + 16) as *i8
 
 pub fn TempArena.alloc(self: &TempArena, size: i32) -> *i8:
-    temp_arena_link(self.head, alloc((if size > 0: size else: 1) + 16))
+    unsafe { temp_arena_link(self.head, alloc((if size > 0: size else: 1) + 16)) }
 
 pub fn TempArena.alloc_zeroed(self: &TempArena, count: i32, size: i32) -> *i8:
-    temp_arena_link(self.head, alloc_zeroed(1, count * size + 16))
+    unsafe { temp_arena_link(self.head, alloc_zeroed(1, count * size + 16)) }
 
 pub fn TempArena.reset(mut self: TempArena) -> Unit:
     var block = unsafe *self.head
