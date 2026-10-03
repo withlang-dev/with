@@ -1611,12 +1611,21 @@ pub type Sema {
     // A text-view return on a function that is no resource's method is
     // presented at the call: the C name stays the surface and the call's
     // result is `Option[CStr]` in every module that imported it
-    // (SemaFacade.w verify_facade_text_return; SemaCheck.w check_call;
-    // MirLower.w lower_call).
+    // (SemaFacade.w verify_facade_text_return; SemaCheck.w check_call).
     facade_presented_syms: HashMap[i32, i32],      // fn sym -> 1
     facade_bridge_of: HashMap[str, str],           // D64: C name -> the rendered free operation presented under it (`__with_facade_<name>`)
-    facade_bridge_syms: HashMap[i32, i32],         // D64: bridge symbols a call was redirected to (MirLower.w lower_call) -> 1
     facade_presented_calls: HashMap[i32, i32],     // call node -> 1
+    // D65 phase 5 (#2043): a call whose value is a conversion of what its
+    // callee returns, and the conversion function Sema chose for it (a
+    // presented text view is `cstr_option_from_ptr` of C's pointer,
+    // §16.2b.8). MirLower lowers the callee's call and then an ordinary
+    // call of the conversion on its result; it knows nothing of why.
+    call_value_conversions: HashMap[i32, i32],     // call node -> conversion fn sym
+    // D65 phase 5 (#2043): a method call Sema resolved to another method
+    // than the one its spelling names (a variadic contract's case, D66
+    // §16.2b.5): the name of the method it calls. MirLower reads it in
+    // place of the spelling.
+    method_call_fields: HashMap[i32, i32],         // call node -> method name sym
     // D86 (§18.2): a call of `assert`/`require`/`check` (std.builtins or
     // std.testing) is a compiler-known form, not a function call: its
     // message is evaluated only when its condition is false (SemaCheck.w
@@ -1625,11 +1634,10 @@ pub type Sema {
     // D66 (spec §16.2b.5): a discriminated variadic contract is presented
     // as one method or function per case, chosen at the call by the
     // selector's compile-time value (SemaFacade.w facade_variadic_retarget;
-    // SemaCheck.w check_method_call / check_call; MirLower.w
-    // lower_method_call / lower_call materialize the choice).
+    // SemaCheck.w check_method_call / check_call record the choice as the
+    // call's resolution: comp_resolved, method_call_fields).
     facade_variadic_ops: HashMap[str, i32],        // "Host.method" (hosted) or the presented free name -> foreign_contracts index
     facade_variadic_method_names: HashMap[i32, i32], // a hosted presented method's symbol -> 1 (the cheap pre-check)
-    facade_variadic_calls: HashMap[i32, i32],      // call node -> the case method's symbol Sema chose
     // §30 (spec §16.2b.6): ephemeral-storage errors whose ephemerality a
     // facade resource supplies, held until the facade facts exist
     // (SemaFacade.w report_facade_layout_errors).
@@ -3328,12 +3336,12 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         current_facade_node: 0,
         facade_presented_syms: sema_new_map_i32_i32(),
         facade_bridge_of: HashMap.new(),
-        facade_bridge_syms: sema_new_map_i32_i32(),
         facade_presented_calls: sema_new_map_i32_i32(),
+        call_value_conversions: sema_new_map_i32_i32(),
+        method_call_fields: sema_new_map_i32_i32(),
         precondition_form_calls: sema_new_map_i32_i32(),
         facade_variadic_ops: HashMap.new(),
         facade_variadic_method_names: sema_new_map_i32_i32(),
-        facade_variadic_calls: sema_new_map_i32_i32(),
         facade_layout_nodes: Vec.new(),
         facade_layout_tids: Vec.new(),
         facade_layout_containers: Vec.new(),
