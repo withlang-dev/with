@@ -16671,6 +16671,17 @@ impl Sema:
             self.emit_error("unknown field '" ++ self.pool_resolve(field) ++ "' for type '" ++ self.type_name(field_base as i32) ++ "'", node)
             return 0
 
+        // #1981: every other type has no fields. Returning 0 here without a
+        // word left `x.v` untyped and MIR read a zero from it (`fn f[T](x:
+        // T) -> i32: x.v` printed 0 for `f(3)`). A generic body is checked
+        // per instantiation (§11.2: "rely on instantiation-time checking"),
+        // so the instantiation whose type has no such field is the error.
+        if ftk != TypeKind.TY_ERR and ftk != TypeKind.TY_NEVER:
+            let unknown_field_msg = "unknown field '" ++ self.pool_resolve(field) ++ "' for type '" ++ self.type_name(field_base as i32) ++ "'"
+            if self.in_concrete_generic_body != 0:
+                self.emit_error_with_help(unknown_field_msg, node, "a generic body is checked for each instantiation (§11.2), and this one's type has no fields; bound the type parameter by a trait whose method provides the value, or instantiate it with a type that has the field")
+            else:
+                self.emit_error(unknown_field_msg, node)
         0
 
     mut fn check_computed_field_access(node: i32) -> i32:
