@@ -4231,6 +4231,14 @@ impl MirBuilder:
 
         // Generic function reference (monomorphized at codegen time)
         if self.sema.generic_fn_node_for_symbol(fn_sym) != 0:
+            // #1857: Sema instantiated the generic at the expected callable
+            // type and recorded the specialization on this node; the
+            // constant names that instance.
+            if node_id != 0 and self.sema.resolved_call_mono_syms.contains(node_id):
+                let mono_sym: i32 = self.sema.resolved_call_mono_syms.get(node_id).unwrap()
+                let mono_sig = self.sema.get_sig(mono_sym)
+                let mono_tid = if type_id != 0: type_id else if mono_sig >= 0: self.sema.sig_type_ids[mono_sig] else: 0
+                return self.fn_const_operand(mono_sym, mono_tid, node_id)
             return self.fn_const_operand(fn_sym, type_id, node_id)
 
         let const_node = self.try_resolve_module_const_node(sym)

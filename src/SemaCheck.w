@@ -9799,6 +9799,43 @@ impl Sema:
 
         // Check function names
         if self.generic_fn_node_for_symbol(sym) != 0 and self.is_ci_visible(sym) != 0 and self.symbol_visible_from_current(sym) != 0:
+            // #1857 (§12): a generic function named where a `fn(..) -> R`
+            // is expected is instantiated at that type's parameters. The
+            // specialization is recorded on this node (resolved_call_mono_syms,
+            // as a generic call records it) and the name is the instance's
+            // With callable value (D65); MIR never meets an untyped name.
+            if self.has_expected_type != 0 and self.expected_expr_type != 0:
+                let expected_callable = self.resolve_alias(self.expected_expr_type)
+                if self.get_type_kind(expected_callable) == TypeKind.TY_FN:
+                    let generic_node = self.generic_fn_node_for_symbol(sym)
+                    let expected_param_count = self.get_type_d1(expected_callable)
+                    let instance_arg_types: Vec[i32] = Vec.new()
+                    let instance_arg_nodes: Vec[i32] = Vec.new()
+                    for pi in 0..expected_param_count:
+                        instance_arg_types.push(self.fn_type_param_type(expected_callable as i32, pi))
+                    if self.check_generic_call(sym, generic_node, &instance_arg_types, &instance_arg_nodes, expected_param_count, node) == 0:
+                        return 0
+                    let mono_sig = self.resolved_call_sigs.get(node) ?? -1
+                    if mono_sig < 0:
+                        return 0
+                    // A specialization's signature carries no function type
+                    // (check_fn_body_concrete adds it with 0); the instance's
+                    // callable type is built from its concrete parameters
+                    // and return.
+                    let mono_param_count = self.sig_get_param_count(mono_sig)
+                    let mono_params: Vec[i32] = Vec.new()
+                    for mpi in 0..mono_param_count:
+                        mono_params.push(self.sig_param_type(mono_sig, mpi))
+                    let mono_tid = self.ensure_fn_type(&mono_params, mono_param_count, self.sig_return_type(mono_sig) as TypeId) as i32
+                    if self.fn_types_assignable(expected_callable as i32, mono_tid) == 0:
+                        self.emit_error("`" ++ self.pool_resolve(sym) ++ "` instantiated at the expected parameters is `" ++ self.type_name(mono_tid) ++ "`, not `" ++ self.type_name(expected_callable as i32) ++ "`", node)
+                        return 0
+                    self.fn_callable_values.insert(node, 1)
+                    self.typed_expr_types.insert(node, mono_tid)
+                    self.fn_value_ident_sigs.insert(node, mono_sig)
+                    self.note_callable_value(mono_sig, mono_tid)
+                    return mono_tid
+            self.emit_error("generic function `" ++ self.pool_resolve(sym) ++ "` as a value needs an expected function type to instantiate it (§12): annotate the binding or parameter, or call it", node)
             return 0
 
         let sig_idx = self.get_visible_sig(sym)
