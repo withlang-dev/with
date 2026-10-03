@@ -751,6 +751,10 @@ type AstPoolState {
     receiver_field_methods: HashMap[i32, i32],
     receiver_field_accesses: HashMap[i32, i32],
     receiver_field_keys: HashMap[i64, i32],
+    // §18.1: (file, last segment of its `module` header) pairs, in parse
+    // order — a module's self-name when it has a header.
+    module_header_files: Vec[i32],
+    module_header_names: Vec[i32],
     frozen: i32,
 }
 
@@ -848,6 +852,8 @@ fn AstPool.new -> AstPool:
             receiver_field_methods: HashMap.new(),
             receiver_field_accesses: HashMap.new(),
             receiver_field_keys: HashMap.new(),
+            module_header_files: Vec.new(),
+            module_header_names: Vec.new(),
             unsafe_fn_type_nodes: HashMap.new(),
             variadic_fn_type_nodes: HashMap.new(),
             fn_effect_pin_starts: HashMap.new(),
@@ -1899,6 +1905,18 @@ impl AstPool:
                 self.state.receiver_field_accesses.insert(n, owner)
 
     fn receiver_type_has_field(owner: i32, sym: i32) -> bool: self.state.receiver_field_keys.contains(ast_pair_key(owner, sym))
+
+    // §18.1: `module a.b.c` in file `file` names the module `c`.
+    fn record_module_header(file: i32, name_sym: i32):
+        self.state.module_header_files.push(file)
+        self.state.module_header_names.push(name_sym)
+
+    // The last segment of `file`'s `module` header, 0 when it has none.
+    fn module_header_name(file: i32) -> i32:
+        for i in 0..self.state.module_header_files.len() as i32:
+            if self.state.module_header_files[i] == file: return self.state.module_header_names[i]
+        0
+
 
     // The type whose fields are in scope by bare name in `fn_node`'s body
     // (§9.5), 0 when the method is not one of its own module's.

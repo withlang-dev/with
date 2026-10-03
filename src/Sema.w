@@ -1906,6 +1906,12 @@ pub type Sema {
     // more.
     receiver_field_owner: i32,
     receiver_field_shadowed: HashMap[i32, i32],
+    // §18.1: module_self_name's last answer, for the module path it read.
+    self_name_cache_path: str,
+    self_name_cache: str,
+    // §18.2: callee nodes `builtins.name` bound to a compiler intrinsic —
+    // the intrinsic, whatever else the bare name names here.
+    builtins_intrinsic_nodes: HashMap[i32, i32],
     body_typed_decls: HashMap[i32, i32],
     body_typed_next: Vec[i32],
     // §13.6a: one for-comprehension's desugar (AstPool.build_comprehension_match)
@@ -3439,6 +3445,9 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         body_order_lower: Vec.new(),
         receiver_field_owner: 0,
         receiver_field_shadowed: sema_new_map_i32_i32(),
+        self_name_cache_path: "",
+        self_name_cache: "",
+        builtins_intrinsic_nodes: sema_new_map_i32_i32(),
         body_typed_decls: sema_new_map_i32_i32(),
         body_typed_next: Vec.new(),
         comprehension_chain_roots: sema_new_map_i32_i32(),
@@ -6487,7 +6496,11 @@ impl Sema:
         let name: str = with_str_clone_ref(self.pool_resolve(sym))
         let owner: str = with_str_clone_ref(self.pool_resolve(self.ast.get_data0(self.receiver_field_owner)))
         self.receiver_field_shadowed.insert(sym, 1)
-        self.emit_error_with_help(f"shadowing is not allowed for '{name}': it names a field of the receiver `{owner}`, which this method reaches by its bare name (§9.5)", node, f"rename the binding, e.g. `new_{name}`; the field is `{name}` or `self.{name}`")
+        // A destructuring shorthand binds the field's own name: bind it under
+        // another (`{ repr: r }`).
+        let fix = if self.ast.kind(node) == NodeKind.NK_PAT_STRUCT: f"bind the field under another name, e.g. `{name}: {name.slice(0, 1)}`" else: f"rename the binding, e.g. `new_{name}`"
+        self.emit_error_with_help(f"shadowing is not allowed for '{name}': it names a field of the receiver `{owner}`, which this method reaches by its bare name (§9.5)", node, f"{fix}; the field is `{name}` or `self.{name}`")
+
 
     mut fn scope_put_at(sym: i32, tid: i32, is_mut: i32, node: i32):
         if self.is_discard_binding_symbol(sym) != 0:
@@ -9261,7 +9274,33 @@ impl Sema:
 
 // ── Utility functions ────────────────────────────────────────────
 
+// §18.2: the standard library's prelude module, std.builtins.
+pub fn sema_path_is_std_builtins(path: &str) -> bool:
+    path == "lib/std/builtins.w" or path == "<embedded-std>/std/builtins.w" or path.ends_with("/lib/std/builtins.w")
+
+// §18.1: a module without a `module` header names itself by its file's
+// stem, each character that cannot appear in an identifier replaced by `_`
+// and a leading digit prefixed with `_`.
+pub fn sema_module_stem_self_name(path: &str) -> str:
+    var start = 0
+    for i in 0..path.len() as i32:
+        if path[i] == '/': start = i + 1
+    var end = path.len() as i32
+    if path.ends_with(".wi"): end = end - 3
+    else if path.ends_with(".w"): end = end - 2
+    if end <= start:
+        return ""
+    var out = ""
+    for i in start..end:
+        let c = path[i]
+        let ident_char = (c >= 'a' and c <= 'z') or (c >= 'A' and c <= 'Z') or (c >= '0' and c <= '9') or c == '_'
+        out = out ++ (if ident_char: path.slice(i as i64, (i + 1) as i64) else: "_")
+    if path[start] >= '0' and path[start] <= '9':
+        out = "_" ++ out
+    out
+
 pub fn sema_str_has_data(text: &str) -> i32:
+
     if text.len() <= 0:
         return 0
     let data_ptr = unsafe *(text as *const str as *const *const u8)

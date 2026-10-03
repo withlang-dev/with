@@ -1,4 +1,4 @@
-//! expect-error: shadowing is not allowed for 'limit': it names a field of the receiver `Gauge` and the function `limit` (§9.5)
+//! expect-error: bare 'limit' names both a field of the receiver `Gauge` and the function `limit` (§9.5)
 
 // §9.5 (#1930): a bare name that names both a receiver field and a
 // module-level function is a shadowing error; `self.limit` and the

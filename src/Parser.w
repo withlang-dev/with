@@ -989,24 +989,34 @@ impl Parser:
         self.top_level_stmts = Vec.new()
         self.explicit_main_decl = 0
 
-        // Skip optional module declaration
+        // The optional module declaration: its last segment is the module's
+        // self-name (§18.1).
         if self.peek() == TokenKind.TK_KW_MODULE:
             self.advance()
+            var last_segment = ""
             if self.peek() == TokenKind.TK_IDENT or self.peek() == TokenKind.TK_DOT_IDENT:
+                last_segment = self.current_text()
                 self.advance()
             while true:
                 if self.peek() == TokenKind.TK_DOT:
                     self.advance()
                     if self.peek() == TokenKind.TK_IDENT:
+                        last_segment = self.current_text()
                         self.advance()
                     else:
                         break
                 else if self.peek() == TokenKind.TK_DOT_IDENT:
                     // .Uppercase segments are lexed as dot-identifiers.
+                    last_segment = self.current_text()
                     self.advance()
                 else:
                     break
+            if last_segment.starts_with("."):
+                last_segment = last_segment.slice(1, last_segment.len())
+            if last_segment.len() > 0:
+                self.pool.record_module_header(self.file_id, self.intern.intern(last_segment))
             self.skip_separators()
+
 
         while self.peek() != TokenKind.TK_EOF:
             self.skip_separators()
