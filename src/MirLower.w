@@ -2573,14 +2573,11 @@ impl MirBuilder:
                             return asm_rt as i32
             return self.sema.ty_void as i32
         if kind == NodeKind.NK_CALL:
-            // A presented text-view call (spec §16.2b.8) is the Option[CStr]
-            // Sema typed it, not the callee's pointer (lower_call).
-            if self.sema.facade_presented_calls.contains(node):
-                let opt_sym = self.sema.pool_lookup_symbol("Option")
-                let found = if opt_sym != 0: self.sema.find_generic_inst(opt_sym, self.sema.ty_cstr as i32) else: 0
-                if found == 0:
-                    sema_phase_bug(f"BUG: presented text-view call has no Option[CStr] type: node={node}")
-                return found
+            // A call whose value Sema converts (call_value_conversions) is
+            // the conversion's result, not its callee's (lower_call).
+            let conv_sym: i32 = self.sema.call_value_conversions.get(node) ?? 0
+            if conv_sym != 0:
+                return self.sema.sig_return_type(self.sema.get_sig(conv_sym))
             return self.call_return_type(self.ast.get_data0(node))
         if kind == NodeKind.NK_ASSIGN:
             let target_ty = self.expr_type(self.ast.get_data0(node))
@@ -12019,16 +12016,13 @@ impl MirBuilder:
         let recorded_sig = self.sema.resolved_call_sigs.get(node).copied()
         if recorded_sig.is_some():
             sig_idx = recorded_sig.unwrap()
-        // D64 (§16.2b.8): a call to the C name of a free operation a facade
-        // presents is the rendered bridge Sema resolved it to (check_call,
-        // facade_bridge_redirect): the callee and its signature are the
-        // bridge's, not the raw declaration's that the ident names.
-        if fn_expr != 0 and self.ast.kind(fn_expr) == NodeKind.NK_IDENT:
-            let bridged: i32 = if self.sema.comp_resolved.contains(node): self.sema.comp_resolved.get(node).unwrap() else: 0
-            if bridged != 0 and bridged != self.ast.get_data0(fn_expr) and self.sema.facade_bridge_syms.contains(bridged):
-                sig_idx = self.call_sig_for_sym(bridged)
-                let bridge_ret = if sig_idx >= 0: self.sema.sig_return_type(sig_idx) else: self.sema.ty_void as i32
-                fn_op = self.const_operand(ConstKind.CK_FN, bridged, bridge_ret)
+        // The function Sema resolved the call to, when the name spells
+        // another: the callee and its signature are that function's.
+        let resolved = self.resolved_function_callee(node, fn_expr)
+        if resolved != 0:
+            sig_idx = self.call_sig_for_sym(resolved)
+            let resolved_ret = if sig_idx >= 0: self.sema.sig_return_type(sig_idx) else: self.sema.ty_void as i32
+            fn_op = self.const_operand(ConstKind.CK_FN, resolved, resolved_ret)
         let callable_fn_tid = if sig_idx >= 0: 0 else: self.callable_fn_type_for_expr(fn_expr)
         var actual_ret_type_id = ret_type_id
         if (actual_ret_type_id == 0 or actual_ret_type_id == self.sema.ty_void as i32) and sig_idx >= 0:
@@ -12080,13 +12074,13 @@ impl MirBuilder:
         let args_id = self.body.new_call_args(args)
         self.body.set_call_ast_node(args_id, node)
         self.record_call_contract(args_id, node, sig_idx)
-        // D51 stage 7 (spec §16.2b.8): a presented text-view call is typed
-        // `Option[CStr]` by Sema (check_call) while the C function returns
-        // its pointer: the call itself keeps the callee's type, and the
-        // pointer becomes the view through the prelude's
-        // `cstr_option_from_ptr` (NULL is None) — one place, no placeholder.
-        let presented = self.sema.facade_presented_calls.contains(node)
-        if presented and sig_idx >= 0:
+        // D65 phase 5 (#2043): a call whose value Sema converts
+        // (call_value_conversions) keeps its callee's result type; the
+        // value is an ordinary call of the conversion Sema chose on it.
+        let conv_sym: i32 = self.sema.call_value_conversions.get(node) ?? 0
+        if conv_sym != 0:
+            if sig_idx < 0:
+                sema_phase_bug(f"BUG: a call Sema converts has no signature: node={node}")
             actual_ret_type_id = self.sema.sig_return_type(sig_idx)
         // #933: a call whose result has no type is a Sema hole, not a unit
         // value — lowering it as unit once aggregated a void payload into an
@@ -12101,8 +12095,8 @@ impl MirBuilder:
         self.switch_to(next_bb)
         self.register_stmt_temp(result_local, actual_ret_type_id)
 
-        if presented:
-            return self.lower_presented_text_view(result_place, node)
+        if conv_sym != 0:
+            return self.lower_value_conversion(conv_sym, result_place, node)
         if self.sema.is_copy_frozen(actual_ret_type_id) != 0:
             return self.body.new_operand(OperandKind.OK_COPY, result_place)
         self.body.new_operand(OperandKind.OK_MOVE, result_place)
@@ -12187,15 +12181,15 @@ impl MirBuilder:
         self.switch_to(pass_bb)
         self.unit_operand()
 
-    // The `Option[CStr]` of a presented call's pointer result (above).
-    mut fn lower_presented_text_view(ptr_place: i32, node: i32) -> i32:
-        let conv_sym = self.sema.pool_lookup_symbol("cstr_option_from_ptr")
-        let conv_sig = if conv_sym != 0: self.sema.get_sig(conv_sym) else: -1
+    // A call's value converted by the function Sema chose (above): an
+    // ordinary call of `conv_sym` on the callee's result.
+    mut fn lower_value_conversion(conv_sym: i32, raw_place: i32, node: i32) -> i32:
+        let conv_sig = self.sema.get_sig(conv_sym)
         if conv_sig < 0:
-            sema_phase_bug(f"BUG: presented text-view call has no cstr_option_from_ptr to lower through: node={node}")
+            sema_phase_bug(f"BUG: Sema converts a call's value through a function with no signature: node={node}")
         let fn_op = self.lower_var(conv_sym, 0, 0)
         let args: Vec[i32] = Vec.new()
-        args.push(self.body.new_operand(OperandKind.OK_COPY, ptr_place))
+        args.push(self.body.new_operand(OperandKind.OK_COPY, raw_place))
         let args_id = self.body.new_call_args(args)
         let result_ty = self.sema.sig_return_type(conv_sig)
         let result_local = self.new_temp(result_ty)
@@ -12379,6 +12373,22 @@ impl MirBuilder:
     // signature and declaration tables must not be consulted for it, or a
     // parameter named like `std.builtins.check` inherits that fn's signature
     // and its `loc = src()` default (#1230). Sema's record decides (#2043).
+    // D65 phase 5 (#2043): a call of a name Sema resolved to a function
+    // calls the function Sema resolved (comp_resolved), whatever the name
+    // spells. That function when it is not the spelled one, else 0. (A
+    // facade's C name resolves to its bridge or its variadic case, D64,
+    // D66; MIR does not know why.)
+    fn resolved_function_callee(call_node: i32, fn_expr: i32) -> i32:
+        if call_node <= 0 or fn_expr == 0 or self.ast.kind(fn_expr) != NodeKind.NK_IDENT or self.sema.call_callee_kind(call_node) != CallCalleeKind.Function:
+            return 0
+        let resolved: i32 = self.sema.comp_resolved.get(call_node) ?? 0
+        if resolved == 0:
+            sema_phase_bug(f"BUG: Sema resolved a call to a function without recording which: node={call_node}")
+        let spelled = self.ast.get_data0(fn_expr)
+        if resolved == spelled or resolved == self.sema_symbol_for_ast_symbol(spelled):
+            return 0
+        resolved
+
     fn call_sig_for_expr(fn_expr: i32, call_node: i32) -> i32:
         if fn_expr == 0 or self.ast.kind(fn_expr) != NodeKind.NK_IDENT or self.sema.call_callee_kind(call_node) == CallCalleeKind.Callable:
             return -1
@@ -13147,10 +13157,9 @@ impl MirBuilder:
         self.unit_operand()
 
     mut fn lower_method_call(self_expr: i32, method_sym0: i32, arg_start: i32, arg_count: i32, node: i32) -> i32:
-        // D66 (§16.2b.5): a variadic contract's presented method is the
-        // case method Sema chose for this call (SemaCheck.w check_call);
-        // the AST still names the presented method.
-        let method_sym = if self.sema.facade_variadic_calls.contains(node): self.sema.facade_variadic_calls.get(node).unwrap() else: method_sym0
+        // D65 phase 5 (#2043): the method Sema resolved the call to when it
+        // is not the one the spelling names (method_call_fields).
+        let method_sym: i32 = self.sema.method_call_fields.get(node) ?? method_sym0
         // Lower method calls as normal calls with receiver inserted as first arg.
         var callee_sym = if self.sema.comp_resolved.contains(node):
             self.sema.comp_resolved.get(node).unwrap()
@@ -15934,12 +15943,20 @@ impl MirBuilder:
         // `collect[Vec]()`: Sema resolved the stage to the generic function
         // the bracketed callee names (check_generic_pipeline_call).
         let stage_expr = if fn_expr != 0 and self.ast.kind(fn_expr) == NodeKind.NK_INDEX and self.sema.comp_resolved.contains(node): self.ast.get_data0(fn_expr) else: fn_expr
-        let fn_op = self.lower_expr(stage_expr)
-        let callee_sym =
+        var fn_op = self.lower_expr(stage_expr)
+        var callee_sym =
             if stage_expr != 0 and self.ast.kind(stage_expr) == NodeKind.NK_IDENT:
                 self.ast.get_data0(stage_expr)
             else:
                 0
+        // D65 phase 5 (#2043): the stage call is the call Sema resolved —
+        // its function (lower_call's rule) and its value conversion.
+        let resolved = self.resolved_function_callee(call_node, stage_expr)
+        if resolved != 0:
+            let resolved_sig = self.call_sig_for_sym(resolved)
+            fn_op = self.const_operand(ConstKind.CK_FN, resolved, if resolved_sig >= 0: self.sema.sig_return_type(resolved_sig) else: self.sema.ty_void as i32)
+            callee_sym = resolved
+        let conv_sym: i32 = if call_node != 0: self.sema.call_value_conversions.get(call_node) ?? 0 else: 0
         let arg_nodes: Vec[i32] = Vec.new()
         arg_nodes.push(lhs_expr)
         // #2024: the stage call's argument list as Sema filled it (its
@@ -15950,6 +15967,12 @@ impl MirBuilder:
         else:
             for i in 0..args_count:
                 arg_nodes.push(self.ast.get_extra(args_start + i))
+        if conv_sym != 0:
+            let raw_sig = self.call_sig_for_sym(callee_sym)
+            if raw_sig < 0:
+                sema_phase_bug(f"BUG: a pipeline stage Sema converts has no signature: node={node}")
+            let raw = self.lower_call_with_arg_nodes_recv(fn_op, callee_sym, -1, arg_nodes, self.sema.sig_return_type(raw_sig), node, call_node)
+            return self.lower_value_conversion(conv_sym, self.body.operand_d0[raw], node)
         let ret_ty = self.expr_type(node)
         self.lower_call_with_arg_nodes_recv(fn_op, callee_sym, -1, arg_nodes, ret_ty, node, call_node)
 
