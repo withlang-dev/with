@@ -3118,15 +3118,25 @@ impl MirBuilder:
         if canonical_sym == self.sema.syms.src: 1 else: 0
 
 impl MirBuilder:
+    // A string constant whose text the compiler made, not a literal the
+    // programmer wrote: it carries the raw-literal prefix, so the backends'
+    // escape decoders (CodegenDispatch str_const_text, CCodegen
+    // cc_string_literal_payload, comptime_decode_string_escapes) leave its
+    // bytes as they are. A source path such as `W:\review\test\b.w` went in
+    // as a plain CK_STR and came out of the panic as `W:` CR `eview` TAB …
+    // (#1953).
+    mut fn lower_synthesized_str_lit(text: &str) -> i32:
+        self.lower_str_lit(self.pool.intern("\x01raw\x01" ++ text))
+
     mut fn source_location_operand(node: i32) -> i32:
         let path = if self.sema.current_module_path.len() > 0: self.sema.current_module_path.clone() else: "<unknown>"
         let loc = self.sema.source_location_for_file_id(self.sema.local_file_id, self.ast.get_start(node))
-        self.lower_str_lit(self.pool.intern(f"{path}:{loc.line + 1}:{loc.col + 1}"))
+        self.lower_synthesized_str_lit(f"{path}:{loc.line + 1}:{loc.col + 1}")
 
     mut fn source_file_operand(node: i32) -> i32:
         let _ = node
         let path = if self.sema.current_module_path.len() > 0: self.sema.current_module_path.clone() else: "<unknown>"
-        self.lower_str_lit(self.pool.intern(path))
+        self.lower_synthesized_str_lit(path)
 
     mut fn source_line_operand(node: i32) -> i32:
         let loc = self.sema.source_location_for_file_id(self.sema.local_file_id, self.ast.get_start(node))
@@ -3134,7 +3144,7 @@ impl MirBuilder:
 
     mut fn source_fn_operand(node: i32) -> i32:
         let _ = node
-        self.lower_str_lit(self.pool.intern(self.pool.resolve(self.body.fn_sym)))
+        self.lower_synthesized_str_lit(self.pool.resolve(self.body.fn_sym))
 
     mut fn lower_magic_ident(kind: i32, node: i32) -> i32:
         if kind == SemaMagicIdentKind.FILE:
