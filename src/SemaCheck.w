@@ -6250,6 +6250,9 @@ impl Sema:
     mut fn fn_symbol_may_suspend(fn_sym: i32) -> i32:
         if fn_sym == 0:
             return 0
+        if self.suspend_facts_settling != 0:
+            let settled_node = self.fn_decl_node_for_suspend(fn_sym)
+            return if settled_node != 0 and self.suspend_fact_nodes.contains(settled_node): 1 else: 0
         if self.suspend_visiting.contains(fn_sym):
             return 0
         if not self.fn_decl_nodes.contains(fn_sym):
@@ -6263,6 +6266,45 @@ impl Sema:
         self.suspend_site_depth -= 1
         self.suspend_visiting.remove(fn_sym)
         result
+
+    // The declaration a callee symbol runs: its own, or, for a concrete
+    // specialization, its generic template's — 0 when it has none.
+    fn fn_decl_node_for_suspend(fn_sym: i32) -> i32:
+        if self.fn_decl_nodes.contains(fn_sym):
+            return self.fn_decl_nodes.get(fn_sym).unwrap()
+        if self.concrete_specialization_by_sym.contains(fn_sym):
+            return self.concrete_specialization_nodes[self.concrete_specialization_by_sym.get(fn_sym).unwrap()]
+        0
+
+    // #916 (§14.7): settle which fn declarations may suspend the fiber that
+    // runs them, once checking is done. A least fixpoint over every body —
+    // a body suspends when it awaits, or calls a declaration already known
+    // to — so a recursive cycle cannot cut the answer short the way the
+    // on-demand walk's visiting set does.
+    mut fn settle_may_suspend_facts():
+        self.suspend_facts_settling = 1
+        var changed = true
+        while changed:
+            changed = false
+            for node in 1..self.ast.node_count():
+                if self.ast.kind(node) != NodeKind.NK_FN_DECL or self.suspend_fact_nodes.contains(node) or self.ast.fn_decl_body_is_interface(node):
+                    continue
+                if self.expr_may_suspend(self.ast.get_data1(node)) != 0:
+                    self.suspend_fact_nodes.insert(node, 1)
+                    changed = true
+        self.suspend_facts_settling = 0
+
+    // #916 (§14.7): a call to `callee` may return to its caller by a
+    // cancellation unwind — the callee is a sync fn whose body may suspend,
+    // so the fiber can be cancelled while it runs and the callee then leaves
+    // without producing its value. Calling an async fn spawns its Task and
+    // calling a gen fn builds its generator: neither suspends the caller.
+    fn call_target_may_suspend(callee: i32) -> bool:
+        let fn_node = self.fn_decl_node_for_suspend(callee)
+        if fn_node == 0 or not self.suspend_fact_nodes.contains(fn_node):
+            return false
+        let flags = self.ast.get_data2(fn_node)
+        (flags / FnFlags.ASYNC) % 2 == 0 and (flags / FnFlags.GEN) % 2 == 0
 
     // D69 (§13.4): a generator's body runs inside the loop that consumes it
     // (`for x in g`, or a comprehension clause, keyed by `key_node`), so a
@@ -6362,7 +6404,20 @@ impl Sema:
             return self.expr_may_suspend(self.ast.get_data0(node))
         if kind == NodeKind.NK_UNARY or kind == NodeKind.NK_RETURN:
             return self.expr_may_suspend(self.ast.get_data1(node))
-        if kind == NodeKind.NK_BINARY or kind == NodeKind.NK_ASSIGN or kind == NodeKind.NK_PIPELINE or kind == NodeKind.NK_RANGE or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_MATCH_OP or kind == NodeKind.NK_NEG_MATCH_OP:
+        if kind == NodeKind.NK_PIPELINE:
+            // `x |> f` calls its stage (d0 = the piped value, d1 = the stage):
+            // the stage's resolved callee may suspend like any call's (#916).
+            if self.comp_resolved.contains(node) and self.fn_symbol_may_suspend(self.comp_resolved.get(node).unwrap()) != 0:
+                return self.suspension_site(node)
+            if self.pipeline_method_calls.contains(node) and self.fn_symbol_may_suspend(self.pipeline_method_calls.get(node).unwrap()) != 0:
+                return self.suspension_site(node)
+            let stage = self.ast.get_data1(node)
+            if self.ast.kind(stage) == NodeKind.NK_IDENT and self.fn_symbol_may_suspend(self.ast.get_data0(stage)) != 0:
+                return self.suspension_site(node)
+            if self.expr_may_suspend(self.ast.get_data0(node)) != 0:
+                return 1
+            return self.expr_may_suspend(stage)
+        if kind == NodeKind.NK_BINARY or kind == NodeKind.NK_ASSIGN or kind == NodeKind.NK_RANGE or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_MATCH_OP or kind == NodeKind.NK_NEG_MATCH_OP:
             if self.expr_may_suspend(self.ast.get_data1(node)) != 0:
                 return 1
             return self.expr_may_suspend(self.ast.get_data2(node))

@@ -1568,6 +1568,13 @@ pub type Sema {
     suspend_site_depth: i32,
     suspend_site_record_depth: i32,
     suspend_site_node: i32,
+    // #916 (§14.7): the fn declarations whose body may suspend the calling
+    // fiber — the least fixpoint settle_may_suspend_facts computes once
+    // checking is done, keyed by declaration node so a generic template and
+    // its specializations share one answer. While suspend_facts_settling is
+    // set, fn_symbol_may_suspend reads this table instead of walking.
+    suspend_fact_nodes: HashMap[i32, i32],
+    suspend_facts_settling: i32,
     // §13.4 `g.pull()`: the generator value's type → its gen fn; a gen fn → its
     // first `yield` that hands out a view of its own locals (and that local);
     // each checked `g.pull()` node and its gen fn, judged once bodies are done.
@@ -3157,6 +3164,8 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         suspend_site_depth: 0,
         suspend_site_record_depth: -1,
         suspend_site_node: 0,
+        suspend_fact_nodes: sema_new_map_i32_i32(),
+        suspend_facts_settling: 0,
         generator_state_fns: sema_new_map_i32_i32(),
         generator_local_view_yields: sema_new_map_i32_i32(),
         generator_local_view_origins: sema_new_map_i32_i32(),

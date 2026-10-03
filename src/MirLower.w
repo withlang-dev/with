@@ -395,14 +395,38 @@ impl MirBuilder:
 
     mut fn terminate(kind: i32, d0: i32, d1: i32, d2: i32, d3: i32):
         let span = if self.cur_node > 0: self.ast.get_start(self.cur_node) else: 0
+        self.terminate_with_span(kind, d0, d1, d2, d3, span)
+
+    mut fn terminate_with_span(kind: i32, d0: i32, d1: i32, d2: i32, d3: i32, span: i32):
+        if kind == TermKind.TK_CALL and self.call_may_cancel_return(d0, d1):
+            // #916 (§14.7): the callee may have left by a cancellation
+            // unwind, its result never written. The caller unwinds in turn
+            // before anything reads the result, like the await it sits under.
+            let check_bb = self.new_block()
+            self.settle_payload_resets_at_terminator(kind, d2, check_bb)
+            self.body.set_terminator(self.cur_bb, kind, d0, d1, d2, check_bb, span)
+            self.mark_no_suspend_terminator()
+            self.switch_to(check_bb)
+            self.emit_cancelled_return_check(d2, d3)
+            return
         self.settle_payload_resets_at_terminator(kind, d2, d3)
         self.body.set_terminator(self.cur_bb, kind, d0, d1, d2, d3, span)
         self.mark_no_suspend_terminator()
 
-    mut fn terminate_with_span(kind: i32, d0: i32, d1: i32, d2: i32, d3: i32, span: i32):
-        self.settle_payload_resets_at_terminator(kind, d2, d3)
-        self.body.set_terminator(self.cur_bb, kind, d0, d1, d2, d3, span)
-        self.mark_no_suspend_terminator()
+    // A direct call (or a generic one, through its specialization) of a sync
+    // fn that may suspend (Sema's settled fact). The callee is the one Sema
+    // resolved the call to (its contract's symbol: an overload's own, a
+    // generic's specialization), else the function constant.
+    fn call_may_cancel_return(callee_op: i32, call_id: i32) -> bool:
+        let intrinsic = self.body.call_intrinsic(call_id)
+        if intrinsic != MirIntrinsic.NONE and intrinsic != MirIntrinsic.GENERIC_CALL:
+            return false
+        let constant = mir_body_extract_callee_sym(&self.body, callee_op)
+        if constant == 0:
+            return false
+        let resolved = self.body.call_mono_sym(call_id)
+        let target = if resolved != 0 and self.sema.fn_decl_node_for_suspend(resolved) != 0: resolved else: constant
+        self.sema.call_target_may_suspend(target)
 
     fn push_scope() -> Unit:
         if with_getenv_str("WITH_TRACE_SCOPES").len() > 0:
@@ -1370,10 +1394,18 @@ impl MirBuilder:
         self.lower_expr_discard(node)
         self.finish_stmt_temp_frame(frame)
 
+    // Each defer body runs with only the defers registered before it still
+    // pending: a cancellation unwind inside it (§14.7, #916) runs those, never
+    // the body itself or the ones this exit already ran.
     mut fn emit_defers_for_range(start: i32, end: i32):
         var i = end - 1
         while i >= start:
-            self.emit_deferred_body(self.defer_nodes[i])
+            let ran: Vec[i32] = Vec.new()
+            while self.defer_nodes.len() as i32 > i:
+                ran.push(self.defer_nodes.remove(self.defer_nodes.len() as i32 - 1))
+            self.emit_deferred_body(ran[(ran.len() as i32 - 1)])
+            while ran.len() > 0:
+                self.defer_nodes.push(ran.remove(ran.len() as i32 - 1))
             i = i - 1
 
     mut fn emit_drops_for_range(start: i32, end: i32):
@@ -2235,7 +2267,7 @@ impl MirBuilder:
                 return recv_type
         self.sema.ty_void as i32
 
-    mut fn struct_field_type(struct_tid: i32, field_sym: i32) -> i32:
+    fn struct_field_type(struct_tid: i32, field_sym: i32) -> i32:
         let resolved = self.sema.resolve_alias(struct_tid)
         let tk = self.sema.get_type_kind(resolved)
         if tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR:
@@ -10334,6 +10366,21 @@ impl MirBuilder:
     // the wait completed, continue; else the runtime cut it short → cancelled
     // return. (#1293: a select loser parked in recv() never unwound.)
     mut fn emit_wait_cancel_check():
+        let continue_bb = self.new_block()
+        self.emit_cancelled_return_check(-1, continue_bb)
+        self.switch_to(continue_bb)
+
+    // The fiber's cancelled-return flag (set by every cancellation unwind,
+    // emit_cancelled_return) clear → continue_bb; set → unwind. `dest` is the
+    // place the just-returned call would have written (-1: none): on the
+    // unwind edge it holds no value, so it must not be one this function
+    // already owns and would drop.
+    mut fn emit_cancelled_return_check(dest: i32, continue_bb: i32):
+        if dest >= 0 and dest < self.body.place_locals.len():
+            let dest_local: i32 = self.body.place_locals[dest]
+            for di in 0..self.drop_local_ids.len():
+                if self.drop_local_ids[di] == dest_local:
+                    sema_phase_bug(f"BUG: a call that may unwind on cancellation writes _{dest_local}, already scheduled for drop (#916)")
         let ic_args: Vec[i32] = Vec.new()
         let ic_args_id = self.body.new_call_args(ic_args)
         self.body.set_call_intrinsic(ic_args_id, MirIntrinsic.FIBER_WAIT_CANCELLED)
@@ -10343,7 +10390,6 @@ impl MirBuilder:
         let ic_unit = self.unit_operand()
         self.terminate(TermKind.TK_CALL, ic_unit, ic_args_id, ic_place, check_bb)
         self.switch_to(check_bb)
-        let continue_bb = self.new_block()
         let unwind_bb = self.new_block()
         let sw_vals: Vec[i64] = Vec.new()
         sw_vals.push(0)
@@ -10354,7 +10400,6 @@ impl MirBuilder:
         self.terminate(TermKind.TK_SWITCH_INT, ic_op, sw, unwind_bb, 0)
         self.switch_to(unwind_bb)
         self.emit_cancelled_return()
-        self.switch_to(continue_bb)
 
     // Join a Task purely for cleanup: await completion and free its result buffer,
     // but do not propagate child-cancel status into the current fiber.
@@ -18040,6 +18085,8 @@ fn lower_debug_formatter(sema: &Sema, ast_pool: AstPool, pool: InternPool, entry
 pub fn lower_module(input_sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirLowerResult:
     var sema = input_sema
     sema.prepare_source_line_offsets()
+    // #916: lowering a call reads whether its callee may suspend.
+    sema.settle_may_suspend_facts()
     var mir_mod = MirModule.init()
 
     for di in 0..ast_pool.decl_count():
