@@ -4247,7 +4247,10 @@ impl MirBuilder:
             if hinted_tk == TypeKind.TY_PTR or hinted_tk == TypeKind.TY_REF or hinted_tk == TypeKind.TY_EXTERN_FN:
                 return self.const_operand(ConstKind.CK_INT, 0, self.sema.ty_i32)
 
-        let local = self.lookup_local(sym)
+        // §18.1/§18.2: a qualified name (Sema's namespace binding) names a
+        // declaration, never a local of its short name.
+        let qualified = node_id > 0 and self.ast.is_namespace_bound(node_id as NodeId)
+        let local = if qualified: -1 else: self.lookup_local(sym)
         if local >= 0:
             let place = self.body.new_place(local)
             // D52 (§9.1c): a global is never moved out — a `const` is a value
@@ -4262,7 +4265,7 @@ impl MirBuilder:
                     self.mark_string_base_fields_may_alias(local)
                 return self.body.new_operand(OperandKind.OK_COPY, place)
             return self.body.new_operand(OperandKind.OK_MOVE, place)
-        let alias_place = self.lookup_alias_place(sym)
+        let alias_place = if qualified: -1 else: self.lookup_alias_place(sym)
         if alias_place >= 0:
             // #747 (03h): a view binding rooted in storage THIS frame owns and
             // will drop (consumed param / owned local with a scheduled value
@@ -12389,6 +12392,10 @@ impl MirBuilder:
     fn ident_names_local_callable(fn_expr: i32) -> bool:
         if fn_expr == 0 or self.ast.kind(fn_expr) != NodeKind.NK_IDENT:
             return false
+        // §18.1/§18.2: a qualified callee names a declaration (Sema bound it).
+        if self.ast.is_namespace_bound(fn_expr as NodeId):
+            return false
+
         let sym = self.ast.get_data0(fn_expr)
         self.lookup_local(sym) >= 0 or self.lookup_alias_place(sym) >= 0
 
