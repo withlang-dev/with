@@ -9460,7 +9460,7 @@ impl CCodegen:
             if self.sema.get_type_kind(resolved) == TypeKind.TY_STRUCT and count == 1 and self.sema.distinct_type_names.contains(name_sym):
                 continue  // distinct types get their typedef in the definition pass
             let name = self.struct_c_name(tid)
-            out = out ++ "typedef struct " ++ name ++ " " ++ name ++ ";\n"
+            out = out ++ "typedef " ++ self.record_keyword(tid) ++ " " ++ name ++ " " ++ name ++ ";\n"
         out = out ++ "\n"
         out = out ++ self.emit_fn_type_defs()
 
@@ -9481,12 +9481,15 @@ impl CCodegen:
                 let start = self.sema.get_type_d0(resolved)
                 let count = self.sema.get_type_d1(resolved)
                 out = out ++ "struct " ++ name ++ " " ++ cc_lbrace() ++ "\n"
+                var elem_names: Vec[str] = Vec.new()
                 for ti in 0..count:
                     if self.check_interrupted() != 0:
                         return ""
                     let elem_tid: i32 = self.sema.type_extra[(start + ti)]
                     out = out ++ "    " ++ self.c_decl(elem_tid, f"field{ti}") ++ ";\n"
-                out = out ++ cc_rbrace() ++ ";\n\n"
+                    elem_names.push(f"field{ti}")
+                out = out ++ cc_rbrace() ++ ";\n"
+                out = out ++ self.layout_static_asserts(resolved, name, &elem_names) ++ "\n"
                 continue
             let generic_base_name = self.generic_inst_base_name(resolved as i32)
             if self.sema.is_opaque_value_type(resolved as i32) != 0:
@@ -9547,11 +9550,17 @@ impl CCodegen:
                 out = out ++ cc_rbrace() ++ ";\n\n"
                 continue
             if self.generic_inst_is_declared_struct(resolved as i32):
-                out = out ++ "struct " ++ name ++ " " ++ cc_lbrace() ++ "\n"
+                out = out ++ self.record_keyword(resolved as i32) ++ " " ++ name ++ " " ++ cc_lbrace() ++ "\n"
+                var field_names: Vec[str] = Vec.new()
                 for fi in 0..self.sema.type_reflection_field_count(resolved as i32):
                     let field_name = cc_intern_resolve(self.intern, self.sema.type_reflection_field_name(resolved as i32, fi))
                     out = out ++ "    " ++ self.c_decl(self.sema.type_reflection_field_type_frozen(resolved as i32, fi), field_name) ++ ";\n"
-                out = out ++ cc_rbrace() ++ ";\n\n"
+                    field_names.push(field_name)
+                // D72 (§2.5.1): the template's hidden liveness byte.
+                if self.sema.struct_liveness_byte_frozen(self.sema.get_type_d0(resolved)) != 0:
+                    out = out ++ "    uint8_t __with_live;\n"
+                out = out ++ cc_rbrace() ++ ";\n"
+                out = out ++ self.layout_static_asserts(resolved as i32, name, &field_names) ++ "\n"
                 continue
             let start = self.sema.get_type_d1(resolved)
             let count = self.sema.get_type_d2(resolved)
@@ -9563,7 +9572,8 @@ impl CCodegen:
                 let field_tid = self.effective_field_tid(resolved, field_sym, raw_field_tid)
                 out = out ++ "typedef " ++ self.c_decl(field_tid, name) ++ ";\n\n"
                 continue
-            out = out ++ "struct " ++ name ++ " " ++ cc_lbrace() ++ "\n"
+            out = out ++ self.record_keyword(resolved as i32) ++ " " ++ name ++ " " ++ cc_lbrace() ++ "\n"
+            var field_names: Vec[str] = Vec.new()
             for fi in 0..count:
                 if self.check_interrupted() != 0:
                     return ""
@@ -9571,8 +9581,88 @@ impl CCodegen:
                 let raw_field_tid: i32 = self.sema.type_extra[(start + fi * 3 + 1)]
                 let field_tid = self.effective_field_tid(resolved, field_sym, raw_field_tid)
                 let field_name = cc_intern_resolve(self.intern, field_sym)
-                out = out ++ "    " ++ self.c_decl(field_tid, field_name) ++ ";\n"
-            out = out ++ cc_rbrace() ++ ";\n\n"
+                // §16.4 `@[align(N)]`: the field's declared alignment, the
+                // one TypeLayout places it at (#2022).
+                let align_slot = start + count * 3 + fi
+                let declared_align = if align_slot < self.sema.type_extra.len() as i32: self.sema.type_extra[align_slot] else: 0
+                let align_text = if declared_align > 0: f"_Alignas({declared_align}) " else: ""
+                out = out ++ "    " ++ align_text ++ self.c_decl(field_tid, field_name) ++ ";\n"
+                field_names.push(field_name)
+            // D72 (§2.5.1): the hidden liveness byte after the last field.
+            if self.sema.struct_liveness_byte_frozen(name_sym) != 0:
+                out = out ++ "    uint8_t __with_live;\n"
+            out = out ++ cc_rbrace() ++ ";\n"
+            out = out ++ self.layout_static_asserts(resolved, name, &field_names) ++ "\n"
+        out
+
+    // Whether `tid` stores an Option that with-abi §3 makes a nullable
+    // pointer, directly or in a field, element or payload it holds by value.
+    fn record_holds_nullable_option(tid: i32, depth: i32) -> bool:
+        if depth > 32:
+            return false
+        let resolved = self.sema.resolve_alias(tid as TypeId) as i32
+        if self.sema.type_layout_option_is_nullable(resolved):
+            return true
+        let tk = self.sema.get_type_kind(resolved as TypeId)
+        if tk == TypeKind.TY_ARRAY:
+            return self.record_holds_nullable_option(self.sema.get_type_d0(resolved as TypeId), depth + 1)
+        if tk == TypeKind.TY_TUPLE:
+            let start = self.sema.get_type_d0(resolved as TypeId)
+            for ti in 0..self.sema.get_type_d1(resolved as TypeId):
+                if self.record_holds_nullable_option(self.sema.type_extra[(start + ti)], depth + 1):
+                    return true
+            return false
+        if tk == TypeKind.TY_STRUCT:
+            let start = self.sema.get_type_d1(resolved as TypeId)
+            for fi in 0..self.sema.get_type_d2(resolved as TypeId):
+                if self.record_holds_nullable_option(self.sema.type_extra[(start + fi * 3 + 1)], depth + 1):
+                    return true
+            return false
+        if self.type_is_payload_enum(resolved) != 0:
+            for vi in 0..self.sema.type_reflection_variant_count(resolved):
+                for pi in 0..self.sema.type_reflection_variant_payload_count(resolved, vi):
+                    if self.record_holds_nullable_option(self.sema.type_reflection_variant_payload_type_frozen(resolved, vi, pi), depth + 1):
+                        return true
+            return false
+        if tk == TypeKind.TY_GENERIC_INST and self.generic_inst_is_declared_struct(resolved):
+            for fi in 0..self.sema.type_reflection_field_count(resolved):
+                if self.record_holds_nullable_option(self.sema.type_reflection_field_type_frozen(resolved, fi), depth + 1):
+                    return true
+        false
+
+    // `union` for a §16.4 union type (all fields at offset 0, TypeLayout's
+    // union rule), else `struct`. A union emitted as a struct laid its
+    // members end to end: pcre2's class_bits_storage was 64 bytes where the
+    // model says 32, moving every later field of compile_block_8 (#2022).
+    fn record_keyword(tid: i32) -> str:
+        let resolved = self.sema.resolve_alias(tid as TypeId)
+        let tk = self.sema.get_type_kind(resolved)
+        let name_sym = if tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_GENERIC_INST: self.sema.get_type_d0(resolved) else: 0
+        if name_sym != 0 and self.sema.type_layout_struct_sub_kind(name_sym) == TypeDeclKind.Union: "union" else: "struct"
+
+    // #2022: the C compiler proves an emitted record is TypeLayout's model
+    // (with-abi.md §2): its size, its alignment and each field's offset. A
+    // difference is a C compile error naming the type, never a program that
+    // silently reads its fields elsewhere than the LLVM backend does. A
+    // fact the model never registered is not asserted.
+    fn layout_static_asserts(tid: i32, c_type: &str, field_names: &Vec[str]) -> str:
+        let label = cc_escape_c_string(self.sema.type_name(tid))
+        // #2036: this backend's nullable-pointer Options are tagged structs,
+        // a known divergence from with-abi §3; a record holding one is
+        // checked once that issue gives the Option its pointer form.
+        if self.record_holds_nullable_option(tid, 0):
+            return "/* layout not asserted: holds a nullable-pointer Option (#2036) */\n"
+        var out = ""
+        let size_opt = self.sema.layout_size_cache.get(tid)
+        if size_opt.is_some():
+            out = out ++ f"_Static_assert(sizeof({c_type}) == {size_opt.unwrap()}, \"emit-c: " ++ label ++ f" is not TypeLayout's {size_opt.unwrap()} bytes\");\n"
+        let align_opt = self.sema.layout_align_cache.get(tid)
+        if align_opt.is_some():
+            out = out ++ f"_Static_assert(_Alignof({c_type}) == {align_opt.unwrap()}, \"emit-c: " ++ label ++ f" is not TypeLayout's {align_opt.unwrap()}-byte alignment\");\n"
+        for fi in 0..field_names.len() as i32:
+            let offset_opt = self.sema.layout_field_offset_cache.get(sema_pair_key(tid, fi))
+            if offset_opt.is_some():
+                out = out ++ f"_Static_assert(offsetof({c_type}, " ++ field_names[fi] ++ f") == {offset_opt.unwrap()}, \"emit-c: " ++ label ++ "." ++ field_names[fi] ++ f" is not at TypeLayout's offset {offset_opt.unwrap()}\");\n"
         out
 
     mut fn global_var_definition(decl: NodeId) -> str:
