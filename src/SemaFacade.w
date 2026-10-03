@@ -987,7 +987,7 @@ impl Sema:
                 return
             self.emit_error(f"fn '{fname}' is described by two facade blocks with different clauses; one function has one contract — restate it word for word or describe it once (§16.2b)", item)
             return
-        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: Vec.new(), consumes_destroyed_by: Vec.new(), retains: Vec.new(), retains_by: Vec.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_domain: 0, returns_static_tid: 0, preserves_params: Vec.new(), preserves_domains: Vec.new(), of_resource: 0, rename: 0, callback_thread_any: 0, callbacks_none: 0, callback_consumes: Vec.new(), callback_userdata_cb: Vec.new(), callback_userdata_of: Vec.new(), valid_on_failed: 0, nullable_params: Vec.new(), buffer_ptr: Vec.new(), buffer_len: Vec.new(), buffer_inout: Vec.new(), buffer_elements: Vec.new(), fixed_params: Vec.new(), fixed_literals: Vec.new(), ok_const: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: Vec.new(), variadic_case_values: Vec.new(), variadic_case_tids: Vec.new(), variadic_case_kinds: Vec.new(), variadic_slots: Vec.new(), returns_borrow_record: 0, argv_cb: Vec.new(), argv_index: Vec.new(), argc_index: Vec.new(), argv_handle: Vec.new(), argv_nodes: Vec.new(), user_data_fn: 0, user_data_handle: -1, user_data_node: 0 }
+        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: Vec.new(), consumes_destroyed_by: Vec.new(), retains: Vec.new(), retains_by: Vec.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_domain: 0, returns_borrow_parent: 0, returns_static_tid: 0, preserves_params: Vec.new(), preserves_domains: Vec.new(), of_resource: 0, rename: 0, callback_thread_any: 0, callbacks_none: 0, callback_consumes: Vec.new(), callback_userdata_cb: Vec.new(), callback_userdata_of: Vec.new(), valid_on_failed: 0, nullable_params: Vec.new(), buffer_ptr: Vec.new(), buffer_len: Vec.new(), buffer_inout: Vec.new(), buffer_elements: Vec.new(), fixed_params: Vec.new(), fixed_literals: Vec.new(), ok_const: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: Vec.new(), variadic_case_values: Vec.new(), variadic_case_tids: Vec.new(), variadic_case_kinds: Vec.new(), variadic_slots: Vec.new(), returns_borrow_record: 0, argv_cb: Vec.new(), argv_index: Vec.new(), argc_index: Vec.new(), argv_handle: Vec.new(), argv_nodes: Vec.new(), user_data_fn: 0, user_data_handle: -1, user_data_node: 0 }
         let extra_start = self.ast.get_data1(item)
         let clause_count = self.ast.get_data2(item)
         for ci in 0..clause_count:
@@ -1270,6 +1270,30 @@ impl Sema:
         if kind == FACADE_CLAUSE_RETURNS_BORROW:
             let res = self.ast.get_extra(ops)
             let domain = self.ast.get_extra(ops + 2)
+            let parent = self.ast.get_extra(ops + 3)
+            // `returns borrow T from parent T of param N` (D85, spec
+            // §16.2b.6): a borrow of the parent of the resource param N
+            // receives. Only a resource has a parent; that the argument's
+            // resource declares it is verified once every resource is
+            // known (verify_facade_borrowed_returns).
+            if parent != 0:
+                let rn: str = self.pool_resolve(res)
+                let pn: str = self.pool_resolve(parent)
+                if rn == "CStr" or self.facade_imported_record_type(res) != 0 or not self.facade_resource_index.contains(res):
+                    self.emit_error(f"fn '{fname}': 'returns borrow {rn} from parent {pn}' — a parent borrow hands out a modeled resource, the parent the argument's resource declares with 'borrows'; '{rn}' is no resource (§16.2b.6)", clause)
+                    return c
+                let pfrom = self.facade_resolve_param(self.ast.get_extra(ops + 1), fn_sym, sig)
+                if pfrom < 0:
+                    return c
+                let pri: i32 = self.facade_resource_index.get(res).unwrap()
+                if not self.facade_same_type(self.sig_return_type(sig), self.facade_resources[pri].repr_tid):
+                    let rt: str = self.type_name(self.sig_return_type(sig))
+                    self.emit_error(f"fn '{fname}' returns {rt}, not the representation of '{rn}' (§16.2b.13)", clause)
+                    return c
+                c.returns_borrow_resource = res
+                c.returns_borrow_from = pfrom
+                c.returns_borrow_parent = parent
+                return c
             // `returns borrow CStr from param N` / `from domain D` (ruling
             // §32, §33, §41; spec §16.2b.8): the borrowed modeled text. Its
             // origin is the resource or the C string the parameter receives,
@@ -3417,16 +3441,32 @@ impl Sema:
                 let why = if n == 0: "receives no modeled resource, and With does not invent an origin (§16.2b.7)" else: "receives a representation several resources wrap; the facade has not assigned it (§16.2b.3)"
                 self.emit_error(f"fn '{fname}': 'returns borrow {rn} from param {from}' names {shown}, which {why}; a borrowed '{rn}' is a view of the resource its origin parameter receives (§16.2b.6)", node)
                 continue
+            let parent = self.foreign_contracts[ci].returns_borrow_parent
+            if parent != 0 and not self.verify_facade_parent_borrow(ci, origin[0], sig, shown):
+                continue
             let recv0 = self.facade_method_host(fn_sym)
             let ci0 = self.facade_contract_for(fn_sym)
             if recv0.len() != 1 or self.foreign_contracts[ci0].destroys != 0 or self.foreign_contracts[ci0].consumes.len() > 0 or self.foreign_contracts[ci0].retains.len() > 0:
                 let shown0 = self.facade_param_display(fn_sym, sig, 0)
                 self.emit_error(f"fn '{fname}': 'returns borrow {rn}' is presented as a lend method of the resource its first parameter receives, and {shown0} receives none it can be a method of (one pointer resource, with nothing stronger than a lend stated) (§16.2b.6)", node)
                 continue
-            // One `Borrowed<R>`, one origin view type.
+            // One `Borrowed<R>`, one origin view type. A parent borrow's
+            // origin is the parent (`R` itself), and its operations are the
+            // parent's (D85): it is not mixed with a `from param` borrow of
+            // the same `R`, whose origin rule differs.
             var clash = false
             for cj in 0..ci:
                 if self.foreign_contracts[cj].returns_borrow_resource != res:
+                    continue
+                if (self.foreign_contracts[cj].returns_borrow_parent != 0) != (parent != 0):
+                    let ofn: str = self.pool_resolve(self.foreign_contracts[cj].fn_sym)
+                    let bn = facade_render_borrowed_name(rn)
+                    let pf = if parent != 0: fname.clone() else: ofn.clone()
+                    let cf = if parent != 0: ofn.clone() else: fname.clone()
+                    self.emit_error(f"fn '{pf}' borrows '{rn}' as the parent of its argument and fn '{cf}' from its argument ('from param'); '{bn}' is one type with one origin rule, and a borrowed value under both is not ruled (§16.2b.6)", node)
+                    clash = true
+                    break
+                if parent != 0:
                     continue
                 let other = self.facade_param_receives(self.foreign_contracts[cj].fn_sym, self.foreign_contracts[cj].returns_borrow_from)
                 if other.len() == 1 and other[0] != origin[0]:
@@ -3452,7 +3492,12 @@ impl Sema:
             if msig < 0:
                 self.emit_error(f"fn '{fname}': 'returns borrow {rn}' passed every facade check but no method '{host}.{mname}' was rendered — a compiler defect (§16.2b.6)", node)
                 continue
-            self.facade_declare_view_of_param(msig, from)
+            // D85: the parent borrow views what the argument views (its
+            // parent's origin), never the argument's own storage.
+            if parent != 0:
+                self.facade_declare_view_through_param(msig, from)
+            else:
+                self.facade_declare_view_of_param(msig, from)
 
     // ── record views (D66, spec §16.2b.6) ────────────────────────────────
     //
@@ -3923,6 +3968,83 @@ impl Sema:
     // The declared summary: the result of signature `sig` is a view of
     // parameter `pi` (its receiver when 0), as the constructors and
     // `Borrowed<R>` methods state theirs (apply_facade_dependency_effects).
+    // D85 (§16.2b.6): the result of `sig` views what parameter `pi` views —
+    // the parent its resource borrows — and never `pi`'s own storage: "the
+    // borrow lives as long as the parent's origin". Kept across the body
+    // check (check_fn_body_with_sig_at), as the declared origin is.
+    mut fn facade_declare_view_through_param(sig: i32, pi: i32):
+        self.facade_declare_view_of_param(sig, pi)
+        let bit = sema_param_origin_bit(pi)
+        self.facade_declared_through.insert(sema_pair_key(sig, pi), bit)
+        self.set_sig_param_view_through(sig, pi, self.sig_param_view_through(sig, pi) | bit)
+
+    // The through bits a facade declared for parameter `pi` of `sig`, or 0.
+    fn facade_declared_through_mask(sig: i32, pi: i32) -> i32:
+        let key = sema_pair_key(sig, pi)
+        if self.facade_declared_through.contains(key): self.facade_declared_through.get(key).unwrap() else: 0
+
+    // D85 (§16.2b.6): "The parent is resolved through the argument
+    // resource's declared `borrows` clause; naming a parent the resource
+    // does not declare, or a type its parent does not have, is an error."
+    // `ari` is the resource the origin parameter receives. Every producer of
+    // it must state exactly one parent of the named type with `borrows`, so
+    // the parent is one field the borrow is read from on every value.
+    mut fn verify_facade_parent_borrow(ci: i32, ari: i32, sig: i32, shown: &str) -> bool:
+        let fn_sym = self.foreign_contracts[ci].fn_sym
+        let node = self.foreign_contracts[ci].node
+        let fname: str = self.pool_resolve(fn_sym)
+        let res = self.foreign_contracts[ci].returns_borrow_resource
+        let parent = self.foreign_contracts[ci].returns_borrow_parent
+        let rn: str = self.pool_resolve(res)
+        let pn: str = self.pool_resolve(parent)
+        let an: str = self.pool_resolve(self.facade_resources[ari].name)
+        let from = self.foreign_contracts[ci].returns_borrow_from
+        let written = f"'returns borrow {rn} from parent {pn} of param {from}'"
+        // The parents the argument's resource declares, by resource index.
+        let declared: Vec[i32] = Vec.new()
+        for bi in 0..self.facade_resources[ari].borrows.len() as i32:
+            let f = self.facade_owner_fn(ari, self.facade_resources[ari].borrows_owner[bi])
+            let recv = self.facade_param_receives(f, self.facade_resources[ari].borrows[bi])
+            if recv.len() == 1:
+                declared.push(recv[0])
+        if declared.len() == 0:
+            self.emit_error(f"fn '{fname}': {written} names {shown}, which receives '{an}'; '{an}' declares no parent with 'borrows', and a parent borrow is resolved through the argument resource's declared 'borrows' clause (§16.2b.6)", node)
+            return false
+        var named = -1
+        for k in 0..declared.len() as i32:
+            if self.facade_resources[declared[k]].name == parent:
+                named = declared[k]
+        if named < 0:
+            var have = ""
+            for k in 0..declared.len() as i32:
+                let dn: str = self.pool_resolve(self.facade_resources[declared[k]].name)
+                if not have.contains("'" ++ dn ++ "'"):
+                    have = if have.len() == 0: f"'{dn}'" else: have ++ f", '{dn}'"
+            self.emit_error(f"fn '{fname}': {written} names {shown}, which receives '{an}'; '{an}' declares no parent of type '{pn}' (its 'borrows' parents: {have}), and naming a parent the resource does not declare is an error (§16.2b.6)", node)
+            return false
+        if res != parent:
+            self.emit_error(f"fn '{fname}': {written} names a type its parent does not have: the borrow is of the parent itself, a '{pn}', so it is written 'returns borrow {pn} from parent {pn} of param {from}' (§16.2b.6)", node)
+            return false
+        // One parent of that type on every product: the borrow reads it from
+        // the one field each value of the argument's resource carries.
+        let owners = self.facade_owners(ari)
+        for oi in 0..owners.len() as i32:
+            let owner = owners[oi]
+            var count = 0
+            for bi in 0..self.facade_resources[ari].borrows.len() as i32:
+                if self.facade_resources[ari].borrows_owner[bi] != owner:
+                    continue
+                let f = self.facade_owner_fn(ari, owner)
+                let recv = self.facade_param_receives(f, self.facade_resources[ari].borrows[bi])
+                if recv.len() == 1 and recv[0] == named:
+                    count = count + 1
+            if count != 1:
+                let on: str = self.pool_resolve(self.facade_owner_fn(ari, owner))
+                let why = if count == 0: "states no 'borrows' parent of that type" else: f"states {count} of them"
+                self.emit_error(f"fn '{fname}': {written} reads the '{pn}' parent of '{an}', and its producer '{on}' {why}; a parent borrow names the one '{pn}' parent every producer of '{an}' declares with 'borrows' (§16.2b.6)", node)
+                return false
+        true
+
     mut fn facade_declare_view_of_param(sig: i32, pi: i32):
         self.facade_declared_effect_sigs.insert(sig, 1)
         let eff = self.sig_param_effect(sig, pi) | EFF_ESCAPE_VIEW
@@ -4181,6 +4303,15 @@ impl Sema:
             return self.facade_borrowed_contract_in(self.get_type_d0(r), depth + 1)
         -1
 
+    // D85 (§16.2b.6): whether a type carries a `Borrowed<R>` its facade hands
+    // out as the parent of an argument (`returns borrow R from parent R of
+    // param N`) — read from the stated clause, never from the type's shape.
+    // Such a value is the parent: it lives as long as the parent's origin,
+    // and an operation through it is an operation on that origin.
+    fn facade_type_is_parent_borrow(tid: i32) -> bool:
+        let ci = self.facade_borrowed_contract_in(tid, 0)
+        ci >= 0 and self.foreign_contracts[ci].returns_borrow_parent != 0
+
     // §8, §57: what a borrowed value is borrowed from, and the clause.
     fn facade_borrowed_note(ci: i32) -> str:
         let fn_sym = self.foreign_contracts[ci].fn_sym
@@ -4196,6 +4327,8 @@ impl Sema:
         var on = "?"
         if osym != 0:
             on = self.pool_resolve(osym)
+        if self.foreign_contracts[ci].returns_borrow_parent != 0:
+            return f"borrowed: '{bn}' is the '{rn}' parent of the '{on}' that '{fname}' receives as {shown} — stated by 'returns borrow {rn} from parent {rn} of param {from}' in facade {facade}; it has no Drop and cannot outlive that parent's origin (§16.2b.6)"
         f"borrowed: '{bn}' is borrowed from the '{on}' that '{fname}' receives as {shown} — stated by 'returns borrow {rn} from param {from}' in facade {facade}; it has no Drop and cannot outlive that origin (§16.2b.6)"
 
 // ── stage 9: callbacks and threads (ruling §44-§51, spec §16.2b.9-10) ───

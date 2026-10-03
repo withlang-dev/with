@@ -282,7 +282,10 @@ fn contract_collect_resource(report: &AnalysisReport, sema: &Sema, ri: i32, sour
     for ci in 0..sema.foreign_contracts.len() as i32:
         let c = &sema.foreign_contracts[ci]
         let fname = sema.safe_symbol_text(c.fn_sym)
-        if c.returns_borrow_resource == r.name:
+        if c.returns_borrow_resource == r.name and c.returns_borrow_parent != 0:
+            // D85 (§16.2b.6): the parent of the resource the argument receives.
+            contract_row(report, sema, &site, subject, CONTRACT_RESOURCE, c.node, c.fn_sym, owner, c.returns_borrow_from, "view", f"Borrowed{rname} from {fname}, the {rname} parent of {contract_param(sema, c.fn_sym, c.returns_borrow_from)} ({contract_received(sema, c.fn_sym, c.returns_borrow_from)}); it lives as long as that parent's origin, and an operation through it is an operation on that origin", contract_item_at(sema, &site, "fn", c.node))
+        else if c.returns_borrow_resource == r.name:
             contract_row(report, sema, &site, subject, CONTRACT_RESOURCE, c.node, c.fn_sym, owner, c.returns_borrow_from, "view", f"Borrowed{rname} from {fname}, dependent on {contract_param(sema, c.fn_sym, c.returns_borrow_from)}", contract_item_at(sema, &site, "fn", c.node))
         else if c.returns_borrow_resource != 0 and c.returns_borrow_domain == 0 and c.returns_borrow_from >= 0 and sema.safe_symbol_text(c.returns_borrow_resource) == "CStr":
             let recv = sema.facade_param_receives(c.fn_sym, c.returns_borrow_from)
@@ -394,7 +397,9 @@ fn contract_collect_fn(report: &AnalysisReport, sema: &Sema, ci: i32, source_pat
     if c.returns_borrow_resource != 0:
         let clause = contract_clause(sema, node, FACADE_CLAUSE_RETURNS_BORROW, 0)
         let what = sema.safe_symbol_text(c.returns_borrow_resource)
-        let origin = if c.returns_borrow_domain != 0: "domain " ++ sema.safe_symbol_text(c.returns_borrow_domain) else: contract_param(sema, c.fn_sym, c.returns_borrow_from) ++ (if contract_received(sema, c.fn_sym, c.returns_borrow_from).len() > 0: " (" ++ contract_received(sema, c.fn_sym, c.returns_borrow_from) ++ ")" else: ", a lent C string")
+        var origin = if c.returns_borrow_domain != 0: "domain " ++ sema.safe_symbol_text(c.returns_borrow_domain) else: contract_param(sema, c.fn_sym, c.returns_borrow_from) ++ (if contract_received(sema, c.fn_sym, c.returns_borrow_from).len() > 0: " (" ++ contract_received(sema, c.fn_sym, c.returns_borrow_from) ++ ")" else: ", a lent C string")
+        if c.returns_borrow_parent != 0:
+            origin = "parent " ++ sema.safe_symbol_text(c.returns_borrow_parent) ++ " of " ++ origin
         let shape = if what == "CStr": "Option[CStr], nullable" else: f"Option[Borrowed{what}], nullable, no Drop"
         contract_row(report, sema, &site, subject, CONTRACT_FN, clause, c.fn_sym, owner, c.returns_borrow_from, "returns", f"borrow {what} from {origin}; {shape}", contract_clause_at(sema, &site, clause))
     else if c.returns_borrow_record != 0:
@@ -735,6 +740,26 @@ pub fn analysis_audit_contract(report: &AnalysisReport, sema: &Sema, source_path
             let holds = sema.facade_param_receives(e.fn_sym, source).len() == 1
             if not holds:
                 report.fail(f"contract: {form} invalidates views of its parameter {pi}, which holds no modeled resource; the effect names the wrong parameter (#1674, §16.2b.14)")
+    // D85 (§16.2b.6): a parent borrow's origin is what its argument views.
+    // Acceptance reads that from the presented method's declared summary
+    // (facade_declare_view_through_param) and the stated clause
+    // (facade_type_is_parent_borrow); a method whose summary does not view
+    // through the argument would tie the borrow to the argument instead.
+    for ci in 0..sema.foreign_contracts.len() as i32:
+        let c = &sema.foreign_contracts[ci]
+        if c.returns_borrow_parent == 0:
+            continue
+        let fname = sema.safe_symbol_text(c.fn_sym)
+        let pn = sema.safe_symbol_text(c.returns_borrow_parent)
+        let host = sema.facade_method_host(c.fn_sym)
+        if host.len() != 1:
+            report.fail(f"contract: fn '{fname}' states 'returns borrow {pn} from parent {pn} of param {c.returns_borrow_from}' and is no resource's method; the parent borrow has no presented call (§16.2b.6)")
+            continue
+        let mtext = sema.safe_symbol_text(sema.facade_resources[host[0]].name) ++ "." ++ sema.facade_presented(host[0], fname)
+        let msig: i32 = if sema.sig_text_index.contains(mtext): sema.sig_text_index.get(mtext).unwrap() else: -1
+        let bit = sema_param_origin_bit(c.returns_borrow_from)
+        if msig < 0 or (sema.sig_param_view_through(msig, c.returns_borrow_from) & bit) == 0:
+            report.fail(f"contract: fn '{fname}' states 'returns borrow {pn} from parent {pn} of param {c.returns_borrow_from}', and the presented '{mtext}' does not view through that parameter; acceptance would tie the borrow to the argument, not its parent's origin (§16.2b.6)")
     // Profile checks (§63; stage 11, §16.2b.12): an ambiguous match is a
     // rule that contributed nothing where the facade may have counted on it
     // — a violation naming the profile, the rule, the item and the clause

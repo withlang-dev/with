@@ -4610,11 +4610,12 @@ impl Parser:
                 let res = self.expect_ident()
                 if res == 0: return 0
                 if not self.current_ident_is("from"):
-                    self.emit_error("a borrowed return is written 'returns borrow <Resource> from param <ref>' or 'returns borrow CStr from domain <name>' (§16.2b.6, §16.2b.7)")
+                    self.emit_error("a borrowed return is written 'returns borrow <Resource> from param <ref>', 'returns borrow <Resource> from parent <Resource> of param <ref>' or 'returns borrow CStr from domain <name>' (§16.2b.6, §16.2b.7)")
                     return 0
                 self.advance()
                 // The origin: a parameter (a resource it receives, or the C
-                // string it is lent), or a foreign-state domain (§16.2b.7).
+                // string it is lent), the parent of the resource a parameter
+                // receives (D85), or a foreign-state domain (§16.2b.7).
                 if self.current_ident_is("domain"):
                     self.advance()
                     let d = self.expect_ident()
@@ -4622,11 +4623,27 @@ impl Parser:
                     ops.push(res)
                     ops.push(0)
                     ops.push(d)
+                    ops.push(0)
+                else if self.current_ident_is("parent"):
+                    self.advance()
+                    let parent = self.expect_ident()
+                    if parent == 0: return 0
+                    if not self.current_ident_is("of"):
+                        self.emit_error("a borrow of an argument's parent is written 'returns borrow <Resource> from parent <Resource> of param <ref>' (§16.2b.6)")
+                        return 0
+                    self.advance()
+                    let r = self.parse_facade_param_ref()
+                    if r == 0: return 0
+                    ops.push(res)
+                    ops.push(r)
+                    ops.push(0)
+                    ops.push(parent)
                 else:
                     let r = self.parse_facade_param_ref()
                     if r == 0: return 0
                     ops.push(res)
                     ops.push(r)
+                    ops.push(0)
                     ops.push(0)
             else if self.current_ident_is("static"):
                 self.advance()

@@ -4099,7 +4099,10 @@ impl Sema:
                     // storage (§21.1 Rule 6). A declared origin (facade,
                     // interface) is the parameter's storage; an overflowed
                     // mask proves nothing.
-                    let through = if body_origins < 0 or body_storage < 0 or declared_origin < 0: 0 else: body_origins & ~body_storage & ~declared_origin
+                    // A parent borrow (D85) declares its origin as what
+                    // the parameter views: that through bit stays.
+                    let declared_through = if facade_declared: self.facade_declared_through_mask(sig_idx, pi) else: 0
+                    let through = if body_origins < 0 or body_storage < 0 or declared_origin < 0: declared_through else: (body_origins & ~body_storage & ~declared_origin) | declared_through
                     self.set_sig_param_view_through(sig_idx, pi, through)
                 else:
                     self.set_sig_param_view_origin(sig_idx, pi, declared_origin)
@@ -14642,6 +14645,16 @@ impl Sema:
                 roots = self.collect_expr_view_deps(origin_arg, move roots)
                 if roots.len() == 0:
                     roots.push(self.place_root_sym(origin_arg))
+            // D85 (§16.2b.6): an operation through a parent borrow is an
+            // operation on the parent's origin — the bindings the borrow
+            // views — and invalidates their views as the same call on the
+            // parent would.
+            if self.typed_expr_types.contains(origin_arg) and self.facade_type_is_parent_borrow(self.typed_expr_types.get(origin_arg).unwrap()):
+                let held = roots.len() as i32
+                for hi in 0..held:
+                    let held_sym: i32 = roots[hi]
+                    for di in 0..self.binding_view_dep_count(held_sym):
+                        roots = self.push_unique_i32(move roots, self.binding_view_dep_at(held_sym, di))
             for ri in 0..roots.len() as i32:
                 self.facade_poison_foreign_views(roots[ri], call_node, fx, self.facade_effect_source_param(fx, pi))
         for di in 0..self.facade_call_effects[fx].touch_domains.len() as i32:
@@ -14658,6 +14671,10 @@ impl Sema:
             if self.binding_depends_on_origin(view_sym, origin_sym) == 0:
                 continue
             if self.facade_type_holds_resource(self.bind_types[bi], 0):
+                continue
+            // D85: a parent borrow is the parent, not a view of its memory;
+            // it lives as long as the parent's origin (§16.2b.6).
+            if self.facade_type_is_parent_borrow(self.bind_types[bi]):
                 continue
             if self.binding_poisoned_origin_sym(view_sym) != 0:
                 continue

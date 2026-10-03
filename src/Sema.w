@@ -486,6 +486,7 @@ pub type ForeignContract {
     returns_borrow_resource: i32,   // a resource, or `CStr` (the borrowed modeled text, §16.2b.8)
     returns_borrow_from: i32,       // the origin parameter, or -1
     returns_borrow_domain: i32,     // the origin foreign-state domain (`from domain D`, §16.2b.7), or 0
+    returns_borrow_parent: i32,     // D85 (§16.2b.6): `from parent P of param N` — the parent resource P of the resource param N receives, or 0
     returns_static_tid: i32,
     preserves_params: Vec[i32],
     preserves_domains: Vec[i32],
@@ -1792,6 +1793,10 @@ pub type Sema {
     // into them and never replaces them (D65: the facade fact is the owner;
     // the rendered body reads a raw pointer and can derive no foreign origin).
     facade_declared_effect_sigs: HashMap[i32, i32],
+    // D85: (sig, param) -> the through bits a parent borrow declares
+    // (facade_declare_view_through_param): the result views what the
+    // parameter views, never its storage.
+    facade_declared_through: HashMap[i64, i32],
     // D73: assignment node -> the whole non-Copy local it assigns, when its
     // view (assign_reads_view) is rooted at that local (a view origin).
     assign_view_targets: HashMap[i32, i32],
@@ -3319,6 +3324,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         discarded_tails: sema_new_map_i32_i32(),
         tail_read_assigns: sema_new_map_i32_i32(),
         facade_declared_effect_sigs: sema_new_map_i32_i32(),
+        facade_declared_through: sema_new_map_i64_i32(),
         assign_view_targets: sema_new_map_i32_i32(),
         display_join_node: 0,
         join_assign_arms_as_views: 0,

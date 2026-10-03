@@ -358,7 +358,20 @@ fn facade_render_lend_methods(pool: AstPool, intern: InternPool, ci: &Vec[i32], 
             let from = facade_render_param_ref(pool, intern, decl, li.borrow_from)
             if from < 0:
                 continue
-            let origin = if from == 0: "self" else: facade_render_param_name(pool, intern, pool.fn_meta_param_start(meta), from)
+            var origin = if from == 0: "self" else: facade_render_param_name(pool, intern, pool.fn_meta_param_start(meta), from)
+            // `returns borrow R from parent R of param N` (D85, §16.2b.6):
+            // the borrow holds the parent the argument's resource holds —
+            // its `parent` view — so it views the parent's origin, not the
+            // argument. A shape with no one parent field renders nothing;
+            // Sema names it (verify_facade_parent_borrow).
+            if li.borrow_parent != 0:
+                let arg_res = facade_render_received(pool, intern, render_type_expr(pool, intern, pool.fn_param_type(pool.fn_meta_param_start(meta), from) as NodeId))
+                if arg_res <= 0:
+                    continue
+                let pfield = facade_render_parent_field(pool, intern, ci, arg_res, intern.resolve(li.borrow_parent))
+                if pfield.len() == 0:
+                    continue
+                origin = origin ++ "." ++ pfield
             let bname = facade_render_borrowed_name(intern.resolve(li.borrow_res))
             let handle = facade_render_fresh("repr", facade_render_param_names(pool, intern, decl))
             out = out ++ head ++ mname ++ "(" ++ params ++ ") -> Option[" ++ bname ++ "]:\n" ++ pro ++ "        let " ++ handle ++ " = " ++ facade_render_call(pool, intern, decl, call_args) ++ "\n        if " ++ handle ++ " == null: None else: Some(" ++ bname ++ " { origin: " ++ origin ++ ", repr: " ++ handle ++ " })\n"
@@ -409,7 +422,9 @@ fn facade_render_borrowed_type(pool: AstPool, intern: InternPool, ci: &Vec[i32],
             let origin = facade_render_received(pool, intern, render_type_expr(pool, intern, pool.fn_param_type(pool.fn_meta_param_start(meta), from) as NodeId))
             if origin <= 0:
                 continue
-            let oname: str = intern.resolve(pool.get_data0(origin as NodeId))
+            // A parent borrow (D85) views the parent itself: `&R`.
+            let parent = pool.get_extra(ops + 3)
+            let oname = intern.resolve(if parent != 0: parent else: pool.get_data0(origin as NodeId))
             let bname = facade_render_borrowed_name(rname)
             var out = "type " ++ bname ++ " = ephemeral { origin: &" ++ oname ++ ", repr: " ++ repr_text ++ " }\n"
             if methods.len() > 0:
@@ -759,6 +774,7 @@ type FacadeLendItem {
     lends: bool,
     borrow_res: i32,
     borrow_from: i32,
+    borrow_parent: i32,      // `returns borrow R from parent R of param N` (D85 §16.2b.6): R's symbol, or 0
     text_view: bool,
     valid_on_failed: bool,   // rendered on `Failed<R>` too (#1612)
     bridged: bool,           // states a buffer pairing, a fixed argument or an `ok` (D64)
@@ -767,7 +783,7 @@ type FacadeLendItem {
 }
 
 fn facade_render_lend_item(pool: AstPool, intern: InternPool, ci: &Vec[i32], item: i32) -> FacadeLendItem:
-    var li = FacadeLendItem { decl: 0, of_sym: 0, rename: 0, lends: true, borrow_res: 0, borrow_from: 0, text_view: false, valid_on_failed: false, bridged: false, variadic: 0, record_view: false }
+    var li = FacadeLendItem { decl: 0, of_sym: 0, rename: 0, lends: true, borrow_res: 0, borrow_from: 0, borrow_parent: 0, text_view: false, valid_on_failed: false, bridged: false, variadic: 0, record_view: false }
     let cstart = pool.get_data1(item as NodeId)
     for k in 0..pool.get_data2(item as NodeId):
         let clause = pool.get_extra(cstart + k)
@@ -779,6 +795,7 @@ fn facade_render_lend_item(pool: AstPool, intern: InternPool, ci: &Vec[i32], ite
         else if kind == FACADE_CLAUSE_RETURNS_BORROW:
             li.borrow_res = pool.get_extra(ops)
             li.borrow_from = pool.get_extra(ops + 1)
+            li.borrow_parent = pool.get_extra(ops + 3)
             if intern.resolve(li.borrow_res) == "CStr":
                 li.text_view = true
                 li.borrow_res = 0
@@ -861,12 +878,8 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, ci: &Vec[i32], item
     let repr_text = render_type_expr(pool, intern, pool.get_extra(extra_start) as NodeId)
     let producers: Vec[i32] = Vec.new()
     let out_refs: Vec[i32] = Vec.new()   // parallel to producers; 0 for a direct return
-    // Each `borrows` clause names a parameter of the producer stated before
-    // it (a `from`, or the `init`: FACADE_DEP_INIT).
-    let borrow_refs: Vec[i32] = Vec.new()
-    let borrow_owners: Vec[i32] = Vec.new()
-    var last_producer = -2
-    var independent = false
+    // The `borrows` and `independent` clauses are read by
+    // facade_render_item_deps, the one dependency derivation.
     var drop_fn = 0
     var init_fn = 0
     var preinit_fn = 0
@@ -882,15 +895,8 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, ci: &Vec[i32], item
         if kind == FACADE_CLAUSE_FROM:
             producers.push(facade_render_find_fn(pool, intern, ci, pool.get_extra(ops)))
             out_refs.push(pool.get_extra(ops + 1))
-            last_producer = producers.len() as i32 - 1
-        else if kind == FACADE_CLAUSE_BORROWS:
-            borrow_refs.push(pool.get_extra(ops))
-            borrow_owners.push(last_producer)
-        else if kind == FACADE_CLAUSE_INDEPENDENT:
-            independent = true
         else if kind == FACADE_CLAUSE_INIT:
             init_fn = facade_render_find_fn(pool, intern, ci, pool.get_extra(ops))
-            last_producer = FACADE_DEP_INIT
         else if kind == FACADE_CLAUSE_PREINIT:
             preinit_fn = facade_render_find_fn(pool, intern, ci, pool.get_extra(ops))
         else if kind == FACADE_CLAUSE_OK:
@@ -923,7 +929,7 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, ci: &Vec[i32], item
     // depends on. A producer whose received resources the renderer cannot
     // hand to C, or whose parent no one resource wraps, renders nothing;
     // Sema names it.
-    let deps = facade_render_deps(pool, intern, producers, out_refs, init_fn, preinit_fn, &borrow_refs, &borrow_owners, independent)
+    let deps = facade_render_item_deps(pool, intern, ci, item)
     if not deps.ok:
         return ""
     let field = if pinned: "Box[" ++ repr_text ++ "]" else: repr_text.clone()
@@ -1067,6 +1073,57 @@ type FacadeDeps {
     slot_res: Vec[i32],
     slot_optional: Vec[bool],
 }
+
+// The dependencies of resource `item` as its clauses state them: the one
+// derivation both the resource's own type (facade_render_resource) and a
+// parent borrow of it (facade_render_parent_field) read.
+fn facade_render_item_deps(pool: AstPool, intern: InternPool, ci: &Vec[i32], item: i32) -> FacadeDeps:
+    let extra_start = pool.get_data1(item as NodeId)
+    let producers: Vec[i32] = Vec.new()
+    let out_refs: Vec[i32] = Vec.new()
+    let borrow_refs: Vec[i32] = Vec.new()
+    let borrow_owners: Vec[i32] = Vec.new()
+    var last_producer = -2
+    var independent = false
+    var init_fn = 0
+    var preinit_fn = 0
+    for k in 0..pool.get_data2(item as NodeId):
+        let clause = pool.get_extra(extra_start + 1 + k)
+        let kind = pool.get_data0(clause as NodeId)
+        let ops = pool.get_data1(clause as NodeId)
+        if kind == FACADE_CLAUSE_FROM:
+            producers.push(facade_render_find_fn(pool, intern, ci, pool.get_extra(ops)))
+            out_refs.push(pool.get_extra(ops + 1))
+            last_producer = producers.len() as i32 - 1
+        else if kind == FACADE_CLAUSE_BORROWS:
+            borrow_refs.push(pool.get_extra(ops))
+            borrow_owners.push(last_producer)
+        else if kind == FACADE_CLAUSE_INDEPENDENT:
+            independent = true
+        else if kind == FACADE_CLAUSE_INIT:
+            init_fn = facade_render_find_fn(pool, intern, ci, pool.get_extra(ops))
+            last_producer = FACADE_DEP_INIT
+        else if kind == FACADE_CLAUSE_PREINIT:
+            preinit_fn = facade_render_find_fn(pool, intern, ci, pool.get_extra(ops))
+    facade_render_deps(pool, intern, producers, out_refs, init_fn, preinit_fn, &borrow_refs, &borrow_owners, independent)
+
+// D85 (§16.2b.6): the field of resource `item` that holds its parent named
+// `parent` — the one view a parent borrow is read from. "" unless exactly
+// one slot holds that parent and every producer fills it (Sema refuses the
+// other shapes first: verify_facade_parent_borrow).
+fn facade_render_parent_field(pool: AstPool, intern: InternPool, ci: &Vec[i32], item: i32, parent: &str) -> str:
+    let deps = facade_render_item_deps(pool, intern, ci, item)
+    if not deps.ok:
+        return ""
+    var found = -1
+    for si in 0..deps.slot_res.len() as i32:
+        if intern.resolve(pool.get_data0(deps.slot_res[si] as NodeId)) == parent:
+            if found >= 0:
+                return ""
+            found = si
+    if found < 0 or deps.slot_optional[found]:
+        return ""
+    facade_render_slot_field(&deps, found)
 
 fn facade_render_deps(pool: AstPool, intern: InternPool, producers: &Vec[i32], out_refs: &Vec[i32], init_fn: i32, preinit_fn: i32, borrow_refs: &Vec[i32], borrow_owners: &Vec[i32], independent: bool) -> FacadeDeps:
     var deps = FacadeDeps { ok: true, owners: Vec.new(), params: Vec.new(), resources: Vec.new(), slots: Vec.new(), slot_res: Vec.new(), slot_optional: Vec.new() }
@@ -2341,7 +2398,7 @@ fn facade_render_callback_item(pool: AstPool, intern: InternPool, ci: &Vec[i32],
 fn facade_render_callback_hosted(pool: AstPool, intern: InternPool, cbi: &FacadeCallbackItem, resource: i32, repr: &str) -> bool:
     if cbi.decl == 0:
         return false
-    let li = FacadeLendItem { decl: cbi.decl, of_sym: cbi.of_sym, rename: cbi.rename, lends: true, borrow_res: 0, borrow_from: 0, text_view: false, valid_on_failed: false, bridged: false, variadic: 0, record_view: false }
+    let li = FacadeLendItem { decl: cbi.decl, of_sym: cbi.of_sym, rename: cbi.rename, lends: true, borrow_res: 0, borrow_from: 0, borrow_parent: 0, text_view: false, valid_on_failed: false, bridged: false, variadic: 0, record_view: false }
     facade_render_lend_hosted(pool, intern, &li, resource, repr)
 
 // Whether some callback method of `resource` retains userdata: the
