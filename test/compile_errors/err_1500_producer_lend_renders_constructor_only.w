@@ -1,4 +1,5 @@
-//! expect-check-fail: wrong argument type in call to 'Database.prepare'
+//! expect-check-fail: method 'Database.prepare' expects 2 argument(s), found 3
+//! expect-check-fail-not: undefined variable
 
 // #1500 (§16.2b.3/§16.2b.4, ruling §9): an fn item with `lend` that describes
 // a resource's producer (`from db_prepare(out param 2)`) covers that
@@ -7,7 +8,10 @@
 // caller's own out slot — `Database.db_prepare(sql, out, tail)`, a second
 // call surface producing an unowned, never-finalized statement. The one
 // `prepare` on Database is the producer's receiver form `(sql, tail)`; a
-// call passing an out slot is refused.
+// call passing an out slot is refused. Since #1973 it is refused for its
+// count — three arguments to the two-parameter receiver form — before any
+// argument type is compared, and the call keeps the method's result type, so
+// `rc` is bound and nothing else is reported.
 
 use c_import("typedef struct db db;
 typedef struct st st;

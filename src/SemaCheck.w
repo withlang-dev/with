@@ -29090,7 +29090,16 @@ impl Sema:
                 // reached MIR and failed LLVM verification.
                 let mc_arity_name = self.pool_resolve(type_name_sym) ++ "." ++ self.pool_resolve(field)
                 if not self.check_call_arity(node, method_fn_sym, self.sig_get_param_count(sig_idx), self.sig_is_variadic(sig_idx) != 0, mc_resolved_arg_count, call_param_offset, mc_arity_name, if call_param_offset == 1: "method" else: "function"):
-                    return 0
+                    // The call is refused, and it still has the method's
+                    // result type: returning 0 left `let (rc, _) = d.prepare(..)`
+                    // unbound and every later use of `rc` reported an
+                    // undefined variable on top of the one real error.
+                    let refused_ret = self.sig_return_type(sig_idx)
+                    if self.get_type_kind(recv_type) == TypeKind.TY_GENERIC_INST:
+                        let refused_subst = self.substitute_method_return_for_generic_inst(recv_type, type_name_sym, field, method_fn_sym, refused_ret)
+                        if refused_subst != 0:
+                            return refused_subst
+                    return refused_ret
                 if call_param_offset == 1 and self.sig_get_param_count(sig_idx) > 0:
                     let exact_receiver_ty = self.recorded_expr_type_or_zero(expr)
                     if exact_receiver_ty != 0:
