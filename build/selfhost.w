@@ -8831,6 +8831,18 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     if level_ran.rc != 0: return bs_fail(ctx, f"the origin-global consumer failed with exit code {level_ran.rc}")
     rc = bs_assert_stdout_exact(ctx, level_ran, "3\n4", "origin-global consumer")
     if rc != 0: return rc
+    // §21.1 rule 6 (spec v7.18): `from static` crosses the boundary; the
+    // consumer's view of static data lives across a write of any global.
+    let static_src = bs_join(case_dir, "static_ok.w")
+    rc = bs_write_fixture(ctx, static_src, "use std.wi_demo\nfn main:\n    let g = greeting()\n    bump()\n    raise()\n    print(g)\n", "a view of static data across global writes")
+    if rc != 0: return rc
+    let static_bin = bs_join(case_dir, "static_ok")
+    let static_build = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-static-build", bs_bundle_build_args(static_src, bundle, static_bin, false), 120000)
+    if static_build.rc != 0: return bs_fail(ctx, "a view `from static` live across global writes failed to build:\n" ++ static_build.stderr)
+    let static_ran = bs_run_binary_capture(ctx, static_bin, "bundle-interface-static-run", 120000)
+    if static_ran.rc != 0: return bs_fail(ctx, f"the `from static` consumer failed with exit code {static_ran.rc}")
+    rc = bs_assert_stdout_exact(ctx, static_ran, "hello", "`from static` consumer")
+    if rc != 0: return rc
     let private_src = bs_join(case_dir, "name_private_origin.w")
     rc = bs_write_fixture(ctx, private_src, "use std.wi_demo\nfn main: print(LEVEL)\n", "a consumer naming a private origin global")
     if rc != 0: return rc
@@ -8902,6 +8914,16 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     rc = bs_expect_bundle_refusal(ctx, compiler_path, case_dir, "wi_refuse_origin_writes", "fn raise: writes global `LEVEL`, an origin of an exported function's returned view,")
     if rc != 0: return rc
     rc = bs_expect_bundle_refusal(ctx, compiler_path, case_dir, "wi_refuse_origin_writes", "add 'writes LEVEL' to raise's declaration")
+    if rc != 0: return rc
+    // §21.1 rule 6 (spec v7.18): an absent clause means the elision at a
+    // bundle boundary; a view of static data says `from static`.
+    rc = bs_expect_bundle_refusal(ctx, compiler_path, case_dir, "wi_refuse_elision_mismatch", "returns a view derived from `o`, but with no `from` clause its origin at a bundle boundary is the §21.1 elision")
+    if rc != 0: return rc
+    rc = bs_expect_bundle_refusal(ctx, compiler_path, case_dir, "wi_refuse_elision_mismatch", "write `from o` after the return type")
+    if rc != 0: return rc
+    rc = bs_expect_bundle_refusal(ctx, compiler_path, case_dir, "wi_refuse_static", "fn name: returns a reference with no unambiguous origin")
+    if rc != 0: return rc
+    rc = bs_expect_bundle_refusal(ctx, compiler_path, case_dir, "wi_refuse_static", "or write `from static` for a view of static data")
     if rc != 0: return rc
 
     // Declaration only: the consumer's object references the bundle's

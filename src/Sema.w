@@ -90,6 +90,10 @@ fn binding_provenance_empty -> BindingProvenance:
 // index, or one of these.
 pub const DECLARED_ORIGIN_NONE: i32 = -2
 pub const DECLARED_ORIGIN_AMBIGUOUS: i32 = -1
+// §21.1 rule 6: the resolved `from static` entry (resolve_declared_view_origins)
+// — a view of static data, with no parameter or global origin. Below every
+// parameter entry (-1 - index).
+pub const FROM_STATIC_ENTRY: i32 = -1048576
 
 pub fn sema_param_origin_bit(pi: i32) -> i32:
     if pi < 0:

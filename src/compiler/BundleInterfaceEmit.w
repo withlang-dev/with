@@ -671,8 +671,26 @@ impl BundleEmitter:
                     clause = clause ++ (if clause.len() == 0: "from " else: ", ") ++ sema.pool_resolve(derived_globals[gi])
                 self.refuse("returns a view of the global `" ++ sema.pool_resolve(derived_globals[0]) ++ "`, an origin its declaration does not state: a bundle interface states every origin of a returned view (§21.1 rule 6, D39); write `" ++ clause ++ "` after the return type")
                 return ""
+            // "An absent clause means the §21.1 elision (the receiver, else
+            // the single borrowed parameter)": a body that returns a view of
+            // another parameter states it, or a consumer would tie the result
+            // to the wrong argument.
+            if origin != DECLARED_ORIGIN_AMBIGUOUS:
+                var clause = ""
+                var stray = ""
+                for pi in 0..param_count:
+                    if (sema.sig_param_effect(sig, pi) & EFF_ESCAPE_VIEW) == 0:
+                        continue
+                    let pname: str = with_str_clone_ref(sema.pool_resolve(ast.fn_param_name(param_start, pi)))
+                    clause = clause ++ (if clause.len() == 0: "from " else: ", ") ++ pname
+                    if pi != origin and stray.len() == 0:
+                        stray = pname
+                if stray.len() > 0:
+                    let elided = if origin >= 0: "`" ++ sema.pool_resolve(ast.fn_param_name(param_start, origin)) ++ "`" else: "none"
+                    self.refuse("returns a view derived from `" ++ stray ++ "`, but with no `from` clause its origin at a bundle boundary is the §21.1 elision (" ++ elided ++ ": the receiver, else the single borrowed parameter); write `" ++ clause ++ "` after the return type")
+                    return ""
         if origin == DECLARED_ORIGIN_AMBIGUOUS and not has_from:
-            self.refuse("returns a reference with no unambiguous origin: name the origin in the source signature (D39 elision: receiver, else the single borrowed parameter)")
+            self.refuse("returns a reference with no unambiguous origin: name the origin in the source signature (D39 elision: receiver, else the single borrowed parameter), or write `from static` for a view of static data (§21.1 rule 6)")
             return ""
         var from_text = ""
         var from_row = ""
@@ -680,7 +698,9 @@ impl BundleEmitter:
             from_text = " " ++ self.written_from_clause(sema, node)
             for ei in 0..from_entries.len() as i32:
                 let entry = from_entries[ei]
-                if entry < 0:
+                if entry == FROM_STATIC_ENTRY:
+                    from_row = from_row ++ "static;"
+                else if entry < 0:
                     from_row = from_row ++ "param:" ++ sema.pool_resolve(ast.fn_param_name(param_start, -1 - entry)) ++ ";"
                 else:
                     let entries = self.exported_global_entries(sema, entry)

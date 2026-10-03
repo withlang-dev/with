@@ -27,6 +27,7 @@ pub fn add(p: &Pair) -> i32
 pub fn bump() -> Unit writes COUNTER
 pub fn call_once(f: once fn() -> i32) -> i32
 pub fn call_twice(f: fn() -> i32) -> i32
+pub fn greeting() -> &str from static
 pub fn level() -> &i32 from LEVEL
 pub fn level_value(l: Level) -> u8
 pub fn packet_word(p: &Packet) -> i32

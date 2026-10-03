@@ -2534,12 +2534,29 @@ impl Sema:
             let qualifier = self.ast.fn_view_origin_path(node, oi)
             let name = self.ast.fn_view_origin_name(node, oi)
             var entry = 0
+            let name_text: str = with_str_clone_ref(self.pool_resolve(name))
             if qualifier == 0:
+                // `from static` (ORIGIN := 'self' | PATH; `static` is
+                // contextual here): a view of static data.
+                if name_text == "static":
+                    entry = FROM_STATIC_ENTRY
                 for pi in 0..param_count:
                     if self.ast.fn_param_name(param_start, pi) == name:
                         entry = -1 - pi
+            else:
+                // "`a.b` is a module-qualified global, never a field of
+                // parameter `a`": an entry names a parameter whole.
+                let qtext: str = with_str_clone_ref(self.pool_resolve(qualifier))
+                let dot = qtext.find(".")
+                let root_text = if dot > 0: qtext.slice(0, dot) else: qtext.clone()
+                var field_of = false
+                for pi in 0..param_count:
+                    if self.pool_resolve(self.ast.fn_param_name(param_start, pi)) == root_text:
+                        field_of = true
+                if field_of:
+                    self.emit_error_with_help(f"`from {qtext}.{name_text}` names a part of parameter `{root_text}`: each origin in a `from` clause names a parameter, `self`, or a global, whole, and `a.b` is a module-qualified global (§21.1 rule 6)", node, f"write `from {root_text}`")
+                    continue
             if entry == 0:
-                let name_text: str = with_str_clone_ref(self.pool_resolve(name))
                 entry = self.resolve_clause_global("from", qualifier, name, node, interface_decl, f"`from {name_text}`: `{name_text}` is neither a parameter of `{fn_text}` nor a global (§21.1 rule 6)")
                 if entry <= 0:
                     continue
@@ -2662,6 +2679,21 @@ impl Sema:
         let param_start = if meta >= 0: self.ast.fn_meta_param_start(meta) else: 0
         let param_count = self.sig_get_param_count(sig)
         let derived_globals = self.sig_derived_global_origins(sig)
+        // `from static`: the returned view has no parameter or global
+        // origin; listed alone.
+        if entries.contains(FROM_STATIC_ENTRY):
+            if entries.len() > 1:
+                self.emit_error_with_help(f"`{fn_text}` declares `from static` beside other origins: `from static` states a view of static data, with no parameter or global origin (§21.1 rule 6)", node, "write `from static` alone, or name the origins without it")
+                return
+            var derived_names = ""
+            for pi in 0..param_count:
+                if (self.sig_param_effect(sig, pi) & EFF_ESCAPE_VIEW) != 0:
+                    derived_names = derived_names ++ (if derived_names.len() == 0: "" else: ", ") ++ with_str_clone_ref(self.pool_resolve(self.ast.fn_param_name(param_start, pi)))
+            for gi in 0..derived_globals.len() as i32:
+                derived_names = derived_names ++ (if derived_names.len() == 0: "" else: ", ") ++ with_str_clone_ref(self.pool_resolve(derived_globals[gi]))
+            if derived_names.len() > 0:
+                self.emit_error_with_help(f"`{fn_text}` declares `from static`, but its returned view derives from `{derived_names}`: `from static` states a view of static data, with no parameter or global origin (§21.1 rule 6)", node, f"write `from {derived_names}`")
+            return
         var clause = ""
         for ei in 0..entries.len() as i32:
             let entry = entries[ei]
@@ -4626,9 +4658,12 @@ impl Sema:
     // receiver, else the single `&`/`&mut` parameter; DECLARED_ORIGIN_AMBIGUOUS
     // when the declaration cannot say, DECLARED_ORIGIN_NONE when nothing is
     // returned by reference.
+    // A return that holds views (`Option[&T]`, a tuple of views) elides the
+    // same way (§21.1 rule 6: an absent clause means the elision).
     fn declared_view_origin(sig_idx: i32) -> i32:
-        let ret_resolved = self.resolve_alias(self.sig_return_type(sig_idx) as TypeId)
-        if self.get_type_kind(ret_resolved) != TypeKind.TY_REF:
+        let ret = self.sig_return_type(sig_idx)
+        let ret_resolved = self.resolve_alias(ret as TypeId)
+        if self.get_type_kind(ret_resolved) != TypeKind.TY_REF and (ret <= 0 or self.type_is_ephemeral_value(ret) == 0):
             return DECLARED_ORIGIN_NONE
         let receiver_mode = self.sig_receiver_mode(sig_idx)
         if receiver_mode != ReceiverMode.None and receiver_mode != ReceiverMode.Missing:

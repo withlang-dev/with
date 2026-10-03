@@ -46,6 +46,9 @@ pub fn take(p: Pair) -> i32: p.a * p.b
 // identity a consumer cannot name), and `raise`, which writes it, declares
 // the write though LEVEL is not exported.
 var LEVEL: i32 = 3
+// §21.1 rule 6 (spec v7.18): `from static` states a view of static data;
+// the interface carries it, and a consumer's view is tied to nothing.
+pub fn greeting() -> &str from static: "hello"
 pub fn level() -> &i32 from LEVEL: &LEVEL
 pub fn raise() writes LEVEL: LEVEL = LEVEL + 1
 pub fn table_at(i: i64) -> u8: TABLE[i]
