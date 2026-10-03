@@ -363,7 +363,22 @@ pub unsafe fn Regex.__literal_code(slot: *mut *const i8, pattern: &str, options:
     if compiled as i64 == 0:
         with_panic("invalid regex literal: " ++ regex_error_message(err_code), "", 0)
     *slot = compiled
+    regex_literal_codes.codes.push(compiled as i64)
     compiled
+
+// The code every regex literal compiled into its slot. A literal's code
+// lives for the program, so the program's exit frees it: a module global
+// with drop glue is dropped by the exit wrapper (#777). #1036/#2049: nothing
+// owned the cached code, and every literal site that ran leaked its pattern
+// and tables.
+type RegexLiteralCodes { codes: Vec[i64] }
+
+impl Drop for RegexLiteralCodes:
+    move fn drop():
+        for code in self.codes:
+            unsafe { pcre2_code_free_8(code as *mut pcre2_real_code_8) }
+
+var regex_literal_codes = RegexLiteralCodes { codes: Vec.new() }
 
 pub fn Regex.__capture_count(code: *const i8) -> i32:
     if code as i64 == 0:
