@@ -2552,6 +2552,12 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                     skipped_targets.push(with_str_clone_ref(target.name))
                     completed_targets.push(with_str_clone_ref(target.name))
                     continue
+            // #1899: another worktree may have built this very target from
+            // these very inputs; a restored target is a fresh one.
+            else if not force_action_worker_target and build_cache_store_restore(root, target):
+                skipped_targets.push(with_str_clone_ref(target.name))
+                completed_targets.push(with_str_clone_ref(target.name))
+                continue
         // About to run: remember what its outputs are now, and what its
         // inputs are (#1654: the record after the run must not describe an
         // input the action never saw).

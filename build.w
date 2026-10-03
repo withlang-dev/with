@@ -3090,7 +3090,11 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage1 = stage1.extra_output("out/command/stage1")
     stage1 = stage1.extra_output("out/.build-state/seed-input.json")
     stage1 = stage1.timeout(1800000)
-    stage1 = stage1.input(host_bin("out/bin/with-sha256"))
+    // #1899: the helper's source, not its binary: the seed links the binary
+    // with this worktree's paths in its debug map (N_SO/N_OSO), so its bytes
+    // (LC_UUID, code signature) differ per worktree, while what stage1 is made
+    // from is the source and the seed (D50). The dep below orders the build.
+    stage1 = stage1.input("tools/with-sha256.w")
     // The ABI stamp every stage binary carries is sha256 of this record; a
     // re-record re-links (and re-stamps) the stage.
     stage1 = stage1.input("docs/with-abi.sha256")

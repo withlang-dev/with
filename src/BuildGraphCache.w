@@ -148,13 +148,15 @@ fn build_cache_fingerprint_regular_file(path: &str, mode: i32) -> str:
     let exec = if (mode & 0o111) != 0: "x" else: "-"
     build_cache_sha256_framed("file\nmode:" ++ f"{mode & 0o777}" ++ "\nexec:" ++ exec ++ "\ncontent:", build_graph_rt_read_file(path))
 
+// Entries are named relative to the directory: the fingerprint is the tree's
+// content, the same in every worktree (D50; the machine-wide store keys on it).
 fn build_cache_fingerprint_directory(path: &str, mode: i32) -> str:
     let listing = build_graph_rt_list_files(path)
     let files = build_cache_sorted_strings(build_cache_split_lines(listing))
     var combined = "dir\nmode:" ++ f"{mode & 0o777}" ++ "\n"
     for i in 0..files.len() as i32:
         let file = files[i]
-        combined = combined ++ file ++ ":" ++ build_cache_fingerprint_file(file) ++ "\n"
+        combined = combined ++ build_cache_project_relative(path, file) ++ ":" ++ build_cache_fingerprint_file(file) ++ "\n"
     build_cache_sha256_text(combined)
 
 fn build_cache_fingerprint_symlink(path: &str, mode: i32) -> str:
@@ -433,7 +435,7 @@ pub fn build_cache_hash_directory_w_files(root: &str, dir: &str) -> str:
     var combined = ""
     for i in 0..files.len() as i32:
         let path = files[i]
-        combined = combined ++ path ++ ":" ++ build_cache_fingerprint_file(path) ++ "\n"
+        combined = combined ++ build_cache_project_relative(root, path) ++ ":" ++ build_cache_fingerprint_file(path) ++ "\n"
     build_cache_sha256_text(combined)
 
 // #686: the evaluator resolves std modules from the embedded stdlib; their
@@ -456,10 +458,13 @@ fn build_cache_hash_action_sources(root: &str, paths: &Vec[str]) -> str:
     for i in 0..sorted.len() as i32:
         let p = sorted[i]
         let disk = build_cache_action_source_disk_path(root, p)
+        // #1899: the module closure names files absolutely; the key names
+        // them from the root, so every worktree computes the same one.
+        let named = build_cache_project_relative(root, p)
         if build_graph_rt_file_exists(disk) != 0:
-            combined = combined ++ p ++ ":" ++ build_cache_fingerprint_file(disk) ++ "\n"
+            combined = combined ++ named ++ ":" ++ build_cache_fingerprint_file(disk) ++ "\n"
         else:
-            combined = combined ++ p ++ ":missing\n"
+            combined = combined ++ named ++ ":missing\n"
     build_cache_sha256_text(combined)
 
 fn build_cache_hash_build_graph_sources(root: &str) -> str:
@@ -977,6 +982,227 @@ pub fn build_cache_record(root: &str, target: &BuildGraphTarget, discovered_deps
         let hash = build_cache_fingerprint_file(path)
         content = content ++ "out:" ++ path ++ ":" ++ hash ++ "\n"
     let _ = build_graph_rt_write_file(state_path, content)
+    build_cache_store_publish(root, target, content, effects_text)
+
+// ── Machine-wide build store (#1899) ──────────────────────────────────
+// A green belongs to the sources, not to the worktree (D49/D50); so does a
+// built artifact. Once a compiler-producing action has run, its declared
+// outputs, its state record and its effect log are published under
+// $WITH_BUILD_CACHE_DIR (default ~/.local/with-build-cache; "none" disables
+// it), keyed on everything the local signature keys on (the producing seed
+// or stage compiler, the action code, the compiler sources, with.toml), on
+// the content of every declared input, on the `compiler=` binary's identity
+// (an object target's compiler is a dep, not a signature part) and on the
+// driver's own digest, so no entry is served across seeds or drivers. A
+// worktree whose freshness check misses restores the entry into its own
+// out/ and re-verifies it with that same check: a hit is exactly a fresh
+// target, or it is discarded. Paths inside the stored records are rooted at
+// `<root>`. The store trusts the declared inputs the way the runner's
+// preflight does; an action that reads a dep's output it did not declare
+// is wrong in both worlds.
+//
+// Scope: actions that name their compiler (stage compiles, runtime and
+// bridge objects, .wo bundles, producer stamps) whose outputs and write
+// scopes all lie under out/. An action that writes elsewhere (.deps,
+// lib/std) leaves state a restore would not bring along.
+
+const BUILD_CACHE_STORE_KEEP_DEFAULT: i32 = 96
+
+pub fn build_cache_store_dir() -> str:
+    let explicit = build_graph_rt_getenv("WITH_BUILD_CACHE_DIR")
+    if explicit == "none": return ""
+    if explicit.len() > 0: return explicit
+    let home = build_graph_rt_getenv("HOME")
+    if home.len() == 0: return ""
+    home ++ "/.local/with-build-cache"
+
+fn build_cache_store_path_is_under_out(path: &str) -> bool:
+    path.starts_with("out/") and not path.contains("/../") and not path.contains("/./") and not path.ends_with("/..")
+
+fn build_cache_store_eligible(target: &BuildGraphTarget) -> bool:
+    if target.kind != 23 or target.output.len() == 0: return false
+    if not build_cache_target_names_compiler(target): return false
+    if not build_cache_store_path_is_under_out(target.output): return false
+    for i in 0..target.extra_outputs.len() as i32:
+        let extra = target.extra_outputs[i]
+        if extra.len() > 0 and not build_cache_store_path_is_under_out(extra): return false
+    for i in 0..target.write_scopes.len() as i32:
+        if not build_cache_store_path_is_under_out(target.write_scopes[i]): return false
+    true
+
+// A symlink among the outputs is copied as its referent by the runtime's
+// copy_tree; such an output stays per-worktree.
+fn build_cache_store_tree_has_symlink(path: &str) -> bool:
+    let mode = build_graph_rt_file_mode(path)
+    if mode < 0: return false
+    if (mode & BUILD_CACHE_S_IFMT) == BUILD_CACHE_S_IFLNK: return true
+    if (mode & BUILD_CACHE_S_IFMT) != BUILD_CACHE_S_IFDIR: return false
+    let files = build_cache_split_lines(build_graph_rt_list_files(path))
+    for i in 0..files.len() as i32:
+        let child_mode = build_graph_rt_file_mode(files[i])
+        if child_mode >= 0 and (child_mode & BUILD_CACHE_S_IFMT) == BUILD_CACHE_S_IFLNK: return true
+    false
+
+fn build_cache_store_key(root: &str, target: &BuildGraphTarget) -> str:
+    var text = "build-store v1\nsig:" ++ build_cache_compute_signature(target, root) ++ "\ndriver:" ++ build_cache_current_compiler_fingerprint() ++ "\n"
+    let compiler_path = build_cache_target_compiler_path(root, target)
+    if compiler_path.len() > 0:
+        text = text ++ "compiler:" ++ build_cache_compiler_binary_fingerprint(compiler_path) ++ "\n"
+    let inputs = build_cache_collect_input_paths(root, target)
+    for i in 0..inputs.len() as i32:
+        text = text ++ "in:" ++ build_cache_project_relative(root, inputs[i]) ++ ":" ++ build_cache_fingerprint_file(inputs[i]) ++ "\n"
+    build_cache_sha256_text(text)
+
+fn build_cache_store_portable(root: &str, text: &str) -> str: text.replace(root ++ "/", "<root>/")
+fn build_cache_store_localize(root: &str, text: &str) -> str: text.replace("<root>/", root ++ "/")
+
+// The relative output paths, as the record lists them (the capture directory
+// included: it is a declared output, and the freshness check wants it).
+fn build_cache_store_output_rel_paths(target: &BuildGraphTarget) -> Vec[str]:
+    var rels: Vec[str] = Vec.new()
+    rels.push(with_str_clone_ref(target.output))
+    for i in 0..target.extra_outputs.len() as i32:
+        if target.extra_outputs[i].len() > 0: rels.push(with_str_clone_ref(target.extra_outputs[i]))
+    rels
+
+fn build_cache_store_dirname(path: &str) -> str:
+    var last = -1
+    for i in 0..path.len() as i32:
+        if path[i] == '/': last = i
+    if last <= 0: "." else: path.slice(0, last as i64)
+
+fn build_cache_store_touch(entry: &str):
+    let _ = build_graph_rt_write_file(entry ++ "/used", f"{build_graph_rt_time_now()}\n")
+
+pub fn build_cache_store_publish(root: &str, target: &BuildGraphTarget, state_text: &str, effects_text: &str):
+    let dir = build_cache_store_dir()
+    if dir.len() == 0 or not build_cache_store_eligible(target): return
+    let entry = dir ++ "/" ++ build_cache_store_key(root, target)
+    if build_graph_rt_file_exists(entry ++ "/state") != 0:
+        build_cache_store_touch(entry)
+        return
+    let rels = build_cache_store_output_rel_paths(target)
+    for i in 0..rels.len() as i32:
+        if build_cache_store_tree_has_symlink(root ++ "/" ++ rels[i]): return
+    let tmp = entry ++ f".tmp.{build_graph_rt_getpid()}"
+    let _rm = build_graph_rt_remove_tree(tmp)
+    if build_graph_rt_mkdir_p(tmp ++ "/outputs") != 0: return
+    var ok = true
+    for i in 0..rels.len() as i32:
+        let rel = rels[i]
+        if build_graph_rt_mkdir_p(tmp ++ "/outputs/" ++ build_cache_store_dirname(rel)) != 0 or build_graph_rt_copy_tree(root ++ "/" ++ rel, tmp ++ "/outputs/" ++ rel) != 0:
+            ok = false
+            break
+    if ok and effects_text.len() > 0 and build_graph_rt_write_file(tmp ++ "/effects", build_cache_store_portable(root, effects_text)) != 0: ok = false
+    if ok and build_graph_rt_write_file(tmp ++ "/state", build_cache_store_portable(root, state_text)) != 0: ok = false
+    if ok:
+        build_cache_store_touch(tmp)
+        ok = build_graph_rt_rename_file(tmp, entry) == 0
+    if not ok:
+        // Another worktree published the same entry first, or the copy
+        // failed; either way this run's outputs stand on their own.
+        let _rm_tmp = build_graph_rt_remove_tree(tmp)
+        return
+    build_cache_store_prune(dir)
+
+// The store is bounded: the entries used least recently go once more than
+// $WITH_BUILD_CACHE_KEEP (default 96) are held. A stage compiler is ~170MB;
+// one commit's chain publishes about seven of them.
+fn build_cache_store_prune(dir: &str):
+    var keep = BUILD_CACHE_STORE_KEEP_DEFAULT
+    let explicit = build_graph_rt_getenv("WITH_BUILD_CACHE_KEEP")
+    if explicit.len() > 0: keep = build_cache_parse_i32(explicit, keep)
+    let entries = build_cache_split_lines(build_graph_rt_list_files(dir))
+    var names: Vec[str] = Vec.new()
+    var stamps: Vec[i64] = Vec.new()
+    for i in 0..entries.len() as i32:
+        let path = entries[i]
+        if not path.ends_with("/used"): continue
+        let entry = build_cache_store_dirname(path)
+        if build_cache_project_relative(dir, entry).contains("/"): continue
+        names.push(entry.clone())
+        stamps.push(build_cache_parse_i64(build_graph_rt_read_file(path)))
+    if names.len() as i32 <= keep: return
+    // Drop the oldest until `keep` remain; a few entries, so the quadratic
+    // selection is nothing.
+    var remaining = names.len() as i32
+    while remaining > keep:
+        var oldest = -1
+        for i in 0..names.len() as i32:
+            if names[i].len() == 0: continue
+            if oldest < 0 or stamps[i] < stamps[oldest]: oldest = i
+        if oldest < 0: break
+        let _rm = build_graph_rt_remove_tree(names[oldest])
+        names[oldest] = ""
+        remaining = remaining - 1
+
+fn build_cache_parse_i64(text: &str) -> i64:
+    var value: i64 = 0
+    for i in 0..text.len() as i32:
+        let c = text[i]
+        if c < '0' or c > '9': break
+        value = value * 10 + (c - '0') as i64
+    value
+
+fn build_cache_parse_i32(text: &str, fallback: i32) -> i32:
+    var seen = false
+    var value = 0
+    for i in 0..text.len() as i32:
+        let c = text[i]
+        if c < '0' or c > '9': break
+        seen = true
+        value = value * 10 + (c - '0') as i32
+    if seen: value else: fallback
+
+// The state record with its `effects:` line naming `hash`.
+fn build_cache_store_repin_effects(state_text: &str, hash: &str) -> str:
+    var out = ""
+    for line in state_text.split("\n"):
+        if line.len() == 0: continue
+        out = out ++ (if line.starts_with("effects:"): "effects:" ++ hash else: line.clone()) ++ "\n"
+    out
+
+// Restore `target` from the store when an entry matches its key: the
+// outputs replace what is on disk, the state and effect records are
+// written as the record would have, and the freshness check must then say
+// fresh; otherwise the restored state is dropped and the target runs.
+pub fn build_cache_store_restore(root: &str, target: &BuildGraphTarget) -> bool:
+    let dir = build_cache_store_dir()
+    if dir.len() == 0 or not build_cache_store_eligible(target): return false
+    let key = build_cache_store_key(root, target)
+    let entry = dir ++ "/" ++ key
+    if build_graph_rt_file_exists(entry ++ "/state") == 0: return false
+    let rels = build_cache_store_output_rel_paths(target)
+    for i in 0..rels.len() as i32:
+        let rel = rels[i]
+        let dest = root ++ "/" ++ rel
+        let _rm = build_graph_rt_remove_tree(dest)
+        if build_graph_rt_mkdir_p(root ++ "/" ++ build_cache_store_dirname(rel)) != 0: return false
+        if build_graph_rt_copy_tree(entry ++ "/outputs/" ++ rel, dest) != 0:
+            build_graph_rt_eprint("[cache] " ++ target.name ++ ": could not restore " ++ rel ++ " from the build store; running it")
+            let _drop = build_graph_rt_remove_tree(dest)
+            return false
+    let _mk = build_graph_rt_mkdir_p(build_cache_state_dir(root))
+    let effects_path = build_cache_effects_path(root, target.name)
+    var state_text = build_cache_store_localize(root, build_graph_rt_read_file(entry ++ "/state"))
+    if build_graph_rt_file_exists(entry ++ "/effects") != 0:
+        // The effect log names this worktree's paths once localized, so the
+        // record pins its hash as build_cache_record would have here.
+        let effects_text = build_cache_store_localize(root, build_graph_rt_read_file(entry ++ "/effects"))
+        let _w = build_graph_rt_write_file(effects_path, effects_text)
+        state_text = build_cache_store_repin_effects(state_text, build_cache_sha256_text(effects_text))
+    else:
+        let _rm_effects = build_graph_rt_remove_file(effects_path)
+    let _ws = build_graph_rt_write_file(build_cache_state_path(root, target.name), state_text)
+    build_cache_forget_fingerprints()
+    let reason = build_cache_freshness_reason(root, target, false)
+    if reason != "fresh":
+        build_graph_rt_eprint("[cache] " ++ target.name ++ ": build store entry " ++ key.slice(0, 12) ++ " does not verify (" ++ reason ++ "); running it")
+        let _inv = build_cache_invalidate_target(root, target.name)
+        return false
+    build_cache_store_touch(entry)
+    build_graph_rt_eprint("[cache] " ++ target.name ++ ": restored from the build store (" ++ key.slice(0, 12) ++ ")")
+    true
 
 pub fn build_cache_record_build_effects(root: &str, effects: &Vec[str]) -> Unit:
     let state_dir = build_cache_state_dir(root)

@@ -24,6 +24,8 @@ extern fn with_fs_readlink(path: &str) -> str
 extern fn with_fs_remove_dir(path: &str) -> i32
 extern fn with_fs_remove_file(path: &str) -> i32
 extern fn with_fs_remove_tree(path: &str) -> i32
+extern fn with_fs_copy_tree(src: &str, dst: &str) -> i32
+extern fn with_time_now() -> i64
 extern fn with_fs_list_files(path: &str) -> str
 extern fn with_fs_rename_file(old_path: &str, new_path: &str) -> i32
 extern fn with_fs_write_file(path: &str, data: &str) -> i32
@@ -105,6 +107,13 @@ pub fn build_graph_rt_remove_dir(path: &str) -> i32:
 
 pub fn build_graph_rt_remove_tree(path: &str) -> i32:
     with_fs_remove_tree(path)
+
+// Recursive copy: a file with its mode, a directory with its entries.
+pub fn build_graph_rt_copy_tree(src: &str, dst: &str) -> i32:
+    with_fs_copy_tree(src, dst)
+
+// Wall-clock seconds since the epoch.
+pub fn build_graph_rt_time_now() -> i64: with_time_now()
 
 pub fn build_graph_rt_list_files(path: &str) -> str:
     with_fs_list_files(path)
