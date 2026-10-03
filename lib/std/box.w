@@ -2,7 +2,7 @@
 
 use std.traits
 
-extern fn with_alloc(size: i64) -> *mut u8
+extern fn with_alloc_aligned(size: i64, align: i64) -> *mut u8
 extern fn with_free(ptr: *mut u8) -> Unit
 extern fn with_memcpy(dst: *mut u8, src: *const u8, n: i64) -> *mut u8
 
@@ -10,7 +10,7 @@ extern fn with_memcpy(dst: *mut u8, src: *const u8, n: i64) -> *mut u8
 pub type Box[T] { ptr: *mut T }
 
 pub fn Box.new[T](value: T) -> Box[T]:
-    let ptr = with_alloc(sizeof[T]() as i64) as *mut T
+    let ptr = with_alloc_aligned(sizeof[T](), alignof[T]()) as *mut T
     // Move-assign through the pointer: consumes `value` without running its
     // drop (the heap slot now owns it). The old memcpy of `&raw const value`
     // left `value` owned on this side, so the payload was dropped while the

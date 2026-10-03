@@ -8633,6 +8633,14 @@ impl Codegen:
         let fn_ty = wl_function_type(wl_ptr_type(self.context), vec_data_i64(&params), 1, 0)
         wl_add_function(self.llmod, "with_alloc", fn_ty)
 
+    fn ensure_box_alloc_aligned_fn() -> i64:
+        var alloc_fn = wl_get_named_function(self.llmod, "with_alloc_aligned")
+        if alloc_fn != 0:
+            return alloc_fn
+        let params: Vec[i64] = [wl_i64_type(self.context), wl_i64_type(self.context)]
+        let fn_ty = wl_function_type(wl_ptr_type(self.context), vec_data_i64(&params), 2, 0)
+        wl_add_function(self.llmod, "with_alloc_aligned", fn_ty)
+
     fn ensure_box_free_fn() -> i64:
         var free_fn = wl_get_named_function(self.llmod, "with_free")
         if free_fn != 0:
@@ -8654,12 +8662,18 @@ impl Codegen:
         let value_ty = wl_type_of(value)
         if value_ty == 0 or value_ty == wl_void_type(self.context):
             return false
-        let alloc_fn = self.ensure_box_alloc_fn()
-        if alloc_fn == 0:
+        // #2039: the cell is at the payload's TypeLayout alignment; with_free
+        // takes an over-aligned placement back like any allocation.
+        let value_sema = self.mir_operand_sema_type(body, value_op)
+        if value_sema <= 0:
+            with_eprint("error: internal: Box.new payload has no Sema type (#2039)")
+            self.had_error = 1
             return false
+        let alloc_fn = self.ensure_box_alloc_aligned_fn()
         let alloc_args: Vec[i64] = Vec.new()
         alloc_args.push(wl_const_int(wl_i64_type(self.context), self.abi_size_of(value_ty), 0))
-        let heap_ptr = wl_build_call(self.builder, wl_global_get_value_type(alloc_fn), alloc_fn, vec_data_i64(&alloc_args), 1)
+        alloc_args.push(wl_const_int(wl_i64_type(self.context), self.sema.type_layout_align_of_frozen(value_sema), 0))
+        let heap_ptr = wl_build_call(self.builder, wl_global_get_value_type(alloc_fn), alloc_fn, vec_data_i64(&alloc_args), 2)
         wl_build_store(self.builder, value, heap_ptr)
 
         var result = heap_ptr
@@ -8669,7 +8683,6 @@ impl Codegen:
             let trait_sym = self.mir_dyn_trait_symbol_from_sema_type(dest_sema_ty)
             var info = self.mir_dyn_arg_info_from_operand(body, value_op, value)
             if info.type_sym == 0:
-                let value_sema = self.mir_operand_sema_type(body, value_op)
                 info = self.mir_dyn_arg_info_from_sema_type(value_sema, 0)
             if trait_sym == 0 or info.type_sym == 0:
                 with_eprint("error: cannot lower Box.new value to boxed dyn trait")
@@ -19523,17 +19536,16 @@ impl Codegen:
         let dl = wl_get_module_data_layout(self.llmod)
         if name_sym == self.sym_sizeof or name_sym == self.sym_size_of:
             return wl_const_int(wl_i64_type(self.context), wl_abi_size_of(dl, type_val), 0)
-        // alignof: report the layout-model alignment, which honors §16.4 @[align]
-        // field annotations (LLVM's i8-padded struct representation keeps the
-        // correct size/stride but reports only the member ABI alignment).
-        // The declaration is Sema's resolution of the argument, never a
-        // lookup of its spelling (a name two modules declare is two types).
-        let align_kind = self.sema.get_type_kind(self.sema.resolve_alias(sema_tid as TypeId))
-        if align_kind == TypeKind.TY_STRUCT or align_kind == TypeKind.TY_ENUM:
-            let model_align = self.sema.type_layout_align_of_frozen(sema_tid)
-            if model_align > 0:
-                return wl_const_int(wl_i64_type(self.context), model_align, 0)
-        wl_const_int(wl_i64_type(self.context), wl_abi_align_of(dl, type_val) as i64, 0)
+        // alignof is the layout model's (TypeLayout), which honors §16.4
+        // @[align]; LLVM's i8-padded struct body keeps the size but reports
+        // only its members' ABI alignment. Every kind reads the model: a
+        // generic instance or tuple holding an `@[align(32)]` record read
+        // LLVM's 8, so std's generator core was under-aligned (#2039).
+        if sema_tid <= 0:
+            with_eprint(f"error: internal: alignof's type argument has no Sema type in {self.intern.resolve(self.current_function_name_sym)} (node={tp_node}, #2039)")
+            self.had_error = 1
+            return wl_const_int(wl_i64_type(self.context), 0, 0)
+        wl_const_int(wl_i64_type(self.context), self.sema.type_layout_align_of_frozen(sema_tid), 0)
 
     // ── nameof/type_name intrinsic ─────────────────────────────────────
 

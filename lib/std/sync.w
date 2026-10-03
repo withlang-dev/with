@@ -1,6 +1,7 @@
 // std.sync — synchronization primitives.
 
 extern fn with_alloc(size: i64) -> *mut u8
+extern fn with_alloc_aligned(size: i64, align: i64) -> *mut u8
 extern fn with_free(ptr: *mut u8) -> Unit
 extern fn with_memcpy(dst: *mut u8, src: *const u8, n: i64) -> *mut u8
 extern fn with_fiber_in_fiber() -> i32
@@ -132,9 +133,9 @@ unsafe fn sync_barrier_unlock(state: *mut BarrierState):
 
 /// Create a new generic mutex with the given initial value.
 pub fn Mutex.new[T](value: T) -> Mutex[T]:
-    let value_ptr = with_alloc(sizeof[T]() as i64) as *mut T
+    let value_ptr = with_alloc_aligned(sizeof[T](), alignof[T]()) as *mut T
     unsafe { *value_ptr = value }
-    let state = with_alloc(sizeof[MutexState]() as i64) as *mut MutexState
+    let state = with_alloc(sizeof[MutexState]()) as *mut MutexState
     (unsafe *state).locked = 0
     (unsafe *state).value = value_ptr as *mut u8
     Mutex { ptr: state as *mut u8 }
@@ -219,9 +220,9 @@ impl[T] Drop for Mutex[T]:
 
 /// Create a new generic reader-writer lock with the given initial value.
 pub fn RwLock.new[T](value: T) -> RwLock[T]:
-    let value_ptr = with_alloc(sizeof[T]() as i64) as *mut T
+    let value_ptr = with_alloc_aligned(sizeof[T](), alignof[T]()) as *mut T
     unsafe { *value_ptr = value }
-    let state = with_alloc(sizeof[RwLockState]() as i64) as *mut RwLockState
+    let state = with_alloc(sizeof[RwLockState]()) as *mut RwLockState
     (unsafe *state).state = 0
     (unsafe *state).value = value_ptr as *mut u8
     RwLock { ptr: state as *mut u8 }

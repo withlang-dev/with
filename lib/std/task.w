@@ -240,7 +240,7 @@ pub fn with_concurrency[T](tasks: impl IntoIter[Task[T]], n: i32) -> impl IntoIt
 // generator value to gen_pull and rejects a generator that yields views of
 // its own locals or may suspend.
 
-extern fn with_alloc(size: i64) -> *mut u8
+extern fn with_alloc_aligned(size: i64, align: i64) -> *mut u8
 extern fn with_free(ptr: *mut u8)
 extern fn with_fiber_coro_new(entry: *const u8, arg: *mut u8) -> i64
 extern fn with_fiber_coro_resume(co: i64)
@@ -308,7 +308,7 @@ pub fn gen_pull[T, G: Gen[T]](g: G) -> Pulled[T]:
         let held = move cell.source
         drop(held)
     }
-    let core = with_alloc(sizeof[PullCore[G]]() as i64) as *mut PullCore[G]
+    let core = with_alloc_aligned(sizeof[PullCore[G]](), alignof[PullCore[G]]()) as *mut PullCore[G]
     unsafe { *core = PullCore { head: PullHeader { run, drop_gen, co: 0, slot: 0 as *mut u8, stop: false, done: false }, source: g } }
     Pulled { core: core as *mut u8 }
 

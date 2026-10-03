@@ -9873,7 +9873,7 @@ impl CCodegen:
         cc_str_starts_with(name, "with_str_") != 0 or cc_str_starts_with(name, "with_fmt_") != 0 or
         name == "with_fiber_in_fiber" or name == "with_fiber_await" or name == "with_fiber_cleanup_await" or
         name == "with_fiber_cancel" or name == "with_fiber_panic_capture" or cc_str_starts_with(name, "with_println_") != 0 or
-        name == "with_alloc" or name == "with_free" or name == "with_memcpy" or name == "with_memmove" or
+        name == "with_alloc" or name == "with_alloc_aligned" or name == "with_free" or name == "with_memcpy" or name == "with_memmove" or
         name == "with_memset" or name == "with_memcmp" or name == "with_hashmap_get_ptr" or
         name == "with_hashmap_capacity" or name == "with_hashmap_slot_occupied" or
         name == "with_hashmap_key_ptr_at" or name == "with_hashmap_value_ptr_at" or
@@ -10475,7 +10475,7 @@ impl CCodegen:
                 // captures are not destroyed here either.
                 out = out ++ "static void " ++ name ++ "_drop(void* cell) " ++ cc_lbrace() ++ " with_free(cell); " ++ cc_rbrace() ++ "\n"
                 if self.closure_cell_clonable(idx):
-                    out = out ++ "static void* " ++ name ++ "_clone(void* old) " ++ cc_lbrace() ++ " " ++ cell ++ "* c = (" ++ cell ++ "*)with_alloc((int64_t)sizeof(" ++ cell ++ ")); memcpy(c, old, sizeof(" ++ cell ++ "));"
+                    out = out ++ "static void* " ++ name ++ "_clone(void* old) " ++ cc_lbrace() ++ " " ++ cell ++ "* c = (" ++ cell ++ "*)with_alloc_aligned((int64_t)sizeof(" ++ cell ++ "), (int64_t)_Alignof(" ++ cell ++ ")); memcpy(c, old, sizeof(" ++ cell ++ "));"
                     for ci in 0..count:
                         if self.sema.get_type_kind(self.sema.resolve_alias(body.local_type_ids[ci + 1])) == TypeKind.TY_STR:
                             out = out ++ f" c->env.c{ci} = with_str_clone_ref(c->env.c{ci});"
@@ -10534,7 +10534,7 @@ impl CCodegen:
                 out = out ++ f" memcpy(&__with_env.c{ci}, &(" ++ src ++ f"), sizeof(__with_env.c{ci}));"
             return out ++ " (" ++ pair_ty ++ ")" ++ cc_lbrace() ++ " " ++ fn_name ++ ", __with_closure_inline_ctx(&__with_env, sizeof(__with_env)) " ++ cc_rbrace() ++ "; " ++ cc_rbrace() ++ ")"
         let cell = self.closure_cell_struct(idx)
-        out = out ++ " " ++ cell ++ "* __with_cell = (" ++ cell ++ "*)with_alloc((int64_t)sizeof(" ++ cell ++ "));"
+        out = out ++ " " ++ cell ++ "* __with_cell = (" ++ cell ++ "*)with_alloc_aligned((int64_t)sizeof(" ++ cell ++ "), (int64_t)_Alignof(" ++ cell ++ "));"
         out = out ++ " __with_cell->drop_fn = " ++ fn_name ++ "_drop;"
         out = out ++ " __with_cell->clone_fn = " ++ (if self.closure_cell_clonable(idx): fn_name ++ "_clone;" else: "0;")
         for ci in 0..count:
@@ -10898,6 +10898,8 @@ impl CCodegen:
         out.write("extern with_str with_fmt_buf_finish(uint8_t*);\n")
         if self.module_exports_c_name("with_alloc") == 0:
             out.write("extern void* with_alloc(int64_t);\n")
+        if self.module_exports_c_name("with_alloc_aligned") == 0:
+            out.write("extern void* with_alloc_aligned(int64_t, int64_t);\n")
         if self.module_exports_c_name("with_free") == 0:
             out.write("extern void with_free(void*);\n")
         if self.module_exports_c_name("with_memcpy") == 0:

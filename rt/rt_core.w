@@ -1684,9 +1684,67 @@ fn rt_alloc_with_origin(size_arg: i64, origin: i64):
 fn rt_alloc(size_arg: i64) -> *mut u8:
     rt_alloc_with_origin(size_arg, DBG_ORIGIN_UNKNOWN)
 
-fn rt_free_unlocked_with_drop_origin(ptr: *mut u8, drop_origin_ptr: i64, drop_origin_len: i64):
-    if ptr as i64 == 0:
+// ── Over-aligned placements (#2022, #2039) ─────────────────────────
+//
+// Payloads are 16-aligned. A request for a larger power-of-two alignment
+// (§16.4 allows up to 65536) is placed at that alignment inside a block
+// `align` bytes larger. The two words below the placed pointer describe it:
+// [p - 16] = align ^ RT_PLACED_TAG, [p - 8] = the block's payload start. The
+// free path recognizes a placement by that description, checked against the
+// allocator's own tables, so every free of the pointer takes back the block.
+let RT_PLACED_TAG: i64 = 6075439749126946816  // 0x5450_4C43_4500_0000
+
+fn rt_alloc_aligned_with_origin(size: i64, align: i64, origin: i64) -> *mut u8:
+    if align <= RT_ALLOC_HEADER_SIZE:
+        return rt_alloc_with_origin(size, origin)
+    let block = rt_alloc_with_origin(size + align, origin) as i64
+    let p = (block + RT_ALLOC_HEADER_SIZE + align - 1) & (0 - align)
+    unsafe *((p - 16) as *mut i64) = align ^ RT_PLACED_TAG
+    unsafe *((p - 8) as *mut i64) = block
+    p as *mut u8
+
+fn rt_addr_in_large_range(addr: i64) -> bool:
+    var lo = 0
+    var hi = rt_large_range_count - 1
+    var found = -1
+    while lo <= hi:
+        let mid = (lo + hi) / 2
+        if rt_range_start(rt_large_range_base, mid) <= addr:
+            found = mid
+            lo = mid + 1
+        else:
+            hi = mid - 1
+    found >= 0 and addr < rt_range_end(rt_large_range_base, rt_large_range_cap, found)
+
+// The block a placed pointer lives in, or 0 when `p` is not a placement.
+// Called under the allocator lock, for a pointer that is not itself a
+// payload start; its description words are read only when they lie in
+// memory the allocator owns.
+fn rt_placed_block(p: i64) -> i64:
+    if p < 64 or p % 32 != 0:
+        return 0
+    let desc = p - 16
+    if alloc_system_on() == 0 and rt_owned_slab_start(desc) == 0 and not rt_addr_in_large_range(desc):
+        return 0
+    let align = unsafe *(desc as *const i64) ^ RT_PLACED_TAG
+    if align < 32 or align > 65536 or align & (align - 1) != 0 or p % align != 0:
+        return 0
+    let block = unsafe *((p - 8) as *const i64)
+    if p - block < RT_ALLOC_HEADER_SIZE or p - block > align:
+        return 0
+    if alloc_system_on() == 0 and rt_payload_start_is_owned(block as *const u8) == 0:
+        return 0
+    block
+
+fn rt_free_unlocked_with_drop_origin(ptr_arg: *mut u8, drop_origin_ptr: i64, drop_origin_len: i64):
+    if ptr_arg as i64 == 0:
         return
+    // An over-aligned placement frees its block (#2039).
+    var ptr = ptr_arg
+    if alloc_system_on() != 0 or rt_payload_start_is_owned(ptr_arg as *const u8) == 0:
+        let placed = rt_placed_block(ptr_arg as i64)
+        if placed != 0:
+            ptr = placed as *mut u8
     dbg_trap_free_check(ptr as i64, drop_origin_ptr, drop_origin_len)
     // #606 debug allocator: detect double-free before the generic ownership
     // panic so the report names the address; poison freed small payloads.
@@ -1959,6 +2017,11 @@ pub fn with_realloc(ptr: *mut u8, old_size: i64, new_size: i64) -> *mut u8:
 
 pub fn with_free(ptr: *mut u8):
     rt_free(ptr)
+
+// std's Box, Mutex, RwLock and generator cores: one `T` at alignof[T]
+// (TypeLayout's, #2039). with_free takes it back like any allocation.
+pub fn with_alloc_aligned(size: i64, align: i64) -> *mut u8:
+    rt_alloc_aligned_with_origin(size, align, DBG_ORIGIN_WITH_ALLOC)
 
 pub fn with_free_drop_origin(ptr: *mut u8, drop_origin: *const u8, drop_origin_len: i64) -> Unit:
     rt_free_with_drop_origin(ptr, drop_origin, drop_origin_len)
@@ -3184,9 +3247,8 @@ pub fn with_vec_new_with_capacity_out(out: *mut u8, elem_size: i64, cap: i64):
 // #2022: a Vec buffer is aligned for its element. The header carries only the
 // element size (with-abi.md §3), and TypeLayout rounds every size up to its
 // type's alignment (§2), so the largest power of two dividing the size, at
-// most §16.4's 65536, is at least the element's alignment. The allocator's
-// payloads are 16-aligned; a buffer that needs more is placed at that
-// alignment inside a larger block whose start is the word below the buffer.
+// most §16.4's 65536, is at least the element's alignment. The exact
+// alignment would need a header word §3 does not have (#2039).
 fn vec_buffer_align(es: i64) -> i64:
     if es <= 0:
         return RT_ALLOC_HEADER_SIZE
@@ -3196,19 +3258,7 @@ fn vec_buffer_align(es: i64) -> i64:
     align
 
 fn vec_buffer_alloc(bytes: i64, es: i64) -> *mut u8:
-    let align = vec_buffer_align(es)
-    if align <= RT_ALLOC_HEADER_SIZE:
-        return rt_alloc_with_origin(bytes, DBG_ORIGIN_VEC)
-    let block = rt_alloc_with_origin(bytes + align, DBG_ORIGIN_VEC) as i64
-    let buffer = (block + 8 + align - 1) & (0 - align)
-    unsafe *((buffer - 8) as *mut i64) = block
-    buffer as *mut u8
-
-// The allocation a buffer from vec_buffer_alloc lives in.
-fn vec_buffer_block(p: *mut u8, es: i64) -> *mut u8:
-    if vec_buffer_align(es) <= RT_ALLOC_HEADER_SIZE:
-        return p
-    unsafe *((p as i64 - 8) as *const *mut u8)
+    rt_alloc_aligned_with_origin(bytes, vec_buffer_align(es), DBG_ORIGIN_VEC)
 
 fn vec_grow(v: *mut u8):
     let old_cap = vec_get_cap(v)
@@ -3220,7 +3270,7 @@ fn vec_grow(v: *mut u8):
     if old_ptr as i64 != 0 and vlen > 0:
         rt_memcpy(new_ptr, old_ptr as *const u8, vlen * es)
     if old_ptr as i64 != 0 and old_cap > 0:
-        rt_free_sized(vec_buffer_block(old_ptr, es), old_cap * es)
+        rt_free_sized(old_ptr, old_cap * es)
     vec_set_ptr_field(v, new_ptr)
     vec_set_cap(v, new_cap)
 
@@ -3276,7 +3326,7 @@ pub fn with_vec_clear(v: *mut u8):
 // benchmark reloaded five headers after every store before this).
 pub fn with_vec_free_buffer(p: *mut u8, cap: i64, es: i64) -> Unit:
     if p as i64 != 0 and cap > 0 and es > 0:
-        rt_free_sized(vec_buffer_block(p, es), cap * es)
+        rt_free_sized(p, cap * es)
 
 pub fn with_vec_free(v: *mut u8) -> Unit:
     with_vec_free_buffer(vec_get_ptr_field(v), vec_get_cap(v), vec_get_elem_size(v))
@@ -3308,7 +3358,7 @@ pub fn with_vec_free_buffer_drop_origin(p: *mut u8, cap: i64, es: i64, drop_orig
                 dbg_puts(drop_origin, drop_origin_len)
             dbg_puts("\n" as *const u8, 1)
             with_panic_core(make_str("corrupt vec header: freed memory reused or overwritten" as *const u8, 54), make_str("" as *const u8, 0), 0)
-        rt_free_sized_with_drop_origin(vec_buffer_block(p, es), cap * es, drop_origin, drop_origin_len)
+        rt_free_sized_with_drop_origin(p, cap * es, drop_origin, drop_origin_len)
 
 // #747 (#691 second half): dropping a str frees its buffer. A str place is
 // {data_ptr, len}; only a pointer that is the START of a live allocation
