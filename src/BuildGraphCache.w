@@ -961,18 +961,31 @@ pub fn build_cache_record(root: &str, target: &BuildGraphTarget, discovered_deps
         let path = input_paths[idx]
         let hash = build_cache_fingerprint_file(path)
         content = content ++ "in:" ++ path ++ ":" ++ hash ++ "\n"
-    let dep_paths = build_cache_sorted_unique_strings(discovered_deps)
+    // #1899: a path the action read (a `read` effect, ToolFs.record_read) is
+    // a discovered dependency like a compile's tracked input: the record is
+    // fresh, here or restored from the build store into another worktree,
+    // only while that path is as it was.
+    var deps = build_cache_sorted_unique_strings(discovered_deps)
+    var other_effects: Vec[str] = Vec.new()
+    for idx in 0..effects.len() as i32:
+        let effect = effects[idx]
+        if effect.starts_with("read\t"):
+            let read = effect.slice(5, effect.len())
+            deps.push(if runtime_path_is_absolute(read): read else: root ++ "/" ++ read)
+        else:
+            other_effects.push(effect.clone())
+    let dep_paths = build_cache_sorted_unique_strings(&deps)
     for idx in 0..dep_paths.len() as i32:
         let path = dep_paths[idx]
         let hash = build_cache_fingerprint_file(path)
         let rel_path = build_cache_project_relative(root, path)
         content = content ++ "dep:" ++ rel_path ++ ":" ++ hash ++ "\n"
-    let effects_text = build_cache_effects_text(effects)
+    let effects_text = build_cache_effects_text(&other_effects)
     if effects_text.len() > 0:
         let effects_path = build_cache_effects_path(root, target.name)
         let _write_effects = build_graph_rt_write_file(effects_path, effects_text)
         content = content ++ "effects:" ++ build_cache_sha256_text(effects_text) ++ "\n"
-        let sorted_effects = build_cache_sorted_unique_strings(effects)
+        let sorted_effects = build_cache_sorted_unique_strings(&other_effects)
         for idx in 0..sorted_effects.len() as i32:
             let env_line = build_cache_effect_env_state_line(sorted_effects[idx])
             if env_line.len() > 0:
@@ -1234,16 +1247,50 @@ fn build_cache_store_repin_signature(state_text: &str, target: &BuildGraphTarget
         out = out ++ line ++ "\n"
     out
 
-// Restore `target` from the store when an entry matches its key: the
-// outputs replace what is on disk, the state and effect records are
-// written as the record would have, and the freshness check must then say
-// fresh; otherwise the restored state is dropped and the target runs.
+// What makes a stored record not this worktree's, or "": an input it
+// names (declared, or discovered: a compile's tracked inputs, a path an
+// action read) whose content, kind or absence differs here, or an
+// environment variable it read whose value differs. The key covers the
+// declared inputs only; the rest is known once the entry is found.
+fn build_cache_store_record_mismatch(root: &str, state_text: &str) -> str:
+    for line in state_text.split("\n"):
+        let is_input = line.starts_with("in:")
+        if is_input or line.starts_with("dep:"):
+            let entry = line.slice(if is_input: 3 else: 4, line.len())
+            let split = build_cache_last_colon(entry)
+            if split < 0: return "malformed record"
+            let stored_path = entry.slice(0, split as i64)
+            // An `in:` line names the path as the record joined it to the
+            // root; a `dep:` line names it from the root, or absolutely.
+            let current = if is_input: stored_path.clone() else: build_cache_dep_path(root, stored_path)
+            if build_cache_fingerprint_file(current) != entry.slice((split + 1) as i64, entry.len()):
+                return "made from another " ++ build_cache_project_relative(root, stored_path)
+        else if line.starts_with("env:"):
+            let entry = line.slice(4, line.len())
+            let split = build_cache_last_colon(entry)
+            if split < 0: return "malformed record"
+            let name = entry.slice(0, split as i64)
+            if build_cache_sha256_text(build_graph_rt_getenv(name)) != entry.slice((split + 1) as i64, entry.len()):
+                return "made under another " ++ name
+    ""
+
+// Restore `target` from the store when an entry matches its key and every
+// input its record names is this worktree's (checked before anything on
+// disk is touched): the outputs replace what is on disk, the state and
+// effect records are written as the record would have, and the freshness
+// check must then say fresh; otherwise the restored state is dropped and
+// the target runs.
 pub fn build_cache_store_restore(root: &str, target: &BuildGraphTarget) -> bool:
     let dir = build_cache_store_dir()
     if dir.len() == 0 or not build_cache_store_eligible(target): return false
     let key = build_cache_store_key(root, target)
     let entry = dir ++ "/" ++ key
     if build_graph_rt_file_exists(entry ++ "/state") == 0: return false
+    var state_text = build_cache_store_localize(root, build_graph_rt_read_file(entry ++ "/state"))
+    let mismatch = build_cache_store_record_mismatch(root, state_text)
+    if mismatch.len() > 0:
+        build_graph_rt_eprint("[cache] " ++ target.name ++ ": build store entry " ++ key.slice(0, 12) ++ " does not apply (" ++ mismatch ++ "); running it")
+        return false
     let rels = build_cache_store_output_rel_paths(target)
     for i in 0..rels.len() as i32:
         let rel = rels[i]
@@ -1256,7 +1303,6 @@ pub fn build_cache_store_restore(root: &str, target: &BuildGraphTarget) -> bool:
             return false
     let _mk = build_graph_rt_mkdir_p(build_cache_state_dir(root))
     let effects_path = build_cache_effects_path(root, target.name)
-    var state_text = build_cache_store_localize(root, build_graph_rt_read_file(entry ++ "/state"))
     if build_graph_rt_file_exists(entry ++ "/effects") != 0:
         // The effect log names this worktree's paths once localized, so the
         // record pins its hash as build_cache_record would have here.

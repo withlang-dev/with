@@ -128,6 +128,15 @@ pub fn p7_run_without_out_dir(case_dir: &str, label: &str, args_blob: &str) -> P
     result
 
 fn p7_run_with_compiler_keeping_env(compiler: &str, case_dir: &str, label: &str, args_blob: &str) -> P7Run:
+    // #1899: the build store is machine-wide. This test process's builds
+    // share one of their own, made empty on first use: a case asserts what
+    // its build ran, and the machine-wide store would serve it a target
+    // another run built from the same inputs; nor does a test publish into
+    // the user's store. A test that names WITH_BUILD_CACHE_DIR keeps it.
+    if env("WITH_BUILD_CACHE_DIR").len() == 0:
+        let store = p7_abs(f"out/tmp/pre-d-p7-store/{pid()}")
+        let _clear = remove_tree(store)
+        assert(set_env("WITH_BUILD_CACHE_DIR", store) == 0)
     let capture_dir = p7_join(p7_abs("out/tmp/pre-d-p7-capture"), label)
     let _remove = remove_tree(capture_dir)
     assert(mkdir_p(capture_dir) == 0)

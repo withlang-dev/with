@@ -168,6 +168,21 @@ fn bs_run_cli_capture_with_env(ctx: &ActionCtx, compiler_path: &str, label: &str
         let _remove_stderr = ctx.fs().remove_file(bs_join(output_dir, label ++ ".stderr"))
     SelfhostRunResult { result.rc, move result.stdout, move result.stderr }
 
+// #1899: a case's builds use a build store of the case's own, under this
+// action's output (removed at the start of every run), never the
+// machine-wide one: a case asserts what its build ran, and the machine-wide
+// store serves a target another run built from the same inputs (an action
+// that prints, served, prints nothing). A case that names
+// WITH_BUILD_CACHE_DIR keeps it.
+fn bs_case_process_env(root: &str, output_dir: &str, cwd: &str, process_env: &ProcessEnv) -> ProcessEnv:
+    var env = bs_clone_process_env(process_env)
+    for i in 0..env.vars.len() as i32:
+        if env.vars[i].name == "WITH_BUILD_CACHE_DIR": return env
+    let abs_cwd = bs_abs(root, cwd)
+    let rel = if abs_cwd.starts_with(root ++ "/"): abs_cwd.slice(root.len() + 1, abs_cwd.len()) else: abs_cwd.clone()
+    let name = if rel.len() == 0 or rel == ".": "root" else: rel.replace("/", "_")
+    env.set("WITH_BUILD_CACHE_DIR", bs_abs(root, bs_join(output_dir, ".build-store/" ++ name)))
+
 fn bs_run_cli_capture_cwd_with_env(ctx: &ActionCtx, compiler_path: &str, label: &str, args: &Vec[str], timeout_ms: i32, cwd: &str, process_env: &ProcessEnv) -> SelfhostRunResult:
     let root = ctx.project_info().project_root()
     let output_dir = ctx.output()
@@ -177,7 +192,7 @@ fn bs_run_cli_capture_cwd_with_env(ctx: &ActionCtx, compiler_path: &str, label: 
     argv |> push(selfhost_owned_text(compiler_path))
     for i in 0..args.len() as i32:
         argv |> push(selfhost_owned_text(args[i]))
-    var result = ctx.process_runner().run_capture_cwd_with_env(argv, stdout_path, stderr_path, timeout_ms, bs_abs(root, cwd), bs_clone_process_env(process_env))
+    var result = ctx.process_runner().run_capture_cwd_with_env(argv, stdout_path, stderr_path, timeout_ms, bs_abs(root, cwd), bs_case_process_env(root, output_dir, cwd, process_env))
     if result.rc == 0:
         let _remove_stdout = ctx.fs().remove_file(bs_join(output_dir, label ++ ".stdout"))
         let _remove_stderr = ctx.fs().remove_file(bs_join(output_dir, label ++ ".stderr"))
@@ -204,19 +219,7 @@ fn bs_run_cli_capture_input(ctx: &ActionCtx, compiler_path: &str, label: &str, a
     SelfhostRunResult { result.rc, move result.stdout, move result.stderr }
 
 fn bs_run_cli_capture_cwd(ctx: &ActionCtx, compiler_path: &str, label: &str, args: &Vec[str], timeout_ms: i32, cwd: &str) -> SelfhostRunResult:
-    let root = ctx.project_info().project_root()
-    let output_dir = ctx.output()
-    let stdout_path = bs_capture_path(root, output_dir, label, "stdout")
-    let stderr_path = bs_capture_path(root, output_dir, label, "stderr")
-    var argv: Vec[str] = Vec.new()
-    argv |> push(selfhost_owned_text(compiler_path))
-    for i in 0..args.len() as i32:
-        argv |> push(selfhost_owned_text(args[i]))
-    var result = ctx.process_runner().run_capture_cwd(argv, stdout_path, stderr_path, timeout_ms, bs_abs(root, cwd))
-    if result.rc == 0:
-        let _remove_stdout = ctx.fs().remove_file(bs_join(output_dir, label ++ ".stdout"))
-        let _remove_stderr = ctx.fs().remove_file(bs_join(output_dir, label ++ ".stderr"))
-    SelfhostRunResult { result.rc, move result.stdout, move result.stderr }
+    bs_run_cli_capture_cwd_with_env(ctx, compiler_path, label, args, timeout_ms, cwd, &process_env())
 
 fn bs_run_binary_capture_with_env(ctx: &ActionCtx, exe_path: &str, label: &str, timeout_ms: i32, process_env: &ProcessEnv) -> SelfhostRunResult:
     let root = ctx.project_info().project_root()
@@ -5961,6 +5964,21 @@ fn bs_check_build_w_comptime_with_entry(ctx: &ActionCtx, compiler_path: &str, ba
 fn bs_force_comptime_evaluator(ctx: &ActionCtx, case_dir: &str) -> i32:
     bs_write_fixture(ctx, bs_join(case_dir, "out/lib/cimport_stubs.o"), "", "foreign-generation out/lib marker")
 
+// A build of a case bs_force_comptime_evaluator prepared, in the evaluator:
+// the machine-wide runner store (#1899) holds a runner already built for a
+// graph like this one (the evaluator_seed case's is this tree's own), and a
+// built runner links nothing, so the marker alone does not keep the action
+// out of it. The case's runner store is its own and empty, and the driver
+// must say the actions evaluate at comptime.
+fn bs_build_w_in_evaluator(ctx: &ActionCtx, compiler_path: &str, case_dir: &str, label: &str, args: &Vec[str]) -> SelfhostRunResult:
+    let env = process_env().set("WITH_BUILD_RUNNER_DIR", bs_abs(ctx.project_info().project_root(), bs_join(case_dir, ".runners")))
+    let result = bs_run_cli_capture_cwd_with_env(ctx, compiler_path, label, args, 120000, case_dir, &env)
+    if result.rc != 0:
+        ctx.diagnostics().error(ctx.target_name() ++ ": build.w selfhost case '" ++ label ++ f"' failed with exit code {result.rc}")
+    else if bs_assert_contains(ctx, result.stderr, "actions evaluate in the driver's comptime evaluator", label ++ "_said_evaluator") != 0:
+        return SelfhostRunResult { 1, result.stdout.clone(), result.stderr.clone() }
+    result
+
 fn bs_check_build_w_comptime_evaluator(ctx: &ActionCtx, compiler_path: &str, base_dir: &str) -> i32:
     let fs = ctx.fs()
     let print_dir = bs_join(base_dir, "evaluator_print")
@@ -5988,7 +6006,7 @@ fn bs_check_build_w_comptime_evaluator(ctx: &ActionCtx, compiler_path: &str, bas
         "    ctx.new_build().add_target(report).default(\"report\")\n"
     rc = bs_build_w_write_fixture(ctx, bs_join(print_dir, "build.w"), print_build, ctx.target_name(), "evaluator print build.w")
     if rc != 0: return rc
-    let print_result = bs_build_w_expect_success(ctx, compiler_path, print_dir, "build-w-evaluator-print", bs_blob_to_args(bs_argv_append(bs_argv_append("", "build"), ":report")))
+    let print_result = bs_build_w_in_evaluator(ctx, compiler_path, print_dir, "build-w-evaluator-print", bs_blob_to_args(bs_argv_append(bs_argv_append("", "build"), ":report")))
     if print_result.rc != 0: return print_result.rc
     rc = bs_assert_not_contains(ctx, print_result.stderr, "runner compiled", "build_w_evaluator_print_ran_in_evaluator")
     if rc != 0: return rc
@@ -6028,7 +6046,7 @@ fn bs_check_build_w_comptime_evaluator(ctx: &ActionCtx, compiler_path: &str, bas
         return bs_fail(ctx, "could not link the pinned seed into " ++ seed_dir)
     rc = bs_force_comptime_evaluator(ctx, seed_dir)
     if rc != 0: return rc
-    let seed_result = bs_build_w_expect_success(ctx, compiler_path, seed_dir, "build-w-evaluator-seed", bs_blob_to_args(bs_argv_append(bs_argv_append(bs_argv_append("", "build"), ":seed"), "--no-deps")))
+    let seed_result = bs_build_w_in_evaluator(ctx, compiler_path, seed_dir, "build-w-evaluator-seed", bs_blob_to_args(bs_argv_append(bs_argv_append(bs_argv_append("", "build"), ":seed"), "--no-deps")))
     if seed_result.rc != 0: return seed_result.rc
     rc = bs_assert_not_contains(ctx, seed_result.stderr, "runner compiled", "build_w_evaluator_seed_ran_in_evaluator")
     if rc != 0: return rc

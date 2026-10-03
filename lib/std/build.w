@@ -906,15 +906,36 @@ fn ToolFs.project_relative_path(self: &Self, path: &str) -> str:
         return normalized.slice(prefix.len(), normalized.len())
     normalized
 
+// #1899: a path an action reads through ToolFs is an input of what it makes,
+// declared or not. The driver keys the action's cache record on it, so
+// neither this worktree's state nor the machine-wide build store calls the
+// action fresh once that path's bytes, kind or absence differ. A read inside
+// the action's own write scope is of what it wrote; build(ctx)'s reads (no
+// write scope, or the runner's graph reconstruction with writes suppressed)
+// are the graph's, not the action's. One file per path, named by its hash,
+// beside the effect log, so recording stays constant-time however many
+// reads an action makes. Evaluator twin: ComptimeEvaluator.record_read_effect.
+fn ToolFs.record_read(self: &Self, resolved: &str):
+    if not self.write_scoped or tool_fs_writes_suppressed(): return
+    let out_path = with_getenv_str("WITH_BUILD_EFFECTS_OUT")
+    if out_path.len() == 0 or self.write_file_allowed(self.project_relative_path(resolved)): return
+    let dir = out_path ++ ".reads"
+    let _mk = with_fs_mkdir_p(dir)
+    let _w = with_fs_write_file(dir ++ "/" ++ tool_sha256_text(resolved), resolved)
+
 pub fn ToolFs.exists(self: &Self, path: &str) -> bool:
-    with_fs_file_exists(self.resolve_path(path)) != 0
+    let resolved = self.resolve_path(path)
+    self.record_read(resolved)
+    with_fs_file_exists(resolved) != 0
 
 pub fn ToolFs.host_exists(self: &Self, path: &str) -> bool:
     tool_capability_require(self.token, "ToolFs")
+    self.record_read(path)
     with_fs_file_exists(path) != 0
 
 pub fn ToolFs.host_read_text(self: &Self, path: &str) -> str:
     tool_capability_require(self.token, "ToolFs")
+    self.record_read(path)
     with_fs_read_file(path)
 
 fn tool_sha256_text(data: &str) -> str:
@@ -929,10 +950,13 @@ pub fn ToolFs.sha256_file(self: &Self, path: &str) -> str:
 
 pub fn ToolFs.host_list_files(self: &Self, path: &str) -> Vec[str]:
     tool_capability_require(self.token, "ToolFs")
+    self.record_read(path)
     tool_split_nonempty_lines(with_fs_list_files(path))
 
 pub fn ToolFs.is_dir(self: &Self, path: &str) -> bool:
-    with_fs_is_dir(self.resolve_path(path)) != 0
+    let resolved = self.resolve_path(path)
+    self.record_read(resolved)
+    with_fs_is_dir(resolved) != 0
 
 // #921: the runner re-executes build(ctx) natively to reconstruct the
 // graph; the driver already ran build(ctx)'s side effects during graph
@@ -954,6 +978,7 @@ pub fn ToolFs.mkdir_all(self: &Self, path: &str) -> i32:
 /// `read_text_opt` (#953: "" used to mean all four at once).
 pub fn ToolFs.read_text(self: &Self, path: &str) -> str:
     let resolved = self.resolve_path(path)
+    self.record_read(resolved)
     var status: i32 = 0
     let text = with_fs_read_file_status(resolved, &raw mut status as *mut i32)
     if status != 0:
@@ -964,12 +989,15 @@ pub fn ToolFs.read_text(self: &Self, path: &str) -> str:
 
 /// The file's text, or None when it cannot be read (the optional-file probe).
 pub fn ToolFs.read_text_opt(self: &Self, path: &str) -> Option[str]:
+    let resolved = self.resolve_path(path)
+    self.record_read(resolved)
     var status: i32 = 0
-    let text = with_fs_read_file_status(self.resolve_path(path), &raw mut status as *mut i32)
+    let text = with_fs_read_file_status(resolved, &raw mut status as *mut i32)
     if status != 0: None else: Some(text)
 
 pub fn ToolFs.read_binary(self: &Self, path: &str) -> Vec[u8]:
     let resolved = self.resolve_path(path)
+    self.record_read(resolved)
     var status: i32 = 0
     let data = with_fs_read_file_status(resolved, &raw mut status as *mut i32)
     if status != 0:
@@ -983,6 +1011,7 @@ pub fn ToolFs.read_binary(self: &Self, path: &str) -> Vec[u8]:
 
 pub fn ToolFs.list_files(self: &Self, path: &str) -> Vec[str]:
     let resolved = self.resolve_path(path)
+    self.record_read(resolved)
     let raw_files = tool_split_nonempty_lines(with_fs_list_files(resolved))
     let files: Vec[str] = Vec.new()
     for i in 0..raw_files.len() as i32:
@@ -1320,6 +1349,7 @@ pub fn ToolFs.write_tar_gz(self: &Self, output_path: &str, entries: &Vec[Archive
             if entry.source_path.len() == 0: return 1
             tool_path_require_project_relative(entry.source_path)
             let input_path = self.resolve_path(entry.source_path)
+            self.record_read(input_path)
             let size = tool_archive_size(input_path)
             if size < 0: return 1
             var input = tool_archive_open(input_path, c"rb".ptr)
@@ -1573,6 +1603,7 @@ pub fn ToolFs.extract_tar(self: &Self, archive_path: &str, output_dir: &str) -> 
     if self.mkdir_all(output_dir) != 0:
         return tool_tar_extract_fail("could not create output directory: " ++ output_dir)
     let input_path = self.resolve_path(archive_path)
+    self.record_read(input_path)
     let archive_len = tool_archive_size(input_path)
     if archive_len < 0: return tool_tar_extract_fail("could not read archive size: " ++ archive_path)
     var input = tool_archive_open(input_path, c"rb".ptr)
@@ -1684,6 +1715,7 @@ pub fn ToolFs.copy_file(self: &Self, src: &str, dst: &str) -> i32:
     if tool_fs_writes_suppressed(): return 0
     self.require_write_file_allowed(dst)
     let source_path = self.resolve_path(src)
+    self.record_read(source_path)
     var status: i32 = 0
     let contents = with_fs_read_file_status(source_path, &raw mut status as *mut i32)
     if status != 0:
@@ -1723,7 +1755,9 @@ pub fn ToolFs.remove_tree(self: &Self, path: &str) -> i32:
 pub fn ToolFs.copy_tree(self: &Self, src: &str, dst: &str) -> i32:
     if tool_fs_writes_suppressed(): return 0
     self.require_write_file_allowed(dst)
-    with_fs_copy_tree(self.resolve_path(src), self.resolve_path(dst))
+    let source_path = self.resolve_path(src)
+    self.record_read(source_path)
+    with_fs_copy_tree(source_path, self.resolve_path(dst))
 
 pub fn ToolFs.symlink(self: &Self, target: &str, link_path: &str) -> i32:
     if tool_fs_writes_suppressed(): return 0

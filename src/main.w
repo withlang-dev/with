@@ -1805,6 +1805,9 @@ fn build_runner_effects_path(root: &str, target_name: &str) -> str:
     let _mk = with_fs_mkdir_p(dir)
     resolve_join(dir, "worker.effects")
 
+// The runner's effect records: the log's lines, and (#1899) one `read` record
+// per path the action read through ToolFs, each kept in its own file beside
+// the log (ToolFs.record_read).
 fn build_runner_read_effects(path: &str) -> Vec[str]:
     var out: Vec[str] = Vec.new()
     let text = with_fs_read_file(path)
@@ -1812,7 +1815,17 @@ fn build_runner_read_effects(path: &str) -> Vec[str]:
     for i in 0..lines.len() as i32:
         if lines[i].len() > 0:
             out.push(with_str_clone_ref(lines[i]))
+    let reads = build_graph_rt_list_files(path ++ ".reads").split("\n")
+    for i in 0..reads.len() as i32:
+        if reads[i].len() > 0:
+            out.push("read\t" ++ with_fs_read_file(reads[i]))
     out
+
+// A runner starts with no effect records: neither the log nor the reads of
+// the action's previous run.
+fn build_runner_reset_effects(path: &str):
+    let _rm = with_fs_remove_file(path)
+    let _rm_reads = with_fs_remove_tree(path ++ ".reads")
 
 fn build_runner_validate_outputs(root: &str, target: &BuildGraphTarget) -> i32:
     if target.output.len() > 0:
@@ -1833,7 +1846,7 @@ fn run_build_action_runner_process(runner_path: &str, target: &BuildGraphTarget,
     let old_effects = with_getenv_str("WITH_BUILD_EFFECTS_OUT")
     let _sn = with_setenv_str("WITH_BUILD_ACTION_NAME", target.name)
     let _se = with_setenv_str("WITH_BUILD_EFFECTS_OUT", effects_path)
-    let _rm = with_fs_remove_file(effects_path)
+    build_runner_reset_effects(effects_path)
     let rc = build_graph_rt_exec_argv(build_graph_argv_append("", runner_path))
     let _rn = with_setenv_str("WITH_BUILD_ACTION_NAME", old_name)
     let _re = with_setenv_str("WITH_BUILD_EFFECTS_OUT", old_effects)
@@ -1988,7 +2001,7 @@ fn build_pool_spawn_runner(runner_path: &str, target: &BuildGraphTarget, effects
     let old_effects = with_getenv_str("WITH_BUILD_EFFECTS_OUT")
     let _sn = with_setenv_str("WITH_BUILD_ACTION_NAME", target.name)
     let _se = with_setenv_str("WITH_BUILD_EFFECTS_OUT", effects_path)
-    let _rm = with_fs_remove_file(effects_path)
+    build_runner_reset_effects(effects_path)
     let pid = build_graph_rt_exec_argv_capture_spawn(build_graph_argv_append("", runner_path), stdout_path, stderr_path)
     let _rn = with_setenv_str("WITH_BUILD_ACTION_NAME", old_name)
     let _re = with_setenv_str("WITH_BUILD_EFFECTS_OUT", old_effects)
@@ -2381,12 +2394,15 @@ fn build_options_for_graph_target(root: &str, base: &BuildCommandOptions, target
         options.output_kind = BuildOutputKind.Binary
     options
 
+// WITH_BUILD_NO_EARLY_CUTOFF=1 restores "a dependency ran, so rebuild": no
+// content comparison then spares a target whose dependency ran, neither the
+// cutoff below nor a build store entry (#1899).
+fn build_graph_early_cutoff_enabled() -> bool: with_getenv_str("WITH_BUILD_NO_EARLY_CUTOFF").len() == 0
+
 // Whether dependency `dep_name`, which ran in this invocation, left its
 // declared outputs byte-identical to what they were when it was dispatched.
-// WITH_BUILD_NO_EARLY_CUTOFF=1 answers no, restoring "a dependency ran, so
-// rebuild".
 fn build_graph_dep_outputs_unchanged(root: &str, graph: &BuildGraph, dep_name: &str, names: &Vec[str], digests: &Vec[str]) -> bool:
-    if with_getenv_str("WITH_BUILD_NO_EARLY_CUTOFF").len() > 0: return false
+    if not build_graph_early_cutoff_enabled(): return false
     var before = ""
     for i in 0..names.len() as i32:
         if names[i] == dep_name: before = digests[i].clone()
@@ -2598,7 +2614,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                     continue
             // #1899: another worktree may have built this very target from
             // these very inputs; a restored target is a fresh one.
-            else if not force_action_worker_target and build_cache_store_restore(root, target):
+            else if not force_action_worker_target and (not dep_rebuilt or build_graph_early_cutoff_enabled()) and build_cache_store_restore(root, target):
                 skipped_targets.push(with_str_clone_ref(target.name))
                 completed_targets.push(with_str_clone_ref(target.name))
                 continue

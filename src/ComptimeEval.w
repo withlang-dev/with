@@ -2099,6 +2099,18 @@ impl ComptimeEvaluator:
         let value = with_getenv_str(name)
         self.record_effect("env\t" ++ comptime_effect_escape(target_name) ++ "\t" ++ comptime_effect_escape(name) ++ "\t" ++ comptime_sha256_text(value))
 
+    // #1899: a path an action reads through ToolFs is an input of what it
+    // makes, declared or not; the driver keys the action's cache record on it
+    // (build_cache_record). A read inside the action's own write scope is of
+    // what it wrote, and build(ctx)'s reads (no write scope, or a worker's
+    // graph reconstruction) are the graph's. The path is recorded unescaped:
+    // records reach the driver as a Vec, never as lines. Twin of
+    // ToolFs.record_read in lib/std/build.w.
+    mut fn record_read_effect(record: &ComptimeCapabilityRecord, resolved: &str):
+        if record.write_scoped == 0 or self.suppress_toolfs_writes != 0: return
+        if self.capability_write_file_allowed(record, self.capability_project_relative_path(record, resolved)): return
+        self.record_effect("read\t" ++ resolved)
+
 fn comptime_effect_join_argv_parts(parts: &Vec[str]) -> str:
     var out = ""
     for i in 0..parts.len() as i32:
@@ -5265,6 +5277,7 @@ impl ComptimeEvaluator:
                 let resolved_source = self.capability_resolve_project_path(record, entry.source_path, method, node)
                 if self.had_error != 0:
                     return 1
+                self.record_read_effect(record, resolved_source)
                 let name = comptime_tar_entry_name(entry.archive_path, false)
                 let contents = with_fs_read_file(resolved_source)
                 let header = comptime_tar_build_header(name, entry.mode, contents.len(), 0, "")
@@ -5393,6 +5406,7 @@ impl ComptimeEvaluator:
         let resolved_archive = self.capability_resolve_project_path(record, archive_path, method, node)
         if self.had_error != 0:
             return 1
+        self.record_read_effect(record, resolved_archive)
         if not self.capability_require_mkdir_allowed(record, output_dir, method, node):
             return 1
         let resolved_output_dir = self.capability_resolve_project_path(record, output_dir, method, node)
@@ -5629,6 +5643,7 @@ impl ComptimeEvaluator:
             let resolved_base = self.capability_resolve_project_path(record, glob_base, method, node)
             if self.had_error != 0:
                 return comptime_control_error()
+            self.record_read_effect(record, resolved_base)
             let raw_files = comptime_tool_split_nonempty_lines(with_fs_list_files(resolved_base))
             let pat_segs = comptime_glob_split_by_slash(glob_suffix)
             let results: Vec[str] = Vec.new()
@@ -5662,6 +5677,8 @@ impl ComptimeEvaluator:
             let resolved = self.capability_resolve_project_path(record, path, method, node)
             if self.had_error != 0:
                 return comptime_control_error()
+            if not comptime_toolfs_method_is_mutating(method):
+                self.record_read_effect(record, resolved)
             if method == "exists":
                 return comptime_control_value(comptime_value_bool(if with_fs_file_exists(resolved) != 0: 1 else: 0))
             if method == "is_dir":
@@ -5729,6 +5746,7 @@ impl ComptimeEvaluator:
             let path = self.capability_arg_str(args_signal.value, 0, method, node)
             if self.had_error != 0:
                 return comptime_control_error()
+            self.record_read_effect(record, path)
             if method == "host_read_text":
                 return comptime_control_value(comptime_value_str(with_fs_read_file(path)))
             return comptime_control_value(comptime_value_bool(if with_fs_file_exists(path) != 0: 1 else: 0))
@@ -5741,6 +5759,7 @@ impl ComptimeEvaluator:
             let path = self.capability_arg_str(args_signal.value, 0, method, node)
             if self.had_error != 0:
                 return comptime_control_error()
+            self.record_read_effect(record, path)
             let raw_files = comptime_tool_split_nonempty_lines(with_fs_list_files(path))
             let vec_type = self.node_type_or(node, 0)
             if vec_type == 0:
@@ -5781,6 +5800,7 @@ impl ComptimeEvaluator:
                     return comptime_control_error()
                 if not self.capability_require_write_file_allowed(record, dst, method, node):
                     return comptime_control_error()
+                self.record_read_effect(record, resolved_src)
                 var status: i32 = 0
                 let contents = with_fs_read_file_status(resolved_src, &raw mut status as *mut i32)
                 if status != 0:
@@ -5831,6 +5851,7 @@ impl ComptimeEvaluator:
                 let resolved_dst = self.capability_resolve_project_path(record, dst, method, node)
                 if self.had_error != 0:
                     return comptime_control_error()
+                self.record_read_effect(record, resolved_src)
                 return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), with_fs_copy_tree(resolved_src, resolved_dst) as i64))
             if method == "symlink":
                 let target = self.capability_arg_str(args_signal.value, 0, method, node)
