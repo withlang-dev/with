@@ -6142,7 +6142,9 @@ impl MirBuilder:
             current_ty = step_ty
         place
 
-    mut fn lower_index(base_expr: i32, index_expr: i32) -> i32:
+    mut fn lower_index(node: i32) -> i32:
+        let base_expr = self.ast.get_data0(node)
+        let index_expr = self.ast.get_data1(node)
         var base = self.lower_expr_place(base_expr)
         // Indexing through `&Vec[T]` / `&mut Vec[T]` should index the container,
         // not treat the reference itself like a raw pointer. A D27 index has
@@ -6169,7 +6171,9 @@ impl MirBuilder:
         let idx_local = self.new_temp(idx_ty)
         let idx_place = self.place_for_local(idx_local)
         self.assign_operand_to_place(idx_place, idx_op, self.ast.get_start(index_expr))
-        self.body.new_index_place(base, idx_local, elem_ty)
+        let place = self.body.new_index_place(base, idx_local, elem_ty)
+        self.body.note_index_place(node, place, base)
+        place
 
     mut fn lower_call_place(node: i32) -> i32:
         // D27 E2: `xs.get(i)` is no longer a place-former — it observes,
@@ -6211,7 +6215,9 @@ impl MirBuilder:
             if self.sema.autoderef_step_counts.contains(base_expr):
                 let autoderef_place = self.lower_recorded_autoderef_place(base_expr)
                 let field_ty = self.expr_type(node)
-                return self.new_projected_field_place(autoderef_place, field_sym, field_ty)
+                let alias_field = self.new_projected_field_place(autoderef_place, field_sym, field_ty)
+                self.body.note_field_place(node, alias_field, autoderef_place)
+                return alias_field
             var base_place = self.lower_binding_alias_place(base_expr)
             // #747: a field of a NAMED local (the method receiver included) is
             // a pure place projection — "a binding names what's there" (D27).
@@ -6241,7 +6247,9 @@ impl MirBuilder:
                 field_base = self.new_deref_place(field_base)
                 base_ty = self.sema.get_type_d0(resolved)
             let field_ty = self.expr_type(node)
-            return self.new_projected_field_place(field_base, field_sym, field_ty)
+            let alias_field = self.new_projected_field_place(field_base, field_sym, field_ty)
+            self.body.note_field_place(node, alias_field, field_base)
+            return alias_field
         -1
 
     mut fn lower_vec_literal_push(vec_place: i32, elem_node: i32, elem_ty: i32):
@@ -6961,7 +6969,7 @@ impl MirBuilder:
                 return p
             if self.is_runtime_pair_multi_index(node) != 0:
                 return self.lower_multi_index_read(node)
-            return self.lower_index(self.ast.get_data0(node), self.ast.get_data1(node))
+            return self.lower_index(node)
 
         if kind == NodeKind.NK_MULTI_INDEX:
             return self.lower_multi_index_read(node)
@@ -7038,9 +7046,9 @@ impl MirBuilder:
                     if self.place_type_is_str(alias_place) != 0:
                         self.mark_string_place_copied(alias_place)
                     self.bind_alias_place(name_sym, alias_place, bind_ty)
-                    self.body.note_let_binding(node, 1)
+                    self.body.note_let_binding(node, alias_place)
                     return
-        self.body.note_let_binding(node, 0)
+        self.body.note_let_binding(node, -1)
         let local_id = self.body.new_local(bind_ty, mutable, name_sym, 1)
 
         // d1 = 0 for normal storage, bind_ty for zero-init (no initializer)
@@ -16543,7 +16551,7 @@ impl MirBuilder:
                     self.terminate(TermKind.TK_CALL, ip_rd_fn_op, ip_rd_args_id, ip_rd_place, ip_rd_next)
                     self.switch_to(ip_rd_next)
                     return self.body.new_operand(OperandKind.OK_COPY, ip_rd_place)
-            let place = self.lower_index(self.ast.get_data0(node), self.ast.get_data1(node))
+            let place = self.lower_index(node)
             let idx_exact_ty = self.expr_type(node)
             if idx_exact_ty != 0 and self.sema.get_type_kind(self.sema.resolve_alias(idx_exact_ty as TypeId)) == TypeKind.TY_REF:
                 let idx_ref_rv = self.body.new_rvalue(RvalueKind.RK_REF, BorrowKind.SHARED, place, 0)

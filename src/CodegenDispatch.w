@@ -1128,6 +1128,37 @@ impl Codegen:
 
         -1
 
+    // D65 (#1647): a field projection's index is the position of the field
+    // in the declaration Sema resolved the owner to — never a lookup of the
+    // name in whichever LLVM struct the owner's representation happens to
+    // be. -1 when the owner has no Sema struct declaration to read (a tuple
+    // element, a variant payload, a compiler-laid-out record): those
+    // indices are positional already.
+    fn mir_sema_field_index(source_type: i32, field_token: i32) -> i32:
+        var owner = if source_type > 0: self.sema.resolve_alias(source_type as TypeId) as i32 else: 0
+        for _ in 0..8:
+            let kind = self.sema.get_type_kind(owner as TypeId)
+            if kind != TypeKind.TY_REF and kind != TypeKind.TY_PTR: break
+            owner = self.sema.resolve_alias(self.sema.get_type_d0(owner as TypeId)) as i32
+        if owner <= 0: return -1
+        let count = self.sema.type_reflection_field_count(owner)
+        if count <= 0: return -1
+        var text = with_str_clone_ref(self.intern.resolve(field_token))
+        if text.len() == 0: text = self.sema_symbol_text(field_token)
+        for fi in 0..count:
+            if self.sema.pool_resolve_symbol(self.sema.type_reflection_field_name(owner, fi)) == text:
+                return fi
+        -1
+
+    // The index a field projection GEPs: Sema's declaration index when the
+    // owner has a Sema struct declaration; the LLVM registry's lookup by
+    // name is then the verification. Positional owners keep the registry.
+    mut fn mir_field_index_decided(agg_ty: i64, field_token: i32, source_type: i32, active_variant: i32, fn_sym: i32, subject: i32) -> i32:
+        let sema_fi = if active_variant < 0: self.mir_sema_field_index(source_type, field_token) else: -1
+        if sema_fi < 0: return self.mir_resolve_field_index(agg_ty, field_token, source_type)
+        let derived = if self.analysis_enabled != 0: self.mir_resolve_field_index(agg_ty, field_token, source_type) else: sema_fi
+        self.fact_decide(MODE_SITE_FIELD_INDEX, sema_fi as i64, derived as i64, fn_sym, subject) as i32
+
     // `src as tgt` where src is a transparent std Box and tgt is a raw
     // pointer to its payload type: the box value itself (#1280).
     fn mir_cast_is_box_payload_pointer(src_sema_ty: i32, tgt_sema_ty: i32) -> bool:
@@ -1246,7 +1277,7 @@ impl Codegen:
                 // (LLVMGetTypeKind(null) segfaulted the #1280 audit).
                 if cur_ty == 0:
                     return 0
-                let fi = self.mir_resolve_field_index(cur_ty, pd, variant_owner_sema_ty)
+                let fi = self.mir_field_index_decided(cur_ty, pd, variant_owner_sema_ty, active_variant_idx, body.fn_sym, place_id)
                 if fi < 0:
                     return 0
                 let union_idx = self.find_struct_index_by_type(cur_ty)
@@ -1444,7 +1475,7 @@ impl Codegen:
                         cur_ty = payload_ty
                         active_variant_idx = -1
                         continue
-                let fi = self.mir_resolve_field_index(cur_ty, pd, variant_owner_sema_ty)
+                let fi = self.mir_field_index_decided(cur_ty, pd, variant_owner_sema_ty, active_variant_idx, body.fn_sym, place_id)
                 if fi < 0:
                     return 0
                 let union_idx = self.find_struct_index_by_type(cur_ty)
@@ -3986,7 +4017,7 @@ impl Codegen:
                         if (agg_start + i) < body.agg_field_name_syms.len() as i32:
                             let name_sym = body.agg_field_name_syms[(agg_start + i)]
                             if name_sym != 0:
-                                let resolved_fi = self.mir_resolve_field_index(struct_ty, name_sym, dest_sema_ty)
+                                let resolved_fi = self.mir_field_index_decided(struct_ty, name_sym, dest_sema_ty, -1, body.fn_sym, i)
                                 if resolved_fi >= 0:
                                     fi = resolved_fi
                         let bp_info = self.get_bitpacked_field_info(struct_ty, fi)
@@ -4022,7 +4053,7 @@ impl Codegen:
                     if (agg_start + i) < body.agg_field_name_syms.len() as i32:
                         let name_sym = body.agg_field_name_syms[(agg_start + i)]
                         if name_sym != 0:
-                            let resolved_fi = self.mir_resolve_field_index(struct_ty, name_sym, dest_sema_ty)
+                            let resolved_fi = self.mir_field_index_decided(struct_ty, name_sym, dest_sema_ty, -1, body.fn_sym, i)
                             if resolved_fi >= 0:
                                 fi = resolved_fi
                     let union_idx = self.find_struct_index_by_type(struct_ty)

@@ -561,6 +561,14 @@ pub type MirBody {
     // name aliases a place, 0 when it owns a local.
     let_binding_nodes: Vec[i32],
     let_binding_aliases: Vec[i32],
+    // ... the place an aliasing `let` names (-1 for an owning local), whose
+    // root audit:resolution joins to Sema's view origins for the value.
+    let_binding_places: Vec[i32],
+    // ... and each place lowered from a source index expression, with the
+    // base place it indexes.
+    index_place_nodes: Vec[i32],
+    index_place_places: Vec[i32],
+    index_place_bases: Vec[i32],
 
     // Stage 4 (spec §2.5.2): locals that are ever moved — and therefore
     // reset-on-move (§2.5.1) — recorded at the single pending_reset_locals.push
@@ -816,6 +824,10 @@ fn MirBody.init_for_fn(fn_sym: i32) -> MirBody:
         field_place_bases: Vec.new(),
         let_binding_nodes: Vec.new(),
         let_binding_aliases: Vec.new(),
+        let_binding_places: Vec.new(),
+        index_place_nodes: Vec.new(),
+        index_place_places: Vec.new(),
+        index_place_bases: Vec.new(),
         ever_moved_locals: Vec.new(),
     }
 
@@ -1099,10 +1111,17 @@ impl MirBody:
     mut fn note_elided_call_node(node: i32):
         if node > 0: self.elided_call_nodes.push(node)
 
-    mut fn note_let_binding(node: i32, alias: i32):
+    mut fn note_let_binding(node: i32, alias_place: i32):
         if node <= 0: return
         self.let_binding_nodes.push(node)
-        self.let_binding_aliases.push(alias)
+        self.let_binding_aliases.push(if alias_place >= 0: 1 else: 0)
+        self.let_binding_places.push(alias_place)
+
+    mut fn note_index_place(node: i32, place: i32, base: i32):
+        if node <= 0: return
+        self.index_place_nodes.push(node)
+        self.index_place_places.push(place)
+        self.index_place_bases.push(base)
 
     mut fn note_field_place(node: i32, place: i32, base: i32):
         if node <= 0: return
@@ -4113,6 +4132,29 @@ pub fn mir_let_binding_verdict(mir_alias: bool, sema_place_view: bool) -> str:
         return "MIR binds the name as an alias of a place; Sema bound it as an owner"
     if sema_place_view and not mir_alias:
         return "Sema bound the name as a view of a place; MIR gives it an owning local"
+    ""
+
+// #1647 (D65): a place lowered from a source index expression against
+// Sema's facts for the node. Types arrive alias-resolved: `sema_ty` is
+// Sema's type of the node and `sema_view_target` its referent when Sema
+// typed the element read as a view (D27: `xs[i]` denotes the element
+// place, typed `&T` where a view is demanded); bases with references and
+// raw pointers peeled. "" when they agree.
+pub fn mir_index_place_verdict(proj_kind: i32, mir_ty: i32, sema_ty: i32, sema_view_target: i32, mir_base: i32, sema_base: i32) -> str:
+    if proj_kind != ProjKind.PK_INDEX:
+        return f"index expression lowered to a place whose last projection is not an index (kind {proj_kind})"
+    if sema_ty > 0 and mir_ty > 0 and mir_ty != sema_ty and mir_ty != sema_view_target:
+        return f"element place type (ty {mir_ty}) disagrees with Sema's type for the node (ty {sema_ty})"
+    if sema_base > 0 and mir_base > 0 and sema_base != mir_base:
+        return f"indexed base is ty {mir_base} in MIR, ty {sema_base} in Sema"
+    ""
+
+// #1647 (D65): the place an aliasing `let` names against Sema's view
+// origins for its value — the bindings Sema recorded the view depends on.
+// `root_name_in_origins`: the alias place's root local is one of them.
+pub fn mir_view_origin_verdict(sema_has_origins: bool, root_named: bool, root_name_in_origins: bool) -> str:
+    if sema_has_origins and root_named and not root_name_in_origins:
+        return "MIR aliases a place rooted at a binding Sema did not record as the view's origin"
     ""
 
 pub fn mir_resolution_check_call(mir_mod: &MirModule, body: &MirBody, bb: i32, answer: &CalleeResolution) -> str:
