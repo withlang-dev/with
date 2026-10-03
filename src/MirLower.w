@@ -14231,7 +14231,10 @@ impl MirBuilder:
         // On this path nothing moved out, so the subject — an Err payload, or
         // nothing — is dropped here, once; then its cleanup is retired before
         // lowering a default that may itself return from the function.
-        if mir_place_plain_local(&self.body, value_place) >= 0:
+        // A Copy subject has nothing to drop: a drop of it made it owned
+        // storage to the ownership validator, which then found it Init at
+        // return on the success path when this default diverges.
+        if mir_place_plain_local(&self.body, value_place) >= 0 and self.sema.type_needs_drop_frozen(value_ty) != 0:
             self.emit_drop_stmt(value_place, "coalesce-default", self.ast.get_start(expr))
         let dq_scrut_local = self.retire_decomposed_carrier(value_place)
         // #772: a lazy-arm frame + divergence guard, exactly like lower_if's
