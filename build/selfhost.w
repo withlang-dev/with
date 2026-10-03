@@ -4654,6 +4654,42 @@ fn bs_check_migrate_void_omits_unit(ctx: &ActionCtx, compiler_path: &str, case_d
     let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-void-omits-unit", check_args)
     check.rc
 
+// #2060: `--c-target`/`--c-sysroot` name the C model: the parse reads that
+// sysroot's headers and nothing of the host (the host's <string.h> defines
+// no MODEL_MARK, so the migration succeeds only against the model), and a
+// record the model's headers name only through a type — glibc's
+// `struct __locale_data *` — is the model's, never a declaration of the
+// migration.
+fn bs_check_migrate_c_model(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "c_model.c")
+    let out_w = bs_join(case_dir, "c_model.w")
+    let sysroot = bs_join(case_dir, "model")
+    var rc = bs_write_fixture(ctx, bs_join(sysroot, "usr/include/string.h"), "#define MODEL_MARK 7\n", "the model's string.h")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(sysroot, "usr/include/stdio.h"), "struct model_box { struct model_hidden *inner; int n; };\n", "the model's stdio.h")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, src, "int model_mark(void) { return MODEL_MARK; }\n", "a unit that reads the model's macro")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--c-target")
+    args |> push("arm64-apple-macosx")
+    args |> push("--c-sysroot")
+    args |> push(bs_abs(root, sysroot))
+    args |> push("--no-c-export")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-c-model", args)
+    if result.rc != 0: return result.rc
+    let out_text = ctx.fs().read_text(out_w)
+    rc = bs_assert_contains(ctx, out_text, "fn model_mark() -> c_int", "c_model")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "7", "c_model")
+    if rc != 0: return rc
+    bs_assert_not_contains(ctx, out_text, "model_hidden", "c_model")
+
 // #1838: an omitted return type is legal only when the rendered body's tail
 // infers Unit (D43). C's `(void)p` says "p is unused": a discarded pure read
 // is no statement, so it never becomes the tail that a fn-pointer return
@@ -5013,6 +5049,8 @@ pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     rc = bs_check_migrate_variadic_stdarg(ctx, compiler_path, bs_join(output_dir, "variadic_stdarg"))
     if rc != 0: return rc
     rc = bs_check_migrate_void_omits_unit(ctx, compiler_path, bs_join(output_dir, "void_omits_unit"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_c_model(ctx, compiler_path, bs_join(output_dir, "c_model"))
     if rc != 0: return rc
     rc = bs_check_migrate_void_tail_is_unit(ctx, compiler_path, bs_join(output_dir, "void_tail_is_unit"))
     if rc != 0: return rc
