@@ -892,9 +892,9 @@ jobs:
       # The seed.lock pin (#1915): a self-contained compiler that embeds its
       # runtime, sysroot and lld, so it needs no runtime bundle, linker shim
       # or host libxml2.
-      WITH_SEED_VERSION: v0.15.2.0
+      WITH_SEED_VERSION: nightly-20261003-local-2-b78ceca2d3c5
       WITH_SEED_ASSET: with-linux-aarch64
-      WITH_SEED_SHA256: 3e54f7839dbf9549233a19753c897fb08f493fa8cfafeeec25b62fa87a43aac3
+      WITH_SEED_SHA256: c5b434ce739a0ef2a8beddf09abd30f1f501aa2b9227b07a0b16bdf65f8f2898
       WITH_SDK_REPO: withlang-dev/with
       WITH_SDK_VERSION: nightly-sdk-20260930-e997223d40ce
       WITH_SDK_ASSET: with-llvm-sdk-22.1.6-linux-aarch64.tar.gz
