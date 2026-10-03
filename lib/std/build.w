@@ -2466,8 +2466,9 @@ fn build_timeout_or(timeout: i32, fallback: i32) -> i32:
         return timeout
     fallback
 
-// The twin of build/https_fetch.w: a fetch retries with a growing pause, so
-// one dropped connection does not fail a lane. Keep the two identical.
+// The twin of build/https_fetch.w's download: a fetch retries with a growing
+// pause, so one dropped connection does not fail a lane. Keep the two
+// downloads identical (that program also has a --probe mode, #2062).
 fn build_https_fetch_source() -> str:
     "use std.http\n" ++
     "use std.process\n" ++
