@@ -1765,27 +1765,30 @@ impl AstPool:
     // a parameter or local binding of a field's name and a bare name that
     // also names a global or a module-level function are its shadowing
     // errors (receiver_field_owner, receiver_field_access_owner). A
-    // c_import's declarations — the header's types and the methods a
-    // `c facade` renders onto them — are the compiler's code, not a module
+    // c_import's declarations and the types and methods a `c facade`
+    // renders (`generated_files`) are the compiler's text, not a module
     // anyone wrote: their C parameter names stand.
-    mut fn resolve_receiver_field_names(intern: InternPool, decl_is_c_import: &Vec[i32]):
+    mut fn resolve_receiver_field_names(intern: InternPool, decl_is_c_import: &Vec[i32], generated_files: &Vec[i32]):
         if self.state.frozen != 0:
             ast_pool_phase_bug("BUG: receiver field-name resolution ran after AstPool.freeze")
         let self_sym = intern.intern("self")
+        let generated: HashMap[i32, i32] = HashMap.new()
+        for gi in 0..generated_files.len() as i32:
+            generated.insert(generated_files[gi], 1)
         let struct_decls: HashMap[i64, i32] = HashMap.new()
         let decl_nodes: HashMap[i32, i32] = HashMap.new()
         for di in 0..self.decl_count():
             let decl = self.get_decl(di)
             decl_nodes.insert(decl as i32, 1)
-            let from_c = di < decl_is_c_import.len() as i32 and decl_is_c_import[di] != 0
+            let from_c = (di < decl_is_c_import.len() as i32 and decl_is_c_import[di] != 0) or generated.contains(self.file(decl) as i32)
             if self.kind(decl) == NodeKind.NK_TYPE_DECL and not from_c:
                 let sub = type_decl_sub_kind(self.get_data2(decl))
                 if sub == TypeDeclKind.Struct or sub == TypeDeclKind.Union:
                     struct_decls.insert(ast_pair_key(self.file(decl) as i32, self.get_data0(decl)), decl as i32)
         for di in 0..self.decl_count():
-            if di < decl_is_c_import.len() as i32 and decl_is_c_import[di] != 0:
-                continue
             let fn_node = self.get_decl(di)
+            if (di < decl_is_c_import.len() as i32 and decl_is_c_import[di] != 0) or generated.contains(self.file(fn_node) as i32):
+                continue
             let owner = self.own_module_receiver_type(fn_node, self_sym, intern, &struct_decls)
             if owner != 0:
                 self.resolve_method_receiver_field_names(fn_node, owner, self_sym, &decl_nodes)

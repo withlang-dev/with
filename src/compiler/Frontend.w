@@ -2066,7 +2066,14 @@ impl Zcu:
 
         // §9.5: a bare receiver field name in its type's own module's methods,
         // on the final pool (the comptime transform may replace it).
-        pool.resolve_receiver_field_names(self.pool, &self.decl_is_c_import)
+        // A c_import's translation and a rendered `c facade` are the
+        // compiler's own text: the rule is for modules people write.
+        let generated_files: Vec[i32] = Vec.new()
+        for si in 0..self.source_text_names.len() as i32:
+            let text_name = self.source_text_names[si]
+            if text_name.starts_with("<c_import ") or text_name.starts_with("<facade ") or text_name.starts_with("<toolchain facade "):
+                generated_files.push(self.source_text_file_ids[si])
+        pool.resolve_receiver_field_names(self.pool, &self.decl_is_c_import, &generated_files)
 
         // The comptime transform may replace the AstPool and remap every node. Cache
         // only the final pool: MIR preparation must never re-enter Sema with the
