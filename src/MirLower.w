@@ -435,9 +435,17 @@ impl MirBuilder:
     // fn that may suspend (Sema's settled fact). The callee is the one Sema
     // resolved the call to (its contract's symbol: an overload's own, a
     // generic's specialization), else the function constant.
+    // #1985 (§14.3): a call through a callable value or a `dyn` method, or
+    // one that hands a callable over, may too: Sema's settled call-site fact
+    // for the call's AST node.
     fn call_may_cancel_return(callee_op: i32, call_id: i32) -> bool:
         let intrinsic = self.body.call_intrinsic(call_id)
-        if intrinsic != MirIntrinsic.NONE and intrinsic != MirIntrinsic.GENERIC_CALL:
+        if intrinsic != MirIntrinsic.NONE and intrinsic != MirIntrinsic.GENERIC_CALL and intrinsic != MirIntrinsic.DYN_CALL:
+            return false
+        let ast_node = self.body.call_ast_node(call_id)
+        if ast_node > 0 and self.sema.call_site_may_suspend(ast_node):
+            return true
+        if intrinsic == MirIntrinsic.DYN_CALL:
             return false
         let constant = mir_body_extract_callee_sym(&self.body, callee_op)
         if constant == 0:
@@ -4797,7 +4805,7 @@ impl MirBuilder:
         if aggregate_place < 0 or fields_id < 0 or fields_id >= self.body.agg_field_starts.len():
             return
         let start: i32 = self.body.agg_field_starts[fields_id]
-        let count = self.body.agg_field_counts[fields_id]
+        let count: i32 = self.body.agg_field_counts[fields_id]
         for i in 0..count:
             let field_sym: i32 = self.body.agg_field_name_syms[(start + i)]
             if field_sym == 0:
