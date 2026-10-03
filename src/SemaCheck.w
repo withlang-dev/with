@@ -4101,6 +4101,12 @@ impl Sema:
                 if at_tid != 0:
                     self.assoc_type_bindings.insert(at_name, at_tid as i32)
 
+        // §9.5: the receiver's fields are in scope by bare name here.
+        let saved_receiver_field_owner: i32 = self.receiver_field_owner
+        let saved_receiver_field_shadowed = move self.receiver_field_shadowed
+        self.receiver_field_owner = self.ast.receiver_field_owner(node)
+        self.receiver_field_shadowed = sema_new_map_i32_i32()
+
         // Add parameters to scope
         let meta = self.ast.find_fn_meta(node)
         let has_ret_annotation = meta >= 0 and self.ast.fn_meta_ret(meta) != 0
@@ -4574,6 +4580,8 @@ impl Sema:
         self.local_file_id = saved_body_file_id
         self.current_module_path = saved_body_module_path
         self.current_module_has_ci = saved_body_module_has_ci
+        self.receiver_field_owner = saved_receiver_field_owner
+        self.receiver_field_shadowed = saved_receiver_field_shadowed
 
     // A declaration's own body is no specialization's: facts recorded per
     // instance key it by 0 even when its check runs inside an instance's.
@@ -4719,6 +4727,10 @@ impl Sema:
             if at_tid != 0:
                 self.assoc_type_bindings.insert(at_name, at_tid as i32)
 
+        // A trait's default body is the trait's code: no receiver field is
+        // in scope by its bare name there (§9.5).
+        let saved_receiver_field_owner: i32 = self.receiver_field_owner
+        self.receiver_field_owner = 0
         self.push_scope()
         let param_start: i32 = self.trait_method_param_starts[method_idx]
         let param_count = self.trait_method_param_counts[method_idx]
@@ -4757,6 +4769,7 @@ impl Sema:
         self.has_expected_type = saved_has_expected
         self.current_value_expr_root = saved_value_root
         self.current_statement_expr_root = saved_stmt_root
+        self.receiver_field_owner = saved_receiver_field_owner
 
     mut fn check_trait_default_method_bodies():
         for di in 0..self.ast.decl_count():
@@ -9696,6 +9709,8 @@ impl Sema:
             return self.ty_never
 
         if kind == NodeKind.NK_FIELD_ACCESS:
+            if not self.check_receiver_field_name(node):
+                return 0 as TypeId
             // D70: a namespace access becomes the declaration's ident.
             let ns = self.rewrite_namespace_access(node, false)
             if ns < 0:
@@ -10449,6 +10464,69 @@ impl Sema:
 
 // ── Expression checking helpers ──────────────────────────────────
 impl Sema:
+    // §9.5 (#1930): `node` reaches a receiver field by its bare name
+    // (AstPool.resolve_receiver_field_names) when the access is one; the
+    // name may then mean nothing else here. A binding of it was refused
+    // already (refuse_receiver_field_shadow); a global, a module-level
+    // function — the prelude's are std.builtins' — a type, a variant or an
+    // import namespace of the name makes the bare name a shadowing error.
+    mut fn check_receiver_field_name(node: i32) -> bool:
+        let owner = self.ast.receiver_field_access_owner(node)
+        if owner == 0:
+            return true
+        let sym = self.ast.get_data1(node)
+        if self.receiver_field_shadowed.contains(sym):
+            return false
+        let other = self.receiver_field_name_other_meaning(sym)
+        if other.len() == 0:
+            return true
+        let name: str = with_str_clone_ref(self.pool_resolve(sym))
+        let owner_name: str = with_str_clone_ref(self.pool_resolve(self.ast.get_data0(owner)))
+        self.emit_error_with_help(f"shadowing is not allowed for '{name}': it names a field of the receiver `{owner_name}` and {other} (§9.5)", node, f"write `self.{name}` for the field, or the other declaration's qualified name")
+        false
+
+    // What else a bare `sym` names from the current module, "" for nothing.
+    fn receiver_field_name_other_meaning(sym: i32) -> str:
+        let name: str = with_str_clone_ref(self.pool_resolve(sym))
+        if self.scope_lookup(sym) >= 0 and not self.scope_binding_is_local(sym):
+            let binding_decl = self.binding_decl_node(sym)
+            let hidden = if binding_decl != 0: self.decl_node_visible_from_current(binding_decl) == 0 and self.has_extern_var_decl(sym) == 0
+                else: self.global_value_decl_kind(sym) != 0 and self.has_extern_var_decl(sym) == 0 and self.symbol_visible_from_current(sym) == 0
+            if not hidden:
+                return f"the global `{name}`"
+        if (self.get_visible_sig(sym) >= 0 or self.generic_fn_node_for_symbol(sym) != 0) and self.is_ci_visible(sym) != 0 and self.symbol_visible_from_current(sym) != 0:
+            return f"the function `{name}`"
+        var di = if self.displaced_fn_index.contains(sym): self.displaced_fn_index.get(sym).unwrap() else: -1
+        while di >= 0:
+            let path = self.displaced_fn_paths[di]
+            if path == self.current_module_path or self.module_is_visible_from_current(path) != 0:
+                return f"the function `{name}`"
+            di = self.displaced_fn_prev[di]
+        if self.primitive_type_by_sym(sym) != 0 or (self.lookup_named_type_visible(sym) != 0 and self.is_ci_visible(sym) != 0):
+            return f"the type `{name}`"
+        if self.variant_lookup.contains(sym) and self.is_ci_visible(sym) != 0:
+            return f"the variant `{name}`"
+        let cur = self.module_index_by_path.get(with_str_clone_ref(self.current_module_path)) ?? -1
+        for ni in 0..self.ns_names.len() as i32:
+            if self.ns_modules[ni] == cur and self.ns_names[ni] == name:
+                return f"the import namespace `{name}`"
+        ""
+
+    // §9.5: a method declared outside its type's module reaches the
+    // receiver's fields only through `self.`; "" when `sym` is no field of
+    // the receiver in scope.
+    fn bare_receiver_field_help(sym: i32) -> str:
+        let self_sym = self.pool_lookup_symbol("self")
+        if self_sym == 0 or self.scope_lookup(self_sym) < 0 or not self.scope_binding_is_local(self_sym):
+            return ""
+        var recv = self.resolve_alias(self.scope_lookup(self_sym) as TypeId)
+        if self.get_type_kind(recv) == TypeKind.TY_REF:
+            recv = self.resolve_alias(self.get_type_d0(recv) as TypeId)
+        if self.struct_field_type_frozen(recv as i32, sym) == 0:
+            return ""
+        let name: str = with_str_clone_ref(self.pool_resolve(sym))
+        f"`{name}` is a field of the receiver; a method declared outside its type's module reaches it only as `self.{name}` (§9.5)"
+
     mut fn check_ident(ident_sym: i32, node: i32) -> i32:
         // D70 / #1757: `ns.T` names the import's type by identity, whatever
         // the short name resolves to here.
@@ -10667,6 +10745,10 @@ impl Sema:
             // A bare uppercase-initial identifier in a pattern is a unit
             // variant or a constant (§9.7); `fn f(N: i32)` meant a binding.
             self.emit_error("'" ++ target_name ++ "' is neither a variant of the subject type nor a known constant; a binding starts with a lowercase letter, a unit variant is spelled ." ++ target_name ++ " (§9.7)", node)
+            return 0
+        let field_help = self.bare_receiver_field_help(sym)
+        if field_help.len() > 0:
+            self.emit_error_with_help("undefined variable", node, field_help)
             return 0
         let suggestion = self.suggest_name(target_name, node)
         self.emit_error_with_suggestion("undefined variable", node, suggestion)

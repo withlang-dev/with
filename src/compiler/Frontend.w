@@ -2064,6 +2064,10 @@ impl Zcu:
             if comptime_ns > 100000:
                 runtime_eprint(f"[profile] frontend.comptime  {comptime_ns / 1000000}.{(comptime_ns % 1000000) / 1000} ms")
 
+        // §9.5: a bare receiver field name in its type's own module's methods,
+        // on the final pool (the comptime transform may replace it).
+        pool.resolve_receiver_field_names(self.pool)
+
         // The comptime transform may replace the AstPool and remap every node. Cache
         // only the final pool: MIR preparation must never re-enter Sema with the
         // pre-transform pool against post-transform semantic/intern state.
