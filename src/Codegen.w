@@ -1390,9 +1390,9 @@ impl Codegen:
         let cached = self.di_files.get(file_id)
         if cached.is_some():
             return cached.unwrap()
-        let di_file = self.debug_create_file(self.debug_source_path(file_id))
-        self.di_files.insert(file_id, di_file)
-        di_file
+        let file_scope = self.debug_create_file(self.debug_source_path(file_id))
+        self.di_files.insert(file_id, file_scope)
+        file_scope
 
     // Line (1-based) and column (1-based) of a byte offset in the current
     // function's own file.
@@ -1738,14 +1738,14 @@ impl Codegen:
     // and must keep the module alive through generation. Removes the per-cg
     // deep copy of all MIR bodies, and is the sharing contract per-unit
     // generation threads reuse (#681).
-    mut fn gen_module_from_mir(mir_ptr: i64, pool: AstPool) -> i32:
-        let mir_err = unsafe { validate_mir_module((*(mir_ptr as *const MirModule))) }
+    mut fn gen_module_from_mir(mir_module_ptr: i64, ast_pool: AstPool) -> i32:
+        let mir_err = unsafe { validate_mir_module((*(mir_module_ptr as *const MirModule))) }
         if mir_err.len() > 0:
             with_eprint("error: invalid MIR input for LLVM backend: " ++ mir_err)
             self.had_error = 1
             return 1
-        self.mir_ptr = mir_ptr
-        self.gen_module(pool)
+        self.mir_ptr = mir_module_ptr
+        self.gen_module(ast_pool)
 
     fn mir_bodies_len() -> i64: unsafe { (*(self.mir_ptr as *const MirModule)).bodies.len() }
     // Codegen only observes bodies owned by the frozen MirModule. Returning an
@@ -2137,10 +2137,10 @@ impl Codegen:
     fn loop_result_alloca_at(idx: i32) -> i64:
         with_codegen_loop_get_result(idx)
 
-    fn debug_call_coerce_failure(context: &str, call_node: i32, arg_index: i32, arg_node: i32, actual_val: i64, expected_ty: i64) -> Unit:
+    fn debug_call_coerce_failure(coerce_context: &str, call_node: i32, arg_index: i32, arg_node: i32, actual_val: i64, expected_ty: i64) -> Unit:
         if not self.debug_call_coerce_enabled():
             return
-        var msg = "[call-coerce] " ++ context
+        var msg = "[call-coerce] " ++ coerce_context
         if self.current_function_name_sym != 0:
             msg = msg ++ " fn=" ++ self.function_symbol_name(self.current_function_name_sym)
         msg = msg ++ f" arg={arg_index}"
@@ -2163,7 +2163,7 @@ impl Codegen:
                 msg = msg ++ f" arg_text={arg_text}"
         with_eprint(msg)
 
-    mut fn enforce_coerced_type(value: i64, expected_ty: i64, context: &str) -> i64:
+    mut fn enforce_coerced_type(value: i64, expected_ty: i64, coerce_context: &str) -> i64:
         if value == 0 or expected_ty == 0:
             return value
 
@@ -2189,7 +2189,7 @@ impl Codegen:
                 return coerced_str
 
         self.had_error = 1
-        var msg = "error: " ++ context
+        var msg = "error: " ++ coerce_context
         msg = msg ++ f" actual={self.llvm_type_mangle(wl_type_of(value))}"
         msg = msg ++ f" expected={self.llvm_type_mangle(expected_ty)}"
         if self.current_function_name_sym != 0:
@@ -7583,10 +7583,10 @@ impl Codegen:
 
     // ── gen_module: multi-pass entry point ────────────────────────────
 
-    mut fn gen_module(pool: AstPool) -> i32:
+    mut fn gen_module(ast_pool: AstPool) -> i32:
         if self.debug_pool_flow_enabled():
-            with_eprint(f"[llvm-cg] gen_module input.decls={pool.decl_count()} input.nodes={pool.node_count()}")
-        self.pool = pool
+            with_eprint(f"[llvm-cg] gen_module input.decls={ast_pool.decl_count()} input.nodes={ast_pool.node_count()}")
+        self.pool = ast_pool
         self.build_type_decl_name_index()
         if self.debug_pool_flow_enabled():
             with_eprint(f"[llvm-cg] gen_module self.decls={self.pool.decl_count()} self.nodes={self.pool.node_count()}")
