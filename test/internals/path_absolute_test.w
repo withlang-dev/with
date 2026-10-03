@@ -45,9 +45,12 @@ fn main:
     assert(build_graph_resolve_project_path("/root", "C:/tools/with.exe") == "C:/tools/with.exe")
     assert(build_graph_resolve_project_path("/root", "/tools/with") == "/tools/with")
     assert(build_graph_resolve_project_path("/root", "out/bin/with") == "/root/out/bin/with")
-    assert(not build_graph_path_project_contained("C:/elsewhere/x.w"))
-    assert(not build_graph_path_project_contained("/elsewhere/x.w"))
-    assert(build_graph_path_project_contained("src/x.w"))
+    // Containment is relative to the project root (#1885): an absolute path
+    // outside it escapes, one beneath it is contained.
+    assert(not build_graph_path_project_contained("/root", "C:/elsewhere/x.w"))
+    assert(not build_graph_path_project_contained("/root", "/elsewhere/x.w"))
+    assert(build_graph_path_project_contained("/root", "src/x.w"))
+    assert(build_graph_path_project_contained("/root", "/root/out/x.w"))
 
     // Lexical normalization keeps a drive or UNC root under `..`.
     assert(resolve_canonical_module_key("C:/a/b/../c") == "C:/a/c")
