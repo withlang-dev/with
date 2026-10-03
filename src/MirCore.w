@@ -2735,10 +2735,170 @@ fn validate_moves_through_references(mir_mod: &MirModule, body: &MirBody) -> str
                 return f"fn sym{body.fn_sym} bb{bb}: " ++ err
     ""
 
+// The whole-local drop a statement or terminator performs, or -1.
+fn mir_whole_drop_local(body: &MirBody, place: i32) -> i32:
+    if place < 0 or place >= body.place_locals.len() or body.place_proj_counts[place] != 0:
+        return -1
+    body.place_locals[place]
+
+// The locals every path has dropped, one flag per slot (slot[local] >= 0
+// for each local some whole drop targets).
+type MirDroppedSet {
+    flags: Vec[i32],
+}
+
+impl MirDroppedSet:
+    fn has(slot: &Vec[i32], local: i32) -> bool:
+        local >= 0 and local < slot.len() and slot[local] >= 0 and self.flags[slot[local]] != 0
+
+    mut fn mark(slot: &Vec[i32], local: i32, dropped: i32):
+        if local >= 0 and local < slot.len() and slot[local] >= 0:
+            self.flags[slot[local]] = dropped
+
+    // One statement's effect; reads are judged before it. A whole write or a
+    // StorageLive gives the local a new value (or fresh storage).
+    mut fn transfer_stmt(body: &MirBody, slot: &Vec[i32], stmt_id: i32):
+        let kind = body.stmt_kind(stmt_id)
+        let d0 = body.stmt_data0(stmt_id)
+        if kind == StmtKind.StorageLive:
+            self.mark(slot, d0, 0)
+        else if kind == StmtKind.Drop:
+            self.mark(slot, mir_whole_drop_local(body, d0), 1)
+        else if kind == StmtKind.Assign:
+            self.mark(slot, mir_whole_drop_local(body, d0), 0)
+
+    mut fn transfer_term(body: &MirBody, slot: &Vec[i32], bb: i32):
+        let kind = body.term_kind(bb)
+        if kind == TermKind.TK_DROP_AND_GOTO:
+            self.mark(slot, mir_whole_drop_local(body, body.term_data0(bb)), 1)
+        else if kind == TermKind.TK_CALL:
+            self.mark(slot, mir_whole_drop_local(body, body.term_data2(bb)), 0)
+
+// #1991: a read of a local — whole, or through a projection (`_2[_4].f`) —
+// that every path reaching it has dropped and nothing rewrote. The value is
+// gone: the drop freed what the read dereferences. The pre-#1968 lowering
+// left a block tail `t[id].arity` a lazy place operand and emitted
+// `drop(_2); _0 = copy _2[_4].f`; the Vec's drop cleared its length and the
+// read panicked "index out of bounds" (the seed-built stage1's
+// math_fn_arity), and validate-all said ok: the drop-state lattice marks a
+// dropped place Uninit, as StorageDead does, and judges only whole-local
+// reads of Maybe places (mir_read_of_uninit_place), never a projection.
+// Must-dropped: a read on a path that dropped only on some paths is not
+// judged here.
+fn validate_read_after_drop(body: &MirBody) -> str:
+    let local_count = body.local_type_ids.len() as i32
+    let block_count = body.block_count()
+    if local_count <= 0 or block_count <= 0:
+        return ""
+    // Only locals some whole drop targets can be read after a drop.
+    var slot: Vec[i32] = Vec.new()
+    for _ in 0..local_count:
+        slot.push(-1)
+    var width = 0
+    for bb in 0..block_count:
+        for si in body.bb_stmt_starts[bb]..body.bb_stmt_starts[bb] + body.bb_stmt_counts[bb]:
+            if body.stmt_kind(si) == StmtKind.Drop:
+                let local = mir_whole_drop_local(body, body.stmt_data0(si))
+                if local >= 0 and local < local_count and slot[local] < 0:
+                    slot[local] = width
+                    width += 1
+        if body.term_kind(bb) == TermKind.TK_DROP_AND_GOTO:
+            let local = mir_whole_drop_local(body, body.term_data0(bb))
+            if local >= 0 and local < local_count and slot[local] < 0:
+                slot[local] = width
+                width += 1
+    if width == 0:
+        return ""
+    // Forward must-analysis: a block's input is the meet (AND) of its
+    // reachable predecessors' outputs; the entry starts with nothing dropped.
+    var reached: Vec[i32] = Vec.new()
+    for _ in 0..block_count:
+        reached.push(0)
+    var work: Vec[i32] = Vec.new()
+    work.push(0)
+    reached[0] = 1
+    var edge_from: Vec[i32] = Vec.new()
+    var edge_to: Vec[i32] = Vec.new()
+    while work.len() > 0:
+        let bb: i32 = work.pop().unwrap()
+        for next in mir_drop_state_block_successors(body, bb):
+            if next < 0 or next >= block_count:
+                continue
+            edge_from.push(bb)
+            edge_to.push(next)
+            if reached[next] == 0:
+                reached[next] = 1
+                work.push(next)
+    // Predecessors of block b: pred_list[pred_start[b]..pred_start[b + 1]].
+    var pred_start: Vec[i32] = Vec.new()
+    for _ in 0..block_count + 1:
+        pred_start.push(0)
+    for e in 0..edge_to.len():
+        pred_start[edge_to[e] + 1] += 1
+    for b in 0..block_count:
+        pred_start[b + 1] += pred_start[b]
+    var fill = pred_start.clone()
+    var pred_list: Vec[i32] = Vec.new()
+    for _ in 0..edge_to.len():
+        pred_list.push(0)
+    for e in 0..edge_to.len():
+        pred_list[fill[edge_to[e]]] = edge_from[e]
+        fill[edge_to[e]] += 1
+    // out rows: block_count × width, all-dropped (the meet's top) until computed.
+    var out: Vec[i32] = Vec.new()
+    for _ in 0..block_count * width:
+        out.push(1)
+    var changed = true
+    while changed:
+        changed = false
+        for bb in 0..block_count:
+            if reached[bb] == 0:
+                continue
+            var state = mir_dropped_input(&out, &pred_start, &pred_list, bb, width)
+            for si in body.bb_stmt_starts[bb]..body.bb_stmt_starts[bb] + body.bb_stmt_counts[bb]:
+                state.transfer_stmt(body, &slot, si)
+            state.transfer_term(body, &slot, bb)
+            for i in 0..width:
+                if out[bb * width + i] != state.flags[i]:
+                    out[bb * width + i] = state.flags[i]
+                    changed = true
+    for bb in 0..block_count:
+        if reached[bb] == 0:
+            continue
+        var state = mir_dropped_input(&out, &pred_start, &pred_list, bb, width)
+        for si in body.bb_stmt_starts[bb]..body.bb_stmt_starts[bb] + body.bb_stmt_counts[bb]:
+            if body.stmt_kind(si) == StmtKind.Assign:
+                for local in mir_rvalue_read_locals(body, body.stmt_data1(si)):
+                    if state.has(&slot, local):
+                        return f"fn sym{body.fn_sym} stmt{si} span={body.stmt_spans[si]}: read of _{local} after every path reaching it dropped _{local}: the value it reads is freed (§2.5.1)"
+            state.transfer_stmt(body, &slot, si)
+        for op in mir_term_operands(body, bb):
+            let local = mir_local_of_operand(body, op)
+            if state.has(&slot, local):
+                return f"fn sym{body.fn_sym} bb{bb}: read of _{local} after every path reaching it dropped _{local}: the value it reads is freed (§2.5.1)"
+    ""
+
+// A block's dropped set on entry: nothing at the entry block, else the AND
+// of its predecessors' outputs.
+fn mir_dropped_input(out: &Vec[i32], pred_start: &Vec[i32], pred_list: &Vec[i32], bb: i32, width: i32) -> MirDroppedSet:
+    var flags: Vec[i32] = Vec.new()
+    for _ in 0..width:
+        flags.push(if bb == 0: 0 else: 1)
+    if bb != 0:
+        for pi in pred_start[bb]..pred_start[bb + 1]:
+            let p = pred_list[pi]
+            for i in 0..width:
+                if out[p * width + i] == 0:
+                    flags[i] = 0
+    MirDroppedSet { flags }
+
 pub fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
     let through_reference = validate_moves_through_references(mir_mod, body)
     if through_reference.len() > 0:
         return through_reference
+    let read_after_drop = validate_read_after_drop(body)
+    if read_after_drop.len() > 0:
+        return read_after_drop
     var blocks = mir_drop_state_compute_blocks(body)
     let key_places = mir_drop_state_key_places(blocks.keys)
     var dropped_local: Vec[i32] = Vec.new()

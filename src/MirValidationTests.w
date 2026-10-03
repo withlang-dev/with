@@ -1406,3 +1406,87 @@ fn array_fill_verdict(elem_is_copy: bool) -> str:
 pub fn mir_test_non_copy_array_fill:
     assert(array_fill_verdict(false).contains("array_fill of a non-Copy element (ty=2)"))
     assert(array_fill_verdict(true) == "")
+
+// #1991: `drop(_1); _2 = copy _1.f0` — a read through a projection of a
+// local every path reaching it dropped. The pre-#1968 lowering emitted
+// exactly this for `let t = table(); t[id].arity` (the seed-built
+// stage1's math_fn_arity read a freed Vec and panicked), and validate-all
+// said ok. shape: 0 = read after the drop, 1 = read before it, 2 = drop,
+// rewrite, read, 3 = the drop on one arm only (a may-drop, not judged),
+// 4 = the drop is a drop-and-goto terminator, 5 = the read is a call
+// argument.
+fn read_after_drop_verdict(shape: i32) -> str:
+    var mir_mod = MirModule.init()
+    for kind in [0, TypeKind.TY_STRUCT, TypeKind.TY_INT]:
+        mir_mod.sema_type_kinds.push(kind)
+        mir_mod.sema_type_d0.push(0)
+        mir_mod.sema_type_d1.push(0)
+        mir_mod.sema_type_d2.push(0)
+    let whole_ty = 1
+    let int_ty = 2
+    mir_mod.sema_moved_drop_types.insert(whole_ty, 1)
+    mir_mod.sema_dropped_types.insert(whole_ty, 1)
+    var body = MirBody.init_for_fn(1)
+    body.n_params = 1
+    let flag_local = body.new_temp(int_ty)
+    let flag = body.new_place(flag_local)
+    let whole_local = body.new_temp(whole_ty)
+    let whole = body.new_place(whole_local)
+    let field = body.new_field_place(whole, 0, int_ty)
+    let out_local = body.new_temp(int_ty)
+    let out = body.new_place(out_local)
+    let entry = body.new_block()
+    let read_bb = body.new_block()
+    let done = body.new_block()
+    let no_fields: Vec[i32] = Vec.new()
+    let no_field_table = body.new_agg_fields(&no_fields, &no_fields)
+    let init = body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, no_field_table, 0)
+    let read_op = body.new_operand(OperandKind.OK_COPY, field)
+    let read = body.new_rvalue(RvalueKind.RK_USE, read_op, 0, 0)
+    body.push_stmt(entry, StmtKind.StorageLive, whole_local, 0, 0)
+    body.push_stmt(entry, StmtKind.Assign, whole, init, 0)
+    if shape == 1:
+        body.push_stmt(entry, StmtKind.Assign, out, read, 0)
+    if shape == 0 or shape == 1 or shape == 2 or shape == 5:
+        body.push_stmt(entry, StmtKind.Drop, whole, 0, 0)
+    if shape == 2:
+        body.push_stmt(entry, StmtKind.Assign, whole, init, 0)
+    if shape == 3:
+        let arm = body.new_block()
+        let vals: Vec[i64] = Vec.new()
+        vals.push(1)
+        let targets: Vec[i32] = Vec.new()
+        targets.push(arm)
+        let table = body.new_switch_table(&vals, &targets)
+        let flag_op = body.new_operand(OperandKind.OK_COPY, flag)
+        body.set_terminator(entry, TermKind.TK_SWITCH_INT, flag_op, table, read_bb, 0, 0)
+        body.push_stmt(arm, StmtKind.Drop, whole, 0, 0)
+        body.set_terminator(arm, TermKind.TK_GOTO, read_bb, 0, 0, 0, 0)
+    else if shape == 4:
+        body.set_terminator(entry, TermKind.TK_DROP_AND_GOTO, whole, read_bb, 0, 0, 0)
+    else:
+        body.set_terminator(entry, TermKind.TK_GOTO, read_bb, 0, 0, 0, 0)
+    if shape == 5:
+        mir_mod.sema_callable_syms.insert(2, MirCallableClass.Signature as i32)
+        let callee_const = body.new_const(ConstKind.CK_FN, 2, 0, 0, int_ty)
+        let callee = body.new_operand(OperandKind.OK_CONSTANT, callee_const)
+        let args: Vec[i32] = Vec.new()
+        args.push(read_op)
+        let call = body.new_call_args(&args)
+        body.set_terminator(read_bb, TermKind.TK_CALL, callee, call, out, done, 0)
+    else:
+        if shape != 1:
+            body.push_stmt(read_bb, StmtKind.Assign, out, read, 0)
+        if shape == 2:
+            body.push_stmt(read_bb, StmtKind.Drop, whole, 0, 0)
+        body.set_terminator(read_bb, TermKind.TK_GOTO, done, 0, 0, 0, 0)
+    body.set_terminator(done, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    validate_ownership_body(mir_mod, body)
+
+pub fn mir_test_read_after_drop:
+    assert(read_after_drop_verdict(0).contains("read of _2 after every path reaching it dropped _2"))
+    assert(read_after_drop_verdict(1) == "")
+    assert(read_after_drop_verdict(2) == "")
+    assert(read_after_drop_verdict(3) == "")
+    assert(read_after_drop_verdict(4).contains("read of _2 after every path reaching it dropped _2"))
+    assert(read_after_drop_verdict(5).contains("read of _2 after every path reaching it dropped _2"))
