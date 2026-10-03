@@ -682,15 +682,26 @@ fn comp_path_for_process(root: &str, path: &str) -> str:
         return compiler_owned_text(path)
     comp_abs(root, path)
 
+// D50: the compiler's own artifacts name their sources under /with-src, not
+// under this checkout, so one tree compiles to the same bytes in every
+// worktree (src/FnAbi.w fn_abi_file_prefix_mapped) and the build store can
+// serve them to any (#1899). Every compile of this tree gets it: a stage's
+// child compiler through its environment, an in-process target (with-sha256)
+// through the target's declared environment (#2016). A debugger maps it back:
+// `lldb -o "settings set target.source-map /with-src $PWD" -- <binary>`.
+pub fn compiler_file_prefix_map(root: &str) -> str: root ++ "=/with-src"
+
+// A path the link records spell for every worktree alike (#2016): one under
+// the project root is written relative to it, and the compile that reads the
+// record runs in the root (comp_run_compiler_capture). Lld resolves a
+// relative response-file path against its working directory.
+pub fn comp_root_relative_text(root: &str, text: &str) -> str: comp_replace_all(text, root ++ "/", "")
+
 fn comp_run_compiler_capture(ctx: &ActionCtx, label: &str, argv: Vec[str], stdout_path: &str, stderr_path: &str, timeout_ms: i32) -> i32:
     let root = ctx.project_info().project_root()
     var process_env = process_env()
     process_env = process_env.set("WITH_OUT_DIR", comp_abs(root, "out"))
-    // The compiler's own objects name their sources under /with-src, not under
-    // this checkout, so one tree compiles to the same bytes in every worktree
-    // (src/FnAbi.w fn_abi_file_prefix_mapped). A debugger maps it back:
-    // `lldb -o "settings set target.source-map /with-src $PWD" -- <binary>`.
-    process_env = process_env.set("WITH_FILE_PREFIX_MAP", root ++ "=/with-src")
+    process_env = process_env.set("WITH_FILE_PREFIX_MAP", compiler_file_prefix_map(root))
     // The frozen seed predates bounded compiler partitions. Give its one
     // compiler-sized bootstrap invocation the same portable low-memory
     // layout; ordinary small programs keep the compiler's size gate.
@@ -779,7 +790,9 @@ fn comp_run_compiler_capture(ctx: &ActionCtx, label: &str, argv: Vec[str], stdou
     let overflow_mode = comp_arg_value(ctx.args(), "overflow=")
     if overflow_mode.len() > 0:
         process_env = process_env.set("WITH_INTERNAL_OVERFLOW_MODE", overflow_mode)
-    let result = ctx.process_runner().run_capture_with_env(argv, comp_abs(root, stdout_path), comp_abs(root, stderr_path), timeout_ms, process_env)
+    // In the root: the link records name what lies under it relative to it
+    // (comp_root_relative_text), and the linker resolves them from here.
+    let result = ctx.process_runner().run_capture_cwd_with_env(argv, comp_abs(root, stdout_path), comp_abs(root, stderr_path), timeout_ms, root, process_env)
     if result.rc == 124:
         return comp_fail(ctx, "step '" ++ label ++ "' timed out; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
     if result.rc != 0:
@@ -2702,6 +2715,21 @@ pub fn comp_lld_alias_lines(flavors: &Vec[str], target_os: &str, driver_form: bo
 pub fn comp_sdk_has_clang_main(fs: &ToolFs, llvm_lib_dir: &str) -> bool:
     fs.host_exists(llvm_lib_dir ++ "/libclangMain.a") or fs.host_exists(llvm_lib_dir ++ "/clangMain.lib")
 
+// #2016: for an SDK published without the driver archive, sdk-clang-main
+// builds it here, under out/: the SDK (.deps) is an input, never written, and
+// the archive is that target's declared output, which the build store serves.
+pub fn comp_clang_main_built_dir() -> str: "out/gen/sdk-clang-main"
+pub fn comp_clang_main_built_archive() -> str: comp_clang_main_built_dir() ++ "/libclangMain.a"
+
+// The driver archive the host compiler links: the SDK's own (picked up with
+// its other libclang* archives), else the one sdk-clang-main built, else "".
+pub fn comp_clang_main_extra_archive(fs: &ToolFs, llvm_lib_dir: &str) -> str:
+    if comp_sdk_has_clang_main(fs, llvm_lib_dir) or not fs.exists(comp_clang_main_built_archive()): return ""
+    comp_clang_main_built_archive()
+
+pub fn comp_host_has_clang_main(fs: &ToolFs, llvm_lib_dir: &str) -> bool:
+    comp_sdk_has_clang_main(fs, llvm_lib_dir) or comp_clang_main_extra_archive(fs, llvm_lib_dir).len() > 0
+
 pub fn comp_clang_main_link_lines(has_clang_main: bool, target_os: &str, windows_gnu_sdk: bool, driver_form: bool) -> str:
     let itanium = if has_clang_main: "_Z10clang_mainiPPcRKN4llvm11ToolContextE" else: "with_alloc"
     if target_os == "Macos":
@@ -2863,6 +2891,8 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     var ld_rsp = ""
     rsp = rsp ++ comp_rsp_path(libclang) ++ "\n"
     ld_rsp = ld_rsp ++ comp_rsp_path(libclang) ++ "\n"
+    let built_clang_main = comp_clang_main_extra_archive(fs, llvm_lib_dir)
+    if built_clang_main.len() > 0: clang_archives.push(built_clang_main)
     let sorted_clang_archives = comp_sort_strings(clang_archives)
     for i in 0..sorted_clang_archives.len() as i32:
         let path = sorted_clang_archives[i]
@@ -2883,7 +2913,7 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     // has, and ClangDriver.w tells the two apart by address and says that
     // this build has no C compiler. Each platform gains `with cc` when its SDK
     // is republished with the archive.
-    let has_clang_main = comp_sdk_has_clang_main(fs, llvm_lib_dir)
+    let has_clang_main = comp_host_has_clang_main(fs, llvm_lib_dir)
     rsp = rsp ++ comp_clang_main_link_lines(has_clang_main, os(), windows_gnu_sdk, true)
     ld_rsp = ld_rsp ++ comp_clang_main_link_lines(has_clang_main, os(), windows_gnu_sdk, false)
     // An SDK built without the WebAssembly backend (every SDK published before
@@ -3004,13 +3034,16 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     let cc_path = comp_join(output_dir, "llvm_cc")
     let ld_rsp_path = comp_join(output_dir, "llvm_ld.rsp")
     let ld_path = comp_join(output_dir, "llvm_ld")
-    if fs.write_text(rsp_path, rsp) != 0:
+    // #2016: the SDK (.deps) and the darwin sysroot (out/gen) lie under the
+    // root; the records name them relative to it, so they are the same bytes
+    // in every worktree and the build store can serve them.
+    if fs.write_text(rsp_path, comp_root_relative_text(root, rsp)) != 0:
         return comp_fail(ctx, "could not write: " ++ rsp_path)
-    if fs.write_text(cc_path, llvm_clang ++ "\n") != 0:
+    if fs.write_text(cc_path, comp_root_relative_text(root, llvm_clang) ++ "\n") != 0:
         return comp_fail(ctx, "could not write: " ++ cc_path)
-    if fs.write_text(ld_rsp_path, ld_rsp) != 0:
+    if fs.write_text(ld_rsp_path, comp_root_relative_text(root, ld_rsp)) != 0:
         return comp_fail(ctx, "could not write: " ++ ld_rsp_path)
-    if fs.write_text(ld_path, llvm_ld ++ "\n") != 0:
+    if fs.write_text(ld_path, comp_root_relative_text(root, llvm_ld) ++ "\n") != 0:
         return comp_fail(ctx, "could not write: " ++ ld_path)
     if fs.write_text(output_path, "ok\n") != 0:
         return comp_fail(ctx, "could not write stamp: " ++ output_path)

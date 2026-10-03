@@ -710,6 +710,10 @@ fn build_cache_signature_parts(target: &BuildGraphTarget, root: &str) -> Vec[Bui
         shape = shape ++ ":library-path:" ++ target.library_paths[i]
     for i in 0..target.rpaths.len() as i32:
         shape = shape ++ ":rpath:" ++ target.rpaths[i]
+    // The declared environment shapes what the target builds (#2016: an
+    // in-process compile's WITH_FILE_PREFIX_MAP), so it keys it.
+    for i in 0..target.env.len() as i32:
+        shape = shape ++ ":env:" ++ target.env[i]
     parts.push(BuildCacheSigPart { name: "target", text: shape })
     // The manifest changes compilation even when build.w returns the same
     // graph (for example [link].rpath). A graph-cache miss alone does not
@@ -1093,8 +1097,24 @@ fn build_cache_store_key(root: &str, target: &BuildGraphTarget) -> str:
         text = text ++ "in:" ++ build_cache_project_relative(root, inputs[i]) ++ ":" ++ build_cache_fingerprint_file(inputs[i]) ++ "\n"
     build_cache_sha256_text(text)
 
-fn build_cache_store_portable(root: &str, text: &str) -> str: text.replace(root ++ "/", "<root>/")
-fn build_cache_store_localize(root: &str, text: &str) -> str: text.replace("<root>/", root ++ "/")
+// The root spelled `<root>` wherever it is a whole path: before a `/`, and
+// before any byte a file name does not continue with — the `=` of a declared
+// WITH_FILE_PREFIX_MAP=<root>=/with-src (#2016) included. A sibling sharing
+// its prefix (<root>-drivers/) stays as it is.
+fn build_cache_store_portable(root: &str, text: &str) -> str:
+    if root.len() == 0 or not text.contains(root): return text.clone()
+    var out = ""
+    var rest = text.clone()
+    while true:
+        let at = rest.find(root)
+        if at < 0: break
+        let end = at + root.len()
+        let whole = end == rest.len() or not build_cache_store_is_name_byte(rest[end])
+        out = out ++ rest.slice(0, if whole: at else: end) ++ (if whole: "<root>" else: "")
+        rest = rest.slice(end, rest.len())
+    out ++ rest
+
+fn build_cache_store_localize(root: &str, text: &str) -> str: text.replace("<root>", root)
 
 // The relative output paths, as the record lists them (the capture directory
 // included: it is a declared output, and the freshness check wants it).
@@ -1111,8 +1131,26 @@ fn build_cache_store_dirname(path: &str) -> str:
         if path[i] == '/': last = i
     if last <= 0: "." else: path.slice(0, last as i64)
 
+fn build_cache_store_is_name_byte(b: u8) -> bool:
+    (b >= 'a' and b <= 'z') or (b >= 'A' and b <= 'Z') or (b >= '0' and b <= '9') or b == '.' or b == '_' or b == '-'
+
+// Whether `text` names `root` as a path: the root not continued by more of a
+// file name. A sibling that only shares its prefix (/x/wt beside
+// /x/wt-drivers/with) names another directory; #2016 found stage1 refused
+// for a seed-input.json that recorded such a driver path.
+fn build_cache_store_text_names_root(text: &str, root: &str) -> bool:
+    if root.len() == 0 or not text.contains(root): return false
+    let n = text.len() as i32
+    let m = root.len() as i32
+    var i = 0
+    while i + m <= n:
+        if text[i] == root[0] and text.slice(i as i64, (i + m) as i64) == root:
+            if i + m == n or not build_cache_store_is_name_byte(text[i + m]): return true
+        i = i + 1
+    false
+
 // The first output file (outside the out/command/ capture logs) whose bytes
-// contain this worktree's root, or "".
+// name this worktree's root, or "".
 fn build_cache_store_names_root(root: &str, rels: &Vec[str]) -> str:
     for i in 0..rels.len() as i32:
         let rel = rels[i]
@@ -1123,9 +1161,9 @@ fn build_cache_store_names_root(root: &str, rels: &Vec[str]) -> str:
         if (mode & BUILD_CACHE_S_IFMT) == BUILD_CACHE_S_IFDIR:
             let files = build_cache_split_lines(build_graph_rt_list_files(path))
             for fi in 0..files.len() as i32:
-                if build_graph_rt_read_file(files[fi]).contains(root):
+                if build_cache_store_text_names_root(build_graph_rt_read_file(files[fi]), root):
                     return build_cache_project_relative(root, files[fi])
-        else if build_graph_rt_read_file(path).contains(root):
+        else if build_cache_store_text_names_root(build_graph_rt_read_file(path), root):
             return rel.clone()
     ""
 

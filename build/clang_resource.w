@@ -228,7 +228,7 @@ fn cr_generate(ctx: &ActionCtx, include_dir: &str, files: &Vec[str], version: &s
     // distinct function symbols to "not equal".
     // The same SDK, by the same path, that the compiler link tests.
     let lib_dir = comp_llvm_prefix_for_root(ctx.project_info().project_root()) ++ "/lib"
-    let driver_linked = ctx.fs().host_exists(lib_dir ++ "/libclangMain.a") or ctx.fs().host_exists(lib_dir ++ "/clangMain.lib")
+    let driver_linked = comp_host_has_clang_main(ctx.fs(), lib_dir)
     out = out ++ "pub fn embedded_clang_driver_linked() -> bool:\n    return " ++ (if driver_linked: "true" else: "false") ++ "\n\n"
     // Whether this compiler links LLVM's WebAssembly backend (the wasm32
     // target): the SDK has the archive, or it predates it and the five

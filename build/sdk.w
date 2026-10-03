@@ -1298,7 +1298,7 @@ pub fn run_sdk_llvm_action(ctx: ActionCtx) -> i32:
     rc = sdk_validate_wasm_install(ctx, output_prefix)
     if rc != 0: return rc
     let archiver_prefix = if llvm_arch != arch(): sdk_owned_text(bootstrap_prefix) else: sdk_owned_text(output_prefix)
-    let clang_rc = sdk_archive_clang_main(ctx, root, sdk_abs(root, build_dir) ++ "/tools/clang/tools/driver/CMakeFiles/clang.dir", output_prefix, archiver_prefix)
+    let clang_rc = sdk_archive_clang_main(ctx, root, sdk_abs(root, build_dir) ++ "/tools/clang/tools/driver/CMakeFiles/clang.dir", sdk_clang_main_archive(ctx.fs(), output_prefix), archiver_prefix)
     if clang_rc != 0: return clang_rc
     if os() != "Macos": return 0
     sdk_archive_dsymutil_main(ctx, root, sdk_abs(root, build_dir) ++ "/tools/dsymutil/CMakeFiles/dsymutil.dir", output_prefix)
@@ -1353,15 +1353,15 @@ fn sdk_clang_main_archive(fs: &ToolFs, prefix: &str) -> str:
         return sdk_join(prefix, "lib/clangMain.lib")
     sdk_join(prefix, "lib/libclangMain.a")
 
-fn sdk_archive_clang_main(ctx: &ActionCtx, root: &str, objects_dir: &str, output_prefix: &str, archiver_prefix: &str) -> i32:
+fn sdk_archive_clang_main(ctx: &ActionCtx, root: &str, objects_dir: &str, archive_path: &str, archiver_prefix: &str) -> i32:
     let ext = if os() == "Windows": ".cpp.obj" else: ".cpp.o"
-    let archive = sdk_abs(root, sdk_clang_main_archive(ctx.fs(), output_prefix))
+    let archive = sdk_abs(root, archive_path)
     // GNU-named and made by llvm-ar on every platform: the Windows SDK's LLVM
     // is a windows-gnu build (#1915); CMake there still names objects .obj.
     var argv: Vec[str] = Vec.new()
     argv.push(sdk_abs(root, sdk_tool(archiver_prefix, "llvm-ar")))
     argv.push("rcs")
-    argv.push(archive)
+    argv.push(archive.clone())
     // Pushed one by one: the build layer runs on the pinned seed (#1122).
     let names: Vec[str] = Vec.new()
     names.push("driver")
@@ -1375,8 +1375,8 @@ fn sdk_archive_clang_main(ctx: &ActionCtx, root: &str, objects_dir: &str, output
         argv.push(object)
     let rc = sdk_run_capture(ctx, "clang-main-archive", argv, 120000)
     if rc != 0: return rc
-    if not ctx.fs().host_exists(sdk_abs(root, sdk_clang_main_archive(ctx.fs(), output_prefix))):
-        return sdk_fail(ctx, "clang driver archive was not written: " ++ sdk_clang_main_archive(ctx.fs(), output_prefix))
+    if not ctx.fs().host_exists(archive):
+        return sdk_fail(ctx, "clang driver archive was not written: " ++ archive_path)
     0
 
 // A packaged SDK (`with build :deps`) predating `with cc` has no clang driver
@@ -1398,28 +1398,35 @@ pub fn run_sdk_clang_main_action(ctx: ActionCtx) -> i32:
     // the same fact and takes this file as an input, so it is regenerated
     // when an SDK gains the archive.
     let root = ctx.project_info().project_root()
-    let linked = ctx.fs().host_exists(sdk_abs(root, sdk_clang_main_archive(ctx.fs(), comp_llvm_prefix_for_root(root))))
+    let linked = comp_host_has_clang_main(ctx.fs(), comp_llvm_prefix_for_root(root) ++ "/lib")
     if ctx.fs().mkdir_all(sdk_dirname(ctx.output())) != 0 or ctx.fs().write_text(ctx.output(), (if linked: "linked" else: "absent") ++ "\n") != 0:
         return sdk_fail(ctx, "could not write " ++ ctx.output())
     0
+
+// Whether sdk-clang-main builds the archive for the SDK at `prefix` (an
+// absolute path): it has none, and has the headers compiling the driver
+// needs. A packaged SDK ships libraries and tools only; one predating
+// `with cc` has to be republished with the archive.
+pub fn sdk_clang_main_builds(fs: &ToolFs, prefix: &str) -> bool:
+    not comp_sdk_has_clang_main(fs, prefix ++ "/lib") and fs.host_exists(prefix ++ "/include/clang/Driver/Driver.h")
 
 fn sdk_ensure_clang_main(ctx: &ActionCtx) -> i32:
     let fs = ctx.fs()
     let root = ctx.project_info().project_root()
     // The same SDK the link will read, which on CI is LLVM_PREFIX, not .deps.
     let prefix = comp_llvm_prefix_for_root(root)
-    if fs.host_exists(sdk_abs(root, sdk_clang_main_archive(ctx.fs(), prefix))):
+    // #2016: the SDK is read, never written; an archive this action builds
+    // is its declared output under out/ (comp_clang_main_built_archive).
+    if comp_sdk_has_clang_main(fs, prefix ++ "/lib"):
         return 0
-    // Compiling the driver needs LLVM's and clang's headers. A packaged SDK
-    // ships libraries and tools only; it has to be published with the archive.
-    if not fs.host_exists(sdk_abs(root, sdk_join(prefix, "include/clang/Driver/Driver.h"))):
+    if not sdk_clang_main_builds(fs, prefix):
         print("note: the LLVM SDK at " ++ prefix ++ " predates `with cc` (no clang driver archive, and no headers to build one): this compiler will have no C compiler until that SDK is republished")
         return 0
     if not fs.host_exists(sdk_abs(root, sdk_tool(prefix, "clang++"))):
         return sdk_fail(ctx, "no clang++ in the LLVM SDK at " ++ prefix)
     let scratch = "out/tmp/sdk-clang-main"
-    if fs.mkdir_all(scratch) != 0:
-        return sdk_fail(ctx, "could not create " ++ scratch)
+    if fs.mkdir_all(scratch) != 0 or fs.mkdir_all(sdk_dirname(comp_clang_main_built_archive())) != 0:
+        return sdk_fail(ctx, "could not create " ++ scratch ++ " and " ++ sdk_dirname(comp_clang_main_built_archive()))
     let ext = if os() == "Windows": ".cpp.obj" else: ".cpp.o"
     let names: Vec[str] = Vec.new()
     names.push("driver")
@@ -1456,6 +1463,8 @@ fn sdk_ensure_clang_main(ctx: &ActionCtx) -> i32:
         argv.push("-fno-rtti")
         argv.push("-fno-exceptions")
         argv.push("-I" ++ sdk_abs(root, sdk_join(prefix, "include")))
+        // The archive is the same in every worktree (#2016).
+        argv.push("-ffile-prefix-map=" ++ root ++ "/=")
         argv.push("-D__STDC_CONSTANT_MACROS")
         argv.push("-D__STDC_FORMAT_MACROS")
         argv.push("-D__STDC_LIMIT_MACROS")
@@ -1471,7 +1480,7 @@ fn sdk_ensure_clang_main(ctx: &ActionCtx) -> i32:
                 argv.push(sdkroot)
         rc = sdk_run_capture(ctx, "clang-main-" ++ names[i], argv, 600000)
         if rc != 0: return rc
-    sdk_archive_clang_main(ctx, root, sdk_abs(root, scratch), prefix, prefix)
+    sdk_archive_clang_main(ctx, root, sdk_abs(root, scratch), comp_clang_main_built_archive(), prefix)
 
 // ── The darwin sysroot (#1915) ─────────────────────────────────────────
 //
@@ -1534,11 +1543,24 @@ fn sdk_merge_sort_strings(items: Vec[str]) -> Vec[str]:
 
 pub fn sdk_zig_source_url() -> str: "https://codeberg.org/ziglang/zig/archive/" ++ SDK_ZIG_VERSION ++ ".tar.gz"
 pub fn sdk_zig_source_sha256() -> str: SDK_ZIG_TAR_GZ_SHA256
-pub fn sdk_zig_archive() -> str: sdk_source_root() ++ "/zig-" ++ SDK_ZIG_VERSION ++ ".tar.gz"
-pub fn sdk_zig_source_root() -> str: sdk_source_root() ++ "/zig-" ++ SDK_ZIG_VERSION
-// The archive's top directory is `zig/`.
-pub fn sdk_zig_source_dir() -> str: sdk_zig_source_root() ++ "/zig"
-pub fn sdk_zig_source_marker() -> str: sdk_zig_source_dir() ++ "/.with-source-ready"
+
+// The sysroots are generated from the pinned Zig source, which each sysroot
+// action fetches into its own scratch under out/command/<target> (#1899 for
+// darwin, #2016 for linux): what it reads is a function of its declared
+// inputs (this file pins the sha256), it writes nothing outside out/, and a
+// worktree the build store serves fetches nothing. The archive's top
+// directory is `zig/`.
+fn sdk_scratch_zig_dir(scratch: &str) -> str: sdk_join(sdk_join(scratch, "zig-" ++ SDK_ZIG_VERSION), "zig")
+
+fn sdk_materialize_zig_source(ctx: &ActionCtx, scratch: &str) -> i32:
+    let fs = ctx.fs()
+    let zig_root = sdk_join(scratch, "zig-" ++ SDK_ZIG_VERSION)
+    let zig_dir = sdk_scratch_zig_dir(scratch)
+    let zig_marker = sdk_join(zig_dir, ".with-source-ready")
+    if fs.exists(zig_marker):
+        return 0
+    let _partial = fs.remove_tree(zig_root)
+    sdk_materialize_source_tar_gz(ctx, scratch, sdk_zig_source_url(), sdk_zig_source_sha256(), sdk_join(scratch, "zig-" ++ SDK_ZIG_VERSION ++ ".tar.gz"), zig_root, zig_dir, zig_marker)
 
 fn sdk_libcxx_abilist_url() -> str:
     "https://raw.githubusercontent.com/llvm/llvm-project/llvmorg-" ++ compiler_llvm_version() ++ "/libcxx/lib/abi/" ++ SDK_LIBCXX_ABILIST_NAME
@@ -1627,14 +1649,10 @@ pub fn run_darwin_sysroot_action(ctx: ActionCtx) -> i32:
     // from the build store; a worktree that is served never fetches. (The
     // Zig source used to come from the sysroot-zig-source target under
     // .deps/src, outside out/, which no restore can bring along.)
-    let zig_root = sdk_join(scratch, "zig-" ++ SDK_ZIG_VERSION)
-    let zig_dir = sdk_join(zig_root, "zig")
-    let zig_marker = sdk_join(zig_dir, ".with-source-ready")
-    if not fs.exists(zig_marker):
-        let _partial = fs.remove_tree(zig_root)
-        let zig_rc = sdk_materialize_source_tar_gz(ctx, scratch, sdk_zig_source_url(), sdk_zig_source_sha256(), sdk_join(scratch, "zig-" ++ SDK_ZIG_VERSION ++ ".tar.gz"), zig_root, zig_dir, zig_marker)
-        if zig_rc != 0:
-            return zig_rc
+    let zig_rc = sdk_materialize_zig_source(ctx, scratch)
+    if zig_rc != 0:
+        return zig_rc
+    let zig_dir = sdk_scratch_zig_dir(scratch)
     let abilist_path = sdk_join(scratch, "libcxx-" ++ compiler_llvm_version() ++ "-" ++ SDK_LIBCXX_ABILIST_NAME)
     if not fs.exists(abilist_path) or fs.sha256_file(abilist_path) != SDK_LIBCXX_ABILIST_SHA256:
         let _stale = fs.remove_file(abilist_path)
@@ -1902,9 +1920,12 @@ fn sdk_llvm_major() -> str:
     if dot < 0: sdk_owned_text(v) else: sdk_owned_text(v.slice(0, dot))
 
 // Compiling glibc's own sources: the SDK's clang, no host header.
-fn sdk_glibc_cc(clang: &str, resource_include: &str, zig_libc: &str, a: &str) -> Vec[str]:
+fn sdk_glibc_cc(root: &str, clang: &str, resource_include: &str, zig_libc: &str, a: &str) -> Vec[str]:
     var argv = sdk_cmd(clang)
     argv.push(sdk_owned_text("--target=" ++ sdk_linux_glibc_target(a)))
+    // The objects name their sources relative to the root (__FILE__, the
+    // file symbol), so the sysroot is the same in every worktree (#2016).
+    argv.push(sdk_owned_text("-ffile-prefix-map=" ++ root ++ "/="))
     for f in ["-nostdinc", "-w", "-O2", "-isystem"]: argv.push(sdk_owned_text(f))
     argv.push(sdk_owned_text(resource_include))
     argv.push(sdk_owned_text(f"-D__GLIBC_MINOR__={SDK_LINUX_GLIBC_MINOR}"))
@@ -2003,10 +2024,18 @@ pub fn run_linux_sysroot_action(ctx: ActionCtx) -> i32:
     if not fs.exists(clang) or not fs.exists(lld):
         return sdk_fail(ctx, "the LLVM SDK at " ++ prefix ++ " has no clang or ld.lld")
     let resource_include = sdk_abs(root, sdk_join(prefix, "lib/clang/" ++ sdk_llvm_major() ++ "/include"))
-    let zig_libc = sdk_abs(root, sdk_join(sdk_zig_source_dir(), "lib/libc"))
+    // #2016: the Zig source in this target's own scratch, as darwin-sysroot
+    // has it (sdk_materialize_zig_source); it used to be the
+    // sysroot-zig-source target's extraction into .deps/src.
+    let scratch = sdk_join("out/command", ctx.target_name())
+    let zig_rc = sdk_materialize_zig_source(ctx, scratch)
+    if zig_rc != 0:
+        return zig_rc
+    let zig_dir = sdk_scratch_zig_dir(scratch)
+    let zig_libc = sdk_abs(root, sdk_join(zig_dir, "lib/libc"))
     let abilists = fs.read_text(sdk_join(zig_libc, "glibc/abilists"))
     if abilists.len() == 0:
-        return sdk_fail(ctx, "the Zig " ++ SDK_ZIG_VERSION ++ " source at " ++ sdk_zig_source_dir() ++ " has no lib/libc/glibc/abilists")
+        return sdk_fail(ctx, "the Zig " ++ SDK_ZIG_VERSION ++ " source at " ++ zig_dir ++ " has no lib/libc/glibc/abilists")
     let sources = sdk_glibc_stub_sources(abilists, sdk_linux_glibc_target(a), SDK_LINUX_GLIBC_MAJOR, SDK_LINUX_GLIBC_MINOR)
     if sources.len() != 9:
         return sdk_fail(ctx, "Zig's glibc abilists has no " ++ sdk_linux_glibc_target(a) ++ f" glibc {SDK_LINUX_GLIBC_MAJOR}.{SDK_LINUX_GLIBC_MINOR}, or is malformed")
@@ -2051,7 +2080,7 @@ pub fn run_linux_sysroot_action(ctx: ActionCtx) -> i32:
     let libc_modules = sdk_join(zig_libc, "glibc/include/libc-modules.h")
     let libc_symbols = sdk_join(zig_libc, "glibc/include/libc-symbols.h")
     let start_src = if SDK_LINUX_GLIBC_MINOR <= 33: "glibc/sysdeps/" ++ a ++ "/start-2.33.S" else: "glibc/sysdeps/" ++ a ++ "/start.S"
-    var start = sdk_glibc_cc(clang, resource_include, zig_libc, a)
+    var start = sdk_glibc_cc(root, clang, resource_include, zig_libc, a)
     for flag in ["-D_LIBC_REENTRANT", "-include"]: start.push(sdk_owned_text(flag))
     start.push(sdk_owned_text(libc_modules))
     for flag in ["-DMODULE_NAME=libc", "-include"]: start.push(sdk_owned_text(flag))
@@ -2062,7 +2091,7 @@ pub fn run_linux_sysroot_action(ctx: ActionCtx) -> i32:
     start.push(sdk_owned_text(sdk_join(work, "start.o")))
     rc = sdk_run_capture(ctx, "crt-start", start, 600000)
     if rc != 0: return rc
-    var note = sdk_glibc_cc(clang, resource_include, zig_libc, a)
+    var note = sdk_glibc_cc(root, clang, resource_include, zig_libc, a)
     note.push(sdk_owned_text("-I"))
     note.push(sdk_owned_text(sdk_join(zig_libc, "glibc/csu")))
     for flag in ["-D_LIBC_REENTRANT", "-DMODULE_NAME=libc", "-DTOP_NAMESPACE=glibc", "-DASSEMBLER", "-Wa,--noexecstack", "-c"]: note.push(sdk_owned_text(flag))
@@ -2071,7 +2100,7 @@ pub fn run_linux_sysroot_action(ctx: ActionCtx) -> i32:
     note.push(sdk_owned_text(sdk_join(work, "abi-note.o")))
     rc = sdk_run_capture(ctx, "crt-abi-note", note, 600000)
     if rc != 0: return rc
-    var init = sdk_glibc_cc(clang, resource_include, zig_libc, a)
+    var init = sdk_glibc_cc(root, clang, resource_include, zig_libc, a)
     init.push(sdk_owned_text("-c"))
     init.push(sdk_owned_text(sdk_join(zig_libc, "glibc/csu/init.c")))
     init.push(sdk_owned_text("-o"))
@@ -2109,7 +2138,7 @@ pub fn run_linux_sysroot_action(ctx: ActionCtx) -> i32:
     nonshared_link.push(sdk_owned_text(sdk_join(lib_dir, "libc_nonshared.o")))
     for i in 0..nonshared.len() as i32:
         let obj = sdk_join(work, f"nonshared{i}.o")
-        var cmd = sdk_glibc_cc(clang, resource_include, zig_libc, a)
+        var cmd = sdk_glibc_cc(root, clang, resource_include, zig_libc, a)
         for flag in ["-std=gnu11", "-fgnu89-inline", "-fmerge-all-constants", "-frounding-math", "-fno-common", "-fmath-errno", "-ftls-model=initial-exec", "-Qunused-arguments", "-fPIC", "-DNO_INITFINI", "-D_LIBC_REENTRANT", "-include"]: cmd.push(sdk_owned_text(flag))
         cmd.push(sdk_owned_text(libc_modules))
         for flag in ["-DMODULE_NAME=libc", "-include"]: cmd.push(sdk_owned_text(flag))
@@ -2137,7 +2166,7 @@ pub fn run_linux_sysroot_action(ctx: ActionCtx) -> i32:
     var hd = 3
     while hd >= 0:
         // Project-relative, as the build's file listing names what it finds.
-        let dir = sdk_join(sdk_zig_source_dir(), "lib/libc/include/" ++ sdk_glibc_header_dir(hd, a))
+        let dir = sdk_join(zig_dir, "lib/libc/include/" ++ sdk_glibc_header_dir(hd, a))
         hd = hd - 1
         let headers = sdk_merge_sort_strings(fs.list_files(dir))
         if headers.len() == 0:

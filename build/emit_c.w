@@ -551,7 +551,9 @@ fn emitc_run_capture_env(ctx: &ActionCtx, label: &str, argv: Vec[str], timeout_m
     env = env.set("WITH_OUT_DIR", emitc_abs(root, "out"))
     if extra_key.len() > 0:
         env = env.set(emit_c_owned_text(extra_key), emit_c_owned_text(extra_val))
-    let result = ctx.process_runner().run_capture_with_env(argv, emitc_abs(root, stdout_rel), emitc_abs(root, stderr_rel), timeout_ms, env)
+    // In the root: the link records (out/lib/llvm_link.rsp) name the SDK
+    // relative to it (#2016), and the C driver resolves them from here.
+    let result = ctx.process_runner().run_capture_cwd_with_env(argv, emitc_abs(root, stdout_rel), emitc_abs(root, stderr_rel), timeout_ms, root, env)
     if result.rc == 0:
         let _remove_stdout = fs.remove_file(stdout_rel)
         let _remove_stderr = fs.remove_file(stderr_rel)
@@ -668,7 +670,7 @@ fn emitc_compile_c_compiler_with_bridges(ctx: &ActionCtx, main_c: &str, output_p
     if cc_path.len() == 0:
         return emitc_fail(ctx, "missing LLVM compiler metadata: out/lib/llvm_cc")
     var argv: Vec[str] = Vec.new()
-    argv |> push(cc_path)
+    argv |> push(emitc_abs(root, cc_path))
     argv |> push("-O1")
     argv = emitc_push_host_c_flags(move argv)
     argv |> push("-fuse-ld=lld")

@@ -2897,7 +2897,9 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                 return 1
             var comp = Compilation.init()
             comp.configure_options(target_options)
+            let saved_env = build_graph_apply_target_env(target)
             let built = comp.emit_archive_to_path_with_build_settings(source_path, ar_path, target_options.include_paths, target_options.defines, target_options.link_libs)
+            build_graph_restore_target_env(&saved_env)
             if built == "":
                 with_eprint("error: build.w library target failed: " ++ target.name)
                 return 1
@@ -2913,7 +2915,9 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                 return 1
             var comp = Compilation.init()
             comp.configure_options(target_options)
+            let saved_env = build_graph_apply_target_env(target)
             let built = comp.emit_object_to_path_with_build_settings(source_path, obj_path, target_options.include_paths, target_options.defines, target_options.link_libs)
+            build_graph_restore_target_env(&saved_env)
             if built == "":
                 with_eprint("error: build.w object target failed: " ++ target.name)
                 return 1
@@ -2929,7 +2933,9 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                 return 1
             var comp = Compilation.init()
             comp.configure_options(target_options)
+            let saved_env = build_graph_apply_target_env(target)
             let built = comp.emit_archive_to_path_with_build_settings(source_path, ar_path, target_options.include_paths, target_options.defines, target_options.link_libs)
+            build_graph_restore_target_env(&saved_env)
             if built == "":
                 with_eprint("error: build.w archive target failed: " ++ target.name)
                 return 1
@@ -2944,7 +2950,9 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
             return 1
         var comp = Compilation.init()
         comp.configure_options(target_options)
+        let saved_env = build_graph_apply_target_env(target)
         let built = comp.build_binary_to_path_with_build_settings(source_path, bin_path, target_options.include_paths, target_options.defines, target_options.link_libs)
+        build_graph_restore_target_env(&saved_env)
         if built == "":
             with_eprint("error: build.w target failed: " ++ target.name)
             return 1
@@ -3163,6 +3171,31 @@ fn build_command_validate_target(options: &BuildCommandOptions, cfg: &ProjectCon
         with_eprint("error: cross-target build for '" ++ build_graph_target_name(options.target_kind) ++ "' is not implemented yet; host is " ++ build_graph_target_name(build_graph_host_target_kind()))
         return 1
     0
+
+// #2016: a target's declared environment (Target.with_env) holds for however
+// the target is built: an action's processes get it from their runner, and a
+// compile the driver runs in-process gets it here, set around the compile
+// with what was there put back after. Returns the NAME=old pairs to restore.
+// (The driver once dropped it for in-process compiles, so with-sha256's debug
+// map named the worktree its WITH_FILE_PREFIX_MAP was declared to hide.)
+fn build_graph_apply_target_env(target: &BuildGraphTarget) -> Vec[str]:
+    var saved: Vec[str] = Vec.new()
+    for i in 0..target.env.len() as i32:
+        let entry = target.env[i]
+        let eq = entry.find("=")
+        if eq <= 0: continue
+        let name = entry.slice(0, eq)
+        saved.push(name ++ "=" ++ with_getenv_str(name))
+        let _set = with_setenv_str(name, entry.slice(eq + 1, entry.len()))
+    saved
+
+fn build_graph_restore_target_env(saved: &Vec[str]):
+    var i = saved.len() as i32 - 1
+    while i >= 0:
+        let entry = saved[i]
+        let eq = entry.find("=")
+        let _set = with_setenv_str(entry.slice(0, eq), entry.slice(eq + 1, entry.len()))
+        i = i - 1
 
 // Always-on wall-clock report: every top-level `with build <target>` prints how
 // long it took, unconditionally (worker re-entries — WITH_BUILD_*_WORKER — stay

@@ -159,6 +159,16 @@ fn add_cross_wasm_rt_targets(out0: Build, tag: &str, p: &str, group_name: &str) 
 // every one off Linux, is `linux-sysroot-<arch>`. One target per pack (#2014).
 fn linux_sysroot_target_name(a: &str) -> str: if a == arch() and os() == "Linux": "linux-sysroot" else: "linux-sysroot-" ++ a
 
+// A linux sysroot target that generates one (#2016, as darwin-sysroot since
+// #1899): it fetches the pinned Zig source into its own scratch, and the tree
+// links read is a declared output beside the pack, so the build store serves
+// both and a served worktree fetches nothing.
+fn linux_sysroot_fetches(target: Target, a: &str) -> Target:
+    var out = target.extra_output(sdk_linux_sysroot_dir_for(a))
+    out = out.input("build/https_fetch.w")
+    out = out.input("build/zlib_gunzip.w")
+    out.allow_network()
+
 fn cross_llvm_prefix(tag: &str) -> str:
     let arch_tag = if tag == "linux_aarch64": "linux-aarch64" else: "linux-x86_64"
     ".deps/llvm-" ++ compiler_llvm_version() ++ "-" ++ arch_tag
@@ -2801,7 +2811,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     let sdk_lib_dir = comp_llvm_prefix_for_root(ctx.project_info().project_root()) ++ "/lib"
     clang_resource = clang_resource.arg("llvm-prefix=" ++ sdk_lib_dir)
     clang_resource = clang_resource.arg("wasm-backend=" ++ (if comp_sdk_has_wasm_backend(ctx.fs(), sdk_lib_dir): "yes" else: "no"))
-    let sdk_driver = ctx.fs().host_exists(sdk_lib_dir ++ "/libclangMain.a") or ctx.fs().host_exists(sdk_lib_dir ++ "/clangMain.lib")
+    let sdk_driver = comp_host_has_clang_main(ctx.fs(), sdk_lib_dir)
     clang_resource = clang_resource.arg("clang-driver=" ++ (if sdk_driver: "yes" else: "no"))
     let sdk_lld_flavors = comp_sdk_lld_flavors(ctx.fs(), sdk_lib_dir, os())
     var sdk_lld_text = ""
@@ -2833,9 +2843,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(windows_sysroot)
 
     // The darwin and linux sysroots come from the Zig source (#1915).
-    let sysroot_host = os() == "Macos" or (os() == "Linux" and sdk_linux_arch_supported(arch()))
-    if sysroot_host:
-        out = out.add_target(sdk_source_target("sysroot-zig-source", sdk_zig_source_url(), sdk_zig_source_sha256(), sdk_zig_archive(), sdk_zig_source_root(), sdk_zig_source_dir(), sdk_zig_source_marker()))
+    // Each fetches the pinned source into its own scratch (build/sdk.w
+    // sdk_materialize_zig_source): no target writes .deps (#2016).
     var darwin_sysroot = target_new(.Action, "darwin-sysroot", "").output(sdk_darwin_sysroot_pack())
     darwin_sysroot.action = run_darwin_sysroot_action
     darwin_sysroot = darwin_sysroot.input("build/sdk.w")
@@ -2862,8 +2871,7 @@ pub fn build(ctx: BuildCtx) -> Build:
         linux_sysroot = linux_sysroot.input("build/sdk.w")
         linux_sysroot = linux_sysroot.input("sdk.lock")
         if sdk_linux_arch_supported(arch()):
-            linux_sysroot = linux_sysroot.dep("sysroot-zig-source")
-            linux_sysroot = linux_sysroot.input(sdk_zig_source_marker())
+            linux_sysroot = linux_sysroot_fetches(move linux_sysroot, arch())
         linux_sysroot = linux_sysroot.write_scope(sdk_linux_sysroot_dir())
         linux_sysroot = linux_sysroot.write_scope("out/command/linux-sysroot")
         linux_sysroot = linux_sysroot.timeout(1200000)
@@ -2879,8 +2887,7 @@ pub fn build(ctx: BuildCtx) -> Build:
         linux_sysroot_arm = linux_sysroot_arm.arg(build_owned_text(other))
         linux_sysroot_arm = linux_sysroot_arm.input("build/sdk.w")
         linux_sysroot_arm = linux_sysroot_arm.input("sdk.lock")
-        linux_sysroot_arm = linux_sysroot_arm.dep("sysroot-zig-source")
-        linux_sysroot_arm = linux_sysroot_arm.input(sdk_zig_source_marker())
+        linux_sysroot_arm = linux_sysroot_fetches(move linux_sysroot_arm, other)
         linux_sysroot_arm = linux_sysroot_arm.write_scope(sdk_linux_sysroot_dir_for(other))
         linux_sysroot_arm = linux_sysroot_arm.write_scope("out/command/" ++ name)
         linux_sysroot_arm = linux_sysroot_arm.timeout(1200000)
@@ -4424,13 +4431,18 @@ pub fn build(ctx: BuildCtx) -> Build:
     deps = deps.arg(llvm_sdk_dir_basename())
     out = out.add_target(deps)
 
-    // `with cc` links clang's driver; an SDK fetched before that existed gets
-    // the archive added in place (build/sdk.w).
+    // `with cc` links clang's driver; for an SDK fetched before that existed
+    // this builds the archive under out/ (build/sdk.w). The SDK is an input,
+    // pinned by sdk.lock, and never written (#2016): a target that wrote into
+    // .deps changed what every other worktree's build reads.
     var clang_main = target_new(.Action, "sdk-clang-main", "").output("out/command/sdk-clang-main/done")
     clang_main.action = run_sdk_clang_main_action
-    clang_main = clang_main.write_scope("out/tmp")
+    clang_main = clang_main.input("sdk.lock")
+    if sdk_clang_main_builds(ctx.fs(), comp_llvm_prefix_for_root(ctx.project_info().project_root())):
+        clang_main = clang_main.extra_output(comp_clang_main_built_archive())
+    clang_main = clang_main.write_scope("out/tmp/sdk-clang-main")
     clang_main = clang_main.write_scope("out/command/sdk-clang-main")
-    clang_main = clang_main.write_scope(".deps")
+    clang_main = clang_main.write_scope(comp_clang_main_built_dir())
     clang_main = clang_main.allow_network()
     out = out.add_target(clang_main)
 
@@ -4527,6 +4539,10 @@ pub fn build(ctx: BuildCtx) -> Build:
     // entries while selecting a late default target.
     var sha256_tool = target_new(.Executable, "with-sha256", "tools/with-sha256.w").output(host_bin("out/bin/with-sha256"))
     sha256_tool = sha256_tool.compiler("seed")
+    // The driver compiles it in-process, under this declared environment
+    // (#2016): its debug map names /with-src, as the stage compiles' do (D50),
+    // so it is the same binary in every worktree and the build store serves it.
+    sha256_tool = sha256_tool.with_env("WITH_FILE_PREFIX_MAP", compiler_file_prefix_map(ctx.project_info().project_root()))
     sha256_tool = sha256_tool.dep("prepare-bootstrap-link-root")
     out = out.add_target(move sha256_tool)
 
