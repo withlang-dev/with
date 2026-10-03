@@ -109,9 +109,23 @@ reports per site; a disagreement is a violation. Before the change the lane
 was red over `src/main.w` on all nine live sites; the two method-owner
 fallbacks of the field walks never fired and were deleted. The downcast
 sites and the null constant read the `Option`-of-pointer niche, which is
-codegen-owned representation, and stay LLVM-typed. Not yet converted:
-`mir_try_place_ptr_for_ref` (value-vs-slot by LLVM type and the name
-`self`) and `mir_operand_local_holds_pointer`.
+codegen-owned representation, and stay LLVM-typed. Converted since
+(wave-d65b): `mir_try_place_ptr_for_ref` and
+`mir_operand_local_holds_pointer` (the reference's place pointer from the
+local's category, sites `place-for-ref …`); a `sizeof`/`alignof` type
+argument (Sema's `type_level_arg_in_body`); every struct field's LLVM type
+(Sema's field type); a field projection's GEP index (the declaration index
+MIR carries, `MirBody.proj_decl`; the LLVM registry verifies, and a named
+projection that arrives without it is reported, site `field projection
+declaration index carried by MIR`); closure capture mode and environment
+ownership (Sema's capture record). A user generic struct instance's LLVM
+struct is built from Sema's instance — its TypeId, arguments and field
+types (`get_or_create_generic_struct_type`); the path that resolved the
+declaration's field types under codegen's LLVM bindings and mapped LLVM
+types back to Sema types (`monomorphize_struct_nodes`) is deleted. Its
+symbol text is still spelled from the arguments' LLVM types, which method
+symbols and owner lookups parse; that naming moves to Sema's identity with
+phase 5.
 Every `analysis_last_marshal_strategy` must be derivable from the argument's
 `PassMode` and the operand's MIR category, never from `wl_get_type_kind` of
 the evaluated value. Concretely: `marshal_ref_addr`'s "already a pointer"
@@ -129,9 +143,17 @@ persists its binding category (`view_bound_let_nodes`). `audit:resolution`
 judges them with `mir_field_place_verdict` / `mir_let_binding_verdict`
 (planted in `test/internals/analysis_resolution_test.w`). Over `src/main.w`
 the compiler already agrees: 70083 field places and 9155 bindings, 0
-violations. Not yet covered: view origins (`expr_view_param_origins`)
-and index places; the field projection still names its field by symbol,
-not by Sema's declaration index.
+violations. Since (wave-d65b): index places and view origins are judged
+too (`mir_index_place_verdict`, `mir_view_origin_verdict`); a named field
+projection carries Sema's declaration index (`MirBody.proj_decl`, judged by
+`mir_field_decl_verdict`). Sema records the per-node facts a template's
+instances differ in per instance, keyed (specialization symbol, node):
+an index's element place type and base (`index_element_in_body`), a field
+access's type, owner and declaration index (`field_access_type_in_body`,
+`field_decl_index_in_body`). MIR reads the index element from it
+(`MirBody.instance_sym` names the instance a body, its closures and its
+gen-loop bodies belong to), and the audit judges specialization bodies
+against their own instance: none is skipped.
 Every MIR place lowered from a source expression must correspond to Sema's
 resolved place/origin for that node: field index from Sema's declaration
 identity (not from name lookup at lowering time — the module-type identity
@@ -146,9 +168,13 @@ binding with `mir_call_arg_transfer_verdict`: a move into a parameter Sema
 borrows (share-place, extern bit-copy) or a copy into one it consumes is a
 violation (planted in `test/internals/analysis_resolution_test.w`). Over
 `src/main.w`: 180558 arguments, 27343 judged (18417 into borrowing
-parameters), 0 violations. Not yet covered: closure captures (D62/D63's
-`{storage, captures, call_kind}` record) and `lower_callable_expr`'s own
-observe-vs-move choice.
+parameters), 0 violations. Since (wave-d65b): closure captures are judged
+against Sema's capture record (`mir_capture_verdict`), and a closure
+literal passed by value to a generic method is the callee's per Sema's
+signature (its statement temporary is blanked, not dropped after the
+callee dropped it: test/debug_alloc/da_closure_literal_into_generic_method.w).
+Not yet covered: `lower_callable_expr`'s own observe-vs-move choice
+(phase 5).
 MIR move/borrow/capture classification per operation must agree with Sema's
 effect summary: a MIR `move` operand where Sema recorded observe (or vice
 versa) is a violation; closure environments carry Sema's

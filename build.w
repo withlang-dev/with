@@ -2525,6 +2525,14 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
         return 1
     if deep_debug_analyze_expect(ctx, root, compiler, build_project_abs(root, "test/behavior/behav_c_facade_resource_in_place_drop_once.w"), out_dir, "analyze-audit-in-place-drop-once", "audit:all", "violations=0 ok") != 0:
         return 1
+    // #1647: a template's index and field nodes are judged per instance
+    // (Sema's per-specialization facts), and a closure literal moved into a
+    // generic method is not dropped again by its caller (the ownership
+    // validator's "drop ... after a path reaching it moved it out").
+    if deep_debug_analyze_expect(ctx, root, compiler, build_project_abs(root, "test/behavior/behav_1647_index_and_field_per_instance.w"), out_dir, "analyze-audit-per-instance", "audit:all", "violations=0 ok") != 0:
+        return 1
+    if deep_debug_analyze_expect(ctx, root, compiler, build_project_abs(root, "test/behavior/behav_gen_push_generic_and_methods.w"), out_dir, "analyze-audit-gen-push-generic", "audit:all", "violations=0 ok") != 0:
+        return 1
     // #1381: a downcast place has no type of its own; typed as the enum it
     // failed audit:codegen on every `??`/`unwrap_or`. #1394: the payload a
     // carrier eliminator moves out is reset-on-move, and audit:all's
