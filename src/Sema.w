@@ -4398,14 +4398,24 @@ impl Sema:
         var global_tid = 0
         var saw_recorded = 0
         var saw_named_tid = 0
+        // The scoped tier first (#1967): `Self` and a generic type parameter
+        // are inserted into named_types directly, with no module candidate,
+        // and are lexically closer than any module's declaration — a visible
+        // module's `pub type T` must not shadow the `T` of `fn f[T]`.
         var i = self.named_type_candidate_head(sym)
         while i >= 0:
             saw_recorded = 1
+            if named_tid != 0 and self.named_type_candidate_tids[i] == named_tid:
+                saw_named_tid = 1
+            i = self.named_type_candidate_next[i]
+        let scoped = self.scoped_type_binding(sym, named_tid, saw_recorded, saw_named_tid)
+        if scoped != 0:
+            return scoped
+        i = self.named_type_candidate_head(sym)
+        while i >= 0:
             let candidate_tid = self.named_type_candidate_tids[i]
             let candidate_path = self.named_type_candidate_paths[i]
             let candidate_pub = self.named_type_candidate_pub[i]
-            if named_tid != 0 and candidate_tid == named_tid:
-                saw_named_tid = 1
             let candidate_visible = if gated != 0: self.decl_visible_from_current_gated(candidate_path, candidate_pub, sym) else: self.decl_visible_from_current(candidate_path, candidate_pub)
             if candidate_path.len() == 0:
                 if global_tid == 0:
@@ -4437,9 +4447,6 @@ impl Sema:
                     if self.named_type_candidate_paths[i] == bridged:
                         return self.named_type_candidate_tids[i]
                     i = self.named_type_candidate_next[i]
-        let scoped = self.scoped_type_binding(sym, named_tid, saw_recorded, saw_named_tid)
-        if scoped != 0:
-            return scoped
         // The builtin tier: a candidate recorded before any module path
         // existed (primitives, FieldInfo/VariantInfo) has the empty path and
         // is visible everywhere, after every module candidate so a module's
