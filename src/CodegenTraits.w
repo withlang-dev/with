@@ -1366,6 +1366,13 @@ impl Codegen:
         result
 
     mut fn try_eval_const_string(node: i32, source_path: &str, depth: i32) -> ConstStringEval:
+        self.note_ast_derivation(AST_DERIVATION_CONST, node)
+        self.ast_derivation_depth = self.ast_derivation_depth + 1
+        let value = self.eval_const_string_from_ast(node, source_path, depth)
+        self.ast_derivation_depth = self.ast_derivation_depth - 1
+        value
+
+    mut fn eval_const_string_from_ast(node: i32, source_path: &str, depth: i32) -> ConstStringEval:
         if node == 0 or depth > 32:
             return const_string_eval_fail()
 
