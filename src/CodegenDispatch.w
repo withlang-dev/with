@@ -1999,6 +1999,35 @@ impl Codegen:
                 return self.mir_sema_type_is_unsigned(pointee)
         false
 
+    // A format spec's flags with the value's own bit width in bits 24-31
+    // (none for 64 bits or a non-integer): with_fmt_int_spec prints a narrow
+    // signed value's own bits under a hex, binary or octal spec, `i8` -2
+    // under `:x` as `fe` (#1907). The width is Sema's, as the signedness is:
+    // the operand may already be widened when it is formatted. Both the
+    // FMT_SPEC and FMT_BUF_WRITE_FMT intrinsics pass through here.
+    fn mir_int_spec_flags(flags: i32, sema_ty: i32) -> i32:
+        let own_width = self.mir_sema_type_int_width(sema_ty)
+        if own_width > 0 and own_width < 64: flags | (own_width << 24) else: flags
+
+    // The bit width of an integer-valued Sema type, through the same
+    // enum-repr and view-binding readings as mir_sema_type_is_unsigned; 64
+    // for anything else.
+    fn mir_sema_type_int_width(sema_ty: i32) -> i32:
+        if sema_ty <= 0: return 64
+        let resolved = self.mir_resolve_alias_at(sema_ty)
+        let kind = self.mir_type_kind_at(resolved)
+        if kind == TypeKind.TY_INT:
+            return self.mir_type_d0_at(resolved)
+        if kind == TypeKind.TY_ENUM:
+            let repr = self.sema.enum_repr_type(resolved)
+            return if repr != 0: self.mir_sema_type_int_width(repr) else: 64
+        if kind == TypeKind.TY_REF:
+            let pointee = self.mir_resolve_alias_at(self.mir_type_d0_at(resolved))
+            let pointee_kind = self.mir_type_kind_at(pointee)
+            if pointee_kind == TypeKind.TY_INT or pointee_kind == TypeKind.TY_ENUM:
+                return self.mir_sema_type_int_width(pointee)
+        64
+
     fn mir_sema_type_is_raw_pointer_or_ref(sema_ty: i32) -> bool:
         if sema_ty <= 0: return false
         let resolved = self.mir_resolve_alias_at(sema_ty)
@@ -3180,7 +3209,8 @@ impl Codegen:
 
     // `is_unsigned` is Sema's signedness of the value's type (the FMT_SPEC
     // intrinsic carries the type id): an unsigned or narrow value keeps its
-    // own width, never a sign-extended 64-bit reading (#1922).
+    // own width, never a sign-extended 64-bit reading (#1922). `flags`
+    // carries the value's own bit width (mir_int_spec_flags, #1907).
     mut fn gen_fmt_with_spec(val: i64, is_unsigned: bool, flags: i32, width: i32, precision: i32, mode: i32, str_ty: i64) -> i64:
         // Dispatch to runtime with_fmt_*_spec based on LLVM value type.
         let val_ty = wl_type_of(val)
@@ -11999,7 +12029,8 @@ impl Codegen:
             let sp_width = wl_const_int_sext_val(sp_width_v) as i32
             let sp_prec = wl_const_int_sext_val(sp_prec_v) as i32
             let sp_mode = sp_flags & 255
-            result = self.gen_fmt_with_spec(sp_val, self.mir_sema_type_is_unsigned(wl_const_int_sext_val(sp_type_v) as i32), sp_flags, sp_width, sp_prec, sp_mode, sp_str_ty)
+            let sp_sema_ty = wl_const_int_sext_val(sp_type_v) as i32
+            result = self.gen_fmt_with_spec(sp_val, self.mir_sema_type_is_unsigned(sp_sema_ty), self.mir_int_spec_flags(sp_flags, sp_sema_ty), sp_width, sp_prec, sp_mode, sp_str_ty)
 
         // ── FmtBuffer intrinsics (f-string formatting via buffer) ────
         else if intrinsic == MirIntrinsic.FMT_BUF_NEW:
@@ -12034,7 +12065,7 @@ impl Codegen:
             let fb_width = wl_const_int_sext_val(fb_width_v) as i32
             let fb_prec = wl_const_int_sext_val(fb_prec_v) as i32
             let fb_mode = fb_flags & 255
-            self.gen_fmt_buf_write_fmt(fb_buf, fb_val, self.mir_sema_type_is_unsigned(wl_const_int_sext_val(fb_type_v) as i32), fb_flags, fb_width, fb_prec, fb_mode)
+            self.gen_fmt_buf_write_fmt(fb_buf, fb_val, self.mir_sema_type_is_unsigned(wl_const_int_sext_val(fb_type_v) as i32), self.mir_int_spec_flags(fb_flags, wl_const_int_sext_val(fb_type_v) as i32), fb_width, fb_prec, fb_mode)
             result = wl_const_int(wl_i32_type(self.context), 0, 0)
 
         else if intrinsic == MirIntrinsic.FMT_BUF_FINISH:

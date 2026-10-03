@@ -1542,6 +1542,12 @@ impl CCodegen:
             return f"(int64_t)(uint64_t)({expr}), 1"
         f"(int64_t)({expr}), 0"
 
+    // The spec's flags with the value's own bit width in bits 24-31 (none
+    // for 64 or 128 bits), as the LLVM backend's mir_int_spec_flags (#1907).
+    fn int_spec_flags_text(resolved: i32, flags_text: &str) -> str:
+        let own_width = if self.sema.get_type_kind(resolved as TypeId) == TypeKind.TY_INT: self.sema.get_type_d0(resolved as TypeId) else: 64
+        if own_width > 0 and own_width < 64: f"(({flags_text}) | ((int64_t){own_width} << 24))" else: flags_text.to_owned()
+
     fn int_spec_is_128(resolved: i32) -> bool:
         self.sema.get_type_kind(resolved as TypeId) == TypeKind.TY_INT and self.sema.get_type_d0(resolved as TypeId) == 128
 
@@ -7828,7 +7834,7 @@ impl CCodegen:
                 out = out ++ "    with_fmt_buf_write_str_spec_ref((uint8_t*)(" ++ buf ++ "), " ++ val ++ ", (int64_t)(" ++ flags ++ "), (int32_t)(" ++ width ++ "), (int32_t)(" ++ precision ++ "));\n"
             else:
                 let spec_fn = if self.int_spec_is_128(resolved as i32): "with_fmt_buf_write_int128_spec" else: "with_fmt_buf_write_i64_spec"
-                out = out ++ "    " ++ spec_fn ++ "((uint8_t*)(" ++ buf ++ "), " ++ self.int_spec_value_args(resolved as i32, val) ++ ", (int64_t)(" ++ flags ++ "), (int32_t)(" ++ width ++ "), (int32_t)(" ++ precision ++ "), (int32_t)(((" ++ flags ++ ") & 255)));\n"
+                out = out ++ "    " ++ spec_fn ++ "((uint8_t*)(" ++ buf ++ "), " ++ self.int_spec_value_args(resolved as i32, val) ++ ", (int64_t)(" ++ self.int_spec_flags_text(resolved as i32, flags) ++ "), (int32_t)(" ++ width ++ "), (int32_t)(" ++ precision ++ "), (int32_t)(((" ++ flags ++ ") & 255)));\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 
@@ -7948,7 +7954,7 @@ impl CCodegen:
                     out = out ++ "    " ++ dst ++ " = with_fmt_str_spec_ref(" ++ val_text ++ ", (int64_t)(" ++ flags_text ++ "), (int32_t)(" ++ width_text ++ "), (int32_t)(" ++ prec_text ++ "));\n"
                 else:
                     let spec_fn = if self.int_spec_is_128(resolved as i32): "with_fmt_int128_spec" else: "with_fmt_int_spec"
-                    out = out ++ "    " ++ dst ++ " = " ++ spec_fn ++ "(" ++ self.int_spec_value_args(resolved as i32, val_text) ++ ", (int64_t)(" ++ flags_text ++ "), (int32_t)(" ++ width_text ++ "), (int32_t)(" ++ prec_text ++ "), (int32_t)(" ++ mode_text ++ "));\n"
+                    out = out ++ "    " ++ dst ++ " = " ++ spec_fn ++ "(" ++ self.int_spec_value_args(resolved as i32, val_text) ++ ", (int64_t)(" ++ self.int_spec_flags_text(resolved as i32, flags_text) ++ "), (int32_t)(" ++ width_text ++ "), (int32_t)(" ++ prec_text ++ "), (int32_t)(" ++ mode_text ++ "));\n"
             else:
                 out = out ++ "    (void)0;\n"
             out = out ++ f"    goto bb{next_bb};"

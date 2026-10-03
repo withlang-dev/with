@@ -2426,13 +2426,19 @@ fn fmt_spec_base(mode: i32) -> i32:
 
 // A 64-bit integer under a spec: `val_arg` holds the value's bits, extended
 // to 64 by the caller as its type's signedness says (zero for unsigned).
+// Flags bits 24-31 carry the value's own bit width (0 for 64): under a
+// bit-pattern base a narrow signed value prints its own bits, never its
+// 64-bit extension (`i8` -2 under `:x` is `fe`, #1907).
 pub fn with_fmt_int_spec(val_arg: i64, is_unsigned: i32, flags: i64, width: i32, precision: i32, mode: i32) -> str:
     let _ = precision
-    let bits = val_arg as u64
+    var bits = val_arg as u64
     // A negative decimal prints its magnitude after '-'; ~x + 1 cannot
     // overflow for a negative x, i64::MIN included (#1922).
     if is_unsigned == 0 and val_arg < 0 and fmt_spec_base(mode) == 10:
         return fmt_int_spec_parts(~bits + 1, 0, true, true, flags, width, mode)
+    let own_width = (flags >> 24) & 255
+    if own_width > 0 and own_width < 64 and fmt_spec_base(mode) != 10:
+        bits = bits & (((1 as u64) << (own_width as u64)) - 1)
     fmt_int_spec_parts(bits, 0, false, is_unsigned == 0, flags, width, mode)
 
 // A 128-bit integer under a spec, passed as its low and high 64-bit words
