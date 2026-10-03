@@ -7,6 +7,7 @@ use BuildGraphKinds
 use BuildGraphModel
 use BuildGraphSupport
 use BuildGraphRuntime
+use std.string.StringBuilder
 
 extern fn with_str_clone_ref(s: &str) -> str
 
@@ -178,13 +179,48 @@ pub fn build_graph_assemble_to_object(root: &str, target: &BuildGraphTarget) -> 
         let arg0 = target.args[0]
         if arg0.starts_with("triple="):
             asm_triple = arg0.slice(7, arg0.len())
+    // #1899: a relative `.incbin`/`.include` operand names a file from the
+    // project root (an embed target's assembly is the same text in every
+    // worktree). The assembler opens operands against the process's working
+    // directory, which need not be the root, so it reads a copy whose
+    // operands are resolved; the object holds the bytes, not the names.
+    let source_text = build_graph_rt_read_file(source_path)
+    let resolved_text = build_graph_asm_resolve_operands(root, &source_text)
+    var assembled_path = source_path.clone()
+    if resolved_text != source_text:
+        assembled_path = output_path ++ ".resolved.s"
+        if build_graph_rt_write_file(assembled_path, resolved_text) != 0:
+            build_graph_rt_eprint("error: compile_asm_object target '" ++ target.name ++ "' could not write " ++ assembled_path)
+            return 1
     let rc = if asm_triple.len() > 0:
-        build_graph_rt_assemble_to_object_for_triple(source_path, output_path, asm_triple)
+        build_graph_rt_assemble_to_object_for_triple(assembled_path, output_path, asm_triple)
     else:
-        build_graph_rt_assemble_to_object(source_path, output_path)
+        build_graph_rt_assemble_to_object(assembled_path, output_path)
+    if assembled_path != source_path:
+        let _rm = build_graph_rt_remove_file(assembled_path)
     if rc != 0:
         build_graph_rt_eprint("error: compile_asm_object target '" ++ target.name ++ "' failed")
     rc
+
+// `text` with every relative `.incbin`/`.include` operand resolved against
+// the project root.
+fn build_graph_asm_resolve_operands(root: &str, text: &str) -> str:
+    var out = StringBuilder.new()
+    var start: i64 = 0
+    while start < text.len():
+        var end = start
+        while end < text.len() and text[end] != '\n': end = end + 1
+        let line = text.slice(start, end)
+        let path = build_graph_asm_directive_path(line)
+        let quoted = build_graph_asm_quote_path(path)
+        let at = line.find(quoted)
+        if path.len() > 0 and not runtime_path_is_absolute(path) and at >= 0:
+            out.push_str(line.slice(0, at as i64) ++ build_graph_asm_quote_path(build_graph_resolve_project_path(root, path)) ++ line.slice(at as i64 + quoted.len(), line.len()))
+        else:
+            out.push_str(line)
+        if end < text.len(): out.push_str("\n")
+        start = end + 1
+    out.to_str()
 
 // The files a standard target read that it does not declare, recorded as its
 // discovered dependencies. An assembled object is made from its source and
@@ -385,7 +421,10 @@ pub fn build_graph_embed_object_files(root: &str, target: &BuildGraphTarget) -> 
             has_windows_runtime = true
         if sym == "rt_windows_aarch64_o":
             has_windows_aarch64_runtime = true
-        asm_text = asm_text ++ build_graph_emit_embedded_blob(sym, input_path)
+        // #1899: named as declared (from the project root), so the assembly
+        // is the same text in every worktree; build_graph_assemble_to_object
+        // resolves the operand against the root, as the discovered inputs do.
+        asm_text = asm_text ++ build_graph_emit_embedded_blob(sym, target.inputs[ii])
     // Every platform slot src/compiler/Link.w declares must exist in every
     // embedded-objects blob, real or zero-length: a cross-compiled compiler
     // (build.w's cross-rt-windows-* targets) carries only its own platform

@@ -1724,7 +1724,7 @@ fn link_stage_compiler_runtime_dir() -> str:
 fn link_stage_resolve_runtime_root() -> str:
     let explicit = runtime_getenv("WITH_RUNTIME_ROOT") ++ ""
     if explicit.len() > 0:
-        if compiler_generation_is_stamped() and link_stage_runtime_dir_producer(explicit) != compiler_generation():
+        if not link_stage_named_runtime_root_is_this_generation(explicit):
             return ""
         return explicit
     let argv0 = runtime_arg_at(0)
@@ -1750,6 +1750,17 @@ fn link_stage_resolve_runtime_root() -> str:
             return with_str_clone_ref(dir)
     // Fall back to compiler-relative runtime dir.
     compiler_dir ++ "/runtime"
+
+// Whether a root the build names (WITH_RUNTIME_ROOT) may be linked: its
+// recorded producer is this compiler's generation. Named, it is checked,
+// never vouched for by bytes; a set whose .producer is not yet written is
+// not yet a root. The build asks this same question before it names one
+// (main.w build_runner_link_root), so it never names a root the link then
+// refuses (#1899: the runner named a seed-compiled out/bootstrap-lib whose
+// rt_core.o matched, before its .producer existed, and every action of the
+// run fell back to comptime evaluation).
+pub fn link_stage_named_runtime_root_is_this_generation(dir: &str) -> bool:
+    not compiler_generation_is_stamped() or link_stage_runtime_dir_producer(dir) == compiler_generation()
 
 // The generation that compiled a runtime object set, as the build recorded it
 // (build/compiler.w run_write_runtime_producer_action); "" when none is.

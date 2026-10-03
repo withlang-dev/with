@@ -2798,12 +2798,15 @@ pub fn build(ctx: BuildCtx) -> Build:
     darwin_sysroot.action = run_darwin_sysroot_action
     darwin_sysroot = darwin_sysroot.input("build/sdk.w")
     if os() == "Macos":
-        darwin_sysroot = darwin_sysroot.dep("sysroot-zig-source")
-        darwin_sysroot = darwin_sysroot.input(sdk_zig_source_marker())
+        // #1899: it fetches the pinned Zig source and libc++ ABI list into its
+        // own scratch, so its products are all under out/ and declared — the
+        // tree every darwin link reads included — and the build store can
+        // serve them to another worktree, which then fetches nothing.
+        darwin_sysroot = darwin_sysroot.extra_output(sdk_darwin_sysroot_dir())
         darwin_sysroot = darwin_sysroot.input("build/https_fetch.w")
+        darwin_sysroot = darwin_sysroot.input("build/zlib_gunzip.w")
         darwin_sysroot = darwin_sysroot.allow_network()
     darwin_sysroot = darwin_sysroot.write_scope(sdk_darwin_sysroot_dir())
-    darwin_sysroot = darwin_sysroot.write_scope(sdk_source_root())
     darwin_sysroot = darwin_sysroot.write_scope("out/command/darwin-sysroot")
     darwin_sysroot = darwin_sysroot.timeout(600000)
     out = out.add_target(darwin_sysroot)

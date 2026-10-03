@@ -1648,6 +1648,14 @@ fn build_runner_entry_source() -> str:
     "    let _c = set_env(\"WITH_BUILD_TOOLFS_SUPPRESS\", \"\")\n" ++
     "    __driver_exit(b.__driver_run_action(__runner_ctx(), __driver_action_name()))\n"
 
+// A runner for this build's key exists, here or in the shared store.
+fn build_runner_built(root: &str, options: &BuildCommandOptions) -> bool:
+    let key = build_cache_graph_key(root, options.target_kind, 0)
+    let bin_path = resolve_join(root, "out/.build-state/build-runner")
+    if with_fs_file_exists(bin_path) != 0 and with_fs_read_file(bin_path ++ ".key") == key: return true
+    let shared = build_cache_runner_store_path(key)
+    shared.len() > 0 and with_fs_file_exists(shared) != 0 and with_fs_read_file(shared ++ ".key") == key
+
 fn build_runner_ensure(root: &str, options: &BuildCommandOptions) -> str:
     let bin_path = resolve_join(root, "out/.build-state/build-runner")
     let key_path = bin_path ++ ".key"
@@ -1737,7 +1745,8 @@ fn build_runner_link_root(root: &str) -> str:
         let dir = resolve_join(root, dirs[i])
         if with_fs_file_exists(dir ++ "/cimport_stubs.o") == 0: continue
         if platform_object.len() > 0 and with_fs_file_exists(dir ++ "/" ++ platform_object) == 0: continue
-        if link_stage_runtime_dir_is_this_generation(dir): return dir
+        // The link's own test for a root it is named (#1899).
+        if link_stage_named_runtime_root_is_this_generation(dir): return dir
     ""
 
 // A project with no runtime directory at all links its runner from the
@@ -2608,7 +2617,12 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                 return preflight_rc
         if target.kind == 23 and not runner_checked and not build_action_worker_env_enabled() and not options.strict_effects:
             let prepare_done = not bootstrap_root_scheduled or completed_targets.contains(bootstrap_root_target)
-            if build_runner_link_root(root).len() > 0 or (prepare_done and not build_runner_runtime_dirs_present(root)):
+            // #1899: a runner already built for this key (here, or by any
+            // project into the machine-wide store) is a finished binary: it
+            // links nothing, so it needs no root and no prepare. A worktree
+            // whose targets the build store serves runs its few remaining
+            // actions natively instead of evaluating each at comptime.
+            if build_runner_built(root, options) or build_runner_link_root(root).len() > 0 or (prepare_done and not build_runner_runtime_dirs_present(root)):
                 runner_checked = true
                 runner_path = build_runner_ensure(root, options)
             else if prepare_done:

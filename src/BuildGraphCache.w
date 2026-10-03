@@ -803,23 +803,26 @@ pub fn build_cache_cutoff_digest(root: &str, target: &BuildGraphTarget) -> str:
     if text.len() == 0: return ""
     build_cache_sha256_text("cutoff\n" ++ text)
 
-pub fn build_cache_freshness_reason(root: &str, target: &BuildGraphTarget, dep_rebuilt: bool) -> str:
-    if not build_cache_is_cacheable(target.kind):
-        return "not cacheable"
+fn build_cache_freshness_always_runs(target: &BuildGraphTarget) -> bool:
     if target.name == "prune" or target.name == "prune-apply":
-        return "stale: target is always run"
+        return true
     if target.name == "last-green" or target.name == "test-green" or target.name == "require-last-green" or target.name == "check-committed-state" or target.name == "print-version" or target.name == "unit-return-review":
-        return "stale: target is always run"
+        return true
     // The pinned-driver gate answers "which compiler is running this build",
     // a fact no input names (every action's signature already carries the
     // driver fingerprint, so the pinned seed re-runs it on a driver change).
     if target.name == "seed-driver":
-        return "stale: target is always run"
+        return true
     // Publishing is not a function of declared inputs (env-driven, and the
     // release's add-only rule is what refuses a duplicate): never a cache hit.
     // A name, like the lanes above: a Target flag would be a std.build API
     // the pinned seed evaluating build.w does not have (the bootstrap rule).
-    if target.name == "publish-release-asset":
+    target.name == "publish-release-asset"
+
+pub fn build_cache_freshness_reason(root: &str, target: &BuildGraphTarget, dep_rebuilt: bool) -> str:
+    if not build_cache_is_cacheable(target.kind):
+        return "not cacheable"
+    if build_cache_freshness_always_runs(target):
         return "stale: target is always run"
     if dep_rebuilt:
         return "stale: dependency rebuilt"
@@ -1001,12 +1004,25 @@ pub fn build_cache_record(root: &str, target: &BuildGraphTarget, discovered_deps
 // preflight does; an action that reads a dep's output it did not declare
 // is wrong in both worlds.
 //
-// Scope: actions that name their compiler (stage compiles, runtime and
-// bridge objects, .wo bundles, producer stamps) whose outputs and write
-// scopes all lie under out/. An action that writes elsewhere (.deps,
-// lib/std) leaves state a restore would not bring along.
+// Scope: every cacheable target (the same freshness contract the local
+// state uses) whose outputs and write scopes all lie under out/: compiles,
+// actions, generated sources, packed sysroots, placeholder objects. An
+// action that writes elsewhere (.deps, lib/std) leaves state a restore
+// would not bring along. What a restore reproduces is the declared outputs;
+// a write under out/ that is not one (stage1's purge of stale out/lib
+// probes) is trusted as the local cache trusts it, which skips the action
+// just the same whenever it is fresh. A target is published only when its outputs are
+// the same in every worktree: one that names the worktree it ran in (an
+// absolute path baked into a response file, a debug map) would hand that
+// path to the next worktree, so it is not stored and the build says so
+// (build_cache_store_names_root). The capture logs under out/command/ are
+// exempt from that check: they are declared so the freshness check finds
+// them, and no target consumes them.
 
-const BUILD_CACHE_STORE_KEEP_DEFAULT: i32 = 96
+// A commit's :dev publishes about sixty entries and its full chain about a
+// hundred and fifty, most of them small; about seven are stage compilers
+// (~170MB each).
+const BUILD_CACHE_STORE_KEEP_DEFAULT: i32 = 512
 
 pub fn build_cache_store_dir() -> str:
     let explicit = build_graph_rt_getenv("WITH_BUILD_CACHE_DIR")
@@ -1020,8 +1036,9 @@ fn build_cache_store_path_is_under_out(path: &str) -> bool:
     path.starts_with("out/") and not path.contains("/../") and not path.contains("/./") and not path.ends_with("/..")
 
 fn build_cache_store_eligible(target: &BuildGraphTarget) -> bool:
-    if target.kind != 23 or target.output.len() == 0: return false
-    if not build_cache_target_names_compiler(target): return false
+    if not build_cache_is_cacheable(target.kind) or target.output.len() == 0: return false
+    // The always-run targets are never fresh, so an entry would never verify.
+    if build_cache_freshness_always_runs(target): return false
     if not build_cache_store_path_is_under_out(target.output): return false
     for i in 0..target.extra_outputs.len() as i32:
         let extra = target.extra_outputs[i]
@@ -1043,8 +1060,18 @@ fn build_cache_store_tree_has_symlink(path: &str) -> bool:
         if child_mode >= 0 and (child_mode & BUILD_CACHE_S_IFMT) == BUILD_CACHE_S_IFLNK: return true
     false
 
+// The local signature with this worktree's root spelled `<root>`: an arg
+// naming a path in the tree (`llvm-prefix=<root>/.deps/...`) is the same
+// argument in every worktree. What the action makes of it is checked on
+// the outputs (build_cache_store_names_root).
+fn build_cache_store_signature(target: &BuildGraphTarget, root: &str) -> str:
+    var sig = ""
+    for part in build_cache_signature_parts(target, root):
+        sig = sig ++ part.text
+    build_cache_sha256_text(build_cache_store_portable(root, sig))
+
 fn build_cache_store_key(root: &str, target: &BuildGraphTarget) -> str:
-    var text = "build-store v1\nsig:" ++ build_cache_compute_signature(target, root) ++ "\ndriver:" ++ build_cache_current_compiler_fingerprint() ++ "\n"
+    var text = "build-store v2\nsig:" ++ build_cache_store_signature(target, root) ++ "\ndriver:" ++ build_cache_current_compiler_fingerprint() ++ "\n"
     let compiler_path = build_cache_target_compiler_path(root, target)
     if compiler_path.len() > 0:
         text = text ++ "compiler:" ++ build_cache_compiler_binary_fingerprint(compiler_path) ++ "\n"
@@ -1071,6 +1098,24 @@ fn build_cache_store_dirname(path: &str) -> str:
         if path[i] == '/': last = i
     if last <= 0: "." else: path.slice(0, last as i64)
 
+// The first output file (outside the out/command/ capture logs) whose bytes
+// contain this worktree's root, or "".
+fn build_cache_store_names_root(root: &str, rels: &Vec[str]) -> str:
+    for i in 0..rels.len() as i32:
+        let rel = rels[i]
+        if rel.starts_with("out/command/"): continue
+        let path = root ++ "/" ++ rel
+        let mode = build_graph_rt_file_mode(path)
+        if mode < 0: continue
+        if (mode & BUILD_CACHE_S_IFMT) == BUILD_CACHE_S_IFDIR:
+            let files = build_cache_split_lines(build_graph_rt_list_files(path))
+            for fi in 0..files.len() as i32:
+                if build_graph_rt_read_file(files[fi]).contains(root):
+                    return build_cache_project_relative(root, files[fi])
+        else if build_graph_rt_read_file(path).contains(root):
+            return rel.clone()
+    ""
+
 fn build_cache_store_touch(entry: &str):
     let _ = build_graph_rt_write_file(entry ++ "/used", f"{build_graph_rt_time_now()}\n")
 
@@ -1084,6 +1129,10 @@ pub fn build_cache_store_publish(root: &str, target: &BuildGraphTarget, state_te
     let rels = build_cache_store_output_rel_paths(target)
     for i in 0..rels.len() as i32:
         if build_cache_store_tree_has_symlink(root ++ "/" ++ rels[i]): return
+    let named = build_cache_store_names_root(root, &rels)
+    if named.len() > 0:
+        build_graph_rt_eprint("[cache] " ++ target.name ++ ": not stored: " ++ named ++ " names this worktree (" ++ root ++ "), so it is not the same output in another")
+        return
     let tmp = entry ++ f".tmp.{build_graph_rt_getpid()}"
     let _rm = build_graph_rt_remove_tree(tmp)
     if build_graph_rt_mkdir_p(tmp ++ "/outputs") != 0: return
@@ -1162,6 +1211,29 @@ fn build_cache_store_repin_effects(state_text: &str, hash: &str) -> str:
         out = out ++ (if line.starts_with("effects:"): "effects:" ++ hash else: line.clone()) ++ "\n"
     out
 
+fn build_cache_forget_restored_fingerprints(root: &str, rels: &Vec[str]):
+    for i in 0..rels.len() as i32:
+        let path = root ++ "/" ++ rels[i]
+        build_cache_fp_memo.remove(path.clone())
+        if build_graph_rt_is_dir(path) != 0:
+            let files = build_cache_split_lines(build_graph_rt_list_files(path))
+            for fi in 0..files.len() as i32:
+                build_cache_fp_memo.remove(files[fi].clone())
+    build_cache_tree_fp_memo = HashMap.new()
+
+fn build_cache_store_repin_signature(state_text: &str, target: &BuildGraphTarget, root: &str) -> str:
+    var out = ""
+    var pinned = false
+    for line in state_text.split("\n"):
+        if line.len() == 0: continue
+        if line.starts_with("sig:") or line.starts_with("sigpart:"):
+            if not pinned:
+                out = out ++ "sig:" ++ build_cache_compute_signature(target, root) ++ "\n" ++ build_cache_signature_part_lines(target, root)
+                pinned = true
+            continue
+        out = out ++ line ++ "\n"
+    out
+
 // Restore `target` from the store when an entry matches its key: the
 // outputs replace what is on disk, the state and effect records are
 // written as the record would have, and the freshness check must then say
@@ -1193,8 +1265,15 @@ pub fn build_cache_store_restore(root: &str, target: &BuildGraphTarget) -> bool:
         state_text = build_cache_store_repin_effects(state_text, build_cache_sha256_text(effects_text))
     else:
         let _rm_effects = build_graph_rt_remove_file(effects_path)
+    // The key matched on the signature with the root spelled `<root>`; the
+    // record's own sig lines hash the producing worktree's spelling, so they
+    // are re-pinned to this one's, as build_cache_record would write them.
+    state_text = build_cache_store_repin_signature(state_text, target, root)
     let _ws = build_graph_rt_write_file(build_cache_state_path(root, target.name), state_text)
-    build_cache_forget_fingerprints()
+    // Only the restored outputs changed on disk: the rest of the memo (the
+    // compiler sources every stage target's key hashes) stays valid, so a
+    // worktree served sixty entries hashes src/ once, not once per entry.
+    build_cache_forget_restored_fingerprints(root, &rels)
     let reason = build_cache_freshness_reason(root, target, false)
     if reason != "fresh":
         build_graph_rt_eprint("[cache] " ++ target.name ++ ": build store entry " ++ key.slice(0, 12) ++ " does not verify (" ++ reason ++ "); running it")

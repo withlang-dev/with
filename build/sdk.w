@@ -730,19 +730,19 @@ pub fn run_sdk_source_tar_gz_action(ctx: ActionCtx) -> i32:
     if args.len() < 5 or marker.len() == 0:
         return sdk_fail(ctx, "requires url, sha256, archive, source-root, and source-dir args")
     let url = args[0]
-    let expected_sha = args[1]
-    let archive = args[2]
-    let source_root = args[3]
-    let source_dir = args[4]
+    if ctx.fs().exists(marker):
+        // A tree extracted before the backport existed still gets it.
+        return sdk_patch_llvm_source(ctx, args[4])
+    sdk_materialize_source_tar_gz(ctx, sdk_join("out/command", ctx.target_name()), url, args[1], args[2], args[3], args[4], marker)
+
+// Fetch the pinned archive (unless it is already there), check its sha256,
+// and extract it under `source_root`; `marker` says the tree is complete.
+fn sdk_materialize_source_tar_gz(ctx: &ActionCtx, scratch: &str, url: &str, expected_sha: &str, archive: &str, source_root: &str, source_dir: &str, marker: &str) -> i32:
     if expected_sha.len() == 0:
         return sdk_fail(ctx, "source download requires pinned SHA-256")
     let fs = ctx.fs()
-    if fs.exists(marker):
-        // A tree extracted before the backport existed still gets it.
-        return sdk_patch_llvm_source(ctx, source_dir)
     if fs.mkdir_all(source_root) != 0:
         return sdk_fail(ctx, "could not create source root: " ++ source_root)
-    let scratch = sdk_join("out/command", ctx.target_name())
     if fs.mkdir_all(scratch) != 0:
         return sdk_fail(ctx, "could not create command directory: " ++ scratch)
     if not fs.exists(archive):
@@ -1534,9 +1534,6 @@ pub fn sdk_zig_source_marker() -> str: sdk_zig_source_dir() ++ "/.with-source-re
 fn sdk_libcxx_abilist_url() -> str:
     "https://raw.githubusercontent.com/llvm/llvm-project/llvmorg-" ++ compiler_llvm_version() ++ "/libcxx/lib/abi/" ++ SDK_LIBCXX_ABILIST_NAME
 
-fn sdk_libcxx_abilist_path() -> str:
-    sdk_source_root() ++ "/libcxx-" ++ compiler_llvm_version() ++ "-" ++ SDK_LIBCXX_ABILIST_NAME
-
 // The tree the compiler's own link reads as -syslibroot, and the packed
 // form the compiler embeds (src/compiler/EmbeddedSysroot.w reads it).
 pub fn sdk_darwin_sysroot_dir() -> str: comp_darwin_sysroot_dir()
@@ -1615,7 +1612,21 @@ pub fn run_darwin_sysroot_action(ctx: ActionCtx) -> i32:
     let scratch = sdk_join("out/command", ctx.target_name())
     if fs.mkdir_all(scratch) != 0:
         return sdk_fail(ctx, "could not create " ++ scratch)
-    let abilist_path = sdk_libcxx_abilist_path()
+    // #1899: everything this action reads is fetched into its own scratch,
+    // pinned by sha256 in this file (an input), so the pack and the tree are
+    // a function of its declared inputs and may be served to any worktree
+    // from the build store; a worktree that is served never fetches. (The
+    // Zig source used to come from the sysroot-zig-source target under
+    // .deps/src, outside out/, which no restore can bring along.)
+    let zig_root = sdk_join(scratch, "zig-" ++ SDK_ZIG_VERSION)
+    let zig_dir = sdk_join(zig_root, "zig")
+    let zig_marker = sdk_join(zig_dir, ".with-source-ready")
+    if not fs.exists(zig_marker):
+        let _partial = fs.remove_tree(zig_root)
+        let zig_rc = sdk_materialize_source_tar_gz(ctx, scratch, sdk_zig_source_url(), sdk_zig_source_sha256(), sdk_join(scratch, "zig-" ++ SDK_ZIG_VERSION ++ ".tar.gz"), zig_root, zig_dir, zig_marker)
+        if zig_rc != 0:
+            return zig_rc
+    let abilist_path = sdk_join(scratch, "libcxx-" ++ compiler_llvm_version() ++ "-" ++ SDK_LIBCXX_ABILIST_NAME)
     if not fs.exists(abilist_path) or fs.sha256_file(abilist_path) != SDK_LIBCXX_ABILIST_SHA256:
         let _stale = fs.remove_file(abilist_path)
         let rc = sdk_fetch(ctx, scratch, "libcxx-abilist", sdk_libcxx_abilist_url(), abilist_path, 300000)
@@ -1627,11 +1638,11 @@ pub fn run_darwin_sysroot_action(ctx: ActionCtx) -> i32:
     let libcxx_tbd = sdk_libcxx_tbd_from_abilist(fs.read_text(abilist_path))
     if libcxx_tbd.len() == 0:
         return sdk_fail(ctx, "no defined symbols in " ++ abilist_path)
-    let zig_libc = sdk_join(sdk_zig_source_dir(), "lib/libc")
+    let zig_libc = sdk_join(zig_dir, "lib/libc")
     let libsystem = fs.read_text(sdk_join(zig_libc, "darwin/libSystem.tbd"))
     let settings = fs.read_text(sdk_join(zig_libc, "darwin/SDKSettings.json"))
     if libsystem.len() == 0 or settings.len() == 0:
-        return sdk_fail(ctx, "the Zig " ++ SDK_ZIG_VERSION ++ " source at " ++ sdk_zig_source_dir() ++ " has no lib/libc/darwin/{libSystem.tbd,SDKSettings.json}")
+        return sdk_fail(ctx, "the Zig " ++ SDK_ZIG_VERSION ++ " source at " ++ zig_dir ++ " has no lib/libc/darwin/{libSystem.tbd,SDKSettings.json}")
     let include_root = sdk_join(zig_libc, "include/any-darwin-any")
     let headers = sdk_merge_sort_strings(fs.list_files(include_root))
     if headers.len() == 0:
