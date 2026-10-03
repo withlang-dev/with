@@ -92,10 +92,11 @@ impl Sema:
         let resolved = self.resolve_alias(tid)
         if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
             return 0
-        let base_sym = self.get_type_d0(resolved)
-        if not self.type_decl_nodes.contains(base_sym):
+        // The instance's own declaration (#1745, #1647): never the flat
+        // name map's newest declaration, a user's namesake of std's type.
+        let decl = self.generic_inst_decl_node(resolved as i32)
+        if decl == 0:
             return 0
-        let decl = self.type_decl_nodes.get(base_sym).unwrap()
         let sub_kind = type_decl_sub_kind(self.ast.get_data2(decl))
         if sub_kind != TypeDeclKind.Struct and sub_kind != TypeDeclKind.Union:
             return 0
@@ -106,9 +107,9 @@ impl Sema:
         if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
             return 0
         let base_sym = self.get_type_d0(resolved)
-        if not self.type_decl_nodes.contains(base_sym):
+        let decl = self.generic_inst_decl_node(resolved as i32)
+        if decl == 0:
             return 0
-        let decl: i32 = self.type_decl_nodes.get(base_sym).unwrap()
         let extra_start = self.ast.get_data1(decl)
         let field_count = self.ast.get_extra(extra_start)
         if field_index < 0 or field_index >= field_count:
@@ -140,10 +141,10 @@ impl Sema:
             return self.packed_caps.get(resolved).unwrap() as i64
         if self.get_type_kind(resolved as TypeId) != TypeKind.TY_GENERIC_INST:
             return 0
-        let base_sym = self.get_type_d0(resolved as TypeId)
-        if not self.type_decl_nodes.contains(base_sym):
+        let decl = self.generic_inst_decl_node(resolved)
+        if decl == 0:
             return 0
-        let packed = self.ast.get_data2(self.type_decl_nodes.get(base_sym).unwrap())
+        let packed = self.ast.get_data2(decl)
         if type_decl_is_packed(packed) != 0:
             return 1
         type_decl_pack_cap(packed) as i64
@@ -292,8 +293,8 @@ impl Sema:
         let tk = self.get_type_kind(resolved)
         if tk == TypeKind.TY_GENERIC_INST:
             let base_sym = self.get_type_d0(resolved)
-            if base_sym != 0 and self.type_decl_nodes.contains(base_sym):
-                let decl: i32 = self.type_decl_nodes.get(base_sym).unwrap()
+            let decl = self.generic_inst_decl_node(resolved as i32)
+            if decl != 0:
                 if type_decl_sub_kind(self.ast.get_data2(decl)) == TypeDeclKind.Union:
                     var max_size: i64 = 0
                     var max_align: i64 = 1

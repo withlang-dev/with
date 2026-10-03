@@ -5849,7 +5849,25 @@ impl Sema:
             return 0
         if self.generic_inst_templates.contains(resolved):
             return self.generic_inst_templates.get(resolved).unwrap()
-        self.type_reflection_base_template(self.get_type_d0(resolved))
+        // #1647 / #1745: only a generic declaration can be an instance's
+        // template. Name visibility from wherever the question is asked (a
+        // user module's `type PullCore { .. }` beside std.task's private
+        // `PullCore[G]`) must not pick a non-generic namesake.
+        let base_sym = self.get_type_d0(resolved)
+        var generic_only = 0
+        var i = self.named_type_candidate_head(base_sym)
+        while i >= 0:
+            let candidate_tid = self.resolve_alias(self.named_type_candidate_tids[i] as TypeId) as i32
+            let decl = self.type_decl_nodes_by_tid.get(candidate_tid) ?? 0
+            if decl != 0 and self.type_decl_tp_count(decl) > 0 and candidate_tid != generic_only:
+                if generic_only != 0:
+                    generic_only = -1
+                    break
+                generic_only = candidate_tid
+            i = self.named_type_candidate_next[i]
+        if generic_only > 0:
+            return generic_only
+        self.type_reflection_base_template(base_sym)
 
     // The declaring node of a generic instance's template: by the recorded
     // template's identity first; the flat symbol-keyed map (the newest
