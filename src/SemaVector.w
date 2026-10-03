@@ -57,6 +57,40 @@ impl Sema:
 
     fn is_vector_or_mask_type(tid: i32) -> bool: self.is_vector_type(tid) or self.is_mask_type(tid)
 
+    // The first vector or mask an aggregate holds by value — a tuple's
+    // element, an array's element, a record's field, at any depth — else 0
+    // (#1995: `==` on the aggregate has no one-bool meaning for it).
+    mut fn aggregate_held_vector(tid: i32, depth: i32) -> i32:
+        if tid <= 0 or depth > 16:
+            return 0
+        let resolved = self.resolve_alias(tid as TypeId) as i32
+        if self.is_vector_or_mask_type(resolved):
+            return resolved
+        let tk = self.get_type_kind(resolved as TypeId)
+        if tk == TypeKind.TY_TUPLE:
+            let te_start = self.get_type_d0(resolved as TypeId)
+            for ei in 0..self.get_type_d1(resolved as TypeId):
+                let held = self.aggregate_held_vector(self.type_extra[(te_start + ei)], depth + 1)
+                if held != 0:
+                    return held
+            return 0
+        if tk == TypeKind.TY_ARRAY:
+            return self.aggregate_held_vector(self.get_type_d0(resolved as TypeId), depth + 1)
+        if tk == TypeKind.TY_STRUCT:
+            let te_start = self.get_type_d1(resolved as TypeId)
+            for fi in 0..self.get_type_d2(resolved as TypeId):
+                let held = self.aggregate_held_vector(self.type_extra[(te_start + fi * 3 + 1)], depth + 1)
+                if held != 0:
+                    return held
+            return 0
+        if tk == TypeKind.TY_GENERIC_INST:
+            for fi in 0..self.type_layout_generic_struct_field_count(resolved):
+                let field_tid = self.type_layout_generic_struct_field_type(resolved, fi)
+                let held = self.aggregate_held_vector(field_tid, depth + 1)
+                if held != 0:
+                    return held
+        0
+
     // A Vector's lane type; 0 for anything else.
     fn vector_lane_type(tid: i32) -> i32:
         if not self.is_vector_type(tid): return 0

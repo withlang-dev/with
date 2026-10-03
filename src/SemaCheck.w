@@ -11917,6 +11917,17 @@ impl Sema:
             if bool_int_cmp == 0 and ptr_like_cmp == 0 and ptr_zero_cmp == 0 and ptr_none_cmp == 0 and self.builtin_arg_type_compatible(lhs, rhs) == 0 and self.builtin_arg_type_compatible(rhs, lhs) == 0:
                 self.emit_error("comparison operands must have compatible types", node)
                 return 0
+            // §4.3d: a vector's `==` is lane-wise and yields a Mask, not the
+            // one `bool` that `==` on an aggregate is (§11.7: `eq(...) ->
+            // bool`), so an aggregate holding a vector has no structural
+            // equality to derive — and the mask rule refuses picking "all
+            // lanes" for the user (#1995).
+            if op == BinaryOp.OP_EQ or op == BinaryOp.OP_NEQ:
+                let lhs_value = if lhs_cmp_kind == TypeKind.TY_REF: self.auto_deref_ref_ptr_type(self.resolve_alias(lhs)) as i32 else: lhs as i32
+                let held = self.aggregate_held_vector(lhs_value, 0)
+                if held != 0 and not self.is_vector_or_mask_type(lhs_value):
+                    self.emit_error(f"`{sema_operator_symbol_text(op)}` on `{self.type_name(lhs_value)}` is refused: it holds `{self.type_name(held)}`, whose `==` is lane-wise and yields a mask, not one `bool` (§4.3d); compare that part with `(a == b).all()`", node)
+                    return 0
             // Two tuples compare element by element, each pair one type
             // (#1996): `(i8, i64) == (i32, i32)` has no element-wise meaning
             // short of an implicit conversion, which §4.2.6 never makes
