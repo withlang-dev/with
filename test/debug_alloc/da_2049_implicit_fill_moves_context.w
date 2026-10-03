@@ -1,8 +1,8 @@
 //! expect-debug-alloc: leak count=0
 //! expect-stdout: 4 6
 //! expect-stdout: drop ctx
-//! expect-stdout: took 4
 //! expect-stdout: drop ctx
+//! expect-stdout: took 4
 //! expect-stdout: done
 // #2049 (D5, §3.8, §7.3a): an implicit fill passes the `with` binding as
 // the argument and the signature decides. A `&Ctx` parameter borrows the

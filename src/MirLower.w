@@ -7703,6 +7703,10 @@ impl MirBuilder:
             cond_op = self.lower_option_is_some_place(regex_captures_opt_place, self.regex_captures_option_type())
             if self.ast.kind(rhs) == NodeKind.NK_REGEX_LIT:
                 regex_capture_node = rhs
+            else:
+                // #2049: a compiled-Regex `=~` binds no captures; the Option
+                // it tested drops with the condition (a Some(Captures) leaked).
+                self.register_stmt_temp(mir_place_plain_local(&self.body, regex_captures_opt_place), self.regex_captures_option_type())
         else:
             cond_op = self.lower_expr(cond_expr)
         self.finish_stmt_temp_frame(cond_frame)
@@ -7986,6 +7990,10 @@ impl MirBuilder:
             cond_op = self.lower_option_is_some_place(regex_captures_opt_place, self.regex_captures_option_type())
             if self.ast.kind(rhs) == NodeKind.NK_REGEX_LIT:
                 regex_capture_node = rhs
+            else:
+                // #2049: as in lower_if — no captures bound, the Option drops
+                // with the condition.
+                self.register_stmt_temp(mir_place_plain_local(&self.body, regex_captures_opt_place), self.regex_captures_option_type())
         else:
             cond_op = self.lower_expr(cond_expr)
         self.finish_stmt_temp_frame(cond_frame)
