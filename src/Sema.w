@@ -1530,6 +1530,9 @@ pub type Sema {
     // The contents an `embed_file(path)` call embeds, read when Sema
     // evaluated the path (check_intrinsic_call); codegen emits it.
     embed_file_contents: HashMap[i32, str],
+    // `let _ = place` (a name or a field): the wildcard observes, moving
+    // nothing (D5/P1); keyed by the let node.
+    discard_place_lets: HashMap[i32, i32],
 
     // C11 6.5.2.2p6-7: the type each argument of a call to a C function is
     // passed as after the default argument promotions, keyed by the call
@@ -3296,6 +3299,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         call_callee_kinds: sema_new_map_i32_i32(),
         type_ctor_call_syms: sema_new_map_i32_i32(),
         embed_file_contents: HashMap.new(),
+        discard_place_lets: sema_new_map_i32_i32(),
 
         c_promoted_arg_starts: sema_new_map_i32_i32(),
         c_promoted_arg_data: Vec.new(),

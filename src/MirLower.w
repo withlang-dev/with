@@ -7052,6 +7052,11 @@ impl MirBuilder:
         let flags = self.ast.get_data2(node)
         let mutable = flags % 2
         let is_discard_binding = if name_sym != 0 and self.pool.resolve_symbol(name_sym) == "_": 1 else: 0
+        // D5/P1 (#2043): Sema recorded that this wildcard names a place it
+        // leaves untouched; there is nothing to bind, move or drop.
+        if self.sema.discard_place_lets.contains(node):
+            self.body.note_let_binding(node, -1)
+            return
 
         let bind_ty = self.binding_type(node)
         if mutable == 0:
@@ -11876,8 +11881,8 @@ impl MirBuilder:
         self.body.new_operand(OperandKind.OK_COPY, value_place)
 
     mut fn lower_call(fn_expr: i32, arg_exprs_start: i32, arg_exprs_count: i32, ret_type_id: i32, node: i32) -> i32:
-        var fn_op = self.lower_callable_expr(fn_expr)
-        var sig_idx = self.call_sig_for_expr(fn_expr)
+        var fn_op = self.lower_callable_expr(fn_expr, node)
+        var sig_idx = self.call_sig_for_expr(fn_expr, node)
         let recorded_sig = self.sema.resolved_call_sigs.get(node).copied()
         if recorded_sig.is_some():
             sig_idx = recorded_sig.unwrap()
@@ -11927,7 +11932,7 @@ impl MirBuilder:
                 args.push(self.lower_call_arg(arg_node, sig_idx, callable_fn_tid, i, bc_callee_sym))
 
             // Fill in default parameter values for missing arguments
-            if fn_expr != 0 and self.ast.kind(fn_expr) == NodeKind.NK_IDENT and not self.ident_names_local_callable(fn_expr):
+            if fn_expr != 0 and self.ast.kind(fn_expr) == NodeKind.NK_IDENT and self.sema.call_callee_kind(node) != CallCalleeKind.Callable:
                 let callee_sym = self.ast.get_data0(fn_expr)
                 if self.sema.fn_decl_nodes.contains(callee_sym):
                     let fn_node = self.sema.fn_decl_nodes.get(callee_sym).unwrap()
@@ -12237,23 +12242,13 @@ impl MirBuilder:
         let ps = self.ast.fn_meta_param_start(meta)
         fn_param_is_mut_self(self.ast.fn_param_flags(ps, 0)) != 0
 
-    // D29 precedence: a lexical binding wins before any module-level
-    // interpretation. Sema resolves the callee of `check(1)` to the local
-    // `check` (its scope lookup runs before the global gate); the name-keyed
+    // A callee Sema resolved to a callable value (a parameter, local or
+    // let-alias of a callable, D29) has no signature of its own: the
     // signature and declaration tables must not be consulted for it, or a
     // parameter named like `std.builtins.check` inherits that fn's signature
-    // and its `loc = src()` default (#1230: one extra `str` argument on the
-    // indirect call, rejected by the LLVM verifier).
-    fn ident_names_local_callable(fn_expr: i32) -> bool:
-        if fn_expr == 0 or self.ast.kind(fn_expr) != NodeKind.NK_IDENT:
-            return false
-        let sym = self.ast.get_data0(fn_expr)
-        self.lookup_local(sym) >= 0 or self.lookup_alias_place(sym) >= 0
-
-    fn call_sig_for_expr(fn_expr: i32) -> i32:
-        if fn_expr == 0:
-            return -1
-        if self.ast.kind(fn_expr) != NodeKind.NK_IDENT or self.ident_names_local_callable(fn_expr):
+    // and its `loc = src()` default (#1230). Sema's record decides (#2043).
+    fn call_sig_for_expr(fn_expr: i32, call_node: i32) -> i32:
+        if fn_expr == 0 or self.ast.kind(fn_expr) != NodeKind.NK_IDENT or self.sema.call_callee_kind(call_node) == CallCalleeKind.Callable:
             return -1
         self.call_sig_for_sym(self.ast.get_data0(fn_expr))
 
@@ -12265,7 +12260,7 @@ impl MirBuilder:
             return 0
         self.sema.callable_any_fn_type(expr_tid as TypeId)
 
-    mut fn lower_callable_expr(callee: i32) -> i32:
+    mut fn lower_callable_expr(callee: i32, call_node: i32) -> i32:
         // `(self.run)(body)` names the same place as `self.run(...)` would.
         var node = callee
         while node != 0 and self.ast.kind(node) == NodeKind.NK_GROUPED:
@@ -12281,7 +12276,9 @@ impl MirBuilder:
             // A bare function NAME is an ident of callable type with no place.
             // A let-alias of a callable place (`let r = c.run`) names that
             // place too (#1635): read it in place, never move it out.
-            let is_local_callable = callee_kind == NodeKind.NK_IDENT and self.ident_names_local_callable(node)
+            // Sema states it (#2043): a name it resolved to a callable value
+            // is observed in place; a function name has no place.
+            let is_local_callable = callee_kind == NodeKind.NK_IDENT and self.sema.call_callee_kind(call_node) == CallCalleeKind.Callable
             if is_local_callable or callee_kind == NodeKind.NK_FIELD_ACCESS or callee_kind == NodeKind.NK_INDEX:
                 let callee_place = self.lower_expr_place(node)
                 if callee_place >= 0:
@@ -16997,7 +16994,7 @@ impl MirBuilder:
                     let form_sym: i32 = self.sema.precondition_form_calls.get(rhs).unwrap()
                     let recorded = self.sema.resolved_call_sigs.get(rhs).copied()
                     let form_sig = if recorded.is_some(): recorded.unwrap() else: self.call_sig_for_sym(form_sym)
-                    let form_fn_op = self.lower_callable_expr(self.ast.get_data0(rhs))
+                    let form_fn_op = self.lower_callable_expr(self.ast.get_data0(rhs), rhs)
                     let form_ret = if form_sig >= 0: self.sema.sig_return_type(form_sig) else: 0
                     return self.lower_precondition_form(form_fn_op, form_sig, form_sym, form_ret, self.ast.get_data0(node), self.ast.get_data1(rhs), self.ast.get_data2(rhs), rhs)
                 return self.lower_pipeline(self.ast.get_data0(node), self.ast.get_data0(rhs), self.ast.get_data1(rhs), self.ast.get_data2(rhs), node, rhs)
