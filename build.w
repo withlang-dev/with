@@ -2582,6 +2582,11 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
     // Init for the caller to drop; the ownership validator called it a leak.
     if deep_debug_analyze_expect(ctx, root, compiler, build_project_abs(root, "test/behavior/behav_1822_mut_receiver_replaced_whole.w"), out_dir, "analyze-audit-receiver-replaced", "audit:all", "violations=0 ok") != 0:
         return 1
+    // #2049: a module global's runtime initializer emitted after a facade
+    // method inherited that function's by-address local map; audit:all
+    // names the disagreement (mode-provenance).
+    if deep_debug_analyze_expect(ctx, root, compiler, build_project_abs(root, "test/behavior/behav_2049_runtime_init_global_after_facade.w"), out_dir, "analyze-audit-runtime-init-global", "audit:all", "violations=0 ok") != 0:
+        return 1
     // #2049: the ownership validator's verdicts over passing behavior
     // programs — each was a MIR ownership defect (a copy into a consuming
     // parameter, a leak at return, a drop after a move, a reset of an

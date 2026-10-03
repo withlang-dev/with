@@ -748,6 +748,13 @@ impl Codegen:
         let saved_mir_memory_locals = move self.mir_memory_locals
         let saved_mir_bbs = move self.mir_bb_values
         let saved_mir_unreachable = move self.mir_default_unreachable_bbs
+        // #2049: a synthesized body has its own locals; the by-address and
+        // by-place-capture facts of the function emitted before it are not
+        // its facts (see emit_module_runtime_init_fn).
+        let saved_mir_indirect_locals = move self.mir_indirect_value_local_types
+        let saved_mir_ref_capture_locals = move self.mir_ref_capture_local_types
+        self.mir_indirect_value_local_types = HashMap.new()
+        self.mir_ref_capture_local_types = HashMap.new()
         let dtm_fresh_mir_locals: HashMap[i32, i64] = HashMap.new()
         let dtm_fresh_mir_types: HashMap[i32, i64] = HashMap.new()
         let dtm_fresh_mir_bbs: Vec[i64] = Vec.new()
@@ -848,6 +855,8 @@ impl Codegen:
         self.mir_memory_locals = saved_mir_memory_locals
         self.mir_bb_values = saved_mir_bbs
         self.mir_default_unreachable_bbs = saved_mir_unreachable
+        self.mir_indirect_value_local_types = saved_mir_indirect_locals
+        self.mir_ref_capture_local_types = saved_mir_ref_capture_locals
 
         self.current_function = saved_fn
         self.current_function_name_sym = saved_fn_name_sym
@@ -1661,6 +1670,16 @@ impl Codegen:
         let saved_mir_local_types = move self.mir_local_types
         let saved_mir_bbs = move self.mir_bb_values
         let saved_mir_unreachable = move self.mir_default_unreachable_bbs
+        // #2049: an initializer's locals are its own. Left in place, the
+        // by-address map of the function emitted before it named this
+        // body's local of the same number: `audit:all` reported the
+        // disagreement ("operand read of an indirect local ... fact=true
+        // llvm-pointer=false"), and a pointer-typed local there would have
+        // been read through the address it does not hold.
+        let saved_mir_indirect_locals = move self.mir_indirect_value_local_types
+        let saved_mir_ref_capture_locals = move self.mir_ref_capture_local_types
+        self.mir_indirect_value_local_types = HashMap.new()
+        self.mir_ref_capture_local_types = HashMap.new()
         self.mir_local_ptrs = HashMap.new()
         self.mir_local_values = HashMap.new()
         self.mir_memory_locals = HashMap.new()
@@ -1732,6 +1751,8 @@ impl Codegen:
         self.mir_local_types = saved_mir_local_types
         self.mir_bb_values = saved_mir_bbs
         self.mir_default_unreachable_bbs = saved_mir_unreachable
+        self.mir_indirect_value_local_types = saved_mir_indirect_locals
+        self.mir_ref_capture_local_types = saved_mir_ref_capture_locals
 
         self.current_function = saved_fn
         self.current_ret_type = saved_ret
