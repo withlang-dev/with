@@ -388,6 +388,25 @@ pub enum CallCalleeKind: i32:
 
 impl Copy for CallCalleeKind
 
+// D65 phase 5 (#2043): which builtin a builtin call is, recorded by Sema
+// where it checks the call; codegen's builtin dispatch switches on it and
+// never on the callee's spelling.
+pub enum CallBuiltin: i32:
+    None = 0
+    Src = 1
+    Transmute = 2
+    SizeOf = 3
+    AlignOf = 4
+    NameOf = 5
+    EmbedFile = 6
+    Chan = 7
+    Channel = 8
+    Send = 9
+    Recv = 10
+    Close = 11
+
+impl Copy for CallBuiltin
+
 pub enum AllocConstructKind: i32:
     EXPLICIT_API = 1
     VEC_NEW = 2
@@ -1536,6 +1555,8 @@ pub type Sema {
     // #2043: each method function's owner key (the symbol its method table
     // row is keyed by), its specializations included.
     method_owner_keys: HashMap[i32, i32],
+    // #2043: each builtin call's CallBuiltin, by call node.
+    call_builtins: HashMap[i32, i32],
 
     // C11 6.5.2.2p6-7: the type each argument of a call to a C function is
     // passed as after the default argument promotions, keyed by the call
@@ -3340,6 +3361,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         embed_file_contents: HashMap.new(),
         discard_place_lets: sema_new_map_i32_i32(),
         method_owner_keys: sema_new_map_i32_i32(),
+        call_builtins: sema_new_map_i32_i32(),
 
         c_promoted_arg_starts: sema_new_map_i32_i32(),
         c_promoted_arg_data: Vec.new(),

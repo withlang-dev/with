@@ -7384,6 +7384,10 @@ impl Sema:
     mut fn note_call_callee(node: i32, kind: CallCalleeKind):
         self.call_callee_kinds.insert(node, kind as i32)
 
+    fn call_builtin(node: i32) -> CallBuiltin:
+        let raw = self.call_builtins.get(node) ?? 0
+        raw as CallBuiltin
+
     fn call_callee_kind(node: i32) -> CallCalleeKind:
         let raw = self.call_callee_kinds.get(node) ?? 0
         raw as CallCalleeKind
@@ -23418,6 +23422,13 @@ impl Sema:
         // sizeof[T]() / alignof[T]() / transmute[T]() / nameof[T]() builtins
         if self.is_sizeof_or_alignof(callee) != 0 or self.is_nameof_call(callee) != 0 or self.is_transmute_call(callee) != 0 or self.is_chan_call(callee) != 0:
             self.note_call_callee(node, CallCalleeKind.TypeLevelBuiltin)
+            let tl_name = self.generic_builtin_callee_name(callee)
+            let tl_builtin = if tl_name == "sizeof" or tl_name == "size_of": CallBuiltin.SizeOf
+                else if tl_name == "alignof" or tl_name == "align_of": CallBuiltin.AlignOf
+                else if tl_name == "nameof" or tl_name == "type_name": CallBuiltin.NameOf
+                else if tl_name == "transmute": CallBuiltin.Transmute
+                else: CallBuiltin.Chan
+            self.call_builtins.insert(node, tl_builtin as i32)
         if self.is_sizeof_or_alignof(callee) != 0:
             let type_arg_node = self.sizeof_alignof_type_arg_node(callee)
             if type_arg_node == 0:
@@ -31152,6 +31163,16 @@ impl Sema:
     mut fn check_intrinsic_call(fn_sym: i32, node: i32, arg_types: &Vec[i32], arg_count: i32) -> i32:
 
         let args_start = self.ast.get_data1(node)
+        // #2043: which builtin this is, for codegen's dispatch.
+        let builtin = if fn_sym == self.syms.channel: CallBuiltin.Channel
+            else if fn_sym == self.syms.send: CallBuiltin.Send
+            else if fn_sym == self.syms.recv: CallBuiltin.Recv
+            else if fn_sym == self.syms.close: CallBuiltin.Close
+            else if fn_sym == self.syms.src: CallBuiltin.Src
+            else if fn_sym == self.syms.embed_file: CallBuiltin.EmbedFile
+            else: CallBuiltin.None
+        if builtin != CallBuiltin.None:
+            self.call_builtins.insert(node, builtin as i32)
         if fn_sym == self.syms.channel:
             if arg_count > 1:
                 self.emit_error("Channel() expects zero or one capacity argument", node)
