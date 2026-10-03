@@ -3867,11 +3867,17 @@ impl Sema:
     fn facade_call_effect_for(sig: i32) -> i32:
         if self.facade_call_effect_index.contains(sig): self.facade_call_effect_index.get(sig).unwrap() else: -1
 
-    // Whether a type holds a modeled resource — the resource itself, a
-    // reference to one, a dependent child, an Option of either. Such a
-    // binding is a resource, not a view of one's memory, and a foreign
-    // operation's unknown effect does not invalidate it (§27 dependency is
-    // lifetime; §38 invalidation is of views).
+    // Whether a type holds a modeled resource — the resource itself, its
+    // failed state (`Failed<R>`: "a resource owned by an error … carried as
+    // a distinct type", spec §16.2b.4; the `valid on failed` operation is
+    // "presented on the failed-state type as well", ruling Amendment 1, so
+    // its receiver is the same resource), a reference to one, a dependent
+    // child, an Option of either. Such a binding is a resource, not a view
+    // of one's memory, and a foreign operation's unknown effect does not
+    // invalidate it (§27 dependency is lifetime; §38 invalidation is of
+    // views). #1834: `FailedDatabase.errmsg()` invalidates views of its
+    // receiver (§38, no `preserves`), and the audit read that receiver as
+    // holding nothing.
     fn facade_type_holds_resource(tid: i32, depth: i32) -> bool:
         if tid <= 0 or depth > 6 or self.facade_resources.len() == 0:
             return false
@@ -3880,6 +3886,8 @@ impl Sema:
         let name = self.get_type_name(r)
         if name != 0 and kind != TypeKind.TY_REF and kind != TypeKind.TY_PTR:
             if self.facade_resource_index.contains(name):
+                return true
+            if self.facade_failed_state_resource(self.pool_resolve(name)) >= 0:
                 return true
         if kind == TypeKind.TY_GENERIC_INST:
             for ai in 0..self.get_generic_inst_arg_count(r as i32):
