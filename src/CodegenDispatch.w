@@ -2219,20 +2219,10 @@ impl Codegen:
             sema_phase_bug(f"BUG: `&dyn` coercion from a place of type {self.sema.type_name(place_sema_ty)} found no concrete impl type")
         ptr
 
-    fn current_method_owner_from_name() -> i32:
+    fn current_method_owner() -> i32:
         if self.current_method_owner_sym != 0:
             return self.current_method_owner_sym
-        if self.current_function_name_sym == 0:
-            return 0
-        let name = self.intern.resolve(self.current_function_name_sym)
-        var dot = -1
-        for i in 0..name.len() as i32:
-            if name[i] == 46:
-                dot = i
-                break
-        if dot <= 0:
-            return 0
-        self.method_owner_cg_sym(name.slice(0, dot as i64))
+        self.fn_method_owner_cg_sym(self.current_function_name_sym)
 
     fn mir_current_owner_projected_nominal_sym(body: &MirBody, place_id: i32) -> i32:
         if place_id < 0 or place_id >= body.place_locals.len() as i32:
@@ -2240,7 +2230,7 @@ impl Codegen:
         let p_count = body.place_proj_counts[place_id]
         if p_count <= 0:
             return 0
-        let owner_sym = self.current_method_owner_from_name()
+        let owner_sym = self.current_method_owner()
         if owner_sym == 0:
             return 0
         var cur_ty = self.resolve_named_type(owner_sym)
@@ -7864,7 +7854,7 @@ impl Codegen:
         0
 
     fn current_method_named_field_nominal_sym() -> i32:
-        let owner_sym = self.current_method_owner_from_name()
+        let owner_sym = self.current_method_owner()
         if owner_sym == 0:
             return 0
         let field_name = self.current_method_suffix()
@@ -17276,12 +17266,8 @@ impl Codegen:
         if fn_direct_types_opt.is_some():
             fn_direct_types = vec_copy_i64(fn_direct_types_opt.unwrap())
 
-        // Detect method owner from mangled name (e.g. "Vec__i32.push")
-        var method_owner_sym = 0
-        for di in 0..name_str.len() as i32:
-            if name_str[di] == 46:
-                method_owner_sym = self.method_owner_cg_sym(name_str.slice(0, di as i64))
-                break
+        // The method owner Sema recorded for this function (#2043).
+        var method_owner_sym = self.fn_method_owner_cg_sym(mono_sym)
         self.current_method_owner_sym = method_owner_sym
 
         let max_params = param_count

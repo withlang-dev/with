@@ -5944,6 +5944,10 @@ impl Sema:
             self.concrete_specialization_sigs[found_idx] = sig_idx
             return
         let idx = self.concrete_specialization_nodes.len() as i32
+        // #2043: a method's specialization is owned as its template is.
+        let template_owner = self.method_owner_keys.get(self.fn_decl_semantic_symbol(fn_node, self.ast.get_data0(fn_node))) ?? 0
+        if template_owner != 0:
+            self.method_owner_keys.insert(mono_sym, template_owner)
         self.concrete_specialization_by_sym.insert(mono_sym, idx)
         self.concrete_specialization_nodes.push(fn_node)
         self.concrete_specialization_syms.push(mono_sym)
