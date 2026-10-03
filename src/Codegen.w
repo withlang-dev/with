@@ -2137,7 +2137,7 @@ impl Codegen:
     fn loop_result_alloca_at(idx: i32) -> i64:
         with_codegen_loop_get_result(idx)
 
-    fn debug_call_coerce_failure(coerce_context: &str, call_node: i32, arg_index: i32, arg_node: i32, actual_val: i64, expected_ty: i64) -> Unit:
+    fn debug_call_coerce_failure(coerce_context: &str, call_node: i32, arg_index: i32, arg_node: i32, actual_val: i64, expected_ty: i64):
         if not self.debug_call_coerce_enabled():
             return
         var msg = "[call-coerce] " ++ coerce_context
