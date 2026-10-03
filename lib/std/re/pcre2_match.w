@@ -3019,7 +3019,7 @@ unsafe fn match_ref(__param_offset: c_ulong, __param_caseless: c_int, __param_ca
 
 }
 
-unsafe fn recurse_update_offsets(__param_F: *mut heapframe, __param_P: *mut heapframe) -> Unit {
+unsafe fn recurse_update_offsets(__param_F: *mut heapframe, __param_P: *mut heapframe) {
     var __local_dst: *mut c_ulong = ((&raw const (*__param_F).ovector[0] as *mut c_ulong))
 
     var __local_src: *mut c_ulong = ((&raw const (*__param_P).ovector[0] as *mut c_ulong))
@@ -43255,7 +43255,6 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
         (__local_ecode__goto_5856_18 = ((*__local_F__goto_692_12).ecode + ((1 as isize) as usize)) + ((2 as isize) as usize))
         (__local_extra_size__goto_5857_16 = ((0 as c_uint)))
         (__local_offset__goto_705_12 = ((0 as c_ulong)))
-        __local_offset__goto_705_12
         goto '__ci_bb_6545
     }
 

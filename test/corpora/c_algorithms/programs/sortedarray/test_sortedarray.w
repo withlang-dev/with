@@ -6,7 +6,7 @@ use std.calg_testing.framework
 use std.calg_testing.sortedarray
 use std.libc
 
-pub unsafe fn check_sorted(__param_sa: *mut _SortedArray) -> Unit {
+pub unsafe fn check_sorted(__param_sa: *mut _SortedArray) {
     var __local_i: c_uint
 
     (__local_i = ((1 as c_uint)))
@@ -26,7 +26,7 @@ pub unsafe fn check_sorted(__param_sa: *mut _SortedArray) -> Unit {
 
 }
 
-pub fn generate_sortedarray() -> *mut _SortedArray {
+pub fn generate_sortedarray() -> *mut _SortedArray writes allocation_limit {
     var __local_sa: *mut _SortedArray
 
     var __local_i: c_uint
@@ -48,7 +48,7 @@ pub fn generate_sortedarray() -> *mut _SortedArray {
 
 }
 
-pub fn test_sortedarray_new_free() -> Unit {
+pub fn test_sortedarray_new_free() writes allocation_limit {
     var __local_sa: *mut _SortedArray
 
     if (((if not ((if sortedarray_new((0 as c_uint), null) == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
@@ -83,7 +83,7 @@ pub fn test_sortedarray_new_free() -> Unit {
 
 }
 
-pub fn test_sortedarray_insert() -> Unit {
+pub fn test_sortedarray_insert() writes allocation_limit {
     var __local_sa: *mut _SortedArray = generate_sortedarray()
 
     if (((if not ((if unsafe { sortedarray_insert((null as *mut _SortedArray), null) } == 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
@@ -98,7 +98,7 @@ pub fn test_sortedarray_insert() -> Unit {
 
 }
 
-pub fn test_sortedarray_get() -> Unit {
+pub fn test_sortedarray_get() writes allocation_limit {
     var __local_sa: *mut _SortedArray = generate_sortedarray()
 
     var __local_i: c_uint
@@ -150,7 +150,7 @@ pub fn test_sortedarray_get() -> Unit {
 
 }
 
-pub fn test_sortedarray_remove() -> Unit {
+pub fn test_sortedarray_remove() writes allocation_limit {
     var __local_sa: *mut _SortedArray = generate_sortedarray()
 
     var __local_i: c_uint
@@ -249,7 +249,7 @@ pub fn test_sortedarray_remove() -> Unit {
 
 }
 
-pub fn test_sortedarray_index_of() -> Unit {
+pub fn test_sortedarray_index_of() writes allocation_limit {
     var __local_sa: *mut _SortedArray = generate_sortedarray()
 
     var __local_i: c_uint
@@ -294,7 +294,7 @@ pub fn test_sortedarray_index_of() -> Unit {
 
 }
 
-pub fn test_sortedarray_clear() -> Unit {
+pub fn test_sortedarray_clear() writes allocation_limit {
     var __local_sa: *mut _SortedArray = generate_sortedarray()
 
     unsafe { sortedarray_clear(__local_sa) }
@@ -309,7 +309,7 @@ pub fn test_sortedarray_clear() -> Unit {
 
 }
 
-pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
+pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int writes allocation_limit {
     run_tests((&tests[0] as *mut extern "C" fn() -> Unit))
 
     return 0

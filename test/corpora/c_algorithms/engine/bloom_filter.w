@@ -2,7 +2,7 @@
 use std.calg_testing.defs
 use std.calg_testing.alloc_testing
 
-pub fn bloom_filter_new(__param_table_size: c_uint, __param_hash_func: unsafe extern "C" fn(*mut c_void) -> c_uint, __param_num_functions: c_uint) -> *mut _BloomFilter {
+pub fn bloom_filter_new(__param_table_size: c_uint, __param_hash_func: unsafe extern "C" fn(*mut c_void) -> c_uint, __param_num_functions: c_uint) -> *mut _BloomFilter writes allocation_limit {
     var __local_filter: *mut _BloomFilter
 
     if ((if __param_num_functions > (((64 * (sizeof[c_uint]() as usize)) as c_ulong) / (sizeof[c_uint]() as c_ulong)): 1 else: 0) != 0) {
@@ -36,14 +36,14 @@ pub fn bloom_filter_new(__param_table_size: c_uint, __param_hash_func: unsafe ex
 
 }
 
-pub unsafe fn bloom_filter_free(__param_bloomfilter: *mut _BloomFilter) -> Unit {
+pub unsafe fn bloom_filter_free(__param_bloomfilter: *mut _BloomFilter) {
     alloc_test_free(((*__param_bloomfilter).table as *mut c_void))
 
     alloc_test_free((__param_bloomfilter as *mut c_void))
 
 }
 
-pub unsafe fn bloom_filter_insert(__param_bloomfilter: *mut _BloomFilter, __param_value: *mut c_void) -> Unit {
+pub unsafe fn bloom_filter_insert(__param_bloomfilter: *mut _BloomFilter, __param_value: *mut c_void) {
     var __local_hash: c_uint
 
     var __local_subhash: c_uint
@@ -134,7 +134,7 @@ pub unsafe fn bloom_filter_load(__param_bloomfilter: *mut _BloomFilter, __param_
 
 }
 
-pub unsafe fn bloom_filter_union(__param_filter1: *mut _BloomFilter, __param_filter2: *mut _BloomFilter) -> *mut _BloomFilter {
+pub unsafe fn bloom_filter_union(__param_filter1: *mut _BloomFilter, __param_filter2: *mut _BloomFilter) -> *mut _BloomFilter writes allocation_limit {
     var __local_result: *mut _BloomFilter
 
     var __local_i: c_uint
@@ -187,7 +187,7 @@ pub unsafe fn bloom_filter_union(__param_filter1: *mut _BloomFilter, __param_fil
 
 }
 
-pub unsafe fn bloom_filter_intersection(__param_filter1: *mut _BloomFilter, __param_filter2: *mut _BloomFilter) -> *mut _BloomFilter {
+pub unsafe fn bloom_filter_intersection(__param_filter1: *mut _BloomFilter, __param_filter2: *mut _BloomFilter) -> *mut _BloomFilter writes allocation_limit {
     var __local_result: *mut _BloomFilter
 
     var __local_i: c_uint

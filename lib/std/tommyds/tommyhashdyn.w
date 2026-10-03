@@ -70,7 +70,7 @@ fn tommy_haszero_u32(__param_value: c_uint) -> c_int {
 
 }
 
-pub unsafe fn tommy_hashdyn_init(__param_hashdyn: *mut tommy_hashdyn_struct) -> Unit {
+pub unsafe fn tommy_hashdyn_init(__param_hashdyn: *mut tommy_hashdyn_struct) {
     ((*__param_hashdyn).bucket_bit = ((4 as c_uint)))
 
     ((*__param_hashdyn).bucket_max = ((((1 as c_ulonglong) << ((*__param_hashdyn).bucket_bit as c_uint)) as c_ulonglong)))
@@ -83,12 +83,12 @@ pub unsafe fn tommy_hashdyn_init(__param_hashdyn: *mut tommy_hashdyn_struct) -> 
 
 }
 
-pub unsafe fn tommy_hashdyn_done(__param_hashdyn: *mut tommy_hashdyn_struct) -> Unit {
+pub unsafe fn tommy_hashdyn_done(__param_hashdyn: *mut tommy_hashdyn_struct) {
     with_free((((*__param_hashdyn).bucket as *mut c_void) as *mut u8))
 
 }
 
-pub unsafe fn tommy_hashdyn_insert(__param_hashdyn: *mut tommy_hashdyn_struct, __param_node: *mut tommy_node_struct, __param_data: *mut c_void, __param_hash: c_ulonglong) -> Unit {
+pub unsafe fn tommy_hashdyn_insert(__param_hashdyn: *mut tommy_hashdyn_struct, __param_node: *mut tommy_node_struct, __param_data: *mut c_void, __param_hash: c_ulonglong) {
     var __local_pos: c_ulonglong = ((((__param_hash as c_ulonglong) & ((*__param_hashdyn).bucket_mask as c_ulonglong)) as c_ulonglong))
 
     tommy_list_insert_tail(((&raw const ((*__param_hashdyn).bucket[__local_pos]) as *const *mut tommy_node_struct) as *mut *mut tommy_node_struct), __param_node, __param_data)
@@ -174,7 +174,7 @@ pub unsafe fn tommy_hashdyn_remove_existing(__param_hashdyn: *mut tommy_hashdyn_
 
 }
 
-pub unsafe fn tommy_hashdyn_foreach(__param_hashdyn: *mut tommy_hashdyn_struct, __param_func: unsafe extern "C" fn(*mut c_void) -> Unit) -> Unit {
+pub unsafe fn tommy_hashdyn_foreach(__param_hashdyn: *mut tommy_hashdyn_struct, __param_func: unsafe extern "C" fn(*mut c_void) -> Unit) {
     var __local_bucket_max: c_ulonglong = (*__param_hashdyn).bucket_max
 
     var __local_bucket: *mut *mut tommy_node_struct = (*__param_hashdyn).bucket
@@ -203,7 +203,7 @@ pub unsafe fn tommy_hashdyn_foreach(__param_hashdyn: *mut tommy_hashdyn_struct, 
 
 }
 
-pub unsafe fn tommy_hashdyn_foreach_arg(__param_hashdyn: *mut tommy_hashdyn_struct, __param_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit, __param_arg: *mut c_void) -> Unit {
+pub unsafe fn tommy_hashdyn_foreach_arg(__param_hashdyn: *mut tommy_hashdyn_struct, __param_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit, __param_arg: *mut c_void) {
     var __local_bucket_max: c_ulonglong = (*__param_hashdyn).bucket_max
 
     var __local_bucket: *mut *mut tommy_node_struct = (*__param_hashdyn).bucket
@@ -242,7 +242,7 @@ pub unsafe fn tommy_hashdyn_memory_usage(__param_hashdyn: *mut tommy_hashdyn_str
 
 }
 
-unsafe fn tommy_hashdyn_resize(__param_hashdyn: *mut tommy_hashdyn_struct, __param_new_bucket_bit: c_uint) -> Unit {
+unsafe fn tommy_hashdyn_resize(__param_hashdyn: *mut tommy_hashdyn_struct, __param_new_bucket_bit: c_uint) {
     var __local_bucket_bit: c_ulonglong
 
     var __local_bucket_max: c_ulonglong
@@ -328,14 +328,14 @@ unsafe fn tommy_hashdyn_resize(__param_hashdyn: *mut tommy_hashdyn_struct, __par
 
 }
 
-unsafe fn hashdyn_grow_step(__param_hashdyn: *mut tommy_hashdyn_struct) -> Unit {
+unsafe fn hashdyn_grow_step(__param_hashdyn: *mut tommy_hashdyn_struct) {
     if ((if (*__param_hashdyn).count >= (((*__param_hashdyn).bucket_max as c_ulonglong) / (2 as c_ulonglong)): 1 else: 0) != 0) {
         tommy_hashdyn_resize(__param_hashdyn, ((((*__param_hashdyn).bucket_bit as c_uint) +% (1 as c_uint)) as c_uint))
     }
 
 }
 
-unsafe fn hashdyn_shrink_step(__param_hashdyn: *mut tommy_hashdyn_struct) -> Unit {
+unsafe fn hashdyn_shrink_step(__param_hashdyn: *mut tommy_hashdyn_struct) {
     var __ci_expr_logic_0: c_int = 0
 
     if ((if (*__param_hashdyn).count <= (((*__param_hashdyn).bucket_max as c_ulonglong) / (8 as c_ulonglong)): 1 else: 0) != 0) {

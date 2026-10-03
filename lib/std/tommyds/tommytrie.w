@@ -71,7 +71,7 @@ fn tommy_haszero_u32(__param_value: c_uint) -> c_int {
 
 }
 
-pub unsafe fn tommy_trie_init(__param_trie: *mut tommy_trie_struct, __param_alloc: *mut tommy_allocator_struct) -> Unit {
+pub unsafe fn tommy_trie_init(__param_trie: *mut tommy_trie_struct, __param_alloc: *mut tommy_allocator_struct) {
     var __local_i: c_uint
 
     (__local_i = ((0 as c_uint)))
@@ -92,7 +92,7 @@ pub unsafe fn tommy_trie_init(__param_trie: *mut tommy_trie_struct, __param_allo
 
 }
 
-pub unsafe fn tommy_trie_insert(__param_trie: *mut tommy_trie_struct, __param_node: *mut tommy_node_struct, __param_data: *mut c_void, __param_key: c_ulonglong) -> Unit {
+pub unsafe fn tommy_trie_insert(__param_trie: *mut tommy_trie_struct, __param_node: *mut tommy_node_struct, __param_data: *mut c_void, __param_key: c_ulonglong) {
     var __local_let_ptr: *mut *mut tommy_node_struct
 
     var __ci_expr_ternary_7: c_int = 0

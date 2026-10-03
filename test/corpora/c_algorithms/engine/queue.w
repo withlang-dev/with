@@ -2,7 +2,7 @@
 use std.calg_testing.defs
 use std.calg_testing.alloc_testing
 
-pub fn queue_new() -> *mut _Queue {
+pub fn queue_new() -> *mut _Queue writes allocation_limit {
     var __local_queue: *mut _Queue
 
     (__local_queue = ((alloc_test_malloc((sizeof[_Queue]() as c_ulong)) as *mut _Queue)))
@@ -20,7 +20,7 @@ pub fn queue_new() -> *mut _Queue {
 
 }
 
-pub unsafe fn queue_free(__param_queue: *mut _Queue) -> Unit {
+pub unsafe fn queue_free(__param_queue: *mut _Queue) {
     while ((if not (queue_is_empty(__param_queue) != 0): 1 else: 0) != 0) {
         queue_pop_head(__param_queue)
 
@@ -30,7 +30,7 @@ pub unsafe fn queue_free(__param_queue: *mut _Queue) -> Unit {
 
 }
 
-pub unsafe fn queue_push_head(__param_queue: *mut _Queue, __param_data: *mut c_void) -> c_int {
+pub unsafe fn queue_push_head(__param_queue: *mut _Queue, __param_data: *mut c_void) -> c_int writes allocation_limit {
     var __local_new_entry: *mut _QueueEntry
 
     (__local_new_entry = ((alloc_test_malloc((sizeof[_QueueEntry]() as c_ulong)) as *mut _QueueEntry)))
@@ -102,7 +102,7 @@ pub unsafe fn queue_peek_head(__param_queue: *mut _Queue) -> *mut c_void {
 
 }
 
-pub unsafe fn queue_push_tail(__param_queue: *mut _Queue, __param_data: *mut c_void) -> c_int {
+pub unsafe fn queue_push_tail(__param_queue: *mut _Queue, __param_data: *mut c_void) -> c_int writes allocation_limit {
     var __local_new_entry: *mut _QueueEntry
 
     (__local_new_entry = ((alloc_test_malloc((sizeof[_QueueEntry]() as c_ulong)) as *mut _QueueEntry)))

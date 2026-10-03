@@ -184,7 +184,7 @@ fn test_hash_string() -> Unit {
 
 }
 
-fn test_arraylist() -> Unit {
+fn test_arraylist() {
     var __local_arraylist: *mut _ArrayList
 
     (__local_arraylist = arraylist_new((0 as c_uint)))
@@ -193,7 +193,7 @@ fn test_arraylist() -> Unit {
 
 }
 
-fn test_avl_tree() -> Unit {
+fn test_avl_tree() {
     var __local_avl_tree: *mut _AVLTree
 
     (__local_avl_tree = avl_tree_new(string_compare))
@@ -202,7 +202,7 @@ fn test_avl_tree() -> Unit {
 
 }
 
-fn test_binary_heap() -> Unit {
+fn test_binary_heap() {
     var __local_heap: *mut _BinaryHeap
 
     (__local_heap = binary_heap_new((1 as i32), string_compare))
@@ -211,7 +211,7 @@ fn test_binary_heap() -> Unit {
 
 }
 
-fn test_binomial_heap() -> Unit {
+fn test_binomial_heap() {
     var __local_heap: *mut _BinomialHeap
 
     (__local_heap = binomial_heap_new((1 as i32), string_compare))
@@ -220,7 +220,7 @@ fn test_binomial_heap() -> Unit {
 
 }
 
-fn test_bloom_filter() -> Unit {
+fn test_bloom_filter() {
     var __local_filter: *mut _BloomFilter
 
     (__local_filter = bloom_filter_new((16 as c_uint), string_hash, (10 as c_uint)))
@@ -229,7 +229,7 @@ fn test_bloom_filter() -> Unit {
 
 }
 
-fn test_hash_table() -> Unit {
+fn test_hash_table() {
     var __local_hash_table: *mut _HashTable
 
     (__local_hash_table = hash_table_new(string_hash, string_equal))
@@ -238,7 +238,7 @@ fn test_hash_table() -> Unit {
 
 }
 
-fn test_list() -> Unit {
+fn test_list() {
     var __local_list: *mut _ListEntry = ((null as *mut _ListEntry))
 
     var __local_a: c_int
@@ -258,7 +258,7 @@ fn test_list() -> Unit {
 
 }
 
-fn test_queue() -> Unit {
+fn test_queue() {
     var __local_queue: *mut _Queue
 
     (__local_queue = queue_new())
@@ -267,7 +267,7 @@ fn test_queue() -> Unit {
 
 }
 
-fn test_set() -> Unit {
+fn test_set() {
     var __local_set: *mut _Set
 
     (__local_set = set_new(string_hash, string_equal))
@@ -276,7 +276,7 @@ fn test_set() -> Unit {
 
 }
 
-fn test_slist() -> Unit {
+fn test_slist() {
     var __local_list: *mut _SListEntry = ((null as *mut _SListEntry))
 
     var __local_a: c_int
@@ -296,7 +296,7 @@ fn test_slist() -> Unit {
 
 }
 
-fn test_trie() -> Unit {
+fn test_trie() {
     var __local_trie: *mut _Trie
 
     (__local_trie = trie_new())

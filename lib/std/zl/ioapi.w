@@ -14,7 +14,7 @@ use std.zl.adler32
 use std.zl.crc32
 use std.libc
 
-pub unsafe fn fill_fopen64_filefunc(__param_pzlib_filefunc_def: *mut zlib_filefunc64_def_s) -> Unit {
+pub unsafe fn fill_fopen64_filefunc(__param_pzlib_filefunc_def: *mut zlib_filefunc64_def_s) {
     ((*__param_pzlib_filefunc_def).zopen64_file = fopen64_file_func)
 
     ((*__param_pzlib_filefunc_def).zread_file = fread_file_func)
@@ -33,7 +33,7 @@ pub unsafe fn fill_fopen64_filefunc(__param_pzlib_filefunc_def: *mut zlib_filefu
 
 }
 
-pub unsafe fn fill_fopen_filefunc(__param_pzlib_filefunc_def: *mut zlib_filefunc_def_s) -> Unit {
+pub unsafe fn fill_fopen_filefunc(__param_pzlib_filefunc_def: *mut zlib_filefunc_def_s) {
     ((*__param_pzlib_filefunc_def).zopen_file = fopen_file_func)
 
     ((*__param_pzlib_filefunc_def).zread_file = fread_file_func)
@@ -89,7 +89,7 @@ pub unsafe fn call_ztell64(__param_pfilefunc: *const zlib_filefunc64_32_def_s, _
 
 }
 
-pub unsafe fn fill_zlib_filefunc64_32_def_from_filefunc32(__param_p_filefunc64_32: *mut zlib_filefunc64_32_def_s, __param_p_filefunc32: *const zlib_filefunc_def_s) -> Unit {
+pub unsafe fn fill_zlib_filefunc64_32_def_from_filefunc32(__param_p_filefunc64_32: *mut zlib_filefunc64_32_def_s, __param_p_filefunc32: *const zlib_filefunc_def_s) {
     ((*__param_p_filefunc64_32).zfile_func64.zopen64_file = null)
 
     ((*__param_p_filefunc64_32).zopen32_file = (*__param_p_filefunc32).zopen_file)
@@ -119,7 +119,6 @@ unsafe fn fopen_file_func(__param_opaque_: *mut c_void, __param_filename: *const
 
     var __local_mode_fopen: *const c_char = ((null as *const c_char))
 
-    __param_opaque_
 
     if ((if ((__param_mode as c_int) & (3 as c_int)) == 1: 1 else: 0) != 0) {
         (__local_mode_fopen = c"rb".ptr)
@@ -153,7 +152,6 @@ unsafe fn fopen64_file_func(__param_opaque_: *mut c_void, __param_filename: *con
 
     var __local_mode_fopen: *const c_char = ((null as *const c_char))
 
-    __param_opaque_
 
     if ((if ((__param_mode as c_int) & (3 as c_int)) == 1: 1 else: 0) != 0) {
         (__local_mode_fopen = c"rb".ptr)
@@ -185,7 +183,6 @@ unsafe fn fopen64_file_func(__param_opaque_: *mut c_void, __param_filename: *con
 unsafe fn fread_file_func(__param_opaque_: *mut c_void, __param_stream: *mut c_void, __param_buf: *mut c_void, __param_size: c_ulong) -> c_ulong {
     var __local_ret: c_ulong
 
-    __param_opaque_
 
     (__local_ret = ((fread(__param_buf, (1 as c_ulong), __param_size, __param_stream) as c_ulong)))
 
@@ -196,7 +193,6 @@ unsafe fn fread_file_func(__param_opaque_: *mut c_void, __param_stream: *mut c_v
 unsafe fn fwrite_file_func(__param_opaque_: *mut c_void, __param_stream: *mut c_void, __param_buf: *const c_void, __param_size: c_ulong) -> c_ulong {
     var __local_ret: c_ulong
 
-    __param_opaque_
 
     (__local_ret = ((fwrite(__param_buf, (1 as c_ulong), __param_size, __param_stream) as c_ulong)))
 
@@ -207,7 +203,6 @@ unsafe fn fwrite_file_func(__param_opaque_: *mut c_void, __param_stream: *mut c_
 unsafe fn ftell_file_func(__param_opaque_: *mut c_void, __param_stream: *mut c_void) -> c_long {
     var __local_ret: c_long
 
-    __param_opaque_
 
     (__local_ret = ((ftell(__param_stream) as c_long)))
 
@@ -218,7 +213,6 @@ unsafe fn ftell_file_func(__param_opaque_: *mut c_void, __param_stream: *mut c_v
 unsafe fn ftell64_file_func(__param_opaque_: *mut c_void, __param_stream: *mut c_void) -> c_ulong {
     var __local_ret: c_ulong
 
-    __param_opaque_
 
     (__local_ret = ((ftell(__param_stream) as c_ulong)))
 
@@ -231,7 +225,6 @@ unsafe fn fseek_file_func(__param_opaque_: *mut c_void, __param_stream: *mut c_v
 
     var __local_ret: c_long
 
-    __param_opaque_
 
     while true {
         match __param_origin {
@@ -268,7 +261,6 @@ unsafe fn fseek64_file_func(__param_opaque_: *mut c_void, __param_stream: *mut c
 
     var __local_ret: c_long
 
-    __param_opaque_
 
     while true {
         match __param_origin {
@@ -303,7 +295,6 @@ unsafe fn fseek64_file_func(__param_opaque_: *mut c_void, __param_stream: *mut c
 unsafe fn fclose_file_func(__param_opaque_: *mut c_void, __param_stream: *mut c_void) -> c_int {
     var __local_ret: c_int
 
-    __param_opaque_
 
     (__local_ret = ((fclose(__param_stream) as c_int)))
 
@@ -314,7 +305,6 @@ unsafe fn fclose_file_func(__param_opaque_: *mut c_void, __param_stream: *mut c_
 unsafe fn ferror_file_func(__param_opaque_: *mut c_void, __param_stream: *mut c_void) -> c_int {
     var __local_ret: c_int
 
-    __param_opaque_
 
     (__local_ret = ((ferror(__param_stream) as c_int)))
 

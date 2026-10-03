@@ -6,7 +6,7 @@ use std.calg_testing.compare_int
 use std.calg_testing.framework
 use std.libc
 
-pub fn generate_arraylist() -> *mut _ArrayList {
+pub fn generate_arraylist() -> *mut _ArrayList writes allocation_limit, variable1, variable2, variable3, variable4 {
     var __local_arraylist: *mut _ArrayList
 
     var __local_i: c_int
@@ -34,7 +34,7 @@ pub fn generate_arraylist() -> *mut _ArrayList {
 
 }
 
-pub fn test_arraylist_new_free() -> Unit {
+pub fn test_arraylist_new_free() -> Unit writes allocation_limit {
     var __local_arraylist: *mut _ArrayList
 
     (__local_arraylist = arraylist_new((0 as c_uint)))
@@ -81,7 +81,7 @@ pub fn test_arraylist_new_free() -> Unit {
 
 }
 
-pub fn test_arraylist_append() -> Unit {
+pub fn test_arraylist_append() writes allocation_limit, variable1, variable2, variable3, variable4 {
     var __local_arraylist: *mut _ArrayList
 
     var __local_i: c_int
@@ -224,7 +224,7 @@ pub fn test_arraylist_append() -> Unit {
 
 }
 
-pub fn test_arraylist_prepend() -> Unit {
+pub fn test_arraylist_prepend() writes allocation_limit, variable1, variable2, variable3, variable4 {
     var __local_arraylist: *mut _ArrayList
 
     var __local_i: c_int
@@ -367,7 +367,7 @@ pub fn test_arraylist_prepend() -> Unit {
 
 }
 
-pub fn test_arraylist_insert() -> Unit {
+pub fn test_arraylist_insert() writes allocation_limit, variable1, variable2, variable3, variable4 {
     var __local_arraylist: *mut _ArrayList
 
     var __local_i: c_int
@@ -575,7 +575,7 @@ pub fn test_arraylist_insert() -> Unit {
 
 }
 
-pub fn test_arraylist_remove_range() -> Unit {
+pub fn test_arraylist_remove_range() writes allocation_limit, variable1, variable2, variable3, variable4 {
     var __local_arraylist: *mut _ArrayList
 
     (__local_arraylist = generate_arraylist())
@@ -656,7 +656,7 @@ pub fn test_arraylist_remove_range() -> Unit {
 
 }
 
-pub fn test_arraylist_remove() -> Unit {
+pub fn test_arraylist_remove() writes allocation_limit, variable1, variable2, variable3, variable4 {
     var __local_arraylist: *mut _ArrayList
 
     (__local_arraylist = generate_arraylist())
@@ -735,7 +735,7 @@ pub fn test_arraylist_remove() -> Unit {
 
 }
 
-pub fn test_arraylist_index_of() -> Unit {
+pub fn test_arraylist_index_of() writes allocation_limit {
     var __local_entries: [10]c_int = [(89 as c_int), (4 as c_int), (23 as c_int), (42 as c_int), (16 as c_int), (15 as c_int), (8 as c_int), (99 as c_int), (50 as c_int), (30 as c_int)]
 
     var __local_num_entries: c_int
@@ -802,7 +802,7 @@ pub fn test_arraylist_index_of() -> Unit {
 
 }
 
-pub fn test_arraylist_clear() -> Unit {
+pub fn test_arraylist_clear() writes allocation_limit, variable1, variable2, variable3, variable4 {
     var __local_arraylist: *mut _ArrayList
 
     (__local_arraylist = arraylist_new((0 as c_uint)))
@@ -835,7 +835,7 @@ pub fn test_arraylist_clear() -> Unit {
 
 }
 
-pub fn test_arraylist_sort() -> Unit {
+pub fn test_arraylist_sort() writes allocation_limit {
     var __local_arraylist: *mut _ArrayList
 
     var __local_entries: [13]c_int = [(89 as c_int), (4 as c_int), (23 as c_int), (42 as c_int), (4 as c_int), (16 as c_int), (15 as c_int), (4 as c_int), (8 as c_int), (99 as c_int), (50 as c_int), (30 as c_int), (4 as c_int)]
@@ -922,7 +922,7 @@ pub fn test_arraylist_sort() -> Unit {
 
 }
 
-pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
+pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int writes allocation_limit {
     run_tests((&tests[0] as *mut extern "C" fn() -> Unit))
 
     return 0

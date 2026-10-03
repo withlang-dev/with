@@ -71,7 +71,7 @@ pub unsafe fn pcre2_general_context_create_8(__param_private_malloc: unsafe exte
 
 }
 
-pub unsafe fn pcre2_general_context_free_8(__param_gcontext: *mut pcre2_real_general_context_8) -> Unit {
+pub unsafe fn pcre2_general_context_free_8(__param_gcontext: *mut pcre2_real_general_context_8) {
     if ((if __param_gcontext != null: 1 else: 0) != 0) {
         (*(&raw const (*__param_gcontext).memctl as *const pcre2_memctl)).free((__param_gcontext as *mut c_void), (*(&raw const (*__param_gcontext).memctl as *const pcre2_memctl)).memory_data)
     }
@@ -108,7 +108,7 @@ pub unsafe fn pcre2_compile_context_create_8(__param_gcontext: *mut pcre2_real_g
 
 }
 
-pub unsafe fn pcre2_compile_context_free_8(__param_ccontext: *mut pcre2_real_compile_context_8) -> Unit {
+pub unsafe fn pcre2_compile_context_free_8(__param_ccontext: *mut pcre2_real_compile_context_8) {
     if ((if __param_ccontext != null: 1 else: 0) != 0) {
         (*(&raw const (*__param_ccontext).memctl as *const pcre2_memctl)).free((__param_ccontext as *mut c_void), (*(&raw const (*__param_ccontext).memctl as *const pcre2_memctl)).memory_data)
     }
@@ -307,7 +307,7 @@ pub unsafe fn pcre2_convert_context_create_8(__param_gcontext: *mut pcre2_real_g
 
 }
 
-pub unsafe fn pcre2_convert_context_free_8(__param_ccontext: *mut pcre2_real_convert_context_8) -> Unit {
+pub unsafe fn pcre2_convert_context_free_8(__param_ccontext: *mut pcre2_real_convert_context_8) {
     if ((if __param_ccontext != null: 1 else: 0) != 0) {
         (*(&raw const (*__param_ccontext).memctl as *const pcre2_memctl)).free((__param_ccontext as *mut c_void), (*(&raw const (*__param_ccontext).memctl as *const pcre2_memctl)).memory_data)
     }
@@ -395,7 +395,7 @@ pub unsafe fn pcre2_match_context_create_8(__param_gcontext: *mut pcre2_real_gen
 
 }
 
-pub unsafe fn pcre2_match_context_free_8(__param_mcontext: *mut pcre2_real_match_context_8) -> Unit {
+pub unsafe fn pcre2_match_context_free_8(__param_mcontext: *mut pcre2_real_match_context_8) {
     if ((if __param_mcontext != null: 1 else: 0) != 0) {
         (*(&raw const (*__param_mcontext).memctl as *const pcre2_memctl)).free((__param_mcontext as *mut c_void), (*(&raw const (*__param_mcontext).memctl as *const pcre2_memctl)).memory_data)
     }
@@ -463,13 +463,9 @@ pub unsafe fn pcre2_set_recursion_limit_8(__param_mcontext: *mut pcre2_real_matc
 }
 
 pub unsafe fn pcre2_set_recursion_memory_management_8(__param_mcontext: *mut pcre2_real_match_context_8, __param_mymalloc: unsafe extern "C" fn(c_ulong, *mut c_void) -> *mut c_void, __param_myfree: unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit, __param_mydata: *mut c_void) -> c_int {
-    __param_mcontext
 
-    __param_mymalloc
 
-    __param_myfree
 
-    __param_mydata
 
     return 0
 
@@ -510,14 +506,12 @@ pub unsafe fn _pcre2_memctl_malloc_8(__param_size: c_ulong, __param_memctl: *mut
 }
 
 unsafe fn default_malloc(__param_size: c_ulong, __param_data: *mut c_void) -> *mut c_void {
-    __param_data
 
     return ((with_alloc((__param_size as i64)) as *mut c_void))
 
 }
 
-unsafe fn default_free(__param_block: *mut c_void, __param_data: *mut c_void) -> Unit {
-    __param_data
+unsafe fn default_free(__param_block: *mut c_void, __param_data: *mut c_void) {
 
     with_free((__param_block as *mut u8))
 

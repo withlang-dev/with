@@ -345,7 +345,7 @@ pub unsafe fn pcre2_serialize_get_number_of_codes_8(__param_bytes: *const u8) ->
 
 }
 
-pub unsafe fn pcre2_serialize_free_8(__param_bytes: *mut u8) -> Unit {
+pub unsafe fn pcre2_serialize_free_8(__param_bytes: *mut u8) {
     if ((if __param_bytes != null: 1 else: 0) != 0) {
         var __local_memctl: *mut pcre2_memctl = (((__param_bytes - (sizeof[pcre2_memctl]() as usize)) as *mut pcre2_memctl))
 

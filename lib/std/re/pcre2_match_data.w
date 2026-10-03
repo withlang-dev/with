@@ -73,7 +73,7 @@ pub unsafe fn pcre2_match_data_create_from_pattern_8(__param_code: *const pcre2_
 
 }
 
-pub unsafe fn pcre2_match_data_free_8(__param_match_data: *mut pcre2_real_match_data_8) -> Unit {
+pub unsafe fn pcre2_match_data_free_8(__param_match_data: *mut pcre2_real_match_data_8) {
     if ((if __param_match_data != null: 1 else: 0) != 0) {
         if ((if (*__param_match_data).heapframes != null: 1 else: 0) != 0) {
             (*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).free(((*__param_match_data).heapframes as *mut c_void), (*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).memory_data)

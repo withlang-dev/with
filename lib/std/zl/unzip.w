@@ -1181,7 +1181,6 @@ pub unsafe fn unzSetOffset(__param_file: *mut c_void, __param_pos: c_ulong) -> c
 unsafe fn decrypt_byte(__param_pkeys: *mut c_ulong, __param_pcrc_32_tab: *const c_uint) -> c_int {
     var __local_temp: c_uint
 
-    __param_pcrc_32_tab
 
     (__local_temp = (((((((*(__param_pkeys + ((2 as isize) as usize))) as c_uint) & (65535 as c_uint)) as c_uint) | (2 as c_uint)) as c_uint)))
 
@@ -1205,7 +1204,7 @@ unsafe fn update_keys(__param_pkeys: *mut c_ulong, __param_pcrc_32_tab: *const c
 
 }
 
-unsafe fn init_keys(__param_passwd: *const i8, __param_pkeys: *mut c_ulong, __param_pcrc_32_tab: *const c_uint) -> Unit {
+unsafe fn init_keys(__param_passwd: *const i8, __param_pkeys: *mut c_ulong, __param_pcrc_32_tab: *const c_uint) {
     var __local_passwd = __param_passwd
     ((*(__param_pkeys + ((0 as isize) as usize))) = ((305419896 as c_ulong)))
 
@@ -1858,7 +1857,7 @@ unsafe fn unzOpenInternal(__param_path: *const c_void, __param_pzlib_filefunc64_
 
 }
 
-unsafe fn unz64local_DosDateToTmuDate(__param_ulDosDate: c_ulong, __param_ptm: *mut tm_unz_s) -> Unit {
+unsafe fn unz64local_DosDateToTmuDate(__param_ulDosDate: c_ulong, __param_ptm: *mut tm_unz_s) {
     var __local_uDate: c_ulong
 
     (__local_uDate = ((((__param_ulDosDate as c_ulong) >> (16 as c_uint)) as c_ulong)))

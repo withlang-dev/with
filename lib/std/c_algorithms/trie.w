@@ -17,7 +17,7 @@ pub fn trie_new() -> *mut _Trie {
 
 }
 
-pub unsafe fn trie_free(__param_trie: *mut _Trie) -> Unit {
+pub unsafe fn trie_free(__param_trie: *mut _Trie) {
     free_node_recursive((*__param_trie).root_node)
 
     with_free(((__param_trie as *mut c_void) as *mut u8))
@@ -358,7 +358,7 @@ pub unsafe fn trie_num_entries(__param_trie: *mut _Trie) -> c_uint {
 
 }
 
-unsafe fn free_node_recursive(__param_node: *mut _TrieNode) -> Unit {
+unsafe fn free_node_recursive(__param_node: *mut _TrieNode) {
     var __local_i: c_int
 
     if ((if __param_node == null: 1 else: 0) != 0) {
@@ -439,7 +439,7 @@ unsafe fn trie_find_end_binary(__param_trie: *mut _Trie, __param_key: *mut u8, _
 
 }
 
-unsafe fn trie_insert_rollback(__param_trie: *mut _Trie, __param_key: *mut u8) -> Unit {
+unsafe fn trie_insert_rollback(__param_trie: *mut _Trie, __param_key: *mut u8) {
     var __local_node: *mut _TrieNode
 
     var __local_prev_ptr: *mut *mut _TrieNode

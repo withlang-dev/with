@@ -32,7 +32,7 @@ pub fn set_new(__param_hash_func: unsafe extern "C" fn(*mut c_void) -> c_uint, _
 
 }
 
-pub unsafe fn set_free(__param_set: *mut _Set) -> Unit {
+pub unsafe fn set_free(__param_set: *mut _Set) {
     var __local_rover: *mut _SetEntry
 
     var __local_next: *mut _SetEntry
@@ -65,7 +65,7 @@ pub unsafe fn set_free(__param_set: *mut _Set) -> Unit {
 
 }
 
-pub unsafe fn set_register_free_function(__param_set: *mut _Set, __param_free_func: unsafe extern "C" fn(*mut c_void) -> Unit) -> Unit {
+pub unsafe fn set_register_free_function(__param_set: *mut _Set, __param_free_func: unsafe extern "C" fn(*mut c_void) -> Unit) {
     ((*__param_set).free_func = __param_free_func)
 
 }
@@ -305,7 +305,7 @@ pub unsafe fn set_intersection(__param_set1: *mut _Set, __param_set2: *mut _Set)
 
 }
 
-pub unsafe fn set_iterate(__param_set: *mut _Set, __param_iter: *mut _SetIterator) -> Unit {
+pub unsafe fn set_iterate(__param_set: *mut _Set, __param_iter: *mut _SetIterator) {
     var __local_chain: c_uint
 
     ((*__param_iter).set = __param_set)
@@ -400,7 +400,7 @@ unsafe fn set_allocate_table(__param_set: *mut _Set) -> c_int {
 
 }
 
-unsafe fn set_free_entry(__param_set: *mut _Set, __param_entry: *mut _SetEntry) -> Unit {
+unsafe fn set_free_entry(__param_set: *mut _Set, __param_entry: *mut _SetEntry) {
     if ((if (*__param_set).free_func != null: 1 else: 0) != 0) {
         (*__param_set).free_func((*__param_entry).data)
 

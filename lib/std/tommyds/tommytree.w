@@ -69,7 +69,7 @@ fn tommy_haszero_u32(__param_value: c_uint) -> c_int {
 
 }
 
-pub unsafe fn tommy_tree_init(__param_tree: *mut tommy_tree_struct, __param_cmp: unsafe extern "C" fn(*const c_void, *const c_void) -> c_int) -> Unit {
+pub unsafe fn tommy_tree_init(__param_tree: *mut tommy_tree_struct, __param_cmp: unsafe extern "C" fn(*const c_void, *const c_void) -> c_int) {
     ((*__param_tree).root = null)
 
     ((*__param_tree).count = ((0 as c_ulonglong)))
@@ -149,12 +149,12 @@ pub unsafe fn tommy_tree_remove_existing(__param_tree: *mut tommy_tree_struct, _
 
 }
 
-pub unsafe fn tommy_tree_foreach(__param_tree: *mut tommy_tree_struct, __param_func: unsafe extern "C" fn(*mut c_void) -> Unit) -> Unit {
+pub unsafe fn tommy_tree_foreach(__param_tree: *mut tommy_tree_struct, __param_func: unsafe extern "C" fn(*mut c_void) -> Unit) {
     tommy_tree_foreach_node((*__param_tree).root, __param_func)
 
 }
 
-pub unsafe fn tommy_tree_foreach_arg(__param_tree: *mut tommy_tree_struct, __param_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit, __param_arg: *mut c_void) -> Unit {
+pub unsafe fn tommy_tree_foreach_arg(__param_tree: *mut tommy_tree_struct, __param_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit, __param_arg: *mut c_void) {
     tommy_tree_foreach_arg_node((*__param_tree).root, __param_func, __param_arg)
 
 }
@@ -357,7 +357,7 @@ unsafe fn tommy_tree_search_node(__param_cmp: unsafe extern "C" fn(*const c_void
 
 }
 
-unsafe fn tommy_tree_foreach_node(__param_root: *mut tommy_node_struct, __param_func: unsafe extern "C" fn(*mut c_void) -> Unit) -> Unit {
+unsafe fn tommy_tree_foreach_node(__param_root: *mut tommy_node_struct, __param_func: unsafe extern "C" fn(*mut c_void) -> Unit) {
     var __local_next: *mut tommy_node_struct
 
     if ((if not (__param_root != null): 1 else: 0) != 0) {
@@ -374,7 +374,7 @@ unsafe fn tommy_tree_foreach_node(__param_root: *mut tommy_node_struct, __param_
 
 }
 
-unsafe fn tommy_tree_foreach_arg_node(__param_root: *mut tommy_node_struct, __param_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit, __param_arg: *mut c_void) -> Unit {
+unsafe fn tommy_tree_foreach_arg_node(__param_root: *mut tommy_node_struct, __param_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit, __param_arg: *mut c_void) {
     var __local_next: *mut tommy_node_struct
 
     if ((if not (__param_root != null): 1 else: 0) != 0) {

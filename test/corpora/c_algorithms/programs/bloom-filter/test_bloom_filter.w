@@ -6,7 +6,7 @@ use std.calg_testing.framework
 use std.calg_testing.hash_string
 use std.libc
 
-pub fn test_bloom_filter_new_free() -> Unit {
+pub fn test_bloom_filter_new_free() -> Unit writes allocation_limit {
     var __local_filter: *mut _BloomFilter
 
     (__local_filter = bloom_filter_new((128 as c_uint), string_hash, (1 as c_uint)))
@@ -59,7 +59,7 @@ pub fn test_bloom_filter_new_free() -> Unit {
 
 }
 
-pub fn test_bloom_filter_insert_query() -> Unit {
+pub fn test_bloom_filter_insert_query() writes allocation_limit {
     var __local_filter: *mut _BloomFilter
 
     (__local_filter = bloom_filter_new((128 as c_uint), string_hash, (4 as c_uint)))
@@ -96,7 +96,7 @@ pub fn test_bloom_filter_insert_query() -> Unit {
 
 }
 
-pub fn test_bloom_filter_read_load() -> Unit {
+pub fn test_bloom_filter_read_load() writes allocation_limit {
     var __local_filter1: *mut _BloomFilter
 
     var __local_filter2: *mut _BloomFilter
@@ -133,7 +133,7 @@ pub fn test_bloom_filter_read_load() -> Unit {
 
 }
 
-pub fn test_bloom_filter_intersection() -> Unit {
+pub fn test_bloom_filter_intersection() writes allocation_limit {
     var __local_filter1: *mut _BloomFilter
 
     var __local_filter2: *mut _BloomFilter
@@ -188,7 +188,7 @@ pub fn test_bloom_filter_intersection() -> Unit {
 
 }
 
-pub fn test_bloom_filter_union() -> Unit {
+pub fn test_bloom_filter_union() writes allocation_limit {
     var __local_filter1: *mut _BloomFilter
 
     var __local_filter2: *mut _BloomFilter
@@ -235,7 +235,7 @@ pub fn test_bloom_filter_union() -> Unit {
 
 }
 
-pub fn test_bloom_filter_mismatch() -> Unit {
+pub fn test_bloom_filter_mismatch() writes allocation_limit {
     var __local_filter1: *mut _BloomFilter
 
     var __local_filter2: *mut _BloomFilter
@@ -294,7 +294,7 @@ pub fn test_bloom_filter_mismatch() -> Unit {
 
 }
 
-pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
+pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int writes allocation_limit {
     run_tests((&tests[0] as *mut extern "C" fn() -> Unit))
 
     return 0

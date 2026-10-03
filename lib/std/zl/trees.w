@@ -14,7 +14,7 @@ use std.zl.adler32
 use std.zl.crc32
 use std.zl.inftrees
 
-pub unsafe fn _tr_init(__param_s: *mut internal_state) -> Unit {
+pub unsafe fn _tr_init(__param_s: *mut internal_state) {
     tr_static_init()
 
     ((*__param_s).l_desc.dyn_tree = (&(*__param_s).dyn_ltree[0] as *mut ct_data_s))
@@ -90,7 +90,7 @@ pub unsafe fn _tr_tally(__param_s: *mut internal_state, __param_dist: c_uint, __
 
 }
 
-pub unsafe fn _tr_flush_block(__param_s: *mut internal_state, __param_buf: *mut i8, __param_stored_len: c_ulong, __param_last: c_int) -> Unit {
+pub unsafe fn _tr_flush_block(__param_s: *mut internal_state, __param_buf: *mut i8, __param_stored_len: c_ulong, __param_last: c_int) {
     var __local_opt_lenb: c_ulong
 
     var __local_static_lenb: c_ulong
@@ -251,12 +251,12 @@ pub unsafe fn _tr_flush_block(__param_s: *mut internal_state, __param_buf: *mut 
 
 }
 
-pub unsafe fn _tr_flush_bits(__param_s: *mut internal_state) -> Unit {
+pub unsafe fn _tr_flush_bits(__param_s: *mut internal_state) {
     bi_flush(__param_s)
 
 }
 
-pub unsafe fn _tr_align(__param_s: *mut internal_state) -> Unit {
+pub unsafe fn _tr_align(__param_s: *mut internal_state) {
     var __local_len: c_int = ((3 as c_int))
 
     if ((if (*__param_s).bi_valid > (16 - __local_len): 1 else: 0) != 0) {
@@ -341,7 +341,7 @@ pub unsafe fn _tr_align(__param_s: *mut internal_state) -> Unit {
 
 }
 
-pub unsafe fn _tr_stored_block(__param_s: *mut internal_state, __param_buf: *mut i8, __param_stored_len: c_ulong, __param_last: c_int) -> Unit {
+pub unsafe fn _tr_stored_block(__param_s: *mut internal_state, __param_buf: *mut i8, __param_stored_len: c_ulong, __param_last: c_int) {
     var __local_len: c_int = ((3 as c_int))
 
     if ((if (*__param_s).bi_valid > (16 - __local_len): 1 else: 0) != 0) {
@@ -501,7 +501,7 @@ unsafe fn bi_flush(__param_s: *mut internal_state) -> Unit {
 
 }
 
-unsafe fn bi_windup(__param_s: *mut internal_state) -> Unit {
+unsafe fn bi_windup(__param_s: *mut internal_state) {
     if ((if (*__param_s).bi_valid > 8: 1 else: 0) != 0) {
         var __ci_expr_old_0: c_ulong = (*__param_s).pending
 
@@ -545,7 +545,7 @@ unsafe fn bi_windup(__param_s: *mut internal_state) -> Unit {
 
 }
 
-unsafe fn gen_codes(__param_tree: *mut ct_data_s, __param_max_code: c_int, __param_bl_count: *mut c_ushort) -> Unit {
+unsafe fn gen_codes(__param_tree: *mut ct_data_s, __param_max_code: c_int, __param_bl_count: *mut c_ushort) {
     var __local_next_code: [16]c_ushort
 
     var __local_code: c_uint = ((0 as c_uint))
@@ -597,11 +597,11 @@ unsafe fn gen_codes(__param_tree: *mut ct_data_s, __param_max_code: c_int, __par
 
 }
 
-fn tr_static_init() -> Unit {
+fn tr_static_init() {
     return
 }
 
-unsafe fn init_block(__param_s: *mut internal_state) -> Unit {
+unsafe fn init_block(__param_s: *mut internal_state) {
     var __local_n: c_int
 
     (__local_n = ((0 as c_int)))
@@ -648,7 +648,7 @@ unsafe fn init_block(__param_s: *mut internal_state) -> Unit {
 
 }
 
-unsafe fn pqdownheap(__param_s: *mut internal_state, __param_tree: *mut ct_data_s, __param_k: c_int) -> Unit {
+unsafe fn pqdownheap(__param_s: *mut internal_state, __param_tree: *mut ct_data_s, __param_k: c_int) {
     var __local_k = __param_k
     var __local_v: c_int = (((*__param_s).heap[__local_k] as c_int))
 
@@ -715,7 +715,7 @@ unsafe fn pqdownheap(__param_s: *mut internal_state, __param_tree: *mut ct_data_
 
 }
 
-unsafe fn gen_bitlen(__param_s: *mut internal_state, __param_desc: *mut tree_desc_s) -> Unit {
+unsafe fn gen_bitlen(__param_s: *mut internal_state, __param_desc: *mut tree_desc_s) {
     var __local_tree: *mut ct_data_s = (*__param_desc).dyn_tree
 
     var __local_max_code: c_int = (*__param_desc).max_code
@@ -860,7 +860,7 @@ unsafe fn gen_bitlen(__param_s: *mut internal_state, __param_desc: *mut tree_des
 
 }
 
-unsafe fn build_tree(__param_s: *mut internal_state, __param_desc: *mut tree_desc_s) -> Unit {
+unsafe fn build_tree(__param_s: *mut internal_state, __param_desc: *mut tree_desc_s) {
     var __local_tree: *mut ct_data_s = (*__param_desc).dyn_tree
 
     var __local_stree: *const ct_data_s = (*(*__param_desc).stat_desc).static_tree
@@ -1019,7 +1019,7 @@ unsafe fn build_tree(__param_s: *mut internal_state, __param_desc: *mut tree_des
 
 }
 
-unsafe fn scan_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s, __param_max_code: c_int) -> Unit {
+unsafe fn scan_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s, __param_max_code: c_int) {
     var __local_n: c_int
 
     var __local_prevlen: c_int = ((-1 as c_int))
@@ -1122,7 +1122,7 @@ unsafe fn scan_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
 
 }
 
-unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s, __param_max_code: c_int) -> Unit {
+unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s, __param_max_code: c_int) {
     var __local_n: c_int
 
     var __local_prevlen: c_int = ((-1 as c_int))
@@ -1573,7 +1573,7 @@ unsafe fn build_bl_tree(__param_s: *mut internal_state) -> c_int {
 
 }
 
-unsafe fn send_all_trees(__param_s: *mut internal_state, __param_lcodes: c_int, __param_dcodes: c_int, __param_blcodes: c_int) -> Unit {
+unsafe fn send_all_trees(__param_s: *mut internal_state, __param_lcodes: c_int, __param_dcodes: c_int, __param_blcodes: c_int) {
     var __local_rank: c_int
 
 

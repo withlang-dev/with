@@ -201,7 +201,7 @@ pub unsafe fn gzerror(__param_file: *mut gzFile_s, __param_errnum: *mut c_int) -
 
 }
 
-pub unsafe fn gzclearerr(__param_file: *mut gzFile_s) -> Unit {
+pub unsafe fn gzclearerr(__param_file: *mut gzFile_s) {
     var __local_state: *mut gz_state
 
     if ((if __param_file == null: 1 else: 0) != 0) {
@@ -583,7 +583,7 @@ pub fn gz_intmax() -> c_uint {
 
 }
 
-unsafe fn gz_reset(__param_state: *mut gz_state) -> Unit {
+unsafe fn gz_reset(__param_state: *mut gz_state) {
     ((*__param_state).x.have = ((0 as c_uint)))
 
     if ((if (*__param_state).mode == 7247: 1 else: 0) != 0) {

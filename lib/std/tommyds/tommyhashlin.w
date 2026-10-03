@@ -70,7 +70,7 @@ fn tommy_haszero_u32(__param_value: c_uint) -> c_int {
 
 }
 
-pub unsafe fn tommy_hashlin_init(__param_hashlin: *mut tommy_hashlin_struct) -> Unit {
+pub unsafe fn tommy_hashlin_init(__param_hashlin: *mut tommy_hashlin_struct) {
     var __local_i: c_uint
 
     ((*__param_hashlin).bucket_bit = ((6 as c_uint)))
@@ -97,7 +97,7 @@ pub unsafe fn tommy_hashlin_init(__param_hashlin: *mut tommy_hashlin_struct) -> 
 
 }
 
-pub unsafe fn tommy_hashlin_done(__param_hashlin: *mut tommy_hashlin_struct) -> Unit {
+pub unsafe fn tommy_hashlin_done(__param_hashlin: *mut tommy_hashlin_struct) {
     var __local_i: c_uint
 
     with_free((((*__param_hashlin).bucket[0] as *mut c_void) as *mut u8))
@@ -117,7 +117,7 @@ pub unsafe fn tommy_hashlin_done(__param_hashlin: *mut tommy_hashlin_struct) -> 
 
 }
 
-pub unsafe fn tommy_hashlin_insert(__param_hashlin: *mut tommy_hashlin_struct, __param_node: *mut tommy_node_struct, __param_data: *mut c_void, __param_hash: c_ulonglong) -> Unit {
+pub unsafe fn tommy_hashlin_insert(__param_hashlin: *mut tommy_hashlin_struct, __param_node: *mut tommy_node_struct, __param_data: *mut c_void, __param_hash: c_ulonglong) {
     tommy_list_insert_tail(tommy_hashlin_bucket_ref(__param_hashlin, __param_hash), __param_node, __param_data)
 
     ((*__param_node).index = __param_hash)
@@ -226,7 +226,7 @@ pub unsafe fn tommy_hashlin_remove_existing(__param_hashlin: *mut tommy_hashlin_
 
 }
 
-pub unsafe fn tommy_hashlin_foreach(__param_hashlin: *mut tommy_hashlin_struct, __param_func: unsafe extern "C" fn(*mut c_void) -> Unit) -> Unit {
+pub unsafe fn tommy_hashlin_foreach(__param_hashlin: *mut tommy_hashlin_struct, __param_func: unsafe extern "C" fn(*mut c_void) -> Unit) {
     var __local_bucket_max: c_ulonglong
 
     var __local_pos: c_ulonglong
@@ -255,7 +255,7 @@ pub unsafe fn tommy_hashlin_foreach(__param_hashlin: *mut tommy_hashlin_struct, 
 
 }
 
-pub unsafe fn tommy_hashlin_foreach_arg(__param_hashlin: *mut tommy_hashlin_struct, __param_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit, __param_arg: *mut c_void) -> Unit {
+pub unsafe fn tommy_hashlin_foreach_arg(__param_hashlin: *mut tommy_hashlin_struct, __param_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit, __param_arg: *mut c_void) {
     var __local_bucket_max: c_ulonglong
 
     var __local_pos: c_ulonglong
@@ -294,7 +294,7 @@ pub unsafe fn tommy_hashlin_memory_usage(__param_hashlin: *mut tommy_hashlin_str
 
 }
 
-unsafe fn tommy_hashlin_stable(__param_hashlin: *mut tommy_hashlin_struct) -> Unit {
+unsafe fn tommy_hashlin_stable(__param_hashlin: *mut tommy_hashlin_struct) {
     ((*__param_hashlin).state = ((0 as c_uint)))
 
     ((*__param_hashlin).low_max = (*__param_hashlin).bucket_max)
@@ -305,7 +305,7 @@ unsafe fn tommy_hashlin_stable(__param_hashlin: *mut tommy_hashlin_struct) -> Un
 
 }
 
-unsafe fn hashlin_grow_step(__param_hashlin: *mut tommy_hashlin_struct) -> Unit {
+unsafe fn hashlin_grow_step(__param_hashlin: *mut tommy_hashlin_struct) {
     var __ci_expr_logic_0: c_int = 0
 
     if ((if (*__param_hashlin).state != 1: 1 else: 0) != 0) {
@@ -391,7 +391,7 @@ unsafe fn hashlin_grow_step(__param_hashlin: *mut tommy_hashlin_struct) -> Unit 
 
 }
 
-unsafe fn hashlin_shrink_step(__param_hashlin: *mut tommy_hashlin_struct) -> Unit {
+unsafe fn hashlin_shrink_step(__param_hashlin: *mut tommy_hashlin_struct) {
     var __ci_expr_logic_0: c_int = 0
 
     if ((if (*__param_hashlin).state != 2: 1 else: 0) != 0) {

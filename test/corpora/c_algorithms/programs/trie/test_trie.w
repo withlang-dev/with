@@ -5,7 +5,7 @@ use std.calg_testing.framework
 use std.calg_testing.trie
 use std.libc
 
-pub fn generate_trie() -> *mut _Trie {
+pub fn generate_trie() -> *mut _Trie writes allocation_limit, test_array {
     var __local_trie: *mut _Trie
 
     var __local_i: c_int
@@ -47,7 +47,7 @@ pub fn generate_trie() -> *mut _Trie {
 
 }
 
-pub fn test_trie_new_free() -> Unit {
+pub fn test_trie_new_free() -> Unit writes allocation_limit {
     var __local_trie: *mut _Trie
 
     (__local_trie = trie_new())
@@ -116,7 +116,7 @@ pub fn test_trie_new_free() -> Unit {
 
 }
 
-pub fn test_trie_insert() -> Unit {
+pub fn test_trie_insert() writes allocation_limit, test_array {
     var __local_trie: *mut _Trie
 
     var __local_entries: c_uint
@@ -179,7 +179,7 @@ pub fn test_trie_insert() -> Unit {
 
 }
 
-pub fn test_trie_lookup() -> Unit {
+pub fn test_trie_lookup() writes allocation_limit, test_array {
     var __local_trie: *mut _Trie
 
     var __local_buf: [10]c_char
@@ -225,7 +225,7 @@ pub fn test_trie_lookup() -> Unit {
 
 }
 
-pub fn test_trie_remove() -> Unit {
+pub fn test_trie_remove() writes allocation_limit, test_array {
     var __local_trie: *mut _Trie
 
     var __local_buf: [10]c_char
@@ -285,7 +285,7 @@ pub fn test_trie_remove() -> Unit {
 
 }
 
-pub fn test_trie_replace() -> Unit {
+pub fn test_trie_replace() writes allocation_limit, test_array {
     var __local_trie: *mut _Trie
 
     var __local_val: *mut c_int
@@ -320,7 +320,7 @@ pub fn test_trie_replace() -> Unit {
 
 }
 
-pub fn test_trie_insert_empty() -> Unit {
+pub fn test_trie_insert_empty() writes allocation_limit {
     var __local_trie: *mut _Trie
 
     var __local_buf: [10]c_char
@@ -361,7 +361,7 @@ pub fn test_trie_insert_empty() -> Unit {
 
 }
 
-fn test_trie_free_long() -> Unit {
+fn test_trie_free_long() {
     var __local_long_string: *mut c_char
 
     var __local_trie: *mut _Trie
@@ -382,7 +382,7 @@ fn test_trie_free_long() -> Unit {
 
 }
 
-fn test_trie_negative_keys() -> Unit {
+fn test_trie_negative_keys() {
     var __local_my_key: [6]c_char = [(97 as c_char), (98 as c_char), (99 as c_char), (-50 as c_char), (-20 as c_char), (0 as c_char)]
 
     var __local_trie: *mut _Trie
@@ -427,7 +427,7 @@ fn test_trie_negative_keys() -> Unit {
 
 }
 
-pub fn generate_binary_trie() -> *mut _Trie {
+pub fn generate_binary_trie() -> *mut _Trie writes allocation_limit {
     var __local_trie: *mut _Trie
 
     (__local_trie = trie_new())
@@ -448,7 +448,7 @@ pub fn generate_binary_trie() -> *mut _Trie {
 
 }
 
-pub fn test_trie_insert_binary() -> Unit {
+pub fn test_trie_insert_binary() writes allocation_limit {
     var __local_trie: *mut _Trie
 
     var __local_value: *mut c_char
@@ -487,7 +487,7 @@ pub fn test_trie_insert_binary() -> Unit {
 
 }
 
-pub fn test_trie_insert_out_of_memory() -> Unit {
+pub fn test_trie_insert_out_of_memory() writes allocation_limit {
     var __local_trie: *mut _Trie
 
     (__local_trie = generate_binary_trie())
@@ -516,7 +516,7 @@ pub fn test_trie_insert_out_of_memory() -> Unit {
 
 }
 
-pub fn test_trie_remove_binary() -> Unit {
+pub fn test_trie_remove_binary() writes allocation_limit {
     var __local_trie: *mut _Trie
 
     var __local_value: *mut c_void
@@ -583,7 +583,7 @@ pub fn test_trie_remove_binary() -> Unit {
 
 }
 
-pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
+pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int writes allocation_limit {
     run_tests((&tests[0] as *mut extern "C" fn() -> Unit))
 
     return 0

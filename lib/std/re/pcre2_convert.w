@@ -243,7 +243,7 @@ pub unsafe fn pcre2_pattern_convert_8(__param_pattern: *const u8, __param_plengt
 
 }
 
-pub unsafe fn pcre2_converted_pattern_free_8(__param_converted: *mut u8) -> Unit {
+pub unsafe fn pcre2_converted_pattern_free_8(__param_converted: *mut u8) {
     if ((if __param_converted != null: 1 else: 0) != 0) {
         var __local_memctl: *mut pcre2_memctl = ((((__param_converted as *mut c_char) - (sizeof[pcre2_memctl]() as usize)) as *mut pcre2_memctl))
 
@@ -362,8 +362,6 @@ unsafe fn convert_posix(__param_pattype: c_uint, __param_pattern: *const u8, __p
         (__local_lastspecial__goto_162_10 = ((0 as c_uint)))
         (__local_extended__goto_163_6 = (((if ((__param_pattype as c_uint) & (8 as c_uint)) != 0: 1 else: 0) as c_int)))
         (__local_nextisliteral__goto_164_6 = ((0 as c_int)))
-        __param_utf
-        __param_ccontext
         ((*__param_bufflenptr) = __local_plength)
         (__local_s__goto_172_1 = c"(*NUL)".ptr)
         goto '__ci_bb_1
@@ -1448,7 +1446,7 @@ unsafe fn convert_posix(__param_pattype: c_uint, __param_pattern: *const u8, __p
 
 }
 
-unsafe fn convert_glob_write(__param_out: *mut pcre2_output_context, __param_chr: u8) -> Unit {
+unsafe fn convert_glob_write(__param_out: *mut pcre2_output_context, __param_chr: u8) {
     ((*__param_out).output_size = ((*__param_out).output_size +% 1))
 
     if ((if (*__param_out).output < (*__param_out).output_end: 1 else: 0) != 0) {
@@ -1462,7 +1460,7 @@ unsafe fn convert_glob_write(__param_out: *mut pcre2_output_context, __param_chr
 
 }
 
-unsafe fn convert_glob_write_str(__param_out: *mut pcre2_output_context, __param_length: c_ulong) -> Unit {
+unsafe fn convert_glob_write_str(__param_out: *mut pcre2_output_context, __param_length: c_ulong) {
     var __local_length = __param_length
     var __local_out_str: *mut u8 = ((&raw const (*__param_out).out_str[0] as *mut u8))
 
@@ -1500,7 +1498,7 @@ unsafe fn convert_glob_write_str(__param_out: *mut pcre2_output_context, __param
 
 }
 
-unsafe fn convert_glob_print_separator(__param_out: *mut pcre2_output_context, __param_separator: u8, __param_with_escape: c_int) -> Unit {
+unsafe fn convert_glob_print_separator(__param_out: *mut pcre2_output_context, __param_separator: u8, __param_with_escape: c_int) {
     if (__param_with_escape != 0) {
         convert_glob_write(__param_out, (92 as u8))
     }
@@ -1509,7 +1507,7 @@ unsafe fn convert_glob_print_separator(__param_out: *mut pcre2_output_context, _
 
 }
 
-unsafe fn convert_glob_print_wildcard(__param_out: *mut pcre2_output_context, __param_separator: u8, __param_with_escape: c_int) -> Unit {
+unsafe fn convert_glob_print_wildcard(__param_out: *mut pcre2_output_context, __param_separator: u8, __param_with_escape: c_int) {
     ((*__param_out).out_str[0] = ((91 as u8)))
 
     ((*__param_out).out_str[1] = ((94 as u8)))
@@ -1766,7 +1764,6 @@ unsafe fn convert_glob_parse_range(__param_from: *mut *const u8, __param_pattern
     var __local_class_index: c_int
 
 
-    __param_utf
 
     if ((if __local_pattern >= __param_pattern_end: 1 else: 0) != 0) {
         ((*__param_from) = __local_pattern)
@@ -2283,7 +2280,7 @@ unsafe fn convert_glob_parse_range(__param_from: *mut *const u8, __param_pattern
 
 }
 
-unsafe fn convert_glob_print_commit(__param_out: *mut pcre2_output_context) -> Unit {
+unsafe fn convert_glob_print_commit(__param_out: *mut pcre2_output_context) {
     ((*__param_out).out_str[0] = ((40 as u8)))
 
     ((*__param_out).out_str[1] = ((42 as u8)))
@@ -2339,7 +2336,6 @@ unsafe fn convert_glob(__param_options: c_uint, __param_pattern: *const u8, __pa
 
     var __local_result: c_int = ((0 as c_int))
 
-    __param_utf
 
     var __ci_expr_logic_1: c_int = 0
 

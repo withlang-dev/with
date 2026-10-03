@@ -62,17 +62,11 @@ pub unsafe fn pcre2_jit_compile_8(__param_code: *mut pcre2_real_code_8, __param_
 }
 
 pub unsafe fn pcre2_jit_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *const u8, __param_length: c_ulong, __param_start_offset: c_ulong, __param_options: c_uint, __param_match_data: *mut pcre2_real_match_data_8, __param_mcontext: *mut pcre2_real_match_context_8) -> c_int {
-    __param_code
 
-    __param_subject
 
-    __param_length
 
-    __param_start_offset
 
-    __param_options
 
-    __param_mcontext
 
     ((*__param_match_data).rc = ((-45 as c_int)))
 
@@ -81,52 +75,35 @@ pub unsafe fn pcre2_jit_match_8(__param_code: *const pcre2_real_code_8, __param_
 
 }
 
-pub unsafe fn pcre2_jit_free_unused_memory_8(__param_gcontext: *mut pcre2_real_general_context_8) -> Unit {
-    __param_gcontext
-
+pub unsafe fn pcre2_jit_free_unused_memory_8(__param_gcontext: *mut pcre2_real_general_context_8) {
+    return
 }
 
 pub unsafe fn pcre2_jit_stack_create_8(__param_startsize: c_ulong, __param_maxsize: c_ulong, __param_gcontext: *mut pcre2_real_general_context_8) -> *mut pcre2_real_jit_stack_8 {
-    __param_gcontext
 
-    __param_startsize
 
-    __param_maxsize
 
     return ((null as *mut pcre2_real_jit_stack_8))
 
 }
 
-pub unsafe fn pcre2_jit_stack_assign_8(__param_mcontext: *mut pcre2_real_match_context_8, __param_callback: unsafe extern "C" fn(*mut c_void) -> *mut pcre2_real_jit_stack_8, __param_callback_data: *mut c_void) -> Unit {
-    __param_mcontext
-
-    __param_callback
-
-    __param_callback_data
-
+pub unsafe fn pcre2_jit_stack_assign_8(__param_mcontext: *mut pcre2_real_match_context_8, __param_callback: unsafe extern "C" fn(*mut c_void) -> *mut pcre2_real_jit_stack_8, __param_callback_data: *mut c_void) {
+    return
 }
 
-pub unsafe fn pcre2_jit_stack_free_8(__param_jit_stack: *mut pcre2_real_jit_stack_8) -> Unit {
-    __param_jit_stack
-
+pub unsafe fn pcre2_jit_stack_free_8(__param_jit_stack: *mut pcre2_real_jit_stack_8) {
+    return
 }
 
-pub unsafe fn _pcre2_jit_free_rodata_8(__param_current: *mut c_void, __param_allocator_data: *mut c_void) -> Unit {
-    __param_current
-
-    __param_allocator_data
-
+pub unsafe fn _pcre2_jit_free_rodata_8(__param_current: *mut c_void, __param_allocator_data: *mut c_void) {
+    return
 }
 
-pub unsafe fn _pcre2_jit_free_8(__param_executable_jit: *mut c_void, __param_memctl: *mut pcre2_memctl) -> Unit {
-    __param_executable_jit
-
-    __param_memctl
-
+pub unsafe fn _pcre2_jit_free_8(__param_executable_jit: *mut c_void, __param_memctl: *mut pcre2_memctl) {
+    return
 }
 
 pub unsafe fn _pcre2_jit_get_size_8(__param_executable_jit: *mut c_void) -> c_ulong {
-    __param_executable_jit
 
     return 0
 

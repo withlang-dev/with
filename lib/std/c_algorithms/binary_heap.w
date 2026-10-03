@@ -32,7 +32,7 @@ pub fn binary_heap_new(__param_heap_type: i32, __param_compare_func: unsafe exte
 
 }
 
-pub unsafe fn binary_heap_free(__param_heap: *mut _BinaryHeap) -> Unit {
+pub unsafe fn binary_heap_free(__param_heap: *mut _BinaryHeap) {
     with_free((((*__param_heap).values as *mut c_void) as *mut u8))
 
     with_free(((__param_heap as *mut c_void) as *mut u8))

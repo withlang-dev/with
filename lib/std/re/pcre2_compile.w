@@ -408,7 +408,6 @@ pub unsafe fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulon
     }
 
     '__ci_bb_23 {
-        __local_zero_terminated__goto_10279_6
         if ((if __local_patlen > (*__local_ccontext).max_pattern_length: 1 else: 0) != 0) {
             goto '__ci_bb_24
         } else {
@@ -2346,7 +2345,7 @@ pub unsafe fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulon
 
 }
 
-pub unsafe fn pcre2_code_free_8(__param_code: *mut pcre2_real_code_8) -> Unit {
+pub unsafe fn pcre2_code_free_8(__param_code: *mut pcre2_real_code_8) {
     var __local_ref_count: *mut c_ulong
 
     if ((if __param_code != null: 1 else: 0) != 0) {
@@ -9740,7 +9739,6 @@ unsafe fn max_parsed_pattern(__param_ptr: *const u8, __param_ptrend: *const u8, 
 
     var __local_parsed_size_needed: c_long
 
-    __param_utf
 
     (__local_parsed_size_needed = ((((((((__param_ptrend as usize) -% (__param_ptr as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong) +% (__local_big32count as c_ulong)) as c_long)))
 

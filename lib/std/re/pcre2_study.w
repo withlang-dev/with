@@ -3421,9 +3421,7 @@ unsafe fn set_table_bit(__param_re: *mut pcre2_real_code_8, __param_p: *const u8
         ((*__ci_expr_old_0) as c_uint)
     }
 
-    __param_utf
 
-    __param_ucp
 
     ((*__param_re).start_bitmap[((__local_c as c_uint) / (8 as c_uint))] = ((*__param_re).start_bitmap[((__local_c as c_uint) / (8 as c_uint))] as u8) | (((1 as c_uint) << (((__local_c as c_uint) & (7 as c_uint)) as c_uint)) as u8))
 
@@ -3507,7 +3505,7 @@ unsafe fn set_table_bit(__param_re: *mut pcre2_real_code_8, __param_p: *const u8
 
 }
 
-unsafe fn set_type_bits(__param_re: *mut pcre2_real_code_8, __param_cbit_type: c_int, __param_table_limit: c_uint) -> Unit {
+unsafe fn set_type_bits(__param_re: *mut pcre2_real_code_8, __param_cbit_type: c_int, __param_table_limit: c_uint) {
     var __local_c: c_uint
 
     (__local_c = ((0 as c_uint)))
@@ -3544,7 +3542,7 @@ unsafe fn set_type_bits(__param_re: *mut pcre2_real_code_8, __param_cbit_type: c
 
 }
 
-unsafe fn set_nottype_bits(__param_re: *mut pcre2_real_code_8, __param_cbit_type: c_int, __param_table_limit: c_uint) -> Unit {
+unsafe fn set_nottype_bits(__param_re: *mut pcre2_real_code_8, __param_cbit_type: c_int, __param_table_limit: c_uint) {
     var __local_c: c_uint
 
     (__local_c = ((0 as c_uint)))
@@ -3571,7 +3569,7 @@ unsafe fn set_nottype_bits(__param_re: *mut pcre2_real_code_8, __param_cbit_type
 
 }
 
-unsafe fn study_char_list(__param_code: *const u8, __param_start_bitmap: *mut u8, __param_char_lists_end: *const u8) -> Unit {
+unsafe fn study_char_list(__param_code: *const u8, __param_start_bitmap: *mut u8, __param_char_lists_end: *const u8) {
     var __local_code = __param_code
     var __local_type_: c_uint
 

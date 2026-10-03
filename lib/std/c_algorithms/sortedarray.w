@@ -69,7 +69,7 @@ pub fn sortedarray_new(__param_length: c_uint, __param_cmp_func: unsafe extern "
 
 }
 
-pub unsafe fn sortedarray_free(__param_sortedarray: *mut _SortedArray) -> Unit {
+pub unsafe fn sortedarray_free(__param_sortedarray: *mut _SortedArray) {
     if ((if __param_sortedarray != null: 1 else: 0) != 0) {
         with_free((((*__param_sortedarray).data as *mut c_void) as *mut u8))
 
@@ -264,7 +264,7 @@ pub unsafe fn sortedarray_index_of(__param_sortedarray: *mut _SortedArray, __par
 
 }
 
-pub unsafe fn sortedarray_clear(__param_sortedarray: *mut _SortedArray) -> Unit {
+pub unsafe fn sortedarray_clear(__param_sortedarray: *mut _SortedArray) {
     ((*__param_sortedarray).length = ((0 as c_uint)))
 
 }

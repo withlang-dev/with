@@ -39,11 +39,11 @@ pub unsafe fn find_subtree_height(__param_node: *mut _RBTreeNode) -> c_int {
 
 }
 
-pub unsafe fn validate_tree(__param_tree: *mut _RBTree) -> Unit {
+pub unsafe fn validate_tree(__param_tree: *mut _RBTree) {
     return
 }
 
-pub fn create_tree() -> *mut _RBTree {
+pub fn create_tree() -> *mut _RBTree writes allocation_limit, test_array {
     var __local_tree: *mut _RBTree
 
     var __local_i: c_int
@@ -67,7 +67,7 @@ pub fn create_tree() -> *mut _RBTree {
 
 }
 
-pub fn test_rb_tree_new() -> Unit {
+pub fn test_rb_tree_new() -> Unit writes allocation_limit {
     var __local_tree: *mut _RBTree
 
     (__local_tree = rb_tree_new(int_compare))
@@ -104,7 +104,7 @@ pub fn test_rb_tree_new() -> Unit {
 
 }
 
-pub fn test_rb_tree_insert_lookup() -> Unit {
+pub fn test_rb_tree_insert_lookup() writes allocation_limit, test_array {
     var __local_tree: *mut _RBTree
 
     var __local_node: *mut _RBTreeNode
@@ -195,7 +195,7 @@ pub fn test_rb_tree_insert_lookup() -> Unit {
 
 }
 
-pub fn test_rb_tree_child() -> Unit {
+pub fn test_rb_tree_child() writes allocation_limit {
     var __local_tree: *mut _RBTree
 
     var __local_root: *mut _RBTreeNode
@@ -269,7 +269,7 @@ pub fn test_rb_tree_child() -> Unit {
 
 }
 
-pub fn test_out_of_memory() -> Unit {
+pub fn test_out_of_memory() writes allocation_limit, test_array {
     var __local_tree: *mut _RBTree
 
     var __local_node: *mut _RBTreeNode
@@ -303,7 +303,7 @@ pub fn test_out_of_memory() -> Unit {
 
 }
 
-pub fn test_rb_tree_free() -> Unit {
+pub fn test_rb_tree_free() writes allocation_limit, test_array {
     var __local_tree: *mut _RBTree
 
     (__local_tree = rb_tree_new(int_compare))
@@ -316,7 +316,7 @@ pub fn test_rb_tree_free() -> Unit {
 
 }
 
-pub fn test_rb_tree_lookup() -> Unit {
+pub fn test_rb_tree_lookup() writes allocation_limit, test_array {
     var __local_tree: *mut _RBTree
 
     var __local_i: c_int
@@ -376,7 +376,7 @@ pub fn test_rb_tree_lookup() -> Unit {
 
 }
 
-pub fn test_rb_tree_remove() -> Unit {
+pub fn test_rb_tree_remove() writes allocation_limit, test_array {
     var __local_tree: *mut _RBTree
 
     var __local_i: c_int
@@ -467,7 +467,7 @@ pub fn test_rb_tree_remove() -> Unit {
 
 }
 
-pub fn test_rb_tree_to_array() -> Unit {
+pub fn test_rb_tree_to_array() writes allocation_limit {
     var __local_tree: *mut _RBTree
 
     var __local_entries: [10]c_int = [(89 as c_int), (23 as c_int), (42 as c_int), (4 as c_int), (16 as c_int), (15 as c_int), (8 as c_int), (99 as c_int), (50 as c_int), (30 as c_int)]
@@ -534,7 +534,7 @@ pub fn test_rb_tree_to_array() -> Unit {
 
 }
 
-pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
+pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int writes allocation_limit {
     run_tests((&tests[0] as *mut extern "C" fn() -> Unit))
 
     return 0

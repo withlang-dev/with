@@ -219,7 +219,7 @@ pub unsafe fn pcre2_maketables_8(__param_gcontext: *mut pcre2_real_general_conte
 
 }
 
-pub unsafe fn pcre2_maketables_free_8(__param_gcontext: *mut pcre2_real_general_context_8, __param_tables: *const u8) -> Unit {
+pub unsafe fn pcre2_maketables_free_8(__param_gcontext: *mut pcre2_real_general_context_8, __param_tables: *const u8) {
     if ((if __param_gcontext != null: 1 else: 0) != 0) {
         (*(&raw const (*__param_gcontext).memctl as *const pcre2_memctl)).free((__param_tables as *mut c_void), (*(&raw const (*__param_gcontext).memctl as *const pcre2_memctl)).memory_data)
     } else {

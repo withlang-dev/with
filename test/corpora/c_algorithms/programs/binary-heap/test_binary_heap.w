@@ -6,7 +6,7 @@ use std.calg_testing.compare_int
 use std.calg_testing.framework
 use std.libc
 
-pub fn test_binary_heap_new_free() -> Unit {
+pub fn test_binary_heap_new_free() -> Unit writes allocation_limit {
     var __local_heap: *mut _BinaryHeap
 
     var __local_i: c_int
@@ -46,7 +46,7 @@ pub fn test_binary_heap_new_free() -> Unit {
 
 }
 
-pub fn test_binary_heap_insert() -> Unit {
+pub fn test_binary_heap_insert() writes allocation_limit, test_array {
     var __local_heap: *mut _BinaryHeap
 
     var __local_i: c_int
@@ -80,7 +80,7 @@ pub fn test_binary_heap_insert() -> Unit {
 
 }
 
-pub fn test_min_heap() -> Unit {
+pub fn test_min_heap() writes allocation_limit, test_array {
     var __local_heap: *mut _BinaryHeap
 
     var __local_val: *mut c_int
@@ -137,7 +137,7 @@ pub fn test_min_heap() -> Unit {
 
 }
 
-pub fn test_max_heap() -> Unit {
+pub fn test_max_heap() writes allocation_limit, test_array {
     var __local_heap: *mut _BinaryHeap
 
     var __local_val: *mut c_int
@@ -182,7 +182,7 @@ pub fn test_max_heap() -> Unit {
 
 }
 
-pub fn test_out_of_memory() -> Unit {
+pub fn test_out_of_memory() writes allocation_limit {
     var __local_heap: *mut _BinaryHeap
 
     var __local_value: *mut c_int
@@ -264,7 +264,7 @@ pub fn test_out_of_memory() -> Unit {
 
 }
 
-pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
+pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int writes allocation_limit {
     run_tests((&tests[0] as *mut extern "C" fn() -> Unit))
 
     return 0

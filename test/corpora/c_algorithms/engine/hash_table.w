@@ -2,7 +2,7 @@
 use std.calg_testing.defs
 use std.calg_testing.alloc_testing
 
-pub fn hash_table_new(__param_hash_func: unsafe extern "C" fn(*mut c_void) -> c_uint, __param_equal_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int) -> *mut _HashTable {
+pub fn hash_table_new(__param_hash_func: unsafe extern "C" fn(*mut c_void) -> c_uint, __param_equal_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int) -> *mut _HashTable writes allocation_limit {
     var __local_hash_table: *mut _HashTable
 
     (__local_hash_table = ((alloc_test_malloc((sizeof[_HashTable]() as c_ulong)) as *mut _HashTable)))
@@ -35,7 +35,7 @@ pub fn hash_table_new(__param_hash_func: unsafe extern "C" fn(*mut c_void) -> c_
 
 }
 
-pub unsafe fn hash_table_free(__param_hash_table: *mut _HashTable) -> Unit {
+pub unsafe fn hash_table_free(__param_hash_table: *mut _HashTable) {
     var __local_rover: *mut _HashTableEntry
 
     var __local_next: *mut _HashTableEntry
@@ -68,14 +68,14 @@ pub unsafe fn hash_table_free(__param_hash_table: *mut _HashTable) -> Unit {
 
 }
 
-pub unsafe fn hash_table_register_free_functions(__param_hash_table: *mut _HashTable, __param_key_free_func: unsafe extern "C" fn(*mut c_void) -> Unit, __param_value_free_func: unsafe extern "C" fn(*mut c_void) -> Unit) -> Unit {
+pub unsafe fn hash_table_register_free_functions(__param_hash_table: *mut _HashTable, __param_key_free_func: unsafe extern "C" fn(*mut c_void) -> Unit, __param_value_free_func: unsafe extern "C" fn(*mut c_void) -> Unit) {
     ((*__param_hash_table).key_free_func = __param_key_free_func)
 
     ((*__param_hash_table).value_free_func = __param_value_free_func)
 
 }
 
-pub unsafe fn hash_table_insert(__param_hash_table: *mut _HashTable, __param_key: *mut c_void, __param_value: *mut c_void) -> c_int {
+pub unsafe fn hash_table_insert(__param_hash_table: *mut _HashTable, __param_key: *mut c_void, __param_value: *mut c_void) -> c_int writes allocation_limit {
     var __local_rover: *mut _HashTableEntry
 
     var __local_pair: *mut _HashTablePair
@@ -218,7 +218,7 @@ pub unsafe fn hash_table_num_entries(__param_hash_table: *mut _HashTable) -> c_u
 
 }
 
-pub unsafe fn hash_table_iterate(__param_hash_table: *mut _HashTable, __param_iterator: *mut _HashTableIterator) -> Unit {
+pub unsafe fn hash_table_iterate(__param_hash_table: *mut _HashTable, __param_iterator: *mut _HashTableIterator) {
     var __local_chain: c_uint
 
     ((*__param_iterator).hash_table = __param_hash_table)
@@ -317,7 +317,7 @@ unsafe fn hash_table_allocate_table(__param_hash_table: *mut _HashTable) -> c_in
 
 }
 
-unsafe fn hash_table_free_entry(__param_hash_table: *mut _HashTable, __param_entry: *mut _HashTableEntry) -> Unit {
+unsafe fn hash_table_free_entry(__param_hash_table: *mut _HashTable, __param_entry: *mut _HashTableEntry) {
     var __local_pair: *mut _HashTablePair
 
     (__local_pair = (((&raw const (*__param_entry).pair as *const _HashTablePair) as *mut _HashTablePair)))

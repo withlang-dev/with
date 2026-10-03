@@ -1,7 +1,7 @@
 // Migrated from C
 use std.c_algorithms.defs
 
-pub unsafe fn slist_free(__param_list: *mut _SListEntry) -> Unit {
+pub unsafe fn slist_free(__param_list: *mut _SListEntry) {
     var __local_entry: *mut _SListEntry
 
     (__local_entry = __param_list)
@@ -86,7 +86,7 @@ pub unsafe fn slist_data(__param_listentry: *mut _SListEntry) -> *mut c_void {
 
 }
 
-pub unsafe fn slist_set_data(__param_listentry: *mut _SListEntry, __param_data: *mut c_void) -> Unit {
+pub unsafe fn slist_set_data(__param_listentry: *mut _SListEntry, __param_data: *mut c_void) {
     if ((if __param_listentry != null: 1 else: 0) != 0) {
         ((*__param_listentry).data = __param_data)
 
@@ -303,7 +303,7 @@ pub unsafe fn slist_find_data(__param_list: *mut _SListEntry, __param_callback: 
 
 }
 
-pub unsafe fn slist_iterate(__param_list: *mut *mut _SListEntry, __param_iter: *mut _SListIterator) -> Unit {
+pub unsafe fn slist_iterate(__param_list: *mut *mut _SListEntry, __param_iter: *mut _SListIterator) {
     ((*__param_iter).prev_next = __param_list)
 
     ((*__param_iter).current = ((null as *mut _SListEntry)))
@@ -358,7 +358,7 @@ pub unsafe fn slist_iter_next(__param_iter: *mut _SListIterator) -> *mut c_void 
 
 }
 
-pub unsafe fn slist_iter_remove(__param_iter: *mut _SListIterator) -> Unit {
+pub unsafe fn slist_iter_remove(__param_iter: *mut _SListIterator) {
     var __ci_expr_logic_0: c_int
 
     if ((if (*__param_iter).current == null: 1 else: 0) != 0) {

@@ -4,7 +4,7 @@ use std.calg_testing.alloc_testing
 use std.calg_testing.framework
 use std.libc
 
-fn test_malloc_free() -> Unit {
+fn test_malloc_free() {
     var __local_block: *mut c_void
 
     var __local_block2: *mut c_void
@@ -107,7 +107,7 @@ fn test_malloc_free() -> Unit {
 
 }
 
-fn test_realloc() -> Unit {
+fn test_realloc() {
     var __local_block: *mut c_void
 
     var __local_block2: *mut c_void
@@ -270,7 +270,7 @@ fn test_realloc() -> Unit {
 
 }
 
-fn test_calloc() -> Unit {
+fn test_calloc() {
     var __local_block: *mut u8
 
     var __local_i: c_int
@@ -350,7 +350,7 @@ fn test_calloc() -> Unit {
 
 }
 
-fn test_strdup() -> Unit {
+fn test_strdup() {
     var __local_str: *mut c_char
 
     if (((if not ((if alloc_test_get_allocated() == 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
@@ -419,7 +419,7 @@ fn test_strdup() -> Unit {
 
 }
 
-fn test_limits() -> Unit {
+fn test_limits() {
     var __local_block: *mut c_void
 
     (__local_block = alloc_test_malloc((2048 as c_ulong)))
@@ -464,7 +464,7 @@ fn test_limits() -> Unit {
 
 }
 
-pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
+pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int writes allocation_limit {
     run_tests((&tests[0] as *mut extern "C" fn() -> Unit))
 
     return 0

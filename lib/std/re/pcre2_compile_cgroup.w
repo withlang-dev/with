@@ -872,7 +872,7 @@ unsafe fn _pcre2_compile_process_capture_list(__param_pptr: *mut c_uint, __param
 
 }
 
-unsafe fn do_heapify_u16(__param_captures: *mut c_ushort, __param_size: c_ulong, __param_i: c_ulong) -> Unit {
+unsafe fn do_heapify_u16(__param_captures: *mut c_ushort, __param_size: c_ulong, __param_i: c_ulong) {
     var __local_i = __param_i
     var __local_max: c_ulong
 

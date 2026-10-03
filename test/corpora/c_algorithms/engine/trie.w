@@ -2,7 +2,7 @@
 use std.calg_testing.defs
 use std.calg_testing.alloc_testing
 
-pub fn trie_new() -> *mut _Trie {
+pub fn trie_new() -> *mut _Trie writes allocation_limit {
     var __local_new_trie: *mut _Trie
 
     (__local_new_trie = ((alloc_test_malloc((sizeof[_Trie]() as c_ulong)) as *mut _Trie)))
@@ -18,14 +18,14 @@ pub fn trie_new() -> *mut _Trie {
 
 }
 
-pub unsafe fn trie_free(__param_trie: *mut _Trie) -> Unit {
+pub unsafe fn trie_free(__param_trie: *mut _Trie) {
     free_node_recursive((*__param_trie).root_node)
 
     alloc_test_free((__param_trie as *mut c_void))
 
 }
 
-pub unsafe fn trie_insert(__param_trie: *mut _Trie, __param_key: *mut i8, __param_value: *mut c_void) -> c_int {
+pub unsafe fn trie_insert(__param_trie: *mut _Trie, __param_key: *mut i8, __param_value: *mut c_void) -> c_int writes allocation_limit {
     var __local_rover: *mut *mut _TrieNode
 
     var __local_node: *mut _TrieNode
@@ -99,7 +99,7 @@ pub unsafe fn trie_insert(__param_trie: *mut _Trie, __param_key: *mut i8, __para
 
 }
 
-pub unsafe fn trie_insert_binary(__param_trie: *mut _Trie, __param_key: *mut u8, __param_key_length: c_int, __param_value: *mut c_void) -> c_int {
+pub unsafe fn trie_insert_binary(__param_trie: *mut _Trie, __param_key: *mut u8, __param_key_length: c_int, __param_value: *mut c_void) -> c_int writes allocation_limit {
     var __local_rover: *mut *mut _TrieNode
 
     var __local_node: *mut _TrieNode
@@ -359,7 +359,7 @@ pub unsafe fn trie_num_entries(__param_trie: *mut _Trie) -> c_uint {
 
 }
 
-unsafe fn free_node_recursive(__param_node: *mut _TrieNode) -> Unit {
+unsafe fn free_node_recursive(__param_node: *mut _TrieNode) {
     var __local_i: c_int
 
     if ((if __param_node == null: 1 else: 0) != 0) {
@@ -440,7 +440,7 @@ unsafe fn trie_find_end_binary(__param_trie: *mut _Trie, __param_key: *mut u8, _
 
 }
 
-unsafe fn trie_insert_rollback(__param_trie: *mut _Trie, __param_key: *mut u8) -> Unit {
+unsafe fn trie_insert_rollback(__param_trie: *mut _Trie, __param_key: *mut u8) {
     var __local_node: *mut _TrieNode
 
     var __local_prev_ptr: *mut *mut _TrieNode

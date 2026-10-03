@@ -70,7 +70,7 @@ fn tommy_haszero_u32(__param_value: c_uint) -> c_int {
 
 }
 
-pub unsafe fn tommy_arrayblkof_init(__param_array: *mut tommy_arrayblkof_struct, __param_element_size: c_ulonglong) -> Unit {
+pub unsafe fn tommy_arrayblkof_init(__param_array: *mut tommy_arrayblkof_struct, __param_element_size: c_ulonglong) {
     tommy_array_init(((&raw const (*__param_array).block as *const tommy_array_struct) as *mut tommy_array_struct))
 
     ((*__param_array).element_size = __param_element_size)
@@ -79,7 +79,7 @@ pub unsafe fn tommy_arrayblkof_init(__param_array: *mut tommy_arrayblkof_struct,
 
 }
 
-pub unsafe fn tommy_arrayblkof_done(__param_array: *mut tommy_arrayblkof_struct) -> Unit {
+pub unsafe fn tommy_arrayblkof_done(__param_array: *mut tommy_arrayblkof_struct) {
     var __local_i: c_ulonglong
 
     (__local_i = ((0 as c_ulonglong)))
@@ -96,7 +96,7 @@ pub unsafe fn tommy_arrayblkof_done(__param_array: *mut tommy_arrayblkof_struct)
 
 }
 
-pub unsafe fn tommy_arrayblkof_grow(__param_array: *mut tommy_arrayblkof_struct, __param_count: c_ulonglong) -> Unit {
+pub unsafe fn tommy_arrayblkof_grow(__param_array: *mut tommy_arrayblkof_struct, __param_count: c_ulonglong) {
     var __local_block_max: c_ulonglong
 
     var __local_block_mac: c_ulonglong

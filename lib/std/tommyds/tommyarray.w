@@ -69,7 +69,7 @@ fn tommy_haszero_u32(__param_value: c_uint) -> c_int {
 
 }
 
-pub unsafe fn tommy_array_init(__param_array: *mut tommy_array_struct) -> Unit {
+pub unsafe fn tommy_array_init(__param_array: *mut tommy_array_struct) {
     var __local_i: c_uint
 
     ((*__param_array).bucket_bit = ((6 as c_uint)))
@@ -92,7 +92,7 @@ pub unsafe fn tommy_array_init(__param_array: *mut tommy_array_struct) -> Unit {
 
 }
 
-pub unsafe fn tommy_array_done(__param_array: *mut tommy_array_struct) -> Unit {
+pub unsafe fn tommy_array_done(__param_array: *mut tommy_array_struct) {
     var __local_i: c_uint
 
     with_free((((*__param_array).bucket[0] as *mut c_void) as *mut u8))
@@ -112,7 +112,7 @@ pub unsafe fn tommy_array_done(__param_array: *mut tommy_array_struct) -> Unit {
 
 }
 
-pub unsafe fn tommy_array_grow(__param_array: *mut tommy_array_struct, __param_count: c_ulonglong) -> Unit {
+pub unsafe fn tommy_array_grow(__param_array: *mut tommy_array_struct, __param_count: c_ulonglong) {
     if ((if (*__param_array).count >= __param_count: 1 else: 0) != 0) {
         return
     }
@@ -149,7 +149,7 @@ pub unsafe fn tommy_array_ref(__param_array: *mut tommy_array_struct, __param_po
 
 }
 
-pub unsafe fn tommy_array_set(__param_array: *mut tommy_array_struct, __param_pos: c_ulonglong, __param_element: *mut c_void) -> Unit {
+pub unsafe fn tommy_array_set(__param_array: *mut tommy_array_struct, __param_pos: c_ulonglong, __param_element: *mut c_void) {
     ((*(tommy_array_ref(__param_array, __param_pos))) = __param_element)
 
 }
@@ -159,7 +159,7 @@ pub unsafe fn tommy_array_get(__param_array: *mut tommy_array_struct, __param_po
 
 }
 
-pub unsafe fn tommy_array_insert(__param_array: *mut tommy_array_struct, __param_element: *mut c_void) -> Unit {
+pub unsafe fn tommy_array_insert(__param_array: *mut tommy_array_struct, __param_element: *mut c_void) {
     var __local_pos: c_ulonglong = (*__param_array).count
 
     tommy_array_grow(__param_array, (((__local_pos as c_ulonglong) +% (1 as c_ulonglong)) as c_ulonglong))

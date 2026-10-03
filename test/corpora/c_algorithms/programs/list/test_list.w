@@ -6,7 +6,7 @@ use std.calg_testing.framework
 use std.calg_testing.list
 use std.libc
 
-pub fn generate_list() -> *mut _ListEntry {
+pub fn generate_list() -> *mut _ListEntry writes allocation_limit, variable1, variable2, variable3, variable4 {
     var __local_list: *mut _ListEntry = ((null as *mut _ListEntry))
 
     if (((if not ((if unsafe { list_append((&raw mut __local_list as *mut *mut _ListEntry), ((&raw mut variable1 as *mut c_int) as *mut c_void)) } != null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
@@ -37,7 +37,7 @@ pub fn generate_list() -> *mut _ListEntry {
 
 }
 
-pub unsafe fn check_list_integrity(__param_list: *mut _ListEntry) -> Unit {
+pub unsafe fn check_list_integrity(__param_list: *mut _ListEntry) {
     var __local_prev: *mut _ListEntry
 
     var __local_rover: *mut _ListEntry
@@ -61,7 +61,7 @@ pub unsafe fn check_list_integrity(__param_list: *mut _ListEntry) -> Unit {
 
 }
 
-pub fn test_list_append() -> Unit {
+pub fn test_list_append() writes allocation_limit, variable1, variable2, variable3, variable4 {
     var __local_list: *mut _ListEntry = ((null as *mut _ListEntry))
 
     if (((if not ((if unsafe { list_append((&raw mut __local_list as *mut *mut _ListEntry), ((&raw mut variable1 as *mut c_int) as *mut c_void)) } != null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
@@ -152,7 +152,7 @@ pub fn test_list_append() -> Unit {
 
 }
 
-pub fn test_list_prepend() -> Unit {
+pub fn test_list_prepend() writes allocation_limit, variable1, variable2, variable3, variable4 {
     var __local_list: *mut _ListEntry = ((null as *mut _ListEntry))
 
     if (((if not ((if unsafe { list_prepend((&raw mut __local_list as *mut *mut _ListEntry), ((&raw mut variable1 as *mut c_int) as *mut c_void)) } != null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
@@ -237,7 +237,7 @@ pub fn test_list_prepend() -> Unit {
 
 }
 
-pub fn test_list_free() -> Unit {
+pub fn test_list_free() writes allocation_limit, variable1, variable2, variable3, variable4 {
     var __local_list: *mut _ListEntry
 
     (__local_list = generate_list())
@@ -248,7 +248,7 @@ pub fn test_list_free() -> Unit {
 
 }
 
-pub fn test_list_next() -> Unit {
+pub fn test_list_next() writes allocation_limit, variable1, variable2, variable3, variable4 {
     var __local_list: *mut _ListEntry
 
     var __local_rover: *mut _ListEntry
@@ -299,7 +299,7 @@ pub fn test_list_next() -> Unit {
 
 }
 
-pub fn test_list_nth_entry() -> Unit {
+pub fn test_list_nth_entry() writes allocation_limit, variable1, variable2, variable3, variable4 {
     var __local_list: *mut _ListEntry
 
     var __local_entry: *mut _ListEntry
@@ -358,7 +358,7 @@ pub fn test_list_nth_entry() -> Unit {
 
 }
 
-pub fn test_list_nth_data() -> Unit {
+pub fn test_list_nth_data() writes allocation_limit, variable1, variable2, variable3, variable4 {
     var __local_list: *mut _ListEntry
 
     (__local_list = generate_list())
@@ -403,7 +403,7 @@ pub fn test_list_nth_data() -> Unit {
 
 }
 
-pub fn test_list_length() -> Unit {
+pub fn test_list_length() -> Unit writes allocation_limit, variable1, variable2, variable3, variable4 {
     var __local_list: *mut _ListEntry
 
     (__local_list = generate_list())
@@ -436,7 +436,7 @@ pub fn test_list_length() -> Unit {
 
 }
 
-pub fn test_list_remove_entry() -> Unit {
+pub fn test_list_remove_entry() writes allocation_limit, variable1, variable2, variable3, variable4 {
     var __local_empty_list: *mut _ListEntry = ((null as *mut _ListEntry))
 
     var __local_list: *mut _ListEntry
@@ -533,7 +533,7 @@ pub fn test_list_remove_entry() -> Unit {
 
 }
 
-pub fn test_list_remove_data() -> Unit {
+pub fn test_list_remove_data() writes allocation_limit {
     var __local_entries: [13]c_int = [(89 as c_int), (4 as c_int), (23 as c_int), (42 as c_int), (4 as c_int), (16 as c_int), (15 as c_int), (4 as c_int), (8 as c_int), (99 as c_int), (50 as c_int), (30 as c_int), (4 as c_int)]
 
     var __local_num_entries: c_uint = ((13 as c_uint))
@@ -631,7 +631,7 @@ pub fn test_list_remove_data() -> Unit {
 
 }
 
-pub fn test_list_sort() -> Unit {
+pub fn test_list_sort() -> Unit writes allocation_limit {
     var __local_list: *mut _ListEntry
 
     var __local_entries: [13]c_int = [(89 as c_int), (4 as c_int), (23 as c_int), (42 as c_int), (4 as c_int), (16 as c_int), (15 as c_int), (4 as c_int), (8 as c_int), (99 as c_int), (50 as c_int), (30 as c_int), (4 as c_int)]
@@ -700,7 +700,7 @@ pub fn test_list_sort() -> Unit {
 
 }
 
-pub fn test_list_find_data() -> Unit {
+pub fn test_list_find_data() writes allocation_limit {
     var __local_entries: [10]c_int = [(89 as c_int), (23 as c_int), (42 as c_int), (16 as c_int), (15 as c_int), (4 as c_int), (8 as c_int), (99 as c_int), (50 as c_int), (30 as c_int)]
 
     var __local_num_entries: c_int = ((10 as c_int))
@@ -779,7 +779,7 @@ pub fn test_list_find_data() -> Unit {
 
 }
 
-pub fn test_list_to_array() -> Unit {
+pub fn test_list_to_array() writes allocation_limit, variable1, variable2, variable3, variable4 {
     var __local_list: *mut _ListEntry
 
     var __local_array: *mut *mut c_void
@@ -828,7 +828,7 @@ pub fn test_list_to_array() -> Unit {
 
 }
 
-pub fn test_list_iterate() -> Unit {
+pub fn test_list_iterate() -> Unit writes allocation_limit {
     var __local_list: *mut _ListEntry
 
     var __local_iter: _ListIterator
@@ -933,7 +933,7 @@ pub fn test_list_iterate() -> Unit {
 
 }
 
-pub fn test_list_iterate_bad_remove() -> Unit {
+pub fn test_list_iterate_bad_remove() writes allocation_limit {
     var __local_list: *mut _ListEntry
 
     var __local_iter: _ListIterator
@@ -985,7 +985,7 @@ pub fn test_list_iterate_bad_remove() -> Unit {
 
 }
 
-pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
+pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int writes allocation_limit {
     run_tests((&tests[0] as *mut extern "C" fn() -> Unit))
 
     return 0

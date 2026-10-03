@@ -38,7 +38,7 @@ pub unsafe fn find_subtree_height(__param_node: *mut _AVLTreeNode) -> c_int {
 
 }
 
-pub unsafe fn validate_subtree(__param_node: *mut _AVLTreeNode) -> c_int {
+pub unsafe fn validate_subtree(__param_node: *mut _AVLTreeNode) -> c_int writes counter {
     var __local_left_node: *mut _AVLTreeNode
 
     var __local_right_node: *mut _AVLTreeNode
@@ -126,7 +126,7 @@ pub unsafe fn validate_subtree(__param_node: *mut _AVLTreeNode) -> c_int {
 
 }
 
-pub unsafe fn validate_tree(__param_tree: *mut _AVLTree) -> Unit {
+pub unsafe fn validate_tree(__param_tree: *mut _AVLTree) -> Unit writes counter {
     var __local_root_node: *mut _AVLTreeNode
 
     var __local_height: c_int
@@ -150,7 +150,7 @@ pub unsafe fn validate_tree(__param_tree: *mut _AVLTree) -> Unit {
 
 }
 
-pub fn create_tree() -> *mut _AVLTree {
+pub fn create_tree() -> *mut _AVLTree writes allocation_limit, test_array {
     var __local_tree: *mut _AVLTree
 
     var __local_i: c_int
@@ -174,7 +174,7 @@ pub fn create_tree() -> *mut _AVLTree {
 
 }
 
-pub fn test_avl_tree_new() -> Unit {
+pub fn test_avl_tree_new() -> Unit writes allocation_limit {
     var __local_tree: *mut _AVLTree
 
     (__local_tree = avl_tree_new(int_compare))
@@ -211,7 +211,7 @@ pub fn test_avl_tree_new() -> Unit {
 
 }
 
-pub fn test_avl_tree_insert_lookup() -> Unit {
+pub fn test_avl_tree_insert_lookup() writes allocation_limit, counter, test_array {
     var __local_tree: *mut _AVLTree
 
     var __local_node: *mut _AVLTreeNode
@@ -294,7 +294,7 @@ pub fn test_avl_tree_insert_lookup() -> Unit {
 
 }
 
-pub fn test_avl_tree_child() -> Unit {
+pub fn test_avl_tree_child() writes allocation_limit {
     var __local_tree: *mut _AVLTree
 
     var __local_root: *mut _AVLTreeNode
@@ -368,7 +368,7 @@ pub fn test_avl_tree_child() -> Unit {
 
 }
 
-pub fn test_out_of_memory() -> Unit {
+pub fn test_out_of_memory() writes allocation_limit, counter, test_array {
     var __local_tree: *mut _AVLTree
 
     var __local_node: *mut _AVLTreeNode
@@ -402,7 +402,7 @@ pub fn test_out_of_memory() -> Unit {
 
 }
 
-pub fn test_avl_tree_free() -> Unit {
+pub fn test_avl_tree_free() writes allocation_limit, test_array {
     var __local_tree: *mut _AVLTree
 
     (__local_tree = avl_tree_new(int_compare))
@@ -415,7 +415,7 @@ pub fn test_avl_tree_free() -> Unit {
 
 }
 
-pub fn test_avl_tree_lookup() -> Unit {
+pub fn test_avl_tree_lookup() writes allocation_limit, test_array {
     var __local_tree: *mut _AVLTree
 
     var __local_i: c_int
@@ -475,7 +475,7 @@ pub fn test_avl_tree_lookup() -> Unit {
 
 }
 
-pub fn test_avl_tree_remove() -> Unit {
+pub fn test_avl_tree_remove() writes allocation_limit, counter, test_array {
     var __local_tree: *mut _AVLTree
 
     var __local_i: c_int
@@ -566,7 +566,7 @@ pub fn test_avl_tree_remove() -> Unit {
 
 }
 
-pub fn test_avl_tree_to_array() -> Unit {
+pub fn test_avl_tree_to_array() writes allocation_limit, counter {
     var __local_tree: *mut _AVLTree
 
     var __local_entries: [10]c_int = [(89 as c_int), (23 as c_int), (42 as c_int), (4 as c_int), (16 as c_int), (15 as c_int), (8 as c_int), (99 as c_int), (50 as c_int), (30 as c_int)]
@@ -633,7 +633,7 @@ pub fn test_avl_tree_to_array() -> Unit {
 
 }
 
-pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
+pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int writes allocation_limit {
     run_tests((&tests[0] as *mut extern "C" fn() -> Unit))
 
     return 0

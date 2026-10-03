@@ -1325,7 +1325,6 @@ pub unsafe fn _pcre2_eclass_8(__param_c: c_uint, __param_data_start: *const u8, 
         }
     }
 
-    __local_stack_depth
 
     return (if ((__local_stack as c_uint) & (1 as c_uint)) != 0: 1 else: 0)
 

@@ -5271,7 +5271,6 @@ pub unsafe fn inflateUndermine(__param_strm: *mut z_stream_s, __param_subvert: c
 
     (__local_state = (((*__param_strm).state as *mut inflate_state)))
 
-    __param_subvert
 
     ((*__local_state).sane = ((1 as c_int)))
 

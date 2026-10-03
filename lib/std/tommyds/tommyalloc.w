@@ -68,7 +68,7 @@ fn tommy_haszero_u32(__param_value: c_uint) -> c_int {
 
 }
 
-pub unsafe fn tommy_allocator_init(__param_alloc: *mut tommy_allocator_struct, __param_block_size: c_ulonglong, __param_align_size: c_ulonglong) -> Unit {
+pub unsafe fn tommy_allocator_init(__param_alloc: *mut tommy_allocator_struct, __param_block_size: c_ulonglong, __param_align_size: c_ulonglong) {
     var __local_block_size = __param_block_size
     var __local_align_size = __param_align_size
     if ((if __local_align_size < 8: 1 else: 0) != 0) {
@@ -91,7 +91,7 @@ pub unsafe fn tommy_allocator_init(__param_alloc: *mut tommy_allocator_struct, _
 
 }
 
-pub unsafe fn tommy_allocator_done(__param_alloc: *mut tommy_allocator_struct) -> Unit {
+pub unsafe fn tommy_allocator_done(__param_alloc: *mut tommy_allocator_struct) {
     allocator_reset(__param_alloc)
 
 }
@@ -166,7 +166,7 @@ pub unsafe fn tommy_allocator_alloc(__param_alloc: *mut tommy_allocator_struct) 
 
 }
 
-pub unsafe fn tommy_allocator_free(__param_alloc: *mut tommy_allocator_struct, __param_ptr: *mut c_void) -> Unit {
+pub unsafe fn tommy_allocator_free(__param_alloc: *mut tommy_allocator_struct, __param_ptr: *mut c_void) {
     var __local_free_block: *mut tommy_allocator_entry_struct = ((__param_ptr as *mut tommy_allocator_entry_struct))
 
     ((*__local_free_block).next = (*__param_alloc).free_block)
@@ -182,7 +182,7 @@ pub unsafe fn tommy_allocator_memory_usage(__param_alloc: *mut tommy_allocator_s
 
 }
 
-unsafe fn allocator_reset(__param_alloc: *mut tommy_allocator_struct) -> Unit {
+unsafe fn allocator_reset(__param_alloc: *mut tommy_allocator_struct) {
     var __local_block: *mut tommy_allocator_entry_struct = (*__param_alloc).used_segment
 
     while (__local_block != null) {

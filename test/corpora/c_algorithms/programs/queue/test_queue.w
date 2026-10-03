@@ -5,7 +5,7 @@ use std.calg_testing.framework
 use std.calg_testing.queue
 use std.libc
 
-pub fn generate_queue() -> *mut _Queue {
+pub fn generate_queue() -> *mut _Queue writes allocation_limit, variable1, variable2, variable3, variable4 {
     var __local_queue: *mut _Queue
 
     var __local_i: c_int
@@ -33,7 +33,7 @@ pub fn generate_queue() -> *mut _Queue {
 
 }
 
-pub fn test_queue_new_free() -> Unit {
+pub fn test_queue_new_free() -> Unit writes allocation_limit, variable1 {
     var __local_i: c_int
 
     var __local_queue: *mut _Queue
@@ -69,7 +69,7 @@ pub fn test_queue_new_free() -> Unit {
 
 }
 
-pub fn test_queue_push_head() -> Unit {
+pub fn test_queue_push_head() writes allocation_limit, variable1, variable2, variable3, variable4 {
     var __local_queue: *mut _Queue
 
     var __local_i: c_int
@@ -163,7 +163,7 @@ pub fn test_queue_push_head() -> Unit {
 
 }
 
-pub fn test_queue_pop_head() -> Unit {
+pub fn test_queue_pop_head() writes allocation_limit, variable1, variable2, variable3, variable4 {
     var __local_queue: *mut _Queue
 
     (__local_queue = queue_new())
@@ -215,7 +215,7 @@ pub fn test_queue_pop_head() -> Unit {
 
 }
 
-pub fn test_queue_peek_head() -> Unit {
+pub fn test_queue_peek_head() writes allocation_limit, variable1, variable2, variable3, variable4 {
     var __local_queue: *mut _Queue
 
     (__local_queue = queue_new())
@@ -291,7 +291,7 @@ pub fn test_queue_peek_head() -> Unit {
 
 }
 
-pub fn test_queue_push_tail() -> Unit {
+pub fn test_queue_push_tail() writes allocation_limit, variable1, variable2, variable3, variable4 {
     var __local_queue: *mut _Queue
 
     var __local_i: c_int
@@ -385,7 +385,7 @@ pub fn test_queue_push_tail() -> Unit {
 
 }
 
-pub fn test_queue_pop_tail() -> Unit {
+pub fn test_queue_pop_tail() writes allocation_limit, variable1, variable2, variable3, variable4 {
     var __local_queue: *mut _Queue
 
     (__local_queue = queue_new())
@@ -437,7 +437,7 @@ pub fn test_queue_pop_tail() -> Unit {
 
 }
 
-pub fn test_queue_peek_tail() -> Unit {
+pub fn test_queue_peek_tail() writes allocation_limit, variable1, variable2, variable3, variable4 {
     var __local_queue: *mut _Queue
 
     (__local_queue = queue_new())
@@ -513,7 +513,7 @@ pub fn test_queue_peek_tail() -> Unit {
 
 }
 
-pub fn test_queue_is_empty() -> Unit {
+pub fn test_queue_is_empty() writes allocation_limit, variable1 {
     var __local_queue: *mut _Queue
 
     (__local_queue = queue_new())
@@ -560,7 +560,7 @@ pub fn test_queue_is_empty() -> Unit {
 
 }
 
-pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
+pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int writes allocation_limit {
     run_tests((&tests[0] as *mut extern "C" fn() -> Unit))
 
     return 0

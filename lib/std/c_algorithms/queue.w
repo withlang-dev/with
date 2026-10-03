@@ -19,7 +19,7 @@ pub fn queue_new() -> *mut _Queue {
 
 }
 
-pub unsafe fn queue_free(__param_queue: *mut _Queue) -> Unit {
+pub unsafe fn queue_free(__param_queue: *mut _Queue) {
     while ((if not (queue_is_empty(__param_queue) != 0): 1 else: 0) != 0) {
         queue_pop_head(__param_queue)
 

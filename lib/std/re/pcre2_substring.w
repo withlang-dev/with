@@ -105,7 +105,7 @@ pub unsafe fn pcre2_substring_copy_bynumber_8(__param_match_data: *mut pcre2_rea
 
 }
 
-pub unsafe fn pcre2_substring_free_8(__param_string: *mut u8) -> Unit {
+pub unsafe fn pcre2_substring_free_8(__param_string: *mut u8) {
     if ((if __param_string != null: 1 else: 0) != 0) {
         var __local_memctl: *mut pcre2_memctl = ((((__param_string as *mut c_char) - (sizeof[pcre2_memctl]() as usize)) as *mut pcre2_memctl))
 
@@ -428,7 +428,7 @@ pub unsafe fn pcre2_substring_number_from_name_8(__param_code: *const pcre2_real
 
 }
 
-pub unsafe fn pcre2_substring_list_free_8(__param_list: *mut *mut u8) -> Unit {
+pub unsafe fn pcre2_substring_list_free_8(__param_list: *mut *mut u8) {
     if ((if __param_list != null: 1 else: 0) != 0) {
         var __local_memctl: *mut pcre2_memctl = ((((__param_list as *mut c_char) - (sizeof[pcre2_memctl]() as usize)) as *mut pcre2_memctl))
 

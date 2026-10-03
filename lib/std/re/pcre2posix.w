@@ -399,7 +399,7 @@ pub unsafe fn pcre2_regerror(__param_errcode: c_int, __param_preg: *const regex_
 
 }
 
-pub unsafe fn pcre2_regfree(__param_preg: *mut regex_t) -> Unit {
+pub unsafe fn pcre2_regfree(__param_preg: *mut regex_t) {
     pcre2_match_data_free_8(((*__param_preg).re_match_data as *mut pcre2_real_match_data_8))
 
     pcre2_code_free_8(((*__param_preg).re_pcre2_code as *mut pcre2_real_code_8))

@@ -94,7 +94,7 @@ unsafe fn print_char_8(__param_f: *mut c_void, __param_ptr: *const u8, __param_u
 
 }
 
-unsafe fn print_custring_8(__param_f: *mut c_void, __param_ptr: *const u8) -> Unit {
+unsafe fn print_custring_8(__param_f: *mut c_void, __param_ptr: *const u8) {
     var __local_ptr = __param_ptr
     while ((if (*__local_ptr) != 0: 1 else: 0) != 0) {
         var __local_c: c_uint = with 0 as __ci_expr_seq_7 {
@@ -120,7 +120,7 @@ unsafe fn print_custring_8(__param_f: *mut c_void, __param_ptr: *const u8) -> Un
 
 }
 
-unsafe fn print_custring_bylen_8(__param_f: *mut c_void, __param_ptr: *const u8, __param_len: u8) -> Unit {
+unsafe fn print_custring_bylen_8(__param_f: *mut c_void, __param_ptr: *const u8, __param_len: u8) {
     var __local_ptr = __param_ptr
     var __local_len = __param_len
     while ((if __local_len > 0: 1 else: 0) != 0) {
@@ -425,7 +425,7 @@ unsafe fn print_char_list_8(__param_f: *mut c_void, __param_code: *const u8, __p
 
 }
 
-unsafe fn print_map_8(__param_f: *mut c_void, __param_map: *const u8, __param_negated: c_int) -> Unit {
+unsafe fn print_map_8(__param_f: *mut c_void, __param_map: *const u8, __param_negated: c_int) {
     var __local_map = __param_map
     var __local_first: c_int = ((1 as c_int))
 
@@ -3136,7 +3136,7 @@ pub unsafe fn valid_utf(__param_string: *const u8, __param_length: c_ulong, __pa
 
 }
 
-unsafe fn patctl_zero(__param_p: *mut patctl) -> Unit {
+unsafe fn patctl_zero(__param_p: *mut patctl) {
     with_memset(((__param_p as *mut c_void) as *mut u8), (0 as c_int), ((sizeof[patctl]() as c_ulong) as i64))
 
     ((*__param_p).replacement[0] = ((255 as u8)))
@@ -3151,7 +3151,7 @@ unsafe fn patctl_zero(__param_p: *mut patctl) -> Unit {
 
 }
 
-unsafe fn datctl_zero(__param_d: *mut datctl) -> Unit {
+unsafe fn datctl_zero(__param_d: *mut datctl) {
     with_memset(((__param_d as *mut c_void) as *mut u8), (0 as c_int), ((sizeof[datctl]() as c_ulong) as i64))
 
     ((*__param_d).replacement[0] = ((255 as u8)))
@@ -3212,14 +3212,14 @@ unsafe fn should_print_colour(__param_clr: c_int, __param_f: *mut c_void) -> c_i
 
 }
 
-unsafe fn colour_begin(__param_clr: c_int, __param_f: *mut c_void) -> Unit {
+unsafe fn colour_begin(__param_clr: c_int, __param_f: *mut c_void) {
     if (should_print_colour(__param_clr, __param_f) != 0) {
         fprintf(__param_f, c"\x1b[%dm".ptr, __param_clr)
     }
 
 }
 
-unsafe fn colour_end(__param_f: *mut c_void) -> Unit {
+unsafe fn colour_end(__param_f: *mut c_void) {
     colour_begin((0 as c_int), __param_f)
 
 }
@@ -3241,7 +3241,7 @@ unsafe fn cfprintf(__param_clr: c_int, __param_file: *mut c_void, __param_fmt: *
 
 }
 
-fn reset_callout_state() -> Unit {
+fn reset_callout_state() {
     (mallocs_called = ((0 as c_int)))
 
     (first_callout = ((1 as c_int)))
@@ -3255,7 +3255,6 @@ fn reset_callout_state() -> Unit {
 unsafe fn my_malloc(__param_size: c_ulong, __param_data: *mut c_void) -> *mut c_void {
     var __local_block: *mut c_void
 
-    __param_data
 
     (mallocs_called = mallocs_called + 1)
 
@@ -3330,8 +3329,7 @@ unsafe fn my_malloc(__param_size: c_ulong, __param_data: *mut c_void) -> *mut c_
 
 }
 
-unsafe fn my_free(__param_block: *mut c_void, __param_data: *mut c_void) -> Unit {
-    __param_data
+unsafe fn my_free(__param_block: *mut c_void, __param_data: *mut c_void) {
 
     var __ci_expr_logic_1: c_int = 0
 
@@ -3417,7 +3415,6 @@ unsafe fn my_free(__param_block: *mut c_void, __param_data: *mut c_void) -> Unit
 }
 
 unsafe fn stack_guard(__param_depth: c_uint, __param_user_data: *mut c_void) -> c_int {
-    __param_user_data
 
     return (if __param_depth > (*(&raw const pat_patctl as *const patctl)).stackguard_test: 1 else: 0)
 
@@ -3642,7 +3639,7 @@ unsafe fn pchar(__param_c: c_uint, __param_utf: c_int, __param_f: *mut c_void) -
 
 }
 
-fn expand_input_buffers() -> Unit {
+fn expand_input_buffers() {
     var __local_new_pbuffer8_size: c_ulong = ((((2 as c_ulong) *% (pbuffer8_size as c_ulong)) as c_ulong))
 
     var __local_new_buffer: *mut u8 = (((unsafe { with_alloc((__local_new_pbuffer8_size as i64)) } as *mut c_void) as *mut u8))
@@ -4297,7 +4294,7 @@ fn error_direction(__param_rc: c_int, __param_erroroffset: c_ulong) -> c_int {
 
 }
 
-unsafe fn prmsg(__param_msg: *mut *const i8, __param_s: *const i8) -> Unit {
+unsafe fn prmsg(__param_msg: *mut *const i8, __param_s: *const i8) {
     colour_begin(31, outfile)
 
     fprintf(outfile, c"%s %s".ptr, (*__param_msg), __param_s)
@@ -5826,7 +5823,7 @@ unsafe fn case_transform(__param_to_case: c_int, __param_num_in: c_int, __param_
 
 }
 
-unsafe fn show_ovector(__param_ovector: *mut c_ulong, __param_oveccount: c_uint) -> Unit {
+unsafe fn show_ovector(__param_ovector: *mut c_ulong, __param_oveccount: c_uint) {
     var __local_i: c_uint
 
     (__local_i = ((0 as c_uint)))
@@ -6011,7 +6008,7 @@ unsafe fn pchars_8(__param_clr: c_int, __param_p: *const u8, __param_length: c_l
 
 }
 
-unsafe fn ptrunc_8(__param_clr: c_int, __param_p: *const u8, __param_p_len: c_ulong, __param_offset: c_ulong, __param_left: c_int, __param_utf: c_int, __param_f: *mut c_void) -> Unit {
+unsafe fn ptrunc_8(__param_clr: c_int, __param_p: *const u8, __param_p_len: c_ulong, __param_offset: c_ulong, __param_left: c_int, __param_utf: c_int, __param_f: *mut c_void) {
     var __local_start: *const u8 = (__param_p + (__param_offset as usize))
 
     var __local_end: *const u8 = (__param_p + (__param_offset as usize))
@@ -6127,7 +6124,7 @@ unsafe fn ptrunc_8(__param_clr: c_int, __param_p: *const u8, __param_p_len: c_ul
 
 }
 
-unsafe fn config_str_8(__param_what: c_uint, __param_where_: *mut i8) -> Unit {
+unsafe fn config_str_8(__param_what: c_uint, __param_where_: *mut i8) {
     var __local_r1: c_int
 
     var __local_r2: c_int
@@ -7982,7 +7979,7 @@ unsafe fn pattern_info_8(__param_what: c_int, __param_where_: *mut c_void, __par
 
 }
 
-fn show_memory_info_8() -> Unit {
+fn show_memory_info_8() {
     var __local_name_count: c_uint
 
     var __local_name_entry_size: c_uint
@@ -8143,7 +8140,6 @@ unsafe fn callout_enumerate_function_8(__param_cb: *mut pcre2_callout_enumerate_
 
     var __local_next_item_length: c_ulong = (*__param_cb).next_item_length
 
-    __param_callout_data
 
     fprintf(outfile, c"Callout ".ptr)
 
@@ -8195,16 +8191,13 @@ unsafe fn callout_enumerate_function_8(__param_cb: *mut pcre2_callout_enumerate_
 }
 
 unsafe fn callout_enumerate_function_void_8(__param_cb: *mut pcre2_callout_enumerate_block_8, __param_callout_data: *mut c_void) -> c_int {
-    __param_cb
 
-    __param_callout_data
 
     return 0
 
 }
 
 unsafe fn callout_enumerate_function_fail_8(__param_cb: *mut pcre2_callout_enumerate_block_8, __param_callout_data: *mut c_void) -> c_int {
-    __param_cb
 
     return (*(__param_callout_data as *mut c_int))
 
@@ -11196,7 +11189,6 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_218 {
-        __local_valgrind_access_length__goto_2020_12
         (__ci_expr_logic_31 = 0)
         if ((if (((unsafe *(&raw const pat_patctl as *const patctl)).control2 as c_uint) & (1073741824 as c_uint)) == 0: 1 else: 0) != 0) {
             (__ci_expr_logic_31 = (if (if local_newline_default != 0: 1 else: 0) != 0: 1 else: 0))
@@ -11957,7 +11949,7 @@ fn have_active_pattern_8() -> c_int {
 
 }
 
-fn free_active_pattern_8() -> Unit {
+fn free_active_pattern_8() {
     unsafe { pcre2_code_free_8(compiled_code_8) }
 
     (compiled_code_8 = ((null as *mut pcre2_real_code_8)))
@@ -12136,7 +12128,6 @@ unsafe fn substitute_callout_function_8(__param_scb: *mut pcre2_substitute_callo
     '__ci_bb_0 {
         (__local_yield___goto_3177_5 = ((0 as c_int)))
         (__local_utf__goto_3178_6 = (((if (((*compiled_code_8).overall_options as c_uint) & (524288 as c_uint)) != 0: 1 else: 0) as c_int)))
-        __param_data_ptr
         if ((if outfile == null: 1 else: 0) != 0) {
             goto '__ci_bb_1
         } else {
@@ -12269,7 +12260,6 @@ unsafe fn substitute_case_callout_function_8(__param_input: *const u8, __param_i
 
     '__ci_bb_0 {
         (__local_written__goto_3242_12 = ((0 as c_ulong)))
-        __param_data_ptr
         if ((if __param_input_len > (((16 * (sizeof[u8]() as usize)) as c_ulong) / (sizeof[u8]() as c_ulong)): 1 else: 0) != 0) {
             goto '__ci_bb_1
         } else {
@@ -13429,7 +13419,7 @@ fn copy_and_get_8(__param_utf: c_int, __param_capcount: c_int) -> c_int {
 
 }
 
-unsafe fn copy_substitute_string_8(__param_utf: c_int, __param_input: *mut u8, __param_inlen: c_ulong, __param_output: *mut u8, __param_outlen: *mut c_ulong) -> Unit {
+unsafe fn copy_substitute_string_8(__param_utf: c_int, __param_input: *mut u8, __param_inlen: c_ulong, __param_output: *mut u8, __param_outlen: *mut c_ulong) {
     var __local_input = __param_input
     var __local_output = __param_output
     var __local_c: c_uint
@@ -18544,7 +18534,7 @@ fn init_globals_8() -> Unit {
 
 }
 
-fn free_globals_8() -> Unit {
+fn free_globals_8() {
     unsafe { pcre2_maketables_free_8(general_context_8, locale_tables) }
 
     unsafe { pcre2_match_data_free_8(match_data_8) }
@@ -22999,7 +22989,7 @@ unsafe fn pcre2_config_(__param_what: c_uint, __param_where_: *mut c_void) -> c_
 
 }
 
-unsafe fn config_str(__param_what: c_uint, __param_where_: *mut i8) -> Unit {
+unsafe fn config_str(__param_what: c_uint, __param_where_: *mut i8) {
     config_str_8(__param_what, __param_where_)
 
 }
@@ -23029,7 +23019,7 @@ fn have_active_pattern() -> c_int {
 
 }
 
-fn free_active_pattern() -> Unit {
+fn free_active_pattern() {
     free_active_pattern_8()
 
 }
@@ -23039,17 +23029,17 @@ fn process_data() -> c_int {
 
 }
 
-fn init_globals() -> Unit {
+fn init_globals() {
     init_globals_8()
 
 }
 
-fn free_globals() -> Unit {
+fn free_globals() {
     free_globals_8()
 
 }
 
-fn unittest() -> Unit {
+fn unittest() {
     unittest_8()
 
 }
@@ -23462,7 +23452,7 @@ unsafe fn c_option(__param_arg: *const i8) -> c_int {
 
 }
 
-unsafe fn format_list_item(__param_ff: *mut c_short, __param_buff: *mut i8, __param_isscript: c_int) -> Unit {
+unsafe fn format_list_item(__param_ff: *mut c_short, __param_buff: *mut i8, __param_isscript: c_int) {
     var __local_buff = __param_buff
     var __local_count: c_int
 
@@ -23553,7 +23543,7 @@ unsafe fn format_list_item(__param_ff: *mut c_short, __param_buff: *mut i8, __pa
 
 }
 
-fn display_properties(__param_wantscripts: c_int) -> Unit {
+fn display_properties(__param_wantscripts: c_int) {
     var __local_seentypes: [1024]c_ushort
 
     var __local_seenvalues: [1024]c_ushort
@@ -23774,7 +23764,7 @@ fn display_properties(__param_wantscripts: c_int) -> Unit {
 
 }
 
-unsafe fn display_one_modifier(__param_m: *mut modstruct, __param_for_pattern: c_int) -> Unit {
+unsafe fn display_one_modifier(__param_m: *mut modstruct, __param_for_pattern: c_int) {
     var __local_c: c_uint = with 0 as __ci_expr_seq_20 {
         var __ci_expr_ternary_2: c_int = 0
         var __ci_expr_logic_1: c_int = 0
@@ -23812,7 +23802,7 @@ unsafe fn display_one_modifier(__param_m: *mut modstruct, __param_for_pattern: c
 
 }
 
-unsafe fn display_selected_modifiers(__param_for_pattern: c_int, __param_title: *const i8) -> Unit {
+unsafe fn display_selected_modifiers(__param_for_pattern: c_int, __param_title: *const i8) {
     var __local_i: c_uint
 
     var __local_j: c_uint
@@ -23961,7 +23951,7 @@ unsafe fn display_selected_modifiers(__param_for_pattern: c_int, __param_title: 
 
 }
 
-fn display_modifiers() -> Unit {
+fn display_modifiers() {
     printf(c"An asterisk on a subject modifier means that it may be given on a pattern\nline, in order to apply to all subjects matched by that pattern. Modifiers\nthat are listed for both patterns and subjects have different effects in\neach case.\n\n".ptr)
 
     unsafe { display_selected_modifiers((1 as c_int), c"PATTERN".ptr) }

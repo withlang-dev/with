@@ -2,7 +2,7 @@
 use std.calg_testing.defs
 use std.calg_testing.alloc_testing
 
-pub unsafe fn list_free(__param_list: *mut _ListEntry) -> Unit {
+pub unsafe fn list_free(__param_list: *mut _ListEntry) {
     var __local_entry: *mut _ListEntry
 
     (__local_entry = __param_list)
@@ -20,7 +20,7 @@ pub unsafe fn list_free(__param_list: *mut _ListEntry) -> Unit {
 
 }
 
-pub unsafe fn list_prepend(__param_list: *mut *mut _ListEntry, __param_data: *mut c_void) -> *mut _ListEntry {
+pub unsafe fn list_prepend(__param_list: *mut *mut _ListEntry, __param_data: *mut c_void) -> *mut _ListEntry writes allocation_limit {
     var __local_newentry: *mut _ListEntry
 
     if ((if __param_list == null: 1 else: 0) != 0) {
@@ -52,7 +52,7 @@ pub unsafe fn list_prepend(__param_list: *mut *mut _ListEntry, __param_data: *mu
 
 }
 
-pub unsafe fn list_append(__param_list: *mut *mut _ListEntry, __param_data: *mut c_void) -> *mut _ListEntry {
+pub unsafe fn list_append(__param_list: *mut *mut _ListEntry, __param_data: *mut c_void) -> *mut _ListEntry writes allocation_limit {
     var __local_rover: *mut _ListEntry
 
     var __local_newentry: *mut _ListEntry
@@ -128,7 +128,7 @@ pub unsafe fn list_data(__param_listentry: *mut _ListEntry) -> *mut c_void {
 
 }
 
-pub unsafe fn list_set_data(__param_listentry: *mut _ListEntry, __param_value: *mut c_void) -> Unit {
+pub unsafe fn list_set_data(__param_listentry: *mut _ListEntry, __param_value: *mut c_void) {
     if ((if __param_listentry != null: 1 else: 0) != 0) {
         ((*__param_listentry).data = __param_value)
 
@@ -197,7 +197,7 @@ pub unsafe fn list_length(__param_list: *mut _ListEntry) -> c_uint {
 
 }
 
-pub unsafe fn list_to_array(__param_list: *mut _ListEntry) -> *mut *mut c_void {
+pub unsafe fn list_to_array(__param_list: *mut _ListEntry) -> *mut *mut c_void writes allocation_limit {
     var __local_rover: *mut _ListEntry
 
     var __local_array: *mut *mut c_void
@@ -363,7 +363,7 @@ pub unsafe fn list_find_data(__param_list: *mut _ListEntry, __param_callback: un
 
 }
 
-pub unsafe fn list_iterate(__param_list: *mut *mut _ListEntry, __param_iter: *mut _ListIterator) -> Unit {
+pub unsafe fn list_iterate(__param_list: *mut *mut _ListEntry, __param_iter: *mut _ListIterator) {
     ((*__param_iter).prev_next = __param_list)
 
     ((*__param_iter).current = ((null as *mut _ListEntry)))
@@ -418,7 +418,7 @@ pub unsafe fn list_iter_next(__param_iter: *mut _ListIterator) -> *mut c_void {
 
 }
 
-pub unsafe fn list_iter_remove(__param_iter: *mut _ListIterator) -> Unit {
+pub unsafe fn list_iter_remove(__param_iter: *mut _ListIterator) {
     var __ci_expr_logic_0: c_int
 
     if ((if (*__param_iter).current == null: 1 else: 0) != 0) {

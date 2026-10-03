@@ -130,7 +130,6 @@ pub fn zError(__param_err: c_int) -> *const i8 {
 }
 
 pub unsafe fn zcalloc(__param_opaque_: *mut c_void, __param_items: c_uint, __param_size: c_uint) -> *mut c_void {
-    __param_opaque_
 
     var __ci_expr_ternary_0: *mut c_void = null
 
@@ -145,8 +144,7 @@ pub unsafe fn zcalloc(__param_opaque_: *mut c_void, __param_items: c_uint, __par
 
 }
 
-pub unsafe fn zcfree(__param_opaque_: *mut c_void, __param_ptr: *mut c_void) -> Unit {
-    __param_opaque_
+pub unsafe fn zcfree(__param_opaque_: *mut c_void, __param_ptr: *mut c_void) {
 
     with_free((__param_ptr as *mut u8))
 

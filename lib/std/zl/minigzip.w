@@ -49,14 +49,14 @@ unsafe fn string_copy(__param_dst: *mut i8, __param_src: *const i8, __param_len:
 
 }
 
-unsafe fn error_(__param_msg: *const i8) -> Unit {
+unsafe fn error_(__param_msg: *const i8) {
     fprintf(libc_stderr(), c"%s: %s\n".ptr, prog, __param_msg)
 
     exit((1 as c_int))
 
 }
 
-unsafe fn gz_compress(__param_in_: *mut c_void, __param_out: *mut gzFile_s) -> Unit {
+unsafe fn gz_compress(__param_in_: *mut c_void, __param_out: *mut gzFile_s) {
     var __local_buf: [16384]c_char
 
     var __local_len: c_int
@@ -91,7 +91,7 @@ unsafe fn gz_compress(__param_in_: *mut c_void, __param_out: *mut gzFile_s) -> U
 
 }
 
-unsafe fn gz_uncompress(__param_in_: *mut gzFile_s, __param_out: *mut c_void) -> Unit {
+unsafe fn gz_uncompress(__param_in_: *mut gzFile_s, __param_out: *mut c_void) {
     var __local_buf: [16384]c_char
 
     var __local_len: c_int

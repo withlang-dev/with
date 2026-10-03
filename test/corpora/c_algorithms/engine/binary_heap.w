@@ -2,7 +2,7 @@
 use std.calg_testing.defs
 use std.calg_testing.alloc_testing
 
-pub fn binary_heap_new(__param_heap_type: i32, __param_compare_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int) -> *mut _BinaryHeap {
+pub fn binary_heap_new(__param_heap_type: i32, __param_compare_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int) -> *mut _BinaryHeap writes allocation_limit {
     var __local_heap: *mut _BinaryHeap
 
     (__local_heap = ((alloc_test_malloc((sizeof[_BinaryHeap]() as c_ulong)) as *mut _BinaryHeap)))
@@ -33,14 +33,14 @@ pub fn binary_heap_new(__param_heap_type: i32, __param_compare_func: unsafe exte
 
 }
 
-pub unsafe fn binary_heap_free(__param_heap: *mut _BinaryHeap) -> Unit {
+pub unsafe fn binary_heap_free(__param_heap: *mut _BinaryHeap) {
     alloc_test_free(((*__param_heap).values as *mut c_void))
 
     alloc_test_free((__param_heap as *mut c_void))
 
 }
 
-pub unsafe fn binary_heap_insert(__param_heap: *mut _BinaryHeap, __param_value: *mut c_void) -> c_int {
+pub unsafe fn binary_heap_insert(__param_heap: *mut _BinaryHeap, __param_value: *mut c_void) -> c_int writes allocation_limit {
     var __local_new_values: *mut *mut c_void
 
     var __local_index: c_uint

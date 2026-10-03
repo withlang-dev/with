@@ -198,7 +198,7 @@ unsafe fn test_gzio(__param_fname: *const i8, __param_uncompr: *mut u8, __param_
 
 }
 
-unsafe fn test_deflate(__param_compr: *mut u8, __param_comprLen: c_ulong) -> Unit {
+unsafe fn test_deflate(__param_compr: *mut u8, __param_comprLen: c_ulong) {
     var __local_c_stream: z_stream_s
 
     var __local_err: c_int
@@ -368,7 +368,7 @@ unsafe fn test_inflate(__param_compr: *mut u8, __param_comprLen: c_ulong, __para
 
 }
 
-unsafe fn test_large_deflate(__param_compr: *mut u8, __param_comprLen: c_ulong, __param_uncompr: *mut u8, __param_uncomprLen: c_ulong) -> Unit {
+unsafe fn test_large_deflate(__param_compr: *mut u8, __param_comprLen: c_ulong, __param_uncompr: *mut u8, __param_uncomprLen: c_ulong) {
     var __local_c_stream: z_stream_s
 
     var __local_err: c_int
@@ -545,7 +545,7 @@ unsafe fn test_large_inflate(__param_compr: *mut u8, __param_comprLen: c_ulong, 
 
 }
 
-unsafe fn test_flush(__param_compr: *mut u8, __param_comprLen: *mut c_ulong) -> Unit {
+unsafe fn test_flush(__param_compr: *mut u8, __param_comprLen: *mut c_ulong) {
     var __local_c_stream: z_stream_s
 
     var __local_err: c_int
@@ -701,7 +701,7 @@ unsafe fn test_sync(__param_compr: *mut u8, __param_comprLen: c_ulong, __param_u
 
 }
 
-unsafe fn test_dict_deflate(__param_compr: *mut u8, __param_comprLen: c_ulong) -> Unit {
+unsafe fn test_dict_deflate(__param_compr: *mut u8, __param_comprLen: c_ulong) {
     var __local_c_stream: z_stream_s
 
     var __local_err: c_int

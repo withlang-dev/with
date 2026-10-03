@@ -9,7 +9,7 @@ use std.calg_testing.hash_string
 use std.calg_testing.hash_table
 use std.libc
 
-pub fn generate_hash_table() -> *mut _HashTable {
+pub fn generate_hash_table() -> *mut _HashTable writes allocation_limit {
     var __local_hash_table: *mut _HashTable
 
     var __local_buf: [10]c_char
@@ -41,7 +41,7 @@ pub fn generate_hash_table() -> *mut _HashTable {
 
 }
 
-pub fn test_hash_table_new_free() -> Unit {
+pub fn test_hash_table_new_free() -> Unit writes allocation_limit, value1, value2, value3, value4 {
     var __local_hash_table: *mut _HashTable
 
     (__local_hash_table = hash_table_new(int_hash, int_equal))
@@ -96,7 +96,7 @@ pub fn test_hash_table_new_free() -> Unit {
 
 }
 
-pub fn test_hash_table_insert_lookup() -> Unit {
+pub fn test_hash_table_insert_lookup() writes allocation_limit {
     var __local_hash_table: *mut _HashTable
 
     var __local_buf: [10]c_char
@@ -164,7 +164,7 @@ pub fn test_hash_table_insert_lookup() -> Unit {
 
 }
 
-pub fn test_hash_table_remove() -> Unit {
+pub fn test_hash_table_remove() writes allocation_limit {
     var __local_hash_table: *mut _HashTable
 
     var __local_buf: [10]c_char
@@ -213,7 +213,7 @@ pub fn test_hash_table_remove() -> Unit {
 
 }
 
-pub fn test_hash_table_iterating() -> Unit {
+pub fn test_hash_table_iterating() writes allocation_limit {
     var __local_hash_table: *mut _HashTable
 
     var __local_iterator: _HashTableIterator
@@ -265,7 +265,7 @@ pub fn test_hash_table_iterating() -> Unit {
 
 }
 
-pub fn test_hash_table_iterating_remove() -> Unit {
+pub fn test_hash_table_iterating_remove() writes allocation_limit {
     var __local_hash_table: *mut _HashTable
 
     var __local_iterator: _HashTableIterator
@@ -355,7 +355,7 @@ pub fn test_hash_table_iterating_remove() -> Unit {
 
 }
 
-pub fn new_key(__param_value: c_int) -> *mut c_int {
+pub fn new_key(__param_value: c_int) -> *mut c_int writes allocated_keys, allocation_limit {
     var __local_result: *mut c_int
 
     (__local_result = ((alloc_test_malloc((sizeof[c_int]() as c_ulong)) as *mut c_int)))
@@ -368,14 +368,14 @@ pub fn new_key(__param_value: c_int) -> *mut c_int {
 
 }
 
-pub unsafe fn free_key(__param_key: *mut c_void) -> Unit {
+pub unsafe fn free_key(__param_key: *mut c_void) writes allocated_keys {
     alloc_test_free(__param_key)
 
     (allocated_keys = allocated_keys - 1)
 
 }
 
-pub fn new_value(__param_value: c_int) -> *mut c_int {
+pub fn new_value(__param_value: c_int) -> *mut c_int writes allocated_values, allocation_limit {
     var __local_result: *mut c_int
 
     (__local_result = ((alloc_test_malloc((sizeof[c_int]() as c_ulong)) as *mut c_int)))
@@ -388,14 +388,14 @@ pub fn new_value(__param_value: c_int) -> *mut c_int {
 
 }
 
-pub unsafe fn free_value(__param_value: *mut c_void) -> Unit {
+pub unsafe fn free_value(__param_value: *mut c_void) writes allocated_values {
     alloc_test_free(__param_value)
 
     (allocated_values = allocated_values - 1)
 
 }
 
-pub fn test_hash_table_free_functions() -> Unit {
+pub fn test_hash_table_free_functions() -> Unit writes allocated_keys, allocated_values, allocation_limit {
     var __local_hash_table: *mut _HashTable
 
     var __local_key: *mut c_int
@@ -499,7 +499,7 @@ pub fn test_hash_table_free_functions() -> Unit {
 
 }
 
-pub fn test_hash_table_out_of_memory() -> Unit {
+pub fn test_hash_table_out_of_memory() writes allocation_limit {
     var __local_hash_table: *mut _HashTable
 
     var __local_values: [66]c_int
@@ -575,7 +575,7 @@ pub fn test_hash_table_out_of_memory() -> Unit {
 
 }
 
-pub fn test_hash_iterator_key_pair() -> Unit {
+pub fn test_hash_iterator_key_pair() writes allocation_limit, value1, value2 {
     var __local_hash_table: *mut _HashTable
 
     var __local_iterator: _HashTableIterator
@@ -614,7 +614,7 @@ pub fn test_hash_iterator_key_pair() -> Unit {
 
 }
 
-pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
+pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int writes allocation_limit {
     run_tests((&tests[0] as *mut extern "C" fn() -> Unit))
 
     return 0

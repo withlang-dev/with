@@ -1753,7 +1753,6 @@ pub unsafe fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param
 
     '__ci_bb_193 {
         (__local_next__goto_1094_19 = ((0 as u8)))
-        __local_next__goto_1094_19
         if (__local_inparens__goto_1090_12 != 0) {
             goto '__ci_bb_209
         } else {
@@ -3364,7 +3363,6 @@ pub unsafe fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param
     }
 
     '__ci_bb_437 {
-        __local_ch__goto_1053_14
         (__ci_expr_logic_55 = 0)
         if ((if (*(&raw const __local_forcecase__goto_962_14 as *const case_state)).to_case != 0: 1 else: 0) != 0) {
             (__ci_expr_logic_55 = (if (if __local_substitute_case_callout__goto_765_14 == null: 1 else: 0) != 0: 1 else: 0))
@@ -5243,7 +5241,6 @@ unsafe fn do_case_copy(__param_input_output: *mut u8, __param_input_len: c_ulong
 
 
 
-    __local_ch
 
     loop {
         0
@@ -5383,7 +5380,6 @@ unsafe fn do_case_copy(__param_input_output: *mut u8, __param_input_len: c_ulong
         }
     }
 
-    __local_rest_overflow
 
     return ((__local_rc as c_ulong) +% (__local_rc2 as c_ulong))
 

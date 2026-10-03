@@ -2,7 +2,7 @@
 use std.calg_testing.defs
 use std.calg_testing.alloc_testing
 
-pub fn avl_tree_new(__param_compare_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int) -> *mut _AVLTree {
+pub fn avl_tree_new(__param_compare_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int) -> *mut _AVLTree writes allocation_limit {
     var __local_new_tree: *mut _AVLTree
 
     (__local_new_tree = ((alloc_test_malloc((sizeof[_AVLTree]() as c_ulong)) as *mut _AVLTree)))
@@ -22,14 +22,14 @@ pub fn avl_tree_new(__param_compare_func: unsafe extern "C" fn(*mut c_void, *mut
 
 }
 
-pub unsafe fn avl_tree_free(__param_tree: *mut _AVLTree) -> Unit {
+pub unsafe fn avl_tree_free(__param_tree: *mut _AVLTree) {
     avl_tree_free_subtree(__param_tree, (*__param_tree).root_node)
 
     alloc_test_free((__param_tree as *mut c_void))
 
 }
 
-pub unsafe fn avl_tree_insert(__param_tree: *mut _AVLTree, __param_key: *mut c_void, __param_value: *mut c_void) -> *mut _AVLTreeNode {
+pub unsafe fn avl_tree_insert(__param_tree: *mut _AVLTree, __param_key: *mut c_void, __param_value: *mut c_void) -> *mut _AVLTreeNode writes allocation_limit {
     var __local_rover: *mut *mut _AVLTreeNode
 
     var __local_new_node: *mut _AVLTreeNode
@@ -82,7 +82,7 @@ pub unsafe fn avl_tree_insert(__param_tree: *mut _AVLTree, __param_key: *mut c_v
 
 }
 
-pub unsafe fn avl_tree_remove_node(__param_tree: *mut _AVLTree, __param_node: *mut _AVLTreeNode) -> Unit {
+pub unsafe fn avl_tree_remove_node(__param_tree: *mut _AVLTree, __param_node: *mut _AVLTreeNode) {
     var __local_swap_node: *mut _AVLTreeNode
 
     var __local_balance_startpoint: *mut _AVLTreeNode
@@ -242,7 +242,7 @@ pub unsafe fn avl_tree_subtree_height(__param_node: *mut _AVLTreeNode) -> c_int 
 
 }
 
-pub unsafe fn avl_tree_to_array(__param_tree: *mut _AVLTree) -> *mut *mut c_void {
+pub unsafe fn avl_tree_to_array(__param_tree: *mut _AVLTree) -> *mut *mut c_void writes allocation_limit {
     var __local_array: *mut *mut c_void
 
     var __local_index: c_int
@@ -267,7 +267,7 @@ pub unsafe fn avl_tree_num_entries(__param_tree: *mut _AVLTree) -> c_uint {
 
 }
 
-unsafe fn avl_tree_free_subtree(__param_tree: *mut _AVLTree, __param_node: *mut _AVLTreeNode) -> Unit {
+unsafe fn avl_tree_free_subtree(__param_tree: *mut _AVLTree, __param_node: *mut _AVLTreeNode) {
     if ((if __param_node == null: 1 else: 0) != 0) {
         return
 
@@ -413,7 +413,7 @@ unsafe fn avl_tree_node_balance(__param_tree: *mut _AVLTree, __param_node: *mut 
 
 }
 
-unsafe fn avl_tree_balance_to_root(__param_tree: *mut _AVLTree, __param_node: *mut _AVLTreeNode) -> Unit {
+unsafe fn avl_tree_balance_to_root(__param_tree: *mut _AVLTree, __param_node: *mut _AVLTreeNode) {
     var __local_rover: *mut _AVLTreeNode
 
     (__local_rover = __param_node)
@@ -488,7 +488,7 @@ unsafe fn avl_tree_node_get_replacement(__param_tree: *mut _AVLTree, __param_nod
 
 }
 
-unsafe fn avl_tree_to_array_add_subtree(__param_subtree: *mut _AVLTreeNode, __param_array: *mut *mut c_void, __param_index: *mut c_int) -> Unit {
+unsafe fn avl_tree_to_array_add_subtree(__param_subtree: *mut _AVLTreeNode, __param_array: *mut *mut c_void, __param_index: *mut c_int) {
     if ((if __param_subtree == null: 1 else: 0) != 0) {
         return
 

@@ -120,7 +120,7 @@ pub unsafe fn compare_vector(__param_void_a: *const c_void, __param_void_b: *con
 
 }
 
-fn nano_init() -> Unit {
+fn nano_init() {
     return
 }
 
@@ -219,7 +219,7 @@ pub fn isqrt(__param_n: c_uint) -> c_uint {
 
 }
 
-pub fn cache_clear() -> Unit {
+pub fn cache_clear() {
     var __local_i: c_uint
 
     (__local_i = ((0 as c_uint)))
@@ -234,7 +234,7 @@ pub fn cache_clear() -> Unit {
 
 }
 
-pub unsafe fn start(__param_str: *const i8) -> Unit writes compare_counter {
+pub unsafe fn start(__param_str: *const i8) writes compare_counter {
     cache_clear()
 
     (compare_counter = ((0 as c_uint)))
@@ -252,17 +252,15 @@ pub fn stop() -> Unit {
 
 }
 
-unsafe fn count_callback(__param_data: *mut c_void) -> Unit {
-    __param_data
+unsafe fn count_callback(__param_data: *mut c_void) {
 
     (the_count = (the_count +% 1))
 
 }
 
-unsafe fn count_arg_callback(__param_arg: *mut c_void, __param_data: *mut c_void) -> Unit {
+unsafe fn count_arg_callback(__param_arg: *mut c_void, __param_data: *mut c_void) {
     var __local_count: *mut c_uint = ((__param_arg as *mut c_uint))
 
-    __param_data
 
     ((*__local_count) = ((*__local_count) +% 1))
 
@@ -273,7 +271,7 @@ unsafe fn search_callback(__param_arg: *const c_void, __param_obj: *const c_void
 
 }
 
-pub fn test_hash() -> Unit writes compare_counter {
+pub fn test_hash() writes compare_counter {
     var __local_i: c_uint
 
     var __local_buffer: [16]u8
@@ -430,7 +428,7 @@ pub fn test_hash() -> Unit writes compare_counter {
 
 }
 
-pub fn test_alloc() -> Unit writes compare_counter {
+pub fn test_alloc() writes compare_counter {
     var __local_size: c_uint = ((10000000 as c_uint))
 
     var __local_i: c_uint
@@ -503,7 +501,7 @@ pub fn test_alloc() -> Unit writes compare_counter {
 
 }
 
-pub unsafe fn test_list_order(__param_list: *mut tommy_node_struct) -> Unit {
+pub unsafe fn test_list_order(__param_list: *mut tommy_node_struct) {
     var __local_node: *mut tommy_node_struct
 
     (__local_node = __param_list)
@@ -537,7 +535,7 @@ pub unsafe fn test_list_order(__param_list: *mut tommy_node_struct) -> Unit {
 
 }
 
-pub fn test_list() -> Unit writes SEED, compare_counter {
+pub fn test_list() writes SEED, compare_counter {
     var __local_LIST: *mut object
 
     var __local_VECTOR: *mut object_vector
@@ -761,7 +759,7 @@ pub fn test_list() -> Unit writes SEED, compare_counter {
 
 }
 
-pub fn test_tree() -> Unit writes compare_counter {
+pub fn test_tree() writes compare_counter {
     var __local_tree: tommy_tree_struct
 
     var __local_OBJ: *mut object_tree
@@ -975,7 +973,7 @@ pub fn test_tree() -> Unit writes compare_counter {
 
 }
 
-pub fn test_array() -> Unit writes compare_counter {
+pub fn test_array() writes compare_counter {
     var __local_array: tommy_array_struct
 
     var __local_i: c_ulong
@@ -1045,7 +1043,7 @@ pub fn test_array() -> Unit writes compare_counter {
 
 }
 
-pub fn test_arrayof() -> Unit writes compare_counter {
+pub fn test_arrayof() writes compare_counter {
     var __local_arrayof: tommy_arrayof_struct
 
     var __local_i: c_uint
@@ -1121,7 +1119,7 @@ pub fn test_arrayof() -> Unit writes compare_counter {
 
 }
 
-pub fn test_arrayblk() -> Unit writes compare_counter {
+pub fn test_arrayblk() writes compare_counter {
     var __local_arrayblk: tommy_arrayblk_struct
 
     var __local_i: c_ulong
@@ -1191,7 +1189,7 @@ pub fn test_arrayblk() -> Unit writes compare_counter {
 
 }
 
-pub fn test_arrayblkof() -> Unit writes compare_counter {
+pub fn test_arrayblkof() writes compare_counter {
     var __local_arrayblkof: tommy_arrayblkof_struct
 
     var __local_i: c_uint
@@ -1267,7 +1265,7 @@ pub fn test_arrayblkof() -> Unit writes compare_counter {
 
 }
 
-pub fn test_hashtable() -> Unit writes compare_counter {
+pub fn test_hashtable() writes compare_counter {
     var __local_hashtable: tommy_hashtable_struct
 
     var __local_HASH: *mut object_hash
@@ -1462,7 +1460,7 @@ pub fn test_hashtable() -> Unit writes compare_counter {
 
 }
 
-pub fn test_hashdyn() -> Unit writes compare_counter {
+pub fn test_hashdyn() writes compare_counter {
     var __local_hashdyn: tommy_hashdyn_struct
 
     var __local_HASH: *mut object_hash
@@ -1649,7 +1647,7 @@ pub fn test_hashdyn() -> Unit writes compare_counter {
 
 }
 
-pub fn test_hashlin() -> Unit writes compare_counter {
+pub fn test_hashlin() writes compare_counter {
     var __local_hashlin: tommy_hashlin_struct
 
     var __local_HASH: *mut object_hash
@@ -1858,7 +1856,7 @@ pub fn test_hashlin() -> Unit writes compare_counter {
 
 }
 
-pub fn test_trie() -> Unit writes compare_counter {
+pub fn test_trie() writes compare_counter {
     var __local_trie: tommy_trie_struct
 
     var __local_alloc: tommy_allocator_struct
@@ -2000,7 +1998,7 @@ pub fn test_trie() -> Unit writes compare_counter {
 
 }
 
-pub fn test_trie_inplace() -> Unit writes compare_counter {
+pub fn test_trie_inplace() writes compare_counter {
     var __local_trie_inplace: tommy_trie_inplace_struct
 
     var __local_OBJ: *mut object_trie_inplace

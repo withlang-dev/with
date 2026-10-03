@@ -7,7 +7,7 @@ use std.calg_testing.hash_pointer
 use std.calg_testing.hash_string
 use std.libc
 
-pub fn test_pointer_hash() -> Unit {
+pub fn test_pointer_hash() {
     var __local_array: [200]c_int
 
     var __local_i: c_int
@@ -181,7 +181,7 @@ pub fn test_string_nocase_hash() -> Unit {
 
 }
 
-pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
+pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int writes allocation_limit {
     run_tests((&tests[0] as *mut extern "C" fn() -> Unit))
 
     return 0

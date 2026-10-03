@@ -26,7 +26,7 @@ pub unsafe fn sortedarray_length(__param_array: *mut _SortedArray) -> c_uint {
 
 }
 
-pub fn sortedarray_new(__param_length: c_uint, __param_cmp_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int) -> *mut _SortedArray {
+pub fn sortedarray_new(__param_length: c_uint, __param_cmp_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int) -> *mut _SortedArray writes allocation_limit {
     var __local_length = __param_length
     var __local_array: *mut *mut c_void
 
@@ -70,7 +70,7 @@ pub fn sortedarray_new(__param_length: c_uint, __param_cmp_func: unsafe extern "
 
 }
 
-pub unsafe fn sortedarray_free(__param_sortedarray: *mut _SortedArray) -> Unit {
+pub unsafe fn sortedarray_free(__param_sortedarray: *mut _SortedArray) {
     if ((if __param_sortedarray != null: 1 else: 0) != 0) {
         alloc_test_free(((*__param_sortedarray).data as *mut c_void))
 
@@ -114,7 +114,7 @@ pub unsafe fn sortedarray_remove_range(__param_sortedarray: *mut _SortedArray, _
 
 }
 
-pub unsafe fn sortedarray_insert(__param_sortedarray: *mut _SortedArray, __param_data: *mut c_void) -> c_int {
+pub unsafe fn sortedarray_insert(__param_sortedarray: *mut _SortedArray, __param_data: *mut c_void) -> c_int writes allocation_limit {
     var __local_data = __param_data
     var __local_left: c_uint
 
@@ -265,7 +265,7 @@ pub unsafe fn sortedarray_index_of(__param_sortedarray: *mut _SortedArray, __par
 
 }
 
-pub unsafe fn sortedarray_clear(__param_sortedarray: *mut _SortedArray) -> Unit {
+pub unsafe fn sortedarray_clear(__param_sortedarray: *mut _SortedArray) {
     ((*__param_sortedarray).length = ((0 as c_uint)))
 
 }

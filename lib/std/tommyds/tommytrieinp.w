@@ -69,7 +69,7 @@ fn tommy_haszero_u32(__param_value: c_uint) -> c_int {
 
 }
 
-pub unsafe fn tommy_trie_inplace_init(__param_trie_inplace: *mut tommy_trie_inplace_struct) -> Unit {
+pub unsafe fn tommy_trie_inplace_init(__param_trie_inplace: *mut tommy_trie_inplace_struct) {
     var __local_i: c_uint
 
     (__local_i = ((0 as c_uint)))
@@ -86,7 +86,7 @@ pub unsafe fn tommy_trie_inplace_init(__param_trie_inplace: *mut tommy_trie_inpl
 
 }
 
-pub unsafe fn tommy_trie_inplace_insert(__param_trie_inplace: *mut tommy_trie_inplace_struct, __param_node: *mut tommy_trie_inplace_node_struct, __param_data: *mut c_void, __param_key: c_ulonglong) -> Unit {
+pub unsafe fn tommy_trie_inplace_insert(__param_trie_inplace: *mut tommy_trie_inplace_struct, __param_node: *mut tommy_trie_inplace_node_struct, __param_data: *mut c_void, __param_key: c_ulonglong) {
     var __local_let_ptr: *mut *mut tommy_trie_inplace_node_struct
 
     var __local_i: c_uint
@@ -1383,7 +1383,7 @@ unsafe fn tommy_trie_inplace_list_insert_first(__param_node: *mut tommy_trie_inp
 
 }
 
-unsafe fn tommy_trie_inplace_list_insert_tail_not_empty(__param_head: *mut tommy_trie_inplace_node_struct, __param_node: *mut tommy_trie_inplace_node_struct) -> Unit {
+unsafe fn tommy_trie_inplace_list_insert_tail_not_empty(__param_head: *mut tommy_trie_inplace_node_struct, __param_node: *mut tommy_trie_inplace_node_struct) {
     ((*__param_node).prev = (*__param_head).prev)
 
     ((*__param_head).prev = __param_node)

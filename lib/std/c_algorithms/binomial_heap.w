@@ -19,7 +19,7 @@ pub fn binomial_heap_new(__param_heap_type: i32, __param_compare_func: unsafe ex
 
 }
 
-pub unsafe fn binomial_heap_free(__param_heap: *mut _BinomialHeap) -> Unit {
+pub unsafe fn binomial_heap_free(__param_heap: *mut _BinomialHeap) {
     var __local_i: c_uint
 
     (__local_i = ((0 as c_uint)))
@@ -177,7 +177,7 @@ unsafe fn binomial_heap_cmp(__param_heap: *mut _BinomialHeap, __param_data1: *mu
 
 }
 
-unsafe fn binomial_tree_ref(__param_tree: *mut _BinomialTree) -> Unit {
+unsafe fn binomial_tree_ref(__param_tree: *mut _BinomialTree) {
     if ((if __param_tree != null: 1 else: 0) != 0) {
         ((*__param_tree).refcount = ((*__param_tree).refcount +% 1))
 
@@ -185,7 +185,7 @@ unsafe fn binomial_tree_ref(__param_tree: *mut _BinomialTree) -> Unit {
 
 }
 
-unsafe fn binomial_tree_unref(__param_tree: *mut _BinomialTree) -> Unit {
+unsafe fn binomial_tree_unref(__param_tree: *mut _BinomialTree) {
     var __local_i: c_int
 
     if ((if __param_tree == null: 1 else: 0) != 0) {
@@ -274,7 +274,7 @@ unsafe fn binomial_tree_merge(__param_heap: *mut _BinomialHeap, __param_tree1: *
 
 }
 
-unsafe fn binomial_heap_merge_undo(__param_new_roots: *mut *mut _BinomialTree, __param_count: c_uint) -> Unit {
+unsafe fn binomial_heap_merge_undo(__param_new_roots: *mut *mut _BinomialTree, __param_count: c_uint) {
     var __local_i: c_uint
 
     (__local_i = ((0 as c_uint)))

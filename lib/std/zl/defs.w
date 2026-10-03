@@ -264,7 +264,7 @@ pub extern fn with_abs(x: i32) -> i32
 pub extern fn with_alloc(size: i64) -> *mut u8
 pub extern fn with_alloc_zeroed(count: i64, size: i64) -> *mut u8
 pub extern fn with_realloc(ptr: *mut u8, old_size: i64, new_size: i64) -> *mut u8
-pub extern fn with_free(ptr: *mut u8) -> Unit
+pub extern fn with_free(ptr: *mut u8)
 pub extern fn with_memcpy(dst: *mut u8, src: *const u8, n: i64) -> *mut u8
 pub extern fn with_memmove(dst: *mut u8, src: *const u8, n: i64) -> *mut u8
 pub extern fn with_memset(dst: *mut u8, c: i32, n: i64) -> *mut u8
@@ -388,22 +388,22 @@ pub let MIN_MATCH: c_int = 3
 pub let MAX_MATCH: c_int = 258
 pub let PRESET_DICT: c_int = 0x20
 pub let OS_CODE: c_int = 19
-pub fn Assert(cond: i32, msg: i32) -> Unit {
+pub fn Assert(cond: i32, msg: i32) {
     return
 }
-pub fn Trace(x: i32) -> Unit {
+pub fn Trace(x: i32) {
     return
 }
-pub fn Tracev(x: i32) -> Unit {
+pub fn Tracev(x: i32) {
     return
 }
-pub fn Tracevv(x: i32) -> Unit {
+pub fn Tracevv(x: i32) {
     return
 }
-pub fn Tracec(c: i32, x: i32) -> Unit {
+pub fn Tracec(c: i32, x: i32) {
     return
 }
-pub fn Tracecv(c: i32, x: i32) -> Unit {
+pub fn Tracecv(c: i32, x: i32) {
     return
 }
 pub fn ZSWAP32[T](q: T) -> T {
@@ -485,7 +485,7 @@ pub let TOO_FAR: c_int = 4096
 pub fn RANK[T](f: T) -> T {
     ((f * 2) - (if (f > 4): 9 else: 0))
 }
-pub fn check_match(s: i32, start: i32, match_: i32, length: i32) -> Unit {
+pub fn check_match(s: i32, start: i32, match_: i32, length: i32) {
     return
 }
 pub let MAX_STORED: c_int = 65535

@@ -21,7 +21,7 @@ pub fn rb_tree_new(__param_compare_func: unsafe extern "C" fn(*mut c_void, *mut 
 
 }
 
-pub unsafe fn rb_tree_free(__param_tree: *mut _RBTree) -> Unit {
+pub unsafe fn rb_tree_free(__param_tree: *mut _RBTree) {
     rb_tree_free_subtree((*__param_tree).root_node)
 
     with_free(((__param_tree as *mut c_void) as *mut u8))
@@ -85,7 +85,7 @@ pub unsafe fn rb_tree_insert(__param_tree: *mut _RBTree, __param_key: *mut c_voi
 
 }
 
-pub unsafe fn rb_tree_remove_node(__param_tree: *mut _RBTree, __param_node: *mut _RBTreeNode) -> Unit {
+pub unsafe fn rb_tree_remove_node(__param_tree: *mut _RBTree, __param_node: *mut _RBTreeNode) {
     return
 }
 
@@ -267,7 +267,7 @@ unsafe fn rb_tree_rotate(__param_tree: *mut _RBTree, __param_node: *mut _RBTreeN
 
 }
 
-unsafe fn rb_tree_free_subtree(__param_node: *mut _RBTreeNode) -> Unit {
+unsafe fn rb_tree_free_subtree(__param_node: *mut _RBTreeNode) {
     if ((if __param_node != null: 1 else: 0) != 0) {
         rb_tree_free_subtree((*__param_node).children[RB_TREE_NODE_LEFT])
 
@@ -290,7 +290,7 @@ unsafe fn rb_tree_insert_case1(__param_tree: *mut _RBTree, __param_node: *mut _R
 
 }
 
-unsafe fn rb_tree_insert_case2(__param_tree: *mut _RBTree, __param_node: *mut _RBTreeNode) -> Unit {
+unsafe fn rb_tree_insert_case2(__param_tree: *mut _RBTree, __param_node: *mut _RBTreeNode) {
     if ((if (*(*__param_node).parent).color != 1: 1 else: 0) != 0) {
         rb_tree_insert_case3(__param_tree, __param_node)
 
@@ -298,7 +298,7 @@ unsafe fn rb_tree_insert_case2(__param_tree: *mut _RBTree, __param_node: *mut _R
 
 }
 
-unsafe fn rb_tree_insert_case3(__param_tree: *mut _RBTree, __param_node: *mut _RBTreeNode) -> Unit {
+unsafe fn rb_tree_insert_case3(__param_tree: *mut _RBTree, __param_node: *mut _RBTreeNode) {
     var __local_grandparent: *mut _RBTreeNode
 
     var __local_uncle: *mut _RBTreeNode
@@ -330,7 +330,7 @@ unsafe fn rb_tree_insert_case3(__param_tree: *mut _RBTree, __param_node: *mut _R
 
 }
 
-unsafe fn rb_tree_insert_case4(__param_tree: *mut _RBTree, __param_node: *mut _RBTreeNode) -> Unit {
+unsafe fn rb_tree_insert_case4(__param_tree: *mut _RBTree, __param_node: *mut _RBTreeNode) {
     var __local_next_node: *mut _RBTreeNode
 
     var __local_side: i32
@@ -351,7 +351,7 @@ unsafe fn rb_tree_insert_case4(__param_tree: *mut _RBTree, __param_node: *mut _R
 
 }
 
-unsafe fn rb_tree_insert_case5(__param_tree: *mut _RBTree, __param_node: *mut _RBTreeNode) -> Unit {
+unsafe fn rb_tree_insert_case5(__param_tree: *mut _RBTree, __param_node: *mut _RBTreeNode) {
     var __local_parent: *mut _RBTreeNode
 
     var __local_grandparent: *mut _RBTreeNode

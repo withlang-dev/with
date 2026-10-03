@@ -34,7 +34,7 @@ pub fn arraylist_new(__param_length: c_uint) -> *mut _ArrayList {
 
 }
 
-pub unsafe fn arraylist_free(__param_arraylist: *mut _ArrayList) -> Unit {
+pub unsafe fn arraylist_free(__param_arraylist: *mut _ArrayList) {
     if ((if __param_arraylist != null: 1 else: 0) != 0) {
         with_free((((*__param_arraylist).data as *mut c_void) as *mut u8))
 
@@ -54,12 +54,12 @@ pub unsafe fn arraylist_prepend(__param_arraylist: *mut _ArrayList, __param_data
 
 }
 
-pub unsafe fn arraylist_remove(__param_arraylist: *mut _ArrayList, __param_index: c_uint) -> Unit {
+pub unsafe fn arraylist_remove(__param_arraylist: *mut _ArrayList, __param_index: c_uint) {
     arraylist_remove_range(__param_arraylist, __param_index, (1 as c_uint))
 
 }
 
-pub unsafe fn arraylist_remove_range(__param_arraylist: *mut _ArrayList, __param_index: c_uint, __param_length: c_uint) -> Unit {
+pub unsafe fn arraylist_remove_range(__param_arraylist: *mut _ArrayList, __param_index: c_uint, __param_length: c_uint) {
     var __ci_expr_logic_0: c_int
 
     if ((if __param_index > (*__param_arraylist).length: 1 else: 0) != 0) {
@@ -125,12 +125,12 @@ pub unsafe fn arraylist_index_of(__param_arraylist: *mut _ArrayList, __param_cal
 
 }
 
-pub unsafe fn arraylist_clear(__param_arraylist: *mut _ArrayList) -> Unit {
+pub unsafe fn arraylist_clear(__param_arraylist: *mut _ArrayList) {
     ((*__param_arraylist).length = ((0 as c_uint)))
 
 }
 
-pub unsafe fn arraylist_sort(__param_arraylist: *mut _ArrayList, __param_compare_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int) -> Unit {
+pub unsafe fn arraylist_sort(__param_arraylist: *mut _ArrayList, __param_compare_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int) {
     arraylist_sort_internal((*__param_arraylist).data, (*__param_arraylist).length, __param_compare_func)
 
 }
@@ -157,7 +157,7 @@ unsafe fn arraylist_enlarge(__param_arraylist: *mut _ArrayList) -> c_int {
 
 }
 
-unsafe fn arraylist_sort_internal(__param_list_data: *mut *mut c_void, __param_list_length: c_uint, __param_compare_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int) -> Unit {
+unsafe fn arraylist_sort_internal(__param_list_data: *mut *mut c_void, __param_list_length: c_uint, __param_compare_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int) {
     var __local_pivot: *mut c_void
 
     var __local_tmp: *mut c_void

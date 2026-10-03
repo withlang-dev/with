@@ -38,7 +38,7 @@ pub fn alloc_test_malloc(__param_bytes: c_ulong) -> *mut c_void writes allocatio
 
 }
 
-pub unsafe fn alloc_test_free(__param_ptr: *mut c_void) -> Unit {
+pub unsafe fn alloc_test_free(__param_ptr: *mut c_void) {
     var __local_header: *mut _BlockHeader
 
     var __local_block_size: c_ulong
@@ -136,7 +136,7 @@ pub unsafe fn alloc_test_strdup(__param_string: *const i8) -> *mut i8 writes all
 
 }
 
-pub fn alloc_test_set_limit(__param_alloc_count: c_int) -> Unit writes allocation_limit {
+pub fn alloc_test_set_limit(__param_alloc_count: c_int) writes allocation_limit {
     (allocation_limit = __param_alloc_count)
 
 }
@@ -161,7 +161,7 @@ unsafe fn alloc_test_get_header(__param_ptr: *mut c_void) -> *mut _BlockHeader {
 
 }
 
-unsafe fn alloc_test_overwrite(__param_ptr: *mut c_void, __param_length: c_ulong, __param_pattern: c_uint) -> Unit {
+unsafe fn alloc_test_overwrite(__param_ptr: *mut c_void, __param_length: c_ulong, __param_pattern: c_uint) {
     var __local_byte_ptr: *mut u8
 
     var __local_pattern_seq: c_int

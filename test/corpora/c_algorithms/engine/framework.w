@@ -3,7 +3,7 @@ use std.calg_testing.defs
 use std.calg_testing.alloc_testing
 use std.libc
 
-pub unsafe fn run_tests(__param_tests: *mut extern "C" fn() -> Unit) -> Unit {
+pub unsafe fn run_tests(__param_tests: *mut extern "C" fn() -> Unit) writes allocation_limit {
     var __local_i: c_int
 
     (__local_i = ((0 as c_int)))

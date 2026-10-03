@@ -440,7 +440,7 @@ pub unsafe fn inflate_table(__param_type_: i32, __param_lens: *mut c_ushort, __p
 
 }
 
-pub unsafe fn inflate_fixed(__param_state: *mut inflate_state) -> Unit {
+pub unsafe fn inflate_fixed(__param_state: *mut inflate_state) {
     ((*__param_state).lencode = (&lenfix[0] as *const code))
 
     ((*__param_state).lenbits = ((9 as c_uint)))

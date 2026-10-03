@@ -128,7 +128,6 @@ unsafe fn do_bumpalong(__param_match_data: *mut pcre2_real_match_data_8, __param
 
         var __local_subject_end: *const u8 = (__local_subject + (__local_subject_length as usize))
 
-        __local_subject_end
 
         while true {
             var __ci_expr_logic_2: c_int = 0

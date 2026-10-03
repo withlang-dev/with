@@ -3852,7 +3852,7 @@ unsafe fn deflate_huff(__param_s: *mut internal_state, __param_flush: c_int) -> 
 
 }
 
-unsafe fn slide_hash(__param_s: *mut internal_state) -> Unit {
+unsafe fn slide_hash(__param_s: *mut internal_state) {
     var __local_n: c_uint
 
     var __local_m: c_uint
@@ -3953,7 +3953,7 @@ unsafe fn read_buf(__param_strm: *mut z_stream_s, __param_buf: *mut u8, __param_
 
 }
 
-unsafe fn fill_window(__param_s: *mut internal_state) -> Unit {
+unsafe fn fill_window(__param_s: *mut internal_state) {
     var __local_n: c_uint
 
     var __local_more: c_uint
@@ -4185,7 +4185,7 @@ unsafe fn deflateStateCheck(__param_strm: *mut z_stream_s) -> c_int {
 
 }
 
-unsafe fn lm_init(__param_s: *mut internal_state) -> Unit {
+unsafe fn lm_init(__param_s: *mut internal_state) {
     ((*__param_s).window_size = ((((2 as c_ulong) *% ((*__param_s).w_size as c_ulong)) as c_ulong)))
 
     loop {
@@ -4227,7 +4227,7 @@ unsafe fn lm_init(__param_s: *mut internal_state) -> Unit {
 
 }
 
-unsafe fn putShortMSB(__param_s: *mut internal_state, __param_b: c_uint) -> Unit {
+unsafe fn putShortMSB(__param_s: *mut internal_state, __param_b: c_uint) {
     var __ci_expr_old_0: c_ulong = (*__param_s).pending
 
     ((*__param_s).pending = ((*__param_s).pending +% 1))
@@ -4248,7 +4248,7 @@ unsafe fn putShortMSB(__param_s: *mut internal_state, __param_b: c_uint) -> Unit
 
 }
 
-unsafe fn flush_pending(__param_strm: *mut z_stream_s) -> Unit {
+unsafe fn flush_pending(__param_strm: *mut z_stream_s) {
     var __local_len: c_uint
 
     var __local_s: *mut internal_state = (*__param_strm).state

@@ -31,7 +31,7 @@ use std.re.pcre2_valid_utf
 use std.re.pcre2_xclass
 use std.re.pcre2_compile_cgroup
 
-pub unsafe fn _pcre2_update_classbits_8(__param_ptype: c_uint, __param_pdata: c_uint, __param_negated: c_int, __param_classbits: *mut u8) -> Unit {
+pub unsafe fn _pcre2_update_classbits_8(__param_ptype: c_uint, __param_pdata: c_uint, __param_negated: c_int, __param_classbits: *mut u8) {
     var __local_classbits = __param_classbits
     var __local_c: c_int
 
@@ -60,7 +60,6 @@ pub unsafe fn _pcre2_update_classbits_8(__param_ptype: c_uint, __param_pdata: c_
 
         (__local_set_bit = ((0 as c_int)))
 
-        __local_set_bit
 
         while true {
             match __param_ptype {
@@ -2664,7 +2663,7 @@ pub unsafe fn _pcre2_compile_class_nested_8(__param_options: c_uint, __param_xop
 
 }
 
-unsafe fn do_heapify(__param_buffer: *mut c_uint, __param_size: c_ulong, __param_i: c_ulong) -> Unit {
+unsafe fn do_heapify(__param_buffer: *mut c_uint, __param_size: c_ulong, __param_i: c_ulong) {
     var __local_i = __param_i
     var __local_max: c_ulong
 
@@ -2949,7 +2948,6 @@ unsafe fn utf_caseless_extend(__param_start: c_uint, __param_end: c_uint, __para
 
         (__local_buffer = __local_buffer + ((2 as isize) as usize))
 
-        __local_buffer
 
     }
 
@@ -2998,7 +2996,6 @@ unsafe fn append_char_list(__param_p: *const c_uint, __param_buffer: *mut c_uint
 }
 
 fn get_highest_char(__param_options: c_uint) -> c_uint {
-    __param_options
 
     return 1114111
 
@@ -3058,7 +3055,6 @@ unsafe fn append_negated_char_list(__param_p: *const c_uint, __param_options: c_
 
         (__local_buffer = __local_buffer + ((2 as isize) as usize))
 
-        __local_buffer
 
     }
 
@@ -3740,7 +3736,7 @@ unsafe fn compile_optimize_class(__param_start_ptr: *mut c_uint, __param_options
 
 }
 
-unsafe fn add_to_class(__param_options: c_uint, __param_xoptions: c_uint, __param_cb: *mut compile_block_8, __param_start: c_uint, __param_end: c_uint) -> Unit {
+unsafe fn add_to_class(__param_options: c_uint, __param_xoptions: c_uint, __param_cb: *mut compile_block_8, __param_start: c_uint, __param_end: c_uint) {
     var __local_classbits: *mut u8 = ((&raw const (*__param_cb).classbits.classbits[0] as *mut u8))
 
     var __local_c: c_uint
@@ -3909,7 +3905,7 @@ unsafe fn add_to_class(__param_options: c_uint, __param_xoptions: c_uint, __para
 
 }
 
-unsafe fn add_list_to_class(__param_options: c_uint, __param_xoptions: c_uint, __param_cb: *mut compile_block_8, __param_p: *const c_uint) -> Unit {
+unsafe fn add_list_to_class(__param_options: c_uint, __param_xoptions: c_uint, __param_cb: *mut compile_block_8, __param_p: *const c_uint) {
     var __local_p = __param_p
     while ((if (__local_p[0]) < 256: 1 else: 0) != 0) {
         var __local_n: c_uint = ((0 as c_uint))
@@ -3926,7 +3922,7 @@ unsafe fn add_list_to_class(__param_options: c_uint, __param_xoptions: c_uint, _
 
 }
 
-unsafe fn add_not_list_to_class(__param_options: c_uint, __param_xoptions: c_uint, __param_cb: *mut compile_block_8, __param_p: *const c_uint) -> Unit {
+unsafe fn add_not_list_to_class(__param_options: c_uint, __param_xoptions: c_uint, __param_cb: *mut compile_block_8, __param_p: *const c_uint) {
     var __local_p = __param_p
     if ((if (__local_p[0]) > 0: 1 else: 0) != 0) {
         add_to_class(__param_options, __param_xoptions, __param_cb, (0 as c_uint), ((((__local_p[0]) as c_uint) -% (1 as c_uint)) as c_uint))
@@ -3954,7 +3950,7 @@ unsafe fn add_not_list_to_class(__param_options: c_uint, __param_xoptions: c_uin
 
 }
 
-unsafe fn fold_negation(__param_pop_info: *mut eclass_op_info, __param_lengthptr: *mut c_ulong, __param_preserve_classbits: c_int) -> Unit {
+unsafe fn fold_negation(__param_pop_info: *mut eclass_op_info, __param_lengthptr: *mut c_ulong, __param_preserve_classbits: c_int) {
     if ((if (*__param_pop_info).op_single_type == 0: 1 else: 0) != 0) {
         if ((if __param_lengthptr != null: 1 else: 0) != 0) {
             ((*__param_lengthptr) = ((*__param_lengthptr) +% 1))
@@ -4020,7 +4016,7 @@ unsafe fn fold_negation(__param_pop_info: *mut eclass_op_info, __param_lengthptr
 
 }
 
-unsafe fn fold_binary(__param_op: c_int, __param_lhs_op_info: *mut eclass_op_info, __param_rhs_op_info: *mut eclass_op_info, __param_lengthptr: *mut c_ulong) -> Unit {
+unsafe fn fold_binary(__param_op: c_int, __param_lhs_op_info: *mut eclass_op_info, __param_rhs_op_info: *mut eclass_op_info, __param_lengthptr: *mut c_ulong) {
     while true {
         match __param_op {
             1 => {

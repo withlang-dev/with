@@ -11,7 +11,7 @@ use std.calg_testing.hash_string
 use std.calg_testing.set
 use std.libc
 
-pub fn generate_set() -> *mut _Set {
+pub fn generate_set() -> *mut _Set writes allocation_limit {
     var __local_set: *mut _Set
 
     var __local_buf: [10]c_char
@@ -49,7 +49,7 @@ pub fn generate_set() -> *mut _Set {
 
 }
 
-pub fn test_set_new_free() -> Unit {
+pub fn test_set_new_free() -> Unit writes allocation_limit {
     var __local_set: *mut _Set
 
     var __local_i: c_int
@@ -111,7 +111,7 @@ pub fn test_set_new_free() -> Unit {
 
 }
 
-pub fn test_set_insert() -> Unit {
+pub fn test_set_insert() writes allocation_limit {
     var __local_set: *mut _Set
 
     var __local_numbers1: [6]c_int = [(1 as c_int), (2 as c_int), (3 as c_int), (4 as c_int), (5 as c_int), (6 as c_int)]
@@ -154,7 +154,7 @@ pub fn test_set_insert() -> Unit {
 
 }
 
-pub fn test_set_query() -> Unit {
+pub fn test_set_query() writes allocation_limit {
     var __local_set: *mut _Set
 
     var __local_buf: [10]c_char
@@ -196,7 +196,7 @@ pub fn test_set_query() -> Unit {
 
 }
 
-pub fn test_set_remove() -> Unit {
+pub fn test_set_remove() writes allocation_limit {
     var __local_set: *mut _Set
 
     var __local_buf: [10]c_char
@@ -302,7 +302,7 @@ pub fn test_set_remove() -> Unit {
 
 }
 
-pub fn test_set_union() -> Unit {
+pub fn test_set_union() writes allocation_limit {
     var __local_numbers1: [7]c_int = [(1 as c_int), (2 as c_int), (3 as c_int), (4 as c_int), (5 as c_int), (6 as c_int), (7 as c_int)]
 
     var __local_numbers2: [7]c_int = [(5 as c_int), (6 as c_int), (7 as c_int), (8 as c_int), (9 as c_int), (10 as c_int), (11 as c_int)]
@@ -416,7 +416,7 @@ pub fn test_set_union() -> Unit {
 
 }
 
-pub fn test_set_intersection() -> Unit {
+pub fn test_set_intersection() writes allocation_limit {
     var __local_numbers1: [7]c_int = [(1 as c_int), (2 as c_int), (3 as c_int), (4 as c_int), (5 as c_int), (6 as c_int), (7 as c_int)]
 
     var __local_numbers2: [7]c_int = [(5 as c_int), (6 as c_int), (7 as c_int), (8 as c_int), (9 as c_int), (10 as c_int), (11 as c_int)]
@@ -514,7 +514,7 @@ pub fn test_set_intersection() -> Unit {
 
 }
 
-pub fn test_set_to_array() -> Unit {
+pub fn test_set_to_array() writes allocation_limit {
     var __local_set: *mut _Set
 
     var __local_values: [100]c_int
@@ -571,7 +571,7 @@ pub fn test_set_to_array() -> Unit {
 
 }
 
-pub fn test_set_iterating() -> Unit {
+pub fn test_set_iterating() writes allocation_limit {
     var __local_set: *mut _Set
 
     var __local_iterator: _SetIterator
@@ -619,7 +619,7 @@ pub fn test_set_iterating() -> Unit {
 
 }
 
-pub fn test_set_iterating_remove() -> Unit {
+pub fn test_set_iterating_remove() writes allocation_limit {
     var __local_set: *mut _Set
 
     var __local_iterator: _SetIterator
@@ -674,7 +674,7 @@ pub fn test_set_iterating_remove() -> Unit {
 
 }
 
-pub fn new_value(__param_value: c_int) -> *mut c_int {
+pub fn new_value(__param_value: c_int) -> *mut c_int writes allocated_values, allocation_limit {
     var __local_result: *mut c_int
 
     (__local_result = ((alloc_test_malloc((sizeof[c_int]() as c_ulong)) as *mut c_int)))
@@ -687,14 +687,14 @@ pub fn new_value(__param_value: c_int) -> *mut c_int {
 
 }
 
-pub unsafe fn free_value(__param_value: *mut c_void) -> Unit {
+pub unsafe fn free_value(__param_value: *mut c_void) writes allocated_values {
     alloc_test_free(__param_value)
 
     (allocated_values = allocated_values - 1)
 
 }
 
-pub fn test_set_free_function() -> Unit {
+pub fn test_set_free_function() -> Unit writes allocated_values, allocation_limit {
     var __local_set: *mut _Set
 
     var __local_i: c_int
@@ -746,7 +746,7 @@ pub fn test_set_free_function() -> Unit {
 
 }
 
-pub fn test_set_out_of_memory() -> Unit {
+pub fn test_set_out_of_memory() writes allocation_limit {
     var __local_set: *mut _Set
 
     var __local_values: [66]c_int
@@ -822,7 +822,7 @@ pub fn test_set_out_of_memory() -> Unit {
 
 }
 
-pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
+pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int writes allocation_limit {
     run_tests((&tests[0] as *mut extern "C" fn() -> Unit))
 
     return 0
