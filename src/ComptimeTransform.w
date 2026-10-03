@@ -1992,14 +1992,11 @@ impl Sema:
         out.add_extra(type_arg)
         let callee = out.add_node(NodeKind.NK_TYPE_GENERIC, start, end, derive_fn_sym, type_arg_start, 1)
         let call = out.add_node(NodeKind.NK_CALL, start, end, callee as i32, out.extra_len(), 0)
-        let evald = unsafe { comptime_force_eval_expr_result(self as *mut Sema, out, intern, call as i32) }
+        var evald = unsafe { comptime_force_eval_expr_result(self as *mut Sema, out, intern, call as i32) }
         if evald.value.kind != ComptimeValueKind.CV_STR:
             self.ct_emit_error(out, decl, "user-defined derive '" ++ target_name ++ "' must return generated With source as str")
             return ""
-        // D32: a take (`move`) is the intent, but ComptimeValue has a Drop
-        // impl and the CURRENT seed still enforces the retired §2.4
-        // Drop-owner condition — clone until the D32 compiler is the seed.
-        evald.value.text.clone()
+        move evald.value.text
 
     mut fn ct_parse_user_derive_source(out: AstPool, intern: InternPool, decl: i32, source: &str) -> Vec[i32]:
         let generated: Vec[i32] = Vec.new()
