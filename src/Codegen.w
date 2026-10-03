@@ -5621,11 +5621,13 @@ impl Codegen:
         if method_owner_sym != 0:
             self.current_method_owner_sym = method_owner_sym
 
+        // #1647 (D65): the return type is Sema's signature's; the AST type
+        // node is read only for a function Sema holds no signature for.
         var ret_ty_raw: i64 = 0
-        if ret_type_node != 0:
-            ret_ty_raw = self.resolve_return_type(ret_type_node)
-        else if sema_sig_idx >= 0:
+        if sema_sig_idx >= 0:
             ret_ty_raw = self.sema_type_to_llvm(self.sema.sig_return_type(sema_sig_idx))
+        else if ret_type_node != 0:
+            ret_ty_raw = self.resolve_return_type(ret_type_node)
         let ret_ty = if ret_ty_raw != 0: ret_ty_raw else: self.type_fallback()
 
         // Check if this returns Result
