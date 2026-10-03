@@ -23401,9 +23401,10 @@ impl Sema:
     fn fn_min_expected_arg_count(fn_sym: i32, fallback_expected: i32) -> i32:
         if fallback_expected <= 0:
             return fallback_expected
-        if not self.fn_decl_nodes.contains(fn_sym):
+        // #2002: a generic method's declaration is its generic fn node.
+        let fn_node = if self.fn_decl_nodes.contains(fn_sym): self.fn_decl_nodes.get(fn_sym).unwrap() else: self.generic_fn_node_for_symbol(fn_sym)
+        if fn_node == 0:
             return fallback_expected
-        let fn_node = self.fn_decl_nodes.get(fn_sym).unwrap()
         let meta = self.ast.find_fn_meta(fn_node)
         if meta < 0:
             return fallback_expected
@@ -28390,25 +28391,33 @@ impl Sema:
                 self.mark_resolved_call_arg_default(call_node, pi - param_offset)
         param_count - param_offset
 
+    // #2002: a generic method (of a generic type, or with its own type
+    // parameters) has no registered signature — its parameters are its
+    // declaration's (`sig_idx` < 0, the fn node's meta) — and its defaults
+    // are filled the same way. It returned at `sig_idx < 0`, so `b.get()`
+    // against `fn get(k: i32 = 2)` on `Bx[T]` was refused for its count.
     mut fn resolve_method_implicit_default_args(call_node: i32, sig_idx: i32, method_fn_sym: i32, param_offset: i32, extra_start: i32, arg_count: i32) -> i32:
-        if sig_idx < 0:
-            return arg_count
         if self.has_resolved_call_args(call_node) != 0:
             return self.get_resolved_call_arg_count(call_node)
+        var fn_node = 0
+        if method_fn_sym != 0 and self.fn_decl_nodes.contains(method_fn_sym):
+            fn_node = self.fn_decl_nodes.get(method_fn_sym).unwrap()
+        else if sig_idx < 0 and method_fn_sym != 0:
+            fn_node = self.generic_fn_node_for_symbol(method_fn_sym)
+        let meta = if fn_node != 0: self.ast.find_fn_meta(fn_node) else: -1
+        if sig_idx < 0 and meta < 0:
+            return arg_count
         if self.ast.has_call_named_args(call_node) != 0:
+            if sig_idx < 0:
+                return arg_count
             return self.resolve_named_call_args(call_node, sig_idx, method_fn_sym, param_offset, extra_start, arg_count)
-        let param_count = self.sig_get_param_count(sig_idx)
+        let param_count = if sig_idx >= 0: self.sig_get_param_count(sig_idx) else: self.ast.fn_meta_param_count(meta)
         let actual = arg_count + param_offset
         if actual >= param_count:
             return arg_count
-        var param_start = -1
-        if method_fn_sym != 0 and self.fn_decl_nodes.contains(method_fn_sym):
-            let fn_node = self.fn_decl_nodes.get(method_fn_sym).unwrap()
-            let meta = self.ast.find_fn_meta(fn_node)
-            if meta >= 0:
-                param_start = self.ast.fn_meta_param_start(meta)
-        if param_start < 0:
+        if meta < 0:
             return arg_count
+        let param_start = self.ast.fn_meta_param_start(meta)
         let resolved_map: HashMap[i32, i32] = HashMap.new()
         let resolved_defaults: HashMap[i32, i32] = HashMap.new()
         for ai in 0..arg_count:
@@ -28419,8 +28428,10 @@ impl Sema:
             let pflags = self.ast.fn_param_flags(param_start, pi)
             if fn_param_is_implicit(pflags) == 0:
                 continue
-            let expected_ty = self.sig_param_type(sig_idx, pi)
-            var si = self.implicit_binding_types.len() as i32 - 1
+            // A generic method's implicit parameter has no resolved type to
+            // match a binding against here; it stays missing and is reported.
+            let expected_ty = if sig_idx >= 0: self.sig_param_type(sig_idx, pi) else: 0
+            var si = if expected_ty != 0: self.implicit_binding_types.len() as i32 - 1 else: -1
             var found = 0
             while si >= 0:
                 let bind_ty: i32 = self.implicit_binding_types[si]
@@ -28541,7 +28552,9 @@ impl Sema:
         // docs/completed/mut.md Rev 8 §15.8 — see check_call.
         let mc_iter_borrow_idxs: Vec[i32] = Vec.new()
         let mc_param_offset_for_resolution = if self.static_receiver_type_is_known(expr) != 0: 0 else: 1
-        var mc_resolved_arg_count = self.resolve_method_implicit_default_args(node, mc_sig_idx_for_effect, mc_method_fn_for_resolution, mc_param_offset_for_resolution, extra_start, arg_count)
+        // #2002: a generic method has no signature; its declaration supplies the defaults.
+        let mc_default_fn = if mc_owner_sym_for_effect != 0 and mc_sig_idx_for_effect < 0: self.lookup_generic_method_fn(mc_owner_sym_for_effect, field) else: mc_method_fn_for_resolution
+        var mc_resolved_arg_count = self.resolve_method_implicit_default_args(node, mc_sig_idx_for_effect, mc_default_fn, mc_param_offset_for_resolution, extra_start, arg_count)
         if self.has_resolved_call_args(node) == 0 and self.ast.has_call_named_args(node) == 0 and arg_count == 0:
             var mc_unit_expected = self.atomic_method_expected_arg_type(mc_order_type, field, 0)
             if mc_unit_expected == 0:
