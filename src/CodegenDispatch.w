@@ -6155,75 +6155,48 @@ impl Codegen:
                 wl_position_at_end(self.builder, ubb)
                 wl_build_unreachable(self.builder)
 
+    // The pointer a reference to this operand's place is: the place's
+    // address, or — when the local's storage holds a pointer value — that
+    // pointer. Which one is the local's category (D65): FnAbi passing it by
+    // address (an indirect local), a by-place capture of a pointer-valued
+    // binding, or Sema typing it as a thin reference or raw pointer
+    // (mir_local_slot_holds_pointer). The slot's LLVM type is verification:
+    // it once decided, with the local's name (`self`) and the LLVM shape of
+    // its Sema type.
     mut fn mir_try_place_ptr_for_ref(body: &MirBody, operand_id: i32) -> i64:
         if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
             return 0
         let ok = body.operand_kinds[operand_id]
         let od = body.operand_d0[operand_id]
-        if (ok == OperandKind.OK_COPY or ok == OperandKind.OK_MOVE) and od >= 0 and od < body.place_locals.len() as i32:
-            let local_id = body.place_locals[od]
-            let p_count = body.place_proj_counts[od]
-            if p_count == 0:
-                let value_opt = self.mir_local_values.get(local_id)
-                if value_opt.is_some():
-                    let value = value_opt.unwrap() as i64
-                    if value != 0 and wl_get_type_kind(wl_type_of(value)) == wl_pointer_type_kind():
-                        var value_is_indirect = self.mir_indirect_value_local_types.get(local_id).is_some()
-                        if not value_is_indirect and local_id >= 0 and local_id < body.local_names.len() as i32:
-                            let local_name = body.local_names[local_id]
-                            if local_name == self.sym_self:
-                                value_is_indirect = true
-                            else:
-                                let local_text = self.sema_symbol_text(local_name)
-                                if local_text == "self":
-                                    value_is_indirect = true
-                        if not value_is_indirect and local_id >= 0 and local_id < body.local_type_ids.len() as i32:
-                            let local_sema_ty = body.local_type_ids[local_id]
-                            if local_sema_ty > 0:
-                                let semantic_ty = self.mir_sema_type_to_llvm(local_sema_ty)
-                                if semantic_ty != 0 and wl_get_type_kind(semantic_ty) != wl_pointer_type_kind():
-                                    value_is_indirect = true
-                        if value_is_indirect:
-                            return value
-            let ptr = self.mir_place_ptr(body, od, false, 0)
-            if ptr == 0:
-                return 0
-            if p_count == 0:
-                let alloc_ty = wl_get_allocated_type(ptr)
-                if alloc_ty != 0 and wl_get_type_kind(alloc_ty) == wl_pointer_type_kind():
-                    // A by-place capture of a pointer-valued binding (`&T`,
-                    // `*mut T`): the slot holds the outer binding's address,
-                    // the pointer value is one load further (§12.4).
-                    if self.mir_ref_capture_local_types.get(local_id).is_some():
-                        let outer_slot = wl_build_load(self.builder, alloc_ty, ptr)
-                        return wl_build_load(self.builder, alloc_ty, outer_slot)
-                    return wl_build_load(self.builder, alloc_ty, ptr)
-                let ptr_ty_opt = self.mir_local_types.get(local_id)
-                if ptr_ty_opt.is_some():
-                    let ptr_ty = ptr_ty_opt.unwrap() as i64
-                    if ptr_ty != 0 and wl_get_type_kind(ptr_ty) == wl_pointer_type_kind():
-                        return wl_build_load(self.builder, ptr_ty, ptr)
-            var is_indirect_value_local = self.mir_indirect_value_local_types.get(local_id).is_some()
-            if not is_indirect_value_local and p_count == 0 and local_id >= 0 and local_id < body.local_names.len() as i32:
-                let local_name = body.local_names[local_id]
-                if local_name == self.sym_self:
-                    is_indirect_value_local = true
-                else:
-                    let local_text = self.sema_symbol_text(local_name)
-                    if local_text == "self":
-                        is_indirect_value_local = true
-            if not is_indirect_value_local and p_count == 0 and local_id >= 0 and local_id < body.local_type_ids.len() as i32:
-                let local_sema_ty = body.local_type_ids[local_id]
-                if local_sema_ty > 0:
-                    let semantic_ty = self.mir_sema_type_to_llvm(local_sema_ty)
-                    if semantic_ty != 0 and wl_get_type_kind(semantic_ty) != wl_pointer_type_kind():
-                        is_indirect_value_local = true
-            if p_count == 0 and is_indirect_value_local:
-                let indirect_ptr = self.mir_indirect_value_local_ptr(local_id, ptr)
-                if indirect_ptr != 0:
-                    return indirect_ptr
+        if (ok != OperandKind.OK_COPY and ok != OperandKind.OK_MOVE) or od < 0 or od >= body.place_locals.len() as i32:
+            return 0
+        let local_id = body.place_locals[od]
+        let p_count = body.place_proj_counts[od]
+        if p_count == 0:
+            // A local held as an SSA value: an indirect local's value IS the
+            // address of its value.
+            let value_opt = self.mir_local_values.get(local_id)
+            if value_opt.is_some():
+                let value = value_opt.unwrap() as i64
+                let indirect = self.mir_indirect_value_local_types.contains(local_id)
+                if value != 0 and self.mode_decide(MODE_SITE_REF_VALUE_IS_ADDRESS, indirect, indirect and wl_get_type_kind(wl_type_of(value)) == wl_pointer_type_kind(), body.fn_sym, local_id):
+                    return value
+        let ptr = self.mir_place_ptr(body, od, false, 0)
+        if ptr == 0 or p_count != 0:
             return ptr
-        0
+        let alloc_ty = wl_get_allocated_type(ptr)
+        let local_ty: i64 = self.mir_local_types.get(local_id) ?? 0
+        let llvm_holds_pointer = (alloc_ty != 0 and wl_get_type_kind(alloc_ty) == wl_pointer_type_kind()) or (local_ty != 0 and wl_get_type_kind(local_ty) == wl_pointer_type_kind())
+        if not self.mode_decide(MODE_SITE_REF_SLOT_HOLDS_POINTER, self.mir_local_slot_holds_pointer(body, local_id), llvm_holds_pointer, body.fn_sym, local_id):
+            return ptr
+        let ptr_ty = wl_ptr_type(self.context)
+        // A by-place capture of a pointer-valued binding (`&T`, `*mut T`):
+        // the slot holds the outer binding's address, the pointer value is
+        // one load further (§12.4).
+        if self.mir_ref_capture_local_types.contains(local_id):
+            let outer_slot = wl_build_load(self.builder, ptr_ty, ptr)
+            return wl_build_load(self.builder, ptr_ty, outer_slot)
+        wl_build_load(self.builder, ptr_ty, ptr)
 
     // #627: the ADDRESS of a receiver operand's place, without the
     // `mir_try_place_ptr_for_ref` load heuristic. A transparent single-pointer
@@ -6337,15 +6310,30 @@ impl Codegen:
         self.marshal_ref_addr(body, operand_id, val)
 
     // Whether a COPY/MOVE operand of an unprojected local names a local whose
-    // LLVM slot holds a pointer (so a ref marshal loads that pointer).
-    fn mir_operand_local_holds_pointer(body: &MirBody, operand_id: i32) -> bool:
+    // storage holds a pointer value (so a ref marshal loads that pointer).
+    mut fn mir_operand_local_holds_pointer(body: &MirBody, operand_id: i32) -> bool:
         if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32: return false
         let ok = body.operand_kinds[operand_id]
         let od = body.operand_d0[operand_id]
         if (ok != OperandKind.OK_COPY and ok != OperandKind.OK_MOVE) or od < 0 or od >= body.place_locals.len() as i32: return false
         if body.place_proj_counts[od] != 0: return false
-        let ptr_ty_opt = self.mir_local_types.get(body.place_locals[od])
-        ptr_ty_opt.is_some() and wl_get_type_kind(ptr_ty_opt.unwrap() as i64) == wl_pointer_type_kind()
+        let local_id = body.place_locals[od]
+        let local_ty: i64 = self.mir_local_types.get(local_id) ?? 0
+        let fact = self.mir_local_slot_holds_pointer(body, local_id)
+        self.mode_decide(MODE_SITE_REF_SLOT_HOLDS_POINTER, fact, local_ty != 0 and wl_get_type_kind(local_ty) == wl_pointer_type_kind(), body.fn_sym, local_id)
+
+    // Whether an unprojected local's storage holds a pointer value rather
+    // than the value itself: a local FnAbi passes by address (an indirect
+    // local, its slot holds the value's address), a by-place capture of a
+    // pointer-valued binding, or a local whose type TypeLayout lays out as
+    // one address — a thin reference or raw pointer, an `extern fn`, a
+    // `Box[T]`, an `Option` over one of those (with-abi.md §3). D65: the
+    // category is its owners'; the slot's LLVM type is verification.
+    fn mir_local_slot_holds_pointer(body: &MirBody, local_id: i32) -> bool:
+        if self.mir_indirect_value_local_types.contains(local_id) or self.mir_ref_capture_local_types.contains(local_id):
+            return true
+        let sema_ty = if local_id >= 0 and local_id < body.local_type_ids.len() as i32: body.local_type_ids[local_id] else: 0
+        sema_ty > 0 and (self.sema.type_layout_is_single_address(sema_ty) or self.sema.type_layout_option_is_nullable(sema_ty))
 
     // Evaluating wrapper for call paths that have not pre-computed the value.
     mut fn mir_ref_arg_ptr(body: &MirBody, operand_id: i32) -> i64:

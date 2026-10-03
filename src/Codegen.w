@@ -831,16 +831,19 @@ impl Codegen:
     // and the LLVM type is verification only.
     mut fn mode_decide(site: i32, fact: bool, llvm: bool, fn_sym: i32, subject: i32) -> bool:
         if self.analysis_enabled != 0:
-            while self.mode_site_decisions.len() as i32 < MODE_SITE_COUNT:
-                self.mode_site_decisions.push(0)
-                self.mode_site_disagree.push(0)
-                self.mode_site_first.push("")
-            self.mode_site_decisions[site] = self.mode_site_decisions[site] + 1
-            if fact != llvm:
-                if self.mode_site_disagree[site] == 0:
-                    self.mode_site_first[site] = f"{self.sema_symbol_text(fn_sym)} subject {subject}: fact={fact} llvm-pointer={llvm}"
-                self.mode_site_disagree[site] = self.mode_site_disagree[site] + 1
+            self.mode_record(site, fact == llvm, fn_sym, subject, f"fact={fact} llvm-pointer={llvm}")
         fact
+
+    mut fn mode_record(site: i32, agree: bool, fn_sym: i32, subject: i32, detail: str):
+        while self.mode_site_decisions.len() as i32 < MODE_SITE_COUNT:
+            self.mode_site_decisions.push(0)
+            self.mode_site_disagree.push(0)
+            self.mode_site_first.push("")
+        self.mode_site_decisions[site] = self.mode_site_decisions[site] + 1
+        if not agree:
+            if self.mode_site_disagree[site] == 0:
+                self.mode_site_first[site] = f"{self.sema_symbol_text(fn_sym)} subject {subject}: {detail}"
+            self.mode_site_disagree[site] = self.mode_site_disagree[site] + 1
 
     // One verdict per site: an owner fact the LLVM representation
     // contradicts is a violation — either the fact or the representation is
@@ -5275,7 +5278,10 @@ pub const MODE_SITE_EVAL_INDIRECT_LOCAL: i32 = 4
 pub const MODE_SITE_MARSHAL_EXISTING_POINTER: i32 = 5
 pub const MODE_SITE_PARAM_BY_ADDRESS: i32 = 6
 pub const MODE_SITE_PARAM_PLACE_ALIAS: i32 = 7
-pub const MODE_SITE_COUNT: i32 = 8
+// #1647: a reference's place pointer (mir_try_place_ptr_for_ref).
+pub const MODE_SITE_REF_VALUE_IS_ADDRESS: i32 = 8
+pub const MODE_SITE_REF_SLOT_HOLDS_POINTER: i32 = 9
+pub const MODE_SITE_COUNT: i32 = 10
 
 pub fn mode_site_name(site: i32) -> str:
     if site == MODE_SITE_FIELD_TYPE_THROUGH_ADDRESS: return "projected-type field through an address"
@@ -5286,11 +5292,13 @@ pub fn mode_site_name(site: i32) -> str:
     if site == MODE_SITE_MARSHAL_EXISTING_POINTER: return "marshal_ref_addr existing pointer"
     if site == MODE_SITE_PARAM_BY_ADDRESS: return "prologue parameter passed by address"
     if site == MODE_SITE_PARAM_PLACE_ALIAS: return "prologue share-place parameter alias"
+    if site == MODE_SITE_REF_VALUE_IS_ADDRESS: return "place-for-ref local value is the address"
+    if site == MODE_SITE_REF_SLOT_HOLDS_POINTER: return "place-for-ref slot holds a pointer value"
     "unknown"
 
 pub fn mode_site_owner(site: i32) -> str:
     if site == MODE_SITE_MARSHAL_EXISTING_POINTER: return "the operand's Sema category"
-    if site == MODE_SITE_PARAM_BY_ADDRESS or site == MODE_SITE_PARAM_PLACE_ALIAS or site == MODE_SITE_EVAL_INDIRECT_LOCAL: return "FnAbi's PassMode"
+    if site == MODE_SITE_PARAM_BY_ADDRESS or site == MODE_SITE_PARAM_PLACE_ALIAS or site == MODE_SITE_EVAL_INDIRECT_LOCAL or site == MODE_SITE_REF_VALUE_IS_ADDRESS: return "FnAbi's PassMode"
     "Sema's place category"
 
 // Symbol-naming rules live in src/FnAbi.w (docs/spec/abi/with-abi.md §5); this is
