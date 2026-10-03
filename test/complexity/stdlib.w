@@ -9,12 +9,9 @@ use std.builtins
 use std.io
 use std.fs
 use std.string
+use std.libc.cpu_time_ns
 
 extern fn with_exec_argv_capture_input(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32, stdin_path: &str) -> i32
-// std.libc cpu_time_ns's seam, declared here because importing std.libc into
-// this file trips #2000; switch to `use std.libc.cpu_time_ns` when it is fixed.
-extern fn with_libc_cpu_time_ns() -> i64
-fn cpu_time_ns() -> i64: with_libc_cpu_time_ns()
 
 fn slotmap_work(n: i32):
     var slots = SlotMap[i32].new()

@@ -1109,7 +1109,7 @@ impl Sema:
         if self.contextual_join_decision_indices.contains(context_key):
             let prior = self.contextual_join_decision(report_node)
             if prior.final_type != final_type or prior.expected_type != expected:
-                self.emit_error("internal error: conflicting contextual join decisions for one expression", report_node)
+                self.emit_error(f"internal error: conflicting contextual join decisions for one expression (sig {self.current_fn_sig_idx}: first expected {self.type_name(prior.expected_type)} [{prior.expected_type}] final {self.type_name(prior.final_type)} [{prior.final_type}], now expected {self.type_name(expected)} [{expected}] final {self.type_name(final_type)} [{final_type}])", report_node)
                 return 0
         else:
             let decision_index = self.contextual_join_decisions.len() as i32
@@ -16846,11 +16846,8 @@ impl Sema:
                         if ci_arg2_type > 0:
                             ci_args.push(ci_arg2_type)
                             ci_arg_count = 2
-                        let ci_cache_key = sema_generic_inst_hash(ci_base_sym, ci_args, ci_arg_count)
-                        if self.generic_inst_cache.contains(ci_cache_key):
-                            let ci_result: i32 = self.generic_inst_cache.get(ci_cache_key).unwrap()
-                            self.typed_expr_types.insert(node, ci_result)
-                            return ci_result
+                        // #2000: the instance by identity (ensure verifies its
+                        // memo hit); a bare memo hit is a hash, not a type.
                         let ci_tid = self.ensure_generic_inst_type(ci_base_sym, ci_args, ci_arg_count)
                         self.typed_expr_types.insert(node, ci_tid as i32)
                         return ci_tid as i32

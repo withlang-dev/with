@@ -1911,13 +1911,13 @@ impl MirBuilder:
         var arg2_type = 0
         if type_arg2_node != 0:
             arg2_type = self.resolve_type_arg_node(type_arg2_node)
-        // Look up TypeKind.TY_GENERIC_INST from sema cache (created by Sema.check_index)
-        var cache_key: i64 = (base_sym as i64 *% 31) +% arg_type as i64
-        if arg2_type > 0:
-            cache_key = (cache_key *% 31) +% arg2_type as i64
-        if self.sema.generic_inst_cache.contains(cache_key):
-            return self.sema.generic_inst_cache.get(cache_key).unwrap()
-        0
+        // The instance Sema.check_index created. #2000: by identity, not by
+        // the memo's hash alone (a comptime evaluation empties the memo, and
+        // a hash names no type on its own).
+        let args: Vec[i32] = Vec.new()
+        args.push(arg_type)
+        if arg2_type > 0: args.push(arg2_type)
+        self.sema.find_generic_inst_type(base_sym, &args, args.len() as i32) as i32
 
     mut fn resolve_type_arg_node(type_arg_node: i32) -> i32:
         self.sema.resolve_type_level_arg_expr_frozen(type_arg_node)

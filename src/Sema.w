@@ -5568,55 +5568,28 @@ impl Sema:
         // For every Vec[T] type registered, also register VecIter[T].
         // For every HashMap[K, V], register Option[V] so MIR/codegen can
         // materialize aggregate map-get results after type freezing.
+        // #2000: each through ensure_generic_inst_type, which finds an
+        // existing instance by identity. generic_inst_cache is a memo a
+        // comptime evaluation empties (prepare_comptime_eval_copy); reading
+        // its absence as "no such instance" made a second Option[i32] beside
+        // the one a body had already joined at.
         let type_count = self.type_kinds.len() as i32
         for ti in 0..type_count:
             if self.type_kinds[ti] == TypeKind.TY_GENERIC_INST:
-                if self.type_d0[ti] == vec_sym:
-                    let extra_start: i32 = self.type_d1[ti]
-                    let arg_count = self.type_d2[ti]
-                    if arg_count >= 1:
-                        let elem_ty: i32 = self.type_extra[extra_start]
-                        let vi_args: Vec[i32] = Vec.new()
-                        vi_args.push(elem_ty)
-                        let vi_key = sema_generic_inst_hash(vi_sym, vi_args, 1)
-                        if not self.generic_inst_cache.contains(vi_key):
-                            let te_start = self.type_extra.len() as i32
-                            self.type_extra.push(elem_ty)
-                            let tid = self.add_type(TypeKind.TY_GENERIC_INST, vi_sym, te_start, 1)
-                            self.generic_inst_cache.insert(vi_key, tid as i32)
-                if self.type_d0[ti] == hashmap_sym:
-                    let extra_start = self.type_d1[ti]
-                    let arg_count = self.type_d2[ti]
-                    if arg_count >= 2:
-                        let value_ty: i32 = self.type_extra[(extra_start + 1)]
-                        let opt_args: Vec[i32] = Vec.new()
-                        opt_args.push(value_ty)
-                        let opt_key = sema_generic_inst_hash(option_sym, opt_args, 1)
-                        if not self.generic_inst_cache.contains(opt_key):
-                            let opt_start = self.type_extra.len() as i32
-                            self.type_extra.push(value_ty)
-                            let tid = self.add_type(TypeKind.TY_GENERIC_INST, option_sym, opt_start, 1)
-                            self.generic_inst_cache.insert(opt_key, tid as i32)
+                if self.type_d0[ti] == vec_sym and self.type_d2[ti] >= 1:
+                    let vi_args: Vec[i32] = Vec.new()
+                    vi_args.push(self.type_extra[self.type_d1[ti]])
+                    let _ = self.ensure_generic_inst_type(vi_sym, &vi_args, 1)
+                if self.type_d0[ti] == hashmap_sym and self.type_d2[ti] >= 2:
+                    let opt_args: Vec[i32] = Vec.new()
+                    opt_args.push(self.type_extra[self.type_d1[ti] + 1])
+                    let _ = self.ensure_generic_inst_type(option_sym, &opt_args, 1)
 
-        // Register Vec[str] for str.split() return type.
-        let vec_str_args: Vec[i32] = Vec.new()
-        vec_str_args.push(self.ty_str as i32)
-        let vec_str_key = sema_generic_inst_hash(vec_sym, vec_str_args, 1)
-        if not self.generic_inst_cache.contains(vec_str_key):
-            let te_start = self.type_extra.len() as i32
-            self.type_extra.push(self.ty_str as i32)
-            let tid = self.add_type(TypeKind.TY_GENERIC_INST, vec_sym, te_start, 1)
-            self.generic_inst_cache.insert(vec_str_key, tid as i32)
-
-        // Also register VecIter[str] in case Vec[str].iter() is called.
-        let vi_str_args: Vec[i32] = Vec.new()
-        vi_str_args.push(self.ty_str as i32)
-        let vi_str_key = sema_generic_inst_hash(vi_sym, vi_str_args, 1)
-        if not self.generic_inst_cache.contains(vi_str_key):
-            let te_start = self.type_extra.len() as i32
-            self.type_extra.push(self.ty_str as i32)
-            let tid = self.add_type(TypeKind.TY_GENERIC_INST, vi_sym, te_start, 1)
-            self.generic_inst_cache.insert(vi_str_key, tid as i32)
+        // Vec[str] for str.split(), and VecIter[str] for its .iter().
+        let str_args: Vec[i32] = Vec.new()
+        str_args.push(self.ty_str as i32)
+        let _vec_str = self.ensure_generic_inst_type(vec_sym, &str_args, 1)
+        let _vi_str = self.ensure_generic_inst_type(vi_sym, &str_args, 1)
 
         // D7 eager layout tables: compute size/align for every type now (types_frozen is
         // still 0, so a layout that needs a dependent type may create it), then the frozen
