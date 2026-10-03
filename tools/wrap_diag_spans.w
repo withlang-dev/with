@@ -319,9 +319,9 @@ fn plan_edits(path: &str, text: &str, sites: &Vec[Site], skips: &Vec[str]) -> Ed
         texts.push(new_text)
     EditPlan { starts, ends, texts }
 
-// seed workaround: the frozen seed miscompiles a Vec[str] element read
-// feeding a concat that reassigns the accumulator in the same loop
-// (#755 class); routing the edit through a helper keeps the IR valid.
+// #2023 workaround: the str.slice call path passes a Vec element view
+// (`plan.starts[ei]`) as a pointer where it takes i64 and codegen fails;
+// a user fn's i64 parameters materialize it. Inline when #2023 is fixed.
 fn splice(t: str, s: i64, e: i64, piece: &str) -> str:
     t.slice(0, s) ++ piece ++ t.slice(e, t.len())
 
