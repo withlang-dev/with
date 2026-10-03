@@ -500,7 +500,27 @@ pub fn rt_rename(old_path: *const u8, new_path: *const u8) -> i32:
         return -get_errno()
     0
 
+// The path remove_tree was given is classified as a listing would classify
+// it, so its trailing separators are left off first (#1951): lstat("link/")
+// resolves the link, so the walk saw the target as a directory, emptied it,
+// and rmdir("link/") then removed the target itself. A child path never ends
+// in a separator (rt_path_join), so only the top path is stripped, and "/"
+// stays "/". Windows strips the same way before its reparse-point query
+// (#1863).
 pub fn rt_remove_tree(path: *const u8) -> i32:
+    var top: [4096]u8 = [0 as u8; 4096]
+    var len = rt_cstr_len(path)
+    if len >= RT_PATH_MAX:
+        return -36
+    while len > 1 and unsafe *((path as i64 + len - 1) as *const u8) == '/':
+        len = len - 1
+    var i: i64 = 0
+    while i < len:
+        unsafe *((&raw mut top as i64 + i) as *mut u8) = unsafe *((path as i64 + i) as *const u8)
+        i = i + 1
+    rt_remove_tree_entry(&top as *const [4096]u8 as *const u8)
+
+fn rt_remove_tree_entry(path: *const u8) -> i32:
     var mode: i32 = 0
     let stat_rc = rt_lstat_mode(path, &mode as *mut i32)
     if stat_rc != 0:
@@ -523,7 +543,7 @@ pub fn rt_remove_tree(path: *const u8) -> i32:
         if join_rc != 0:
             let _close_on_join = rt_libc_closedir(dir)
             return join_rc
-        let child_rc = rt_remove_tree(&child as *const [4096]u8 as *const u8)
+        let child_rc = rt_remove_tree_entry(&child as *const [4096]u8 as *const u8)
         if child_rc != 0:
             let _close_on_child = rt_libc_closedir(dir)
             return child_rc
