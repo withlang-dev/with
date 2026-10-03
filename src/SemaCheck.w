@@ -5733,7 +5733,10 @@ impl Sema:
         // specialized with `str`), so these diagnostics must stay visible.
         let saved_concrete_generic_body: i32 = self.in_concrete_generic_body
         self.in_concrete_generic_body = self.in_concrete_generic_body + 1
+        let saved_specialization_sym: i32 = self.current_specialization_sym
+        self.current_specialization_sym = mono_sym
         self.check_fn_body_with_sig(fn_node, sig_idx)
+        self.current_specialization_sym = saved_specialization_sym
         self.in_concrete_generic_body = saved_concrete_generic_body
         self.register_concrete_specialization(fn_node, mono_sym, sig_idx, tp_syms, tp_sema_tys, param_concrete_tys)
 
@@ -22334,6 +22337,8 @@ impl Sema:
                 return 0
             if self.reject_opaque_value_type(layout_ty, type_arg_node, self.sizeof_alignof_name(callee)) != 0:
                 return 0
+            if self.current_specialization_sym != 0:
+                self.specialization_type_args.insert(sema_pair_key(self.current_specialization_sym, type_arg_node), layout_ty as i32)
             self.typed_expr_types.insert(node, self.ty_i64 as i32)
             return self.ty_i64 as i32
         if self.is_nameof_call(callee) != 0:
@@ -24138,6 +24143,16 @@ impl Sema:
     // with no record (a non-generic function). A frame still active when
     // a frozen consumer asks is a checker leak: a stale `T` sized
     // `Box.new[A]`'s allocation as the last instance's (#1766).
+    // The type argument of a type-level builtin call in `body_sym`'s body,
+    // as Sema checked it (#1983): for a specialization, the type recorded
+    // under its substitution (0 when the instance never checked the call, a
+    // phase bug its caller reports loudly); for any other body the node
+    // resolves the same everywhere, so frozen resolution answers.
+    fn type_level_arg_in_body(body_sym: i32, type_node: i32) -> i32:
+        if self.concrete_specialization_by_sym.contains(body_sym):
+            return self.specialization_type_args.get(sema_pair_key(body_sym, type_node)) ?? 0
+        self.resolve_type_level_arg_expr_frozen(type_node)
+
     mut fn push_specialization_subst(mono_sym: i32) -> i32:
         let found = self.concrete_specialization_by_sym.get(mono_sym)
         if found.is_none():

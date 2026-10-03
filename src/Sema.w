@@ -1721,6 +1721,14 @@ pub type Sema {
     alloc_callee_calls: Vec[i32],
     alloc_callee_calls_resolved: i32,
     current_fn_symbol: i32,
+    // #1983: the specialization whose body is being checked (its mono
+    // symbol), 0 outside one; and the type argument of each type-level
+    // builtin call (`sizeof[T]()`) as checked in that specialization, keyed
+    // pair(mono symbol, type-argument node). A frozen consumer reads the
+    // fact instead of re-resolving the node under the instance's
+    // substitution, which needs the mutable substitution stack.
+    current_specialization_sym: i32,
+    specialization_type_args: HashMap[i64, i32],
 
     // Current state
     source_text: str,
@@ -3274,6 +3282,8 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         alloc_callee_calls: Vec.new(),
         alloc_callee_calls_resolved: 0,
         current_fn_symbol: 0,
+        current_specialization_sym: 0,
+        specialization_type_args: sema_new_map_i64_i32(),
         source_text: "",
         tracked_input_root: "",
         tracked_input_paths: sema_new_vec_str(),

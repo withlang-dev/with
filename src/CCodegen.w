@@ -8059,7 +8059,7 @@ impl CCodegen:
             if type_node == 0:
                 self.fail("emit-c could not recover the type argument for " ++ name)
                 return "\n"
-            let target_tid = self.sema.resolve_type_level_arg_expr_frozen(type_node)
+            let target_tid = self.sema.type_level_arg_in_body(self.body_owner_sym(body.fn_sym), type_node)
             if target_tid == 0:
                 self.fail("emit-c could not resolve the type argument '" ++ self.type_arg_text(type_node) ++ "' of " ++ name ++ " in '" ++ cc_intern_resolve(self.intern, body.fn_sym) ++ "' (resolved from module '" ++ self.sema.current_module_path ++ "')")
                 return "\n"
@@ -9074,9 +9074,7 @@ impl CCodegen:
                         let saved_module = move self.sema.current_module_path
                         let ga_path = self.sema.fn_body_source_path(ga_owner)
                         self.sema.current_module_path = if ga_path.len() > 0: ga_path else: with_str_clone_ref(saved_module)
-                        let ga_pushed = self.sema.push_specialization_subst(ga_owner)
-                        let ga_tid = self.sema.resolve_type_level_arg_expr_frozen(ga_type_node) as i32
-                        self.sema.pop_generic_subst(ga_pushed)
+                        let ga_tid = self.sema.type_level_arg_in_body(ga_owner, ga_type_node)
                         self.sema.current_module_path = saved_module
                         if ga_tid != 0:
                             acc = self.collect_struct_types_from_tid(move acc, ga_tid)
@@ -10168,8 +10166,8 @@ impl CCodegen:
             let tid = body.local_type_ids[ci + 1]
             if self.sema.is_copy_frozen(tid as TypeId) == 0:
                 return CC_CLOSURE_ENV_CELL
-            let align = self.sema.type_layout_align_of(tid)
-            let size = self.sema.type_layout_size_of(tid)
+            let align = self.sema.type_layout_align_of_frozen(tid)
+            let size = self.sema.type_layout_size_of_frozen(tid)
             if align > max_align: max_align = align
             offset = (offset + align - 1) / align * align + size
         let env_size = (offset + max_align - 1) / max_align * max_align
@@ -10320,7 +10318,6 @@ impl CCodegen:
         let decl_path = self.sema.fn_body_source_path(parent)
         if decl_path.len() > 0:
             self.sema.current_module_path = decl_path
-        let pushed_subst = self.sema.push_specialization_subst(parent)
         let kind: i32 = self.closure_env_kinds[idx]
         let count = body.anonymous_capture_count
         let env = self.closure_env_struct(idx)
@@ -10347,9 +10344,7 @@ impl CCodegen:
                 let li = ci + 1
                 prologue = prologue ++ "    " ++ self.c_decl(body.local_type_ids[li], f"(*_{li})") ++ f" __attribute__((unused)) = &__with_env->c{ci};\n"
         let sig = "static " ++ self.closure_fn_sig(idx)
-        let text = self.emit_body_text(body, sig, body.n_params, prologue)
-        self.sema.pop_generic_subst(pushed_subst)
-        text
+        self.emit_body_text(body, sig, body.n_params, prologue)
 
     mut fn emit_fn_body(body: &MirBody) -> str:
         if self.check_interrupted() != 0:
@@ -10377,12 +10372,9 @@ impl CCodegen:
             self.sema.current_module_path = decl_path
         let fn_sig = self.emit_fn_decl(body)
         let param_count = if sig_idx >= 0: self.sema.sig_get_param_count(sig_idx) else: 0
-        // A specialization's body resolves its type parameters through the
-        // substitution Sema checked it under (`sizeof[PullCore[G]]`, #1766).
-        let pushed_subst = self.sema.push_specialization_subst(fn_sym)
-        let text = self.emit_body_text(body, fn_sig, param_count, "")
-        self.sema.pop_generic_subst(pushed_subst)
-        text
+        // A specialization's type-level builtin arguments (`sizeof[PullCore[G]]`,
+        // #1766) are Sema's recorded facts (type_level_arg_in_body, #1983).
+        self.emit_body_text(body, fn_sig, param_count, "")
 
     // The C function over a MIR body: `fn_sig {`, `prologue` (a closure's
     // capture locals, #1766), the declaration of every local past the
