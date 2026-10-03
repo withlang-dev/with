@@ -1709,7 +1709,10 @@ impl Sema:
             if prim != 0:
                 return prim as i32
             let named = self.lookup_named_type_visible(sym)
-            if named == 0 and self.private_symbol_path_from_current(sym).len() > 0:
+            // #2011: an unimported std type (§18.1) is the same error here as in
+            // an annotation; left silent, `Vec[Task[i32]].new()` without `use
+            // std.task.Task` passed Sema and failed MIR lowering.
+            if named == 0 and (self.private_symbol_path_from_current(sym).len() > 0 or self.std_gated_import_note(sym).len() > 0):
                 self.emit_private_symbol_error(sym, node)
             return named
         if kind == NodeKind.NK_TYPE_GENERIC:
@@ -1734,7 +1737,7 @@ impl Sema:
                     base_sym = canonical_base
                     base_tid = self.lookup_named_type_visible(base_sym)
             if base_tid == 0:
-                if self.private_symbol_path_from_current(base_sym).len() > 0:
+                if self.private_symbol_path_from_current(base_sym).len() > 0 or self.std_gated_import_note(base_sym).len() > 0:
                     self.emit_private_symbol_error(base_sym, base)
                 return 0
             let arg1_node = self.ast.get_data1(node)
