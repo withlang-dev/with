@@ -579,6 +579,7 @@ fn resolution_audit_call_effects(report: &AnalysisReport, sema: &Sema, mir_mod: 
 // no record is a call MIR lowered by its own reading of the name.
 fn resolution_audit_callee_kinds(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> i32:
     var checked = 0
+    var builtins = 0
     for bi in 0..mir_mod.bodies.len() as i32:
         let body = &mir_mod.bodies[bi]
         if body.lowering_failed != 0: continue
@@ -590,6 +591,13 @@ fn resolution_audit_callee_kinds(report: &AnalysisReport, sema: &Sema, mir_mod: 
             let node = body.call_ast_node(call_id)
             if node <= 0 or node >= sema.ast.node_count() or sema.ast.kind(node) != NodeKind.NK_CALL: continue
             let callee = sema.ast.get_data0(node)
+            // #2043: a builtin call carries Sema's record of which builtin
+            // it is; codegen's builtin dispatch switches on that record.
+            let any_kind = sema.call_callee_kind(node)
+            if any_kind == CallCalleeKind.TypeLevelBuiltin or any_kind == CallCalleeKind.Intrinsic or any_kind == CallCalleeKind.SourceLocation:
+                builtins = builtins + 1
+                if sema.call_builtin(node) == CallBuiltin.None and not sema.math_builtin_calls.contains(node) and not sema.va_start_calls.contains(node):
+                    report.fail(f"resolution: {pool.resolve(body.fn_sym)} at {resolution_where(sema, &site, node)}: builtin call carries no Sema builtin kind")
             if sema.ast.kind(callee) != NodeKind.NK_IDENT: continue
             checked = checked + 1
             let kind = sema.call_callee_kind(node)
@@ -601,7 +609,7 @@ fn resolution_audit_callee_kinds(report: &AnalysisReport, sema: &Sema, mir_mod: 
                 let source_argc = if sema.has_resolved_call_args(node) != 0: sema.get_resolved_call_arg_count(node) else: sema.ast.get_data2(node)
                 if body.call_arg_counts[call_id] != source_argc:
                     report.fail(f"resolution: {pool.resolve(body.fn_sym)} at {resolution_where(sema, &site, node)}: builtin `{pool.resolve(sema.ast.get_data0(callee))}` lowered with {body.call_arg_counts[call_id]} MIR operands for {source_argc} arguments")
-    report.note(f"resolution-audit: name-callee-kinds judged={checked}")
+    report.note(f"resolution-audit: name-callee-kinds judged={checked} builtin-calls={builtins}")
     checked
 
 pub fn analysis_audit_resolution(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str):
