@@ -11865,6 +11865,9 @@ impl Sema:
             return 0
 
         if op == BinaryOp.OP_ADD or op == BinaryOp.OP_SUB or op == BinaryOp.OP_MUL or op == BinaryOp.OP_DIV or op == BinaryOp.OP_MOD:
+            let arith_op_text = if op == BinaryOp.OP_ADD: "+" else if op == BinaryOp.OP_SUB: "-" else if op == BinaryOp.OP_MUL: "*" else if op == BinaryOp.OP_DIV: "/" else: "%"
+            if self.reject_unit_operand(arith_op_text, lhs_node, lhs as i32) or self.reject_unit_operand(arith_op_text, rhs_node, rhs as i32):
+                return 0
             if op == BinaryOp.OP_ADD and lhs == self.ty_str and rhs == self.ty_str:
                 self.emit_error("string concatenation uses '++', not '+'", node)
                 return 0
@@ -11972,6 +11975,8 @@ impl Sema:
         // An unresolved type parameter may become str. An instantiated generic
         // such as Result[str, E] is already a known non-str container.
         if op == BinaryOp.OP_CONCAT:
+            if self.reject_unit_operand("++", lhs_node, lhs as i32) or self.reject_unit_operand("++", rhs_node, rhs as i32):
+                return 0
             let lhs_resolved = self.resolve_alias(lhs)
             let rhs_resolved = self.resolve_alias(rhs)
             let lhs_k = self.get_type_kind(lhs_resolved)
@@ -11983,6 +11988,30 @@ impl Sema:
             return self.ty_str as i32
 
         0
+
+    // #1862 (D65): a Unit operand of `++` or arithmetic is a type error here,
+    // never a codegen failure. The operand-kind lists below enumerated what
+    // is not a str or a number and left Unit out, so `"x " ++ test_label(0)`
+    // passed `check` and died in codegen. A call whose function returns Unit
+    // is named, with the D43 rule when that is why (`main`, `@[entry]` and
+    // `test_*` functions do not infer a return: their tail is a statement).
+    mut fn reject_unit_operand(op_text: &str, operand_node: i32, operand_ty: i32) -> bool:
+        if operand_ty == 0 or self.resolve_alias(operand_ty as TypeId) != self.ty_void:
+            return false
+        var why = ""
+        var callee = 0
+        var call = operand_node
+        while call != 0 and self.ast.kind(call) == NodeKind.NK_GROUPED:
+            call = self.ast.get_data0(call)
+        if call != 0 and self.ast.kind(call) == NodeKind.NK_CALL and self.ast.kind(self.ast.get_data0(call)) == NodeKind.NK_IDENT:
+            callee = self.ast.get_data0(self.ast.get_data0(call))
+        if callee != 0:
+            let callee_name: str = with_str_clone_ref(self.pool_resolve(callee))
+            why = ": `" ++ callee_name ++ "` returns Unit"
+            if callee_name == "main" or callee_name.starts_with("test_"):
+                why = why ++ " (D43: `main`, `@[entry]` and `test_*` functions do not infer a return; their tail is statement position — a `test_` name marks a test, so rename a helper)"
+        self.emit_error("operand of `" ++ op_text ++ "` is Unit" ++ why, operand_node)
+        true
 
     fn unwrap_lint_grouped_expr(node: i32) -> i32:
         var cur = node
