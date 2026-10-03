@@ -122,6 +122,16 @@ records the reason; a `type-inspection` reason is a violation). Then the
 `spawn_os`/transmute special path reads Sema's environment-storage fact.
 
 ### Phase 3 — places and origins
+Status: implemented for field places and `let` bindings (#1647, wave-d65).
+MIR records each place lowered from a source field access (node, place,
+base) and each `let`'s materialization (alias or owning local); Sema
+persists its binding category (`view_bound_let_nodes`). `audit:resolution`
+judges them with `mir_field_place_verdict` / `mir_let_binding_verdict`
+(planted in `test/internals/analysis_resolution_test.w`). Over `src/main.w`
+the compiler already agrees: 70083 field places and 9155 bindings, 0
+violations. Not yet covered: view origins (`expr_view_param_origins`)
+and index places; the field projection still names its field by symbol,
+not by Sema's declaration index.
 Every MIR place lowered from a source expression must correspond to Sema's
 resolved place/origin for that node: field index from Sema's declaration
 identity (not from name lookup at lowering time — the module-type identity

@@ -5993,7 +5993,9 @@ impl MirBuilder:
             let len_rv = self.sequence_len_rvalue(len_src, base_ty)
             self.body.push_stmt(self.cur_bb, StmtKind.Assign, len_place, len_rv, self.ast.get_start(node))
             return len_place
-        self.new_projected_field_place(base, field_idx, field_ty)
+        let field_place = self.new_projected_field_place(base, field_idx, field_ty)
+        self.body.note_field_place(node, field_place, base)
+        field_place
 
     mut fn lower_user_deref_result_place(place: i32, current_ty: i32, deref_info: &SemaDerefInfo, node: i32) -> i32:
         let result_ref_ty = if deref_info.target_ty != 0: self.sema.find_exact_type(TypeKind.TY_REF, deref_info.target_ty, 0, 0) as i32 else: deref_info.result_ref_ty
@@ -7036,7 +7038,9 @@ impl MirBuilder:
                     if self.place_type_is_str(alias_place) != 0:
                         self.mark_string_place_copied(alias_place)
                     self.bind_alias_place(name_sym, alias_place, bind_ty)
+                    self.body.note_let_binding(node, 1)
                     return
+        self.body.note_let_binding(node, 0)
         let local_id = self.body.new_local(bind_ty, mutable, name_sym, 1)
 
         // d1 = 0 for normal storage, bind_ty for zero-init (no initializer)

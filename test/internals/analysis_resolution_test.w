@@ -12,4 +12,5 @@ use MirValidationTests
 
 fn main:
     mir_test_resolution_callees()
+    mir_test_resolution_places()
     print("ok")

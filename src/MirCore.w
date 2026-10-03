@@ -551,6 +551,16 @@ pub type MirBody {
     // elision instead of staying silent; audit:resolution joins Sema's
     // resolved call to it.
     elided_call_nodes: Vec[i32],
+    // D65 phase 3 (#1647): each place lowered from a source field access,
+    // with its AST node and the base place it projects from. audit:
+    // resolution joins Sema's facts for the node to the place.
+    field_place_nodes: Vec[i32],
+    field_place_places: Vec[i32],
+    field_place_bases: Vec[i32],
+    // ... and each `let` binding with MIR's materialization: 1 when the
+    // name aliases a place, 0 when it owns a local.
+    let_binding_nodes: Vec[i32],
+    let_binding_aliases: Vec[i32],
 
     // Stage 4 (spec §2.5.2): locals that are ever moved — and therefore
     // reset-on-move (§2.5.1) — recorded at the single pending_reset_locals.push
@@ -801,6 +811,11 @@ fn MirBody.init_for_fn(fn_sym: i32) -> MirBody:
         call_pipeline_receiver_places: Vec.new(),
         call_machinery_dispatch: Vec.new(),
         elided_call_nodes: Vec.new(),
+        field_place_nodes: Vec.new(),
+        field_place_places: Vec.new(),
+        field_place_bases: Vec.new(),
+        let_binding_nodes: Vec.new(),
+        let_binding_aliases: Vec.new(),
         ever_moved_locals: Vec.new(),
     }
 
@@ -1083,6 +1098,17 @@ impl MirBody:
 
     mut fn note_elided_call_node(node: i32):
         if node > 0: self.elided_call_nodes.push(node)
+
+    mut fn note_let_binding(node: i32, alias: i32):
+        if node <= 0: return
+        self.let_binding_nodes.push(node)
+        self.let_binding_aliases.push(alias)
+
+    mut fn note_field_place(node: i32, place: i32, base: i32):
+        if node <= 0: return
+        self.field_place_nodes.push(node)
+        self.field_place_places.push(place)
+        self.field_place_bases.push(base)
 
     mut fn set_call_machinery_dispatch(call_id: i32):
         if call_id >= 0 and call_id < self.call_machinery_dispatch.len():
@@ -4011,6 +4037,29 @@ fn callee_resolution_kind_name(kind: CalleeResolutionKind) -> str:
 // The D65 rule broken, named for the report: what MIR resolved, what Sema
 // resolved, and the rule. "" when the call agrees with Sema. `bb` is the
 // block whose terminator is the call.
+// D65 phase 3 (#1647): a place lowered from a source field access against
+// Sema's facts for the node. Types arrive alias-resolved; bases with their
+// references and raw pointers peeled. "" when they agree.
+pub fn mir_field_place_verdict(proj_kind: i32, proj_field: i32, node_field: i32, mir_ty: i32, sema_ty: i32, mir_base: i32, sema_base: i32) -> str:
+    if proj_kind != ProjKind.PK_FIELD and proj_kind != ProjKind.PK_TUPLE_INDEX:
+        return f"field access lowered to a place whose last projection is not a field (kind {proj_kind})"
+    if proj_kind == ProjKind.PK_FIELD and proj_field != node_field:
+        return "MIR projects a different field than the node names"
+    if sema_ty > 0 and mir_ty > 0 and sema_ty != mir_ty:
+        return f"field place type (ty {mir_ty}) disagrees with Sema's type for the node (ty {sema_ty})"
+    if sema_base > 0 and mir_base > 0 and sema_base != mir_base:
+        return f"field base is ty {mir_base} in MIR, ty {sema_base} after Sema's autoderef"
+    ""
+
+// D65 phase 3 (#1647): an immutable non-Copy `let` against Sema's binding
+// category. "" when MIR materializes what Sema bound.
+pub fn mir_let_binding_verdict(mir_alias: bool, sema_place_view: bool) -> str:
+    if mir_alias and not sema_place_view:
+        return "MIR binds the name as an alias of a place; Sema bound it as an owner"
+    if sema_place_view and not mir_alias:
+        return "Sema bound the name as a view of a place; MIR gives it an owning local"
+    ""
+
 pub fn mir_resolution_check_call(mir_mod: &MirModule, body: &MirBody, bb: i32, answer: &CalleeResolution) -> str:
     let callee_operand = body.term_data0(bb)
     let call_id = body.term_data1(bb)

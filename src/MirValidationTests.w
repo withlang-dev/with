@@ -835,6 +835,33 @@ pub fn mir_test_resolution_callees() -> Unit:
     // Any other intrinsic mark is recognized by its kind.
     assert(resolution_verdict(false, MirIntrinsic.STR_LEN, 1, resolution_answer(CalleeResolutionKind.Unknown, -1, -1, -1)) == "")
 
+// D65 phase 3 (#1647): a field place against Sema's facts for its node —
+// the projection, its type, and its base after Sema's autoderef (the module
+// identity of #1446/#1457: two declarations of one name are two TypeIds) —
+// and a `let`'s alias-or-owner materialization against Sema's category.
+pub fn mir_test_resolution_places() -> Unit:
+    let f = 7
+    // Agreement.
+    assert(mir_field_place_verdict(ProjKind.PK_FIELD, f, f, 10, 10, 20, 20) == "")
+    assert(mir_field_place_verdict(ProjKind.PK_TUPLE_INDEX, 1, f, 10, 10, 20, 20) == "")
+    // A place that is not a field projection.
+    assert(mir_field_place_verdict(ProjKind.PK_INDEX, 0, f, 10, 10, 20, 20).contains("not a field"))
+    // Another field than the node names.
+    assert(mir_field_place_verdict(ProjKind.PK_FIELD, 8, f, 10, 10, 20, 20).contains("different field"))
+    // A type Sema did not give the node (#1457's Self literal built as the
+    // other module's Item: `_1: ty236` where Sema said ty235).
+    assert(mir_field_place_verdict(ProjKind.PK_FIELD, f, f, 236, 235, 20, 20).contains("disagrees with Sema's type"))
+    // The base resolved to another declaration of the same name, or MIR
+    // stopped at another autoderef depth.
+    assert(mir_field_place_verdict(ProjKind.PK_FIELD, f, f, 10, 10, 21, 20).contains("after Sema's autoderef"))
+    // Unknown facts are not judged.
+    assert(mir_field_place_verdict(ProjKind.PK_FIELD, f, f, 0, 10, 0, 20) == "")
+    // A let: alias over an owner, owner over a view, and the agreements.
+    assert(mir_let_binding_verdict(true, false).contains("Sema bound it as an owner"))
+    assert(mir_let_binding_verdict(false, true).contains("owning local"))
+    assert(mir_let_binding_verdict(true, true) == "")
+    assert(mir_let_binding_verdict(false, false) == "")
+
 // #1627: an enum aggregate whose `&T` payload slot receives the `T` value
 // itself — `Option[&Ctx].Some(ctx)` lowered `move ctx` there, and every
 // validator said ok. Types: 1 the struct Ctx, 2 `&Ctx`, 3 an enum whose one

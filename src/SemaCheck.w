@@ -13096,6 +13096,9 @@ impl Sema:
         let bind_kind = self.get_type_kind(self.resolve_alias(bind_type))
         if bind_kind == TypeKind.TY_REF or self.view_projection_exprs.contains(value) or self.view_projection_exprs.contains(value_core) or field_view_let != 0:
             self.scope_set_is_view_bound(name)
+            self.view_bound_let_nodes.insert(node, if bind_kind == TypeKind.TY_REF: 1 else: 2)
+        else:
+            self.view_bound_let_nodes.remove(node)
         // An ephemeral VALUE of a non-ephemeral type — a callable parameter,
         // a variant carrying one, a struct holding a non-move
         // closure — carries its origins on the binding too (#1698).

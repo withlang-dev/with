@@ -1695,6 +1695,11 @@ pub type Sema {
     // argument node, callee sym. Judged after the effect fixpoint.
     deferred_callable_forwards: Vec[i32],
     binding_view_dep_data: Vec[i32],
+    // D65 phase 3 (#1647): Sema's category of each `let` it bound as a
+    // view, by let node: 1 = a reference value (`&T`), 2 = a view of a
+    // place (a recorded view projection or a field view, D22/D27). MIR
+    // materializes 2 as an alias of the place, never as an owning local.
+    view_bound_let_nodes: HashMap[i32, i32],
     // Expression-level view metadata for call expressions and view-producing nodes.
     expr_view_param_origins: HashMap[i32, i32],
     // The subset of a node's expr_view_param_origins whose parameters' own
@@ -3267,6 +3272,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         deferred_closure_arg_checks: Vec.new(),
         deferred_callable_forwards: Vec.new(),
         binding_view_dep_data: Vec.new(),
+        view_bound_let_nodes: sema_new_map_i32_i32(),
         expr_view_param_origins: sema_new_map_i32_i32(),
         expr_view_storage_origins: sema_new_map_i32_i32(),
         expr_view_into_temporary: sema_new_map_i32_i32(),
