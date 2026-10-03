@@ -2588,6 +2588,10 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
         return 1
     if deep_debug_analyze_expect(ctx, root, compiler, build_project_abs(root, "test/behavior/behav_gen_push_generic_and_methods.w"), out_dir, "analyze-audit-gen-push-generic", "audit:all", "violations=0 ok") != 0:
         return 1
+    // #2043: `typedef struct node node;` is one opaque type; two made the
+    // struct's alias and the typedef name different LLVM types.
+    if deep_debug_analyze_expect(ctx, root, compiler, build_project_abs(root, "test/behavior/behav_2043_c_import_typedef_struct_twin_one_type.w"), out_dir, "analyze-audit-typedef-struct-twin", "audit:all", "violations=0 ok") != 0:
+        return 1
     // #1381: a downcast place has no type of its own; typed as the enum it
     // failed audit:codegen on every `??`/`unwrap_or`. #1394: the payload a
     // carrier eliminator moves out is reset-on-move, and audit:all's
