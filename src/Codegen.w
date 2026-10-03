@@ -4640,11 +4640,21 @@ impl Codegen:
         // Parse fields: [field_name, field_type, field_default]*
         let ft_vec: Vec[i64] = Vec.new()
         var invalid_layout = 0
+        let struct_tid = self.type_decl_sema_tid(type_node)
         for fi in 0..field_count:
             let offset = extra_start + 1 + fi * 3
             let f_name = self.pool.get_extra(offset)
             let f_type_node = self.pool.get_extra(offset + 1)
-            let f_ty = self.resolve_type(f_type_node)
+            // #1984 (D65): a generic-instance field is the LLVM type of Sema's
+            // field type, the identity every MIR read of the field lowers.
+            // Resolving the node instead monomorphized the instance under a
+            // name built from its arguments' LLVM layouts
+            // (`HashMap__str__struct{ptr,i64,i64,i64}` beside
+            // `__with.HashMap.str.__with.Vec.str`): one Sema type, two LLVM
+            // structs.
+            let f_sema_ty = if struct_tid > 0: self.sema.type_reflection_field_type_frozen(struct_tid, fi) else: 0
+            let f_is_generic_inst = f_sema_ty > 0 and self.sema.get_type_kind(self.sema.resolve_alias(f_sema_ty as TypeId)) == TypeKind.TY_GENERIC_INST
+            let f_ty = if f_is_generic_inst: self.sema_type_to_llvm(f_sema_ty) else: self.resolve_type(f_type_node)
             self.debug_type_layout_field(name_str, fi, f_name, f_type_node, f_ty)
 
             if f_ty == 0:
