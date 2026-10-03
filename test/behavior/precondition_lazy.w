@@ -1,15 +1,15 @@
 //! expect-stdout: ok
-//! known-issue: #1864
 
-// Test: lazy message evaluation.
-// The message expression must NOT be evaluated when the condition is true.
+// D86 (§18.2, #1864): `assert`, `require` and `check` are compiler-known
+// forms, not functions. The message operand is evaluated only when the
+// condition is false: on success its effects do not run.
 
 fn side_effect() -> str:
     print("SHOULD NOT PRINT")
     "message"
 
 fn main:
-    // If lazy evaluation works, side_effect() is never called
     require(true, side_effect())
     check(true, side_effect())
+    assert(true, side_effect())
     print("ok")

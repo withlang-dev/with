@@ -66,17 +66,26 @@ pub fn print_i64(n: i64) -> Unit:
 pub fn print_bool(v: bool) -> Unit:
     with_println_bool(v)
 
-/// Assert that a condition is true. Panics with `msg` if false.
+// `assert`, `require` and `check` are compiler-known forms, not functions
+// (§18.2, D86): a call evaluates `cond`, and only when it is false
+// evaluates `msg` and `loc` and calls the declaration, which must not
+// return on a false condition (MirLower.w lower_precondition_form). They
+// cannot be used as values.
+
+/// Assert that a condition is true. Panics with `msg` if false; `msg` is
+/// evaluated only then.
 pub fn assert(cond: bool, msg: &str = "assertion failed", loc: &str = src()) -> Unit:
     if not cond:
         with_panic_ref(msg, loc, 0)
 
-/// Assert that a condition is true. Panics with `msg` if false.
+/// Require that a condition is true. Panics with `msg` if false; `msg` is
+/// evaluated only then.
 pub fn require(cond: bool, msg: &str, loc: &str = src()) -> Unit:
     if not cond:
         with_panic_ref(msg, loc, 0)
 
-/// Assert that a condition is true. Panics with `msg` if false.
+/// Check that a condition is true. Panics with `msg` if false; `msg` is
+/// evaluated only then.
 pub fn check(cond: bool, msg: &str, loc: &str = src()) -> Unit:
     if not cond:
         with_panic_ref(msg, loc, 0)

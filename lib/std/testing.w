@@ -2,6 +2,10 @@
 
 extern fn with_panic(msg: str, file: str, line: i32) -> Never
 
+// `assert`, `require` and `check` are compiler-known forms, not functions
+// (§18.2, D86): a call evaluates `cond`, and only when it is false
+// evaluates `msg` and `loc` and calls the declaration, which must not
+// return on a false condition. They cannot be used as values.
 pub fn assert(cond: bool, msg: str = "assertion failed", loc: str = src()) -> Unit:
     if not cond:
         with_panic(msg, loc, 0)

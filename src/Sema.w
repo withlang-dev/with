@@ -1516,6 +1516,11 @@ pub type Sema {
     facade_bridge_of: HashMap[str, str],           // D64: C name -> the rendered free operation presented under it (`__with_facade_<name>`)
     facade_bridge_syms: HashMap[i32, i32],         // D64: bridge symbols a call was redirected to (MirLower.w lower_call) -> 1
     facade_presented_calls: HashMap[i32, i32],     // call node -> 1
+    // D86 (§18.2): a call of `assert`/`require`/`check` (std.builtins or
+    // std.testing) is a compiler-known form, not a function call: its
+    // message is evaluated only when its condition is false (SemaCheck.w
+    // check_call; MirLower.w lower_call; ComptimeEval.w eval_call).
+    precondition_form_calls: HashMap[i32, i32],    // call node -> form fn sym
     // D66 (spec §16.2b.5): a discriminated variadic contract is presented
     // as one method or function per case, chosen at the call by the
     // selector's compile-time value (SemaFacade.w facade_variadic_retarget;
@@ -3161,6 +3166,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         facade_bridge_of: HashMap.new(),
         facade_bridge_syms: sema_new_map_i32_i32(),
         facade_presented_calls: sema_new_map_i32_i32(),
+        precondition_form_calls: sema_new_map_i32_i32(),
         facade_variadic_ops: HashMap.new(),
         facade_variadic_method_names: sema_new_map_i32_i32(),
         facade_variadic_calls: sema_new_map_i32_i32(),
@@ -6891,6 +6897,10 @@ impl Sema:
     // bind_states across branches with divergence handling, but not these — so a
     // field moved on a divergent (returning) branch wrongly poisoned the
     // fall-through. These mirror save/restore/merge for the field-move set.
+    // A placeholder snapshot for a slot filled only on some paths.
+    fn empty_moved_field_state() -> MovedFieldSnap:
+        MovedFieldSnap { base: Vec.new(), starts: Vec.new(), counts: Vec.new(), syms: Vec.new(), poison_syms: Vec.new(), poison_nodes: Vec.new() }
+
     fn save_moved_field_state() -> MovedFieldSnap:
         MovedFieldSnap {
             base: sema_clone_i32_vec(&self.moved_field_base_syms),

@@ -7655,7 +7655,31 @@ impl ComptimeEvaluator:
             return self.fail(node, "callee is not a comptime function value")
         if self.sema.variant_lookup.contains(fn_sym):
             return self.eval_variant_constructor_call(fn_sym, self.ast.get_data1(node), arg_count, node)
+        if self.sema.precondition_form_calls.contains(node):
+            return self.eval_precondition_form(fn_sym, self.ast.get_data1(node), arg_count, node)
         self.eval_fn_symbol_call(fn_sym, self.ast.get_data1(node), arg_count, node)
+
+    // D86 (§18.2): `assert`/`require`/`check` evaluate the condition, and
+    // the message only when it is false (MirLower.w lower_precondition_form).
+    mut fn eval_precondition_form(fn_sym: i32, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
+        if arg_count < 1:
+            return self.fail(node, "a precondition form takes its condition first")
+        var cond_signal = self.eval_expr(self.ast.get_extra(extra_start))
+        if cond_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return cond_signal
+        let truthy = comptime_value_truthy(cond_signal.value)
+        if truthy < 0:
+            return self.fail(node, "a precondition form's condition is a bool")
+        if truthy != 0:
+            return comptime_control_value(comptime_value_void(self.sema.ty_void as i32))
+        let arg_values: Vec[ComptimeValue] = Vec.new()
+        arg_values.push(move cond_signal.value)
+        for i in 1..arg_count:
+            var arg_signal = self.eval_expr(self.ast.get_extra(extra_start + i))
+            if arg_signal.kind != ComptimeControlKind.CTL_VALUE:
+                return arg_signal
+            arg_values.push(move arg_signal.value)
+        self.eval_fn_symbol_call_values(fn_sym, arg_values, node)
 
     mut fn eval_fn_value_call(fn_value: &ComptimeValue, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
         if fn_value.kind != ComptimeValueKind.CV_FN:

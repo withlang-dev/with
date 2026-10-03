@@ -169,6 +169,12 @@ fn sema_path_is_std_implementation(path: &str) -> i32:
         return 1
     0
 
+// The source path of std module `name` (lib/std/<name>.w), in the tree or
+// embedded.
+fn sema_path_is_std_module(path: &str, name: &str) -> bool:
+    let file = name ++ ".w"
+    path == "lib/std/" ++ file or path == "<embedded-std>/std/" ++ file or path.ends_with("/lib/std/" ++ file) or path.ends_with("\\lib\\std\\" ++ file)
+
 fn sema_path_is_runtime_implementation(path: &str) -> i32:
     if path.starts_with("rt/") or path.starts_with("rt\\") or
         path.starts_with("out/gen/") or path.starts_with("out\\gen\\"):
@@ -6664,6 +6670,18 @@ impl Sema:
     fn fn_symbol_is_std_builtins_drop(fn_sym: i32) -> i32:
         self.fn_symbol_is_std_builtins_named(fn_sym, "drop")
 
+    // D86 (§18.2): `assert`, `require` and `check` of std.builtins and of
+    // std.testing are compiler-known forms, not functions. The declarations
+    // give their parameters; a call evaluates the condition and, only when
+    // it is false, the message and location (check_call, MirLower.w
+    // lower_call, ComptimeEval.w eval_call).
+    fn fn_symbol_is_precondition_form(fn_sym: i32) -> bool:
+        let name = self.pool_resolve(fn_sym)
+        if name != "assert" and name != "require" and name != "check":
+            return false
+        let path = self.fn_symbol_source_path(fn_sym)
+        sema_path_is_std_module(path, "builtins") or sema_path_is_std_module(path, "testing")
+
     mut fn check_std_builtins_diverging_call_surface(fn_sym: i32, node: i32, arg_count: i32) -> i32:
         let name: str = self.pool_resolve(fn_sym)
         if name != "panic" and name != "todo" and name != "unreachable":
@@ -9896,6 +9914,12 @@ impl Sema:
             // With has no variadic function-pointer type to give it.
             if self.fn_decl_is_variadic_definition(self.fn_symbol_decl_node(sym)):
                 self.emit_error("`" ++ self.pool_resolve(sym) ++ "` is defined with `...`: it is called directly (under `unsafe`), never used as a value", node)
+                return 0
+            // D86 (§18.2): a function value would evaluate the message
+            // before the call; these forms evaluate it only on failure.
+            if self.fn_symbol_is_precondition_form(sym):
+                let form_name: str = with_str_clone_ref(self.pool_resolve(sym))
+                self.emit_error("`" ++ form_name ++ "` is a compiler-known form, not a function: it evaluates its message only when its condition is false, so it is called directly, never used as a value (§18.2)", node)
                 return 0
             // #1831: a function declared without a prototype has no With
             // function type — each call passes its own promoted arguments —
@@ -22751,8 +22775,23 @@ impl Sema:
         let generic_hint_fn = if sig_idx < 0 and callable_value_tid == 0 and variant_payload_tys.len() == 0: self.generic_fn_node_for_symbol(fn_sym) else: 0
         let generic_hint_meta = if generic_hint_fn != 0: self.ast.find_fn_meta(generic_hint_fn) else: -1
         let deferred_closure_args: Vec[i32] = Vec.new()
+        // D86 (§18.2): a precondition form evaluates the operands after its
+        // condition only when the condition is false, on a path that does
+        // not return (MirLower.w lower_call): as for an `if` whose arm
+        // diverges, what they move or invalidate is untouched after the
+        // form. Their checking starts from, and the form ends in, the state
+        // after the condition.
+        let precondition_form = sig_idx >= 0 and callable_value_tid == 0 and self.fn_symbol_is_precondition_form(fn_sym)
+        var pf_entered = false
+        var pf_states: Vec[i32] = Vec.new()
+        var pf_mf = self.empty_moved_field_state()
         for ai in 0..resolved_arg_count:
             let arg_node = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
+            if precondition_form and not pf_entered and ai + param_offset >= 1:
+                pf_entered = true
+                pf_states = self.save_scope_states()
+                pf_mf = self.save_moved_field_state()
+                self.push_move_control_flow_context(1)
             checked_arg_nodes.push(arg_node)
             var expected_ty = 0
             if sig_idx >= 0:
@@ -22849,6 +22888,8 @@ impl Sema:
             let iter_idx = self.maybe_register_iter_of_self_borrow(arg_node)
             if iter_idx >= 0:
                 iter_borrow_idxs.push(iter_idx)
+        if pf_entered:
+            self.pop_move_control_flow_context()
         // #1831: a call to a function declared without a prototype; #1849:
         // the arguments a variadic callee's `...` receives.
         if sig_idx >= 0 and self.sig_is_unprototyped(sig_idx):
@@ -23070,6 +23111,11 @@ impl Sema:
             self.record_call_view_origins(node, sig_idx, param_offset, 0, resolved_extra_start, resolved_arg_count, has_resolved)
             self.note_sig_call_global_effects(node, sig_idx, param_offset, 0, resolved_extra_start, resolved_arg_count, has_resolved)
             self.record_generator_call_ref_origins(node, sig_idx, param_offset, 0, resolved_extra_start, resolved_arg_count, has_resolved)
+            if precondition_form:
+                self.precondition_form_calls.insert(node, fn_sym)
+                if pf_entered:
+                    self.restore_scope_states(&pf_states)
+                    self.restore_moved_field_state(&pf_mf)
             self.typed_expr_types.insert(node, ret)
             return ret
 
