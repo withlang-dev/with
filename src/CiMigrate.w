@@ -1102,10 +1102,18 @@ impl CiProject:
         with_cimport_dispose(session)
         0
 
-fn ci_migrate_decl_is_filtered(session: i64, name: &str):
+// #2060: the location is the declaration's own. A record that only a type
+// names (glibc's `struct __locale_data *` inside __locale_struct; ClangBridge
+// collect_undefined_record_type) has no top-level cursor, so the by-name
+// index has no location for it and it was emitted into the migration as
+// `type __locale_data = opaque`: a libc-internal name in the output.
+fn ci_migrate_decl_is_filtered(session: i64, idx: i32, name: &str):
     if name.len() == 0 or ci_is_system_decl(name):
         return true
-    let loc = ci_get_decl_location(session, name)
+    var loc = ci_get_decl_location(session, name)
+    if loc.len() == 0:
+        let cursor = with_cimport_decl_cursor(session, idx)
+        if cursor >= 0: loc = with_ci_cursor_location(session, cursor)
     if loc.len() > 0 and ci_is_system_path(loc):
         return true
     ci_migrate_is_width_family_name(name)
@@ -1211,7 +1219,7 @@ fn ci_migrate_file_body(input_path: &str, output_path: &str, project_active: boo
     var i = 0
     while i < count:
         let decl_name = with_cimport_decl_name(session, i)
-        if ci_migrate_decl_is_filtered(session, decl_name):
+        if ci_migrate_decl_is_filtered(session, i, decl_name):
             i = i + 1
             continue
         let kind = with_cimport_decl_kind(session, i)
@@ -2049,7 +2057,7 @@ fn ci_migrate_collect_unsafe_extern_fns(session: i64, count: i32, primary_path: 
             i = i + 1
             continue
         let name = with_cimport_decl_name(session, i)
-        if ci_migrate_decl_is_filtered(session, name):
+        if ci_migrate_decl_is_filtered(session, i, name):
             i = i + 1
             continue
         let owner_path = ci_migrate_project_fn_owner_path(project_active, project, name)
