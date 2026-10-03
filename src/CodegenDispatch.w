@@ -1134,21 +1134,30 @@ impl Codegen:
     // be. -1 when the owner has no Sema struct declaration to read (a tuple
     // element, a variant payload, a compiler-laid-out record): those
     // indices are positional already.
+    // An aggregate's named field operand: its position in the struct
+    // declaration of the aggregate's Sema type (Sema's record).
     fn mir_sema_field_index(source_type: i32, field_token: i32) -> i32:
-        var owner = if source_type > 0: self.sema.resolve_alias(source_type as TypeId) as i32 else: 0
-        for _ in 0..8:
-            let kind = self.sema.get_type_kind(owner as TypeId)
-            if kind != TypeKind.TY_REF and kind != TypeKind.TY_PTR: break
-            owner = self.sema.resolve_alias(self.sema.get_type_d0(owner as TypeId)) as i32
-        if owner <= 0: return -1
-        let count = self.sema.type_reflection_field_count(owner)
-        if count <= 0: return -1
         var text = with_str_clone_ref(self.intern.resolve(field_token))
         if text.len() == 0: text = self.sema_symbol_text(field_token)
-        for fi in 0..count:
-            if self.sema.pool_resolve_symbol(self.sema.type_reflection_field_name(owner, fi)) == text:
-                return fi
-        -1
+        let sema_field = if text.len() > 0: self.sema.pool_lookup_symbol(text) else: 0
+        self.sema.struct_field_decl_index(source_type, sema_field)
+
+    // A field projection's GEP index: the declaration index MIR carries
+    // from Sema (`decl`); the LLVM registry's lookup by name verifies it
+    // under analysis. A positional projection (decl -1: a variant payload, a
+    // tuple-like record) keeps its position through the registry; a named
+    // one MIR lowered without Sema's index is reported (audit:codegen).
+    mut fn mir_projection_field_index(agg_ty: i64, field_token: i32, decl: i32, source_type: i32, active_variant: i32, fn_sym: i32, subject: i32) -> i32:
+        if decl >= 0:
+            let derived = if self.analysis_enabled != 0: self.mir_resolve_field_index(agg_ty, field_token, source_type) else: decl
+            return self.fact_decide(MODE_SITE_FIELD_INDEX, decl as i64, derived as i64, fn_sym, subject) as i32
+        if active_variant < 0:
+            let named = self.mir_sema_field_index(source_type, field_token)
+            if self.analysis_enabled != 0:
+                self.mode_record(MODE_SITE_FIELD_DECL_CARRIED, named < 0, fn_sym, subject, f"MIR carried no declaration index; Sema's record has {named}")
+            if named >= 0:
+                return named
+        self.mir_resolve_field_index(agg_ty, field_token, source_type)
 
     // The index a field projection GEPs: Sema's declaration index when the
     // owner has a Sema struct declaration; the LLVM registry's lookup by
@@ -1277,7 +1286,7 @@ impl Codegen:
                 // (LLVMGetTypeKind(null) segfaulted the #1280 audit).
                 if cur_ty == 0:
                     return 0
-                let fi = self.mir_field_index_decided(cur_ty, pd, variant_owner_sema_ty, active_variant_idx, body.fn_sym, place_id)
+                let fi = self.mir_projection_field_index(cur_ty, pd, body.proj_decl_index(p_start + i), variant_owner_sema_ty, active_variant_idx, body.fn_sym, place_id)
                 if fi < 0:
                     return 0
                 let union_idx = self.find_struct_index_by_type(cur_ty)
@@ -1475,7 +1484,7 @@ impl Codegen:
                         cur_ty = payload_ty
                         active_variant_idx = -1
                         continue
-                let fi = self.mir_field_index_decided(cur_ty, pd, variant_owner_sema_ty, active_variant_idx, body.fn_sym, place_id)
+                let fi = self.mir_projection_field_index(cur_ty, pd, body.proj_decl_index(p_start + i), variant_owner_sema_ty, active_variant_idx, body.fn_sym, place_id)
                 if fi < 0:
                     return 0
                 let union_idx = self.find_struct_index_by_type(cur_ty)

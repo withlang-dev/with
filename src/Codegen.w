@@ -5338,7 +5338,9 @@ pub const MODE_SITE_STRUCT_FIELD_TYPE: i32 = 11
 pub const MODE_SITE_FIELD_INDEX: i32 = 12
 pub const MODE_SITE_CAPTURE_BY_PLACE: i32 = 13
 pub const MODE_SITE_CLOSURE_OWNED_ENV: i32 = 14
-pub const MODE_SITE_COUNT: i32 = 15
+// #1647: a named field projection carries Sema's declaration index in MIR.
+pub const MODE_SITE_FIELD_DECL_CARRIED: i32 = 15
+pub const MODE_SITE_COUNT: i32 = 16
 
 pub fn mode_site_name(site: i32) -> str:
     if site == MODE_SITE_FIELD_TYPE_THROUGH_ADDRESS: return "projected-type field through an address"
@@ -5356,6 +5358,7 @@ pub fn mode_site_name(site: i32) -> str:
     if site == MODE_SITE_FIELD_INDEX: return "field projection index"
     if site == MODE_SITE_CAPTURE_BY_PLACE: return "closure capture by place"
     if site == MODE_SITE_CLOSURE_OWNED_ENV: return "closure owns its environment"
+    if site == MODE_SITE_FIELD_DECL_CARRIED: return "field projection declaration index carried by MIR"
     "unknown"
 
 pub fn mode_site_owner(site: i32) -> str:
@@ -5365,6 +5368,7 @@ pub fn mode_site_owner(site: i32) -> str:
     if site == MODE_SITE_STRUCT_FIELD_TYPE: return "Sema's field type"
     if site == MODE_SITE_FIELD_INDEX: return "Sema's field declaration"
     if site == MODE_SITE_CAPTURE_BY_PLACE or site == MODE_SITE_CLOSURE_OWNED_ENV: return "Sema's capture facts"
+    if site == MODE_SITE_FIELD_DECL_CARRIED: return "MIR's projection"
     "Sema's place category"
 
 // What a site re-derived its fact from before it read the owner.
@@ -5372,6 +5376,7 @@ pub fn mode_site_derivation(site: i32) -> str:
     if site == MODE_SITE_SIZEOF_TYPE_ARG or site == MODE_SITE_STRUCT_FIELD_TYPE: return "the AST type node"
     if site == MODE_SITE_FIELD_INDEX: return "the LLVM struct registry"
     if site == MODE_SITE_CAPTURE_BY_PLACE or site == MODE_SITE_CLOSURE_OWNED_ENV: return "the closure's AST spelling"
+    if site == MODE_SITE_FIELD_DECL_CARRIED: return "a lookup of the field's name in Sema's record"
     "the LLVM type"
 
 // Symbol-naming rules live in src/FnAbi.w (docs/spec/abi/with-abi.md §5); this is

@@ -932,6 +932,10 @@ pub fn mir_test_resolution_places():
     assert(mir_index_place_verdict(ProjKind.PK_FIELD, 10, 10, 0, 20, 20).contains("not an index"))
     assert(mir_index_place_verdict(ProjKind.PK_INDEX, 12, 10, 0, 20, 20).contains("disagrees with Sema's type"))
     assert(mir_index_place_verdict(ProjKind.PK_INDEX, 10, 10, 0, 21, 20).contains("indexed base"))
+    // #1647: a named field projection carries Sema's declaration index.
+    assert(mir_field_decl_verdict(2, 2) == "")
+    assert(mir_field_decl_verdict(-1, 2).contains("carries no declaration index"))
+    assert(mir_field_decl_verdict(1, 2).contains("carries declaration index 1"))
     // A view `let` rooted at a binding Sema did not record as its origin;
     // no recorded origins, or an unnamed root, are not judged.
     assert(mir_view_origin_verdict(true, true, false).contains("did not record"))

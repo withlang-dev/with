@@ -351,6 +351,9 @@ fn resolution_field_base_type(sema: &Sema, base_expr: i32) -> i32:
 // own lookup.
 fn resolution_audit_field_places(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> i32:
     var checked = 0
+    var decls = 0
+    var unrecorded = 0
+    var in_specializations = 0
     for bi in 0..mir_mod.bodies.len() as i32:
         let body = &mir_mod.bodies[bi]
         if body.lowering_failed != 0: continue
@@ -361,18 +364,39 @@ fn resolution_audit_field_places(report: &AnalysisReport, sema: &Sema, mir_mod: 
             let base = body.field_place_bases[fi]
             if node <= 0 or node >= sema.ast.node_count() or place < 0 or place >= body.place_locals.len() as i32: continue
             checked = checked + 1
+            if body.instance_sym != 0: in_specializations = in_specializations + 1
             let fn_name = with_str_clone_ref(pool.resolve(body.fn_sym))
             let count = body.place_proj_counts[place]
             let last = body.place_proj_starts[place] + count - 1
             let kind = if count > 0: body.proj_kinds[last] else: -1
             let proj_field = if count > 0: body.proj_d0[last] else: 0
-            let sema_ty = sema.typed_expr_types.get(node) ?? 0
+            // Sema's facts for the node in this body's instance: a
+            // template's node carries one type in typed_expr_types, the
+            // last instance checked (#1647).
+            let inst_ty = sema.field_access_type_in_body(body.instance_sym, node)
+            if inst_ty <= 0 and body.instance_sym != 0:
+                unrecorded = unrecorded + 1
+                report.fail(f"resolution: {fn_name} at {resolution_where(sema, &site, node)}: MIR lowered a field place Sema never checked in this instance (field `{pool.resolve(sema.ast.get_data1(node))}`)")
+                continue
+            let sema_ty = if inst_ty > 0: inst_ty else: sema.typed_expr_types.get(node) ?? 0
             let mir_ty = body.place_sema_types[place]
-            let sema_base = resolution_peeled(sema, resolution_field_base_type(sema, sema.ast.get_data0(node)))
+            let inst_owner = sema.field_access_owner_in_body(body.instance_sym, node)
+            // A positional owner (a tuple, a payload) records no owner: in a
+            // specialization its base is judged through the field's type.
+            let sema_base = if inst_owner > 0: resolution_peeled(sema, inst_owner) else if body.instance_sym != 0: 0 else: resolution_peeled(sema, resolution_field_base_type(sema, sema.ast.get_data0(node)))
             let mir_base = if base >= 0 and base < body.place_sema_types.len() as i32: resolution_peeled(sema, body.place_sema_types[base]) else: 0
             let verdict = mir_field_place_verdict(kind, proj_field, sema.ast.get_data1(node), if mir_ty > 0: sema.resolve_alias(mir_ty as TypeId) as i32 else: 0, if sema_ty > 0: sema.resolve_alias(sema_ty as TypeId) as i32 else: 0, mir_base, sema_base)
             if verdict.len() > 0:
                 report.fail(f"resolution: {fn_name} at {resolution_where(sema, &site, node)}: {verdict} (field `{pool.resolve(sema.ast.get_data1(node))}`, MIR {sema.type_name(mir_ty)}, Sema {sema.type_name(sema_ty)})")
+            // The projection carries the declaration index Sema resolved the
+            // node to in this body's instance (#1647: not a name lookup).
+            let sema_decl = sema.field_decl_index_in_body(body.instance_sym, node)
+            if kind == ProjKind.PK_FIELD and sema_decl >= 0:
+                decls = decls + 1
+                let decl_verdict = mir_field_decl_verdict(body.proj_decl_index(last), sema_decl)
+                if decl_verdict.len() > 0:
+                    report.fail(f"resolution: {fn_name} at {resolution_where(sema, &site, node)}: {decl_verdict} (field `{pool.resolve(sema.ast.get_data1(node))}`)")
+    report.note(f"resolution-audit: field-places judged={checked} in-specialization-bodies={in_specializations} declaration-indexes={decls} unrecorded={unrecorded}")
     checked
 
 // Every immutable non-Copy `let` is materialized in Sema's category: a
@@ -405,25 +429,18 @@ fn resolution_audit_let_bindings(report: &AnalysisReport, sema: &Sema, mir_mod: 
     checked
 
 // Every place lowered from a source index expression agrees with Sema's
-// facts for the node: it is an index projection, its type is the element
-// type Sema gave the node (or that view's referent, D27), and the base it
-// indexes is the type Sema's base expression has.
-//
-// A specialization's body is not judged: Sema keeps one type per AST node
-// (typed_expr_types), and a template's nodes hold the last instance it
-// checked, so `xs[i]` in `Vec[str].clone` reads `&i32` once `Vec[i32]` was
-// checked after it. That is a Sema gap — no per-instance node fact exists
-// for MIR to read, so MirLower derives the element type from the indexed
-// place — and the count is reported, never hidden.
+// facts for the node in the body's instance (#1647): it is an index
+// projection, its type is the element place type Sema checked, and the base
+// it indexes is the type Sema's base expression had. A specialization's
+// body reads its own instance's record (index_element_in_body), never the
+// one type per node typed_expr_types keeps; a node Sema never checked as a
+// positional index in that body is itself a violation.
 fn resolution_audit_index_places(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> i32:
     var checked = 0
     var in_specializations = 0
     for bi in 0..mir_mod.bodies.len() as i32:
         let body = &mir_mod.bodies[bi]
         if body.lowering_failed != 0: continue
-        if sema.concrete_specialization_by_sym.contains(resolution_sema_sym(sema, pool, body.fn_sym)):
-            in_specializations = in_specializations + body.index_place_nodes.len() as i32
-            continue
         let site = resolution_site(sema, pool, body, source_path, source_text)
         for ii in 0..body.index_place_nodes.len() as i32:
             let node = body.index_place_nodes[ii]
@@ -431,19 +448,22 @@ fn resolution_audit_index_places(report: &AnalysisReport, sema: &Sema, mir_mod: 
             let base = body.index_place_bases[ii]
             if node <= 0 or node >= sema.ast.node_count() or place < 0 or place >= body.place_locals.len() as i32: continue
             checked = checked + 1
+            if body.instance_sym != 0: in_specializations = in_specializations + 1
             let count = body.place_proj_counts[place]
             let kind = if count > 0: body.proj_kinds[(body.place_proj_starts[place] + count - 1)] else: -1
-            let sema_ty_raw = sema.typed_expr_types.get(node) ?? 0
-            let sema_ty = if sema_ty_raw > 0: sema.resolve_alias(sema_ty_raw as TypeId) as i32 else: 0
-            let sema_view_target = if sema_ty > 0 and sema.get_type_kind(sema_ty as TypeId) == TypeKind.TY_REF: sema.resolve_alias(sema.get_type_d0(sema_ty as TypeId)) as i32 else: 0
+            let sema_elem = sema.index_element_in_body(body.instance_sym, node)
+            if sema_elem <= 0:
+                report.fail(f"resolution: {pool.resolve(body.fn_sym)} at {resolution_where(sema, &site, node)}: MIR lowered an index place Sema never checked as a positional index in this body")
+                continue
+            let sema_ty = sema.resolve_alias(sema_elem as TypeId) as i32
             let mir_ty_raw = body.place_sema_types[place]
             let mir_ty = if mir_ty_raw > 0: sema.resolve_alias(mir_ty_raw as TypeId) as i32 else: 0
-            let sema_base = resolution_peeled(sema, resolution_field_base_type(sema, sema.ast.get_data0(node)))
+            let sema_base = resolution_peeled(sema, sema.index_base_in_body(body.instance_sym, node))
             let mir_base = if base >= 0 and base < body.place_sema_types.len() as i32: resolution_peeled(sema, body.place_sema_types[base]) else: 0
-            let verdict = mir_index_place_verdict(kind, mir_ty, sema_ty, sema_view_target, mir_base, sema_base)
+            let verdict = mir_index_place_verdict(kind, mir_ty, sema_ty, sema_ty, mir_base, sema_base)
             if verdict.len() > 0:
                 report.fail(f"resolution: {pool.resolve(body.fn_sym)} at {resolution_where(sema, &site, node)}: {verdict} (MIR {sema.type_name(mir_ty)}, Sema {sema.type_name(sema_ty)})")
-    report.note(f"resolution-audit: index-places judged={checked} in-specialization-bodies-unjudged={in_specializations}")
+    report.note(f"resolution-audit: index-places judged={checked} in-specialization-bodies={in_specializations} unjudged=0")
     checked
 
 // Every aliasing `let` names a place rooted at a binding Sema recorded as

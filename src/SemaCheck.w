@@ -4540,15 +4540,23 @@ impl Sema:
         self.current_module_path = saved_body_module_path
         self.current_module_has_ci = saved_body_module_has_ci
 
+    // A declaration's own body is no specialization's: facts recorded per
+    // instance key it by 0 even when its check runs inside an instance's.
     mut fn check_fn_body(node: i32):
         let fn_name = self.fn_decl_semantic_symbol(node, self.ast.get_data0(node))
         let sig_idx = self.get_sig(fn_name)
+        let saved_specialization_sym: i32 = self.current_specialization_sym
+        self.current_specialization_sym = 0
         self.check_fn_body_with_sig(node, sig_idx)
+        self.current_specialization_sym = saved_specialization_sym
 
     mut fn check_fn_body_at(node: i32, decl_index: i32):
         let fn_name = self.fn_decl_semantic_symbol_at(node, self.ast.get_data0(node), decl_index)
         let sig_idx = self.get_sig(fn_name)
+        let saved_specialization_sym: i32 = self.current_specialization_sym
+        self.current_specialization_sym = 0
         self.check_fn_body_with_sig_at(node, sig_idx, decl_index)
+        self.current_specialization_sym = saved_specialization_sym
 
     // D39 (decisions.md): an interface declaration's callable semantics are
     // the declaration, never a body inference. `T` consumes, `&T` reads, `&mut
@@ -9402,6 +9410,7 @@ impl Sema:
             let result = self.check_field_access(node) as TypeId
             if result != 0:
                 self.typed_expr_types.insert(node, result as i32)
+                self.field_access_types.insert(sema_pair_key(self.current_specialization_sym, node), result as i32)
             return result
 
         if kind == NodeKind.NK_COMPUTED_FIELD_ACCESS:
@@ -17060,6 +17069,7 @@ impl Sema:
             if field_ty == 0:
                 self.emit_error("unknown field '" ++ self.pool_resolve(field) ++ "' for type '" ++ self.type_name(field_base as i32) ++ "'", node)
             self.note_view_field_projection(node, obj_type as i32, field_ty)
+            self.note_field_access_decl(node, field_base as i32, field)
             return field_ty
 
         if ftk == TypeKind.TY_GENERIC_INST:
@@ -17071,6 +17081,7 @@ impl Sema:
             if field_ty2 == 0:
                 self.emit_error("unknown field '" ++ self.pool_resolve(field) ++ "' for type '" ++ self.type_name(field_base as i32) ++ "'", node)
             self.note_view_field_projection(node, obj_type as i32, field_ty2)
+            self.note_field_access_decl(node, field_base as i32, field)
             return field_ty2
 
         if ftk == TypeKind.TY_TUPLE:
@@ -17195,6 +17206,7 @@ impl Sema:
                 return 0
             let elem_ty = self.get_type_d0(resolved)
             self.typed_expr_types.insert(node, elem_ty)
+            self.note_index_element(node, arr_type as i32, elem_ty)
             return elem_ty
         var container_tid = resolved
         var container_tk = tk
@@ -17208,6 +17220,7 @@ impl Sema:
                     return 0
                 let elem_ty = self.get_type_d0(container_tid)
                 self.typed_expr_types.insert(node, elem_ty)
+                self.note_index_element(node, arr_type as i32, elem_ty)
                 return elem_ty
         if container_tk == TypeKind.TY_STR:
             self.check_runtime_index_operand(index)
@@ -17216,17 +17229,22 @@ impl Sema:
             // 0xFF to -1 on widening and made `let b = s[i]` a `&i32` view
             // over one byte (#1017).
             self.typed_expr_types.insert(node, self.ty_u8 as i32)
+            self.note_index_element(node, arr_type as i32, self.ty_u8 as i32)
             return self.ty_u8 as i32
         if container_tk == TypeKind.TY_ARRAY:
             self.check_runtime_index_operand(index)
             let elem_ty = self.get_type_d0(container_tid)
             let elem_view = self.ensure_exact_type(TypeKind.TY_REF, elem_ty, 0, 0) as i32
             self.typed_expr_types.insert(node, elem_view)
+            self.note_index_element(node, arr_type as i32, elem_ty)
             self.record_view_producer_origins(node, expr)
             return elem_view
         // §4.3d: `v[i]` reads (and, as a target, writes) lane i.
         if container_tk == TypeKind.TY_VECTOR:
-            return self.check_vector_index(node, container_tid as i32, index)
+            let lane = self.check_vector_index(node, container_tid as i32, index)
+            if lane != 0:
+                self.note_index_element(node, arr_type as i32, lane)
+            return lane
         if container_tk == TypeKind.TY_MASK:
             return self.check_vector_index(node, container_tid as i32, index)
         if container_tk == TypeKind.TY_SLICE:
@@ -17234,6 +17252,7 @@ impl Sema:
             let elem_ty = self.get_type_d0(container_tid)
             let elem_view = self.ensure_exact_type(TypeKind.TY_REF, elem_ty, 0, 0) as i32
             self.typed_expr_types.insert(node, elem_view)
+            self.note_index_element(node, arr_type as i32, elem_ty)
             self.record_view_producer_origins(node, expr)
             return elem_view
         if container_tk == TypeKind.TY_GENERIC_INST:
@@ -17251,6 +17270,7 @@ impl Sema:
                 let elem_ty = self.get_generic_inst_arg(container_tid, 0)
                 let elem_view = self.ensure_exact_type(TypeKind.TY_REF, elem_ty, 0, 0) as i32
                 self.typed_expr_types.insert(node, elem_view)
+                self.note_index_element(node, arr_type as i32, elem_ty)
                 self.record_view_producer_origins(node, expr)
                 return elem_view
             // A keyed map is not a positional collection: `xs[i]` denotes an
@@ -24720,6 +24740,21 @@ impl Sema:
             return self.specialization_type_args.get(sema_pair_key(body_sym, type_node)) ?? 0
         self.resolve_type_level_arg_expr_frozen(type_node)
 
+    // #1647 (D65): a runtime index expression's element place type and the
+    // type of the base it indexes, recorded for the body being checked (the
+    // specialization's symbol, 0 outside one).
+    mut fn note_index_element(node: i32, base_ty: i32, elem_ty: i32):
+        let key = sema_pair_key(self.current_specialization_sym, node)
+        self.index_element_types.insert(key, elem_ty)
+        self.index_base_types.insert(key, base_ty)
+
+    // The element place type of index `node` as Sema checked it in the
+    // body of `instance_sym` (a specialization's symbol, or 0): 0 when that
+    // body never checked the node as a positional index.
+    fn index_element_in_body(instance_sym: i32, node: i32): self.index_element_types.get(sema_pair_key(instance_sym, node)) ?? 0
+
+    fn index_base_in_body(instance_sym: i32, node: i32): self.index_base_types.get(sema_pair_key(instance_sym, node)) ?? 0
+
     mut fn push_specialization_subst(mono_sym: i32) -> i32:
         let found = self.concrete_specialization_by_sym.get(mono_sym)
         if found.is_none():
@@ -30806,6 +30841,43 @@ impl Sema:
                         return 0
                     return self.type_extra[(te_start + field_index * 3)]
         0
+
+    // #1647 (D65): the position of field `field` (a Sema symbol) in the
+    // struct declaration `owner` names, through references and pointers;
+    // -1 when the owner has no struct declaration with that field (a tuple,
+    // a variant payload, a compiler-laid-out record keep their positions).
+    fn struct_field_decl_index(owner: i32, field: i32) -> i32:
+        var cur = if owner > 0: self.resolve_alias(owner as TypeId) as i32 else: 0
+        for _ in 0..8:
+            let kind = self.get_type_kind(cur as TypeId)
+            if kind != TypeKind.TY_REF and kind != TypeKind.TY_PTR: break
+            cur = self.resolve_alias(self.get_type_d0(cur as TypeId)) as i32
+        if cur <= 0 or field == 0: return -1
+        let count = self.type_reflection_field_count(cur)
+        let text = self.pool_resolve_symbol(field)
+        for fi in 0..count:
+            let name = self.type_reflection_field_name(cur, fi)
+            if name == field or self.pool_resolve_symbol(name) == text:
+                return fi
+        -1
+
+    // The declaration index Sema resolved a source field access `node` to,
+    // in the body of `instance_sym` (a specialization's symbol, or 0); -1
+    // when the node names no declared struct field there.
+    fn field_decl_index_in_body(instance_sym: i32, node: i32): self.field_access_decl_indexes.get(sema_pair_key(instance_sym, node)) ?? -1
+
+    // ... the field's type and the owner it projects from, as checked in
+    // that body (0 when the node names no declared struct field there).
+    fn field_access_type_in_body(instance_sym: i32, node: i32): self.field_access_types.get(sema_pair_key(instance_sym, node)) ?? 0
+
+    fn field_access_owner_in_body(instance_sym: i32, node: i32): self.field_access_owners.get(sema_pair_key(instance_sym, node)) ?? 0
+
+    mut fn note_field_access_decl(node: i32, owner: i32, field: i32):
+        let index = self.struct_field_decl_index(owner, field)
+        if index >= 0:
+            let key = sema_pair_key(self.current_specialization_sym, node)
+            self.field_access_decl_indexes.insert(key, index)
+            self.field_access_owners.insert(key, owner)
 
     mut fn type_reflection_field_type(tid: i32, field_index: i32) -> i32:
         let resolved = self.resolve_alias(tid)

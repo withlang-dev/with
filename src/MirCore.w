@@ -491,6 +491,12 @@ pub type MirBody {
     place_proj_counts: Vec[i32],
     proj_kinds: Vec[i32],
     proj_d0: Vec[i32],
+    // A PK_FIELD projection of a named struct field: the field's position in
+    // the struct declaration Sema resolved its owner to (D65, #1647); -1 for
+    // every other projection (a tuple element, a variant payload, a
+    // compiler-laid-out record's positional field), whose proj_d0 is the
+    // position.
+    proj_decl: Vec[i32],
 
     // Rvalues
     rval_kinds: Vec[i32],
@@ -575,6 +581,11 @@ pub type MirBody {
     index_place_nodes: Vec[i32],
     index_place_places: Vec[i32],
     index_place_bases: Vec[i32],
+    // The Sema symbol of the specialization whose body this is, or that
+    // encloses it (a closure, a gen loop body, a generator's producer); 0
+    // outside a specialization. Sema keys the facts it records per instance
+    // (index_element_in_body, type_level_arg_in_body) by it (#1647, D65).
+    instance_sym: i32,
 
     // Stage 4 (spec §2.5.2): locals that are ever moved — and therefore
     // reset-on-move (§2.5.1) — recorded at the single pending_reset_locals.push
@@ -795,6 +806,7 @@ fn MirBody.init_for_fn(fn_sym: i32) -> MirBody:
         place_proj_counts: Vec.new(),
         proj_kinds: Vec.new(),
         proj_d0: Vec.new(),
+        proj_decl: Vec.new(),
         rval_kinds: Vec.new(),
         rval_d0: Vec.new(),
         rval_d1: Vec.new(),
@@ -835,6 +847,7 @@ fn MirBody.init_for_fn(fn_sym: i32) -> MirBody:
         index_place_nodes: Vec.new(),
         index_place_places: Vec.new(),
         index_place_bases: Vec.new(),
+        instance_sym: 0,
         ever_moved_locals: Vec.new(),
     }
 
@@ -947,6 +960,9 @@ impl MirBody:
         id
 
     mut fn new_place_with_projection(base: i32, proj_kind: i32, proj_data: i32, sema_ty: i32) -> i32:
+        self.new_place_with_projection_decl(base, proj_kind, proj_data, -1, sema_ty)
+
+    mut fn new_place_with_projection_decl(base: i32, proj_kind: i32, proj_data: i32, decl: i32, sema_ty: i32) -> i32:
         if base < 0 or base >= self.place_locals.len():
             return self.new_place(0)
 
@@ -958,9 +974,11 @@ impl MirBody:
         for i in 0..base_proj_count:
             self.proj_kinds.push(self.proj_kinds[(base_proj_start + i)])
             self.proj_d0.push(self.proj_d0[(base_proj_start + i)])
+            self.proj_decl.push(self.proj_decl[(base_proj_start + i)])
 
         self.proj_kinds.push(proj_kind)
         self.proj_d0.push(proj_data)
+        self.proj_decl.push(decl)
 
         let id = self.place_locals.len() as i32
         self.place_locals.push(base_local)
@@ -969,8 +987,18 @@ impl MirBody:
         self.place_proj_counts.push(base_proj_count + 1)
         id
 
+    // A positional field: a variant payload, a tuple-like record's slot.
     mut fn new_field_place(base: i32, field_idx: i32, sema_ty: i32) -> i32:
         self.new_place_with_projection(base, ProjKind.PK_FIELD, field_idx, sema_ty)
+
+    // A named struct field: its symbol, and its declaration index from Sema
+    // (-1 when the owner has no struct declaration with it).
+    mut fn new_named_field_place(base: i32, field_sym: i32, decl: i32, sema_ty: i32) -> i32:
+        self.new_place_with_projection_decl(base, ProjKind.PK_FIELD, field_sym, decl, sema_ty)
+
+    fn proj_decl_index(proj_idx: i32) -> i32:
+        if proj_idx < 0 or proj_idx >= self.proj_decl.len() as i32: return -1
+        self.proj_decl[proj_idx]
 
     mut fn new_tuple_index_place(base: i32, elem_idx: i32, sema_ty: i32) -> i32:
         self.new_place_with_projection(base, ProjKind.PK_TUPLE_INDEX, elem_idx, sema_ty)
@@ -4176,6 +4204,15 @@ pub fn mir_index_place_verdict(proj_kind: i32, mir_ty: i32, sema_ty: i32, sema_v
         return f"element place type (ty {mir_ty}) disagrees with Sema's type for the node (ty {sema_ty})"
     if sema_base > 0 and mir_base > 0 and sema_base != mir_base:
         return f"indexed base is ty {mir_base} in MIR, ty {sema_base} in Sema"
+    ""
+
+// #1647 (D65): a named field projection's declaration index against the
+// index Sema resolved the source field access to. "" when they agree.
+pub fn mir_field_decl_verdict(mir_decl: i32, sema_decl: i32) -> str:
+    if mir_decl < 0:
+        return f"field projection carries no declaration index; Sema resolved the field to declaration index {sema_decl}"
+    if mir_decl != sema_decl:
+        return f"field projection carries declaration index {mir_decl}; Sema resolved the field to {sema_decl}"
     ""
 
 // #1647 (D65): the place an aliasing `let` names against Sema's view

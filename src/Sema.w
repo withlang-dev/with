@@ -1776,6 +1776,19 @@ pub type Sema {
     // substitution, which needs the mutable substitution stack.
     current_specialization_sym: i32,
     specialization_type_args: HashMap[i64, i32],
+    // #1647 (D65): each runtime index expression's element place type and
+    // the type of the base it indexes, as checked in the body that holds it,
+    // keyed pair(specialization symbol or 0, index node). typed_expr_types
+    // holds one type per node — a template's nodes carry whichever instance
+    // was checked last — so MIR and the audit read the instance's answer
+    // here (index_element_in_body).
+    index_element_types: HashMap[i64, i32],
+    index_base_types: HashMap[i64, i32],
+    // ... and each source field access's position in the struct
+    // declaration Sema resolved its owner to (field_decl_index_in_body).
+    field_access_decl_indexes: HashMap[i64, i32],
+    field_access_types: HashMap[i64, i32],
+    field_access_owners: HashMap[i64, i32],
 
     // Current state
     source_text: str,
@@ -3347,6 +3360,11 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         current_fn_symbol: 0,
         current_specialization_sym: 0,
         specialization_type_args: sema_new_map_i64_i32(),
+        index_element_types: sema_new_map_i64_i32(),
+        index_base_types: sema_new_map_i64_i32(),
+        field_access_decl_indexes: sema_new_map_i64_i32(),
+        field_access_types: sema_new_map_i64_i32(),
+        field_access_owners: sema_new_map_i64_i32(),
         source_text: "",
         tracked_input_root: "",
         tracked_input_paths: sema_new_vec_str(),

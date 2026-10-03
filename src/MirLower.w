@@ -2334,7 +2334,24 @@ impl MirBuilder:
             return idx
         -1
 
+    // #1647 (D65): a named struct field projection carries the field's
+    // position in the struct declaration Sema resolved its owner to: for a
+    // source field access, the index Sema recorded for the node in this
+    // body's instance; otherwise Sema's declaration record for the base
+    // place's type.
+    mut fn named_field_place(base: i32, field_sym: i32, field_ty: i32, node: i32) -> i32:
+        var decl = if node > 0: self.sema.field_decl_index_in_body(self.body.instance_sym, node) else: -1
+        if decl < 0:
+            let field_text = self.pool.resolve(field_sym)
+            let sema_field = if field_text.len() > 0: self.sema.pool_lookup_symbol(field_text) else: 0
+            let owner = if base >= 0 and base < self.body.place_sema_types.len() as i32: self.body.place_sema_types[base] else: 0
+            decl = self.sema.struct_field_decl_index(owner, sema_field)
+        self.body.new_named_field_place(base, field_sym, decl, field_ty)
+
     mut fn new_projected_field_place(base: i32, field_token: i32, field_ty: i32) -> i32:
+        self.new_projected_field_place_at(base, field_token, field_ty, 0)
+
+    mut fn new_projected_field_place_at(base: i32, field_token: i32, field_ty: i32, node: i32) -> i32:
         var base_ty = self.place_local_type(base)
         if base_ty > 0 and base_ty != self.sema.ty_void as i32:
             var resolved = self.sema.resolve_alias(base_ty)
@@ -2347,7 +2364,7 @@ impl MirBuilder:
                 let tuple_idx = self.tuple_index_from_field_token(resolved as i32, field_token)
                 if tuple_idx >= 0:
                     return self.body.new_tuple_index_place(base, tuple_idx, field_ty)
-        self.body.new_field_place(base, field_token, field_ty)
+        self.named_field_place(base, field_token, field_ty, node)
 
     fn indexed_element_type(collection_tid: i32) -> i32:
         let resolved = self.sema.resolve_alias(collection_tid) as i32
@@ -3619,7 +3636,7 @@ impl MirBuilder:
             self.lower_debug_write_literal(buf_op, if fi > 0: ", " ++ field_name ++ ": " else: field_name ++ ": ", 0)
             let field_ty = self.sema.type_reflection_field_type_frozen(resolved, fi)
             let field_sym = self.pool.intern(field_name)
-            let field_place = self.body.new_field_place(place, field_sym, field_ty)
+            let field_place = self.body.new_named_field_place(place, field_sym, fi, field_ty)
             self.lower_debug_write_place(buf_op, field_place, field_ty, 0)
         self.lower_debug_write_literal(buf_op, " }", 0)
 
@@ -4758,7 +4775,7 @@ impl MirBuilder:
             let aggregate_ty = if aggregate_place < self.body.place_sema_types.len(): self.body.place_sema_types[aggregate_place] else: 0
             if aggregate_ty != 0:
                 field_ty = self.struct_field_type(aggregate_ty, field_sym)
-            let field_place = self.body.new_field_place(aggregate_place, field_sym, field_ty)
+            let field_place = self.named_field_place(aggregate_place, field_sym, field_ty, 0)
             self.update_string_alias_after_assignment(field_place, operand_id)
 
     mut fn is_string_concat_node(node: i32) -> bool:
@@ -5995,7 +6012,7 @@ impl MirBuilder:
             let len_rv = self.sequence_len_rvalue(len_src, base_ty)
             self.body.push_stmt(self.cur_bb, StmtKind.Assign, len_place, len_rv, self.ast.get_start(node))
             return len_place
-        let field_place = self.new_projected_field_place(base, field_idx, field_ty)
+        let field_place = self.new_projected_field_place_at(base, field_idx, field_ty, node)
         self.body.note_field_place(node, field_place, base)
         field_place
 
@@ -6164,7 +6181,11 @@ impl MirBuilder:
                 break
             base = self.new_deref_place(base)
             base_ty = self.sema.get_type_d0(resolved)
-        let elem_ty = self.indexed_element_type(base_ty)
+        // #1647 (D65): the element is Sema's answer for this node in this
+        // body's instance, not a derivation from the indexed place's type.
+        let elem_ty = self.sema.index_element_in_body(self.body.instance_sym, node)
+        if elem_ty == 0:
+            sema_phase_bug(f"BUG: index expression has no Sema element type in this body: body={self.pool.resolve(self.body.fn_sym)} instance={self.body.instance_sym} node={node}")
         let idx_op = self.lower_expr(index_expr)
         let idx_ty = if self.has_contextual_copy_adjustment(index_expr) != 0:
             self.contextual_copy_adjustment(index_expr).target_type
@@ -6217,7 +6238,7 @@ impl MirBuilder:
             if self.sema.autoderef_step_counts.contains(base_expr):
                 let autoderef_place = self.lower_recorded_autoderef_place(base_expr)
                 let field_ty = self.expr_type(node)
-                let alias_field = self.new_projected_field_place(autoderef_place, field_sym, field_ty)
+                let alias_field = self.new_projected_field_place_at(autoderef_place, field_sym, field_ty, node)
                 self.body.note_field_place(node, alias_field, autoderef_place)
                 return alias_field
             var base_place = self.lower_binding_alias_place(base_expr)
@@ -6249,7 +6270,7 @@ impl MirBuilder:
                 field_base = self.new_deref_place(field_base)
                 base_ty = self.sema.get_type_d0(resolved)
             let field_ty = self.expr_type(node)
-            let alias_field = self.new_projected_field_place(field_base, field_sym, field_ty)
+            let alias_field = self.new_projected_field_place_at(field_base, field_sym, field_ty, node)
             self.body.note_field_place(node, alias_field, field_base)
             return alias_field
         -1
@@ -8421,6 +8442,7 @@ impl MirBuilder:
         let body_local = self.gen_body_local
         var child = MirBuilder.init(self.sema, self.ast, self.pool, self.pool.intern(f"$genloop${self.body.fn_sym}${key_node}"))
         child.contextual_fact_sig_idx = self.contextual_fact_sig_idx
+        child.body.instance_sym = self.body.instance_sym
         child.body.anonymous_type = self.sema.gen_for_body_types.get(key_node).unwrap()
         child.body.local_type_ids[0] = self.sema.ty_bool as i32
         child.push_scope()
@@ -9843,7 +9865,7 @@ impl MirBuilder:
         if storage_ty == 0:
             self.mark_unsupported()
             return self.unit_operand()
-        let entries_place = self.body.new_field_place(map_place, self.pool.intern("entries"), storage_ty)
+        let entries_place = self.named_field_place(map_place, self.pool.intern("entries"), storage_ty, 0)
         let resolved_storage = self.sema.resolve_alias(storage_ty)
         let pair_ty = self.sema.get_generic_inst_arg(resolved_storage as i32, 0)
         if self.sema.type_needs_drop_frozen(pair_ty) != 0 and self.sema.is_copy_frozen(pair_ty) == 0:
@@ -10704,7 +10726,7 @@ impl MirBuilder:
                         continue
                     let field_name = self.sema.type_reflection_field_name(struct_ty, bi)
                     let field_ty = self.sema.type_reflection_field_type_frozen(struct_ty, bi)
-                    let field_place = self.body.new_field_place(struct_subject_place, field_name, field_ty)
+                    let field_place = self.body.new_named_field_place(struct_subject_place, field_name, bi, field_ty)
                     let child_place = self.pattern_child_subject_place(scrutinee_place, field_place, self.ast.get_start(pat_node))
                     let next_test_bb = self.new_block()
                     self.switch_to(cur_test_bb)
@@ -10987,7 +11009,7 @@ impl MirBuilder:
                 if field_ty == 0:
                     self.terminate(TermKind.TK_GOTO, fail_bb, 0, 0, 0)
                     return
-                let field_place = self.body.new_field_place(struct_subject_place, field_name, field_ty)
+                let field_place = self.named_field_place(struct_subject_place, field_name, field_ty, 0)
                 let child_place = self.pattern_child_subject_place(scrutinee_place, field_place, self.ast.get_start(pat_node))
                 let next_test_bb = self.new_block()
                 self.switch_to(cur_test_bb)
@@ -11312,7 +11334,7 @@ impl MirBuilder:
                         continue
                     let field_name = self.sema.type_reflection_field_name(struct_ty, bi)
                     let field_ty = self.sema.type_reflection_field_type_frozen(struct_ty, bi)
-                    let field_place = self.body.new_field_place(struct_subject_place, field_name, field_ty)
+                    let field_place = self.body.new_named_field_place(struct_subject_place, field_name, bi, field_ty)
                     let child_place = self.pattern_child_subject_place(scrutinee_place, field_place, self.ast.get_start(pat_node))
                     let inner = self.lower_pattern(inner_pat, child_place)
                     for i in 0..inner.len():
@@ -11427,7 +11449,7 @@ impl MirBuilder:
                 let field_ty = self.struct_pattern_field_type(struct_ty, field_name)
                 if field_ty == 0:
                     return out
-                let field_place = self.body.new_field_place(struct_subject_place, field_name, field_ty)
+                let field_place = self.named_field_place(struct_subject_place, field_name, field_ty, 0)
                 let child_place = self.pattern_child_subject_place(scrutinee_place, field_place, self.ast.get_start(pat_node))
                 if field_pat != 0:
                     let inner = self.lower_pattern(field_pat, child_place)
@@ -11464,7 +11486,7 @@ impl MirBuilder:
                     let rest_fty = self.sema.type_reflection_field_type_frozen(rest_subject_ty, fi)
                     if self.type_needs_value_drop(rest_fty) == 0:
                         continue
-                    let rest_fplace = self.body.new_field_place(struct_subject_place, rest_fname, rest_fty)
+                    let rest_fplace = self.body.new_named_field_place(struct_subject_place, rest_fname, fi, rest_fty)
                     let rest_local = self.body.new_local(rest_fty, 0, 0, 1)
                     self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, rest_local, 0, self.ast.get_start(pat_node))
                     self.schedule_drop(rest_local, DropKind.DK_VALUE)
@@ -15629,7 +15651,7 @@ impl MirBuilder:
         for fi in 0..struct_fc:
             let f_name_sym: i32 = self.sema.type_extra[(struct_extra + fi * 3)]
             let field_ty = self.struct_field_type(ty, f_name_sym)
-            let src_field_place = self.body.new_field_place(base_place, f_name_sym, field_ty)
+            let src_field_place = self.body.new_named_field_place(base_place, f_name_sym, fi, field_ty)
             var update_idx = -1
             for ui in 0..field_updates_count:
                 if self.ast.get_extra(field_updates_start + ui * 2) == f_name_sym:
@@ -15759,7 +15781,7 @@ impl MirBuilder:
         let field_place = if tuple_idx >= 0:
             self.body.new_tuple_index_place(payload_place, tuple_idx, field_ty)
         else:
-            self.body.new_field_place(payload_place, member_sym, field_ty)
+            self.named_field_place(payload_place, member_sym, field_ty, 0)
         let field_op_kind = if self.sema.is_copy_frozen(field_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE
         let field_op = self.body.new_operand(field_op_kind, field_place)
         if field_ty == result_ty:
@@ -16115,6 +16137,7 @@ impl MirBuilder:
                 capture_sources.push(self.closure_capture_source(captures[ci], node, ci))
         var child = MirBuilder.init(self.sema, self.ast, self.pool, body_sym)
         child.contextual_fact_sig_idx = if not is_async and captures.len() > 0: 0 else: self.contextual_fact_sig_idx
+        child.body.instance_sym = self.body.instance_sym
         child.body.anonymous_type = ty
         child.body.anonymous_capture_count = captures.len() as i32
         child.body.local_type_ids[0] = ret_ty
@@ -18107,9 +18130,19 @@ fn lower_generator_constructor(sema: &Sema, ast_pool: AstPool, pool: InternPool,
 // symbol, `body_sym` the constructor's body): the producer — the gen fn's
 // body with its consumer's body as a last parameter — whose MIR body leads,
 // then the constructor and `each`.
-fn lower_generator_functions(sema: &Sema, ast_pool: AstPool, pool: InternPool, fn_node: i32, fn_sym: i32, body_sym: i32, sig_idx: i32) -> LoweredFunction:
+// The builder of a specialization's body: Sema's per-instance facts are
+// keyed by its symbol.
+fn specialization_builder(sema: &Sema, ast_pool: AstPool, pool: InternPool, mono_sym: i32) -> MirBuilder:
+    var builder = MirBuilder.init(sema, ast_pool, pool, mono_sym)
+    builder.body.instance_sym = mono_sym
+    builder
+
+// `instance_sym`: the specialization a generic gen fn's producer belongs to
+// (0 for a non-generic one).
+fn lower_generator_functions(sema: &Sema, ast_pool: AstPool, pool: InternPool, fn_node: i32, fn_sym: i32, body_sym: i32, sig_idx: i32, instance_sym: i32) -> LoweredFunction:
     let run_sym: i32 = sema.generator_fn_run_syms.get(fn_sym).unwrap()
-    let producer_builder = MirBuilder.init(sema, ast_pool, pool, mir_symbol_for_pool(sema, pool, run_sym))
+    var producer_builder = MirBuilder.init(sema, ast_pool, pool, mir_symbol_for_pool(sema, pool, run_sym))
+    producer_builder.body.instance_sym = instance_sym
     var lowered = lower_fn_with_sig(move producer_builder, fn_node, sema.get_sig(run_sym))
     lowered.anonymous_bodies.push(lower_generator_constructor(sema, ast_pool, pool, fn_node, fn_sym, body_sym, sig_idx))
     lowered.anonymous_bodies.push(lower_generator_each_body(sema, ast_pool, pool, fn_sym))
@@ -18134,7 +18167,7 @@ fn lower_generator_each_body(sema: &Sema, ast_pool: AstPool, pool: InternPool, f
     for fi in 0..sema.get_type_d2(state_tid):
         let field_sym: i32 = sema.type_extra[(field_start + fi * 3)]
         let field_ty: i32 = sema.type_extra[(field_start + fi * 3 + 1)]
-        let field_place = builder.body.new_field_place(self_place, field_sym, field_ty)
+        let field_place = builder.body.new_named_field_place(self_place, field_sym, fi, field_ty)
         if fi == 0 and sema.generator_fn_receiver_views.contains(fn_sym):
             // The producer takes the receiver by place: the place the view
             // names.
@@ -18293,9 +18326,9 @@ fn lower_concrete_specialization(sema: Sema, ast_pool: AstPool, pool: InternPool
     if decl_index >= 0:
         sema.update_decl_source_context(decl_index)
     let lowered = if (ast_pool.get_data2(fn_node) / FnFlags.GEN) % 2 == 1:
-        lower_generator_functions(&sema, ast_pool, pool, fn_node, mono_sym, mono_sym, sig_idx)
+        lower_generator_functions(&sema, ast_pool, pool, fn_node, mono_sym, mono_sym, sig_idx, mono_sym)
     else:
-        lower_fn_with_sig(MirBuilder.init(&sema, ast_pool, pool, mono_sym), fn_node, sig_idx)
+        lower_fn_with_sig(specialization_builder(&sema, ast_pool, pool, mono_sym), fn_node, sig_idx)
     sema.local_file_id = saved_file_id
     sema.current_module_path = saved_module_path
     sema.current_module_has_ci = saved_module_has_ci
@@ -18369,7 +18402,7 @@ pub fn lower_module(input_sema: Sema, ast_pool: AstPool, pool: InternPool) -> Mi
             let sig_idx = sema.get_sig(fn_sym)
             if sig_idx < 0:
                 continue
-            mir_mod.add_lowered_function(lower_generator_functions(&sema, ast_pool, pool, decl as i32, fn_sym, mir_fn_sym, sig_idx))
+            mir_mod.add_lowered_function(lower_generator_functions(&sema, ast_pool, pool, decl as i32, fn_sym, mir_fn_sym, sig_idx, 0))
             continue
         let sig_idx = sema.get_sig(fn_sym)
         var builder = MirBuilder.init(&sema, ast_pool, pool, mir_fn_sym)
