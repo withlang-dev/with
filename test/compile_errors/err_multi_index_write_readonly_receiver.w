@@ -8,7 +8,7 @@ impl MultiIndex[i32] for Tensor:
         self.value
 
 impl MultiIndexMut[i32] for Tensor:
-    fn multi_index_set(mut self: Self, specs: &[IndexSpec], count: i32, v: i32) -> Unit:
+    fn multi_index_set(mut self: Self, specs: &[IndexSpec], count: i32, v: i32):
         self.value = v
 
 fn overwrite(t: &Tensor):
