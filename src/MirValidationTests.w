@@ -861,6 +861,13 @@ pub fn mir_test_resolution_places() -> Unit:
     assert(mir_let_binding_verdict(false, true).contains("owning local"))
     assert(mir_let_binding_verdict(true, true) == "")
     assert(mir_let_binding_verdict(false, false) == "")
+    // D65 phase 4: a call argument's transfer against Sema's ownership.
+    assert(mir_call_arg_transfer_verdict(OperandKind.OK_MOVE, true, true, false).contains("Sema borrows"))
+    assert(mir_call_arg_transfer_verdict(OperandKind.OK_COPY, true, false, true).contains("two owners"))
+    assert(mir_call_arg_transfer_verdict(OperandKind.OK_MOVE, true, false, true) == "")
+    assert(mir_call_arg_transfer_verdict(OperandKind.OK_COPY, true, true, false) == "")
+    // A statement temporary (an explicit `move x` or `copy x`) is not judged.
+    assert(mir_call_arg_transfer_verdict(OperandKind.OK_MOVE, false, true, false) == "")
 
 // #1627: an enum aggregate whose `&T` payload slot receives the `T` value
 // itself — `Option[&Ctx].Some(ctx)` lowered `move ctx` there, and every

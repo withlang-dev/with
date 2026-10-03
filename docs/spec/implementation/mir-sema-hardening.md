@@ -140,6 +140,15 @@ category, alias/view origin from `expr_view_param_origins`. The audit
 compares MIR place projections with Sema's canonical projection per node.
 
 ### Phase 4 — effects
+Status: implemented for call-argument transfer (#1647, wave-d65).
+`audit:resolution` judges every call argument that reads a named owned
+binding with `mir_call_arg_transfer_verdict`: a move into a parameter Sema
+borrows (share-place, extern bit-copy) or a copy into one it consumes is a
+violation (planted in `test/internals/analysis_resolution_test.w`). Over
+`src/main.w`: 180558 arguments, 27343 judged (18417 into borrowing
+parameters), 0 violations. Not yet covered: closure captures (D62/D63's
+`{storage, captures, call_kind}` record) and `lower_callable_expr`'s own
+observe-vs-move choice.
 MIR move/borrow/capture classification per operation must agree with Sema's
 effect summary: a MIR `move` operand where Sema recorded observe (or vice
 versa) is a violation; closure environments carry Sema's

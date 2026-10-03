@@ -4051,6 +4051,20 @@ pub fn mir_field_place_verdict(proj_kind: i32, proj_field: i32, node_field: i32,
         return f"field base is ty {mir_base} in MIR, ty {sema_base} after Sema's autoderef"
     ""
 
+// D65 phase 4 (#1647): one call argument's transfer against Sema's
+// ownership of the parameter. `named_owned_place`: the operand reads a
+// named binding's place of a non-Copy type (a statement temporary — an
+// explicit `move x` into a borrowing parameter, a `copy x` clone — is the
+// form that exists to differ). "" when they agree.
+pub fn mir_call_arg_transfer_verdict(operand_kind: i32, named_owned_place: bool, sema_borrows: bool, sema_consumes: bool) -> str:
+    if not named_owned_place:
+        return ""
+    if operand_kind == OperandKind.OK_MOVE and sema_borrows:
+        return "MIR moves an argument into a parameter Sema borrows: the caller's binding is reset while it still owns the value"
+    if operand_kind == OperandKind.OK_COPY and sema_consumes:
+        return "MIR copies an owned argument into a parameter Sema consumes: two owners of one value"
+    ""
+
 // D65 phase 3 (#1647): an immutable non-Copy `let` against Sema's binding
 // category. "" when MIR materializes what Sema bound.
 pub fn mir_let_binding_verdict(mir_alias: bool, sema_place_view: bool) -> str:

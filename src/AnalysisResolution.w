@@ -20,9 +20,10 @@
 // never lowered. Phase 3 covers places and bindings: every place lowered
 // from a source field access (its projection, its type, its base after
 // Sema's autoderef) and every immutable non-Copy `let` (alias of a place
-// iff Sema bound a view). Phase 4 (effects) and phase 2 (codegen mode
-// provenance, audit:codegen) follow the plan in
-// docs/spec/implementation/mir-sema-hardening.md.
+// iff Sema bound a view). Phase 4 covers call-argument transfer: a named
+// owned binding moves only into a parameter Sema consumes and is copied
+// only into one it borrows. Phase 2 (codegen mode provenance) is
+// audit:codegen's; the plan is docs/spec/implementation/mir-sema-hardening.md.
 
 use AnalysisTypes
 use Ast
@@ -381,6 +382,8 @@ fn resolution_audit_field_places(report: &AnalysisReport, sema: &Sema, mir_mod: 
 // #747 field move); an alias over an owner leaves a value nobody drops.
 fn resolution_audit_let_bindings(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> i32:
     var checked = 0
+    var aliases = 0
+    var views = 0
     for bi in 0..mir_mod.bodies.len() as i32:
         let body = &mir_mod.bodies[bi]
         if body.lowering_failed != 0: continue
@@ -393,15 +396,64 @@ fn resolution_audit_let_bindings(report: &AnalysisReport, sema: &Sema, mir_mod: 
             if bind_ty <= 0 or sema.is_copy_frozen(bind_ty as TypeId) != 0: continue
             if sema.drop_consumed_binding_values.contains(sema.ast.get_data1(node)): continue
             checked = checked + 1
+            if body.let_binding_aliases[li] != 0: aliases = aliases + 1
+            if (sema.view_bound_let_nodes.get(node) ?? 0) == 2: views = views + 1
             let verdict = mir_let_binding_verdict(body.let_binding_aliases[li] != 0, (sema.view_bound_let_nodes.get(node) ?? 0) == 2)
             if verdict.len() > 0:
                 report.fail(f"resolution: {pool.resolve(body.fn_sym)} at {resolution_where(sema, &site, node)}: `{pool.resolve(sema.ast.get_data0(node))}`: {verdict}")
+    report.note(f"resolution-audit: let-bindings judged={checked} mir-aliases={aliases} sema-place-views={views}")
+    checked
+
+// Phase 4: every call argument that reads a named owned binding transfers
+// it the way Sema's signature says (D5/D65): a share-place parameter or an
+// extern bit-copy parameter borrows, any other non-Copy parameter consumes.
+fn resolution_audit_call_effects(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> i32:
+    var checked = 0
+    var judged = 0
+    var judged_borrows = 0
+    for bi in 0..mir_mod.bodies.len() as i32:
+        let body = &mir_mod.bodies[bi]
+        if body.lowering_failed != 0: continue
+        let site = resolution_site(sema, pool, body, source_path, source_text)
+        for bb in 0..body.block_count():
+            if body.term_kind(bb) != TermKind.TK_CALL: continue
+            let call_id = body.term_data1(bb)
+            if call_id < 0 or call_id >= body.call_arg_starts.len() as i32: continue
+            if body.call_intrinsic(call_id) != MirIntrinsic.NONE: continue
+            let sig = body.call_sig_index(call_id)
+            if sig < 0 or sig >= sema.sig_names.len() as i32: continue
+            let argc = body.call_arg_counts[call_id]
+            if argc != sema.sig_get_param_count(sig): continue
+            let callee = sema.sig_names[sig]
+            for ai in 0..argc:
+                let op = body.call_arg_operands[(body.call_arg_starts[call_id] + ai)]
+                if op < 0 or op >= body.operand_kinds.len() as i32: continue
+                let kind = body.operand_kinds[op]
+                if kind != OperandKind.OK_MOVE and kind != OperandKind.OK_COPY: continue
+                let place = body.operand_d0[op]
+                if place < 0 or place >= body.place_locals.len() as i32: continue
+                let local = body.place_locals[place]
+                let named = local >= 0 and local < body.local_names.len() as i32 and body.local_names[local] != 0
+                let param_ty = sema.sig_param_type(sig, ai)
+                let owned = param_ty > 0 and sema.is_copy_frozen(param_ty as TypeId) == 0
+                let place_ty = body.place_sema_types[place]
+                let place_owned = place_ty > 0 and sema.is_copy_frozen(place_ty as TypeId) == 0 and sema.get_type_kind(sema.resolve_alias(place_ty as TypeId)) != TypeKind.TY_REF
+                let borrows = sema.sig_param_uses_value_ref_abi(sig, ai) != 0 or sema.extern_param_is_bit_copy(callee, sig, ai) != 0
+                checked = checked + 1
+                if named and place_owned:
+                    judged = judged + 1
+                    if borrows: judged_borrows = judged_borrows + 1
+                let verdict = mir_call_arg_transfer_verdict(kind, named and place_owned, borrows, owned and not borrows)
+                if verdict.len() > 0:
+                    report.fail(f"resolution: {pool.resolve(body.fn_sym)} at {resolution_where(sema, &site, body.call_ast_node(call_id))}: call to `{sema.pool_resolve(callee)}` argument {ai}: {verdict}")
+    report.note(f"resolution-audit: call-arguments named-owned={judged} into-borrowing-params={judged_borrows}")
     checked
 
 pub fn analysis_audit_resolution(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str):
     let calls = resolution_audit_calls(report, sema, mir_mod, pool, source_path, source_text)
     let field_places = resolution_audit_field_places(report, sema, mir_mod, pool, source_path, source_text)
     let lets = resolution_audit_let_bindings(report, sema, mir_mod, pool, source_path, source_text)
-    report.note(f"resolution-audit: field-places={field_places} let-bindings={lets}")
+    let effects = resolution_audit_call_effects(report, sema, mir_mod, pool, source_path, source_text)
+    report.note(f"resolution-audit: field-places={field_places} let-bindings={lets} call-arguments={effects}")
     let unlowered = resolution_audit_unlowered_calls(report, sema, mir_mod, pool, source_path, source_text)
     report.note(f"resolution-audit: mir-calls={calls} sema-calls-in-lowered-bodies-without-mir-call={unlowered}")
