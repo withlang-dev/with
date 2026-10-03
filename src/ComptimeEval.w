@@ -6499,23 +6499,34 @@ impl ComptimeEvaluator:
                 if count_signal.value.kind != ComptimeValueKind.CV_INT or count_signal.value.data0 < 0:
                     return self.fail(fill_count_node, "`[value; N]`: the count is not a compile-time integer constant (§4.3a)")
                 count = count_signal.value.data0 as i32
-        let start = self.extra_values.len() as i32
+        // Every element first, then the run of extra values: an element's
+        // own evaluation pushes extra values (a call's arguments, a nested
+        // aggregate), which interleaved with the elements (#2026).
+        let elems: Vec[ComptimeValue] = Vec.new()
         for i in 0..count:
             var elem_signal = self.eval_expr(self.ast.get_extra(extra_start + (if fill_count_node != 0: 0 else: i)))
             if elem_signal.kind != ComptimeControlKind.CTL_VALUE:
                 return elem_signal
-            self.push_extra_value(move elem_signal.value)
+            elems.push(move elem_signal.value)
+        let start = self.extra_values.len() as i32
+        for elem in elems.into_iter():
+            self.push_extra_value(elem)
         comptime_control_value(comptime_value_array(self.node_type_or(node, 0), start, count))
 
     mut fn eval_tuple(node: i32) -> ComptimeControl:
         let extra_start = self.ast.get_data0(node)
         let count = self.ast.get_data1(node)
-        let start = self.extra_values.len() as i32
+        // As eval_array: the elements first, then their run (#2026: a
+        // `(rc, fs.read_text(p))` tuple read back `p`, the call's argument).
+        let elems: Vec[ComptimeValue] = Vec.new()
         for i in 0..count:
             var elem_signal = self.eval_expr(self.ast.get_extra(extra_start + i))
             if elem_signal.kind != ComptimeControlKind.CTL_VALUE:
                 return elem_signal
-            self.push_extra_value(move elem_signal.value)
+            elems.push(move elem_signal.value)
+        let start = self.extra_values.len() as i32
+        for elem in elems.into_iter():
+            self.push_extra_value(elem)
         comptime_control_value(comptime_value_tuple(self.node_type_or(node, 0), start, count))
 
     mut fn eval_struct_lit(node: i32) -> ComptimeControl:
@@ -7059,6 +7070,29 @@ impl ComptimeEvaluator:
         if op == BinaryOp.OP_BIT_XOR:
             return comptime_control_value(self.checked_int_value(result_ty, lv ^ rv))
         self.unsupported(node)
+
+    // A pattern let (§9.7; NK_LET_ELSE over its NK_LET_PATTERN head):
+    // `let (rc, out) = f()` binds the pattern's names; a refutable pattern
+    // that does not match runs its `else`, which does not fall through.
+    // #2026: build.w's `let (rc, audit) = …` reached the generic refusal.
+    mut fn eval_let_pattern(node: i32) -> ComptimeControl:
+        let head = self.ast.get_data0(node)
+        var value_signal = self.eval_expr(self.ast.get_data1(node))
+        if value_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return value_signal
+        let slot_start = self.slot_syms.len() as i32
+        if self.match_pattern(self.ast.get_data0(head), move value_signal.value, node) != 0:
+            if self.ast.get_data1(head) % 2 != 0:
+                for i in slot_start..self.slot_muts.len() as i32:
+                    self.slot_muts[i] = 1
+            return comptime_control_value(comptime_value_void(self.sema.ty_void as i32))
+        let else_body = self.ast.get_data2(node)
+        if else_body == 0:
+            return self.fail(node, "the let pattern did not match its value")
+        let else_signal = self.eval_expr(else_body)
+        if else_signal.kind == ComptimeControlKind.CTL_VALUE:
+            return self.fail(else_body, "a let-else branch must not fall through")
+        else_signal
 
     mut fn eval_let_binding(node: i32) -> ComptimeControl:
         var value_signal = self.eval_expr(self.ast.get_data1(node))
@@ -8288,6 +8322,8 @@ impl ComptimeEvaluator:
             return self.eval_block(node)
         if kind == NodeKind.NK_LET_BINDING:
             return self.eval_let_binding(node)
+        if kind == NodeKind.NK_LET_ELSE:
+            return self.eval_let_pattern(node)
         if kind == NodeKind.NK_ASSIGN:
             return self.eval_assign(node)
         if kind == NodeKind.NK_IF_EXPR:
