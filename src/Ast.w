@@ -1830,13 +1830,34 @@ impl AstPool:
         let nested_starts: Vec[i32] = Vec.new()
         let nested_ends: Vec[i32] = Vec.new()
         let callees: HashMap[i32, i32] = HashMap.new()
+        // Names a binding in the body takes. Sema refuses that binding
+        // (§29.8); its uses stay the binding's, so the refusal is the one
+        // diagnostic rather than the head of a cascade through `self.<name>`.
+        let bound: HashMap[i32, i32] = HashMap.new()
         for n in below + 1..fn_node as i32:
-            let kind = self.kind(n as NodeId)
+            let node = n as NodeId
+            let kind = self.kind(node)
             if kind == NodeKind.NK_FN_DECL:
-                nested_starts.push(self.get_start(n as NodeId))
-                nested_ends.push(self.get_end(n as NodeId))
+                nested_starts.push(self.get_start(node))
+                nested_ends.push(self.get_end(node))
             else if kind == NodeKind.NK_CALL:
-                callees.insert(self.get_data0(n as NodeId), 1)
+                callees.insert(self.get_data0(node), 1)
+            if self.file(node) as i32 != file or self.get_start(node) < body_start or self.get_end(node) > body_end:
+                continue
+            if kind == NodeKind.NK_LET_BINDING or kind == NodeKind.NK_PAT_IDENT or kind == NodeKind.NK_PAT_AT_BINDING or kind == NodeKind.NK_PAT_TYPED_BIND or kind == NodeKind.NK_PAT_REST:
+                bound.insert(self.get_data0(node), 1)
+            else if kind == NodeKind.NK_FOR and not self.for_binding_is_pattern(node):
+                bound.insert(self.get_data0(node), 1)
+            else if kind == NodeKind.NK_CLOSURE:
+                for pi in 0..self.get_data2(node):
+                    bound.insert(self.get_extra(self.get_data1(node) + pi * 2), 1)
+            else if kind == NodeKind.NK_TUPLE_DESTRUCTURE:
+                for ti in 0..self.get_data1(node):
+                    bound.insert(self.get_extra(self.get_data0(node) + ti), 1)
+            else if kind == NodeKind.NK_PAT_STRUCT:
+                for si in 0..self.get_data2(node):
+                    if self.get_extra(self.get_data1(node) + 1 + si * 2 + 1) == 0:
+                        bound.insert(self.get_extra(self.get_data1(node) + 1 + si * 2), 1)
         for n in below + 1..fn_node as i32:
             let node = n as NodeId
             if self.kind(node) != NodeKind.NK_IDENT or self.file(node) as i32 != file:
@@ -1844,7 +1865,7 @@ impl AstPool:
             let sym = self.get_data0(node)
             let start = self.get_start(node)
             let end = self.get_end(node)
-            if start < body_start or end > body_end or not self.receiver_type_has_field(owner, sym):
+            if start < body_start or end > body_end or not self.receiver_type_has_field(owner, sym) or bound.contains(sym):
                 continue
             var is_param = false
             for pi in 0..param_count:
