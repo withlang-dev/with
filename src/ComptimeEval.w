@@ -7487,12 +7487,16 @@ impl ComptimeEvaluator:
     // Consumes: saved subst vecs move back into sema (see restore_label_registry).
     mut fn restore_generic_substitutions(snapshot: ComptimeGenericSubstSnapshot):
         var owned = move snapshot
-        for i in 0..owned.tp_syms.len() as i32:
+        // Last to first: a parameter listed twice was saved twice, and only
+        // the first save is the caller's binding.
+        var i = owned.tp_syms.len() as i32 - 1
+        while i >= 0:
             let tp_sym = owned.tp_syms[i]
             if owned.saved_named_had[i] == 1:
                 self.sema.named_types.insert(tp_sym, owned.saved_named_tys[i])
             else:
                 self.sema.named_types.remove(tp_sym)
+            i = i - 1
         self.sema.generic_subst_param_syms = move owned.saved_subst_syms
         self.sema.generic_subst_type_ids = move owned.saved_subst_tys
 

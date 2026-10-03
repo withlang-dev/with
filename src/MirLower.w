@@ -18168,12 +18168,16 @@ fn lower_concrete_specialization(sema: Sema, ast_pool: AstPool, pool: InternPool
     sema.current_module_path = saved_module_path
     sema.current_module_has_ci = saved_module_has_ci
 
-    for i in 0..subst_count:
-        let sym = subst_syms[i]
-        if saved_named_had[i] != 0:
-            sema.named_types.insert(sym, saved_named[i])
+    // Last to first: a parameter listed twice was saved twice, and only the
+    // first save is the caller's binding.
+    var ri = subst_count - 1
+    while ri >= 0:
+        let sym = subst_syms[ri]
+        if saved_named_had[ri] != 0:
+            sema.named_types.insert(sym, saved_named[ri])
         else:
             sema.named_types.remove(sym)
+        ri = ri - 1
     sema.generic_subst_param_syms = saved_subst_syms
     sema.generic_subst_type_ids = saved_subst_types
     ConcreteSpecializationLowerResult { sema, lowered }

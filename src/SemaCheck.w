@@ -5740,13 +5740,17 @@ impl Sema:
 
         self.leave_callee_lexical_env(caller_env)
 
-        // Restore named_types
-        for ti in 0..tp_count:
+        // Restore named_types last to first: a parameter may be listed twice
+        // (`fn Box.new[T]` binds the owner's `T` and its own), and the second
+        // save read the first install, so only the first save is the caller's.
+        var ti = tp_count - 1
+        while ti >= 0:
             let tp_sym = tp_syms[ti]
             if saved_had[ti] == 1:
                 self.named_types.insert(tp_sym, saved_named[ti])
             else:
                 self.named_types.remove(tp_sym)
+            ti = ti - 1
 
         self.generic_subst_param_syms = saved_generic_subst_param_syms
         self.generic_subst_type_ids = saved_generic_subst_type_ids
