@@ -42,8 +42,10 @@ fn argv5(a: &str, b: &str, c: &str, d: &str, e: &str) -> str:
 // abort or a SIGSEGV fails the lane even when the report line still matches
 // (#697: fixtures crashed AFTER printing the expected line and passed).
 fn run_under_debug_alloc(with_bin: &str, repro: &str, filter: &str) -> (i32, str):
-    let outp = "/tmp/debug_drop_out.txt"
-    let errp = "/tmp/debug_drop_err.txt"
+    // Per process: concurrent lanes (two batteries, an agent's run) shared
+    // one capture file and read each other's half-written report (#2004).
+    let outp = f"/tmp/debug_drop_{pid()}_out.txt"
+    let errp = f"/tmp/debug_drop_{pid()}_err.txt"
     let argv = if filter.len() > 0:
         argv5(with_bin, "run", "--debug-alloc", "--debug-alloc-filter=" ++ filter, repro)
     else:

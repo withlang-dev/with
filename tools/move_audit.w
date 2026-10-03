@@ -371,7 +371,8 @@ fn main:
     let candidate = argv[1]
     // BOOTSTRAP INTERIM: materialize the argv view out of the ""-join (#762).
     let baseline = if argv.len() as i32 >= 3: argv[2] ++ "" else: ""
-    let dir = "/tmp/move-audit-cells"
+    // Per process: two batteries at once shared one cell directory (#2004).
+    let dir = f"/tmp/move-audit-cells-{pid()}"
     let _ = mkdirs(dir)
     let cells = build_cells()
     var failures = 0
