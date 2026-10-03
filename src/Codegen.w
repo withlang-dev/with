@@ -4662,16 +4662,8 @@ impl Codegen:
             let offset = extra_start + 1 + fi * 3
             let f_name = self.pool.get_extra(offset)
             let f_type_node = self.pool.get_extra(offset + 1)
-            // #1984 (D65): a generic-instance field is the LLVM type of Sema's
-            // field type, the identity every MIR read of the field lowers.
-            // Resolving the node instead monomorphized the instance under a
-            // name built from its arguments' LLVM layouts
-            // (`HashMap__str__struct{ptr,i64,i64,i64}` beside
-            // `__with.HashMap.str.__with.Vec.str`): one Sema type, two LLVM
-            // structs.
             let f_sema_ty = if struct_tid > 0: self.sema.type_reflection_field_type_frozen(struct_tid, fi) else: 0
-            let f_is_generic_inst = f_sema_ty > 0 and self.sema.get_type_kind(self.sema.resolve_alias(f_sema_ty as TypeId)) == TypeKind.TY_GENERIC_INST
-            let f_ty = if f_is_generic_inst: self.sema_type_to_llvm(f_sema_ty) else: self.resolve_type(f_type_node)
+            let f_ty = self.field_llvm_type(f_sema_ty, f_type_node, name_sym, fi, false)
             self.debug_type_layout_field(name_str, fi, f_name, f_type_node, f_ty)
 
             if f_ty == 0:
@@ -4847,17 +4839,18 @@ impl Codegen:
         var max_align_ty: i64 = 0
         var max_align_size: i64 = 0
         var invalid_layout = 0
+        let union_tid = self.type_decl_sema_tid(type_node)
         for fi in 0..field_count:
             let offset = extra_start + 1 + fi * 3
             let f_name = self.pool.get_extra(offset)
             let f_type_node = self.pool.get_extra(offset + 1)
-            let f_ty = self.resolve_type(f_type_node)
+            let f_tid = if union_tid > 0: self.sema.type_reflection_field_type_frozen(union_tid, fi) else: 0
+            let f_ty = self.field_llvm_type(f_tid, f_type_node, name_sym, fi, false)
             if f_ty == 0:
                 with_eprint("error: unresolved type for field '" ++ self.intern.resolve(f_name) ++ "' in union '" ++ name_str ++ "'")
                 invalid_layout = 1
                 self.had_error = 1
             self.struct_field_types[field_start + fi] = f_ty
-            let f_tid = self.sema.resolve_type_expr_frozen(f_type_node)
             let f_size = if f_tid > 0: self.sema.type_layout_size_of_frozen(f_tid) else: self.abi_size_of(f_ty)
             let f_align = if f_tid > 0: self.sema.type_layout_align_of_frozen(f_tid) else: 1
             if f_size > max_size:
@@ -5090,6 +5083,40 @@ impl Codegen:
 
     // ── Declare enum type ─────────────────────────────────────────────
 
+    // #1647 (D65): a field's LLVM type — of a struct, a union, an enum
+    // variant's payload — is the LLVM type of Sema's type for that field: the
+    // type every MIR read of the field lowers. Resolving the field's AST type
+    // node again was a second derivation of one fact (#1984: for a generic
+    // instance it named a second LLVM struct for one Sema type). Under
+    // analysis the node's resolution is the verification audit:codegen
+    // compares; a generic instance's node is not resolved at all, since that
+    // path is the duplicate #1984 removed.
+    //
+    // A generic declaration's own body (`enum Slot[T]: Full(T)`) is not a
+    // type: a payload naming its parameter has no concrete Sema type, and
+    // its instances are Sema's generic-instance types with their own facts.
+    // The template keeps the node's codegen resolution, unjudged.
+    mut fn field_llvm_type(sema_ty: i32, type_node: i32, owner_sym: i32, subject: i32, template: bool) -> i64:
+        let fact = if sema_ty > 0: self.sema_type_to_llvm(sema_ty) else: 0
+        if fact == 0:
+            return if template: self.resolve_type(type_node) else: 0
+        let generic_inst = self.sema.get_type_kind(self.sema.resolve_alias(sema_ty as TypeId)) == TypeKind.TY_GENERIC_INST
+        let derived = if self.analysis_enabled != 0 and not generic_inst: self.resolve_type(type_node) else: fact
+        self.fact_decide(MODE_SITE_STRUCT_FIELD_TYPE, fact, derived, owner_sym, subject)
+
+    // Sema's type of payload `pi` of variant `vi` of an enum declaration
+    // (its TY_ENUM record: name, count, payload types per variant).
+    fn sema_enum_payload_type(enum_tid: i32, vi: i32, pi: i32) -> i32:
+        let resolved = self.sema.resolve_alias(enum_tid as TypeId)
+        if enum_tid <= 0 or self.sema.get_type_kind(resolved) != TypeKind.TY_ENUM: return 0
+        var pos = self.sema.get_type_d1(resolved)
+        for v in 0..self.sema.get_type_d2(resolved):
+            let count: i32 = self.sema.type_extra[(pos + 1)]
+            if v == vi:
+                return if pi < count: self.sema.type_extra[(pos + 2 + pi)] else: 0
+            pos = pos + 2 + count
+        0
+
     mut fn declare_enum_type(name_sym: i32, type_node: i32):
         let extra_start = self.pool.get_data1(type_node)
         let variant_count = self.pool.get_extra(extra_start)
@@ -5117,7 +5144,7 @@ impl Codegen:
                 let payload_fields: Vec[i64] = Vec.new()
                 for pi in 0..v_payload_count:
                     let payload_type_node = self.pool.get_extra(offset + pi)
-                    let field_ty = self.resolve_type(payload_type_node)
+                    let field_ty = self.field_llvm_type(self.sema_enum_payload_type(sema_tid, vi, pi), payload_type_node, name_sym, vi * 1000 + pi, self.type_decl_tp_count(type_node) > 0)
                     if field_ty == 0:
                         with_eprint("error: unresolved payload type for enum variant '" ++ self.intern.resolve(v_name) ++ "' in '" ++ enum_name ++ "'")
                         self.had_error = 1
@@ -5203,13 +5230,22 @@ impl Codegen:
             let payload_count = self.pool.get_extra(offset + 2)
             var payload_ty: i64 = 0
             if payload_count > 0:
+                let template = self.type_decl_tp_count(type_node) > 0
                 let payload_fields: Vec[i64] = Vec.new()
+                var payload_ok = true
                 for pi in 0..payload_count:
                     let payload_type_node = self.pool.get_extra(offset + 3 + pi)
-                    let field_ty = self.resolve_type(payload_type_node)
-                    if field_ty != 0:
-                        payload_fields.push(field_ty)
-                if payload_fields.len() as i32 == payload_count:
+                    let field_ty = self.field_llvm_type(self.sema_enum_payload_type(sema_tid, vi, pi), payload_type_node, name_sym, vi * 1000 + pi, template)
+                    // A generic declaration's payload naming its own parameter has
+                    // no layout: the template declares no payload struct (its
+                    // instances are Sema's generic-instance types).
+                    if field_ty == 0 and not template:
+                        with_eprint("error: unresolved payload type for enum variant '" ++ self.intern.resolve(v_name) ++ "' in '" ++ self.intern.resolve(name_sym) ++ "'")
+                        self.had_error = 1
+                    if field_ty == 0:
+                        payload_ok = false
+                    payload_fields.push(field_ty)
+                if payload_ok:
                     payload_ty = self.tuple_type_from_elems(&payload_fields)
             offset = offset + 3 + payload_count
             self.disc_enum_variant_names[v_start + vi] = v_name
@@ -5295,9 +5331,11 @@ pub const MODE_SITE_PARAM_PLACE_ALIAS: i32 = 7
 // #1647: a reference's place pointer (mir_try_place_ptr_for_ref).
 pub const MODE_SITE_REF_VALUE_IS_ADDRESS: i32 = 8
 pub const MODE_SITE_REF_SLOT_HOLDS_POINTER: i32 = 9
-// #1647: a value a site once re-derived — a type-level argument.
+// #1647: values a site once re-derived — a type-level argument, a field's
+// LLVM type.
 pub const MODE_SITE_SIZEOF_TYPE_ARG: i32 = 10
-pub const MODE_SITE_COUNT: i32 = 11
+pub const MODE_SITE_STRUCT_FIELD_TYPE: i32 = 11
+pub const MODE_SITE_COUNT: i32 = 12
 
 pub fn mode_site_name(site: i32) -> str:
     if site == MODE_SITE_FIELD_TYPE_THROUGH_ADDRESS: return "projected-type field through an address"
@@ -5311,17 +5349,19 @@ pub fn mode_site_name(site: i32) -> str:
     if site == MODE_SITE_REF_VALUE_IS_ADDRESS: return "place-for-ref local value is the address"
     if site == MODE_SITE_REF_SLOT_HOLDS_POINTER: return "place-for-ref slot holds a pointer value"
     if site == MODE_SITE_SIZEOF_TYPE_ARG: return "sizeof/alignof type argument"
+    if site == MODE_SITE_STRUCT_FIELD_TYPE: return "struct field LLVM type"
     "unknown"
 
 pub fn mode_site_owner(site: i32) -> str:
     if site == MODE_SITE_MARSHAL_EXISTING_POINTER: return "the operand's Sema category"
     if site == MODE_SITE_PARAM_BY_ADDRESS or site == MODE_SITE_PARAM_PLACE_ALIAS or site == MODE_SITE_EVAL_INDIRECT_LOCAL or site == MODE_SITE_REF_VALUE_IS_ADDRESS: return "FnAbi's PassMode"
     if site == MODE_SITE_SIZEOF_TYPE_ARG: return "Sema's type argument"
+    if site == MODE_SITE_STRUCT_FIELD_TYPE: return "Sema's field type"
     "Sema's place category"
 
 // What a site re-derived its fact from before it read the owner.
 pub fn mode_site_derivation(site: i32) -> str:
-    if site == MODE_SITE_SIZEOF_TYPE_ARG: return "the AST type node"
+    if site == MODE_SITE_SIZEOF_TYPE_ARG or site == MODE_SITE_STRUCT_FIELD_TYPE: return "the AST type node"
     "the LLVM type"
 
 // Symbol-naming rules live in src/FnAbi.w (docs/spec/abi/with-abi.md §5); this is
