@@ -7367,6 +7367,18 @@ impl Sema:
         let path = self.fn_symbol_source_path(fn_sym)
         sema_path_is_std_module(path, "sync") or sema_path_is_std_module(path, "collections")
 
+    // A cast to an integer, float or bool from a value with no numeric
+    // conversion: a str, an array, a slice, a tuple, or a struct that is
+    // neither bitpacked nor a single-field wrapper (§4.4).
+    fn cast_to_scalar_has_no_conversion(src: i32, src_kind: i32, cast_kind: i32) -> bool:
+        if cast_kind != TypeKind.TY_INT and cast_kind != TypeKind.TY_FLOAT and cast_kind != TypeKind.TY_BOOL:
+            return false
+        if src_kind == TypeKind.TY_STR or src_kind == TypeKind.TY_ARRAY or src_kind == TypeKind.TY_SLICE or src_kind == TypeKind.TY_TUPLE:
+            return true
+        if src_kind == TypeKind.TY_STRUCT:
+            return not self.bitpacked_types.contains(src) and self.get_type_d2(src as TypeId) != 1
+        false
+
     // D65 phase 5 (#1647): the one record of what a call's callee resolved
     // to; check_call writes it at the branch that decides.
     mut fn note_call_callee(node: i32, kind: CallCalleeKind):
@@ -9841,6 +9853,13 @@ impl Sema:
                     return vector_cast as TypeId
                 if src_kind == TypeKind.TY_ARRAY and cast_kind == TypeKind.TY_PTR:
                     self.emit_error("arrays do not decay to pointers; use &array[0] as *T", node)
+                    return 0 as TypeId
+                // #2043 (D65): acceptance is Sema's. A text or an aggregate
+                // has no number; MIR's validator met these casts only after
+                // Sema had accepted them ("invalid MIR before codegen").
+                if self.cast_to_scalar_has_no_conversion(src_resolved as i32, src_kind, cast_kind):
+                    let what = if src_kind == TypeKind.TY_STR: "text" else: "compound value"
+                    self.emit_error(f"cannot cast `{self.type_name(src_tid as i32)}` to `{self.type_name(cast_tid as i32)}`: a {what} has no numeric value to convert", node)
                     return 0 as TypeId
                 if src_kind == TypeKind.TY_PTR and (cast_kind == TypeKind.TY_REF or cast_kind == TypeKind.TY_SLICE):
                     self.note_raw_pointer_validity_precondition(self.ast.get_data0(node))
@@ -13906,6 +13925,13 @@ impl Sema:
         var value_core = value
         while value_core != 0 and self.ast.kind(value_core) == NodeKind.NK_GROUPED:
             value_core = self.ast.get_data0(value_core)
+        // #2043 (D65): the place a wildcard names stays where it is — MIR
+        // reads this record and moves nothing (the move it made was the
+        // ownership validator's "move of _1, which a path already moved").
+        if self.pool_resolve(name) == "_" and value_core != 0:
+            let discard_kind = self.ast.kind(value_core)
+            if discard_kind == NodeKind.NK_IDENT or discard_kind == NodeKind.NK_FIELD_ACCESS:
+                self.discard_place_lets.insert(node, 1)
         if self.pool_resolve(name) != "_" and not self.view_projection_exprs.contains(value) and not self.view_projection_exprs.contains(value_core):
             // §2.4: a drop-body let of a self field CONSUMES (the 84ebff6d
             // observation rule contradicted the spec — spec_ss02_4 pins the
