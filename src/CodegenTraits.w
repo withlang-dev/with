@@ -578,7 +578,7 @@ impl Codegen:
                             self.type_bindings_len = self.type_bindings_len + 1
                         ti = ti + 1
 
-        self.generate_default_trait_method_for_impl(impl_type_sym, method_idx)
+        self.generate_default_trait_method_for_impl(impl_type_sym, method_idx, impl_node)
 
         while self.type_binding_syms.len() > saved_vec_len:
             let _ = self.type_binding_syms.pop()
@@ -586,15 +586,14 @@ impl Codegen:
             let _ = self.type_binding_types.pop()
         self.type_bindings_len = saved_len
 
-    mut fn generate_default_trait_method_for_impl(impl_type_sym: i32, method_idx: i32):
+    mut fn generate_default_trait_method_for_impl(impl_type_sym: i32, method_idx: i32, impl_node: i32):
         let body_node: i32 = self.trait_method_default_bodies[method_idx]
         if body_node == 0:
             return
 
         let method_sym = self.trait_method_names[method_idx]
         let method_name = self.intern.resolve(method_sym)
-        let type_name = self.intern.resolve(impl_type_sym)
-        let mangled = type_name ++ "." ++ method_name
+        let mangled = self.impl_method_name_text(impl_node, method_name)
         let fn_sym = self.intern.intern(mangled)
         if self.fn_values.get(fn_sym).is_some():
             return
@@ -609,7 +608,7 @@ impl Codegen:
         if param_count < 0:
             return
 
-        let sig_idx = self.sema.lookup_method_sig(impl_type_sym, method_sym)
+        let sig_idx = self.sema.lookup_method_sig(self.sema.impl_owner_key_symbol(impl_node), self.codegen_sema_sym_for(method_sym))
         if sig_idx < 0 or self.sema.sig_get_param_count(sig_idx) != param_count:
             with_eprint(f"error: default method '{mangled}' has no finalized FnAbi signature")
             self.had_error = 1
@@ -900,7 +899,7 @@ impl Codegen:
             wl_position_at_end(self.builder, saved_bb)
 
     mut fn generate_default_trait_methods_for_impl(impl_node: i32):
-        let impl_type_sym = self.pool.get_data0(impl_node)
+        let impl_type_sym = self.impl_cg_type_sym(impl_node)
         let trait_sym = self.pool.get_data2(impl_node)
         if trait_sym == 0:
             return
@@ -927,7 +926,7 @@ impl Codegen:
                 self.generate_default_trait_methods_for_impl(decl)
 
     mut fn generate_trait_vtable_for_impl(impl_node: i32):
-        let impl_type_sym = self.pool.get_data0(impl_node)
+        let impl_type_sym = self.impl_cg_type_sym(impl_node)
         let trait_sym = self.pool.get_data2(impl_node)
         if trait_sym == 0:
             return
@@ -950,10 +949,10 @@ impl Codegen:
             let consumes_self =
                 if param_count > 0 and fn_param_is_move_self(self.pool.fn_param_flags(param_start, 0)) != 0: 1
                 else: 0
-            let method_name = self.intern.resolve(method_sym)
-            let type_name = self.intern.resolve(impl_type_sym)
-            let mangled = type_name ++ "." ++ method_name
-            var impl_fn_sym = self.intern.intern(mangled)
+            // The impl's method is the one Sema registered for this impl's
+            // owner key (#1457), by name only where the registry has no row.
+            let registered = self.sema.lookup_method_fn(self.sema.impl_owner_key_symbol(impl_node), self.codegen_sema_sym_for(method_sym))
+            var impl_fn_sym = if registered != 0: self.codegen_sym_for_sema_sym(registered) else: self.intern.intern(self.impl_method_name_text(impl_node, self.intern.resolve(method_sym)))
             var fv = self.fn_values.get(impl_fn_sym)
             var ft = self.fn_fn_types.get(impl_fn_sym)
             if not fv.is_some() or not ft.is_some():

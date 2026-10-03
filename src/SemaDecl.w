@@ -73,6 +73,7 @@ impl Sema:
     mut fn compute_colliding_type_names():
         self.colliding_type_names = sema_new_map_i32_i32()
         self.type_identity_syms = sema_new_map_i64_i32()
+        self.impl_identity_traits = sema_new_map_i64_i32()
         let first_paths: HashMap[i32, i32] = HashMap.new()
         let dc = self.ast.decl_count()
         for di in 0..dc:
@@ -119,7 +120,14 @@ impl Sema:
     // module's type first (§18.1); an impl of a same-named type imported from
     // elsewhere resolves it the way the impl's module sees it.
     fn method_decl_owner_key_symbol(decl: i32, parsed_fn_sym: i32) -> i32:
-        let owner = self.method_decl_owner_symbol(decl, parsed_fn_sym)
+        self.owner_key_symbol_from(self.method_decl_owner_symbol(decl, parsed_fn_sym), decl)
+
+    // The owner key of an impl declaration's methods (inherent, trait and
+    // default ones alike): the same rule as a method declaration's.
+    fn impl_owner_key_symbol(impl_node: i32) -> i32:
+        self.owner_key_symbol_from(self.ast.get_data0(impl_node), impl_node)
+
+    fn owner_key_symbol_from(owner: i32, decl: i32) -> i32:
         if owner == 0 or not self.colliding_type_names.contains(owner):
             return owner
         let own_path: str = self.decl_source_path_for_node(decl)
@@ -2474,6 +2482,9 @@ impl Sema:
         let mt_start: i32 = self.trait_method_starts[trait_idx]
         let mt_count = self.trait_method_counts[trait_idx]
         let impl_type_tid = self.lookup_named_type_visible(impl_type_sym)
+        // The registry key of this impl's methods (#1457): the type's name,
+        // or its declaration's identity when two files declare the name.
+        let impl_key = self.impl_owner_key_symbol(impl_node)
         for mi in 0..mt_count:
             let mt_idx = mt_start + mi
             let default_body = self.trait_method_default_bodies[mt_idx]
@@ -2482,10 +2493,10 @@ impl Sema:
             let method_sym: i32 = self.trait_method_names[mt_idx]
             if self.impl_decl_has_method(impl_node, method_sym) != 0:
                 continue
-            if self.trait_default_method_sig_exists(impl_type_sym, method_sym) != 0:
+            if self.trait_default_method_sig_exists(impl_key, method_sym) != 0:
                 continue
 
-            let type_name: str = with_str_clone_ref(self.pool_resolve(impl_type_sym))
+            let type_name: str = with_str_clone_ref(self.pool_resolve(impl_key))
             let method_name: str = with_str_clone_ref(self.pool_resolve(method_sym))
             let fn_sym = self.pool_intern(type_name ++ "." ++ method_name)
             let param_start: i32 = self.trait_method_param_starts[mt_idx]
@@ -2507,7 +2518,7 @@ impl Sema:
                 for pi in 0..param_count:
                     if self.fn_param_uses_value_ref_abi(param_start, pi, impl_type_sym, impl_type_tid) != 0:
                         self.set_sig_param_value_ref_abi(sig_idx, pi, 1)
-                let key = sema_pair_key(impl_type_sym, method_sym)
+                let key = sema_pair_key(impl_key, method_sym)
                 self.method_lookup.sig_lookup.insert(key, sig_idx)
                 self.method_lookup.fn_lookup.insert(key, fn_sym)
                 self.method_symbol_flags.insert(fn_sym, 1)
@@ -2921,6 +2932,24 @@ impl Sema:
         if exact_generic_impl != 0:
             return
 
+        // #1457: two modules' same-named types are two types (§18.1), each
+        // with its own impls. A duplicate is a second impl of the trait for
+        // the same DECLARATION; the name-keyed record below holds the trait
+        // once for the name.
+        let impl_key = self.impl_owner_key_symbol(node)
+        var name_record_has_trait = false
+        if impl_key != type_name:
+            let identity_key = sema_pair_key(impl_key, trait_sym)
+            if self.impl_identity_traits.contains(identity_key):
+                self.emit_error_code("duplicate implementation of trait for type", node, "E1102")
+                return
+            self.impl_identity_traits.insert(identity_key, 1)
+            if self.impl_lookup.contains(type_name):
+                let idx: i32 = self.impl_lookup.get(type_name).unwrap()
+                for i in 0..self.impl_counts[idx]:
+                    if self.impl_extra[(self.impl_starts[idx] + i)] == trait_sym:
+                        name_record_has_trait = true
+
         // Record direct impl
         // D29 scaffolding (#750): E1102 keys on the RESOLVED impl target, not
         // the bare name. For a shadowed sym, a prior record collides only when
@@ -2932,7 +2961,9 @@ impl Sema:
         let dup_want_std = if dup_shadowed != 0: self.type_tid_std_tier(self.resolve_alias(self.lookup_named_type_visible(type_name) as TypeId) as i32) else: 0
         // When appending to an existing type, relocate all entries to keep them
         // contiguous (the flat impl_extra vec is shared across all types).
-        if self.impl_lookup.contains(type_name):
+        if name_record_has_trait:
+            ()
+        else if self.impl_lookup.contains(type_name):
             let idx: i32 = self.impl_lookup.get(type_name).unwrap()
             let old_start = self.impl_starts[idx]
             let old_count = self.impl_counts[idx]

@@ -1954,6 +1954,7 @@ pub type Sema {
     type_identity_syms: HashMap[i64, i32],     // pair(name symbol, path symbol) -> identity symbol
     type_identity_tids: HashMap[i32, i32],     // identity symbol -> the declaration's TypeId
     type_identity_names: HashMap[i32, i32],    // identity symbol -> the declared name symbol
+    impl_identity_traits: HashMap[i64, i32],   // pair(identity symbol, trait) -> 1: that declaration's direct impls
     decl_visibility_syms: Vec[i32],            // top-level symbol visibility candidates
     decl_visibility_paths: Vec[str],           // parallel declaring module path
     decl_visibility_pub: Vec[i32],             // parallel public flag
@@ -3395,6 +3396,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         type_identity_syms: sema_new_map_i64_i32(),
         type_identity_tids: sema_new_map_i32_i32(),
         type_identity_names: sema_new_map_i32_i32(),
+        impl_identity_traits: sema_new_map_i64_i32(),
         decl_visibility_syms: Vec.new(),
         decl_visibility_paths: sema_new_vec_str(),
         decl_visibility_pub: Vec.new(),

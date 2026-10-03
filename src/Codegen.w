@@ -4299,6 +4299,22 @@ impl Codegen:
             return self.nominal_cg_sym_for_tid(tid, name_sym)
         self.intern.intern(owner_text)
 
+    // The codegen type symbol an impl declaration attaches to: the
+    // declaration Sema resolved its target to (impl_decl_target_types), by
+    // its #1446 alias when it has one — the symbol the dyn coercion side
+    // (mir_nominal_sym_from_sema_type) keys a vtable by.
+    fn impl_cg_type_sym(impl_node: i32) -> i32:
+        let bare = self.pool.get_data0(impl_node)
+        let tid = self.sema.impl_decl_target_types.get(impl_node) ?? 0
+        if tid <= 0:
+            return bare
+        self.nominal_cg_sym_for_tid(self.sema.resolve_alias(tid as TypeId) as i32, bare)
+
+    // The method symbol text an impl declaration's methods carry: the owner
+    // key Sema registered them under (#1457) plus the method name.
+    fn impl_method_name_text(impl_node: i32, method_name: &str) -> str:
+        self.sema_symbol_text(self.sema.impl_owner_key_symbol(impl_node)) ++ "." ++ method_name
+
     fn split_owner_sym(owner_sym: i32) -> i32:
         if not self.nominal_split_names.contains(owner_sym):
             return owner_sym
