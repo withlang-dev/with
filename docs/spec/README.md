@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.18
+# The With Programming Language — Specification v7.19
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,10 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.19:** implicit fills, 2026-10-03 (D87). §7.3a: an implicit
+fill observes the binding and never consumes it; a non-Copy `implicit T`
+is passed explicitly; `std.context` APIs take `implicit &Context`. The
+implementation is NON-COMPLIANT until it catches up.
 **Changelog v7.18:** #1930 answers and the `from` grammar, 2026-10-03
 (D83 and D84 amendments). §9.5: a bare name that resolves to a receiver
 field and to any other name in scope is an error at that use; a

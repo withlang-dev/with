@@ -12,6 +12,8 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D87 — An implicit fill observes the binding and never consumes it; `std.context` APIs take `implicit &Context`](2026-10-03-D87-an-implicit-fill-observes-and-never-consumes.md)
+
 - [D86 — `assert`, `require`, `check` are compiler-known forms; the message operand is evaluated only on failure, under `??`'s right-operand rules](2026-10-03-D86-assert-require-check-are-compiler-known-forms-with-lazy-messages.md)
 - [D85 — A facade operation that hands out a borrow of its argument's parent names it: `returns borrow T from parent T of param N`](2026-10-03-D85-a-borrow-of-the-argument-s-parent-names-the-parent.md)
 - [D84 — A returned view's origins include every global it views; a global origin is part of the interface and widens D79's writes clause](2026-10-03-D84-a-returned-view-s-origins-include-the-globals-it-views.md)

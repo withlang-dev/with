@@ -182,16 +182,18 @@ Additional rules:
 The identifier in `with name(expr):` is descriptive. Resolution is
 driven by type, not by the identifier text.
 
+An implicit fill observes the binding and never consumes it. An implicit &T parameter borrows the binding; an implicit T parameter is filled only when T is Copy. A non-Copy implicit T parameter is not filled implicitly: the caller passes the argument explicitly, which moves it (§3.8).
+
 `std.context` defines the standard context shape for common execution
 services. `Context` is ephemeral and currently carries a temporary
 arena, logger, cancellation token, and trace id. Library APIs that need
-these cross-cutting services should accept an `implicit Context`
+these cross-cutting services should accept an `implicit &Context`
 parameter instead of adding unrelated positional parameters.
 
 ```
 use std.context
 
-fn trace_id(ctx: implicit Context) -> i64:
+fn trace_id(ctx: implicit &Context) -> i64:
     ctx.trace_id.value
 
 with active(default_context()):
