@@ -14245,13 +14245,6 @@ impl MirBuilder:
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, fail_bb, 0)
 
         self.switch_to(fail_bb)
-        // #2011: the resets this path's own moves queue (the carrier moved into
-        // the return place) belong to it alone; left queued, the enclosing
-        // statement's flush blanked the still-live carrier on the pass path
-        // too (validate-all: "reset of _3 on a path where it was never moved").
-        let fail_reset_start = self.pending_reset_locals.len() as i32
-        let fail_reset_field_start = self.pending_reset_field_places.len() as i32
-        let fail_move_temp_start = self.pending_move_temp_locals.len() as i32
         let ret_place = self.fn_return_place()
         let ret_ty = self.fn_return_type()
         let source_err_ty = self.generic_inst_arg_type(value_ty, self.sema.syms.result, 1)
@@ -14299,7 +14292,6 @@ impl MirBuilder:
             let fail_op = self.body.new_operand(OperandKind.OK_MOVE, value_place)
             self.assign_operand_to_place(ret_place, fail_op, self.ast.get_start(span_node))
         self.emit_cleanup_awaits_from(cleanup_task_ops, cleanup_start_idx, node)
-        self.flush_pending_resets_since(fail_reset_start, fail_reset_field_start, fail_move_temp_start)
         // D17: moves already executed in this statement (field blanks, move-arg
         // temps) must land before the early error return — the enclosing
         // statement's flush is never reached on this path.

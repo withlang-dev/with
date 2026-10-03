@@ -1656,9 +1656,6 @@ pub type Sema {
     // value, a `dyn` method, or a callable argument handed over.
     dyn_suspend_methods: HashMap[i64, i32],
     suspend_call_sites: HashMap[i32, i32],
-    // #1993: the `t.join_cleanup()` call nodes whose receiver is an owned
-    // Task binding the call consumes (Sema marked it moved).
-    join_cleanup_consumed_calls: HashMap[i32, i32],
     // §13.4 `g.pull()`: the generator value's type → its gen fn; a gen fn → its
     // first `yield` that hands out a view of its own locals (and that local);
     // each checked `g.pull()` node and its gen fn, judged once bodies are done.
@@ -3323,7 +3320,6 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         callable_value_visiting: sema_new_map_i32_i32(),
         dyn_suspend_methods: HashMap.new(),
         suspend_call_sites: sema_new_map_i32_i32(),
-        join_cleanup_consumed_calls: sema_new_map_i32_i32(),
         generator_state_fns: sema_new_map_i32_i32(),
         generator_local_view_yields: sema_new_map_i32_i32(),
         generator_local_view_origins: sema_new_map_i32_i32(),

@@ -29601,7 +29601,6 @@ impl Sema:
             // handle. Lowering moves the binding into the cleanup await.
             if field == self.syms.join_cleanup and self.ast.kind(expr) == NodeKind.NK_IDENT and self.type_is_task(obj_type as i32) != 0:
                 self.mark_moved_if_consumed(expr)
-                self.join_cleanup_consumed_calls.insert(node, 1)
             if field == self.syms.cancel or field == self.syms.join_cleanup:
                 return self.ty_void as i32
             return self.ty_bool as i32
