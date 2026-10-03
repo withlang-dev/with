@@ -786,7 +786,7 @@ fn ci_migrate_preamble_text() -> str:
     p = p ++ "extern fn with_alloc(size: i64) -> " ++ pm ++ "\n"
     p = p ++ "extern fn with_alloc_zeroed(count: i64, size: i64) -> " ++ pm ++ "\n"
     p = p ++ "extern fn with_realloc(ptr: " ++ pm ++ ", old_size: i64, new_size: i64) -> " ++ pm ++ "\n"
-    p = p ++ "extern fn with_free(ptr: " ++ pm ++ ") -> Unit\n"
+    p = p ++ "extern fn with_free(ptr: " ++ pm ++ ")\n"
     p = p ++ "extern fn with_memcpy(dst: " ++ pm ++ ", src: " ++ pc ++ ", n: i64) -> " ++ pm ++ "\n"
     p = p ++ "extern fn with_memmove(dst: " ++ pm ++ ", src: " ++ pc ++ ", n: i64) -> " ++ pm ++ "\n"
     p = p ++ "extern fn with_memset(dst: " ++ pm ++ ", c: i32, n: i64) -> " ++ pm ++ "\n"
@@ -1913,7 +1913,7 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: &str, pr
         // A renamed extern (keyword or prelude collision) keeps its C
         // linkage through the original symbol.
         let link_prefix = if safe_name != name: "@[link_name(\"" ++ name ++ "\")]\n" else: ""
-        return link_prefix ++ cc_prefix ++ "extern fn " ++ safe_name ++ "(" ++ params ++ ") -> " ++ ret_render ++ "\n"
+        return link_prefix ++ cc_prefix ++ "extern fn " ++ safe_name ++ "(" ++ params ++ ")" ++ ci_ret_suffix(ret_render) ++ "\n"
 
     // A header's `static inline` definition is published once, by the unit
     // that owns the header (the project scan's header_owner_module); every
@@ -1949,7 +1949,7 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: &str, pr
         with_cimport_mark_name_emitted(name)
         g_migrate_fn_translated = g_migrate_fn_translated + 1
         let ret_render = ci_unsafe_fn_ptr_type(ret)
-        let ret_suffix = " -> " ++ ret_render
+        let ret_suffix = ci_ret_suffix(ret_render)
         let body_for_emit = if ret == "Unit" and ci_migrate_text_is_blank(body): "    return\n" else: body
         let visibility = if g_migrate_no_c_export != 0 and (storage != CX_SC_STATIC or header_owner.len() > 0): "pub " else: ""
         let fn_keyword = visibility ++ if ci_migrate_extern_fn_call_requires_unsafe(safe_name): "unsafe fn " else: "fn "

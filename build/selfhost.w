@@ -4596,6 +4596,39 @@ fn bs_check_migrate_sizeof_pointer_width(ctx: &ActionCtx, compiler_path: &str, c
     if check.rc != 0: return check.rc
     0
 
+// #1838: an absent return type is Unit, so a C `void` function — a
+// declaration, a definition, a `static inline` body — is rendered without
+// `-> Unit`; `unit-return-review` flags any migrated signature that keeps
+// it. The output still checks.
+fn bs_check_migrate_void_omits_unit(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "void_omits_unit.c")
+    let out_w = bs_join(case_dir, "void_omits_unit.w")
+    var rc = bs_write_fixture(ctx, src, "void stop(void);\nvoid noop(void) {}\nstatic inline void tick(int *p) { *p += 1; }\nint bump(int *p) {\n  tick(p);\n  noop();\n  stop();\n  return *p;\n}\n", "void function renderings")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-void-omits-unit", args)
+    if result.rc != 0: return result.rc
+    let out_text = ctx.fs().read_text(out_w)
+    rc = bs_assert_contains(ctx, out_text, "extern fn stop()\n", "void_omits_unit")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "fn noop()", "void_omits_unit")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "fn bump(__param_p: *mut c_int) -> c_int", "void_omits_unit")
+    if rc != 0: return rc
+    rc = bs_assert_not_contains(ctx, out_text, "-> Unit", "void_omits_unit")
+    if rc != 0: return rc
+    var check_args: Vec[str] = Vec.new()
+    check_args |> push("check")
+    check_args |> push(bs_abs(root, out_w))
+    let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-void-omits-unit", check_args)
+    check.rc
+
 // #1848: a declaration without a prototype (`int knr();`) is emitted as the
 // prototype its calls use after C's default argument promotions (a signed
 // char and a float arrive as int and double), never as the variadic
@@ -4909,6 +4942,8 @@ pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     rc = bs_check_migrate_sizeof_pointer_width(ctx, compiler_path, bs_join(output_dir, "sizeof_pointer_width"))
     if rc != 0: return rc
     rc = bs_check_migrate_variadic_stdarg(ctx, compiler_path, bs_join(output_dir, "variadic_stdarg"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_void_omits_unit(ctx, compiler_path, bs_join(output_dir, "void_omits_unit"))
     if rc != 0: return rc
     rc = bs_check_migrate_unprototyped_declaration(ctx, compiler_path, bs_join(output_dir, "unprototyped_declaration"))
     if rc != 0: return rc

@@ -779,7 +779,7 @@ pub fn process_c_import_with_defines(header_spec: &str, defines: &Vec[str], cxx:
         output.push_str("extern fn with_alloc(size: i64) -> *mut u8\n")
         output.push_str("extern fn with_alloc_zeroed(count: i64, size: i64) -> *mut u8\n")
         output.push_str("extern fn with_realloc(ptr: *mut u8, old_size: i64, new_size: i64) -> *mut u8\n")
-        output.push_str("extern fn with_free(ptr: *mut u8) -> Unit\n")
+        output.push_str("extern fn with_free(ptr: *mut u8)\n")
         output.push_str("extern fn with_memcpy(dst: *mut u8, src: *const u8, n: i64) -> *mut u8\n")
         output.push_str("extern fn with_memmove(dst: *mut u8, src: *const u8, n: i64) -> *mut u8\n")
         output.push_str("extern fn with_memset(dst: *mut u8, c: i32, n: i64) -> *mut u8\n")
@@ -1471,6 +1471,14 @@ pub fn ci_unsafe_fn_ptr_type(t: &str) -> str:
         return "unsafe " ++ normalized
     normalized
 
+// The return clause of a rendered signature. An absent return type is Unit,
+// so a C `void` function is spelled without one (#1838): the compiler
+// already knows it, and `unit-return-review` flags any signature that keeps
+// it. Fn-pointer TYPES keep their `-> Unit` (that is type syntax, not a
+// signature).
+pub fn ci_ret_suffix(ret_render: &str) -> str:
+    if ci_trim(ret_render) == "Unit": "" else: " -> " ++ ret_render
+
 fn ci_field_type_is_demoted(ftype: &str, demoted: &str) -> bool:
     if ftype.len() == 0:
         return false
@@ -1651,10 +1659,10 @@ fn ci_emit_buf_wrapper(session: i64, idx: i32, name: &str) -> str:
                         checks = checks ++ "    if " ++ first_name ++ ".len() != " ++ bn ++ ".len():\n        panic(\"" ++ name ++ ": buffer arguments must have equal length\")\n"
 
     let raw_name = "__wc_buf_" ++ safe_name
-    let raw_decl = "@[link_name(\"" ++ name ++ "\")]\nextern fn " ++ raw_name ++ "(" ++ raw_params ++ ") -> " ++ ret_render ++ "\n"
+    let raw_decl = "@[link_name(\"" ++ name ++ "\")]\nextern fn " ++ raw_name ++ "(" ++ raw_params ++ ")" ++ ci_ret_suffix(ret_render) ++ "\n"
     let ret_prefix = if ret == "Unit": "" else: "return "
     let body = checks ++ ptr_lets ++ "    " ++ ret_prefix ++ "unsafe { " ++ raw_name ++ "(" ++ call_args ++ ") }\n"
-    raw_decl ++ "fn " ++ safe_name ++ "(" ++ wrapper_params ++ ") -> " ++ ret_render ++ ":\n" ++ body
+    raw_decl ++ "fn " ++ safe_name ++ "(" ++ wrapper_params ++ ")" ++ ci_ret_suffix(ret_render) ++ ":\n" ++ body
 
 // §16.9: a record c_import demotes to opaque (a bitfield, a sub-alignment
 // field, a field of a demoted type) has no layout in With. The demoted record
@@ -1917,7 +1925,7 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: &str, demoted_ty
             if si_raw:
                 ci_record_raw_function_name(name)
             let si_ret_render = ci_unsafe_fn_ptr_type(si_ret)
-            return ci_take_body_hoisted_decls() ++ ci_render_generated_fn_body(fn_kw ++ safe_name ++ "(" ++ si_params ++ ") -> " ++ si_ret_render, body)
+            return ci_take_body_hoisted_decls() ++ ci_render_generated_fn_body(fn_kw ++ safe_name ++ "(" ++ si_params ++ ")" ++ ci_ret_suffix(si_ret_render), body)
         // The translator's own reason (va_arg, an unsupported builtin, a
         // record initializer it cannot resolve), not only that it failed.
         let failed_why = if g_ci_bail_message.len() > 0: "inline body translation failed: " ++ g_ci_bail_message else: "inline body translation failed"
@@ -2013,7 +2021,7 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: &str, demoted_ty
     if is_unprototyped:
         g_cimport_unprototyped_names = g_cimport_unprototyped_names ++ "|" ++ safe_name ++ "|"
     let ret_render = ci_unsafe_fn_ptr_type(ret)
-    link_prefix ++ cc_prefix ++ "extern fn " ++ safe_name ++ "(" ++ params ++ ") -> " ++ ret_render ++ "\n"
+    link_prefix ++ cc_prefix ++ "extern fn " ++ safe_name ++ "(" ++ params ++ ")" ++ ci_ret_suffix(ret_render) ++ "\n"
 
 // ── Member function detection (Zig-style) ───────────────────
 // Scan all functions. If a function's first parameter is *StructType (pointer
@@ -2249,7 +2257,7 @@ fn ci_emit_member_fn_wrapper(session: i64, idx: i32, struct_name: &str, method_n
     let ret_prefix = if ret == "Unit": "" else: "return "
     let mode_kw = if recv_mut: "mut fn " else: "fn "
     let fn_kw = (if raw_wrapper: "unsafe " else: "") ++ mode_kw
-    let method_text = ci_render_generated_fn_body("    " ++ fn_kw ++ safe_method ++ "(" ++ params ++ ") -> " ++ ret, "        " ++ ret_prefix ++ safe_fn_name ++ "(" ++ call_args ++ ")")
+    let method_text = ci_render_generated_fn_body("    " ++ fn_kw ++ safe_method ++ "(" ++ params ++ ")" ++ ci_ret_suffix(ret), "        " ++ ret_prefix ++ safe_fn_name ++ "(" ++ call_args ++ ")")
     if migrate_prefer_brace():
         return "impl " ++ safe_struct ++ " {\n" ++ method_text ++ "\n}\n"
     "impl " ++ safe_struct ++ ":\n" ++ method_text ++ "\n"
@@ -2289,7 +2297,7 @@ fn ci_emit_constructor_wrapper(session: i64, idx: i32, struct_name: &str, method
         call_args = call_args ++ actual_name
         pi = pi + 1
     let fn_kw = if raw_wrapper: "unsafe fn " else: "fn "
-    ci_render_generated_fn_body(fn_kw ++ safe_struct ++ "." ++ safe_method ++ "(" ++ params ++ ") -> " ++ ret, "    " ++ safe_fn_name ++ "(" ++ call_args ++ ")") ++ "\n"
+    ci_render_generated_fn_body(fn_kw ++ safe_struct ++ "." ++ safe_method ++ "(" ++ params ++ ")" ++ ci_ret_suffix(ret), "    " ++ safe_fn_name ++ "(" ++ call_args ++ ")") ++ "\n"
 
 fn ci_cimport_type_is_raw_abi(ty: &str) -> bool:
     let t = ci_trim(ty)
@@ -3482,7 +3490,7 @@ pub fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) 
                                 empty_params = empty_params ++ ", "
                             empty_params = empty_params ++ bindings[epi] ++ ": i32"
                             epi = epi + 1
-                        let r = ci_render_generated_fn_body("fn " ++ safe_name ++ "(" ++ empty_params ++ ") -> Unit", "    return")
+                        let r = ci_render_generated_fn_body("fn " ++ safe_name ++ "(" ++ empty_params ++ ")", "    return")
                         with_cimport_mark_name_emitted(name)
                         if not ci_migrate_shared_decl_add("fn", safe_name, r):
                             output = output ++ r ++ "\n"
@@ -3588,7 +3596,7 @@ pub fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) 
                             ci_record_untranslated_macro(name)
                             continue
                         let fn_kw = if ci_translation_calls_raw_function(translated): "unsafe fn " else: "fn "
-                        let r = ci_render_generated_fn_body(fn_kw ++ safe_name ++ type_params ++ "(" ++ param_decl ++ ") -> " ++ inferred_ret, "    " ++ translated)
+                        let r = ci_render_generated_fn_body(fn_kw ++ safe_name ++ type_params ++ "(" ++ param_decl ++ ")" ++ ci_ret_suffix(inferred_ret), "    " ++ translated)
                         with_cimport_mark_name_emitted(name)
                         if not ci_migrate_shared_decl_add("fn", safe_name, r):
                             output = output ++ r ++ "\n"

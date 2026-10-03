@@ -1139,7 +1139,7 @@ fn ci_print_decl(decls: CiDeclPool, stmts: CiStmtPool, exprs: CiExprPool, types:
         var out = ""
         if (flags / CID_FLAG_C_EXPORT) % 2 == 1:
             out = out ++ "@[c_export(\"" ++ name ++ "\")]\n"
-        out = out ++ "fn " ++ name ++ "() -> " ++ ci_print_type(types, ret_ty) ++ " {\n"
+        out = out ++ "fn " ++ name ++ "()" ++ ci_ret_suffix(ci_print_type(types, ret_ty)) ++ " {\n"
         if (body as i32) != 0:
             out = out ++ ci_print_stmt(stmts, exprs, types, body, 4)
         else:
@@ -1176,7 +1176,7 @@ fn ci_print_decl(decls: CiDeclPool, stmts: CiStmtPool, exprs: CiExprPool, types:
         let name_sym = decls.get_d0(id)
         let ret_ty = (decls.get_d1(id)) as CiTypeId
         let name = decls.get_string(name_sym)
-        return "extern fn " ++ name ++ "() -> " ++ ci_print_type(types, ret_ty) ++ "\n"
+        return "extern fn " ++ name ++ "()" ++ ci_ret_suffix(ci_print_type(types, ret_ty)) ++ "\n"
 
     "<ci:decl:unknown>\n"
 
