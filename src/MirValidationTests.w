@@ -478,7 +478,7 @@ fn unmaterialized_view_verdict(arg_is_view: bool, direct: bool) -> str:
     let err = validate_typed_mir_body(mir_mod, body)
     with_str_clone_ref(err.message)
 
-pub fn mir_test_call_unmaterialized_view() -> Unit:
+pub fn mir_test_call_unmaterialized_view:
     assert(unmaterialized_view_verdict(true, false).contains("call argument 2 is a Copy view (&T) where the callee parameter is the owned scalar T"))
     assert(unmaterialized_view_verdict(false, false) == "")
     assert(unmaterialized_view_verdict(true, true).contains("call argument 0 is a Copy view (&T) where the callee parameter is the owned scalar T"))
