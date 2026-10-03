@@ -2102,6 +2102,9 @@ fn with_cimport_add_windows_incdir(var_name: &str) -> i32:
 // means the SDK carries no libc: the parse then finds no system header, and
 // with_cimport_windows_libc_missing names the cause.
 pub fn with_cimport_set_windows_target(triple: &str, sysroot: &str):
+    // A named C model (#2060) is the parse's target for the whole process:
+    // the frontend's per-compile Windows selection never replaces it.
+    if cimport_has_c_model(): return
     unsafe:
         g_cimport_target_buf[0] = 0
         g_cimport_sysroot_arg_buf[0] = 0
@@ -2133,9 +2136,9 @@ pub fn with_cimport_windows_libc_missing() -> i32:
 var g_cimport_model_isysroot_buf: [1100]u8 = [0 as u8; 1100]
 
 pub fn with_cimport_set_c_model(triple: &str, sysroot: &str):
+    unsafe { g_cimport_model_isysroot_buf[0] = 0 }
     with_cimport_set_windows_target(triple, sysroot)
     unsafe:
-        g_cimport_model_isysroot_buf[0] = 0
         if g_cimport_target_buf[0] == 0 or sysroot.len() == 0 or sysroot.len() >= 1099:
             return
         with_memcpy(&raw mut g_cimport_model_isysroot_buf as *mut [1100]u8 as *mut u8, *(sysroot as *const str as *const *const u8), sysroot.len())
