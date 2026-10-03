@@ -356,6 +356,7 @@ extern fn LLVMIntrinsicGetType(c: *mut u8, id: u32, tys: *const *mut u8, cnt: u6
 extern fn LLVMGetModuleDataLayout(m: *mut u8) -> *mut u8
 extern fn LLVMABISizeOfType(dl: *mut u8, ty: *mut u8) -> u64
 extern fn LLVMABIAlignmentOfType(dl: *mut u8, ty: *mut u8) -> u32
+extern fn LLVMOffsetOfElement(dl: *mut u8, ty: *mut u8, elem: u32) -> u64
 
 // Struct name
 extern fn LLVMGetStructName(ty: *mut u8) -> *const u8
@@ -1374,6 +1375,13 @@ pub fn wl_abi_size_of(dl: i64, ty: i64) -> i64:
     unsafe:
         if dl == 0 or ty == 0: return 0
         LLVMABISizeOfType(dl as *mut u8, ty as *mut u8) as i64
+
+// The byte offset of struct `ty`'s member `elem` (#1964: a tuple body's
+// element offsets are checked against TypeLayout's).
+pub fn wl_offset_of_element(dl: i64, ty: i64, elem: i32) -> i64:
+    unsafe:
+        if dl == 0 or ty == 0: return 0
+        LLVMOffsetOfElement(dl as *mut u8, ty as *mut u8, elem as u32) as i64
 
 pub fn wl_abi_align_of(dl: i64, ty: i64) -> i32:
     unsafe:

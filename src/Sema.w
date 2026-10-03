@@ -5617,6 +5617,10 @@ impl Sema:
                     let field_count = self.type_reflection_field_count(lti)
                     for fi in 0..field_count:
                         self.layout_field_offset_cache.insert(sema_pair_key(lti, fi), self.type_layout_struct_field_offset(lti, fi))
+                    // #1964: codegen builds a tuple's body at these offsets.
+                    if self.type_kinds[lti] == TypeKind.TY_TUPLE:
+                        for ei in 0..self.type_d1[lti]:
+                            self.layout_field_offset_cache.insert(sema_pair_key(lti, ei), self.type_layout_tuple_elem_offset(lti, ei))
             // #742: an inst first cached while its template was not yet
             // resolvable (an import-gated std generic reached through a method
             // return, #911) registered zero fields. Visibility can be

@@ -67,6 +67,14 @@
 //! expect-stdout: Option[Option[V4]] 48/16 48/16 ok
 //! expect-stdout: Result[Al32,i8] 96/32 96/32 ok
 //! expect-stdout: Gen[Al32] 96/32 96/32 ok
+//! expect-stdout: (i8,Al32) 96/32 96/32 ok
+//! expect-stdout: (Al32,i8) 96/32 96/32 ok
+//! expect-stdout: (i8,(i8,Al32)) 128/32 128/32 ok
+//! expect-stdout: [(i8,Al32);2] 192/32 192/32 ok
+//! expect-stdout: Option[(i8,Al32)] 128/32 128/32 ok
+//! expect-stdout: (i8,V4) 32/16 32/16 ok
+//! expect-stdout: (i8,V8) ok
+//! expect-stdout: (i8,(i8,V8)) ok
 
 // #1438 (docs/spec/abi/with-abi.md §1–§3): TypeLayout, the hashed ABI source
 // that answers `comptime T.size()`/`T.align()` and sizes union members,
@@ -138,6 +146,18 @@ type TOptV4 = Option[V4]
 type TOptOptV4 = Option[Option[V4]]
 type TResAl32I8 = Result[Al32, i8]
 type TGenAl32 = Gen[Al32]
+// #1964: a tuple places each element at the model's alignment for it, not
+// LLVM's (an `@[align(N)]` record's packed body is LLVM-aligned 1; a
+// `Vector[8, f32]` is LLVM-aligned 32 where §4.3d caps AArch64 at 16).
+type V8 = Vector[8, f32]
+type TTupAl32 = (i8, Al32)
+type TTupAl32Rev = (Al32, i8)
+type TTupTupAl32 = (i8, TTupAl32)
+type TArrTupAl32 = [TTupAl32; 2]
+type TOptTupAl32 = Option[TTupAl32]
+type TTupV4 = (i8, V4)
+type TTupV8 = (i8, V8)
+type TTupTupV8 = (i8, TTupV8)
 type TBoxP = Box[P]
 type TBoxDyn = Box[dyn Shape]
 type TRefDyn = &dyn Shape
@@ -207,6 +227,14 @@ type W_TOptV4 = (i8, TOptV4)
 type W_TOptOptV4 = (i8, TOptOptV4)
 type W_TResAl32I8 = (i8, TResAl32I8)
 type W_TGenAl32 = (i8, TGenAl32)
+type W_TTupAl32 = (i8, TTupAl32)
+type W_TTupAl32Rev = (i8, TTupAl32Rev)
+type W_TTupTupAl32 = (i8, TTupTupAl32)
+type W_TArrTupAl32 = (i8, TArrTupAl32)
+type W_TOptTupAl32 = (i8, TOptTupAl32)
+type W_TTupV4 = (i8, TTupV4)
+type W_TTupV8 = (i8, TTupV8)
+type W_TTupTupV8 = (i8, TTupTupV8)
 type W_TBoxP = (i8, TBoxP)
 type W_TBoxDyn = (i8, TBoxDyn)
 type W_TRefDyn = (i8, TRefDyn)
@@ -250,6 +278,12 @@ fn row(name: str, ms: usize, ma: usize, ls: i64, pair: i64):
     let la = llvm_align(ls, pair)
     let mark = if ms as i64 == ls and ma as i64 == la: "ok" else: "MISMATCH"
     print(f"{name} {ms}/{ma} {ls}/{la} {mark}")
+
+// The verdict alone, for a row whose numbers are the target's (§4.3d).
+fn verdict(name: str, ms: usize, ma: usize, ls: i64, pair: i64):
+    let la = llvm_align(ls, pair)
+    let mark = if ms as i64 == ls and ma as i64 == la: "ok" else: f"MISMATCH {ms}/{ma} {ls}/{la}"
+    print(f"{name} {mark}")
 
 fn main:
     row("E0", comptime E0.size(), comptime E0.align(), size_of[E0](), size_of[W_E0]())
@@ -322,3 +356,11 @@ fn main:
     row("Result[Al32,i8]", comptime TResAl32I8.size(), comptime TResAl32I8.align(), size_of[TResAl32I8](), size_of[W_TResAl32I8]())
     row("Gen[Al32]", comptime TGenAl32.size(), comptime TGenAl32.align(), size_of[TGenAl32](), size_of[W_TGenAl32]())
 
+    row("(i8,Al32)", comptime TTupAl32.size(), comptime TTupAl32.align(), size_of[TTupAl32](), size_of[W_TTupAl32]())
+    row("(Al32,i8)", comptime TTupAl32Rev.size(), comptime TTupAl32Rev.align(), size_of[TTupAl32Rev](), size_of[W_TTupAl32Rev]())
+    row("(i8,(i8,Al32))", comptime TTupTupAl32.size(), comptime TTupTupAl32.align(), size_of[TTupTupAl32](), size_of[W_TTupTupAl32]())
+    row("[(i8,Al32);2]", comptime TArrTupAl32.size(), comptime TArrTupAl32.align(), size_of[TArrTupAl32](), size_of[W_TArrTupAl32]())
+    row("Option[(i8,Al32)]", comptime TOptTupAl32.size(), comptime TOptTupAl32.align(), size_of[TOptTupAl32](), size_of[W_TOptTupAl32]())
+    row("(i8,V4)", comptime TTupV4.size(), comptime TTupV4.align(), size_of[TTupV4](), size_of[W_TTupV4]())
+    verdict("(i8,V8)", comptime TTupV8.size(), comptime TTupV8.align(), size_of[TTupV8](), size_of[W_TTupV8]())
+    verdict("(i8,(i8,V8))", comptime TTupTupV8.size(), comptime TTupTupV8.align(), size_of[TTupTupV8](), size_of[W_TTupTupV8]())

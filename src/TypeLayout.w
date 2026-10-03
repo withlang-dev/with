@@ -210,6 +210,56 @@ impl Sema:
             return self.layout_field_offset_cache.get(key).unwrap()
         sema_phase_bug("BUG: type_layout_struct_field_offset_frozen miss — field layout not preregistered")
 
+    // The kind of a generic instance's template declaration — by the
+    // instance's recorded template (generic_inst_template_tid), not by its
+    // base name in the visible scope: `chan[T]` builds `Sender[T]` and
+    // `Receiver[T]` whether or not std.channel is imported, and the D29
+    // import gate hid their template, sizing them 0 (#1964).
+    fn type_layout_generic_template_kind(tid: i32) -> i32:
+        let template = self.generic_inst_template_tid(tid)
+        if template == 0:
+            return 0
+        self.get_type_kind(self.resolve_alias(template as TypeId))
+
+    // The generic records the compiler builds with no declaration
+    // (Codegen.sema_type_to_llvm): `VecRange[T]` and `VecIterRef[T]` are
+    // `{ data_ptr: i64, offset|len: i64, len|idx: i64 }`; `chan[T]`'s
+    // `Sender[T]` and `Receiver[T]` are `{ handle: i64 }`. Size -1 for any
+    // other instance.
+    fn type_layout_builtin_generic(tid: i32) -> SizeAlign:
+        let base_sym = self.get_generic_inst_base(tid)
+        if base_sym == 0:
+            return SizeAlign { size: -1, align: 1 }
+        if base_sym == self.syms.vecrange or base_sym == self.syms.veciterref:
+            return SizeAlign { size: 24, align: 8 }
+        let base_name = self.pool_resolve(base_sym)
+        if base_name == "Sender" or base_name == "Receiver":
+            return SizeAlign { size: 8, align: 8 }
+        SizeAlign { size: -1, align: 1 }
+
+    // A tuple places each element at the next offset its own alignment
+    // divides, in order (the C record rule over the elements; #1964). The
+    // one rule: type_layout_size_of's tuple end and codegen's tuple body
+    // both read it.
+    mut fn type_layout_tuple_elem_offset(tid: i32, elem_index: i32) -> i64:
+        let resolved = self.resolve_alias(tid)
+        if self.get_type_kind(resolved) != TypeKind.TY_TUPLE:
+            return 0
+        let te_start = self.get_type_d0(resolved)
+        var offset: i64 = 0
+        for ei in 0..elem_index:
+            let elem_tid: i32 = self.type_extra[(te_start + ei)]
+            offset = type_layout_align_up(offset, self.type_layout_align_of(elem_tid)) + self.type_layout_size_of(elem_tid)
+        type_layout_align_up(offset, self.type_layout_align_of(self.type_extra[(te_start + elem_index)]))
+
+    // The frozen twin, from the preregistered offsets (the struct field
+    // offset table, keyed the same way).
+    fn type_layout_tuple_elem_offset_frozen(tid: i32, elem_index: i32) -> i64:
+        let key = sema_pair_key(self.resolve_alias(tid) as i32, elem_index)
+        if self.layout_field_offset_cache.contains(key):
+            return self.layout_field_offset_cache.get(key).unwrap()
+        sema_phase_bug("BUG: type_layout_tuple_elem_offset_frozen miss — tuple layout not preregistered")
+
     mut fn type_layout_struct_align_of(tid: i32) -> i64:
         let resolved = self.resolve_alias(tid)
         let tk = self.get_type_kind(resolved)
@@ -514,14 +564,14 @@ impl Sema:
         if tk == TypeKind.TY_ENUM:
             return self.type_layout_enum_align_of(resolved as i32)
         if tk == TypeKind.TY_GENERIC_INST:
-            let base_sym = self.get_generic_inst_base(resolved as i32)
-            if self.named_types.contains(base_sym):
-                let base_tid: i32 = self.named_types.get(base_sym).unwrap()
-                let base_kind = self.get_type_kind(self.resolve_alias(base_tid))
-                if base_kind == TypeKind.TY_STRUCT:
-                    return self.type_layout_struct_align_of(resolved as i32)
-                if base_kind == TypeKind.TY_ENUM:
-                    return self.type_layout_enum_align_of(resolved as i32)
+            let builtin = self.type_layout_builtin_generic(resolved as i32)
+            if builtin.size >= 0:
+                return builtin.align
+            let base_kind = self.type_layout_generic_template_kind(resolved as i32)
+            if base_kind == TypeKind.TY_STRUCT:
+                return self.type_layout_struct_align_of(resolved as i32)
+            if base_kind == TypeKind.TY_ENUM:
+                return self.type_layout_enum_align_of(resolved as i32)
             return 8
         1
 
@@ -553,18 +603,12 @@ impl Sema:
         if tk == TypeKind.TY_ARRAY:
             return self.type_layout_size_of(self.get_type_d0(resolved)) * self.get_type_d1(resolved) as i64
         if tk == TypeKind.TY_TUPLE:
-            let te_start = self.get_type_d0(resolved)
             let elem_count = self.get_type_d1(resolved)
-            var offset: i64 = 0
-            var max_align: i64 = 1
-            for ei in 0..elem_count:
-                let elem_tid: i32 = self.type_extra[(te_start + ei)]
-                let align = self.type_layout_align_of(elem_tid)
-                if align > max_align:
-                    max_align = align
-                offset = type_layout_align_up(offset, align)
-                offset = offset + self.type_layout_size_of(elem_tid)
-            return type_layout_align_up(offset, max_align)
+            if elem_count <= 0:
+                return 0
+            let last: i32 = self.type_extra[(self.get_type_d0(resolved) + elem_count - 1)]
+            let end = self.type_layout_tuple_elem_offset(resolved as i32, elem_count - 1) + self.type_layout_size_of(last)
+            return type_layout_align_up(end, self.type_layout_align_of(resolved as i32))
         if tk == TypeKind.TY_RANGE:
             let elem_tid = self.get_type_d0(resolved)
             let elem_align = self.type_layout_align_of(elem_tid)
@@ -577,14 +621,14 @@ impl Sema:
         if tk == TypeKind.TY_ENUM:
             return self.type_layout_enum_size_of(resolved as i32)
         if tk == TypeKind.TY_GENERIC_INST:
-            let base_sym = self.get_generic_inst_base(resolved as i32)
-            if self.named_types.contains(base_sym):
-                let base_tid: i32 = self.named_types.get(base_sym).unwrap()
-                let base_kind = self.get_type_kind(self.resolve_alias(base_tid))
-                if base_kind == TypeKind.TY_STRUCT:
-                    return self.type_layout_struct_size_of(resolved as i32)
-                if base_kind == TypeKind.TY_ENUM:
-                    return self.type_layout_enum_size_of(resolved as i32)
+            let builtin = self.type_layout_builtin_generic(resolved as i32)
+            if builtin.size >= 0:
+                return builtin.size
+            let base_kind = self.type_layout_generic_template_kind(resolved as i32)
+            if base_kind == TypeKind.TY_STRUCT:
+                return self.type_layout_struct_size_of(resolved as i32)
+            if base_kind == TypeKind.TY_ENUM:
+                return self.type_layout_enum_size_of(resolved as i32)
             return 0
         0
 

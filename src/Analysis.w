@@ -1392,6 +1392,10 @@ fn analysis_audit_phase(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModul
                 report.fail(f"type {ti} field {fi}: layout-offset cache miss")
             if sema.get_type_kind(ti as TypeId) == TypeKind.TY_GENERIC_INST and not sema.generic_struct_field_index_type_cache.contains(sema_pair_key(ti, fi)):
                 report.fail(f"type {ti} field {fi}: generic field-type cache miss")
+        if sema.get_type_kind(ti as TypeId) == TypeKind.TY_TUPLE:
+            for ei in 0..sema.get_type_d1(ti as TypeId):
+                if not sema.layout_field_offset_cache.contains(sema_pair_key(ti, ei)):
+                    report.fail(f"type {ti} element {ei}: tuple layout-offset cache miss")
         if sema.get_type_kind(ti as TypeId) == TypeKind.TY_ENUM and sema.disc_repr_types.contains(ti):
             if not sema.disc_value_starts.contains(ti):
                 report.fail(f"type {ti}: no per-declaration discriminant table")

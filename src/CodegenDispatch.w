@@ -265,7 +265,13 @@ impl Codegen:
                     elem_llvm = self.type_fallback()
                 elem_types.push(elem_llvm)
             if te_count > 0:
-                return wl_struct_type(self.context, vec_data_i64(&elem_types), te_count, 0)
+                // #1964: the live tuple's body, laid out from TypeLayout and
+                // proven; a snapshot tuple with no live twin takes the same
+                // placement over its element types.
+                let live_tuple = self.mir_type_to_live_sema_type(resolved)
+                if live_tuple > 0:
+                    return self.sema_type_to_llvm(live_tuple)
+                return self.tuple_type_from_elems(&elem_types)
             return wl_i32_type(self.context)
         if tk == TypeKind.TY_RANGE:
             let range_elem_tid = self.mir_type_d0_at(resolved)
@@ -2871,11 +2877,11 @@ impl Codegen:
         if field_idx == 0 and self.mir_enum_variant_payload_count(enum_sema_ty, variant_idx) == 1:
             return wl_build_load(self.builder, payload_ty, payload_ptr)
         if wl_get_type_kind(payload_ty) == wl_struct_type_kind():
-            let field_count = wl_count_struct_elem_types(payload_ty)
+            let field_count = self.tuple_elem_count(payload_ty)
             if field_idx >= field_count:
                 return 0
-            let field_ty = wl_struct_get_type_at(payload_ty, field_idx)
-            let field_ptr = wl_build_struct_gep(self.builder, payload_ty, payload_ptr, field_idx)
+            let field_ty = self.tuple_elem_type(payload_ty, field_idx)
+            let field_ptr = self.tuple_elem_ptr(payload_ty, payload_ptr, field_idx)
             return wl_build_load(self.builder, field_ty, field_ptr)
         if field_idx == 0:
             return wl_build_load(self.builder, payload_ty, payload_ptr)
@@ -3889,14 +3895,14 @@ impl Codegen:
                         let ev_data_ptr = wl_build_struct_gep(self.builder, struct_ty, ev_alloca, 1)
                         if agg_count > 1 and wl_get_type_kind(ev_payload_ty) == wl_struct_type_kind():
                             let ev_payload_ptr = wl_build_bitcast(self.builder, ev_data_ptr, wl_ptr_type(self.context))
-                            let ev_field_count = wl_count_struct_elem_types(ev_payload_ty)
+                            let ev_field_count = self.tuple_elem_count(ev_payload_ty)
                             for evi in 0..agg_count:
                                 if evi >= ev_field_count:
                                     continue
                                 let ev_op = body.agg_field_operands[(agg_start + evi)]
-                                let ev_field_ty = wl_struct_get_type_at(ev_payload_ty, evi)
+                                let ev_field_ty = self.tuple_elem_type(ev_payload_ty, evi)
                                 let ev_val = self.mir_eval_operand(body, ev_op, ev_field_ty)
-                                let ev_field_ptr = wl_build_struct_gep(self.builder, ev_payload_ty, ev_payload_ptr, evi)
+                                let ev_field_ptr = self.tuple_elem_ptr(ev_payload_ty, ev_payload_ptr, evi)
                                 wl_build_store(self.builder, self.coerce_value_to_type(ev_val, ev_field_ty), ev_field_ptr)
                         else:
                             let ev_op = body.agg_field_operands[agg_start]
@@ -4498,7 +4504,7 @@ impl Codegen:
             let elem_sema = self.mir_project_field_sema_type(tuple_sema_ty, i)
             if elem_sema > 0 and self.sema.type_needs_drop_frozen(elem_sema) != 0:
                 let elem_llvm = self.mir_sema_type_to_llvm(elem_sema)
-                let elem_ptr = wl_build_struct_gep(self.builder, ty, ptr, i)
+                let elem_ptr = self.tuple_elem_ptr(ty, ptr, i)
                 self.mir_emit_drop_ptr_for_sema_type(elem_ptr, elem_llvm, elem_sema)
             i = i - 1
         self.member_drop_depth = self.member_drop_depth - 1
@@ -4596,8 +4602,8 @@ impl Codegen:
                     while pf3 < pc:
                         let psema = self.mir_enum_payload_sema_type(enum_sema_ty, vi, pf3)
                         if self.sema.type_needs_drop_frozen(psema) != 0:
-                            let field_llvm = wl_struct_get_type_at(payload_ty, pf3)
-                            let field_ptr = wl_build_struct_gep(self.builder, payload_ty, data_ptr, pf3)
+                            let field_llvm = self.tuple_elem_type(payload_ty, pf3)
+                            let field_ptr = self.tuple_elem_ptr(payload_ty, data_ptr, pf3)
                             self.mir_emit_drop_ptr_for_sema_type(field_ptr, field_llvm, psema)
                         pf3 = pf3 + 1
                 wl_build_br(self.builder, merge_bb)
@@ -8536,8 +8542,8 @@ impl Codegen:
         let right_offset = wl_build_add(self.builder, base_offset, idx)
         var tuple_ty = self.mir_dest_llvm_type(body, dest_place)
         var range_ty_out: i64 = 0
-        if tuple_ty != 0 and wl_get_type_kind(tuple_ty) == wl_struct_type_kind() and wl_count_struct_elem_types(tuple_ty) >= 2:
-            range_ty_out = wl_struct_get_type_at(tuple_ty, 0)
+        if tuple_ty != 0 and wl_get_type_kind(tuple_ty) == wl_struct_type_kind() and self.tuple_elem_count(tuple_ty) >= 2:
+            range_ty_out = self.tuple_elem_type(tuple_ty, 0)
         else:
             let rf: Vec[i64] = Vec.new()
             rf.push(i64_ty)
@@ -8547,13 +8553,13 @@ impl Codegen:
             let tf: Vec[i64] = Vec.new()
             tf.push(range_ty_out)
             tf.push(range_ty_out)
-            tuple_ty = wl_struct_type(self.context, vec_data_i64(&tf), 2, 0)
+            tuple_ty = self.tuple_type_from_elems(&tf)
         let left = self.mir_build_vecrange_value(data_i64, base_offset, idx, range_ty_out)
         let right = self.mir_build_vecrange_value(data_i64, right_offset, right_len, range_ty_out)
         let tuple_alloca = self.create_entry_alloca(tuple_ty)
-        let f0 = wl_build_struct_gep(self.builder, tuple_ty, tuple_alloca, 0)
+        let f0 = self.tuple_elem_ptr(tuple_ty, tuple_alloca, 0)
         wl_build_store(self.builder, left, f0)
-        let f1 = wl_build_struct_gep(self.builder, tuple_ty, tuple_alloca, 1)
+        let f1 = self.tuple_elem_ptr(tuple_ty, tuple_alloca, 1)
         wl_build_store(self.builder, right, f1)
         self.mir_finish_intrinsic_call(body, dest_place, next_bb, wl_build_load(self.builder, tuple_ty, tuple_alloca))
         true
@@ -9419,25 +9425,17 @@ impl Codegen:
                 let pair_fields: Vec[i64] = Vec.new()
                 pair_fields.push(key_ty)
                 pair_fields.push(val_ty)
-                pair_ty = wl_struct_type(self.context, vec_data_i64(&pair_fields), 2, 0)
+                pair_ty = self.tuple_type_from_elems(&pair_fields)
             let pair_size = self.abi_size_of(pair_ty)
             var val_offset = key_size
             if pair_tid != 0:
                 let pair_resolved = self.mir_resolve_alias_at(pair_tid)
                 if self.mir_type_kind_at(pair_resolved) == TypeKind.TY_TUPLE and self.mir_type_d1_at(pair_resolved) >= 2:
-                    let pair_start = self.mir_type_d0_at(pair_resolved)
-                    let tuple_key_tid = self.mir_type_extra_at(pair_start)
-                    let tuple_val_tid = self.mir_type_extra_at(pair_start + 1)
-                    val_offset = self.sema.type_layout_size_of_frozen(tuple_key_tid)
-                    let tuple_val_align = self.sema.type_layout_align_of_frozen(tuple_val_tid)
-                    if tuple_val_align > 1:
-                        let tuple_rem = val_offset % tuple_val_align
-                        if tuple_rem != 0:
-                            val_offset = val_offset + (tuple_val_align - tuple_rem)
+                    val_offset = self.sema.type_layout_tuple_elem_offset_frozen(pair_resolved, 1)
                 else:
                     val_offset = self.sema.type_layout_struct_field_offset_frozen(pair_tid, 1)
             else:
-                let val_align = wl_abi_align_of(wl_get_module_data_layout(self.llmod), val_ty) as i64
+                let val_align = self.declared_align_of(val_ty)
                 if val_align > 1:
                     let rem = val_offset % val_align
                     if rem != 0:
@@ -9696,9 +9694,9 @@ impl Codegen:
                 let sm_tuple_fields: Vec[i64] = Vec.new()
                 sm_tuple_fields.push(sm_slot_ty)
                 sm_tuple_fields.push(sm_slot_ty)
-                sm_tuple_ty = wl_struct_type(self.context, vec_data_i64(&sm_tuple_fields), 2, 0)
-            let sm_tuple0 = wl_build_insert_value(self.builder, self.build_default_value(sm_tuple_ty), sm_s0, 0)
-            result = wl_build_insert_value(self.builder, sm_tuple0, sm_s1, 1)
+                sm_tuple_ty = self.tuple_type_from_elems(&sm_tuple_fields)
+            let sm_tuple0 = self.tuple_elem_insert(self.build_default_value(sm_tuple_ty), sm_s0, 0)
+            result = self.tuple_elem_insert(sm_tuple0, sm_s1, 1)
 
         else if intrinsic == MirIntrinsic.SLOTMAPSLOT_GET:
             let sms_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
@@ -10508,11 +10506,11 @@ impl Codegen:
             let gd_tup_fields: Vec[i64] = Vec.new()
             gd_tup_fields.push(gd_slot_ty)
             gd_tup_fields.push(gd_slot_ty)
-            let gd_tup_ty = wl_struct_type(self.context, vec_data_i64(&gd_tup_fields), 2, 0)
+            let gd_tup_ty = self.tuple_type_from_elems(&gd_tup_fields)
             let gd_tup = self.create_entry_alloca(gd_tup_ty)
-            let gd_tf0 = wl_build_struct_gep(self.builder, gd_tup_ty, gd_tup, 0)
+            let gd_tf0 = self.tuple_elem_ptr(gd_tup_ty, gd_tup, 0)
             wl_build_store(self.builder, gd_slot_a, gd_tf0)
-            let gd_tf1 = wl_build_struct_gep(self.builder, gd_tup_ty, gd_tup, 1)
+            let gd_tf1 = self.tuple_elem_ptr(gd_tup_ty, gd_tup, 1)
             wl_build_store(self.builder, gd_slot_b, gd_tf1)
             result = wl_build_load(self.builder, gd_tup_ty, gd_tup)
 
@@ -13177,9 +13175,9 @@ impl Codegen:
             let rv = self.option_payload_value(rn, right_ty)
             let pair_alloc = self.create_entry_alloca(elem_ty)
             wl_build_store(self.builder, self.build_default_value(elem_ty), pair_alloc)
-            let p0 = wl_build_struct_gep(self.builder, elem_ty, pair_alloc, 0)
+            let p0 = self.tuple_elem_ptr(elem_ty, pair_alloc, 0)
             wl_build_store(self.builder, lv, p0)
-            let p1 = wl_build_struct_gep(self.builder, elem_ty, pair_alloc, 1)
+            let p1 = self.tuple_elem_ptr(elem_ty, pair_alloc, 1)
             wl_build_store(self.builder, rv, p1)
             let pair_val = wl_build_load(self.builder, elem_ty, pair_alloc)
             let some_val4 = self.build_option_some(pair_val, opt_type)
@@ -13216,9 +13214,9 @@ impl Codegen:
             let payload_en = self.option_payload_value(next_en, raw_elem_ty_en)
             let pair_alloc_en = self.create_entry_alloca(elem_ty)
             wl_build_store(self.builder, self.build_default_value(elem_ty), pair_alloc_en)
-            let en0 = wl_build_struct_gep(self.builder, elem_ty, pair_alloc_en, 0)
+            let en0 = self.tuple_elem_ptr(elem_ty, pair_alloc_en, 0)
             wl_build_store(self.builder, idx_val_en, en0)
-            let en1 = wl_build_struct_gep(self.builder, elem_ty, pair_alloc_en, 1)
+            let en1 = self.tuple_elem_ptr(elem_ty, pair_alloc_en, 1)
             wl_build_store(self.builder, payload_en, en1)
             wl_build_store(self.builder, wl_build_add(self.builder, idx_val_en, wl_const_int(wl_i64_type(self.context), 1, 0)), idx_ptr_en)
             let pair_val_en = wl_build_load(self.builder, elem_ty, pair_alloc_en)
@@ -13646,8 +13644,8 @@ impl Codegen:
             var key_val = elem2
             var val_val = wl_const_int(byte_ty, 1, 0)
             if dest_base_sym == self.sym_hashmap:
-                key_val = wl_build_extract_value(self.builder, elem2, 0)
-                val_val = wl_build_extract_value(self.builder, elem2, 1)
+                key_val = self.tuple_elem_extract(elem2, 0)
+                val_val = self.tuple_elem_extract(elem2, 1)
             key_val = self.coerce_value_to_type(key_val, key_ty)
             val_val = self.coerce_value_to_type(val_val, val_ty)
             let key_alloca = self.create_entry_alloca(key_ty)
@@ -14229,19 +14227,19 @@ impl Codegen:
         let elem_tid = self.mir_iter_elem_tid(recv_sema)
         let elem_ty0 = self.mir_sema_type_to_llvm(elem_tid)
         let elem_ty = if elem_ty0 != 0: elem_ty0 else: self.type_fallback()
-        if wl_get_type_kind(elem_ty) != wl_struct_type_kind() or wl_count_struct_elem_types(elem_ty) < 2:
+        if wl_get_type_kind(elem_ty) != wl_struct_type_kind() or self.tuple_elem_count(elem_ty) < 2:
             with_eprint("error: iterator unzip() requires iterator elements shaped like (A, B)")
             self.had_error = 1
             return self.build_default_value(self.mir_dest_llvm_type(body, dest_place))
-        let left_elem_ty = wl_struct_get_type_at(elem_ty, 0)
-        let right_elem_ty = wl_struct_get_type_at(elem_ty, 1)
+        let left_elem_ty = self.tuple_elem_type(elem_ty, 0)
+        let right_elem_ty = self.tuple_elem_type(elem_ty, 1)
         let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
         let tuple_ty0 = self.mir_dest_llvm_type(body, dest_place)
         let tuple_ty = if tuple_ty0 != 0: tuple_ty0 else: self.type_fallback()
         let out_ptr = self.create_entry_alloca(tuple_ty)
         wl_build_store(self.builder, self.build_default_value(tuple_ty), out_ptr)
-        let left_ptr = wl_build_struct_gep(self.builder, tuple_ty, out_ptr, 0)
-        let right_ptr = wl_build_struct_gep(self.builder, tuple_ty, out_ptr, 1)
+        let left_ptr = self.tuple_elem_ptr(tuple_ty, out_ptr, 0)
+        let right_ptr = self.tuple_elem_ptr(tuple_ty, out_ptr, 1)
         let new_fn = self.ensure_vec_runtime_fn("with_vec_new_out", void_ty, 2)
         let new_ty = self.get_vec_fn_type("with_vec_new_out", void_ty, 2)
         let left_new_args: Vec[i64] = Vec.new()
@@ -14263,8 +14261,8 @@ impl Codegen:
         wl_build_cond_br(self.builder, self.mir_option_is_some_value(next), push_bb, end_bb)
         wl_position_at_end(self.builder, push_bb)
         let elem = self.option_payload_value(next, elem_ty)
-        wl_build_store(self.builder, wl_build_extract_value(self.builder, elem, 0), left_tmp)
-        wl_build_store(self.builder, wl_build_extract_value(self.builder, elem, 1), right_tmp)
+        wl_build_store(self.builder, self.tuple_elem_extract(elem, 0), left_tmp)
+        wl_build_store(self.builder, self.tuple_elem_extract(elem, 1), right_tmp)
         let push_fn = self.ensure_vec_runtime_fn("with_vec_push", void_ty, 2)
         let push_ty = self.get_vec_fn_type("with_vec_push", void_ty, 2)
         let left_push_args: Vec[i64] = Vec.new()
@@ -14359,8 +14357,8 @@ impl Codegen:
         let tuple_ty = if tuple_ty0 != 0: tuple_ty0 else: self.type_fallback()
         let out_ptr = self.create_entry_alloca(tuple_ty)
         wl_build_store(self.builder, self.build_default_value(tuple_ty), out_ptr)
-        let left_ptr = wl_build_struct_gep(self.builder, tuple_ty, out_ptr, 0)
-        let right_ptr = wl_build_struct_gep(self.builder, tuple_ty, out_ptr, 1)
+        let left_ptr = self.tuple_elem_ptr(tuple_ty, out_ptr, 0)
+        let right_ptr = self.tuple_elem_ptr(tuple_ty, out_ptr, 1)
         let new_fn = self.ensure_vec_runtime_fn("with_vec_new_out", void_ty, 2)
         let new_ty = self.get_vec_fn_type("with_vec_new_out", void_ty, 2)
         let left_new_args: Vec[i64] = Vec.new()
@@ -15308,7 +15306,7 @@ impl Codegen:
                         let chan_tuple_fields: Vec[i64] = Vec.new()
                         chan_tuple_fields.push(chan_sender_ty)
                         chan_tuple_fields.push(chan_receiver_ty)
-                        let chan_tuple_ty = wl_struct_type(self.context, vec_data_i64(&chan_tuple_fields), 2, 0)
+                        let chan_tuple_ty = self.tuple_type_from_elems(&chan_tuple_fields)
                         // Build sender = { handle }
                         var chan_sender_val = wl_get_undef(chan_sender_ty)
                         chan_sender_val = wl_build_insert_value(self.builder, chan_sender_val, chan_handle, 0)
@@ -15317,8 +15315,8 @@ impl Codegen:
                         chan_receiver_val = wl_build_insert_value(self.builder, chan_receiver_val, chan_handle, 0)
                         // Build tuple = { sender, receiver }
                         var chan_tuple_val = wl_get_undef(chan_tuple_ty)
-                        chan_tuple_val = wl_build_insert_value(self.builder, chan_tuple_val, chan_sender_val, 0)
-                        chan_tuple_val = wl_build_insert_value(self.builder, chan_tuple_val, chan_receiver_val, 1)
+                        chan_tuple_val = self.tuple_elem_insert(chan_tuple_val, chan_sender_val, 0)
+                        chan_tuple_val = self.tuple_elem_insert(chan_tuple_val, chan_receiver_val, 1)
                         if dest_place >= 0:
                             let chan_local = body.place_locals[dest_place]
                             let chan_alloca = self.create_entry_alloca(chan_tuple_ty)
@@ -18007,12 +18005,12 @@ impl Codegen:
             return self.coerce_value_to_type(args[0], payload_ty)
         if wl_get_type_kind(payload_ty) == wl_struct_type_kind():
             var payload = wl_get_undef(payload_ty)
-            let field_count = wl_count_struct_elem_types(payload_ty)
+            let field_count = self.tuple_elem_count(payload_ty)
             var ai = 0
             while ai < arg_count and ai < field_count:
-                let field_ty = wl_struct_get_type_at(payload_ty, ai)
+                let field_ty = self.tuple_elem_type(payload_ty, ai)
                 let coerced = self.coerce_value_to_type(args[ai], field_ty)
-                payload = wl_build_insert_value(self.builder, payload, coerced, ai)
+                payload = self.tuple_elem_insert(payload, coerced, ai)
                 ai = ai + 1
             return payload
         self.coerce_value_to_type(args[0], payload_ty)

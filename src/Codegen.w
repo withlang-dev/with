@@ -251,6 +251,13 @@ pub type Codegen {
     // alignment (a repr(packed(N)) body is an LLVM packed struct, alignment
     // 1) → that alignment, which a struct embedding it is laid out by.
     struct_declared_align: HashMap[i64, i64],
+    // #1964: a tuple whose body carries padding members → the start, in
+    // tuple_elem_indices, of its elements' LLVM positions (tuple_elem_index
+    // reads them); padded bodies by (literal body, positions), so two tuples
+    // with one padded literal never share a position table.
+    tuple_elem_index_starts: HashMap[i64, i32],
+    tuple_elem_indices: Vec[i32],
+    tuple_padded_types: HashMap[str, i64],
     bitpacked_backing_types: HashMap[i32, i64],  // struct_idx → LLVM iN type (64-bit pointer)
     bitpacked_by_llvm_type: HashMap[i64, i32],  // LLVM iN type → struct_idx (reverse lookup)
     // D72 (§2.5.1): LLVM struct type → the index of its hidden liveness byte
@@ -1016,6 +1023,9 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         bitpacked_structs: HashMap.new(),
         bitpacked_total_bits: HashMap.new(),
         struct_declared_align: HashMap.new(),
+        tuple_elem_index_starts: HashMap.new(),
+        tuple_elem_indices: Vec.new(),
+        tuple_padded_types: HashMap.new(),
         bitpacked_backing_types: HashMap.new(),
         bitpacked_by_llvm_type: HashMap.new(),
         liveness_byte_indices: HashMap.new(),
@@ -2609,6 +2619,8 @@ impl Codegen:
     // Map source field index to LLVM struct field index (accounting for padding).
     // Returns source_fi unchanged if no alignment padding exists for this struct.
     fn get_llvm_field_index(llvm_ty: i64, source_fi: i32) -> i32:
+        if self.tuple_elem_index_starts.contains(llvm_ty):
+            return self.tuple_elem_index(llvm_ty, source_fi)
         let struct_idx = self.find_struct_index_by_type(llvm_ty)
         if struct_idx < 0:
             return source_fi
@@ -2808,7 +2820,8 @@ impl Codegen:
         // Field-wise comparison for structs to avoid padding byte mismatches.
         let ty_kind = wl_get_type_kind(lhs_ty)
         if ty_kind == wl_struct_type_kind():
-            let field_count = wl_count_struct_elem_types(lhs_ty)
+            // A padded tuple body's padding members are not elements (#1964).
+            let field_count = self.tuple_elem_count(lhs_ty)
             if field_count == 0:
                 if op == BinaryOp.OP_EQ:
                     return wl_const_int(i1_ty, 1, 0)
@@ -2816,9 +2829,9 @@ impl Codegen:
             var result = wl_const_int(i1_ty, 1, 0)
             var fi = 0
             while fi < field_count:
-                let lf = wl_build_extract_value(self.builder, lhs, fi)
-                let rf = wl_build_extract_value(self.builder, rhs, fi)
-                let field_ty = wl_struct_get_type_at(lhs_ty, fi)
+                let lf = self.tuple_elem_extract(lhs, fi)
+                let rf = self.tuple_elem_extract(rhs, fi)
+                let field_ty = self.tuple_elem_type(lhs_ty, fi)
                 let field_eq = self.compare_value_eq(lf, rf, field_ty, BinaryOp.OP_EQ)
                 result = wl_build_and(self.builder, result, field_eq)
                 fi = fi + 1
@@ -2869,8 +2882,16 @@ impl Codegen:
 
     // ── Helper: create entry alloca ───────────────────────────────────
 
+    // A stack slot of a type whose model alignment exceeds its LLVM body's
+    // (struct_declared_align: an `@[align(N)]` or `repr(packed(N))` record,
+    // a padded tuple, #1964) promises the model's alignment, which the
+    // placement of everything inside it assumes (§16.4).
     fn create_entry_alloca(ty: i64) -> i64:
-        wl_create_entry_alloca(self.builder, self.current_function, ty)
+        let slot = wl_create_entry_alloca(self.builder, self.current_function, ty)
+        let declared = self.struct_declared_align.get(ty) ?? 0
+        if declared > 0:
+            wl_set_alignment(slot, declared)
+        slot
 
 pub fn vec_data_i64(v: &Vec[i64]) -> i64:
     wl_vec_data_ptr(v as i64)
@@ -3048,7 +3069,10 @@ impl Codegen:
             for i in 0..elem_count:
                 let et_node = self.pool.get_extra(extra_start + i)
                 elem_types.push(self.resolve_type(et_node))
-            return wl_struct_type(self.context, vec_data_i64(&elem_types), elem_count, 0)
+            // #1964: TypeLayout's placement over the resolved element types
+            // (a type node may name a generic parameter, which only this
+            // resolution substitutes); the Sema path proves the same rule.
+            return self.tuple_type_from_elems(&elem_types)
 
         if kind == NodeKind.NK_TYPE_GENERIC:
             let name_sym = self.pool.get_data0(type_node)
@@ -3619,7 +3643,7 @@ impl Codegen:
             if field_ty == 0:
                 field_ty = self.type_fallback()
             fields.push(field_ty)
-        wl_struct_type(self.context, vec_data_i64(&fields), count, 0)
+        self.tuple_type_from_elems(&fields)
 
     mut fn get_or_create_generic_enum_type(sema_tid: i32) -> i64:
         let resolved = self.sema.resolve_alias(sema_tid)
@@ -3933,7 +3957,13 @@ impl Codegen:
                     elem_ty = self.type_fallback()
                 elem_types.push(elem_ty)
             if elem_count > 0:
-                return wl_struct_type(self.context, vec_data_i64(&elem_types), elem_count, 0)
+                // #1964: the body is TypeLayout's placement, then proven.
+                let offsets: Vec[i64] = Vec.new()
+                for i in 0..elem_count:
+                    offsets.push(self.sema.type_layout_tuple_elem_offset_frozen(resolved_tid, i))
+                let tuple_ty = self.tuple_type_from_layout(&elem_types, &offsets, self.sema.type_layout_size_of_frozen(resolved_tid), self.sema.type_layout_align_of_frozen(resolved_tid))
+                self.check_tuple_layout(resolved_tid, tuple_ty)
+                return tuple_ty
             return wl_i32_type(self.context)
         if tk == TypeKind.TY_RANGE:
             let elem_tid = self.sema.get_type_d0(resolved_tid)
@@ -4792,6 +4822,143 @@ impl Codegen:
             with_eprint(f"BUG: {what} '{self.sema.type_name(sema_tid)}' is emitted as {llvm_size} bytes aligned {llvm_align}, but TypeLayout lays it out as {model_size} bytes aligned {model_align} (#1438)")
             self.had_error = 1
 
+    // ── Tuples (#1964) ────────────────────────────────────────────────
+
+    // A tuple's LLVM type, built from TypeLayout's placement of its elements:
+    // element i at offsets[i] (type_layout_tuple_elem_offset) in a record of
+    // `size` bytes aligned `align`. LLVM's literal struct of the element
+    // types is the body when it already measures exactly that — every tuple
+    // whose elements LLVM aligns as the model does. Otherwise (an
+    // `@[align(N)]` record's packed body is LLVM-aligned 1, §16.4; a
+    // `Vector[8, f32]` is LLVM-aligned past §4.3d's cap) the body is a named
+    // struct with `[n x i8]` padding before each element that needs it and
+    // after the last, packed when an element's LLVM alignment does not divide
+    // its offset or exceeds the tuple's, the model's alignment recorded in
+    // struct_declared_align, and its element positions in tuple_elem_indices.
+    // The model places; codegen materializes, and every tuple access reads
+    // the positions through tuple_elem_index. Named, so two tuples whose
+    // padded bodies are one literal never share a position table.
+    mut fn tuple_type_from_layout(elem_tys: &Vec[i64], offsets: &Vec[i64], size: i64, align: i64) -> i64:
+        let n = elem_tys.len() as i32
+        let literal = wl_struct_type(self.context, vec_data_i64(elem_tys), n, 0)
+        if self.tuple_measures(literal, offsets, size, align):
+            return literal
+        var key = f"{literal}/{size}/{align}"
+        for i in 0..n:
+            key = key ++ f"/{offsets[i]}"
+        let cached = self.tuple_padded_types.get(key) ?? 0
+        if cached != 0:
+            return cached
+        let i8_ty = wl_i8_type(self.context)
+        let body: Vec[i64] = Vec.new()
+        let positions: Vec[i32] = Vec.new()
+        var at: i64 = 0
+        var packed = 0
+        for i in 0..n:
+            let elem = elem_tys[i]
+            let off = offsets[i]
+            if off < at:
+                // An element the model overlaps with its predecessor (a
+                // zero-size model type carried in a non-empty LLVM type):
+                // no body places it; check_tuple_layout reports the literal.
+                return literal
+            if off > at:
+                body.push(wl_array_type(i8_ty, off - at))
+            let elem_align = self.abi_align_of(elem)
+            if off % elem_align != 0 or elem_align > align:
+                packed = 1
+            positions.push(body.len() as i32)
+            body.push(elem)
+            at = off + self.abi_size_of(elem)
+        if size > at:
+            body.push(wl_array_type(i8_ty, size - at))
+        let named = wl_struct_create_named(self.context, "tuple")
+        wl_struct_set_body(named, vec_data_i64(&body), body.len() as i32, packed)
+        self.tuple_elem_index_starts.insert(named, self.tuple_elem_indices.len() as i32)
+        self.tuple_elem_indices.push(n)
+        for i in 0..n:
+            self.tuple_elem_indices.push(positions[i])
+        if align > self.abi_align_of(named):
+            self.struct_declared_align.insert(named, align)
+        self.tuple_padded_types.insert(key, named)
+        named
+
+    // A tuple with no Sema type (a type node codegen resolves itself, an
+    // intrinsic's internal pair): the same placement over its emitted
+    // element types, each at declared_align_of (§16.4/§4.3d — the alignment
+    // TypeLayout gives the type it was emitted from), so both paths produce
+    // one type, as #1958's Sema-less Option does.
+    mut fn tuple_type_from_elems(elem_tys: &Vec[i64]) -> i64:
+        let offsets: Vec[i64] = Vec.new()
+        var at: i64 = 0
+        var align: i64 = 1
+        for i in 0..elem_tys.len() as i32:
+            let elem_align = self.declared_align_of(elem_tys[i])
+            if elem_align > align:
+                align = elem_align
+            let off = if at % elem_align == 0: at else: at + (elem_align - at % elem_align)
+            offsets.push(off)
+            at = off + self.abi_size_of(elem_tys[i])
+        let size = if at % align == 0: at else: at + (align - at % align)
+        self.tuple_type_from_layout(elem_tys, &offsets, size, align)
+
+    // Whether LLVM type `ty` (a tuple body) measures `size` bytes aligned
+    // `align` with element i at offsets[i].
+    mut fn tuple_measures(ty: i64, offsets: &Vec[i64], size: i64, align: i64) -> bool:
+        if self.abi_size_of(ty) != size or self.declared_align_of(ty) != align:
+            return false
+        let dl = wl_get_module_data_layout(self.llmod)
+        for i in 0..offsets.len() as i32:
+            if wl_offset_of_element(dl, ty, self.tuple_elem_index(ty, i)) != offsets[i]:
+                return false
+        true
+
+    // The one source-index → LLVM-index map for a tuple's elements: a
+    // padded body's recorded position, else the element index itself.
+    fn tuple_elem_index(tuple_ty: i64, elem: i32) -> i32:
+        let start = self.tuple_elem_index_starts.get(tuple_ty) ?? -1
+        if start < 0 or elem < 0 or elem >= self.tuple_elem_indices[start]:
+            return elem
+        self.tuple_elem_indices[start + 1 + elem]
+
+    // The number of elements of a tuple type (its LLVM members, less a
+    // padded body's padding).
+    fn tuple_elem_count(tuple_ty: i64) -> i32:
+        let start = self.tuple_elem_index_starts.get(tuple_ty) ?? -1
+        if start >= 0:
+            return self.tuple_elem_indices[start]
+        wl_count_struct_elem_types(tuple_ty)
+
+    fn tuple_elem_type(tuple_ty: i64, elem: i32) -> i64:
+        wl_struct_get_type_at(tuple_ty, self.tuple_elem_index(tuple_ty, elem))
+
+    fn tuple_elem_ptr(tuple_ty: i64, tuple_ptr: i64, elem: i32) -> i64:
+        wl_build_struct_gep(self.builder, tuple_ty, tuple_ptr, self.tuple_elem_index(tuple_ty, elem))
+
+    fn tuple_elem_extract(tuple_val: i64, elem: i32) -> i64:
+        wl_build_extract_value(self.builder, tuple_val, self.tuple_elem_index(wl_type_of(tuple_val), elem))
+
+    fn tuple_elem_insert(tuple_val: i64, elem_val: i64, elem: i32) -> i64:
+        wl_build_insert_value(self.builder, tuple_val, elem_val, self.tuple_elem_index(wl_type_of(tuple_val), elem))
+
+    // #1964: an emitted tuple must measure what TypeLayout says — its size,
+    // its alignment, and every element's offset — for the same reason an
+    // enum must (check_enum_layout). A compiler bug, reported loudly.
+    mut fn check_tuple_layout(sema_tid: i32, tuple_ty: i64):
+        if sema_tid <= 0 or tuple_ty == 0:
+            return
+        let offsets: Vec[i64] = Vec.new()
+        var at = ""
+        for i in 0..self.sema.get_type_d1(sema_tid):
+            let off = self.sema.type_layout_tuple_elem_offset_frozen(sema_tid, i)
+            offsets.push(off)
+            at = if i == 0: f"{off}" else: at ++ f", {off}"
+        let model_size = self.sema.type_layout_size_of_frozen(sema_tid)
+        let model_align = self.sema.type_layout_align_of_frozen(sema_tid)
+        if not self.tuple_measures(tuple_ty, &offsets, model_size, model_align):
+            with_eprint(f"BUG: tuple '{self.sema.type_name(sema_tid)}' is emitted as {self.abi_size_of(tuple_ty)} bytes aligned {self.declared_align_of(tuple_ty)}, but TypeLayout lays it out as {model_size} bytes aligned {model_align} with elements at [{at}] (#1964)")
+            self.had_error = 1
+
     // ── Declare enum type ─────────────────────────────────────────────
 
     mut fn declare_enum_type(name_sym: i32, type_node: i32):
@@ -4828,7 +4995,7 @@ impl Codegen:
                         invalid_layout = 1
                     payload_fields.push(field_ty)
                 if invalid_layout == 0:
-                    payload_ty = wl_struct_type(self.context, vec_data_i64(&payload_fields), v_payload_count, 0)
+                    payload_ty = self.tuple_type_from_elems(&payload_fields)
                 offset = offset + v_payload_count
             self.enum_variant_names[v_starts + vi] = v_name
             self.enum_variant_payloads[v_starts + vi] = payload_ty
@@ -4914,7 +5081,7 @@ impl Codegen:
                     if field_ty != 0:
                         payload_fields.push(field_ty)
                 if payload_fields.len() as i32 == payload_count:
-                    payload_ty = wl_struct_type(self.context, vec_data_i64(&payload_fields), payload_count, 0)
+                    payload_ty = self.tuple_type_from_elems(&payload_fields)
             offset = offset + 3 + payload_count
             self.disc_enum_variant_names[v_start + vi] = v_name
             self.disc_enum_variant_values[v_start + vi] = disc_value
