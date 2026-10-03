@@ -4096,6 +4096,26 @@ pub fn mir_capture_verdict(mir_kind: i32, sema_by_place: bool) -> str:
         return "MIR captures a reference to a place Sema has the closure take by value"
     ""
 
+// D65 phase 5 (#2043): a direct call lowered from a source call against
+// the function Sema resolved the call to (comp_resolved): a facade's C
+// name is its bridge or its variadic case (D64, D66), and a call MIR
+// lowered by its own reading of the spelling calls the raw declaration.
+// `mir_sym` is MIR's callee in Sema's pool; "" when they agree.
+pub fn mir_resolved_callee_verdict(mir_sym: i32, sema_sym: i32, spelled_sym: i32) -> str:
+    if sema_sym == 0 or mir_sym == sema_sym:
+        return ""
+    if mir_sym == spelled_sym:
+        return "MIR calls the function the call spells; Sema resolved the call to another (D65: AST spelling -> resolved callee after Sema)"
+    "MIR calls a function Sema did not resolve the call to (D65: one call target per call)"
+
+// D65 phase 5 (#2043): a call whose value Sema converts
+// (call_value_conversions: a presented text view, §16.2b.8) against the
+// MIR: its result reaches a call of the conversion. "" when it does.
+pub fn mir_value_conversion_verdict(converted: bool) -> str:
+    if converted:
+        return ""
+    "Sema converts the call's value through a function MIR never hands the result to: the program reads the callee's raw result as the call's value"
+
 pub fn mir_resolution_check_call(mir_mod: &MirModule, body: &MirBody, bb: i32, answer: &CalleeResolution) -> str:
     let callee_operand = body.term_data0(bb)
     let call_id = body.term_data1(bb)

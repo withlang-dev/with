@@ -624,6 +624,95 @@ fn resolution_audit_callee_kinds(report: &AnalysisReport, sema: &Sema, mir_mod: 
     report.note(f"resolution-audit: name-callee-kinds judged={checked} builtin-calls={builtins} method-builtin-calls={method_builtins} method-intrinsic-calls={method_intrinsics}")
     checked
 
+// The source call a MIR call lowers: the call node itself, or a pipeline
+// stage's call (`x |> f(a)` carries the pipeline node). 0 for anything else.
+fn resolution_source_call(sema: &Sema, node: i32) -> i32:
+    if node <= 0 or node >= sema.ast.node_count(): return 0
+    let kind = sema.ast.kind(node)
+    if kind == NodeKind.NK_CALL: return node
+    if kind == NodeKind.NK_PIPELINE:
+        let stage = sema.ast.get_data1(node)
+        if stage > 0 and sema.ast.kind(stage) == NodeKind.NK_CALL: return stage
+    0
+
+// Whether some call in `body` hands the value in `place`'s local to
+// `conv` (a Sema symbol) as its first argument.
+fn resolution_converted(sema: &Sema, pool: &InternPool, body: &MirBody, place: i32, conv: i32) -> bool:
+    if place < 0 or place >= body.place_locals.len() as i32: return false
+    let local = body.place_locals[place]
+    for bb in 0..body.block_count():
+        if body.term_kind(bb) != TermKind.TK_CALL: continue
+        if resolution_sema_sym(sema, pool, mir_call_const_fn_sym(body, body.term_data0(bb))) != conv: continue
+        let call_id = body.term_data1(bb)
+        if call_id < 0 or call_id >= body.call_arg_starts.len() as i32 or body.call_arg_counts[call_id] < 1: continue
+        let op = body.call_arg_operands[body.call_arg_starts[call_id]]
+        if op < 0 or op >= body.operand_kinds.len() as i32: continue
+        let ok = body.operand_kinds[op]
+        if ok != OperandKind.OK_COPY and ok != OperandKind.OK_MOVE: continue
+        let arg_place = body.operand_d0[op]
+        if arg_place >= 0 and arg_place < body.place_locals.len() as i32 and body.place_locals[arg_place] == local: return true
+    false
+
+// D65 phase 5 (#2043): facade rendering is ordinary calls plus effects, and
+// MIR knows nothing about facades. Every direct MIR call lowered from a
+// source call is the call Sema resolved: a name Sema resolved to a
+// function calls that function (comp_resolved — a facade's C name is its
+// bridge or its variadic case, D64/D66), a method call Sema resolved to
+// another method than it spells calls Sema's (method_call_fields), and a
+// call whose value Sema converts (call_value_conversions — a presented text
+// view, §16.2b.8) hands its result to the conversion. A call MIR lowered by
+// its own reading of the spelling — the raw C declaration, the pointer as
+// the value — disagrees here (red before: a facade call in a pipeline
+// stage, which MirLower's facade tables never reached).
+fn resolution_audit_resolved_calls(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> i32:
+    var checked = 0
+    var foreign = 0
+    var redirected = 0
+    var methods = 0
+    var conversions = 0
+    for bi in 0..mir_mod.bodies.len() as i32:
+        let body = &mir_mod.bodies[bi]
+        if body.lowering_failed != 0: continue
+        var site_ready = false
+        var site = ResolutionSite { path: "", source: "" }
+        for bb in 0..body.block_count():
+            if body.term_kind(bb) != TermKind.TK_CALL: continue
+            let call_id = body.term_data1(bb)
+            if call_id < 0 or call_id >= body.call_arg_starts.len() as i32: continue
+            let node = body.call_ast_node(call_id)
+            let call = resolution_source_call(sema, node)
+            if call == 0: continue
+            let callee = sema.ast.get_data0(call)
+            var verdict = ""
+            let mir_sym = mir_call_const_fn_sym(body, body.term_data0(bb))
+            if mir_sym != 0 and body.call_intrinsic(call_id) == MirIntrinsic.NONE:
+                let mir_sema_sym = resolution_sema_sym(sema, pool, mir_sym)
+                let resolved: i32 = sema.comp_resolved.get(call) ?? 0
+                if sema.ast.kind(callee) == NodeKind.NK_IDENT and sema.call_callee_kind(call) == CallCalleeKind.Function:
+                    checked = checked + 1
+                    let spelled = resolution_sema_sym(sema, pool, sema.ast.get_data0(callee))
+                    if resolved != 0 and resolved != spelled: redirected = redirected + 1
+                    if sema.ci_syms.contains(resolved) or sema.ci_syms.contains(spelled): foreign = foreign + 1
+                    verdict = mir_resolved_callee_verdict(mir_sema_sym, resolved, spelled)
+                else if sema.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS and sema.method_call_fields.contains(call):
+                    checked = checked + 1
+                    methods = methods + 1
+                    let spelled = resolution_sema_sym(sema, pool, sema.ast.get_data1(callee))
+                    verdict = mir_resolved_callee_verdict(mir_sema_sym, resolved, spelled)
+            let conv: i32 = sema.call_value_conversions.get(call) ?? 0
+            if verdict.len() == 0 and conv != 0 and (mir_sym == 0 or resolution_sema_sym(sema, pool, mir_sym) != conv):
+                conversions = conversions + 1
+                verdict = mir_value_conversion_verdict(resolution_converted(sema, pool, body, body.term_data2(bb), conv))
+            if verdict.len() == 0: continue
+            if not site_ready:
+                site = resolution_site(sema, pool, body, source_path, source_text)
+                site_ready = true
+            let mir_name = if mir_sym != 0: with_str_clone_ref(pool.resolve(mir_sym)) else: "a place"
+            let want: i32 = sema.comp_resolved.get(call) ?? 0
+            resolution_violation(report, sema, &site, body, bb, call, with_str_clone_ref(pool.resolve(body.fn_sym)), verdict ++ f" (MIR calls `{mir_name}`, Sema resolved `{sema.pool_resolve(want)}`" ++ (if conv != 0: f", converted by `{sema.pool_resolve(conv)}`)" else: ")"))
+    report.note(f"resolution-audit: resolved-calls judged={checked} foreign={foreign} redirected={redirected} retargeted-methods={methods} value-conversions={conversions}")
+    checked
+
 pub fn analysis_audit_resolution(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str):
     let calls = resolution_audit_calls(report, sema, mir_mod, pool, source_path, source_text)
     let field_places = resolution_audit_field_places(report, sema, mir_mod, pool, source_path, source_text)
@@ -633,6 +722,7 @@ pub fn analysis_audit_resolution(report: &AnalysisReport, sema: &Sema, mir_mod: 
     let view_origins = resolution_audit_view_origins(report, sema, mir_mod, pool, source_path, source_text)
     let captures = resolution_audit_captures(report, sema, mir_mod, pool, source_path, source_text)
     resolution_audit_callee_kinds(report, sema, mir_mod, pool, source_path, source_text)
+    resolution_audit_resolved_calls(report, sema, mir_mod, pool, source_path, source_text)
     report.note(f"resolution-audit: field-places={field_places} let-bindings={lets} call-arguments={effects} index-places={index_places} alias-lets={view_origins} closure-captures={captures}")
     let unlowered = resolution_audit_unlowered_calls(report, sema, mir_mod, pool, source_path, source_text)
     report.note(f"resolution-audit: mir-calls={calls} sema-calls-in-lowered-bodies-without-mir-call={unlowered}")

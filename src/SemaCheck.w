@@ -23824,10 +23824,17 @@ impl Sema:
             // that is no resource's method — is `Option[CStr]` at the call,
             // in a module that imported it (another module's same-named
             // extern is its own). The declaration keeps C's return type;
-            // MirLower.w lower_call makes the view from the pointer.
+            // the call's value is the prelude's `cstr_option_from_ptr` of
+            // C's pointer (NULL is None), recorded as the call's value
+            // conversion: MirLower lowers two ordinary calls (D65 phase 5).
             if self.facade_call_is_presented(fn_sym):
                 ret = self.ensure_option_type_for(self.ty_cstr as i32)
                 self.facade_presented_calls.insert(node, 1)
+                let conv_sym = self.pool_lookup_symbol("cstr_option_from_ptr")
+                let conv_sig = if conv_sym != 0: self.get_sig(conv_sym) else: -1
+                if conv_sig < 0 or self.resolve_alias(self.sig_return_type(conv_sig) as TypeId) != self.resolve_alias(ret as TypeId):
+                    sema_phase_bug(f"BUG: a presented text-view call has no prelude cstr_option_from_ptr returning Option[CStr] to convert C's pointer through: node={node}")
+                self.call_value_conversions.insert(node, conv_sym)
             // #1196: a callee that takes its type from a body not checked yet
             // reads as Unit. Often that is right (a procedure); check_bodies
             // reports the calls where it was not.
@@ -29445,6 +29452,13 @@ impl Sema:
         CallBuiltin.None
 
     mut fn check_method_call_parts_inner(expr: i32, field: i32, extra_start: i32, arg_count: i32, node: i32, known_recv_ty: i32) -> i32:
+        // D65 phase 5 (#2043): the method this call resolved to, when it is
+        // not the one its spelling names (D66: a variadic contract's case).
+        // MirLower reads it, never the spelling.
+        if node > 0 and self.ast.kind(node) == NodeKind.NK_CALL:
+            let spelled = self.ast.get_data0(node)
+            if self.ast.kind(spelled) == NodeKind.NK_FIELD_ACCESS and self.ast.get_data1(spelled) != field:
+                self.method_call_fields.insert(node, field)
         let static_type_sym = self.static_receiver_base_sym(expr)
         let early_method_name: str = with_str_clone_ref(self.pool_resolve(field))
         if static_type_sym != 0 and self.pool_resolve(static_type_sym) == "Iter" and self.iterator_constructor_known_but_unimplemented(early_method_name):
