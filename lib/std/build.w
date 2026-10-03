@@ -900,8 +900,8 @@ fn ToolFs.project_relative_path(self: &Self, path: &str) -> str:
     let normalized = tool_path_normalize(path)
     if self.root.len() == 0 or self.root == ".":
         return normalized
-    let root = tool_path_normalize(self.root)
-    let prefix = if root.ends_with("/"): root else: root ++ "/"
+    let root_path = tool_path_normalize(self.root)
+    let prefix = if root_path.ends_with("/"): root_path else: root_path ++ "/"
     if normalized.starts_with(prefix):
         return normalized.slice(prefix.len(), normalized.len())
     normalized
@@ -1377,9 +1377,9 @@ type ToolArchiveFile { handle: *mut c_void }
 impl ToolArchiveFile:
     mut fn close() -> i32:
         if self.handle == null: return 0
-        let handle: *mut c_void = self.handle
+        let file: *mut c_void = self.handle
         self.handle = null
-        fclose(handle)
+        fclose(file)
 
 impl Drop for ToolArchiveFile:
     move fn drop():
@@ -2074,8 +2074,8 @@ fn ProcessRunner.project_relative_path(self: &Self, path: &str) -> str:
     let normalized = tool_path_normalize(path)
     if self.root.len() == 0 or self.root == ".":
         return normalized
-    let root = tool_path_normalize(self.root)
-    let prefix = if root.ends_with("/"): root else: root ++ "/"
+    let root_path = tool_path_normalize(self.root)
+    let prefix = if root_path.ends_with("/"): root_path else: root_path ++ "/"
     if normalized.starts_with(prefix):
         return normalized.slice(prefix.len(), normalized.len())
     normalized
@@ -2660,9 +2660,9 @@ pub fn Target.define(move self: Target, define: str) -> Target:
     out.defines.push(define)
     out
 
-pub fn Target.output(move self: Self, output: str) -> Target:
+pub fn Target.output(move self: Self, path: str) -> Target:
     var out = self
-    out.output = output
+    out.output = path
     out
 
 pub fn Target.input(move self: Target, input: str) -> Target:

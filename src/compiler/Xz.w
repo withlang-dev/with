@@ -110,11 +110,11 @@ impl XzLzma:
         for _ in 0..4:
             self.code = ((self.code << 8) | self.next_byte()) & XZ_MASK32
 
-    mut fn reset_state(lc: i32, lp: i32, pb: i32):
-        self.lc = lc
-        self.lp = lp
-        self.pb = pb
-        let count = P_LITERAL + 768 * (1 << ((lc + lp) as u32))
+    mut fn reset_state(new_lc: i32, new_lp: i32, new_pb: i32):
+        self.lc = new_lc
+        self.lp = new_lp
+        self.pb = new_pb
+        let count = P_LITERAL + 768 * (1 << ((new_lc + new_lp) as u32))
         self.probs = Vec.with_capacity(count as i64)
         for _ in 0..count: self.probs.push(1024)
         self.state = 0
@@ -266,60 +266,60 @@ impl XzLzma:
     // LZMA2 chunks from data[start..], until the end chunk. Returns the offset
     // after it, or -1 (the reason in self.problem).
     mut fn lzma2(start: i64) -> i64:
-        var at = start
+        var byte_at_pos = start
         var have_props = false
         while true:
-            if at >= self.data.len():
+            if byte_at_pos >= self.data.len():
                 self.fail("an LZMA2 stream ends early")
                 return -1
-            let control = self.data[at] as i32
-            at = at + 1
+            let control = self.data[byte_at_pos] as i32
+            byte_at_pos = byte_at_pos + 1
             if control == 0:
-                return at
+                return byte_at_pos
             if control == 1 or control == 2:
                 if control == 1: self.dict_start = self.out.len()
-                let size = ((self.data[at] as i64) << 8 | self.data[at + 1] as i64) + 1
-                at = at + 2
-                if at + size > self.data.len():
+                let size = ((self.data[byte_at_pos] as i64) << 8 | self.data[byte_at_pos + 1] as i64) + 1
+                byte_at_pos = byte_at_pos + 2
+                if byte_at_pos + size > self.data.len():
                     self.fail("an uncompressed LZMA2 chunk ends early")
                     return -1
-                for i in 0..size: self.out.push(self.data[at + i])
-                at = at + size
+                for i in 0..size: self.out.push(self.data[byte_at_pos + i])
+                byte_at_pos = byte_at_pos + size
                 continue
             if control < 128:
                 self.fail(f"an invalid LZMA2 control byte {control}")
                 return -1
-            let unpacked = ((((control & 31) as i64) << 16) | (self.data[at] as i64) << 8 | self.data[at + 1] as i64) + 1
-            let packed = ((self.data[at + 2] as i64) << 8 | self.data[at + 3] as i64) + 1
-            at = at + 4
+            let unpacked = ((((control & 31) as i64) << 16) | (self.data[byte_at_pos] as i64) << 8 | self.data[byte_at_pos + 1] as i64) + 1
+            let packed = ((self.data[byte_at_pos + 2] as i64) << 8 | self.data[byte_at_pos + 3] as i64) + 1
+            byte_at_pos = byte_at_pos + 4
             let reset = (control >> 5) & 3
             if reset == 3: self.dict_start = self.out.len()
             if reset >= 2:
-                var d = self.data[at] as i32
-                at = at + 1
-                let lc = d % 9
+                var d = self.data[byte_at_pos] as i32
+                byte_at_pos = byte_at_pos + 1
+                let props_lc = d % 9
                 d = d / 9
-                let lp = d % 5
-                let pb = d / 5
-                if lc + lp > 4 or pb > 4:
+                let props_lp = d % 5
+                let props_pb = d / 5
+                if props_lc + props_lp > 4 or props_pb > 4:
                     self.fail("invalid LZMA properties in an LZMA2 chunk")
                     return -1
-                self.reset_state(lc, lp, pb)
+                self.reset_state(props_lc, props_lp, props_pb)
                 have_props = true
             else if reset == 1:
                 self.reset_state(self.lc, self.lp, self.pb)
             if not have_props and self.probs.len() == 0:
                 self.fail("an LZMA2 chunk before any properties")
                 return -1
-            self.at = at
-            self.end = at + packed
+            self.at = byte_at_pos
+            self.end = byte_at_pos + packed
             if self.end > self.data.len():
                 self.fail("an LZMA2 chunk ends early")
                 return -1
             self.init_range()
             self.decode_chunk(unpacked)
             if self.problem.len() > 0: return -1
-            at = at + packed
+            byte_at_pos = byte_at_pos + packed
         -1
 
 

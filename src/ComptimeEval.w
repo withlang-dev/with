@@ -4233,7 +4233,7 @@ fn comptime_decl_kind_for_function(name: &str) -> i32:
     0
 
 impl ComptimeEvaluator:
-    mut fn function_decl_summary_value(comp: &Compilation, pool: AstPool, decl: NodeId, decl_index: i32, node: i32) -> ComptimeValue:
+    mut fn function_decl_summary_value(comp: &Compilation, ast_pool: AstPool, decl: NodeId, decl_index: i32, node: i32) -> ComptimeValue:
         let decl_type = self.named_type_id("DeclSummary", node)
         let kind_type = self.named_type_id("DeclKind", node)
         if decl_type == 0 or kind_type == 0:
@@ -4242,20 +4242,20 @@ impl ComptimeEvaluator:
         let file_id = comp.zcu.decl_source_file_id_frontend(decl_index)
         let source = comp.zcu.source_for_file_id_frontend(file_id)
         let module_name = comptime_module_name_for_path(comp.zcu.project_config.root_dir, path)
-        let name = comp.zcu.pool.resolve(pool.get_data0(decl)).clone()
-        let flags = pool.get_data2(decl)
+        let name = comp.zcu.pool.resolve(ast_pool.get_data0(decl)).clone()
+        let flags = ast_pool.get_data2(decl)
         let is_pub = (flags / FnFlags.PUB) % 2 == 1
-        let meta = pool.find_fn_meta(decl)
+        let meta = ast_pool.find_fn_meta(decl)
         var param_count = 0
         var generic_param_count = 0
         var return_type = "void"
         if meta >= 0:
-            param_count = pool.fn_meta_param_count(meta)
-            generic_param_count = pool.fn_meta_tp_count(meta)
-            let ret_node = pool.fn_meta_ret(meta)
+            param_count = ast_pool.fn_meta_param_count(meta)
+            generic_param_count = ast_pool.fn_meta_tp_count(meta)
+            let ret_node = ast_pool.fn_meta_ret(meta)
             if ret_node != 0:
-                return_type = render_type_expr(pool, comp.zcu.pool, ret_node as NodeId)
-        let summary_source = self.source_span_value(path, source.text, pool.get_start(decl), pool.get_end(decl), node)
+                return_type = render_type_expr(ast_pool, comp.zcu.pool, ret_node as NodeId)
+        let summary_source = self.source_span_value(path, source.text, ast_pool.get_start(decl), ast_pool.get_end(decl), node)
         if summary_source.kind == ComptimeValueKind.CV_INVALID:
             return summary_source
         let notes = self.empty_vec_for_field(decl_type, "notes", node)
@@ -4278,7 +4278,7 @@ impl ComptimeEvaluator:
         self.extra_values.push(notes)
         comptime_value_struct(decl_type, start, 14)
 
-    mut fn type_decl_summary_value(comp: &Compilation, pool: AstPool, decl: NodeId, decl_index: i32, node: i32) -> ComptimeValue:
+    mut fn type_decl_summary_value(comp: &Compilation, ast_pool: AstPool, decl: NodeId, decl_index: i32, node: i32) -> ComptimeValue:
         let decl_type = self.named_type_id("DeclSummary", node)
         let kind_type = self.named_type_id("DeclKind", node)
         if decl_type == 0 or kind_type == 0:
@@ -4287,11 +4287,11 @@ impl ComptimeEvaluator:
         let file_id = comp.zcu.decl_source_file_id_frontend(decl_index)
         let source = comp.zcu.source_for_file_id_frontend(file_id)
         let module_name = comptime_module_name_for_path(comp.zcu.project_config.root_dir, path)
-        let name = comp.zcu.pool.resolve(pool.get_data0(decl)).clone()
-        let packed = pool.get_data2(decl)
+        let name = comp.zcu.pool.resolve(ast_pool.get_data0(decl)).clone()
+        let packed = ast_pool.get_data2(decl)
         let sub_kind = type_decl_sub_kind(packed)
-        let is_pub = type_decl_is_pub(pool, pool.get_data1(decl), sub_kind)
-        let summary_source = self.source_span_value(path, source.text, pool.get_start(decl), pool.get_end(decl), node)
+        let is_pub = type_decl_is_pub(ast_pool, ast_pool.get_data1(decl), sub_kind)
+        let summary_source = self.source_span_value(path, source.text, ast_pool.get_start(decl), ast_pool.get_end(decl), node)
         if summary_source.kind == ComptimeValueKind.CV_INVALID:
             return summary_source
         let notes = self.empty_vec_for_field(decl_type, "notes", node)
@@ -4323,21 +4323,21 @@ impl ComptimeEvaluator:
         self.extra_values.push(notes)
         comptime_value_struct(decl_type, start, 14)
 
-    mut fn typechecked_message_value(comp: &Compilation, pool: &AstPool, node: i32) -> ComptimeValue:
+    mut fn typechecked_message_value(comp: &Compilation, ast_pool: &AstPool, node: i32) -> ComptimeValue:
         let vec_type = self.decl_summary_vec_type(node)
         if vec_type == 0:
             return comptime_value_invalid()
         let summaries: Vec[ComptimeValue] = Vec.new()
-        for di in 0..pool.decl_count():
-            let decl = pool.get_decl(di)
-            let kind = pool.kind(decl)
+        for di in 0..ast_pool.decl_count():
+            let decl = ast_pool.get_decl(di)
+            let kind = ast_pool.kind(decl)
             if kind == NodeKind.NK_FN_DECL:
-                let summary = self.function_decl_summary_value(comp, pool, decl, di, node)
+                let summary = self.function_decl_summary_value(comp, ast_pool, decl, di, node)
                 if summary.kind == ComptimeValueKind.CV_INVALID:
                     return summary
                 summaries.push(summary)
             else if kind == NodeKind.NK_TYPE_DECL:
-                let summary = self.type_decl_summary_value(comp, pool, decl, di, node)
+                let summary = self.type_decl_summary_value(comp, ast_pool, decl, di, node)
                 if summary.kind == ComptimeValueKind.CV_INVALID:
                     return summary
                 summaries.push(summary)
@@ -4349,14 +4349,14 @@ impl ComptimeEvaluator:
         payloads.push(decls)
         self.compiler_message_value("Typechecked", payloads, node)
 
-    mut fn workspace_typechecked_messages(comp: &Compilation, pool: &AstPool, node: i32) -> Vec[ComptimeValue]:
+    mut fn workspace_typechecked_messages(comp: &Compilation, ast_pool: &AstPool, node: i32) -> Vec[ComptimeValue]:
         let messages: Vec[ComptimeValue] = Vec.new()
-        if pool.decl_count() == 0:
+        if ast_pool.decl_count() == 0:
             return messages
         let phase = self.compiler_message_phase_value(3, node)
         if phase.kind == ComptimeValueKind.CV_INVALID:
             return messages
-        let typechecked = self.typechecked_message_value(comp, pool, node)
+        let typechecked = self.typechecked_message_value(comp, ast_pool, node)
         if typechecked.kind == ComptimeValueKind.CV_INVALID:
             return messages
         messages.push(phase)
@@ -4370,12 +4370,12 @@ impl ComptimeEvaluator:
         messages.push(phase)
         messages
 
-    mut fn workspace_success_messages(comp: &Compilation, pool: &AstPool, node: i32) -> Vec[ComptimeValue]:
+    mut fn workspace_success_messages(comp: &Compilation, ast_pool: &AstPool, node: i32) -> Vec[ComptimeValue]:
         var messages: Vec[ComptimeValue] = Vec.new()
         messages = self.workspace_phase_message_append(move messages, 0, node)
         messages = self.workspace_phase_message_append(move messages, 1, node)
         messages = self.workspace_phase_message_append(move messages, 2, node)
-        let typechecked = self.workspace_typechecked_messages(comp, pool, node)
+        let typechecked = self.workspace_typechecked_messages(comp, ast_pool, node)
         for mi in 0..typechecked.len() as i32:
             messages.push(comptime_value_clone(typechecked[mi]))
         messages = self.workspace_phase_message_append(move messages, 4, node)
@@ -4976,7 +4976,7 @@ impl ComptimeEvaluator:
         comp.set_compiler_hooks_enabled(self.workspace_bool_option(options, "compiler_hooks_enabled", true))
         comp.set_prelude_mode(self.workspace_i32_option(options, "prelude_mode", 0))
 
-        var pool = AstPool.new()
+        var ast_pool = AstPool.new()
         var source_name = with_str_clone_ref(source_path)
         if out.string_names.len() > 0:
             let source_paths: Vec[str] = Vec.new()
@@ -4985,7 +4985,7 @@ impl ComptimeEvaluator:
                 source_paths.push(self.workspace_path(capability.project_root, out.string_names[si]))
                 source_texts.push(with_str_clone_ref(out.string_sources[si]))
             source_name = with_str_clone_ref(source_paths[0])
-            pool = comp.compile_entry_source_texts(source_paths, source_texts)
+            ast_pool = comp.compile_entry_source_texts(source_paths, source_texts)
         else:
             let absolute_source = self.workspace_path(capability.project_root, source_path)
             var cfg = project_config_load_for_source(absolute_source)
@@ -4995,9 +4995,9 @@ impl ComptimeEvaluator:
                 cfg.c_import_defines.push(with_str_clone_ref(defines[di]))
             for li in 0..link_libs.len() as i32:
                 cfg.dep_link_libs.push(with_str_clone_ref(link_libs[li]))
-            pool = comp.compile_entry_file_with_config(absolute_source, move cfg)
+            ast_pool = comp.compile_entry_file_with_config(absolute_source, move cfg)
 
-        var link_plan = comp.prepare_binary_link_from_pool(pool, source_name, obj_path, absolute_output)
+        var link_plan = comp.prepare_binary_link_from_pool(ast_pool, source_name, obj_path, absolute_output)
         if not link_plan.ok:
             let _ = self.fail(node, "Workspace.intercept failed before PRE_LINK")
             return out

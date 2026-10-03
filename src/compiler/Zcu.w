@@ -220,11 +220,11 @@ impl Zcu:
     fn add_imported_path(path: &str) -> Unit:
         self.imported_paths.push(zcu_owned_text(resolve_canonical_module_key(path)))
 
-    mut fn seed_decl_source_paths(pool: AstPool, path: &str, file_id: i32) -> Unit:
+    mut fn seed_decl_source_paths(new_pool: AstPool, path: &str, file_id: i32) -> Unit:
         self.decl_source_paths = Vec.new()
         self.decl_source_file_ids = Vec.new()
         self.decl_is_c_import = Vec.new()
-        for _ in 0..pool.decl_count():
+        for _ in 0..new_pool.decl_count():
             self.decl_source_paths.push(zcu_owned_text(path))
             self.decl_source_file_ids.push(file_id)
             self.decl_is_c_import.push(0)
@@ -390,8 +390,8 @@ impl Zcu:
     mut fn capture_pending_warnings():
         self.reset_pending_warnings()
 
-    mut fn set_current_source(source_dir: &str, path: &str, text: &str):
-        self.source_dir = with_str_clone_ref(source_dir)
+    mut fn set_current_source(dir: &str, path: &str, text: &str):
+        self.source_dir = with_str_clone_ref(dir)
         self.current_source_path = with_str_clone_ref(path)
         self.current_source_text = with_str_clone_ref(text)
 
@@ -436,8 +436,8 @@ impl Zcu:
         self.source_text_names = Vec.new()
         self.source_texts = Vec.new()
 
-    mut fn reset_for_new_invocation(source_dir: &str, path: &str, text: &str):
-        self.set_current_source(source_dir, path, text)
+    mut fn reset_for_new_invocation(dir: &str, path: &str, text: &str):
+        self.set_current_source(dir, path, text)
         self.frontend_sema_completed = 0
         self.extra_source_names = Vec.new()
         self.extra_source_texts = Vec.new()
@@ -449,11 +449,11 @@ impl Zcu:
     mut fn set_pending_warnings(warnings: Vec[str]):
         self.pending_warnings = warnings
 
-    mut fn set_pool(pool: InternPool):
-        self.pool = pool
+    mut fn set_pool(new_pool: InternPool):
+        self.pool = new_pool
 
-    mut fn set_frontend_pool(pool: InternPool):
-        self.frontend_pool = pool
+    mut fn set_frontend_pool(new_pool: InternPool):
+        self.frontend_pool = new_pool
 
     mut fn sync_from_sema(sema: Sema):
         if zcu_debug_pool_flow_enabled() != 0:
@@ -547,13 +547,13 @@ impl Zcu:
         let empty = zcu_new_vec_str()
         self.last_link_lib_names = empty
 
-    mut fn capture_last_link_lib_names(pool: InternPool, result: &ResolveResult) -> Unit:
+    mut fn capture_last_link_lib_names(new_pool: InternPool, result: &ResolveResult) -> Unit:
         self.reset_last_link_lib_names()
         for li in 0..result.link_libs.len() as i32:
             let lib_sym = result.link_libs[li]
             if lib_sym <= 0:
                 continue
-            let lib_name: str = with_str_clone_ref(pool.resolve(lib_sym))
+            let lib_name: str = with_str_clone_ref(new_pool.resolve(lib_sym))
             if lib_name.len() > 0:
                 self.last_link_lib_names.push(lib_name)
 

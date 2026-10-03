@@ -36,9 +36,9 @@ impl[T] Box[T]:
     pub move fn into_raw() -> *mut T: self as *mut T
 
     pub move fn into_inner() -> T:
-        let ptr = self as *mut T
-        let value = unsafe { *ptr }
-        with_free(ptr as *mut u8)
+        let cell = self as *mut T
+        let value = unsafe { *cell }
+        with_free(cell as *mut u8)
         value
 
 impl[T] Deref[T] for Box[T]:
@@ -47,7 +47,7 @@ impl[T] Deref[T] for Box[T]:
 
 impl[T] Drop for Box[T]:
     move fn drop():
-        let ptr = self as *mut T
-        let value = unsafe { *ptr }
+        let cell = self as *mut T
+        let value = unsafe { *cell }
         drop(value)
-        with_free(ptr as *mut u8)
+        with_free(cell as *mut u8)

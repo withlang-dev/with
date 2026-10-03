@@ -3177,13 +3177,13 @@ fn CiMacroProbes.new(): CiMacroProbes { opened: false, session: 0, errors: "", o
 
 impl CiMacroProbes:
 
-    mut fn open(session: i64, macro_source: &str, cxx: bool):
+    mut fn open(ci_session: i64, macro_source: &str, cxx: bool):
         self.opened = true
         var names = StringBuilder.new()
-        for i in 0..with_cimport_macro_count(session):
-            if with_cimport_macro_is_fn_like(session, i) != 0 or with_cimport_macro_is_system(session, i) != 0: continue
-            let name = with_cimport_macro_name(session, i)
-            let value = ci_trim(ci_strip_c_comments(with_cimport_macro_value(session, i)))
+        for i in 0..with_cimport_macro_count(ci_session):
+            if with_cimport_macro_is_fn_like(ci_session, i) != 0 or with_cimport_macro_is_system(ci_session, i) != 0: continue
+            let name = with_cimport_macro_name(ci_session, i)
+            let value = ci_trim(ci_strip_c_comments(with_cimport_macro_value(ci_session, i)))
             if name.len() == 0 or value.len() == 0 or self.order.contains(name): continue
             if not ci_macro_value_delims_balanced(value): continue
             self.order.insert(name.clone(), self.order.len() as i32)
@@ -3204,8 +3204,8 @@ impl CiMacroProbes:
             if decl_name.starts_with(prefix):
                 self.decls.insert(decl_name.slice(prefix.len(), decl_name.len()).to_owned(), i)
 
-    mut fn result(session: i64, macro_source: &str, name: &str, cxx: bool) -> str:
-        if not self.opened: self.open(session, macro_source, cxx)
+    mut fn result(ci_session: i64, macro_source: &str, name: &str, cxx: bool) -> str:
+        if not self.opened: self.open(ci_session, macro_source, cxx)
         let slot = self.order.get(name)
         if slot.is_none(): return ci_probe_one_object_macro(macro_source, name, cxx)
         let k: i32 = slot.unwrap()

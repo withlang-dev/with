@@ -431,9 +431,9 @@ pub fn Compilation.init -> Compilation:
 impl Compilation:
     mut fn configure(opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool):
         self.config = compilation_config_from_cli(opt_level, no_std, alloc_mode, runtime_available, self.config.prelude_mode)
-        var zcu = move self.zcu
-        zcu.set_prelude_mode(self.config.prelude_mode)
-        self.zcu = zcu
+        var taken_zcu = move self.zcu
+        taken_zcu.set_prelude_mode(self.config.prelude_mode)
+        self.zcu = taken_zcu
 
     mut fn configure_options(options: &BuildCommandOptions):
         self.configure(options.opt_level, options.no_std, options.alloc_mode, options.runtime_available)
@@ -460,9 +460,9 @@ impl Compilation:
     pub mut fn set_bundle_fingerprint(corpus: &str, fingerprint_path: &str):
         self.bundle_corpus = with_str_clone_ref(corpus)
         self.bundle_fingerprint_path = with_str_clone_ref(fingerprint_path)
-        var zcu = move self.zcu
-        zcu.bundle_corpus = with_str_clone_ref(corpus)
-        self.zcu = zcu
+        var taken_zcu = move self.zcu
+        taken_zcu.bundle_corpus = with_str_clone_ref(corpus)
+        self.zcu = taken_zcu
 
     // The exported-declaration model of the corpus in the finalized Sema
     // (the one codegen handed back, or the one `check` froze), with every
@@ -522,9 +522,9 @@ impl Compilation:
         if not self.load_link_bundles():
             return AstPool.new()
         let _ = bundle_interfaces_register_wi(wi_text)
-        var zcu = move self.zcu
-        zcu.interface_eager = true
-        self.zcu = zcu
+        var taken_zcu = move self.zcu
+        taken_zcu.interface_eager = true
+        self.zcu = taken_zcu
         var root_text = "// bundle interface root for " ++ wi_path ++ "\n"
         for si in 0..sections.len() as i32:
             let dotted = bundle_module_dotted_name(sections[si])
@@ -533,14 +533,14 @@ impl Compilation:
                 return AstPool.new()
             root_text = root_text ++ "use " ++ dotted ++ "\n"
         let root_path = wi_path ++ ".root.w"
-        var zcu = move self.zcu
+        var taken_zcu = move self.zcu
         let source_dir = frontend_dirname(root_path)
-        zcu.reset_for_new_invocation(source_dir, root_path, "")
-        zcu.project_config = self.project_config_for_source(root_path)
-        zcu.set_current_source(source_dir, root_path, root_text)
-        zcu = self.apply_cli_diag_mappings(move zcu)
-        let pool = zcu.compile_source_frontend_mode(root_text, root_path, 0, 0)
-        self.zcu = zcu
+        taken_zcu.reset_for_new_invocation(source_dir, root_path, "")
+        taken_zcu.project_config = self.project_config_for_source(root_path)
+        taken_zcu.set_current_source(source_dir, root_path, root_text)
+        taken_zcu = self.apply_cli_diag_mappings(move taken_zcu)
+        let pool = taken_zcu.compile_source_frontend_mode(root_text, root_path, 0, 0)
+        self.zcu = taken_zcu
         pool
 
     // D39 `--link-bundle <prefix>` (docs/spec/toolchain/wo_bundles.md): `<prefix>.o` joins
@@ -598,9 +598,9 @@ impl Compilation:
             // The object joins the link explicitly, so on-demand selection
             // must not extract an embedded copy of the same modules.
             link_stage_add_explicit_bundle_prefixes(&prefixes)
-            var zcu = move self.zcu
-            zcu.add_link_bundle_prefixes(&prefixes)
-            self.zcu = zcu
+            var taken_zcu = move self.zcu
+            taken_zcu.add_link_bundle_prefixes(&prefixes)
+            self.zcu = taken_zcu
         true
 
     // D39 (batch C3): every bundle this compiler embeds registers its
@@ -677,9 +677,9 @@ impl Compilation:
         cfg.prelude_mode = compilation_normalize_prelude_mode(mode)
         let cfg_prelude_mode: i32 = cfg.prelude_mode
         self.config = cfg
-        var zcu = move self.zcu
-        zcu.set_prelude_mode(cfg_prelude_mode)
-        self.zcu = zcu
+        var taken_zcu = move self.zcu
+        taken_zcu.set_prelude_mode(cfg_prelude_mode)
+        self.zcu = taken_zcu
 
     mut fn set_overflow_mode(mode: i32):
         var cfg = move self.config
@@ -702,9 +702,9 @@ impl Compilation:
         var cfg = move self.config
         cfg.tool_mode_entry_path = with_str_clone_ref(path)
         self.config = cfg
-        var zcu = move self.zcu
-        zcu.tool_mode_entry_path = with_str_clone_ref(path)
-        self.zcu = zcu
+        var taken_zcu = move self.zcu
+        taken_zcu.tool_mode_entry_path = with_str_clone_ref(path)
+        self.zcu = taken_zcu
 
     fn add_cli_diag_mapping(gen_start: i32, gen_end: i32, source_name: &str, source_text: &str) -> Unit:
         self.cli_diag_gen_starts.push(gen_start)
@@ -712,24 +712,24 @@ impl Compilation:
         self.cli_diag_source_names.push(with_str_clone_ref(source_name))
         self.cli_diag_source_texts.push(with_str_clone_ref(source_text))
 
-    fn apply_cli_diag_mappings(zcu: Zcu) -> Zcu:
-        zcu.clear_cli_diag_mappings()
+    fn apply_cli_diag_mappings(taken_zcu: Zcu) -> Zcu:
+        taken_zcu.clear_cli_diag_mappings()
         for i in 0..self.cli_diag_gen_starts.len() as i32:
-            zcu.add_cli_diag_mapping(
+            taken_zcu.add_cli_diag_mapping(
                 self.cli_diag_gen_starts[i],
                 self.cli_diag_gen_ends[i],
                 self.cli_diag_source_names[i],
                 self.cli_diag_source_texts[i],
             )
-        zcu
+        taken_zcu
 
     mut fn compile_file(path: &str) -> AstPool:
         compilation_debug_init("Compilation.compile_file:start " ++ path)
         if not self.load_link_bundles():
             return AstPool.new()
-        var zcu = move self.zcu
-        let pool = zcu.compile_file_frontend_with_config(path, self.project_config_for_source(path))
-        self.zcu = zcu
+        var taken_zcu = move self.zcu
+        let pool = taken_zcu.compile_file_frontend_with_config(path, self.project_config_for_source(path))
+        self.zcu = taken_zcu
         compilation_debug_init(f"Compilation.compile_file:done decls={pool.decl_count()}")
         pool
 
@@ -737,9 +737,9 @@ impl Compilation:
         compilation_debug_init("Compilation.compile_file_with_config:start " ++ path)
         if not self.load_link_bundles():
             return AstPool.new()
-        var zcu = move self.zcu
-        let pool = zcu.compile_file_frontend_with_config(path, self.apply_runtime_config(move cfg))
-        self.zcu = zcu
+        var taken_zcu = move self.zcu
+        let pool = taken_zcu.compile_file_frontend_with_config(path, self.apply_runtime_config(move cfg))
+        self.zcu = taken_zcu
         compilation_debug_init(f"Compilation.compile_file_with_config:done decls={pool.decl_count()}")
         pool
 
@@ -747,9 +747,9 @@ impl Compilation:
         compilation_debug_init("Compilation.compile_entry_file:start " ++ path)
         if not self.load_link_bundles():
             return AstPool.new()
-        var zcu = move self.zcu
-        let pool = zcu.compile_file_frontend_entry_with_config(path, self.project_config_for_source(path))
-        self.zcu = zcu
+        var taken_zcu = move self.zcu
+        let pool = taken_zcu.compile_file_frontend_entry_with_config(path, self.project_config_for_source(path))
+        self.zcu = taken_zcu
         compilation_debug_init(f"Compilation.compile_entry_file:done decls={pool.decl_count()}")
         pool
 
@@ -757,9 +757,9 @@ impl Compilation:
         compilation_debug_init("Compilation.compile_entry_file_with_config:start " ++ path)
         if not self.load_link_bundles():
             return AstPool.new()
-        var zcu = move self.zcu
-        let pool = zcu.compile_file_frontend_entry_with_config(path, self.apply_runtime_config(move cfg))
-        self.zcu = zcu
+        var taken_zcu = move self.zcu
+        let pool = taken_zcu.compile_file_frontend_entry_with_config(path, self.apply_runtime_config(move cfg))
+        self.zcu = taken_zcu
         compilation_debug_init(f"Compilation.compile_entry_file_with_config:done decls={pool.decl_count()}")
         pool
 
@@ -775,7 +775,7 @@ impl Compilation:
         self.dump_project_info(pool)
 
     fn dump_project_info(pool: AstPool) -> str:
-        let zcu = &self.zcu
+        let taken_zcu = &self.zcu
         var function_count = 0
         var type_count = 0
         for di in 0..pool.decl_count():
@@ -786,8 +786,8 @@ impl Compilation:
             else if kind == NodeKind.NK_TYPE_DECL:
                 type_count = type_count + 1
 
-        var out = f"project_info modules={zcu.last_resolved.modules.len() as i32} functions={function_count} types={type_count}\n"
-        let cfg = &zcu.project_config
+        var out = f"project_info modules={taken_zcu.last_resolved.modules.len() as i32} functions={function_count} types={type_count}\n"
+        let cfg = &taken_zcu.project_config
         out = out ++ "config root=" ++ cfg.root_dir ++ "\n"
         out = out ++ "config package=" ++ cfg.package_name ++ " version=" ++ cfg.package_version ++ "\n"
         out = out ++ "config c_import_include_paths=" ++ compilation_join_strings(&cfg.c_import_include_paths, ",") ++ "\n"
@@ -807,16 +807,16 @@ impl Compilation:
         out = out ++ f"config runtime_fiber_worker_count={cfg.runtime_fiber_worker_count}\n"
         out = out ++ f"config copy_warn_threshold={cfg.copy_warn_threshold}\n"
         out = out ++ "config lint_partial_statement_match=" ++ if cfg.lint_partial_statement_match: "true\n" else: "false\n"
-        for mi in 0..zcu.last_resolved.modules.len() as i32:
-            let mod = zcu.last_resolved.modules[mi]
+        for mi in 0..taken_zcu.last_resolved.modules.len() as i32:
+            let mod = taken_zcu.last_resolved.modules[mi]
             out = out ++ f"module path={mod.path} file={mod.file_id} decls={mod.decl_count}\n"
 
         for di in 0..pool.decl_count():
             let decl = pool.get_decl(di)
             let kind = pool.kind(decl)
-            let path = zcu.decl_source_path_frontend(di)
+            let path = taken_zcu.decl_source_path_frontend(di)
             if kind == NodeKind.NK_FN_DECL:
-                let name = zcu.pool.resolve(pool.get_data0(decl))
+                let name = taken_zcu.pool.resolve(pool.get_data0(decl))
                 let flags = pool.get_data2(decl)
                 let is_pub = (flags / FnFlags.PUB) % 2 == 1
                 let meta = pool.find_fn_meta(decl)
@@ -826,10 +826,10 @@ impl Compilation:
                     param_count = pool.fn_meta_param_count(meta)
                     let ret_node = pool.fn_meta_ret(meta)
                     if ret_node != 0:
-                        return_type = render_type_expr(pool, zcu.pool, ret_node as NodeId)
+                        return_type = render_type_expr(pool, taken_zcu.pool, ret_node as NodeId)
                 out = out ++ f"function path={path} name={name} pub={compilation_bool_digit(is_pub)} params={param_count} return={return_type} span={pool.get_start(decl)}..{pool.get_end(decl)}\n"
             else if kind == NodeKind.NK_TYPE_DECL:
-                let name = zcu.pool.resolve(pool.get_data0(decl))
+                let name = taken_zcu.pool.resolve(pool.get_data0(decl))
                 let packed = pool.get_data2(decl)
                 let sub_kind = type_decl_sub_kind(packed)
                 let is_pub = compilation_type_decl_is_pub(pool, pool.get_data1(decl), sub_kind)
@@ -838,22 +838,22 @@ impl Compilation:
         out
 
     fn project_info_source(pool: AstPool) -> str:
-        let zcu = &self.zcu
+        let taken_zcu = &self.zcu
         var out = "fn __with_compiler_hook_project_info() -> ProjectInfo:\n"
         out = out ++ "    var project = ProjectInfo.new()\n"
-        for mi in 0..zcu.last_resolved.modules.len() as i32:
-            let mod = zcu.last_resolved.modules[mi]
-            let module_name = compilation_module_import_name(zcu.project_config.root_dir, mod.path)
+        for mi in 0..taken_zcu.last_resolved.modules.len() as i32:
+            let mod = taken_zcu.last_resolved.modules[mi]
+            let module_name = compilation_module_import_name(taken_zcu.project_config.root_dir, mod.path)
             out = out ++ "    project = project.add_module(ModuleInfo.new(\"" ++ compilation_escape_with_string(module_name) ++ "\", \"" ++ compilation_escape_with_string(mod.path) ++ "\"))\n"
 
         for di in 0..pool.decl_count():
             let decl = pool.get_decl(di)
             let kind = pool.kind(decl)
-            let path = zcu.decl_source_path_frontend(di)
-            let module_name = compilation_module_import_name(zcu.project_config.root_dir, path)
+            let path = taken_zcu.decl_source_path_frontend(di)
+            let module_name = compilation_module_import_name(taken_zcu.project_config.root_dir, path)
             let loc = "SourceLocation.new(\"" ++ compilation_escape_with_string(path) ++ "\", " ++ f"{pool.get_start(decl)}" ++ ", " ++ f"{pool.get_end(decl)}" ++ ")"
             if kind == NodeKind.NK_FN_DECL:
-                let name = zcu.pool.resolve(pool.get_data0(decl))
+                let name = taken_zcu.pool.resolve(pool.get_data0(decl))
                 let flags = pool.get_data2(decl)
                 let is_pub = (flags / FnFlags.PUB) % 2 == 1
                 let meta = pool.find_fn_meta(decl)
@@ -863,10 +863,10 @@ impl Compilation:
                     param_count = pool.fn_meta_param_count(meta)
                     let ret_node = pool.fn_meta_ret(meta)
                     if ret_node != 0:
-                        return_type = render_type_expr(pool, zcu.pool, ret_node as NodeId)
+                        return_type = render_type_expr(pool, taken_zcu.pool, ret_node as NodeId)
                 out = out ++ "    project = project.add_function(FunctionInfo.new(\"" ++ compilation_escape_with_string(module_name) ++ "\", \"" ++ compilation_escape_with_string(name) ++ "\", " ++ (if is_pub: "true" else: "false") ++ ", false, " ++ f"{param_count}" ++ ", \"" ++ compilation_escape_with_string(return_type) ++ "\", " ++ loc ++ "))\n"
             else if kind == NodeKind.NK_TYPE_DECL:
-                let name = zcu.pool.resolve(pool.get_data0(decl))
+                let name = taken_zcu.pool.resolve(pool.get_data0(decl))
                 let packed = pool.get_data2(decl)
                 let sub_kind = type_decl_sub_kind(packed)
                 let is_pub = compilation_type_decl_is_pub(pool, pool.get_data1(decl), sub_kind)
@@ -903,8 +903,8 @@ fn compilation_compiler_hook_call_args(pool: AstPool, intern: InternPool, hook_n
 
 impl Compilation:
     fn compiler_hook_runner_source(pool: AstPool, source_path: &str, diag_path: &str, emitted_source_path: &str, token: &str) -> str:
-        let zcu = &self.zcu
-        let root = if zcu.project_config.root_dir.len() > 0: zcu.project_config.root_dir.clone() else: frontend_dirname(source_path)
+        let taken_zcu = &self.zcu
+        let root = if taken_zcu.project_config.root_dir.len() > 0: taken_zcu.project_config.root_dir.clone() else: frontend_dirname(source_path)
         let hook_count = pool.compiler_hook_count()
         var out = "use std.compiler\n"
         let imported: HashMap[str, i32] = HashMap.new()
@@ -913,7 +913,7 @@ impl Compilation:
             let di = compilation_decl_index_for_node(pool, hook_node)
             if di < 0:
                 continue
-            let path = zcu.decl_source_path_frontend(di)
+            let path = taken_zcu.decl_source_path_frontend(di)
             let import_name = compilation_module_import_name(root, path)
             if import_name.len() > 0 and not imported.contains(import_name):
                 out = out ++ "use " ++ import_name ++ ".*\n"
@@ -933,11 +933,11 @@ impl Compilation:
         let emitter_ctor = "SourceEmitter.__driver_new(\"" ++ compilation_escape_with_string(token) ++ "\", \"" ++ compilation_escape_with_string(emitted_source_path) ++ "\")"
         for hi2 in 0..hook_count:
             let hook_node = pool.compiler_hook_node(hi2)
-            let phase_name = zcu.pool.resolve(pool.compiler_hook_phase_at(hi2))
+            let phase_name = taken_zcu.pool.resolve(pool.compiler_hook_phase_at(hi2))
             if phase_name != "after_typecheck":
                 continue
-            let hook_name = zcu.pool.resolve(pool.get_data0(hook_node))
-            var call_args = compilation_compiler_hook_call_args(pool, zcu.pool, hook_node)
+            let hook_name = taken_zcu.pool.resolve(pool.get_data0(hook_node))
+            var call_args = compilation_compiler_hook_call_args(pool, taken_zcu.pool, hook_node)
             call_args = call_args.replace("source_emitter", emitter_ctor)
             call_args = call_args.replace("diagnostics", diag_ctor)
             out = out ++ "    " ++ hook_name ++ "(" ++ call_args ++ ")\n"
@@ -947,7 +947,7 @@ impl Compilation:
         if diag_text.len() == 0:
             return 0
         var emitted = 0
-        var zcu = move self.zcu
+        var taken_zcu = move self.zcu
         let lines = compilation_split_nonempty_lines(diag_text)
         for li in 0..lines.len() as i32:
             let fields = compilation_split_escaped_fields(lines[li])
@@ -959,10 +959,10 @@ impl Compilation:
             let start = compilation_parse_i32(fields[2])
             let end = compilation_parse_i32(fields[3])
             let message = fields[4]
-            let file_id = compilation_span_file_id_for_path(zcu, path)
-            zcu.diagnostics.emit(Diagnostic.err(message, Span { file: file_id, start, end }))
+            let file_id = compilation_span_file_id_for_path(taken_zcu, path)
+            taken_zcu.diagnostics.emit(Diagnostic.err(message, Span { file: file_id, start, end }))
             emitted = emitted + 1
-        self.zcu = zcu
+        self.zcu = taken_zcu
         if emitted > 0:
             self.zcu.render_all_diagnostics_frontend()
         emitted
@@ -1114,33 +1114,33 @@ impl Compilation:
     mut fn compile_source_text(source_path: &str, source_text: &str) -> AstPool:
         if not self.load_link_bundles():
             return AstPool.new()
-        var zcu = move self.zcu
+        var taken_zcu = move self.zcu
         let source_dir = frontend_dirname(source_path)
-        zcu.reset_for_new_invocation(source_dir, source_path, "")
-        zcu.project_config = self.project_config_for_source(source_path)
-        if zcu.project_config.manifest_error.len() > 0:
-            runtime_eprint("error: invalid with.toml: " ++ zcu.project_config.manifest_error)
-            self.zcu = zcu
+        taken_zcu.reset_for_new_invocation(source_dir, source_path, "")
+        taken_zcu.project_config = self.project_config_for_source(source_path)
+        if taken_zcu.project_config.manifest_error.len() > 0:
+            runtime_eprint("error: invalid with.toml: " ++ taken_zcu.project_config.manifest_error)
+            self.zcu = taken_zcu
             return AstPool.new()
-        zcu.set_current_source(source_dir, source_path, source_text)
-        let pool = zcu.compile_source_frontend(source_text, source_path, 0)
-        self.zcu = zcu
+        taken_zcu.set_current_source(source_dir, source_path, source_text)
+        let pool = taken_zcu.compile_source_frontend(source_text, source_path, 0)
+        self.zcu = taken_zcu
         pool
 
     mut fn compile_source_text_with_config(source_path: &str, source_text: &str, cfg: ProjectConfig) -> AstPool:
         if not self.load_link_bundles():
             return AstPool.new()
-        var zcu = move self.zcu
+        var taken_zcu = move self.zcu
         let source_dir = frontend_dirname(source_path)
-        zcu.reset_for_new_invocation(source_dir, source_path, "")
-        zcu.project_config = self.apply_runtime_config(move cfg)
-        if zcu.project_config.manifest_error.len() > 0:
-            runtime_eprint("error: invalid with.toml: " ++ zcu.project_config.manifest_error)
-            self.zcu = zcu
+        taken_zcu.reset_for_new_invocation(source_dir, source_path, "")
+        taken_zcu.project_config = self.apply_runtime_config(move cfg)
+        if taken_zcu.project_config.manifest_error.len() > 0:
+            runtime_eprint("error: invalid with.toml: " ++ taken_zcu.project_config.manifest_error)
+            self.zcu = taken_zcu
             return AstPool.new()
-        zcu.set_current_source(source_dir, source_path, source_text)
-        let pool = zcu.compile_source_frontend(source_text, source_path, 0)
-        self.zcu = zcu
+        taken_zcu.set_current_source(source_dir, source_path, source_text)
+        let pool = taken_zcu.compile_source_frontend(source_text, source_path, 0)
+        self.zcu = taken_zcu
         pool
 
     mut fn compile_entry_source_text(source_path: &str, source_text: &str) -> AstPool:
@@ -1161,26 +1161,26 @@ impl Compilation:
             return AstPool.new()
         if not self.load_link_bundles():
             return AstPool.new()
-        var zcu = move self.zcu
+        var taken_zcu = move self.zcu
         let source_path = source_paths[0]
         let source_text = source_texts[0]
         let source_dir = frontend_dirname(source_path)
-        zcu.reset_for_new_invocation(source_dir, source_path, "")
-        zcu.project_config = self.project_config_for_source(source_path)
-        if zcu.project_config.manifest_error.len() > 0:
-            runtime_eprint("error: invalid with.toml: " ++ zcu.project_config.manifest_error)
-            self.zcu = zcu
+        taken_zcu.reset_for_new_invocation(source_dir, source_path, "")
+        taken_zcu.project_config = self.project_config_for_source(source_path)
+        if taken_zcu.project_config.manifest_error.len() > 0:
+            runtime_eprint("error: invalid with.toml: " ++ taken_zcu.project_config.manifest_error)
+            self.zcu = taken_zcu
             return AstPool.new()
-        zcu.set_current_source(source_dir, source_path, source_text)
+        taken_zcu.set_current_source(source_dir, source_path, source_text)
         let extra_names: Vec[str] = Vec.new()
         let extra_texts: Vec[str] = Vec.new()
         for i in 1..source_paths.len() as i32:
             extra_names.push(with_str_clone_ref(source_paths[i]))
             extra_texts.push(with_str_clone_ref(source_texts[i]))
-        zcu.set_extra_sources(move extra_names, move extra_texts)
-        zcu = self.apply_cli_diag_mappings(move zcu)
-        let pool = zcu.compile_source_frontend_mode(source_text, source_path, 0, if self.statements_entry: 2 else: 1)
-        self.zcu = zcu
+        taken_zcu.set_extra_sources(move extra_names, move extra_texts)
+        taken_zcu = self.apply_cli_diag_mappings(move taken_zcu)
+        let pool = taken_zcu.compile_source_frontend_mode(source_text, source_path, 0, if self.statements_entry: 2 else: 1)
+        self.zcu = taken_zcu
         pool
 
     mut fn check_pool(pool: AstPool, source_path: &str) -> bool:
@@ -1633,57 +1633,57 @@ impl Compilation:
         final_output
 
     mut fn emit_typed(pool: AstPool) -> bool:
-        var zcu = move self.zcu
+        var taken_zcu = move self.zcu
         let typed_pool = pool
         if typed_pool.decl_count() == 0:
             runtime_eprint("error: no source loaded for typed emission")
             return false
-        if zcu.last_sema.ast.decl_count() == typed_pool.decl_count() and typed_pool.decl_count() > 0:
-            zcu.last_sema.emit_typed_module(0)
-            self.zcu = zcu
+        if taken_zcu.last_sema.ast.decl_count() == typed_pool.decl_count() and typed_pool.decl_count() > 0:
+            taken_zcu.last_sema.emit_typed_module(0)
+            self.zcu = taken_zcu
             return true
 
-        var sema = zcu.configure_tracked_input_sema(Sema.init(zcu.pool, move zcu.diagnostics, typed_pool))
+        var sema = taken_zcu.configure_tracked_input_sema(Sema.init(taken_zcu.pool, move taken_zcu.diagnostics, typed_pool))
         // #782: a bare assignment would move the source text out of the Zcu
         // and blank it for later consumers (analyze reads it).
-        sema.source_text = with_str_clone_ref(zcu.current_source_text)
+        sema.source_text = with_str_clone_ref(taken_zcu.current_source_text)
         // Clone: see run_mir_lower — bare assignments would move these tables
         // out of the Zcu and blank them for later consumers.
-        sema.decl_source_paths = sema_clone_str_vec(&zcu.decl_source_paths)
-        sema.decl_source_file_ids = sema_clone_i32_vec(&zcu.decl_source_file_ids)
-        sema.decl_is_c_import = sema_clone_i32_vec(&zcu.decl_is_c_import)
-        sema.source_text_file_ids = sema_clone_i32_vec(&zcu.source_text_file_ids)
-        sema.source_text_names = sema_clone_str_vec(&zcu.source_text_names)
-        sema.source_texts = sema_clone_str_vec(&zcu.source_texts)
-        sema.tool_mode_entry_path = with_str_clone_ref(zcu.tool_mode_entry_path)
-        sema.runtime_available = if zcu.project_config.runtime_available: 1 else: 0
-        sema.runtime_fiber_stack_size = zcu.project_config.runtime_fiber_stack_size
-        sema.runtime_fiber_pool_size = zcu.project_config.runtime_fiber_pool_size
-        sema.runtime_fiber_worker_count = zcu.project_config.runtime_fiber_worker_count
-        sema.copy_warn_threshold = zcu.project_config.copy_warn_threshold
-        sema.lint_partial_statement_match = if zcu.project_config.lint_partial_statement_match: 1 else: 0
-        sema.overflow_mode = zcu.project_config.overflow_mode
-        if zcu.project_config.no_std or self.config.no_std:
+        sema.decl_source_paths = sema_clone_str_vec(&taken_zcu.decl_source_paths)
+        sema.decl_source_file_ids = sema_clone_i32_vec(&taken_zcu.decl_source_file_ids)
+        sema.decl_is_c_import = sema_clone_i32_vec(&taken_zcu.decl_is_c_import)
+        sema.source_text_file_ids = sema_clone_i32_vec(&taken_zcu.source_text_file_ids)
+        sema.source_text_names = sema_clone_str_vec(&taken_zcu.source_text_names)
+        sema.source_texts = sema_clone_str_vec(&taken_zcu.source_texts)
+        sema.tool_mode_entry_path = with_str_clone_ref(taken_zcu.tool_mode_entry_path)
+        sema.runtime_available = if taken_zcu.project_config.runtime_available: 1 else: 0
+        sema.runtime_fiber_stack_size = taken_zcu.project_config.runtime_fiber_stack_size
+        sema.runtime_fiber_pool_size = taken_zcu.project_config.runtime_fiber_pool_size
+        sema.runtime_fiber_worker_count = taken_zcu.project_config.runtime_fiber_worker_count
+        sema.copy_warn_threshold = taken_zcu.project_config.copy_warn_threshold
+        sema.lint_partial_statement_match = if taken_zcu.project_config.lint_partial_statement_match: 1 else: 0
+        sema.overflow_mode = taken_zcu.project_config.overflow_mode
+        if taken_zcu.project_config.no_std or self.config.no_std:
             sema.no_std = 1
-        if zcu.project_config.alloc_mode or self.config.alloc_mode:
+        if taken_zcu.project_config.alloc_mode or self.config.alloc_mode:
             sema.alloc = 1
         sema.check_module()
 
-        zcu.diagnostics = move sema.diags
+        taken_zcu.diagnostics = move sema.diags
         // #782: restore sema's wholeness before the whole-value transfer —
         // sync_from_sema must never see the blanked diags slot.
         sema.diags = DiagnosticList.init()
-        zcu.sync_from_sema(move sema)
-        zcu.set_typed_snapshot("", typed_pool)
-        zcu.set_codegen_snapshot(MirModule.init(), "", AsyncMirModule.init(), "")
+        taken_zcu.sync_from_sema(move sema)
+        taken_zcu.set_typed_snapshot("", typed_pool)
+        taken_zcu.set_codegen_snapshot(MirModule.init(), "", AsyncMirModule.init(), "")
 
-        if zcu.diagnostics.has_errors():
-            zcu.render_current_diagnostics()
-            self.zcu = zcu
+        if taken_zcu.diagnostics.has_errors():
+            taken_zcu.render_current_diagnostics()
+            self.zcu = taken_zcu
             return false
 
-        zcu.last_sema.emit_typed_module(0)
-        self.zcu = zcu
+        taken_zcu.last_sema.emit_typed_module(0)
+        self.zcu = taken_zcu
         true
 
     mut fn emit_typed_file(source_path: &str) -> bool:

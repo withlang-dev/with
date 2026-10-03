@@ -91,9 +91,9 @@ impl BzBits:
         var code = self.bits(len)
         while len <= table.max_len:
             if table.limit[len] >= 0 and code <= table.limit[len]:
-                let at = table.base[len] + code
-                if at >= 0 and at < table.perm.len():
-                    return table.perm[at as i32]
+                let bit_at = table.base[len] + code
+                if bit_at >= 0 and bit_at < table.perm.len():
+                    return table.perm[bit_at as i32]
             code = (code << 1) | self.bits(1)
             len = len + 1
         if self.problem.len() == 0: self.problem = "an invalid bzip2 Huffman code"
