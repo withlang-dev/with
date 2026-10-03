@@ -1253,7 +1253,7 @@ fn analysis_audit_frozen_calls(report: &AnalysisReport, sema: &Sema, mir_mod: &M
 fn analysis_audit_mir(report: &AnalysisReport, mir_mod: &MirModule, pool: &InternPool):
     let err = validate_all_mir_module(mir_mod)
     if err.len() > 0:
-        report.fail(err)
+        report.fail(mir_name_fn_syms(err, pool))
     // #719 class: reading a local after StorageDead / after its reset-on-move
     // blank. Guards ordinary bodies here; the synthesized const initializers are
     // checked where they are built (they never enter this module).

@@ -3063,6 +3063,28 @@ fn validate_use_after_kill_body(body: &MirBody, pool: &InternPool) -> str:
 pub fn validate_use_after_kill(body: &MirBody, pool: &InternPool) -> str:
     validate_use_after_kill_body(body, pool)
 
+// A validator verdict names bodies `fn sym<N>`; the reader needs the
+// function. Each `fn sym<N>` gains its name, as --dump-mir prints it.
+pub fn mir_name_fn_syms(text: &str, pool: &InternPool) -> str:
+    var out = StringBuilder.new()
+    var i = 0
+    let n = text.len() as i32
+    while i < n:
+        if i + 6 <= n and text.slice(i as i64, (i + 6) as i64) == "fn sym":
+            var j = i + 6
+            var sym = 0
+            while j < n and text[j] >= '0' and text[j] <= '9':
+                sym = sym * 10 + (text[j] - '0') as i32
+                j += 1
+            out.push_str(text.slice(i as i64, j as i64))
+            if j > i + 6:
+                out.push_str(f"({pool.resolve(sym)})")
+            i = j
+            continue
+        out.push_byte(text[i])
+        i += 1
+    out.to_str()
+
 pub fn validate_all_mir_module(mir_mod: &MirModule) -> str:
     let shape = validate_mir_module(mir_mod)
     if shape.len() > 0:

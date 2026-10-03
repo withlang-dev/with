@@ -13537,20 +13537,26 @@ impl MirBuilder:
                             self.body.push_stmt(self.cur_bb, StmtKind.Assign, gc_ref_place, gc_closure_ref, self.ast.get_start(gc_ma_node))
                             gc_args.push(self.body.new_operand(OperandKind.OK_COPY, gc_ref_place))
                         else:
-                            gc_closure_ops.push(gc_closure_op)
+                            // The literal goes by value: unless Sema's
+                            // signature borrows the parameter (share-place),
+                            // the callee owns it and drops it at its exit.
+                            if gc_sig_idx < 0 or self.sema.sig_param_uses_value_ref_abi(gc_sig_idx, gc_mai + gc_param_offset) == 0:
+                                gc_closure_ops.push(gc_closure_op)
                             gc_args.push(gc_closure_op)
                 let gc_args_id = self.body.new_call_args(gc_args)
                 self.body.set_call_intrinsic(gc_args_id, MirIntrinsic.GENERIC_CALL)
                 self.require_generic_call_contract(gc_args_id, callee_sym, method_sym, self_expr, has_recorded_method_sig, "method-gc")
-                // D63: a closure handed to language machinery (`s.spawn(..)`)
-                // is the task's: its move is registered, so the statement
-                // temp that held it is blanked, not dropped under the task.
-                // Left unregistered, the temp's drop followed `move _5` into
-                // the spawn (validate-ownership: a drop of a Moved place,
-                // #1539).
-                if self.body.call_is_machinery_dispatch(gc_args_id):
-                    for gc_ci in 0..gc_closure_ops.len():
-                        self.consume_moved_operand(gc_closure_ops[gc_ci])
+                // D63: a closure literal passed by value is the callee's — a
+                // task's under language machinery (`s.spawn(..)`), a generic
+                // method's parameter otherwise (Sema's signature consumes
+                // it): its move is registered, so the statement temp that
+                // held it is blanked, not dropped after the callee dropped
+                // it. Left unregistered, the temp's drop followed `move _5`
+                // into the call (validate-ownership: a drop of a Moved place,
+                // #1539; a capturing closure's environment freed twice,
+                // test/debug_alloc/da_closure_literal_into_generic_method.w).
+                for gc_ci in 0..gc_closure_ops.len():
+                    self.consume_moved_operand(gc_closure_ops[gc_ci])
                 self.body.set_call_ast_node(gc_args_id, node)
                 self.record_call_contract(gc_args_id, node, gc_sig_idx)
                 var gc_ret_ty = self.method_call_result_type(node)

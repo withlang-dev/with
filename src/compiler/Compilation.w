@@ -1882,7 +1882,7 @@ impl Compilation:
             return "MIR lowering produced no bodies"
         let err = validate_ownership_mir_module(self.zcu.last_mir_module)
         if err.len() > 0:
-            return err
+            return mir_name_fn_syms(err, &self.zcu.pool)
         "ok"
 
     mut fn validate_all_file(source_path: &str) -> str:
@@ -1896,7 +1896,7 @@ impl Compilation:
             return "MIR lowering produced no bodies"
         let mir_err = validate_all_mir_module(self.zcu.last_mir_module)
         if mir_err.len() > 0:
-            return mir_err
+            return mir_name_fn_syms(mir_err, &self.zcu.pool)
         "ok"
 
     mut fn dump_async_mir(pool: AstPool) -> str:
