@@ -7195,6 +7195,31 @@ impl Codegen:
             self.slotmap_cache_map.insert(sema_tid as i64, sm_ty)
         sm_ty
 
+    // #2043 (D65): a generic instance's name spells its arguments by Sema's
+    // identity: a nominal by its codegen symbol (a split name's alias), an
+    // instance by its own spelling, a primitive by its Sema name. The LLVM
+    // spelling it replaces made `Atomic[u32]` and `Atomic[i32]` one struct
+    // (both `i32` in LLVM) and named a struct argument by whichever LLVM
+    // struct happened to carry its layout.
+    fn sema_inst_arg_mangle(tid: i32) -> str:
+        if tid <= 0:
+            return "unknown"
+        let r = self.sema.resolve_alias(tid as TypeId) as i32
+        let k = self.sema.get_type_kind(r as TypeId)
+        if k == TypeKind.TY_STRUCT or k == TypeKind.TY_ENUM:
+            let cg = self.nominal_cg_sym_for_tid(r, self.sema_sym_to_codegen_sym(self.sema.get_type_d0(r as TypeId)))
+            return with_str_clone_ref(self.intern.resolve(cg))
+        if k == TypeKind.TY_GENERIC_INST:
+            var out = with_str_clone_ref(self.intern.resolve(self.sema_sym_to_codegen_sym(self.sema.get_type_d0(r as TypeId))))
+            for ai in 0..self.sema.get_generic_inst_arg_count(r):
+                out = out ++ "__" ++ self.sema_inst_arg_mangle(self.sema.get_generic_inst_arg(r, ai))
+            return "[" ++ out ++ "]"
+        if k == TypeKind.TY_REF:
+            return (if self.sema.get_type_d1(r as TypeId) != 0: "refmut_" else: "ref_") ++ self.sema_inst_arg_mangle(self.sema.get_type_d0(r as TypeId))
+        if k == TypeKind.TY_PTR:
+            return (if self.sema.get_type_d1(r as TypeId) != 0: "ptrmut_" else: "ptr_") ++ self.sema_inst_arg_mangle(self.sema.get_type_d0(r as TypeId))
+        with_str_clone_ref(self.sema.type_name(r))
+
     // #1647 (D65): a user generic struct instance is Sema's instance — its
     // TypeId, arguments and field types — laid out once per TypeId. The
     // removed path (monomorphize_struct_nodes) resolved the declaration's
@@ -7239,7 +7264,7 @@ impl Codegen:
                 self.had_error = 1
                 return self.type_fallback()
             arg_types.push(arg_ty)
-            mangled = mangled ++ "__" ++ self.llvm_type_mangle(arg_ty)
+            mangled = mangled ++ "__" ++ self.sema_inst_arg_mangle(self.sema.get_generic_inst_arg(resolved, ti))
         let mono_sym = self.intern.intern(mangled)
         let existing = self.struct_type_map.get(mono_sym)
         if existing.is_some():

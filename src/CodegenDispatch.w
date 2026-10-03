@@ -7461,7 +7461,7 @@ impl Codegen:
                     var arg_llvm = self.sema_type_to_llvm(arg_tid)
                     if arg_llvm == 0:
                         arg_llvm = self.type_fallback()
-                    live_mangled = live_mangled ++ "__" ++ self.llvm_type_mangle(arg_llvm)
+                    live_mangled = live_mangled ++ "__" ++ self.sema_inst_arg_mangle(arg_tid)
                 let live_mono_sym = self.intern.intern(live_mangled)
                 if self.struct_type_map.get(live_mono_sym).is_some():
                     return live_mono_sym
@@ -7498,7 +7498,7 @@ impl Codegen:
                 var arg_llvm = self.mir_sema_type_to_llvm(arg_tid)
                 if arg_llvm == 0:
                     arg_llvm = self.type_fallback()
-                mangled = mangled ++ "__" ++ self.llvm_type_mangle(arg_llvm)
+                mangled = mangled ++ "__" ++ self.sema_inst_arg_mangle(self.mir_type_to_live_sema_type(arg_tid))
             let mono_sym = self.intern.intern(mangled)
             if self.struct_type_map.get(mono_sym).is_some():
                 return mono_sym
@@ -7582,7 +7582,7 @@ impl Codegen:
             pending_syms.push(tp_sym)
             pending_types.push(arg_llvm)
             pending_sema_types.push(live_arg_tid)
-            mangled = mangled ++ "__" ++ self.llvm_type_mangle(arg_llvm)
+            mangled = mangled ++ "__" ++ self.sema_inst_arg_mangle(live_arg_tid)
             tp_pos = tp_pos + 2 + bound_count
 
         let mono_sym = self.intern.intern(mangled)
@@ -15870,20 +15870,10 @@ impl Codegen:
                         let gc_cur_method = self.codegen_ast_method_symbol_text(gc_cur_method_sym)
                         let gc_cur_name = if gc_cur_method.len() > 0: gc_cur_method else: if gc_callee_sym > 0: with_str_clone_ref(self.intern.resolve(gc_callee_sym)) else: ""
                         if gc_cur_name.len() > 0:
-                            var gc_cur_base_sym = 0
-                            let gc_cur_base_opt = self.mono_struct_base.get(self.current_method_owner_sym)
-                            if gc_cur_base_opt.is_some():
-                                gc_cur_base_sym = gc_cur_base_opt.unwrap()
-                            else:
-                                let gc_cur_owner_text = self.intern.resolve(self.current_method_owner_sym)
-                                var gc_cur_sep = -1
-                                for gc_cur_i in 0..gc_cur_owner_text.len() as i32:
-                                    if gc_cur_i + 1 < gc_cur_owner_text.len() as i32:
-                                        if gc_cur_owner_text[gc_cur_i] == 95 and gc_cur_owner_text[(gc_cur_i + 1)] == 95:
-                                            gc_cur_sep = gc_cur_i
-                                            break
-                                if gc_cur_sep > 0:
-                                    gc_cur_base_sym = self.intern.intern(gc_cur_owner_text.slice(0, gc_cur_sep as i64))
+                            // The owner instance's base is the record its
+                            // instance registered (#2043), never a parse of
+                            // the instance's name.
+                            let gc_cur_base_sym: i32 = self.mono_struct_base.get(self.current_method_owner_sym) ?? 0
                             if gc_cur_base_sym != 0:
                                 let gc_cur_base_name = self.intern.resolve(gc_cur_base_sym)
                                 let gc_cur_fn_sym = self.intern.intern(gc_cur_base_name ++ "." ++ gc_cur_name)
@@ -16040,20 +16030,7 @@ impl Codegen:
                 // node no longer preserves field-access shape. Use the current
                 // monomorphized owner to recover the declared generic method.
                 if self.current_method_owner_sym != 0 and gc_name.len() > 0 and gc_name != "?":
-                    var gc_bare_base_sym = 0
-                    let gc_bare_base_opt = self.mono_struct_base.get(self.current_method_owner_sym)
-                    if gc_bare_base_opt.is_some():
-                        gc_bare_base_sym = gc_bare_base_opt.unwrap()
-                    else:
-                        let gc_bare_owner_text = self.intern.resolve(self.current_method_owner_sym)
-                        var gc_bare_sep = -1
-                        for gc_bare_i in 0..gc_bare_owner_text.len() as i32:
-                            if gc_bare_i + 1 < gc_bare_owner_text.len() as i32:
-                                if gc_bare_owner_text[gc_bare_i] == 95 and gc_bare_owner_text[(gc_bare_i + 1)] == 95:
-                                    gc_bare_sep = gc_bare_i
-                                    break
-                        if gc_bare_sep > 0:
-                            gc_bare_base_sym = self.intern.intern(gc_bare_owner_text.slice(0, gc_bare_sep as i64))
+                    let gc_bare_base_sym: i32 = self.mono_struct_base.get(self.current_method_owner_sym) ?? 0
                     if gc_bare_base_sym != 0:
                         let gc_bare_base_name = self.intern.resolve(gc_bare_base_sym)
                         let gc_bare_qualified = gc_bare_base_name ++ "." ++ gc_name
@@ -17912,74 +17889,8 @@ impl Codegen:
             return 0
         let mono_ty = self.get_or_create_generic_struct_type(inst_tid)
 
-        let mono_sym = self.find_struct_type_by_llvm(mono_ty)
-        if mono_sym != 0:
-            return mono_sym
-
-        let base_name = self.intern.resolve(owner_sym)
-        var mangled: str = with_str_clone_ref(base_name)
-        for ti in 0..tp_syms.len() as i32:
-            let tp_sym = tp_syms[ti]
-            let bty = self.find_binding_type(bind_syms, bind_tys, tp_sym)
-            var sema_mangle = "unknown"
-            for bi in 0..bind_syms.len() as i32:
-                if bind_syms[bi] == tp_sym:
-                    let sema_ty = bind_sema_tys[bi]
-                    if sema_ty > 0:
-                        sema_mangle = self.sema_type_mangle(sema_ty)
-                    break
-            if sema_mangle == "unknown":
-                sema_mangle = self.llvm_type_mangle(bty)
-            mangled = mangled ++ "__" ++ sema_mangle
-        let inferred_sym = self.intern.intern(mangled)
-        if self.struct_type_map.get(inferred_sym).is_some():
-            return inferred_sym
-        0
-
-
-    fn sema_type_mangle(sema_ty: i32) -> str:
-        if sema_ty <= 0:
-            return "unknown"
-        let resolved = self.sema.resolve_alias(sema_ty)
-        let tk = self.sema.get_type_kind(resolved)
-        if tk == TypeKind.TY_INT:
-            return "i32"
-        if tk == TypeKind.TY_FLOAT:
-            return "f64"
-        if tk == TypeKind.TY_BOOL:
-            return "bool"
-        if tk == TypeKind.TY_STR:
-            return "str"
-        if tk == TypeKind.TY_VOID:
-            return "void"
-        if tk == TypeKind.TY_STRUCT:
-            let name_sym = self.sema.get_type_d0(resolved)
-            if name_sym != 0:
-                return with_str_clone_ref(self.intern.resolve(name_sym))
-            return "struct"
-        if tk == TypeKind.TY_ENUM:
-            let name_sym = self.sema.get_type_d0(resolved)
-            if name_sym != 0:
-                return with_str_clone_ref(self.intern.resolve(name_sym))
-            return "enum"
-        if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
-            return "ptr"
-        if tk == TypeKind.TY_ARRAY:
-            return "array"
-        if tk == TypeKind.TY_SLICE:
-            return "slice"
-        if tk == TypeKind.TY_TUPLE:
-            return "tuple"
-        if tk == TypeKind.TY_RANGE:
-            return "range"
-        if tk == TypeKind.TY_GENERIC_INST:
-            let name_sym = self.sema.get_type_d0(resolved)
-            if name_sym != 0:
-                return with_str_clone_ref(self.intern.resolve(name_sym))
-            return "generic"
-        if tk == TypeKind.TY_NEVER:
-            return "never"
-        "unknown"
+        // The instance Sema named, laid out once: its symbol is the struct's.
+        self.find_struct_type_by_llvm(mono_ty)
 
     fn sema_generic_inst_owner_mangle(sema_ty: i32) -> str:
         if sema_ty <= 0:
@@ -17990,11 +17901,11 @@ impl Codegen:
         let base_sym = self.sema.get_type_d0(resolved)
         if base_sym == 0:
             return ""
-        var mangled: str = with_str_clone_ref(self.intern.resolve(base_sym))
+        var mangled: str = with_str_clone_ref(self.intern.resolve(self.sema_sym_to_codegen_sym(base_sym)))
         let arg_count = self.sema.get_generic_inst_arg_count(resolved as i32)
         for ai in 0..arg_count:
             let arg_tid = self.sema.get_generic_inst_arg(resolved as i32, ai)
-            mangled = mangled ++ "__" ++ self.sema_type_mangle(arg_tid)
+            mangled = mangled ++ "__" ++ self.sema_inst_arg_mangle(arg_tid)
         mangled
 
     fn llvm_type_mangle(ty: i64) -> str:
