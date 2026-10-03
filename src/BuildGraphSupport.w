@@ -145,11 +145,19 @@ pub fn build_graph_process_arg_valid(arg: &str) -> bool:
             return false
     true
 
-pub fn build_graph_path_project_contained(path: &str) -> bool:
+// Whether `path` stays inside the project at `root`. An absolute path is
+// contained when it is the root or lies beneath it (#1885: an in-root
+// `WITH_WO_DIR`, spelled absolute with a drive letter, was refused as an
+// escape); the comparison is on `/`-normalized spellings, and on Windows
+// ignores case, as the file system does.
+pub fn build_graph_path_project_contained(root: &str, path: &str) -> bool:
     if path.len() == 0:
         return true
     if runtime_path_is_absolute(path):
-        return false
+        let rel = build_graph_path_under_root(root, path)
+        if rel.len() == 0:
+            return false
+        return build_graph_path_project_contained(root, rel)
     if path.contains(".."):
         return false
     if path.starts_with("$"):
@@ -202,10 +210,29 @@ fn build_graph_install_bindir() -> str:
 fn build_graph_install_libdir() -> str:
     resolve_join(build_graph_install_bindir(), "runtime")
 
+// `path`, absolute, relative to `root` when it lies beneath it: "." for the
+// root itself, "" when it does not. Separators compare as `/`; on Windows
+// the two spellings compare without case.
+fn build_graph_path_under_root(root: &str, path: &str) -> str:
+    if root.len() == 0 or not runtime_path_is_absolute(root):
+        return ""
+    var norm_root = resolve_normalize_path(root)
+    while norm_root.len() > 1 and norm_root.ends_with("/"):
+        norm_root = norm_root.slice(0, norm_root.len() - 1)
+    let norm_path = resolve_normalize_path(path)
+    let fold = runtime_sysinfo_os() == "Windows"
+    let cmp_root = if fold: norm_root.to_lower() else: norm_root.clone()
+    let cmp_path = if fold: norm_path.to_lower() else: norm_path.clone()
+    if cmp_path == cmp_root:
+        return "."
+    if cmp_path.starts_with(cmp_root ++ "/"):
+        return norm_path.slice(norm_root.len() + 1, norm_path.len())
+    ""
+
 pub fn build_graph_path_is_install_dest(path: &str) -> bool:
     path.starts_with("$HOME/") or path.starts_with("$INSTALL_BINDIR/") or path.starts_with("$INSTALL_LIBDIR/")
 
-pub fn build_graph_validate_target_containment(target: &BuildGraphTarget) -> i32:
+pub fn build_graph_validate_target_containment(root: &str, target: &BuildGraphTarget) -> i32:
     let kind = target.kind
     let is_install = kind == 8
     let is_promote = kind == 20
@@ -214,15 +241,15 @@ pub fn build_graph_validate_target_containment(target: &BuildGraphTarget) -> i32
         return 0
     if target.output.len() > 0:
         if is_install:
-            if not build_graph_path_is_install_dest(target.output) and not build_graph_path_project_contained(target.output):
+            if not build_graph_path_is_install_dest(target.output) and not build_graph_path_project_contained(root, target.output):
                 build_graph_rt_eprint("error: install target '" ++ target.name ++ "' output escapes project root without install prefix: " ++ target.output)
                 return 1
         else if is_promote:
-            if not build_graph_path_project_contained(target.output):
+            if not build_graph_path_project_contained(root, target.output):
                 build_graph_rt_eprint("error: promote target '" ++ target.name ++ "' output escapes project root: " ++ target.output)
                 return 1
         else:
-            if not build_graph_path_project_contained(target.output):
+            if not build_graph_path_project_contained(root, target.output):
                 build_graph_rt_eprint("error: target '" ++ target.name ++ "' output escapes project root: " ++ target.output)
                 return 1
     let is_command = kind == 7
@@ -230,12 +257,12 @@ pub fn build_graph_validate_target_containment(target: &BuildGraphTarget) -> i32
     let is_action = kind == 23
     let entry_is_executable = is_command or is_corpus
     if target.entry.len() > 0 and not is_install and not entry_is_executable and not is_action:
-        if not build_graph_path_project_contained(target.entry):
+        if not build_graph_path_project_contained(root, target.entry):
             build_graph_rt_eprint("error: target '" ++ target.name ++ "' entry escapes project root: " ++ target.entry)
             return 1
     for oi in 0..target.extra_outputs.len() as i32:
         let extra = target.extra_outputs[oi]
-        if not build_graph_path_project_contained(extra):
+        if not build_graph_path_project_contained(root, extra):
             build_graph_rt_eprint("error: target '" ++ target.name ++ "' extra_output escapes project root: " ++ extra)
             return 1
     0
