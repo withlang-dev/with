@@ -10500,7 +10500,12 @@ impl Sema:
                 return f"the global `{name}`"
         if (self.get_visible_sig(sym) >= 0 or self.generic_fn_node_for_symbol(sym) != 0) and self.is_ci_visible(sym) != 0 and self.symbol_visible_from_current(sym) != 0:
             return f"the function `{name}`"
-        var di = if self.displaced_fn_index.contains(sym): self.displaced_fn_index.get(sym).unwrap() else: -1
+        // A compiler intrinsic called by its bare name (`sin`, `src`,
+        // `sizeof[T]()`) is a module-level function to the programmer, as a
+        // prelude one is: the field does not take precedence over it.
+        if self.is_intrinsic_fn_sym(sym) != 0 or self.generic_builtin_syms().contains(&sym):
+            return f"the function `{name}`"
+        var di =if self.displaced_fn_index.contains(sym): self.displaced_fn_index.get(sym).unwrap() else: -1
         while di >= 0:
             let path = self.displaced_fn_paths[di]
             if path == self.current_module_path or self.module_is_visible_from_current(path) != 0:
