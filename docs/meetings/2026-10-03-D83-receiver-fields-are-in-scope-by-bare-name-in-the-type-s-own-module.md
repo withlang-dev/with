@@ -36,3 +36,25 @@ never enters scope across a module boundary the reader cannot see.
 **Reopen if** the own-module boundary proves to split real types (the
 compiler's own Sema/Codegen are spread across files and keep half their
 prefixes), or escaping closures need Swift's explicit-`self` rule.
+
+**Amendment (2026-10-03, spec v7.18; Eric's answers on #1930).**
+Governing rule, Eric verbatim: "the rule is nothing is uncallable - if it
+is shadowed, there must be a namespace way to reach it". (1) Module
+self-name, option A (§18.1): a module names itself by the last segment of
+its module path, the `module` header's last segment, else the file's
+stem; the self-name is a qualifier only (`name.decl`), and the bare
+self-name names nothing. A stem that is not an identifier names itself by
+the stem with each non-identifier character replaced by `_` and a leading
+digit prefixed with `_` (Eric: "we can default name it according to its
+filename"). (2) One clash rule, at the use (§9.5): a bare name that
+resolves to a receiver field and to any other name in scope is an error
+at that use; `self.field` and the other name's qualified form stay valid.
+This replaces the narrower "global or module-level function" sentence.
+(3) A destructuring binding is a local binding, so a field-named
+destructuring binding is the §29.8 shadowing error. (4) Prelude functions
+and bare-callable intrinsics clash like any other name, and each is
+reachable as `builtins.name` without a `use` (§18.2), so the clash always
+has a qualified way out. A new prelude function or intrinsic can therefore
+break a bare use in a user type with a same-named field; the release
+runbook carries that note (the fix is `self.` or `builtins.name`). **The
+compiler is NON-COMPLIANT** until impl-1930 (PR #2034) lands these rules.

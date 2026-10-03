@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.17
+# The With Programming Language — Specification v7.18
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,16 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.18:** #1930 answers and the `from` grammar, 2026-10-03
+(D83 and D84 amendments). §9.5: a bare name that resolves to a receiver
+field and to any other name in scope is an error at that use; a
+destructuring binding is a local binding. §18.1: a module names itself
+by the last segment of its module path, a qualifier only; a stem that is
+not an identifier is sanitized. §18.2: every prelude function and bare
+intrinsic is reachable as `builtins.name`. §21.1 rule 6: what a `from`
+origin names, the union over several views, inference, and the bundle
+boundary. §30: `FROM_CLAUSE`, `ORIGIN`. The implementation is
+NON-COMPLIANT until it catches up.
 **Changelog v7.17:** four rulings of 2026-10-03. §9.5: in an instance
 method declared in its type's own module, receiver fields are in scope by
 bare name; every collision is a shadowing error (D83; #1930). §21.1 rule 6:

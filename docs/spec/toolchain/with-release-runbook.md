@@ -657,6 +657,8 @@ WITH_VERSION=v0.14.3 with build :release-uat
 
 Do not list Make compatibility wrapper commands on the release page.
 
+- [ ] Release notes for a release that adds a prelude function or intrinsic: a new prelude function or intrinsic can break bare uses in user types with a same-named field; the fix is `self.` (or `builtins.name`).
+
 ## Post-Publish Checks
 
 Confirm the release exposes only the intended binary asset:

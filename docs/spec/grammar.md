@@ -72,7 +72,9 @@ the first token of the statement and has no trailing colon of its own.
 **Function declaration** (§9.1):
 
 ```
-FN_DECL     := [ PUB ] 'fn' IDENT [ TYPE_PARAMS ] [ '(' PARAMS ')' ] [ '->' TYPE ] [ WRITES_CLAUSE ] BODY
+FN_DECL     := [ PUB ] 'fn' IDENT [ TYPE_PARAMS ] [ '(' PARAMS ')' ] [ '->' TYPE [ FROM_CLAUSE ] ] [ WRITES_CLAUSE ] BODY
+FROM_CLAUSE := 'from' ORIGIN { ',' ORIGIN }
+ORIGIN      := 'self' | PATH
 WRITES_CLAUSE := 'writes' PATH { ',' PATH }
 PARAMS      := PARAM { ',' PARAM } [ ',' ]
 PARAM       := IDENT ':' [ 'once' ] TYPE [ '=' EXPR ]

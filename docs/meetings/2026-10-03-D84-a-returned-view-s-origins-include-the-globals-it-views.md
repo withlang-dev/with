@@ -32,3 +32,16 @@ fits "globals are places" (§9.1c), whose conclusion is B.
 **Reopen if** recording private global identities in `.wi` interfaces
 leaks layout or breaks D39's fingerprint, or `from G` turns out to be
 needed on items other than function returns.
+
+**Amendment (2026-10-03, spec v7.18; Eric "blessed" on the words).** The
+`from` clause gets its grammar (§30: `FROM_CLAUSE := 'from' ORIGIN { ','
+ORIGIN }`, `ORIGIN := 'self' | PATH`, after the return type) and its
+prose (§21.1 rule 6): each origin names a parameter, `self`, or a global,
+whole, and `a.b` is a module-qualified global, never a field of parameter
+`a`; a return type holding several views lists the union of their
+origins; without a clause the origins are inferred from the body; at a
+bundle boundary an exported function whose returned view has a global
+origin must state the clause, an absent clause means the §21.1 elision
+(the receiver, else the single borrowed parameter), and `from static`
+states a view of static data. **The compiler is NON-COMPLIANT** until
+impl-1930 (PR #2034) and a `from static` follow-up land.

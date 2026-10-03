@@ -14,6 +14,8 @@ hierarchical paths. `use` resolution searches, in order: the embedded
 standard library, paths relative to the importing module's directory,
 the project's `lib/` roots, and the project root.
 
+A module names itself by the last segment of its module path: the `module` header's last segment, else the file's stem. The self-name is a qualifier only: `name.decl` reaches the module's own declaration `decl`, and the bare self-name names nothing. A file whose stem is not an identifier names itself by its stem with each character that cannot appear in an identifier replaced by `_`, and a leading digit prefixed with `_`.
+
 ### 18.2 Imports
 
 Names are imported with `use`. Variant constructors, functions, and
@@ -44,6 +46,8 @@ The enumerated prelude list is closed. Its role is (a) the set of
 non-imported names permitted bare in `impl` and `extend` headers, and
 (b) the `--no-std` core surface. It does not grow to track the standard
 library.
+
+Every prelude function and every compiler intrinsic callable by a bare name is also reachable as `builtins.name`, without a `use`.
 
 `assert`, `require`, `check` and their `std.testing` forms are compiler-known forms, not functions. Each evaluates its message operand only when its condition is false. The message operand follows the rules of the right operand of `??`: its effects do not run when the condition holds, and a move inside it is a conditional move.
 
