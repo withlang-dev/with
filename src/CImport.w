@@ -243,6 +243,10 @@ pub fn ci_set_include_paths(paths: &Vec[str]):
 pub fn ci_set_windows_target(triple: &str, sysroot: &str):
     with_cimport_set_windows_target(triple, sysroot)
 
+// #2060: the C model a migration names; see ClangBridge.
+pub fn ci_set_c_model(triple: &str, sysroot: &str):
+    with_cimport_set_c_model(triple, sysroot)
+
 pub fn ci_add_windows_system_includes():
     with_cimport_add_windows_system_includes()
 

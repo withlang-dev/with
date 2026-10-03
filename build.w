@@ -2862,6 +2862,22 @@ pub fn build(ctx: BuildCtx) -> Build:
     darwin_sysroot = darwin_sysroot.timeout(600000)
     out = out.add_target(darwin_sysroot)
 
+    // #2060: off macOS the corpus migrations' C model (build/corpus.w) is
+    // its own tree of the same darwin headers; on macOS it is the sysroot.
+    if os() != "Macos":
+        var corpus_c_model = target_new(.Action, "corpus-c-model", "").output("out/gen/corpus-c-model.ready")
+        corpus_c_model.action = run_corpus_c_model_action
+        corpus_c_model = corpus_c_model.input("build/sdk.w")
+        corpus_c_model = corpus_c_model.extra_output(sdk_corpus_c_model_dir())
+        corpus_c_model = corpus_c_model.input("build/https_fetch.w")
+        corpus_c_model = corpus_c_model.input("build/zlib_gunzip.w")
+        corpus_c_model = corpus_c_model.allow_network()
+        corpus_c_model = corpus_c_model.write_scope(sdk_corpus_c_model_dir())
+        corpus_c_model = corpus_c_model.write_scope("out/gen")
+        corpus_c_model = corpus_c_model.write_scope("out/command/corpus-c-model")
+        corpus_c_model = corpus_c_model.timeout(600000)
+        out = out.add_target(corpus_c_model)
+
     // A Linux host's own sysroot (`linux-sysroot`, the pack its compiler
     // embeds). Off Linux there is none: a placeholder here once wrote an empty
     // pack over linux-sysroot-<host arch>'s, two targets owning one file (#2014).
