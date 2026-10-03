@@ -347,6 +347,10 @@ impl Sema:
 
         // D51 stage 2: facade facts, once every signature they reference exists.
         self.collect_c_facades()
+        // A trait impl's unannotated method returns what the trait declares
+        // (#1945): published before any body, a default body included, is
+        // checked — `self.name() ++ "!"` read the unpublished Unit.
+        self.publish_trait_contract_returns(self.ast.decl_count())
         self.check_trait_default_method_bodies()
 
     mut fn collect_enum_constructor_imports():

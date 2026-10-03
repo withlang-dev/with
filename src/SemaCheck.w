@@ -2062,7 +2062,6 @@ impl Sema:
         // (the callee-first dependencies still apply): a program whose facts
         // or diagnostics change under it depends on declaration order.
         let reverse = with_getenv_str("WITH_SEMA_BODY_ORDER") == "reverse"
-        self.publish_trait_contract_returns(count)
         for di in 0..count:
             self.check_decl_body_in_order(if reverse: count - 1 - di else: di)
         self.resolve_allocating_callees()
