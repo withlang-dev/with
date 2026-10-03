@@ -16006,9 +16006,10 @@ impl MirBuilder:
         let result_local = self.new_temp(ret_type)
         let result_place = self.place_for_local(result_local)
         let next_bb = self.new_block()
+        // Tagged before the terminator, which reads the intrinsic (#2019).
+        self.body.set_call_intrinsic(args_id, intrinsic)
         self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
         self.switch_to(next_bb)
-        self.body.set_call_intrinsic(args_id, intrinsic)
         if intrinsic == MirIntrinsic.MATH_FN:
             let math_method_name = self.pool.resolve_symbol(method_sym)
             let math_method_id = math_fn_lookup(math_method_name)

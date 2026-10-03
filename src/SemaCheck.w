@@ -6828,6 +6828,14 @@ impl Sema:
             return self.callable_value_may_suspend(self.ast.get_data0(expr), site)
         if kind == NodeKind.NK_CLOSURE:
             return self.suspend_fact_nodes.contains(expr)
+        // #2019: a lazy adapter Sema can see being built answers from its
+        // parts (`xs.iter()` holds no callable; `.map(f)` holds `f`).
+        if self.typed_expr_types.contains(expr) and self.is_iterator_type(self.typed_expr_types.get(expr).unwrap()):
+            if kind == NodeKind.NK_CALL and self.ast.kind(self.ast.get_data0(expr)) == NodeKind.NK_FIELD_ACCESS:
+                return self.adapter_parts_may_suspend(self.ast.get_data0(self.ast.get_data0(expr)), self.ast.get_data1(expr), self.ast.get_data2(expr), site)
+            if kind == NodeKind.NK_PIPELINE and self.ast.kind(self.ast.get_data1(expr)) == NodeKind.NK_CALL:
+                let stage = self.ast.get_data1(expr)
+                return self.adapter_parts_may_suspend(self.ast.get_data0(expr), self.ast.get_data1(stage), self.ast.get_data2(stage), site)
         if kind != NodeKind.NK_IDENT:
             return true
         if self.callable_param_idents.contains(expr):
@@ -6860,11 +6868,45 @@ impl Sema:
             return true
         if not self.typed_expr_types.contains(expr):
             return false
-        self.type_is_with_callable(self.typed_expr_types.get(expr).unwrap())
+        self.type_carries_callable(self.typed_expr_types.get(expr).unwrap())
 
     fn type_is_with_callable(tid: i32) -> bool:
         let callable = self.callable_any_fn_type(tid as TypeId)
         callable != 0 and self.get_type_kind(callable) == TypeKind.TY_FN
+
+    // #2019 (§14.3 INVARIANT 5): a lazy iterator adapter that holds a closure
+    // (`xs.iter().map(f)`: MapIter, FilterIter, ...), directly or in the
+    // chain under it, is a callable value for the suspension summary: the
+    // closure runs inside whatever drives the adapter (`collect`, `fold`,
+    // `next`, ...), so the driving call reads the adapter's fact.
+    fn iterator_type_holds_callable(tid: i32) -> bool:
+        if tid <= 0 or not self.is_iterator_type(tid):
+            return false
+        var resolved = self.resolve_alias(tid as TypeId)
+        let tk = self.get_type_kind(resolved)
+        if tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR:
+            resolved = self.resolve_alias(self.get_type_d0(resolved) as TypeId)
+        let owner = self.get_generic_inst_base(resolved as i32)
+        if owner == self.syms.mapiter or owner == self.syms.filteriter or owner == self.syms.filtermapiter or owner == self.syms.takewhileiter or owner == self.syms.dropwhileiter or owner == self.syms.zipwithiter or owner == self.syms.flatmapiter:
+            return true
+        let arg_start = self.get_type_d1(resolved)
+        for ai in 0..self.get_type_d2(resolved):
+            if self.iterator_type_holds_callable(self.type_extra[(arg_start + ai)]):
+                return true
+        false
+
+    fn type_carries_callable(tid: i32) -> bool: self.type_is_with_callable(tid) or self.iterator_type_holds_callable(tid)
+
+    // Whether the adapter `expr` builds (`recv.map(f)`, `it |> map(f)`) holds
+    // a callable that may suspend: its receiver does, or an argument is one.
+    mut fn adapter_parts_may_suspend(recv: i32, arg_start: i32, arg_count: i32, site: bool) -> bool:
+        if self.expr_is_callable_value(recv) and self.callable_value_may_suspend(recv, site):
+            return true
+        for ai in 0..arg_count:
+            let arg = self.ast.get_extra(arg_start + ai)
+            if self.expr_is_callable_value(arg) and self.callable_value_may_suspend(arg, site):
+                return true
+        false
 
     // #1985: the call `node` reaches a callable that may suspend — its callee
     // is a callable value (not a declaration Sema resolved it to: #916
@@ -6881,6 +6923,10 @@ impl Sema:
                     return true
             // A callable field called with method syntax (`h.f(x)`).
             if self.typed_expr_types.contains(callee) and self.type_is_with_callable(self.typed_expr_types.get(callee).unwrap()):
+                return true
+            // #2019: a method driven on a lazy adapter that holds a
+            // may-suspend closure (`it.collect()`, `it.fold(..)`, `it.next()`).
+            if self.typed_expr_types.contains(recv) and self.iterator_type_holds_callable(self.typed_expr_types.get(recv).unwrap()) and self.callable_value_may_suspend(recv, site):
                 return true
         else if callee_kind == NodeKind.NK_IDENT:
             if self.expr_is_callable_value(callee) and not self.fn_decl_nodes.contains(self.ast.get_data0(callee)) and self.callable_value_may_suspend(callee, site):
@@ -6928,7 +6974,7 @@ impl Sema:
         if not local and self.fn_decl_nodes.contains(sym):
             return
         let ty = self.scope_lookup(sym)
-        if ty <= 0 or not self.type_is_with_callable(ty):
+        if ty <= 0 or not self.type_carries_callable(ty):
             return
         let decl = if local and self.binding_decl_nodes.contains(sym): self.binding_decl_nodes.get(sym).unwrap() else: 0
         if decl != 0 and self.callable_let_decls.contains(decl):
@@ -13761,7 +13807,7 @@ impl Sema:
             return self.ty_void as i32
         self.binding_decl_nodes.insert(name, node)
         self.binding_value_nodes.insert(name, value)
-        if self.type_is_with_callable(bind_type as i32):
+        if self.type_carries_callable(bind_type as i32):
             self.callable_let_decls.insert(node, 1)
             self.note_callable_binding_value(node, value)
         self.typed_binding_types.insert(node, bind_type as i32)

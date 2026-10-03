@@ -4312,8 +4312,14 @@ fn mir_validate_aggregate_missing_borrow(mir_mod: &MirModule, body: &MirBody, en
 // #2019: the eager intrinsics whose codegen loop invokes a closure argument
 // on the calling fiber once per element (and stops at an invocation that
 // left by a cancellation unwind, when MIR marks the call).
+// The terminals and `next` calls that drive a lazy adapter chain are the
+// same: the chain's closures run inside them.
 pub fn mir_intrinsic_invokes_closure(intrinsic: MirIntrinsic) -> bool:
-    intrinsic == MirIntrinsic.VEC_MAP or intrinsic == MirIntrinsic.VEC_FILTER or intrinsic == MirIntrinsic.VEC_FOLD
+    if intrinsic == MirIntrinsic.VEC_MAP or intrinsic == MirIntrinsic.VEC_FILTER or intrinsic == MirIntrinsic.VEC_FOLD:
+        return true
+    if intrinsic == MirIntrinsic.ITER_FOLD or intrinsic == MirIntrinsic.ITER_REDUCE or intrinsic == MirIntrinsic.ITER_SUM or intrinsic == MirIntrinsic.ITER_PRODUCT or intrinsic == MirIntrinsic.ITER_MIN or intrinsic == MirIntrinsic.ITER_MAX or intrinsic == MirIntrinsic.ITER_MIN_BY or intrinsic == MirIntrinsic.ITER_MAX_BY or intrinsic == MirIntrinsic.ITER_FIND or intrinsic == MirIntrinsic.ITER_POSITION or intrinsic == MirIntrinsic.ITER_ANY or intrinsic == MirIntrinsic.ITER_ALL or intrinsic == MirIntrinsic.ITER_NONE or intrinsic == MirIntrinsic.ITER_FOR_EACH or intrinsic == MirIntrinsic.ITER_COUNT or intrinsic == MirIntrinsic.ITER_COLLECT or intrinsic == MirIntrinsic.ITER_PARTITION or intrinsic == MirIntrinsic.ITER_UNZIP:
+        return true
+    intrinsic == MirIntrinsic.MAPITER_NEXT or intrinsic == MirIntrinsic.FILTERITER_NEXT or intrinsic == MirIntrinsic.FILTERMAPITER_NEXT or intrinsic == MirIntrinsic.TAKEITER_NEXT or intrinsic == MirIntrinsic.DROPITER_NEXT or intrinsic == MirIntrinsic.TAKEWHILEITER_NEXT or intrinsic == MirIntrinsic.DROPWHILEITER_NEXT or intrinsic == MirIntrinsic.ZIPITER_NEXT or intrinsic == MirIntrinsic.ENUMERATEITER_NEXT or intrinsic == MirIntrinsic.CHAINITER_NEXT or intrinsic == MirIntrinsic.ZIPWITHITER_NEXT or intrinsic == MirIntrinsic.STEPBYITER_NEXT or intrinsic == MirIntrinsic.FLATMAPITER_NEXT
 
 // The `const fn` symbol a call terminator invokes, or 0 when the callee is
 // a place (an indirect call) or a unit operand (an intrinsic with no callee).

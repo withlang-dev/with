@@ -11286,6 +11286,9 @@ impl Codegen:
         true
 
     mut fn mir_emit_intrinsic_call(body: &MirBody, intrinsic: MirIntrinsic, args_id: i32, dest_place: i32, next_bb: i32) -> bool:
+        // #2019: MIR's mark on this call (Sema's fact) for the closure
+        // invocations its emitters make.
+        self.iter_cancel_checks = if body.call_is_may_cancel(args_id): 1 else: 0
         if self.mir_emit_vector_intrinsic_call(body, intrinsic, args_id, dest_place, next_bb):
             return true
         if self.mir_emit_collection_literal_intrinsic_call(body, intrinsic, args_id, dest_place, next_bb):
@@ -12933,6 +12936,7 @@ impl Codegen:
             let call_args: Vec[i64] = Vec.new()
             call_args.push(payload)
             let mapped = self.mir_call_fn_value(fn_val, elem_ty, call_args, 1)
+            self.mir_iter_cancel_exit(none_bb)
             let some_val = self.build_option_some(mapped, opt_type)
             wl_build_br(self.builder, merge_bb)
             let some_end = wl_get_insert_block(self.builder)
@@ -12971,6 +12975,7 @@ impl Codegen:
             let pred_args: Vec[i64] = Vec.new()
             pred_args.push(payload2)
             let pred_raw = self.mir_call_fn_value(pred_val, wl_i1_type(self.context), pred_args, 1)
+            self.mir_iter_cancel_exit(none_bb2)
             var pred_bool = pred_raw
             if wl_type_of(pred_raw) != wl_i1_type(self.context):
                 pred_bool = wl_build_icmp(self.builder, wl_int_ne(), pred_raw, wl_const_int(wl_type_of(pred_raw), 0, 0))
@@ -13054,6 +13059,7 @@ impl Codegen:
             let call_args_fm: Vec[i64] = Vec.new()
             call_args_fm.push(payload_fm)
             let mapped_fm = self.mir_call_fn_value(fn_val_fm, opt_type, call_args_fm, 1)
+            self.mir_iter_cancel_exit(none_bb_fm)
             wl_build_cond_br(self.builder, self.mir_option_is_some_value(mapped_fm), some_bb_fm, loop_bb_fm)
             wl_position_at_end(self.builder, some_bb_fm)
             wl_build_br(self.builder, merge_bb_fm)
@@ -13133,6 +13139,7 @@ impl Codegen:
             let pred_args_tw: Vec[i64] = Vec.new()
             pred_args_tw.push(payload_tw)
             let pred_raw_tw = self.mir_call_fn_value(pred_val_tw, wl_i1_type(self.context), pred_args_tw, 1)
+            self.mir_iter_cancel_exit(none_bb_tw)
             var pred_bool_tw = pred_raw_tw
             if wl_type_of(pred_raw_tw) != wl_i1_type(self.context):
                 pred_bool_tw = wl_build_icmp(self.builder, wl_int_ne(), pred_raw_tw, wl_const_int(wl_type_of(pred_raw_tw), 0, 0))
@@ -13181,6 +13188,7 @@ impl Codegen:
             let pred_args_dw: Vec[i64] = Vec.new()
             pred_args_dw.push(payload_dw)
             let pred_raw_dw = self.mir_call_fn_value(pred_val_dw, wl_i1_type(self.context), pred_args_dw, 1)
+            self.mir_iter_cancel_exit(none_bb_dw)
             var pred_bool_dw = pred_raw_dw
             if wl_type_of(pred_raw_dw) != wl_i1_type(self.context):
                 pred_bool_dw = wl_build_icmp(self.builder, wl_int_ne(), pred_raw_dw, wl_const_int(wl_type_of(pred_raw_dw), 0, 0))
@@ -13360,6 +13368,7 @@ impl Codegen:
             call_args_zw.push(lv_zw)
             call_args_zw.push(rv_zw)
             let mapped_zw = self.mir_call_fn_value(fn_val_zw, elem_ty, call_args_zw, 2)
+            self.mir_iter_cancel_exit(none_bb_zw)
             let some_val_zw = self.build_option_some(mapped_zw, opt_type)
             wl_build_br(self.builder, merge_bb_zw)
             let some_end_zw = wl_get_insert_block(self.builder)
@@ -13469,6 +13478,7 @@ impl Codegen:
             let fm_args: Vec[i64] = Vec.new()
             fm_args.push(outer_payload)
             let produced = self.mir_call_fn_value(fn_val5, collection_ty, fm_args, 1)
+            self.mir_iter_cancel_exit(none_bb5)
             let collection_name = self.mir_generic_base_name(collection_tid)
             if collection_name == "Vec":
                 let current_ty = wl_struct_get_type_at(iter_ty, 2)
@@ -13575,6 +13585,7 @@ impl Codegen:
         call_args.push(cur)
         call_args.push(elem)
         let updated = self.mir_call_fn_value(fn_val, acc_ty, call_args, 2)
+        self.mir_iter_cancel_exit_blanking(end_bb, acc_ptr, acc_ty)
         wl_build_store(self.builder, updated, acc_ptr)
         wl_build_br(self.builder, loop_bb)
         wl_position_at_end(self.builder, end_bb)
@@ -14069,6 +14080,7 @@ impl Codegen:
         cmp_args.push(cur)
         cmp_args.push(elem)
         let cmp_raw = self.mir_call_fn_value(fn_val, wl_i32_type(self.context), cmp_args, 2)
+        self.mir_iter_cancel_exit(end_bb)
         let zero = wl_const_int(wl_type_of(cmp_raw), 0, 0)
         let replace = if want_max:
             wl_build_icmp(self.builder, wl_int_slt(), cmp_raw, zero)
@@ -14132,6 +14144,7 @@ impl Codegen:
         let pred_args: Vec[i64] = Vec.new()
         pred_args.push(elem)
         let pred_raw = self.mir_call_fn_value(pred_val, wl_i1_type(self.context), pred_args, 1)
+        self.mir_iter_cancel_exit(none_bb)
         var pred_bool = pred_raw
         if wl_type_of(pred_raw) != wl_i1_type(self.context):
             pred_bool = wl_build_icmp(self.builder, wl_int_ne(), pred_raw, wl_const_int(wl_type_of(pred_raw), 0, 0))
@@ -14184,6 +14197,7 @@ impl Codegen:
         let pred_args: Vec[i64] = Vec.new()
         pred_args.push(elem)
         let pred_raw = self.mir_call_fn_value(pred_val, wl_i1_type(self.context), pred_args, 1)
+        self.mir_iter_cancel_exit(none_bb)
         var pred_bool = pred_raw
         if wl_type_of(pred_raw) != wl_i1_type(self.context):
             pred_bool = wl_build_icmp(self.builder, wl_int_ne(), pred_raw, wl_const_int(wl_type_of(pred_raw), 0, 0))
@@ -14238,6 +14252,7 @@ impl Codegen:
         let pred_args: Vec[i64] = Vec.new()
         pred_args.push(elem)
         let pred_raw = self.mir_call_fn_value(pred_val, i1_ty, pred_args, 1)
+        self.mir_iter_cancel_exit(end_bb)
         var pred_bool = pred_raw
         if wl_type_of(pred_raw) != i1_ty:
             pred_bool = wl_build_icmp(self.builder, wl_int_ne(), pred_raw, wl_const_int(wl_type_of(pred_raw), 0, 0))
@@ -14273,6 +14288,7 @@ impl Codegen:
         let call_args: Vec[i64] = Vec.new()
         call_args.push(elem)
         let _ = self.mir_call_fn_value(fn_val, wl_void_type(self.context), call_args, 1)
+        self.mir_iter_cancel_exit(end_bb)
         wl_build_br(self.builder, loop_bb)
         wl_position_at_end(self.builder, end_bb)
         0
@@ -14372,6 +14388,7 @@ impl Codegen:
         call_args.push(cur)
         call_args.push(elem)
         let updated = self.mir_call_fn_value(fn_val, elem_ty, call_args, 2)
+        self.mir_iter_cancel_exit_blanking(end_bb, acc_ptr, elem_ty)
         wl_build_store(self.builder, updated, acc_ptr)
         wl_build_br(self.builder, loop_bb)
         wl_position_at_end(self.builder, end_bb)
@@ -14444,6 +14461,7 @@ impl Codegen:
         let pred_args: Vec[i64] = Vec.new()
         pred_args.push(elem)
         let pred_raw = self.mir_call_fn_value(pred_val, wl_i1_type(self.context), pred_args, 1)
+        self.mir_iter_cancel_exit(end_bb)
         var pred_bool = pred_raw
         if wl_type_of(pred_raw) != wl_i1_type(self.context):
             pred_bool = wl_build_icmp(self.builder, wl_int_ne(), pred_raw, wl_const_int(wl_type_of(pred_raw), 0, 0))
@@ -14469,18 +14487,38 @@ impl Codegen:
     // (MIR marked the call: Sema's call_site_may_suspend), a cancellation
     // unwind inside it left no value. Leave the loop to `exit_bb` before that
     // value is used: the result holds only what earlier invocations produced,
-    // and the caller's cancelled-return check releases it.
-    mut fn mir_emit_closure_cancel_exit(body: &MirBody, args_id: i32, exit_bb: i64):
-        if not body.call_is_may_cancel(args_id):
+    // and the caller's cancelled-return check releases it. The mark is read
+    // once, where the intrinsic call is emitted (iter_cancel_checks), so the
+    // nested `next` emitters of a lazy adapter chain see it too: an adapter's
+    // `next` ends the iteration (None) at an invocation that unwound.
+    mut fn mir_iter_cancel_exit(exit_bb: i64):
+        if self.iter_cancel_checks == 0:
             return
+        let cont = wl_append_bb(self.context, self.current_function, "cl.ok")
+        wl_build_cond_br(self.builder, self.mir_fiber_wait_cancelled(), exit_bb, cont)
+        wl_position_at_end(self.builder, cont)
+
+    // The same for a fold: the accumulator in `slot` was passed to the
+    // invocation that unwound (and released there), so the slot is blanked
+    // before the exit — the partial result the caller drops owns nothing.
+    mut fn mir_iter_cancel_exit_blanking(exit_bb: i64, slot: i64, slot_ty: i64):
+        if self.iter_cancel_checks == 0:
+            return
+        let blank = wl_append_bb(self.context, self.current_function, "cl.blank")
+        let cont = wl_append_bb(self.context, self.current_function, "cl.ok")
+        wl_build_cond_br(self.builder, self.mir_fiber_wait_cancelled(), blank, cont)
+        wl_position_at_end(self.builder, blank)
+        wl_build_store(self.builder, self.build_default_value(slot_ty), slot)
+        wl_build_br(self.builder, exit_bb)
+        wl_position_at_end(self.builder, cont)
+
+    mut fn mir_fiber_wait_cancelled() -> i64:
         var wc_fn = wl_get_named_function(self.llmod, "with_fiber_wait_cancelled")
         if wc_fn == 0:
             let wcft = wl_function_type(wl_i32_type(self.context), 0, 0, 0)
             wc_fn = wl_add_function(self.llmod, "with_fiber_wait_cancelled", wcft)
         let wc = wl_build_call(self.builder, wl_global_get_value_type(wc_fn), wc_fn, 0, 0)
-        let cont = wl_append_bb(self.context, self.current_function, "cl.ok")
-        wl_build_cond_br(self.builder, wl_build_icmp(self.builder, wl_int_ne(), wc, wl_const_int(wl_i32_type(self.context), 0, 0)), exit_bb, cont)
-        wl_position_at_end(self.builder, cont)
+        wl_build_icmp(self.builder, wl_int_ne(), wc, wl_const_int(wl_i32_type(self.context), 0, 0))
 
     mut fn mir_emit_vec_map(body: &MirBody, args_id: i32) -> i64:
         let i64_ty = wl_i64_type(self.context)
@@ -14569,7 +14607,7 @@ impl Codegen:
         ca.push(self.closure_abi_arg(elem_ty, el))
         let cc = if is_fat != 0: 2 else: 1
         let rv = wl_build_call(self.builder, fn_ty, fn_ptr, vec_data_i64(&ca), cc)
-        self.mir_emit_closure_cancel_exit(body, args_id, eb)
+        self.mir_iter_cancel_exit(eb)
         wl_build_store(self.builder, rv, tmp)
         let pf = self.ensure_vec_runtime_fn("with_vec_push", void_ty, 2)
         let pt = self.get_vec_fn_type("with_vec_push", void_ty, 2)
@@ -14660,7 +14698,7 @@ impl Codegen:
         ca.push(self.closure_abi_arg(elem_ty, el))
         let cc = if is_fat != 0: 2 else: 1
         let pred = wl_build_call(self.builder, fn_ty, fn_ptr, vec_data_i64(&ca), cc)
-        self.mir_emit_closure_cancel_exit(body, args_id, eb)
+        self.mir_iter_cancel_exit(eb)
         wl_build_cond_br(self.builder, wl_build_icmp(self.builder, wl_int_ne(), pred, wl_const_int(wl_type_of(pred), 0, 0)), pb, ib)
         wl_position_at_end(self.builder, pb)
         wl_build_store(self.builder, el, tmp)
@@ -14787,7 +14825,7 @@ impl Codegen:
         ca.push(self.closure_abi_arg(elem_ty, el))
         let cc = if is_fat != 0: 3 else: 2
         let nv = wl_build_call(self.builder, fn_ty, fn_ptr, vec_data_i64(&ca), cc)
-        self.mir_emit_closure_cancel_exit(body, args_id, eb)
+        self.mir_iter_cancel_exit_blanking(eb, aa, at)
         wl_build_store(self.builder, nv, aa)
         wl_build_br(self.builder, ib)
         wl_position_at_end(self.builder, ib)
