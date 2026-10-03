@@ -12166,6 +12166,13 @@ impl MirBuilder:
         var operand = self.lower_expr(node)
         if self.sema.callable_any_fn_type(exact_type as TypeId) == 0:
             return operand
+        // D63 (§12.4): calling a callable observes it, a temporary included
+        // (`h.f.clone()(21)`). lower_expr hands a call result back as a MOVE
+        // of its statement temp, and the temp's scope-exit drop then follows
+        // a path that moved it (#1858: the ownership validator's "drop of _5
+        // after a path reaching it moved it out"). Read the temp in place.
+        if self.body.operand_kinds[operand] == OperandKind.OK_MOVE:
+            operand = self.body.new_operand(OperandKind.OK_COPY, self.body.operand_d0[operand])
         // A callable view (including a collection element) addresses the
         // stored callable. Project through references before invoking it;
         // passing the reference itself jumps into data instead of code.
