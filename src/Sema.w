@@ -1206,8 +1206,9 @@ pub type Sema {
     // per label frame: entry bind-count (outer/inner boundary), the offset of this
     // loop's break-flag region in loop_break_flat (-1 = none), and whether any
     // break to this frame was captured. loop_break_flat is a flat stack of
-    // per-binding break-moved flags (VarState), one region per active loop — kept
-    // as Vec[i32] (not Vec[Vec[i32]]) for seed compatibility.
+    // per-binding break-moved flags (VarState), one region per active loop. Loop
+    // regions open and close strictly LIFO, so one flat stack with a per-frame
+    // offset holds them, and loop_entry_flat reuses the same offset.
     label_loop_entry_binds: Vec[i32],
     label_break_off: Vec[i32],
     label_break_seen: Vec[i32],
