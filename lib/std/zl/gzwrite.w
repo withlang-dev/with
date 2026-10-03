@@ -207,15 +207,13 @@ pub unsafe fn gzfwrite(__param_buf: *const c_void, __param_size: c_ulong, __para
 }
 
 pub unsafe fn gzprintf(__param_file: *mut gzFile_s, __param_format: *const i8, ...) -> c_int {
-    var __local_va: c_va_list
 
     var __local_ret: c_int
 
-    with_va_start((&raw mut __local_va as *mut i8))
+    var __local_va: c_va_list = va_start()
 
     (__local_ret = ((gzvprintf(__param_file, __param_format, __local_va) as c_int)))
 
-    with_va_end((&raw mut __local_va as *mut i8))
 
     return __local_ret
 

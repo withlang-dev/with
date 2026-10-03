@@ -199,6 +199,8 @@ pub fn corpus_migrate_options(corpus: &Corpus, source: &str, output: &str) -> Mi
 /// `WITH=out/release/bin/with out/release/bin/with build :<stem>-promote`.
 /// The battery never migrates; it compiles the checked-in output.
 pub fn corpus_run_migration(ctx: &ActionCtx, label: &str, options: MigrateOptions) -> i32:
+    let migrator = corpus_migrator_arg(ctx)
+    if migrator.len() > 0: return corpus_run_migration_process(ctx, label, migrator, &options)
     let workspace = ctx.create_workspace(label)
     var compiler_options = workspace.options()
     compiler_options.prelude_mode = PreludeMode.None
@@ -206,6 +208,65 @@ pub fn corpus_run_migration(ctx: &ActionCtx, label: &str, options: MigrateOption
     workspace.set_migrate_options(options)
     let result = workspace.compile()
     if result.rc != 0: return corpus_fail(ctx, label ++ f" exited {result.rc}")
+    0
+
+/// The compiler an action's `migrator=<path>` arg names ("" = none: the
+/// migration runs in the driver, as above). The drift check (#1905) names
+/// this tree's release compiler, the migrator a re-promotion would use.
+pub fn corpus_migrator_arg(ctx: &ActionCtx) -> str:
+    for arg in ctx.args():
+        if arg.starts_with("migrator="): return arg.slice("migrator=".len(), arg.len())
+    ""
+
+/// `<compiler> migrate` with exactly the options a workspace migration
+/// takes: the CLI and the workspace both set the migrator's options and call
+/// migrate_c_directory (or migrate_c_file), and a `--no-prelude` CLI run is
+/// the workspace's PreludeMode.None.
+pub fn corpus_migrate_argv(ctx: &ActionCtx, compiler: &str, options: &MigrateOptions) -> Vec[str]:
+    var argv: Vec[str] = Vec.new()
+    argv.push(corpus_abs(ctx, compiler))
+    argv.push("migrate")
+    argv.push(corpus_abs(ctx, options.source_path))
+    argv.push("-o")
+    argv.push(corpus_abs(ctx, options.output_path))
+    for path in options.include_paths:
+        argv.push("-I")
+        argv.push(corpus_abs(ctx, path))
+    for header in options.forced_includes:
+        argv.push("-include")
+        argv.push(header.clone())
+    for define in options.defines:
+        argv.push("-D")
+        argv.push(define.clone())
+    for exclude in options.exclude_basenames:
+        argv.push("--exclude")
+        argv.push(exclude.clone())
+    argv.push("--no-prelude")
+    if options.no_c_export: argv.push("--no-c-export")
+    if options.c_export_functions: argv.push("--c-export-functions")
+    if options.convert_goto_to_structured: argv.push("--convert-goto-to-structured")
+    if options.block_style == 2: argv.push("--prefer-brace")
+    if options.block_style == 0: argv.push("--prefer-colon")
+    argv.push("--width-slice")
+    argv.push(f"{options.width_slice}")
+    if options.shared_defs.len() > 0:
+        argv.push("--shared-defs")
+        argv.push(options.shared_defs.clone())
+    if options.migrate_one.len() > 0:
+        argv.push("--migrate-one")
+        argv.push(options.migrate_one.clone())
+    if options.shared_fragment.len() > 0:
+        argv.push("--shared-fragment")
+        argv.push(corpus_abs(ctx, options.shared_fragment))
+    argv
+
+fn corpus_run_migration_process(ctx: &ActionCtx, label: &str, compiler: &str, options: &MigrateOptions) -> i32:
+    if options.check_mode or options.diff_mode or options.stats_mode or options.ir_roundtrip:
+        return corpus_fail(ctx, label ++ ": the migrate CLI has no check/diff/stats/ir-roundtrip mode for a corpus migration")
+    let stdout = corpus_abs(ctx, corpus_scratch(ctx) ++ "/" ++ label ++ ".stdout")
+    let stderr = corpus_abs(ctx, corpus_scratch(ctx) ++ "/" ++ label ++ ".stderr")
+    let result = ctx.process_runner().run_capture_cwd(corpus_migrate_argv(ctx, compiler, options), stdout, stderr.clone(), 1200000, corpus_abs(ctx, "."))
+    if result.rc != 0: return corpus_fail(ctx, label ++ f": `migrate` exited {result.rc}; see " ++ stderr)
     0
 
 /// The default migrate hook: the staged directory, whole.

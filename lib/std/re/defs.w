@@ -1,34 +1,34 @@
 // std.re.defs — shared definitions for migrated PCRE2
 
-pub fn is_alpha(c: i32) -> bool {
-    (c >= 65 and c <= 90) or (c >= 97 and c <= 122)
+pub fn is_alpha(__with_c: i32) -> bool {
+    (__with_c >= 65 and __with_c <= 90) or (__with_c >= 97 and __with_c <= 122)
 }
-pub fn is_digit(c: i32) -> bool {
-    c >= 48 and c <= 57
+pub fn is_digit(__with_c: i32) -> bool {
+    __with_c >= 48 and __with_c <= 57
 }
-pub fn is_space(c: i32) -> bool {
-    c == 32 or c == 9 or c == 10 or c == 13 or c == 12 or c == 11
+pub fn is_space(__with_c: i32) -> bool {
+    __with_c == 32 or __with_c == 9 or __with_c == 10 or __with_c == 13 or __with_c == 12 or __with_c == 11
 }
-pub fn is_alnum(c: i32) -> bool {
-    is_alpha(c) or is_digit(c)
+pub fn is_alnum(__with_c: i32) -> bool {
+    is_alpha(__with_c) or is_digit(__with_c)
 }
-pub fn is_upper(c: i32) -> bool {
-    c >= 65 and c <= 90
+pub fn is_upper(__with_c: i32) -> bool {
+    __with_c >= 65 and __with_c <= 90
 }
-pub fn is_lower(c: i32) -> bool {
-    c >= 97 and c <= 122
+pub fn is_lower(__with_c: i32) -> bool {
+    __with_c >= 97 and __with_c <= 122
 }
-pub fn is_xdigit(c: i32) -> bool {
-    (c >= 48 and c <= 57) or (c >= 65 and c <= 70) or (c >= 97 and c <= 102)
+pub fn is_xdigit(__with_c: i32) -> bool {
+    (__with_c >= 48 and __with_c <= 57) or (__with_c >= 65 and __with_c <= 70) or (__with_c >= 97 and __with_c <= 102)
 }
-pub fn is_print(c: i32) -> bool {
-    c >= 32 and c <= 126
+pub fn is_print(__with_c: i32) -> bool {
+    __with_c >= 32 and __with_c <= 126
 }
-pub fn to_lower(c: i32) -> i32 {
-    if c >= 65 and c <= 90 { c + 32 } else { c }
+pub fn to_lower(__with_c: i32) -> i32 {
+    if __with_c >= 65 and __with_c <= 90 { __with_c + 32 } else { __with_c }
 }
-pub fn to_upper(c: i32) -> i32 {
-    if c >= 97 and c <= 122 { c - 32 } else { c }
+pub fn to_upper(__with_c: i32) -> i32 {
+    if __with_c >= 97 and __with_c <= 122 { __with_c - 32 } else { __with_c }
 }
 pub extern fn strlen(s: *const i8) -> i64
 pub extern fn strcmp(a: *const i8, b: *const i8) -> i32
@@ -80,175 +80,175 @@ pub type c_ulong = u64
 pub type c_longlong = i64
 pub type c_ulonglong = u64
 pub type c_longdouble = f64
-pub unsafe fn __with_builtin_add_overflow_i8(a: i8, b: i8, out: *mut i8) -> bool {
-    let result = a +% b
-    unsafe { (*out = result) }
-    ((result ^ a) & (result ^ b)) < 0
+pub unsafe fn __with_builtin_add_overflow_i8(__with_a: i8, __with_b: i8, __with_out: *mut i8) -> bool {
+    let __with_result = __with_a +% __with_b
+    unsafe { (*__with_out = __with_result) }
+    ((__with_result ^ __with_a) & (__with_result ^ __with_b)) < 0
 }
-pub unsafe fn __with_builtin_sub_overflow_i8(a: i8, b: i8, out: *mut i8) -> bool {
-    let result = a -% b
-    unsafe { (*out = result) }
-    ((a ^ b) & (result ^ a)) < 0
+pub unsafe fn __with_builtin_sub_overflow_i8(__with_a: i8, __with_b: i8, __with_out: *mut i8) -> bool {
+    let __with_result = __with_a -% __with_b
+    unsafe { (*__with_out = __with_result) }
+    ((__with_a ^ __with_b) & (__with_result ^ __with_a)) < 0
 }
-pub unsafe fn __with_builtin_mul_overflow_i8(a: i8, b: i8, out: *mut i8) -> bool {
-    let result = a *% b
-    unsafe { (*out = result) }
-    if a == 0 or b == 0: false else if a == -1: result == b else if b == -1: result == a else: result / b != a
+pub unsafe fn __with_builtin_mul_overflow_i8(__with_a: i8, __with_b: i8, __with_out: *mut i8) -> bool {
+    let __with_result = __with_a *% __with_b
+    unsafe { (*__with_out = __with_result) }
+    if __with_a == 0 or __with_b == 0: false else if __with_a == -1: __with_result == __with_b else if __with_b == -1: __with_result == __with_a else: __with_result / __with_b != __with_a
 }
-pub unsafe fn __with_builtin_add_overflow_u8(a: u8, b: u8, out: *mut u8) -> bool {
-    let result = a +% b
-    unsafe { (*out = result) }
-    result < a
+pub unsafe fn __with_builtin_add_overflow_u8(__with_a: u8, __with_b: u8, __with_out: *mut u8) -> bool {
+    let __with_result = __with_a +% __with_b
+    unsafe { (*__with_out = __with_result) }
+    __with_result < __with_a
 }
-pub unsafe fn __with_builtin_sub_overflow_u8(a: u8, b: u8, out: *mut u8) -> bool {
-    let result = a -% b
-    unsafe { (*out = result) }
-    a < b
+pub unsafe fn __with_builtin_sub_overflow_u8(__with_a: u8, __with_b: u8, __with_out: *mut u8) -> bool {
+    let __with_result = __with_a -% __with_b
+    unsafe { (*__with_out = __with_result) }
+    __with_a < __with_b
 }
-pub unsafe fn __with_builtin_mul_overflow_u8(a: u8, b: u8, out: *mut u8) -> bool {
-    let result = a *% b
-    unsafe { (*out = result) }
-    if b == 0: false else: result / b != a
+pub unsafe fn __with_builtin_mul_overflow_u8(__with_a: u8, __with_b: u8, __with_out: *mut u8) -> bool {
+    let __with_result = __with_a *% __with_b
+    unsafe { (*__with_out = __with_result) }
+    if __with_b == 0: false else: __with_result / __with_b != __with_a
 }
-pub unsafe fn __with_builtin_add_overflow_i16(a: i16, b: i16, out: *mut i16) -> bool {
-    let result = a +% b
-    unsafe { (*out = result) }
-    ((result ^ a) & (result ^ b)) < 0
+pub unsafe fn __with_builtin_add_overflow_i16(__with_a: i16, __with_b: i16, __with_out: *mut i16) -> bool {
+    let __with_result = __with_a +% __with_b
+    unsafe { (*__with_out = __with_result) }
+    ((__with_result ^ __with_a) & (__with_result ^ __with_b)) < 0
 }
-pub unsafe fn __with_builtin_sub_overflow_i16(a: i16, b: i16, out: *mut i16) -> bool {
-    let result = a -% b
-    unsafe { (*out = result) }
-    ((a ^ b) & (result ^ a)) < 0
+pub unsafe fn __with_builtin_sub_overflow_i16(__with_a: i16, __with_b: i16, __with_out: *mut i16) -> bool {
+    let __with_result = __with_a -% __with_b
+    unsafe { (*__with_out = __with_result) }
+    ((__with_a ^ __with_b) & (__with_result ^ __with_a)) < 0
 }
-pub unsafe fn __with_builtin_mul_overflow_i16(a: i16, b: i16, out: *mut i16) -> bool {
-    let result = a *% b
-    unsafe { (*out = result) }
-    if a == 0 or b == 0: false else if a == -1: result == b else if b == -1: result == a else: result / b != a
+pub unsafe fn __with_builtin_mul_overflow_i16(__with_a: i16, __with_b: i16, __with_out: *mut i16) -> bool {
+    let __with_result = __with_a *% __with_b
+    unsafe { (*__with_out = __with_result) }
+    if __with_a == 0 or __with_b == 0: false else if __with_a == -1: __with_result == __with_b else if __with_b == -1: __with_result == __with_a else: __with_result / __with_b != __with_a
 }
-pub unsafe fn __with_builtin_add_overflow_u16(a: u16, b: u16, out: *mut u16) -> bool {
-    let result = a +% b
-    unsafe { (*out = result) }
-    result < a
+pub unsafe fn __with_builtin_add_overflow_u16(__with_a: u16, __with_b: u16, __with_out: *mut u16) -> bool {
+    let __with_result = __with_a +% __with_b
+    unsafe { (*__with_out = __with_result) }
+    __with_result < __with_a
 }
-pub unsafe fn __with_builtin_sub_overflow_u16(a: u16, b: u16, out: *mut u16) -> bool {
-    let result = a -% b
-    unsafe { (*out = result) }
-    a < b
+pub unsafe fn __with_builtin_sub_overflow_u16(__with_a: u16, __with_b: u16, __with_out: *mut u16) -> bool {
+    let __with_result = __with_a -% __with_b
+    unsafe { (*__with_out = __with_result) }
+    __with_a < __with_b
 }
-pub unsafe fn __with_builtin_mul_overflow_u16(a: u16, b: u16, out: *mut u16) -> bool {
-    let result = a *% b
-    unsafe { (*out = result) }
-    if b == 0: false else: result / b != a
+pub unsafe fn __with_builtin_mul_overflow_u16(__with_a: u16, __with_b: u16, __with_out: *mut u16) -> bool {
+    let __with_result = __with_a *% __with_b
+    unsafe { (*__with_out = __with_result) }
+    if __with_b == 0: false else: __with_result / __with_b != __with_a
 }
-pub unsafe fn __with_builtin_add_overflow_i32(a: i32, b: i32, out: *mut i32) -> bool {
-    let result = a +% b
-    unsafe { (*out = result) }
-    ((result ^ a) & (result ^ b)) < 0
+pub unsafe fn __with_builtin_add_overflow_i32(__with_a: i32, __with_b: i32, __with_out: *mut i32) -> bool {
+    let __with_result = __with_a +% __with_b
+    unsafe { (*__with_out = __with_result) }
+    ((__with_result ^ __with_a) & (__with_result ^ __with_b)) < 0
 }
-pub unsafe fn __with_builtin_sub_overflow_i32(a: i32, b: i32, out: *mut i32) -> bool {
-    let result = a -% b
-    unsafe { (*out = result) }
-    ((a ^ b) & (result ^ a)) < 0
+pub unsafe fn __with_builtin_sub_overflow_i32(__with_a: i32, __with_b: i32, __with_out: *mut i32) -> bool {
+    let __with_result = __with_a -% __with_b
+    unsafe { (*__with_out = __with_result) }
+    ((__with_a ^ __with_b) & (__with_result ^ __with_a)) < 0
 }
-pub unsafe fn __with_builtin_mul_overflow_i32(a: i32, b: i32, out: *mut i32) -> bool {
-    let result = a *% b
-    unsafe { (*out = result) }
-    if a == 0 or b == 0: false else if a == -1: result == b else if b == -1: result == a else: result / b != a
+pub unsafe fn __with_builtin_mul_overflow_i32(__with_a: i32, __with_b: i32, __with_out: *mut i32) -> bool {
+    let __with_result = __with_a *% __with_b
+    unsafe { (*__with_out = __with_result) }
+    if __with_a == 0 or __with_b == 0: false else if __with_a == -1: __with_result == __with_b else if __with_b == -1: __with_result == __with_a else: __with_result / __with_b != __with_a
 }
-pub unsafe fn __with_builtin_add_overflow_u32(a: u32, b: u32, out: *mut u32) -> bool {
-    let result = a +% b
-    unsafe { (*out = result) }
-    result < a
+pub unsafe fn __with_builtin_add_overflow_u32(__with_a: u32, __with_b: u32, __with_out: *mut u32) -> bool {
+    let __with_result = __with_a +% __with_b
+    unsafe { (*__with_out = __with_result) }
+    __with_result < __with_a
 }
-pub unsafe fn __with_builtin_sub_overflow_u32(a: u32, b: u32, out: *mut u32) -> bool {
-    let result = a -% b
-    unsafe { (*out = result) }
-    a < b
+pub unsafe fn __with_builtin_sub_overflow_u32(__with_a: u32, __with_b: u32, __with_out: *mut u32) -> bool {
+    let __with_result = __with_a -% __with_b
+    unsafe { (*__with_out = __with_result) }
+    __with_a < __with_b
 }
-pub unsafe fn __with_builtin_mul_overflow_u32(a: u32, b: u32, out: *mut u32) -> bool {
-    let result = a *% b
-    unsafe { (*out = result) }
-    if b == 0: false else: result / b != a
+pub unsafe fn __with_builtin_mul_overflow_u32(__with_a: u32, __with_b: u32, __with_out: *mut u32) -> bool {
+    let __with_result = __with_a *% __with_b
+    unsafe { (*__with_out = __with_result) }
+    if __with_b == 0: false else: __with_result / __with_b != __with_a
 }
-pub unsafe fn __with_builtin_add_overflow_i64(a: i64, b: i64, out: *mut i64) -> bool {
-    let result = a +% b
-    unsafe { (*out = result) }
-    ((result ^ a) & (result ^ b)) < 0
+pub unsafe fn __with_builtin_add_overflow_i64(__with_a: i64, __with_b: i64, __with_out: *mut i64) -> bool {
+    let __with_result = __with_a +% __with_b
+    unsafe { (*__with_out = __with_result) }
+    ((__with_result ^ __with_a) & (__with_result ^ __with_b)) < 0
 }
-pub unsafe fn __with_builtin_sub_overflow_i64(a: i64, b: i64, out: *mut i64) -> bool {
-    let result = a -% b
-    unsafe { (*out = result) }
-    ((a ^ b) & (result ^ a)) < 0
+pub unsafe fn __with_builtin_sub_overflow_i64(__with_a: i64, __with_b: i64, __with_out: *mut i64) -> bool {
+    let __with_result = __with_a -% __with_b
+    unsafe { (*__with_out = __with_result) }
+    ((__with_a ^ __with_b) & (__with_result ^ __with_a)) < 0
 }
-pub unsafe fn __with_builtin_mul_overflow_i64(a: i64, b: i64, out: *mut i64) -> bool {
-    let result = a *% b
-    unsafe { (*out = result) }
-    if a == 0 or b == 0: false else if a == -1: result == b else if b == -1: result == a else: result / b != a
+pub unsafe fn __with_builtin_mul_overflow_i64(__with_a: i64, __with_b: i64, __with_out: *mut i64) -> bool {
+    let __with_result = __with_a *% __with_b
+    unsafe { (*__with_out = __with_result) }
+    if __with_a == 0 or __with_b == 0: false else if __with_a == -1: __with_result == __with_b else if __with_b == -1: __with_result == __with_a else: __with_result / __with_b != __with_a
 }
-pub unsafe fn __with_builtin_add_overflow_u64(a: u64, b: u64, out: *mut u64) -> bool {
-    let result = a +% b
-    unsafe { (*out = result) }
-    result < a
+pub unsafe fn __with_builtin_add_overflow_u64(__with_a: u64, __with_b: u64, __with_out: *mut u64) -> bool {
+    let __with_result = __with_a +% __with_b
+    unsafe { (*__with_out = __with_result) }
+    __with_result < __with_a
 }
-pub unsafe fn __with_builtin_sub_overflow_u64(a: u64, b: u64, out: *mut u64) -> bool {
-    let result = a -% b
-    unsafe { (*out = result) }
-    a < b
+pub unsafe fn __with_builtin_sub_overflow_u64(__with_a: u64, __with_b: u64, __with_out: *mut u64) -> bool {
+    let __with_result = __with_a -% __with_b
+    unsafe { (*__with_out = __with_result) }
+    __with_a < __with_b
 }
-pub unsafe fn __with_builtin_mul_overflow_u64(a: u64, b: u64, out: *mut u64) -> bool {
-    let result = a *% b
-    unsafe { (*out = result) }
-    if b == 0: false else: result / b != a
+pub unsafe fn __with_builtin_mul_overflow_u64(__with_a: u64, __with_b: u64, __with_out: *mut u64) -> bool {
+    let __with_result = __with_a *% __with_b
+    unsafe { (*__with_out = __with_result) }
+    if __with_b == 0: false else: __with_result / __with_b != __with_a
 }
-pub unsafe fn __with_builtin_add_overflow_i128(a: i128, b: i128, out: *mut i128) -> bool {
-    let result = a +% b
-    unsafe { (*out = result) }
-    ((result ^ a) & (result ^ b)) < 0
+pub unsafe fn __with_builtin_add_overflow_i128(__with_a: i128, __with_b: i128, __with_out: *mut i128) -> bool {
+    let __with_result = __with_a +% __with_b
+    unsafe { (*__with_out = __with_result) }
+    ((__with_result ^ __with_a) & (__with_result ^ __with_b)) < 0
 }
-pub unsafe fn __with_builtin_sub_overflow_i128(a: i128, b: i128, out: *mut i128) -> bool {
-    let result = a -% b
-    unsafe { (*out = result) }
-    ((a ^ b) & (result ^ a)) < 0
+pub unsafe fn __with_builtin_sub_overflow_i128(__with_a: i128, __with_b: i128, __with_out: *mut i128) -> bool {
+    let __with_result = __with_a -% __with_b
+    unsafe { (*__with_out = __with_result) }
+    ((__with_a ^ __with_b) & (__with_result ^ __with_a)) < 0
 }
 // The 128-bit overflow checks stay division-free on purpose: `/` on i128/u128
 // lowers to the __divti3/__udivti3 compiler-rt libcalls, and this shim is
 // compiled into freestanding runtime objects whose COFF link has no builtins
 // library to resolve them from. Limb decomposition keeps the check to multiplies
 // and shifts, which lower inline on every target and at every -O level.
-pub fn u128_mul_would_overflow(a: u128, b: u128) -> bool {
-    let a_hi = (a >> 64) as u64
-    let b_hi = (b >> 64) as u64
-    if a_hi != 0 and b_hi != 0: return true
-    let a_lo = (a as u64) as u128
-    let b_lo = (b as u64) as u128
-    let cross = (a_hi as u128) *% b_lo +% (b_hi as u128) *% a_lo
-    if (cross >> 64) != 0: return true
-    let low = a_lo *% b_lo
-    ((low >> 64) +% cross) >> 64 != 0
+pub fn u128_mul_would_overflow(__with_a: u128, __with_b: u128) -> bool {
+    let __with_a_hi = (__with_a >> 64) as u64
+    let __with_b_hi = (__with_b >> 64) as u64
+    if __with_a_hi != 0 and __with_b_hi != 0: return true
+    let __with_a_lo = (__with_a as u64) as u128
+    let __with_b_lo = (__with_b as u64) as u128
+    let __with_cross = (__with_a_hi as u128) *% __with_b_lo +% (__with_b_hi as u128) *% __with_a_lo
+    if (__with_cross >> 64) != 0: return true
+    let __with_low = __with_a_lo *% __with_b_lo
+    ((__with_low >> 64) +% __with_cross) >> 64 != 0
 }
-pub unsafe fn __with_builtin_mul_overflow_i128(a: i128, b: i128, out: *mut i128) -> bool {
-    unsafe { (*out = a *% b) }
-    if a == 0 or b == 0: return false
-    let neg = (a < 0) != (b < 0)
-    let ua = if a < 0: (0 as u128) -% (a as u128) else: a as u128
-    let ub = if b < 0: (0 as u128) -% (b as u128) else: b as u128
-    if u128_mul_would_overflow(ua, ub): return true
-    let limit = if neg: (1 as u128) << 127 else: ((1 as u128) << 127) -% 1
-    ua *% ub > limit
+pub unsafe fn __with_builtin_mul_overflow_i128(__with_a: i128, __with_b: i128, __with_out: *mut i128) -> bool {
+    unsafe { (*__with_out = __with_a *% __with_b) }
+    if __with_a == 0 or __with_b == 0: return false
+    let __with_neg = (__with_a < 0) != (__with_b < 0)
+    let __with_ua = if __with_a < 0: (0 as u128) -% (__with_a as u128) else: __with_a as u128
+    let __with_ub = if __with_b < 0: (0 as u128) -% (__with_b as u128) else: __with_b as u128
+    if u128_mul_would_overflow(__with_ua, __with_ub): return true
+    let __with_limit = if __with_neg: (1 as u128) << 127 else: ((1 as u128) << 127) -% 1
+    __with_ua *% __with_ub > __with_limit
 }
-pub unsafe fn __with_builtin_add_overflow_u128(a: u128, b: u128, out: *mut u128) -> bool {
-    let result = a +% b
-    unsafe { (*out = result) }
-    result < a
+pub unsafe fn __with_builtin_add_overflow_u128(__with_a: u128, __with_b: u128, __with_out: *mut u128) -> bool {
+    let __with_result = __with_a +% __with_b
+    unsafe { (*__with_out = __with_result) }
+    __with_result < __with_a
 }
-pub unsafe fn __with_builtin_sub_overflow_u128(a: u128, b: u128, out: *mut u128) -> bool {
-    let result = a -% b
-    unsafe { (*out = result) }
-    a < b
+pub unsafe fn __with_builtin_sub_overflow_u128(__with_a: u128, __with_b: u128, __with_out: *mut u128) -> bool {
+    let __with_result = __with_a -% __with_b
+    unsafe { (*__with_out = __with_result) }
+    __with_a < __with_b
 }
-pub unsafe fn __with_builtin_mul_overflow_u128(a: u128, b: u128, out: *mut u128) -> bool {
-    unsafe { (*out = a *% b) }
-    u128_mul_would_overflow(a, b)
+pub unsafe fn __with_builtin_mul_overflow_u128(__with_a: u128, __with_b: u128, __with_out: *mut u128) -> bool {
+    unsafe { (*__with_out = __with_a *% __with_b) }
+    u128_mul_would_overflow(__with_a, __with_b)
 }
 pub extern fn with_clz(x: i32) -> i32
 pub extern fn with_ctz(x: i32) -> i32
@@ -269,8 +269,6 @@ pub extern fn with_memcpy(dst: *mut u8, src: *const u8, n: i64) -> *mut u8
 pub extern fn with_memmove(dst: *mut u8, src: *const u8, n: i64) -> *mut u8
 pub extern fn with_memset(dst: *mut u8, c: i32, n: i64) -> *mut u8
 pub extern fn with_memcmp(a: *const u8, b: *const u8, n: i64) -> i32
-pub extern fn with_va_start(ap: *mut i8) -> Unit
-pub extern fn with_va_end(ap: *mut i8) -> Unit
 
 
 pub type BOOL = c_int
@@ -1278,8 +1276,8 @@ pub let COMPILE_ERROR_BASE: c_int = 100
 pub let START_FRAMES_SIZE: c_int = 20480
 pub let DFA_START_RWS_SIZE: c_int = 30720
 pub let BSR_DEFAULT: c_int = 1
-pub fn HASUTF8EXTRALEN[T](c: T) -> T {
-    (c >= 0xc0)
+pub fn HASUTF8EXTRALEN[T](c: T) -> c_int {
+    ((c >= 0xc0) as c_int)
 }
 pub let NLTYPE_FIXED: c_int = 0
 pub let NLTYPE_ANY: c_int = 1
@@ -1612,11 +1610,11 @@ pub let UCD_BLOCK_SIZE: c_int = 128
 pub let UCD_SCRIPTX_MASK: c_int = 0x3ff
 pub let UCD_BIDICLASS_SHIFT: c_int = 11
 pub let UCD_BPROPS_MASK: c_int = 0xfff
-pub fn UCD_ANY_I[T](ch: T) -> T {
-    ((((ch as u32) | 0x20u32) == 0x69u32) or (((ch as u32) | 1u32) == 0x0131u32))
+pub fn UCD_ANY_I[T](ch: T) -> c_int {
+    (((((ch as u32) | 0x20u32) == 0x69u32) or (((ch as u32) | 1u32) == 0x0131u32)) as c_int)
 }
-pub fn UCD_DOTTED_I[T](ch: T) -> T {
-    (((ch as u32) == 0x69u32) or ((ch as u32) == 0x0130u32))
+pub fn UCD_DOTTED_I[T](ch: T) -> c_int {
+    ((((ch as u32) == 0x69u32) or ((ch as u32) == 0x0130u32)) as c_int)
 }
 pub fn UCD_FOLD_I_TURKISH[T](ch: T) -> T {
     (if ((ch as u32) == 0x0130u32): 0x69u32 else: (if ((ch as u32) == 0x49u32): 0x0131u32 else: (ch as u32)))
@@ -1629,8 +1627,8 @@ pub fn MAX_255[T](c: T) -> c_int {
     1
 }
 pub let MAX_MARK: c_uint = (((1u32 << 8) - 1) as c_uint)
-pub fn CHMAX_255[T](c: T) -> T {
-    (c <= 255u32)
+pub fn CHMAX_255[T](c: T) -> c_int {
+    ((c <= 255u32) as c_int)
 }
 pub fn UCHAR21[T](eptr: T) -> T {
     (unsafe *eptr)
@@ -1639,11 +1637,11 @@ pub fn UCHAR21TEST[T](eptr: T) -> T {
     (unsafe *eptr)
 }
 pub let MAX_UTF_SINGLE_CU: c_int = 127
-pub fn HAS_EXTRALEN[T](c: T) -> T {
+pub fn HAS_EXTRALEN[T](c: T) -> c_int {
     HASUTF8EXTRALEN(c)
 }
-pub fn NOT_FIRSTCU[T](c: T) -> T {
-    ((c & 0xc0u32) == 0x80u32)
+pub fn NOT_FIRSTCU[T](c: T) -> c_int {
+    (((c & 0xc0u32) == 0x80u32) as c_int)
 }
 pub fn CU2BYTES[T](x: T) -> T {
     (x * (8 / 8))
@@ -1728,8 +1726,8 @@ impl Copy for pcre2_output_context
 pub let TYPE_OPTIONS: c_int = 28
 pub let ALL_OPTIONS: c_int = 127
 pub let DUMMY_BUFFER_SIZE: c_int = 100
-pub fn ISLOWER[T](c: T) -> T {
-    ((c >= 97) and (c <= 122))
+pub fn ISLOWER[T](c: T) -> c_int {
+    (((c >= 97) and (c <= 122)) as c_int)
 }
 pub let ERR0: c_int = 100
 pub let ERR1: c_int = 101
@@ -2031,8 +2029,8 @@ pub let REQ_VARY: c_uint = 0x00000002
 pub let GI_SET_FIXED_LENGTH: c_uint = 0x80000000
 pub let GI_NOT_FIXED_LENGTH: c_uint = 0x40000000
 pub let GI_FIXED_LENGTH_MASK: c_uint = 0x0000ffff
-pub fn IS_DIGIT[T](x: T) -> T {
-    ((x >= 48) and (x <= 57))
+pub fn IS_DIGIT[T](x: T) -> c_int {
+    (((x >= 48) and (x <= 57)) as c_int)
 }
 pub let ESCAPES_FIRST: c_int = 48
 pub let ESCAPES_LAST: c_int = 122
@@ -2391,8 +2389,8 @@ pub let VERSION_SIZE: c_int = 64
 pub let REPLACE_BUFFSIZE: c_int = 256
 pub let PCRE2TEST_MODE_8: c_int = 8
 pub let EBCDIC_IO: c_int = 0
-pub fn PRINTABLE[T](c: T) -> T {
-    ((c >= 32) and (c < 127))
+pub fn PRINTABLE[T](c: T) -> c_int {
+    (((c >= 32) and (c < 127)) as c_int)
 }
 pub fn CHAR_OUTPUT[T](c: T) -> T {
     c
@@ -2410,13 +2408,16 @@ pub let PCRE2_CODE_UNIT_WIDTH: c_int = 0
 pub fn PCRE2_SUFFIX[T](a: T) -> T {
     a
 }
-pub fn U32OVERFLOW[T](x: T) -> T {
-    (x > 4294967295u32)
+pub fn U32OVERFLOW[T](x: T) -> c_int {
+    ((x > 4294967295u32) as c_int)
 }
-pub fn S32OVERFLOW[T](x: T) -> T {
-    ((x > 2147483647) or (x < (-2147483647 - 1)))
+pub fn S32OVERFLOW[T](x: T) -> c_int {
+    (((x > 2147483647) or (x < (-2147483647 - 1))) as c_int)
 }
+pub type PCRE2_SPTR = PCRE2_SPTR8
 pub let DEFAULT_TEST_MODE: c_int = 8
+pub type PCRE2_REAL_COMPILE_CONTEXT = pcre2_real_compile_context_8
+pub type PCRE2_REAL_MATCH_CONTEXT = pcre2_real_match_context_8
 pub let CTL_AFTERTEXT: c_uint = 0x00000001
 pub let CTL_ALLAFTERTEXT: c_uint = 0x00000002
 pub let CTL_ALLCAPTURES: c_uint = 0x00000004

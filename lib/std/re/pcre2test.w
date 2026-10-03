@@ -3225,17 +3225,15 @@ unsafe fn colour_end(__param_f: *mut c_void) -> Unit {
 }
 
 unsafe fn cfprintf(__param_clr: c_int, __param_file: *mut c_void, __param_fmt: *const i8, ...) -> c_int {
-    var __local_args: c_va_list
 
     var __local_ret: c_int
 
-    with_va_start((&raw mut __local_args as *mut i8))
+    var __local_args: c_va_list = va_start()
 
     colour_begin(__param_clr, __param_file)
 
     (__local_ret = ((vfprintf(__param_file, __param_fmt, __local_args) as c_int)))
 
-    with_va_end((&raw mut __local_args as *mut i8))
 
     colour_end(__param_file)
 
