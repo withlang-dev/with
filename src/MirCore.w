@@ -2623,6 +2623,45 @@ fn mir_read_of_uninit_place(body: &MirBody, keys: &MirDropStateKeys, state: &Mir
             return f"read of {mir_place_text(body, place)} reaches a path that never initialized it ({mir_drop_state_name(s)})"
     ""
 
+// #1993: a read (copy or move) of an owned local — a value or handle the
+// lowering recorded as owned cleanup — that every path reaching it moved
+// out, or "". The value now belongs to its new owner (a task handle to the
+// join_cleanup that released it); the read sees released storage.
+// `owned` marks body.owned_cleanup_locals. Only a value that is not Copy is
+// judged — one with drop glue, or a Task/ScopedTask handle: a Copy value is
+// transported by `move` and read again legally (a loop's enum passed twice).
+// MaybeMoved is not judged here (a conditional move's join), nor a
+// projection (its key is Absent until touched).
+fn mir_read_of_moved_owned_local(mir_mod: &MirModule, body: &MirBody, keys: &MirDropStateKeys, state: &MirDropStateMap, ops: &Vec[i32], owned: &Vec[i32]) -> str:
+    for oi in 0..ops.len():
+        let op: i32 = ops[oi]
+        if op < 0 or op >= body.operand_kinds.len():
+            continue
+        let k = body.operand_kinds[op]
+        if k != OperandKind.OK_COPY and k != OperandKind.OK_MOVE:
+            continue
+        let place = body.operand_d0[op]
+        if place < 0 or place >= body.place_locals.len() or body.place_proj_counts[place] != 0:
+            continue
+        let local = body.place_locals[place]
+        if local <= 0 or local >= owned.len() or owned[local] == 0:
+            continue
+        if state.place(keys, place) == MirDropState.Moved and mir_place_holds_non_copy_owner(mir_mod, body, place):
+            return f"read of {mir_place_text(body, place)}, which every path reaching it already moved out: the value belongs to its new owner (§2.5.1)"
+    ""
+
+fn mir_place_holds_non_copy_owner(mir_mod: &MirModule, body: &MirBody, place: i32) -> bool:
+    let ty = mir_validate_place_type(mir_mod, body, place)
+    if ty <= 0:
+        return false
+    if mir_mod.sema_dropped_types.contains(ty) or mir_mod.sema_moved_drop_types.contains(ty):
+        return true
+    let resolved = mir_mod.mir_resolve_alias(ty)
+    if mir_mod.sema_task_sym == 0 or mir_mod.mir_get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
+        return false
+    let base = mir_mod.mir_get_type_d0(resolved)
+    base == mir_mod.sema_task_sym or base == mir_mod.sema_scoped_task_sym
+
 // The Sema signature snapshot of `sym` (sema_sig_param_starts): its
 // parameter count, or -1 when Sema has no signature by that name.
 pub fn mir_sig_param_count(mir_mod: &MirModule, sym: i32) -> i32:
@@ -2922,6 +2961,11 @@ pub fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
         if li < 0 or li >= dropped_local.len():
             return f"fn sym{body.fn_sym}: owned cleanup local _{li} is out of range"
         dropped_local[li] = 1
+    var owned_local: Vec[i32] = Vec.new()
+    for _ in 0..body.local_type_ids.len():
+        owned_local.push(0)
+    for li in body.owned_cleanup_locals:
+        owned_local[li] = 1
     for bb in 0..body.block_count():
         let stmt_start = body.bb_stmt_starts[bb]
         let stmt_count = body.bb_stmt_counts[bb]
@@ -2967,6 +3011,9 @@ pub fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
                 let uninit_read = mir_read_of_uninit_place(body, blocks.keys, state, mir_rvalue_operands(body, body.stmt_data1(stmt_id)))
                 if uninit_read.len() > 0:
                     return f"fn sym{body.fn_sym} stmt{stmt_id} span={span}: " ++ uninit_read
+                let moved_read = mir_read_of_moved_owned_local(mir_mod, body, blocks.keys, state, mir_rvalue_operands(body, body.stmt_data1(stmt_id)), owned_local)
+                if moved_read.len() > 0:
+                    return f"fn sym{body.fn_sym} stmt{stmt_id} span={span}: " ++ moved_read
                 // #1487: a reset-on-move blank stores the sentinel over a
                 // place a move left behind. Over a place still Init — no path
                 // moved it — it overwrites a live value without a drop: the
@@ -2992,6 +3039,9 @@ pub fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
             let uninit_term = mir_read_of_uninit_place(body, blocks.keys, state, mir_term_operands(body, bb))
             if uninit_term.len() > 0:
                 return f"fn sym{body.fn_sym} bb{bb}: " ++ uninit_term
+            let moved_term = mir_read_of_moved_owned_local(mir_mod, body, blocks.keys, state, mir_term_operands(body, bb), owned_local)
+            if moved_term.len() > 0:
+                return f"fn sym{body.fn_sym} bb{bb}: " ++ moved_term
         if body.term_kind(bb) == TermKind.TK_CALL or body.term_kind(bb) == TermKind.TK_DROP_AND_GOTO:
             let place_id = if body.term_kind(bb) == TermKind.TK_CALL: body.term_data2(bb) else: body.term_data0(bb)
             if place_id < 0 or place_id >= body.place_locals.len():

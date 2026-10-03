@@ -1533,3 +1533,47 @@ pub fn mir_test_read_after_drop:
     assert(read_after_drop_verdict(3) == "")
     assert(read_after_drop_verdict(4).contains("read of _2 after every path reaching it dropped _2"))
     assert(read_after_drop_verdict(5).contains("read of _2 after every path reaching it dropped _2"))
+
+// #1993: an owned local (the lowering recorded it as owned cleanup) moved
+// out, then read: the read sees what its new owner holds. `t.join_cleanup();
+// t.await` read a released task handle this way, and validate-all said ok.
+// A Copy value (no drop glue) moved and read again is legal transport.
+fn moved_owned_read_verdict(read_after_move: bool, has_glue: bool) -> str:
+    var mir_mod = MirModule.init()
+    for kind in [0, TypeKind.TY_STRUCT]:
+        mir_mod.sema_type_kinds.push(kind)
+        mir_mod.sema_type_d0.push(0)
+        mir_mod.sema_type_d1.push(0)
+        mir_mod.sema_type_d2.push(0)
+    let value_ty = 1
+    if has_glue:
+        mir_mod.sema_dropped_types.insert(value_ty, 1)
+    var body = MirBody.init_for_fn(1)
+    let value_local = body.new_temp(value_ty)
+    let value = body.new_place(value_local)
+    body.owned_cleanup_locals.push(value_local)
+    let taken_local = body.new_temp(value_ty)
+    let taken = body.new_place(taken_local)
+    let out_local = body.new_temp(value_ty)
+    let out = body.new_place(out_local)
+    let entry = body.new_block()
+    let no_fields: Vec[i32] = Vec.new()
+    let no_field_table = body.new_agg_fields(&no_fields, &no_fields)
+    let init = body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, no_field_table, 0)
+    let take_op = body.new_operand(OperandKind.OK_MOVE, value)
+    let take = body.new_rvalue(RvalueKind.RK_USE, take_op, 0, 0)
+    let read_op = body.new_operand(OperandKind.OK_COPY, value)
+    let read = body.new_rvalue(RvalueKind.RK_USE, read_op, 0, 0)
+    body.push_stmt(entry, StmtKind.StorageLive, value_local, 0, 0)
+    body.push_stmt(entry, StmtKind.Assign, value, init, 0)
+    if read_after_move:
+        body.push_stmt(entry, StmtKind.Assign, taken, take, 0)
+    body.push_stmt(entry, StmtKind.Assign, out, read, 0)
+    body.set_terminator(entry, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    validate_ownership_body(mir_mod, body)
+
+pub fn mir_test_moved_owned_read:
+    assert(moved_owned_read_verdict(true, true).contains("read of _1, which every path reaching it already moved out"))
+    assert(not moved_owned_read_verdict(false, true).contains("already moved out"))
+    assert(not moved_owned_read_verdict(true, false).contains("already moved out"))
+
