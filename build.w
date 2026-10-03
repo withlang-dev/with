@@ -2582,6 +2582,9 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
     // Init for the caller to drop; the ownership validator called it a leak.
     if deep_debug_analyze_expect(ctx, root, compiler, build_project_abs(root, "test/behavior/behav_1822_mut_receiver_replaced_whole.w"), out_dir, "analyze-audit-receiver-replaced", "audit:all", "violations=0 ok") != 0:
         return 1
+    // #2049: `text =~ re` observes a compiled Regex; it moved `re` on every match.
+    if deep_debug_tool_expect(ctx, root, compiler, build_project_abs(root, "test/debug_alloc/da_2049_regex_captures_dropped.w"), out_dir, "validate-ownership-regex-observed", "--validate-ownership", "", "validate-ownership: ok") != 0:
+        return 1
     // #2049: a module global's runtime initializer emitted after a facade
     // method inherited that function's by-address local map; audit:all
     // names the disagreement (mode-provenance).

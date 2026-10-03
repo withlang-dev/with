@@ -3342,7 +3342,11 @@ impl MirBuilder:
     // local into a temp, so after the first `/g` iteration the subject was
     // reset-on-move blanked and every later match saw "". One rule for every
     // =~ lowering site (expr, if-cond, while-cond); rvalue subjects still
-    // materialize into a stmt temp.
+    // materialize into a stmt temp. The regex operand is observed the same
+    // way (captures_match_op takes &self): a named compiled Regex lowered
+    // through lower_expr moved into a statement temp that died with the
+    // condition, so the first `text =~ re` freed `re` and the second
+    // matched against its reset blank (#2049).
     mut fn lower_regex_subject_place(lhs: i32) -> i32:
         let lhs_kind = self.ast.kind(lhs)
         if lhs_kind == NodeKind.NK_IDENT or lhs_kind == NodeKind.NK_FIELD_ACCESS:
@@ -3357,9 +3361,7 @@ impl MirBuilder:
         let lhs = self.ast.get_data0(node)
         let rhs = self.ast.get_data1(node)
         let text_place = self.lower_regex_subject_place(lhs)
-        let regex_op = self.lower_expr(rhs)
-        let regex_ty = self.expr_type(rhs)
-        let regex_place = self.materialize_operand(regex_op, regex_ty, self.ast.get_start(rhs))
+        let regex_place = self.lower_regex_subject_place(rhs)
         let captures_opt_place = self.lower_regex_captures_places(regex_place, text_place)
         // #2049: a value `=~` binds no captures; the Option it tested is a
         // statement temporary and drops with the statement.
@@ -7693,9 +7695,7 @@ impl MirBuilder:
             let lhs = self.ast.get_data0(cond_expr)
             let rhs = self.ast.get_data1(cond_expr)
             let regex_text_place = self.lower_regex_subject_place(lhs)
-            let regex_op = self.lower_expr(rhs)
-            let regex_ty = self.expr_type(rhs)
-            let regex_capture_place = self.materialize_operand(regex_op, regex_ty, self.ast.get_start(rhs))
+            let regex_capture_place = self.lower_regex_subject_place(rhs)
             regex_captures_opt_place = self.lower_regex_captures_places(regex_capture_place, regex_text_place)
             cond_op = self.lower_option_is_some_place(regex_captures_opt_place, self.regex_captures_option_type())
             if self.ast.kind(rhs) == NodeKind.NK_REGEX_LIT:
@@ -7980,9 +7980,7 @@ impl MirBuilder:
             let lhs = self.ast.get_data0(cond_expr)
             let rhs = self.ast.get_data1(cond_expr)
             let text_place = self.lower_regex_subject_place(lhs)
-            let regex_op = self.lower_expr(rhs)
-            let regex_ty = self.expr_type(rhs)
-            let regex_place = self.materialize_operand(regex_op, regex_ty, self.ast.get_start(rhs))
+            let regex_place = self.lower_regex_subject_place(rhs)
             regex_captures_opt_place = self.lower_regex_captures_places(regex_place, text_place)
             cond_op = self.lower_option_is_some_place(regex_captures_opt_place, self.regex_captures_option_type())
             if self.ast.kind(rhs) == NodeKind.NK_REGEX_LIT:
