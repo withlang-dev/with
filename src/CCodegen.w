@@ -1350,8 +1350,28 @@ impl CCodegen:
     // `variant_index`: the variant's member itself when it has one field,
     // else that field of the variant's payload struct (#2017).
     fn payload_enum_field_path(enum_tid: i32, variant_index: i32, field_idx: i32) -> str:
-        let member = "." ++ self.payload_enum_variant_field(variant_index)
+        let member = self.enum_payload_member(enum_tid, variant_index)
         if self.sema.type_reflection_variant_payload_count(enum_tid, variant_index) == 1: member else: member ++ "." ++ cc_payload_struct_field(field_idx)
+
+    // with-abi.md §3 (#2036): an Option whose payload is one non-null
+    // address (`&T`, `*T`, an extern fn, a std Box) is that nullable
+    // pointer: null is None, a live address is Some. TypeLayout owns the
+    // fact; this backend only spells it.
+    fn option_is_nullable_pointer(tid: i32) -> bool:
+        self.sema.type_layout_option_is_nullable(self.sema.resolve_alias(tid as TypeId) as i32)
+
+    // The member naming variant `variant_index`'s payload: none for a
+    // nullable-pointer Option, whose value is its payload.
+    fn enum_payload_member(enum_tid: i32, variant_index: i32) -> str:
+        if self.option_is_nullable_pointer(enum_tid): "" else: "." ++ self.payload_enum_variant_field(variant_index)
+
+    // The discriminant of the enum value `expr`.
+    fn enum_tag_text(enum_tid: i32, expr: &str) -> str:
+        if not self.option_is_nullable_pointer(enum_tid):
+            return "(" ++ expr ++ ").tag"
+        let some_disc = self.sema.type_reflection_variant_discriminant(enum_tid, self.payload_enum_named_variant(enum_tid, self.sema.syms.some))
+        let none_disc = self.sema.type_reflection_variant_discriminant(enum_tid, self.payload_enum_named_variant(enum_tid, self.sema.syms.none))
+        f"((" ++ expr ++ f") != 0 ? {some_disc} : {none_disc})"
 
     fn payload_enum_named_variant(enum_tid: i32, variant_sym: i32) -> i32:
         if self.type_is_payload_enum(enum_tid) == 0 or variant_sym == 0:
@@ -1411,6 +1431,10 @@ impl CCodegen:
 
     mut fn payload_enum_literal(enum_tid: i32, variant_index: i32, payload_text: &str) -> str:
         let enum_c = self.c_type(enum_tid, 0)
+        if self.option_is_nullable_pointer(enum_tid):
+            if payload_text.len() == 0 or self.sema.type_reflection_variant_payload_count(enum_tid, variant_index) == 0:
+                return "((" ++ enum_c ++ ")0)"
+            return "((" ++ enum_c ++ ")(" ++ payload_text ++ "))"
         let tag = self.sema.type_reflection_variant_discriminant(enum_tid, variant_index)
         var out = "(" ++ enum_c ++ ")" ++ cc_lbrace() ++ ".tag = " ++ f"{tag}"
         if payload_text.len() > 0:
@@ -1490,7 +1514,7 @@ impl CCodegen:
         while vi >= 0:
             let disc = self.sema.type_reflection_variant_discriminant(enum_tid, vi)
             let case_text = self.payload_enum_variant_format_expr(enum_tid, expr, vi, context)
-            out = "((" ++ expr ++ ").tag == " ++ f"{disc}" ++ " ? " ++ case_text ++ " : " ++ out ++ ")"
+            out = "((" ++ self.enum_tag_text(enum_tid, expr) ++ ") == " ++ f"{disc}" ++ " ? " ++ case_text ++ " : " ++ out ++ ")"
             if vi == 0:
                 break
             vi = vi - 1
@@ -2227,6 +2251,9 @@ impl CCodegen:
             if box_pointee != 0:
                 let pointee = self.c_type(box_pointee, 0)
                 return if pointee == "void": "uint8_t*" else: pointee ++ "*"
+            // with-abi §3 (#2036): the nullable pointer is its payload's type.
+            if self.option_is_nullable_pointer(resolved as i32):
+                return self.c_type(self.sema.get_generic_inst_arg(resolved as i32, 0), 0)
             if self.type_is_payload_enum(resolved as i32) != 0:
                 return self.struct_c_name(resolved)
             // Other generic types: treat as opaque struct
@@ -2456,6 +2483,8 @@ impl CCodegen:
     fn tid_is_c_struct_value(tid: i32) -> bool:
         let resolved = self.sema.resolve_alias(tid as TypeId) as i32
         let kind = self.sema.get_type_kind(resolved as TypeId)
+        if self.option_is_nullable_pointer(resolved):
+            return false
         kind == TypeKind.TY_STRUCT or kind == TypeKind.TY_TUPLE or self.type_is_payload_enum(resolved) != 0 or self.generic_inst_is_declared_struct(resolved)
 
     // A field of a generic instance: a declared struct's own field, or a
@@ -3332,7 +3361,7 @@ impl CCodegen:
                         continue
                     // A trailing downcast names the variant's payload member:
                     // its one field, or its payload struct (#2017).
-                    out = out ++ "." ++ self.payload_enum_variant_field(pd)
+                    out = out ++ self.enum_payload_member(current_tid, pd)
                     current_tid = if payload_count == 1: self.sema.type_reflection_variant_payload_type_frozen(current_tid, pd, 0) else: 0
                     continue
                 out = f"{out}/*downcast{pd}*/"
@@ -3898,7 +3927,7 @@ impl CCodegen:
                 return "((" ++ dst_c ++ "){ (uint8_t*)((" ++ src ++ ").ptr), with_len(" ++ src ++ ") })"
             return "((" ++ dst_c ++ ")(" ++ src ++ "))"
         if rk == RvalueKind.RK_DISCRIMINANT:
-            return "(" ++ self.place_text(body, d0) ++ ").tag"
+            return self.enum_tag_text(self.place_tid(body, d0), self.place_text(body, d0))
         if rk == RvalueKind.RK_LEN:
             let p = self.place_text(body, d0)
             let pt = self.place_tid(body, d0)
@@ -7030,7 +7059,7 @@ impl CCodegen:
                     self.fail("Option.is_some expects an enum with one payload-bearing variant")
                     return "    abort();"
                 let tag = self.sema.type_reflection_variant_discriminant(opt_tid, some_variant)
-                test_text = "((" ++ opt_text ++ ").tag == " ++ f"{tag}" ++ ")"
+                test_text = "(" ++ self.enum_tag_text(opt_tid, opt_text) ++ " == " ++ f"{tag}" ++ ")"
             var out = ""
             if has_ret != 0:
                 out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = " ++ test_text ++ ";\n"
@@ -7082,14 +7111,13 @@ impl CCodegen:
                     // D61: the error's `:?` form when it has one — the LLVM
                     // backend's gen_unwrap_err_message builds the same text.
                     if err_payload_count > 0 and self.debug_form_available(err_tid):
-                        let err_field = self.payload_enum_variant_field(err_variant)
-                        let err_debug = self.debug_format_expr(err_tid, carrier_text ++ "." ++ err_field, "Result.unwrap/expect")
+                        let err_debug = self.debug_format_expr(err_tid, carrier_text ++ self.enum_payload_member(carrier_tid, err_variant), "Result.unwrap/expect")
                         let prefix = if is_expect: user_msg else: "WITH_STR_LIT(\"called unwrap on Err\")"
                         panic_msg = "with_str_concat_ref(with_str_concat_ref(" ++ prefix ++ ", WITH_STR_LIT(\": \")), " ++ err_debug ++ ")"
                     else:
                         panic_msg = if is_expect: user_msg else: "WITH_STR_LIT(\"called unwrap on Err\")"
-                var out = "    if ((" ++ carrier_text ++ ").tag != " ++ f"{ok_tag}" ++ ") with_panic(" ++ panic_msg ++ ", " ++ loc_text ++ ", 0);\n"
-                let payload_text = carrier_text ++ "." ++ self.payload_enum_variant_field(payload_variant)
+                var out = "    if (" ++ self.enum_tag_text(carrier_tid, carrier_text) ++ " != " ++ f"{ok_tag}" ++ ") with_panic(" ++ panic_msg ++ ", " ++ loc_text ++ ", 0);\n"
+                let payload_text = carrier_text ++ self.enum_payload_member(carrier_tid, payload_variant)
                 if has_ret != 0:
                     if borrowed_carrier:
                         let payload_tid = self.sema.type_reflection_variant_payload_type_frozen(carrier_tid, payload_variant, 0)
@@ -7576,7 +7604,7 @@ impl CCodegen:
                     self.fail("Option.is_none expects an enum with one payload-bearing variant")
                     return "    abort();"
                 let tag = self.sema.type_reflection_variant_discriminant(opt_tid, some_variant)
-                test_text = "((" ++ opt_text ++ ").tag != " ++ f"{tag}" ++ ")"
+                test_text = "(" ++ self.enum_tag_text(opt_tid, opt_text) ++ " != " ++ f"{tag}" ++ ")"
             var out = ""
             if has_ret != 0:
                 out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = " ++ test_text ++ ";\n"
@@ -9048,6 +9076,10 @@ impl CCodegen:
         if resolved == 0:
             return acc
         let tk = self.sema.get_type_kind(resolved)
+        // A nullable-pointer Option has no record of its own (#2036): its
+        // payload's types are what it needs.
+        if self.option_is_nullable_pointer(resolved as i32):
+            return self.collect_struct_types_from_tid(move acc, self.sema.get_generic_inst_arg(resolved as i32, 0))
         if tk == TypeKind.TY_STRUCT or self.type_is_payload_enum(resolved as i32) != 0:
             let cname = self.struct_c_name(resolved as i32)
             if not acc.seen_names.contains(resolved as i32) and not acc.seen_c_names.contains(cname):
@@ -9500,6 +9532,8 @@ impl CCodegen:
                 out = out ++ "    int64_t index;\n"
                 out = out ++ cc_rbrace() ++ ";\n\n"
                 continue
+            if self.option_is_nullable_pointer(resolved as i32):
+                continue
             if self.type_is_payload_enum(resolved as i32) != 0:
                 out = out ++ "struct " ++ name ++ " " ++ cc_lbrace() ++ "\n"
                 out = out ++ "    int32_t tag;\n"
@@ -9595,41 +9629,6 @@ impl CCodegen:
             out = out ++ self.layout_static_asserts(resolved, name, &field_names) ++ "\n"
         out
 
-    // Whether `tid` stores an Option that with-abi §3 makes a nullable
-    // pointer, directly or in a field, element or payload it holds by value.
-    fn record_holds_nullable_option(tid: i32, depth: i32) -> bool:
-        if depth > 32:
-            return false
-        let resolved = self.sema.resolve_alias(tid as TypeId) as i32
-        if self.sema.type_layout_option_is_nullable(resolved):
-            return true
-        let tk = self.sema.get_type_kind(resolved as TypeId)
-        if tk == TypeKind.TY_ARRAY:
-            return self.record_holds_nullable_option(self.sema.get_type_d0(resolved as TypeId), depth + 1)
-        if tk == TypeKind.TY_TUPLE:
-            let start = self.sema.get_type_d0(resolved as TypeId)
-            for ti in 0..self.sema.get_type_d1(resolved as TypeId):
-                if self.record_holds_nullable_option(self.sema.type_extra[(start + ti)], depth + 1):
-                    return true
-            return false
-        if tk == TypeKind.TY_STRUCT:
-            let start = self.sema.get_type_d1(resolved as TypeId)
-            for fi in 0..self.sema.get_type_d2(resolved as TypeId):
-                if self.record_holds_nullable_option(self.sema.type_extra[(start + fi * 3 + 1)], depth + 1):
-                    return true
-            return false
-        if self.type_is_payload_enum(resolved) != 0:
-            for vi in 0..self.sema.type_reflection_variant_count(resolved):
-                for pi in 0..self.sema.type_reflection_variant_payload_count(resolved, vi):
-                    if self.record_holds_nullable_option(self.sema.type_reflection_variant_payload_type_frozen(resolved, vi, pi), depth + 1):
-                        return true
-            return false
-        if tk == TypeKind.TY_GENERIC_INST and self.generic_inst_is_declared_struct(resolved):
-            for fi in 0..self.sema.type_reflection_field_count(resolved):
-                if self.record_holds_nullable_option(self.sema.type_reflection_field_type_frozen(resolved, fi), depth + 1):
-                    return true
-        false
-
     // `union` for a §16.4 union type (all fields at offset 0, TypeLayout's
     // union rule), else `struct`. A union emitted as a struct laid its
     // members end to end: pcre2's class_bits_storage was 64 bytes where the
@@ -9647,11 +9646,6 @@ impl CCodegen:
     // fact the model never registered is not asserted.
     fn layout_static_asserts(tid: i32, c_type: &str, field_names: &Vec[str]) -> str:
         let label = cc_escape_c_string(self.sema.type_name(tid))
-        // #2036: this backend's nullable-pointer Options are tagged structs,
-        // a known divergence from with-abi §3; a record holding one is
-        // checked once that issue gives the Option its pointer form.
-        if self.record_holds_nullable_option(tid, 0):
-            return "/* layout not asserted: holds a nullable-pointer Option (#2036) */\n"
         var out = ""
         let size_opt = self.sema.layout_size_cache.get(tid)
         if size_opt.is_some():
