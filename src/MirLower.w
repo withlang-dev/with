@@ -420,12 +420,18 @@ impl MirBuilder:
             // #916 (§14.7): the callee may have left by a cancellation
             // unwind, its result never written. The caller unwinds in turn
             // before anything reads the result, like the await it sits under.
+            // #2019: a closure-invoking intrinsic stops at that invocation
+            // (codegen reads the mark) and its result holds what earlier
+            // invocations produced; the unwind edge releases it.
+            let releases_result = mir_intrinsic_invokes_closure(self.body.call_intrinsic(d1))
+            if releases_result:
+                self.body.set_call_may_cancel(d1)
             let check_bb = self.new_block()
             self.settle_payload_resets_at_terminator(kind, d2, check_bb)
             self.body.set_terminator(self.cur_bb, kind, d0, d1, d2, check_bb, span)
             self.mark_no_suspend_terminator()
             self.switch_to(check_bb)
-            self.emit_cancelled_return_check(d2, d3)
+            self.emit_cancelled_return_check(d2, d3, releases_result)
             return
         self.settle_payload_resets_at_terminator(kind, d2, d3)
         self.body.set_terminator(self.cur_bb, kind, d0, d1, d2, d3, span)
@@ -440,6 +446,11 @@ impl MirBuilder:
     // for the call's AST node.
     fn call_may_cancel_return(callee_op: i32, call_id: i32) -> bool:
         let intrinsic = self.body.call_intrinsic(call_id)
+        // #2019: `xs.map(f)`, `xs.fold(init, f)`: the intrinsic invokes the
+        // closure on this fiber, so Sema's call-site fact decides.
+        if mir_intrinsic_invokes_closure(intrinsic):
+            let closure_call_node = self.body.call_ast_node(call_id)
+            return closure_call_node > 0 and self.sema.call_site_may_suspend(closure_call_node)
         if intrinsic != MirIntrinsic.NONE and intrinsic != MirIntrinsic.GENERIC_CALL and intrinsic != MirIntrinsic.DYN_CALL:
             return false
         let ast_node = self.body.call_ast_node(call_id)
@@ -10611,7 +10622,7 @@ impl MirBuilder:
     // return. (#1293: a select loser parked in recv() never unwound.)
     mut fn emit_wait_cancel_check():
         let continue_bb = self.new_block()
-        self.emit_cancelled_return_check(-1, continue_bb)
+        self.emit_cancelled_return_check(-1, continue_bb, false)
         self.switch_to(continue_bb)
 
     // The fiber's cancelled-return flag (set by every cancellation unwind,
@@ -10619,7 +10630,9 @@ impl MirBuilder:
     // place the just-returned call would have written (-1: none): on the
     // unwind edge it holds no value, so it must not be one this function
     // already owns and would drop.
-    mut fn emit_cancelled_return_check(dest: i32, continue_bb: i32):
+    // `release_dest` (#2019): the call left a valid partial result in `dest`
+    // (a closure-invoking intrinsic stopped early); the unwind edge drops it.
+    mut fn emit_cancelled_return_check(dest: i32, continue_bb: i32, release_dest: bool):
         if dest >= 0 and dest < self.body.place_locals.len():
             let dest_local: i32 = self.body.place_locals[dest]
             for di in 0..self.drop_local_ids.len():
@@ -10643,6 +10656,8 @@ impl MirBuilder:
         let ic_op = self.body.new_operand(OperandKind.OK_COPY, ic_place)
         self.terminate(TermKind.TK_SWITCH_INT, ic_op, sw, unwind_bb, 0)
         self.switch_to(unwind_bb)
+        if release_dest and dest >= 0 and dest < self.body.place_locals.len() and self.sema.type_needs_drop_frozen(self.local_type(self.body.place_locals[dest])) != 0:
+            self.emit_drop_stmt(dest, "cancel-unwind", 0)
         self.emit_cancelled_return()
 
     // Join a Task purely for cleanup: await completion and free its result buffer,

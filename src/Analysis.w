@@ -947,7 +947,7 @@ fn analysis_audit_call_contracts(report: &AnalysisReport, sema: &Sema, mir_mod: 
     for bi in 0..mir_mod.bodies.len() as i32:
         let body = &mir_mod.bodies[bi]
         let calls = body.call_arg_starts.len() as i32
-        if body.call_arg_counts.len() as i32 != calls or body.call_intrinsic_kinds.len() as i32 != calls or body.call_ast_nodes.len() as i32 != calls or body.call_sig_indices.len() as i32 != calls or body.call_mono_syms.len() as i32 != calls or body.call_contract_required.len() as i32 != calls or body.call_pipeline_receiver_places.len() as i32 != calls or body.call_machinery_dispatch.len() as i32 != calls:
+        if body.call_arg_counts.len() as i32 != calls or body.call_intrinsic_kinds.len() as i32 != calls or body.call_ast_nodes.len() as i32 != calls or body.call_sig_indices.len() as i32 != calls or body.call_mono_syms.len() as i32 != calls or body.call_contract_required.len() as i32 != calls or body.call_pipeline_receiver_places.len() as i32 != calls or body.call_machinery_dispatch.len() as i32 != calls or body.call_may_cancel.len() as i32 != calls:
             report.fail(f"body {body.fn_sym}: MIR call tables are not parallel")
             continue
         for ci in 0..calls:

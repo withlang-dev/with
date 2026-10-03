@@ -14465,6 +14465,23 @@ impl Codegen:
         wl_position_at_end(self.builder, end_bb)
         wl_build_load(self.builder, tuple_ty, out_ptr)
 
+    // #2019 (§14.7): after an intrinsic invokes a closure that may suspend
+    // (MIR marked the call: Sema's call_site_may_suspend), a cancellation
+    // unwind inside it left no value. Leave the loop to `exit_bb` before that
+    // value is used: the result holds only what earlier invocations produced,
+    // and the caller's cancelled-return check releases it.
+    mut fn mir_emit_closure_cancel_exit(body: &MirBody, args_id: i32, exit_bb: i64):
+        if not body.call_is_may_cancel(args_id):
+            return
+        var wc_fn = wl_get_named_function(self.llmod, "with_fiber_wait_cancelled")
+        if wc_fn == 0:
+            let wcft = wl_function_type(wl_i32_type(self.context), 0, 0, 0)
+            wc_fn = wl_add_function(self.llmod, "with_fiber_wait_cancelled", wcft)
+        let wc = wl_build_call(self.builder, wl_global_get_value_type(wc_fn), wc_fn, 0, 0)
+        let cont = wl_append_bb(self.context, self.current_function, "cl.ok")
+        wl_build_cond_br(self.builder, wl_build_icmp(self.builder, wl_int_ne(), wc, wl_const_int(wl_i32_type(self.context), 0, 0)), exit_bb, cont)
+        wl_position_at_end(self.builder, cont)
+
     mut fn mir_emit_vec_map(body: &MirBody, args_id: i32) -> i64:
         let i64_ty = wl_i64_type(self.context)
         let i32_ty = wl_i32_type(self.context)
@@ -14552,6 +14569,7 @@ impl Codegen:
         ca.push(self.closure_abi_arg(elem_ty, el))
         let cc = if is_fat != 0: 2 else: 1
         let rv = wl_build_call(self.builder, fn_ty, fn_ptr, vec_data_i64(&ca), cc)
+        self.mir_emit_closure_cancel_exit(body, args_id, eb)
         wl_build_store(self.builder, rv, tmp)
         let pf = self.ensure_vec_runtime_fn("with_vec_push", void_ty, 2)
         let pt = self.get_vec_fn_type("with_vec_push", void_ty, 2)
@@ -14642,6 +14660,7 @@ impl Codegen:
         ca.push(self.closure_abi_arg(elem_ty, el))
         let cc = if is_fat != 0: 2 else: 1
         let pred = wl_build_call(self.builder, fn_ty, fn_ptr, vec_data_i64(&ca), cc)
+        self.mir_emit_closure_cancel_exit(body, args_id, eb)
         wl_build_cond_br(self.builder, wl_build_icmp(self.builder, wl_int_ne(), pred, wl_const_int(wl_type_of(pred), 0, 0)), pb, ib)
         wl_position_at_end(self.builder, pb)
         wl_build_store(self.builder, el, tmp)
@@ -14768,6 +14787,7 @@ impl Codegen:
         ca.push(self.closure_abi_arg(elem_ty, el))
         let cc = if is_fat != 0: 3 else: 2
         let nv = wl_build_call(self.builder, fn_ty, fn_ptr, vec_data_i64(&ca), cc)
+        self.mir_emit_closure_cancel_exit(body, args_id, eb)
         wl_build_store(self.builder, nv, aa)
         wl_build_br(self.builder, ib)
         wl_position_at_end(self.builder, ib)
