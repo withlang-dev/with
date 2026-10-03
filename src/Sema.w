@@ -1567,6 +1567,8 @@ pub type Sema {
     method_owner_keys: HashMap[i32, i32],
     // #2043: each builtin call's CallBuiltin, by call node.
     call_builtins: HashMap[i32, i32],
+    // #2043: each builtin method call's MirIntrinsic, keyed (instance, node).
+    method_intrinsics: HashMap[i64, i32],
 
     // C11 6.5.2.2p6-7: the type each argument of a call to a C function is
     // passed as after the default argument promotions, keyed by the call
@@ -3336,6 +3338,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         discard_place_lets: sema_new_map_i32_i32(),
         method_owner_keys: sema_new_map_i32_i32(),
         call_builtins: sema_new_map_i32_i32(),
+        method_intrinsics: sema_new_map_i64_i32(),
 
         c_promoted_arg_starts: sema_new_map_i32_i32(),
         c_promoted_arg_data: Vec.new(),

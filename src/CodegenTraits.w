@@ -1824,7 +1824,7 @@ impl Codegen:
             if self.pool.kind(callee) == NodeKind.NK_FIELD_ACCESS:
                 let recv = self.pool.get_data0(callee)
                 let method_sym = self.pool.get_data1(callee)
-                let intrinsic = self.classify_generic_call_intrinsic(self.ast_static_type_expr(recv), method_sym)
+                let intrinsic = self.sema.method_intrinsic_in_body(0, node)
                 if self.is_collection_runtime_intrinsic(intrinsic):
                     return true
                 if self.module_const_contains_runtime_collection(recv):

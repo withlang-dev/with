@@ -8209,297 +8209,6 @@ impl Codegen:
             found_trait = trait_sym
         found_decl
 
-    fn classify_generic_call_intrinsic(recv_type: i32, method_sym: i32) -> MirIntrinsic:
-        if recv_type == 0 or method_sym == 0:
-            return MirIntrinsic.NONE
-        let resolved = self.mir_unwrap_ref_like_sema_type(recv_type)
-        var tk = self.mir_type_kind_at(resolved)
-        if tk == 0 and resolved >= self.mir_type_kinds_len() as i32 and resolved > 0:
-            tk = self.sema.get_type_kind(self.sema.resolve_alias(resolved as TypeId))
-        let method_full_name = self.codegen_method_symbol_text(method_sym)
-        var method_name = with_str_clone_ref(method_full_name)
-        for method_dot_i in 0..method_full_name.len() as i32:
-            if method_full_name[method_dot_i] == 46:
-                method_name = method_full_name.slice((method_dot_i + 1) as i64, method_full_name.len() as i64)
-                break
-        if tk == TypeKind.TY_STR:
-            let str_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.STR_LEN, method_name)
-            if str_len_intrinsic != MirIntrinsic.NONE:
-                return str_len_intrinsic
-            if method_name == "byte_at": return MirIntrinsic.STR_BYTE_AT
-            if method_name == "slice": return MirIntrinsic.STR_SLICE
-            if method_name == "contains": return MirIntrinsic.STR_CONTAINS
-            if method_name == "starts_with": return MirIntrinsic.STR_STARTS_WITH
-            if method_name == "ends_with": return MirIntrinsic.STR_ENDS_WITH
-            if method_name == "find": return MirIntrinsic.STR_FIND
-            if method_name == "split": return MirIntrinsic.STR_SPLIT
-            if method_name == "trim": return MirIntrinsic.STR_TRIM
-            if method_name == "to_upper" or method_name == "upper": return MirIntrinsic.STR_TO_UPPER
-            if method_name == "to_lower" or method_name == "lower": return MirIntrinsic.STR_TO_LOWER
-            if method_name == "replace": return MirIntrinsic.STR_REPLACE
-            if method_name == "index_of": return MirIntrinsic.STR_INDEX_OF
-            if method_name == "repeat": return MirIntrinsic.STR_REPEAT
-            return MirIntrinsic.NONE
-        if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE:
-            let arr_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.ARR_LEN, method_name)
-            if arr_len_intrinsic != MirIntrinsic.NONE:
-                return arr_len_intrinsic
-            if method_name == "split_at": return MirIntrinsic.SPLIT_AT
-            if method_name == "split_at_mut": return MirIntrinsic.SPLIT_AT_MUT
-            return MirIntrinsic.NONE
-        var type_name_sym = 0
-        if tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ENUM or tk == TypeKind.TY_GENERIC_INST:
-            if resolved > 0 and resolved < self.mir_type_kinds_len() as i32:
-                type_name_sym = self.mir_type_d0_at(resolved)
-            else:
-                type_name_sym = self.sema.get_type_d0(resolved as TypeId)
-        if type_name_sym == 0:
-            return MirIntrinsic.NONE
-        var type_name = self.sema_symbol_text(type_name_sym)
-        if type_name.len() == 0:
-            type_name = with_str_clone_ref(self.intern.resolve(type_name_sym))
-        if type_name == "Vec":
-            if method_name == "new": return MirIntrinsic.VEC_NEW
-            if method_name == "with_capacity": return MirIntrinsic.VEC_WITH_CAPACITY
-            if method_name == "push": return MirIntrinsic.VEC_PUSH
-            if method_name == "get": return MirIntrinsic.VEC_GET
-            if method_name == "is_empty": return MirIntrinsic.VEC_IS_EMPTY
-            let vec_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.VEC_LEN, method_name)
-            if vec_len_intrinsic != MirIntrinsic.NONE: return vec_len_intrinsic
-            if method_name == "remove": return MirIntrinsic.VEC_REMOVE
-            if method_name == "clear": return MirIntrinsic.VEC_CLEAR
-            if method_name == "pop": return MirIntrinsic.VEC_POP
-            if method_name == "iter": return MirIntrinsic.VEC_ITER
-            if method_name == "iter_ref": return MirIntrinsic.VEC_ITER_REF
-            if method_name == "slot": return MirIntrinsic.VEC_SLOT
-            if method_name == "get_disjoint": return MirIntrinsic.VEC_GET_DISJOINT
-            if method_name == "range": return MirIntrinsic.VEC_RANGE
-            if method_name == "split_at": return MirIntrinsic.SPLIT_AT
-            if method_name == "split_at_mut": return MirIntrinsic.SPLIT_AT_MUT
-            if method_name == "iter_place": return MirIntrinsic.VEC_ITER_PLACE
-            if method_name == "map": return MirIntrinsic.VEC_MAP
-            if method_name == "filter": return MirIntrinsic.VEC_FILTER
-            if method_name == "fold": return MirIntrinsic.VEC_FOLD
-            if method_name == "contains": return MirIntrinsic.VEC_CONTAINS
-            if method_name == "join": return MirIntrinsic.VEC_JOIN
-            return MirIntrinsic.NONE
-        if type_name == "FixedString" or type_name.starts_with("FixedString__"):
-            if method_name == "new": return MirIntrinsic.FIXED_STRING_NEW
-            if method_name == "len": return MirIntrinsic.FIXED_STRING_LEN
-            if method_name == "len_i32": return MirIntrinsic.FIXED_STRING_LEN32
-            if method_name == "len_i64": return MirIntrinsic.FIXED_STRING_LEN64
-            if method_name == "capacity": return MirIntrinsic.FIXED_STRING_CAPACITY
-            if method_name == "is_empty": return MirIntrinsic.FIXED_STRING_IS_EMPTY
-            if method_name == "clear": return MirIntrinsic.FIXED_STRING_CLEAR
-            if method_name == "push_byte": return MirIntrinsic.FIXED_STRING_PUSH_BYTE
-            if method_name == "push_str": return MirIntrinsic.FIXED_STRING_PUSH_STR
-            if method_name == "as_view": return MirIntrinsic.FIXED_STRING_AS_VIEW
-            if method_name == "equals": return MirIntrinsic.FIXED_STRING_EQUALS
-            return MirIntrinsic.NONE
-        if type_name == "VecIter" or type_name == "VecIterRef":
-            if method_name == "next":
-                if type_name == "VecIterRef": return MirIntrinsic.VECITERREF_NEXT
-                return MirIntrinsic.VECITER_NEXT
-            if method_name == "map": return MirIntrinsic.ITER_MAP
-            if method_name == "filter": return MirIntrinsic.ITER_FILTER
-            if method_name == "filter_map": return MirIntrinsic.ITER_FILTER_MAP
-            if method_name == "take": return MirIntrinsic.ITER_TAKE
-            if method_name == "drop": return MirIntrinsic.ITER_DROP
-            if method_name == "take_while": return MirIntrinsic.ITER_TAKE_WHILE
-            if method_name == "drop_while": return MirIntrinsic.ITER_DROP_WHILE
-            if method_name == "zip": return MirIntrinsic.ITER_ZIP
-            if method_name == "enumerate": return MirIntrinsic.ITER_ENUMERATE
-            if method_name == "chain": return MirIntrinsic.ITER_CHAIN
-            if method_name == "zip_with": return MirIntrinsic.ITER_ZIP_WITH
-            if method_name == "step_by": return MirIntrinsic.ITER_STEP_BY
-            if method_name == "flat_map": return MirIntrinsic.ITER_FLAT_MAP
-            if method_name == "fold": return MirIntrinsic.ITER_FOLD
-            if method_name == "reduce": return MirIntrinsic.ITER_REDUCE
-            if method_name == "sum": return MirIntrinsic.ITER_SUM
-            if method_name == "product": return MirIntrinsic.ITER_PRODUCT
-            if method_name == "min": return MirIntrinsic.ITER_MIN
-            if method_name == "max": return MirIntrinsic.ITER_MAX
-            if method_name == "min_by": return MirIntrinsic.ITER_MIN_BY
-            if method_name == "max_by": return MirIntrinsic.ITER_MAX_BY
-            if method_name == "find": return MirIntrinsic.ITER_FIND
-            if method_name == "position": return MirIntrinsic.ITER_POSITION
-            if method_name == "any": return MirIntrinsic.ITER_ANY
-            if method_name == "all": return MirIntrinsic.ITER_ALL
-            if method_name == "none": return MirIntrinsic.ITER_NONE
-            if method_name == "for_each": return MirIntrinsic.ITER_FOR_EACH
-            if method_name == "count": return MirIntrinsic.ITER_COUNT
-            if method_name == "collect": return MirIntrinsic.ITER_COLLECT
-            if method_name == "partition": return MirIntrinsic.ITER_PARTITION
-            if method_name == "unzip": return MirIntrinsic.ITER_UNZIP
-            return MirIntrinsic.NONE
-        if type_name == "MapIter" or type_name == "FilterIter" or type_name == "FilterMapIter" or type_name == "TakeIter" or type_name == "DropIter" or type_name == "TakeWhileIter" or type_name == "DropWhileIter" or type_name == "ZipIter" or type_name == "EnumerateIter" or type_name == "ChainIter" or type_name == "ZipWithIter" or type_name == "StepByIter" or type_name == "FlatMapIter":
-            if method_name == "next":
-                if type_name == "MapIter": return MirIntrinsic.MAPITER_NEXT
-                if type_name == "FilterIter": return MirIntrinsic.FILTERITER_NEXT
-                if type_name == "FilterMapIter": return MirIntrinsic.FILTERMAPITER_NEXT
-                if type_name == "TakeIter": return MirIntrinsic.TAKEITER_NEXT
-                if type_name == "DropIter": return MirIntrinsic.DROPITER_NEXT
-                if type_name == "TakeWhileIter": return MirIntrinsic.TAKEWHILEITER_NEXT
-                if type_name == "DropWhileIter": return MirIntrinsic.DROPWHILEITER_NEXT
-                if type_name == "ZipIter": return MirIntrinsic.ZIPITER_NEXT
-                if type_name == "EnumerateIter": return MirIntrinsic.ENUMERATEITER_NEXT
-                if type_name == "ChainIter": return MirIntrinsic.CHAINITER_NEXT
-                if type_name == "ZipWithIter": return MirIntrinsic.ZIPWITHITER_NEXT
-                if type_name == "StepByIter": return MirIntrinsic.STEPBYITER_NEXT
-                if type_name == "FlatMapIter": return MirIntrinsic.FLATMAPITER_NEXT
-            if method_name == "map": return MirIntrinsic.ITER_MAP
-            if method_name == "filter": return MirIntrinsic.ITER_FILTER
-            if method_name == "filter_map": return MirIntrinsic.ITER_FILTER_MAP
-            if method_name == "take": return MirIntrinsic.ITER_TAKE
-            if method_name == "drop": return MirIntrinsic.ITER_DROP
-            if method_name == "take_while": return MirIntrinsic.ITER_TAKE_WHILE
-            if method_name == "drop_while": return MirIntrinsic.ITER_DROP_WHILE
-            if method_name == "zip": return MirIntrinsic.ITER_ZIP
-            if method_name == "enumerate": return MirIntrinsic.ITER_ENUMERATE
-            if method_name == "chain": return MirIntrinsic.ITER_CHAIN
-            if method_name == "zip_with": return MirIntrinsic.ITER_ZIP_WITH
-            if method_name == "step_by": return MirIntrinsic.ITER_STEP_BY
-            if method_name == "flat_map": return MirIntrinsic.ITER_FLAT_MAP
-            if method_name == "fold": return MirIntrinsic.ITER_FOLD
-            if method_name == "reduce": return MirIntrinsic.ITER_REDUCE
-            if method_name == "sum": return MirIntrinsic.ITER_SUM
-            if method_name == "product": return MirIntrinsic.ITER_PRODUCT
-            if method_name == "min": return MirIntrinsic.ITER_MIN
-            if method_name == "max": return MirIntrinsic.ITER_MAX
-            if method_name == "min_by": return MirIntrinsic.ITER_MIN_BY
-            if method_name == "max_by": return MirIntrinsic.ITER_MAX_BY
-            if method_name == "find": return MirIntrinsic.ITER_FIND
-            if method_name == "position": return MirIntrinsic.ITER_POSITION
-            if method_name == "any": return MirIntrinsic.ITER_ANY
-            if method_name == "all": return MirIntrinsic.ITER_ALL
-            if method_name == "none": return MirIntrinsic.ITER_NONE
-            if method_name == "for_each": return MirIntrinsic.ITER_FOR_EACH
-            if method_name == "count": return MirIntrinsic.ITER_COUNT
-            if method_name == "collect": return MirIntrinsic.ITER_COLLECT
-            if method_name == "partition": return MirIntrinsic.ITER_PARTITION
-            if method_name == "unzip": return MirIntrinsic.ITER_UNZIP
-            return MirIntrinsic.NONE
-        if type_name == "VecSlot":
-            if method_name == "get": return MirIntrinsic.VECSLOT_GET
-            if method_name == "set": return MirIntrinsic.VECSLOT_SET
-            return MirIntrinsic.NONE
-        if type_name == "SlotMap":
-            if method_name == "new": return MirIntrinsic.SLOTMAP_NEW
-            if method_name == "insert": return MirIntrinsic.SLOTMAP_INSERT
-            if method_name == "get": return MirIntrinsic.SLOTMAP_GET
-            if method_name == "slot": return MirIntrinsic.SLOTMAP_SLOT
-            if method_name == "remove": return MirIntrinsic.SLOTMAP_REMOVE
-            if method_name == "replace": return MirIntrinsic.SLOTMAP_REPLACE
-            if method_name == "contains": return MirIntrinsic.SLOTMAP_CONTAINS
-            let slotmap_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.SLOTMAP_LEN, method_name)
-            if slotmap_len_intrinsic != MirIntrinsic.NONE: return slotmap_len_intrinsic
-            if method_name == "get_disjoint": return MirIntrinsic.SLOTMAP_GET_DISJOINT
-            return MirIntrinsic.NONE
-        if type_name == "SlotMapSlot":
-            if method_name == "get": return MirIntrinsic.SLOTMAPSLOT_GET
-            if method_name == "set": return MirIntrinsic.SLOTMAPSLOT_SET
-            return MirIntrinsic.NONE
-        if type_name == "VecRange":
-            if method_name == "get": return MirIntrinsic.VECRANGE_GET
-            if method_name == "set": return MirIntrinsic.VECRANGE_SET
-            if method_name == "split_at": return MirIntrinsic.SPLIT_AT
-            if method_name == "split_at_mut": return MirIntrinsic.SPLIT_AT_MUT
-            let vecrange_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.VECRANGE_LEN, method_name)
-            if vecrange_len_intrinsic != MirIntrinsic.NONE: return vecrange_len_intrinsic
-            return MirIntrinsic.NONE
-        if type_name == "VecIterPlace":
-            if method_name == "next": return MirIntrinsic.VECITERPLACE_NEXT
-            return MirIntrinsic.NONE
-        if type_name == "HashMap":
-            if method_name == "new": return MirIntrinsic.MAP_NEW
-            if method_name == "insert": return MirIntrinsic.MAP_INSERT
-            if method_name == "get": return MirIntrinsic.MAP_GET
-            if method_name == "contains": return MirIntrinsic.MAP_CONTAINS
-            let map_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.MAP_LEN, method_name)
-            if map_len_intrinsic != MirIntrinsic.NONE: return map_len_intrinsic
-            if method_name == "remove": return MirIntrinsic.MAP_REMOVE
-            if method_name == "clear": return MirIntrinsic.MAP_CLEAR
-            if method_name == "increment": return MirIntrinsic.MAP_INCREMENT
-            if method_name == "decrement": return MirIntrinsic.MAP_DECREMENT
-            if method_name == "update": return MirIntrinsic.MAP_UPDATE
-            if method_name == "keys": return MirIntrinsic.MAP_KEYS
-            if method_name == "values": return MirIntrinsic.MAP_VALUES
-            if method_name == "items": return MirIntrinsic.MAP_ITEMS
-            if method_name == "entry": return MirIntrinsic.MAP_ENTRY
-            return MirIntrinsic.NONE
-        if type_name == "HashMapEntry":
-            if method_name == "or_insert": return MirIntrinsic.ENTRY_OR_INSERT
-            if method_name == "get": return MirIntrinsic.ENTRY_GET
-            if method_name == "set": return MirIntrinsic.ENTRY_SET
-            return MirIntrinsic.NONE
-        if type_name == "HashSet":
-            if method_name == "new": return MirIntrinsic.MAP_NEW
-            if method_name == "insert": return MirIntrinsic.MAP_INSERT
-            if method_name == "contains": return MirIntrinsic.MAP_CONTAINS
-            let set_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.MAP_LEN, method_name)
-            if set_len_intrinsic != MirIntrinsic.NONE: return set_len_intrinsic
-            if method_name == "remove": return MirIntrinsic.MAP_REMOVE
-            if method_name == "clear": return MirIntrinsic.MAP_CLEAR
-            return MirIntrinsic.NONE
-        if type_name == "Option":
-            if method_name == "unwrap": return MirIntrinsic.OPT_UNWRAP
-            if method_name == "expect": return MirIntrinsic.OPT_EXPECT
-            if method_name == "is_some": return MirIntrinsic.OPT_IS_SOME
-            if method_name == "is_none": return MirIntrinsic.OPT_IS_NONE
-            return MirIntrinsic.NONE
-        if type_name == "Channel":
-            if method_name == "new": return MirIntrinsic.CHAN_CREATE
-            return MirIntrinsic.NONE
-        if type_name == "Sender":
-            if method_name == "send": return MirIntrinsic.CHAN_SEND
-            if method_name == "close": return MirIntrinsic.CHAN_CLOSE
-            return MirIntrinsic.NONE
-        if type_name == "Receiver":
-            if method_name == "recv": return MirIntrinsic.CHAN_RECV
-            if method_name == "close": return MirIntrinsic.CHAN_CLOSE
-            return MirIntrinsic.NONE
-        if type_name == "Atomic":
-            if method_name == "load": return MirIntrinsic.ATOMIC_LOAD
-            if method_name == "store": return MirIntrinsic.ATOMIC_STORE
-            if method_name == "swap": return MirIntrinsic.ATOMIC_SWAP
-            if method_name == "fetch_add": return MirIntrinsic.ATOMIC_FETCH_ADD
-            if method_name == "fetch_sub": return MirIntrinsic.ATOMIC_FETCH_SUB
-            if method_name == "fetch_and": return MirIntrinsic.ATOMIC_FETCH_AND
-            if method_name == "fetch_or": return MirIntrinsic.ATOMIC_FETCH_OR
-            if method_name == "fetch_xor": return MirIntrinsic.ATOMIC_FETCH_XOR
-            if method_name == "fetch_min": return MirIntrinsic.ATOMIC_FETCH_MIN
-            if method_name == "fetch_max": return MirIntrinsic.ATOMIC_FETCH_MAX
-            if method_name == "compare_exchange": return MirIntrinsic.ATOMIC_CAS
-            if method_name == "compare_exchange_weak": return MirIntrinsic.ATOMIC_CAS_WEAK
-            return MirIntrinsic.NONE
-        MirIntrinsic.NONE
-
-    fn classify_generic_call_intrinsic_by_llvm(recv_ty: i64, method_sym: i32) -> MirIntrinsic:
-        if recv_ty == 0 or method_sym == 0:
-            return MirIntrinsic.NONE
-        let method_full_name = self.codegen_method_symbol_text(method_sym)
-        var method_name = with_str_clone_ref(method_full_name)
-        for method_dot_i in 0..method_full_name.len() as i32:
-            if method_full_name[method_dot_i] == 46:
-                method_name = method_full_name.slice((method_dot_i + 1) as i64, method_full_name.len() as i64)
-                break
-        if self.vec_is_vec.contains(recv_ty):
-            if method_name == "push": return MirIntrinsic.VEC_PUSH
-            if method_name == "get": return MirIntrinsic.VEC_GET
-            if method_name == "is_empty": return MirIntrinsic.VEC_IS_EMPTY
-            let vec_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.VEC_LEN, method_name)
-            if vec_len_intrinsic != MirIntrinsic.NONE: return vec_len_intrinsic
-            if method_name == "remove": return MirIntrinsic.VEC_REMOVE
-            if method_name == "clear": return MirIntrinsic.VEC_CLEAR
-            if method_name == "pop": return MirIntrinsic.VEC_POP
-            if method_name == "iter": return MirIntrinsic.VEC_ITER
-            if method_name == "iter_ref": return MirIntrinsic.VEC_ITER_REF
-            if method_name == "slot": return MirIntrinsic.VEC_SLOT
-            if method_name == "range": return MirIntrinsic.VEC_RANGE
-            if method_name == "split_at": return MirIntrinsic.SPLIT_AT
-            if method_name == "split_at_mut": return MirIntrinsic.SPLIT_AT_MUT
-        MirIntrinsic.NONE
-
     // A call into a runtime entry point, checked against its declaration
     // (#2047): an argument count or type that disagrees with the function
     // the module declares is a compiler bug reported here, not a call LLVM
@@ -15529,7 +15238,9 @@ impl Codegen:
                         let gc_recv_tk = self.mir_type_kind_at(self.mir_resolve_alias_at(gc_recv_type_unwrapped))
                         if gc_recv_tk == TypeKind.TY_REF or gc_recv_tk == TypeKind.TY_PTR:
                             gc_recv_type_unwrapped = self.mir_type_d0_at(self.mir_resolve_alias_at(gc_recv_type_unwrapped))
-                    let gc_intrinsic = self.classify_generic_call_intrinsic(gc_recv_type_unwrapped, gc_method_dispatch_sym)
+                    // Which intrinsic this builtin method call is: Sema's record for the
+                    // call in this body's instance (#2043), never the method's spelling.
+                    let gc_intrinsic = self.sema.method_intrinsic_in_body(self.current_instance_sym(), gc_node)
                     if gc_intrinsic != MirIntrinsic.NONE:
                         return self.mir_emit_intrinsic_call(body, gc_intrinsic, args_id, dest_place, next_bb)
                     let gc_method_name =
@@ -15542,9 +15253,6 @@ impl Codegen:
                         let gc_recv_op = body.call_arg_operands[gc_mir_start]
                         let gc_recv_val = self.mir_eval_operand(body, gc_recv_op, 0)
                         let gc_recv_ty = wl_type_of(gc_recv_val)
-                        let gc_llvm_intrinsic = self.classify_generic_call_intrinsic_by_llvm(gc_recv_ty, gc_method_dispatch_sym)
-                        if gc_llvm_intrinsic != MirIntrinsic.NONE:
-                            return self.mir_emit_intrinsic_call(body, gc_llvm_intrinsic, args_id, dest_place, next_bb)
                         var gc_recv_type_sym = self.mir_struct_sym_from_sema_type(gc_recv_type_unwrapped)
                         if gc_recv_type_sym == 0:
                             gc_recv_type_sym = self.ensure_generic_method_owner_sym(gc_recv_type_unwrapped)
@@ -19313,6 +19021,12 @@ impl Codegen:
     // checked it in the body being emitted (#1983, D65): for a
     // specialization, the type recorded under its substitution; otherwise
     // frozen resolution. Codegen never re-resolves the node itself.
+    // The Sema symbol of the specialization whose body is being emitted, or
+    // 0 outside one: the key of Sema's per-instance facts.
+    fn current_instance_sym() -> i32:
+        let owner = if self.current_body_owner_sym != 0: self.sema.pool_lookup_symbol(self.intern.resolve(self.current_body_owner_sym)) else: 0
+        if owner != 0 and self.sema.concrete_specialization_by_sym.contains(owner): owner else: 0
+
     fn sema_type_level_arg(type_node: i32) -> i32:
         let owner = if self.current_body_owner_sym != 0: self.sema.pool_lookup_symbol(self.intern.resolve(self.current_body_owner_sym)) else: 0
         self.sema.type_level_arg_in_body(owner, type_node)
