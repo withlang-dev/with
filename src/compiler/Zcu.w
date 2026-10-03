@@ -220,7 +220,7 @@ impl Zcu:
     fn add_imported_path(path: &str) -> Unit:
         self.imported_paths.push(zcu_owned_text(resolve_canonical_module_key(path)))
 
-    mut fn seed_decl_source_paths(new_pool: AstPool, path: &str, file_id: i32) -> Unit:
+    mut fn seed_decl_source_paths(new_pool: AstPool, path: &str, file_id: i32):
         self.decl_source_paths = Vec.new()
         self.decl_source_file_ids = Vec.new()
         self.decl_is_c_import = Vec.new()
@@ -547,7 +547,7 @@ impl Zcu:
         let empty = zcu_new_vec_str()
         self.last_link_lib_names = empty
 
-    mut fn capture_last_link_lib_names(new_pool: InternPool, result: &ResolveResult) -> Unit:
+    mut fn capture_last_link_lib_names(new_pool: InternPool, result: &ResolveResult):
         self.reset_last_link_lib_names()
         for li in 0..result.link_libs.len() as i32:
             let lib_sym = result.link_libs[li]

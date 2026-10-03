@@ -53,13 +53,13 @@ pub fn diagnostic_warning(message: &str, primary: Span) -> Diagnostic:
     }
 
 impl Diagnostic:
-    pub mut fn set_code(code: &str): self.code = diagnostic_owned_text(code)
+    pub mut fn set_code(new_code: &str): self.code = diagnostic_owned_text(new_code)
 
-    pub mut fn add_label(span: Span, message: &str): self.labels.push(DiagnosticLabel { span, message: diagnostic_owned_text(message) })
+    pub mut fn add_label(span: Span, text: &str): self.labels.push(DiagnosticLabel { span, message: diagnostic_owned_text(text) })
 
-    pub mut fn add_note(message: &str): self.notes.push(diagnostic_owned_text(message))
+    pub mut fn add_note(text: &str): self.notes.push(diagnostic_owned_text(text))
 
-    pub mut fn add_help(message: &str): self.helps.push(diagnostic_owned_text(message))
+    pub mut fn add_help(text: &str): self.helps.push(diagnostic_owned_text(text))
 
 pub fn DiagnosticStore.init -> DiagnosticStore:
     DiagnosticStore {
