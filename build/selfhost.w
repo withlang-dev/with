@@ -8809,6 +8809,36 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     rc = bs_assert_contains(ctx, bump_build.stderr, "call to `bump` mutates global `COUNTER` while `r` is a live view into it", "view refused across a bundle function that declares writing the global")
     if rc != 0: return rc
 
+    // §21.1 rule 6 (#1903): `level() -> &i32 from LEVEL` returns a view of
+    // the private LEVEL, which the interface declares without `pub`; `raise`
+    // declares writing it. Read from the interface alone, the view `level`
+    // returns is a view of LEVEL: live across `raise`, refused; ended
+    // before it, accepted. A consumer cannot name LEVEL itself.
+    let raise_src = bs_join(case_dir, "view_across_raise.w")
+    rc = bs_write_fixture(ctx, raise_src, "use std.wi_demo\nfn main:\n    let r = level()\n    raise()\n    print(*r)\n", "view of a private origin global across a bundle function that declares writing it")
+    if rc != 0: return rc
+    let raise_build = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-origin-refused", bs_bundle_build_args(raise_src, bundle, bs_join(case_dir, "view_across_raise"), false), 120000)
+    if raise_build.rc == 0: return bs_fail(ctx, "a view `level` returns of LEVEL, live across `raise`, which declares `writes LEVEL`, was accepted")
+    rc = bs_assert_contains(ctx, raise_build.stderr, "call to `raise` mutates global `LEVEL` while `r` is a live view into it", "view of a private origin global refused across its writer")
+    if rc != 0: return rc
+    let level_src = bs_join(case_dir, "level_ok.w")
+    rc = bs_write_fixture(ctx, level_src, "use std.wi_demo\nfn main:\n    let r = level()\n    print(*r)\n    raise()\n    print(*level())\n", "view of a private origin global ended before its writer")
+    if rc != 0: return rc
+    let level_bin = bs_join(case_dir, "level_ok")
+    let level_build = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-origin-ok-build", bs_bundle_build_args(level_src, bundle, level_bin, false), 120000)
+    if level_build.rc != 0: return bs_fail(ctx, "a view of LEVEL ended before `raise` failed to build:\n" ++ level_build.stderr)
+    let level_ran = bs_run_binary_capture(ctx, level_bin, "bundle-interface-origin-ok-run", 120000)
+    if level_ran.rc != 0: return bs_fail(ctx, f"the origin-global consumer failed with exit code {level_ran.rc}")
+    rc = bs_assert_stdout_exact(ctx, level_ran, "3\n4", "origin-global consumer")
+    if rc != 0: return rc
+    let private_src = bs_join(case_dir, "name_private_origin.w")
+    rc = bs_write_fixture(ctx, private_src, "use std.wi_demo\nfn main: print(LEVEL)\n", "a consumer naming a private origin global")
+    if rc != 0: return rc
+    let private_build = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-origin-private", bs_bundle_build_args(private_src, bundle, bs_join(case_dir, "name_private_origin"), false), 120000)
+    if private_build.rc == 0: return bs_fail(ctx, "a consumer named LEVEL, which the interface declares only as an origin, without `pub`")
+    rc = bs_assert_contains(ctx, private_build.stderr, "symbol 'LEVEL' is private to module", "a private origin global stays private")
+    if rc != 0: return rc
+
     // §12.4 (D75): across the boundary a consuming closure may reach only a
     // parameter the interface declares `once`; `call_twice` does not.
     let twice_src = bs_join(case_dir, "consume_twice.w")
@@ -8863,6 +8893,16 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     if rc != 0: return rc
     rc = bs_expect_bundle_refusal(ctx, compiler_path, case_dir, "wi_refuse_writes", "add 'writes COUNT' to bump's declaration")
     if rc != 0: return rc
+    // §21.1 rule 6 (#1903): a returned view of a global crosses only as a
+    // stated origin, and a private origin global's writers declare it (D79).
+    rc = bs_expect_bundle_refusal(ctx, compiler_path, case_dir, "wi_refuse_origin", "fn level: returns a view of the global `LEVEL`, an origin its declaration does not state")
+    if rc != 0: return rc
+    rc = bs_expect_bundle_refusal(ctx, compiler_path, case_dir, "wi_refuse_origin", "write `from LEVEL` after the return type")
+    if rc != 0: return rc
+    rc = bs_expect_bundle_refusal(ctx, compiler_path, case_dir, "wi_refuse_origin_writes", "fn raise: writes global `LEVEL`, an origin of an exported function's returned view,")
+    if rc != 0: return rc
+    rc = bs_expect_bundle_refusal(ctx, compiler_path, case_dir, "wi_refuse_origin_writes", "add 'writes LEVEL' to raise's declaration")
+    if rc != 0: return rc
 
     // Declaration only: the consumer's object references the bundle's
     // symbols and defines none of them.
@@ -8915,7 +8955,13 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     if rc != 0: return rc
     rc = bs_expect_wi_check_error(ctx, compiler_path, "bundle-interface-bad-once", "test/bundle_interface/bad_once.wi", "`once` marks a callable parameter")
     if rc != 0: return rc
-    bs_expect_wi_check_error(ctx, compiler_path, "bundle-interface-init-in-wi", "test/bundle_interface/init_in_wi.wi", "interface storage declarations carry no initializer")
+    rc = bs_expect_wi_check_error(ctx, compiler_path, "bundle-interface-init-in-wi", "test/bundle_interface/init_in_wi.wi", "interface storage declarations carry no initializer")
+    if rc != 0: return rc
+    // §21.1 rules 1 and 6 (#1903): a clause naming a global the interface
+    // does not declare is loud, naming the `.wi`, the function and the name.
+    rc = bs_expect_wi_check_error(ctx, compiler_path, "bundle-interface-from-undeclared", "test/bundle_interface/from_undeclared.wi", "from_undeclared.wi: `fn first` declares `from NOPE`, but the interface declares no global `NOPE`")
+    if rc != 0: return rc
+    bs_expect_wi_check_error(ctx, compiler_path, "bundle-interface-writes-undeclared", "test/bundle_interface/writes_undeclared.wi", "writes_undeclared.wi: `fn bump` declares `writes NOPE`, but the interface declares no global `NOPE`")
 
 pub fn run_bundle_interface_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()

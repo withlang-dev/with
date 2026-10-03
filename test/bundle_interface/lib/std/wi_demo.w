@@ -41,6 +41,13 @@ pub fn add(p: &Pair) -> i32: p.a + p.b
 pub fn bump() writes COUNTER: COUNTER = COUNTER + 1
 pub fn reserve() -> i32 writes COUNTER: 0
 pub fn take(p: Pair) -> i32: p.a * p.b
+// §21.1 rule 6 (#1903): a returned view of a global states the global as
+// its origin; the private LEVEL crosses as a declaration without `pub` (an
+// identity a consumer cannot name), and `raise`, which writes it, declares
+// the write though LEVEL is not exported.
+var LEVEL: i32 = 3
+pub fn level() -> &i32 from LEVEL: &LEVEL
+pub fn raise() writes LEVEL: LEVEL = LEVEL + 1
 pub fn table_at(i: i64) -> u8: TABLE[i]
 pub unsafe fn set_first(p: *mut Pair, v: i32) -> Unit: (*p).a = v
 pub fn sum_slice(xs: []i32) -> i32:

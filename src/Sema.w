@@ -1101,6 +1101,37 @@ pub type Sema {
     // then the global symbols (resolve_declared_global_writes).
     declared_write_starts: HashMap[i32, i32],
     declared_write_syms_flat: Vec[i32],
+    // #1903 (§21.1 rule 6): the globals a function's returned view views —
+    // directly, or through a callee's returned view — keyed by signature, as
+    // a chain over ret_global_origin_entries [sym, node, next]
+    // (note_returned_global_origins). A call's result views them
+    // (record_call_view_origins_args), so §21.1 rule 1 judges a write of
+    // one while the result is live.
+    ret_global_origin_heads: HashMap[i32, i32],
+    ret_global_origin_entries: Vec[i32],
+    // Each declaration's resolved `from` clause, keyed by its node, as an
+    // index into declared_from_flat holding the count then the entries: a
+    // parameter as -1 - its index, a global as its symbol
+    // (resolve_declared_view_origins).
+    declared_from_starts: HashMap[i32, i32],
+    declared_from_flat: Vec[i32],
+    // Recursion (#1903): a call that reads a callee's returned-view globals
+    // before the callee's body is done (it calls back, directly or through
+    // others) also ties its result to a placeholder standing for that
+    // callee's final set — a symbol per signature, both ways mapped. The
+    // sets are completed by a monotone fixpoint once every body is checked
+    // (resolve_ret_global_origin_fixpoint); the signatures with a set, in the
+    // order first met, are what it iterates. A write of a global while a
+    // placeholder view is live is judged then, as [global, placeholder] with
+    // the diagnostic a view of the global itself gets, built at the write
+    // (judge_placeholder_writes); so is each `from` clause, as
+    // [declaration, sig, file].
+    ret_origin_placeholder_sigs: HashMap[i32, i32],
+    ret_origin_placeholder_syms: HashMap[i32, i32],
+    ret_global_origin_sigs: Vec[i32],
+    ret_view_placeholder_writes: Vec[i32],
+    ret_view_placeholder_diags: Vec[Diagnostic],
+    declared_from_checks: Vec[i32],
     // #1827: bodies a call runs that the running program chooses — every
     // impl of a dyn method, every callable of a callable type, every drop a
     // type's drop runs — as [kind, a, b]; chained by `a` for lookup.
@@ -2970,6 +3001,16 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         global_drop_impl_contexts: Vec.new(),
         declared_write_starts: sema_new_map_i32_i32(),
         declared_write_syms_flat: Vec.new(),
+        ret_global_origin_heads: sema_new_map_i32_i32(),
+        ret_global_origin_entries: Vec.new(),
+        declared_from_starts: sema_new_map_i32_i32(),
+        declared_from_flat: Vec.new(),
+        ret_origin_placeholder_sigs: sema_new_map_i32_i32(),
+        ret_origin_placeholder_syms: sema_new_map_i32_i32(),
+        ret_global_origin_sigs: Vec.new(),
+        ret_view_placeholder_writes: Vec.new(),
+        ret_view_placeholder_diags: Vec.new(),
+        declared_from_checks: Vec.new(),
         global_dispatchers: Vec.new(),
         global_dispatcher_heads: sema_new_map_i32_i32(),
         global_dispatcher_next: Vec.new(),

@@ -226,6 +226,9 @@ fn astpool_clone_deep(src: AstPool) -> AstPool:
         // §21.1 rule 1: a function's declared global write set.
         for wi in 0..src.fn_global_write_count(node):
             out.add_fn_global_write(node, src.fn_global_write_path(node, wi), src.fn_global_write_name(node, wi))
+        // §21.1 rule 6: its declared returned-view origins.
+        for oi in 0..src.fn_view_origin_count(node):
+            out.add_fn_view_origin(node, src.fn_view_origin_path(node, oi), src.fn_view_origin_name(node, oi))
         // `in`/`not in` argument slots (#234). The extra array is copied verbatim
         // above, so the slot index remains valid in the cloned pool.
         let membership_slot = src.find_membership_arg(node)

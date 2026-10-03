@@ -358,6 +358,9 @@ impl Sema:
             // clause reported it as no global (pcre2-wo-drift).
             for wi in 0..self.ast.fn_global_write_count(node):
                 self.iface_mentioned.insert(self.ast.fn_global_write_name(node, wi), 1)
+            // So are the globals a `from` clause names (§21.1 rule 6).
+            for oi in 0..self.ast.fn_view_origin_count(node):
+                self.iface_mentioned.insert(self.ast.fn_view_origin_name(node, oi), 1)
             return
         if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_OPTIONAL_CHAIN:
             self.iface_mentioned.insert(self.ast.get_data1(node), 1)

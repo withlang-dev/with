@@ -1,0 +1,5 @@
+// §21.1 rule 1 (D79): a `writes` entry names a global the interface
+// declares. `NOPE` is not one: an error naming the interface, the function
+// and the name, never a silently dropped write.
+pub var COUNT: i32
+pub fn bump() -> Unit writes COUNT, NOPE

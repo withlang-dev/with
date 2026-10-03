@@ -2480,6 +2480,9 @@ impl Zcu:
                 // reported the global as none (pcre2-wo-drift).
                 for wi in 0..pool.fn_global_write_count(node):
                     self.iface_mentioned.insert(pool.fn_global_write_name(node, wi), 1)
+                // So are the globals a `from` clause names (§21.1 rule 6).
+                for oi in 0..pool.fn_view_origin_count(node):
+                    self.iface_mentioned.insert(pool.fn_view_origin_name(node, oi), 1)
                 let text = self.pool.resolve(name)
                 let dot = text.find(".")
                 if dot > 0:

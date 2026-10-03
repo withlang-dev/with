@@ -1108,16 +1108,28 @@ impl Parser:
     // The entries return as (qualifier sym or 0, name sym) pairs, held by
     // the declaration's parse until its node exists (attach_global_writes):
     // a nested `fn` in the body parses clauses of its own in between.
-    mut fn parse_optional_writes_clause() -> Vec[i32]:
+    mut fn parse_optional_writes_clause() -> Vec[i32]: self.parse_optional_name_clause("writes", "a global's name")
+
+    // §21.1 rule 6 (#1903, Eric 2026-10-03): `-> &T from p, other.G`, the
+    // origins of a returned view — a parameter (`self` for the receiver) or
+    // a global, beside each other — stated after the return type and before
+    // the where and `writes` clauses. `from` is contextual, as `writes` is:
+    // it opens the clause only when a name follows. Sema checks the clause
+    // against the body (check_declared_view_origins); entries are
+    // (qualifier sym or 0, name sym) pairs (attach_view_origins).
+    mut fn parse_optional_from_clause() -> Vec[i32]: self.parse_optional_name_clause("from", "a parameter's or a global's name")
+
+    // A contextual clause `<word> NAME, ns.NAME, ...` (`writes`, `from`).
+    mut fn parse_optional_name_clause(word: &str, what: &str) -> Vec[i32]:
         var out: Vec[i32] = Vec.new()
-        if not self.is_ident_named("writes"):
+        if not self.is_ident_named(word):
             return out
         if self.pos + 1 >= self.tokens.len() or self.tokens.get_tag(self.pos + 1) != TokenKind.TK_IDENT:
             return out
         self.advance()
         while true:
             if self.peek() != TokenKind.TK_IDENT:
-                self.emit_error("expected a global's name in the `writes` clause")
+                self.emit_error(f"expected {what} in the `{word}` clause")
                 return out
             var segments: Vec[str] = Vec.new()
             segments.push(self.source.slice(self.current_start() as i64, self.current_end() as i64))
@@ -1149,6 +1161,13 @@ impl Parser:
         while wi + 1 < writes.len() as i32:
             self.pool.add_fn_global_write(fn_node, writes[wi], writes[wi + 1])
             wi = wi + 2
+
+    // The `from` clause's entries onto the declaration (Ast.add_fn_view_origin).
+    mut fn attach_view_origins(fn_node: NodeId, origins: &Vec[i32]):
+        var oi = 0
+        while oi + 1 < origins.len() as i32:
+            self.pool.add_fn_view_origin(fn_node, origins[oi], origins[oi + 1])
+            oi = oi + 2
 
     mut fn parse_decl() -> NodeId:
         var is_pub = Visibility.Private
@@ -1473,6 +1492,8 @@ impl Parser:
         if self.peek() == TokenKind.TK_ARROW:
             self.advance()
             ret_type = self.parse_type_expr()
+        // §21.1 rule 6: the returned view's declared origins
+        let view_origins = self.parse_optional_from_clause()
 
         // Where clause
         self.parse_optional_where_clause()
@@ -1553,6 +1574,7 @@ impl Parser:
             self.pending_no_alloc = 0
         self.attach_pending_effect_pins(fn_node)
         self.attach_global_writes(fn_node, &global_writes)
+        self.attach_view_origins(fn_node, &view_origins)
         if self.pending_compiler_hook_phase != 0:
             self.pool.mark_compiler_hook_fn(fn_node, self.pending_compiler_hook_phase)
             self.pending_compiler_hook_phase = 0
@@ -3287,6 +3309,10 @@ impl Parser:
             if self.peek() == TokenKind.TK_ARROW:
                 self.advance()
                 ret_type = self.parse_type_expr()
+            // §21.1 rule 6: a `from` clause is one function's checked
+            // contract; a trait's method declaration has no such home.
+            if self.parse_optional_from_clause().len() > 0:
+                self.emit_error("a `from` clause states the origins of a function's returned view and is checked against its body; a trait method declaration does not carry one (§21.1 rule 6)")
 
             self.parse_optional_where_clause()
 
@@ -3578,6 +3604,7 @@ impl Parser:
             if self.peek() == TokenKind.TK_ARROW:
                 self.advance()
                 ret_type = self.parse_type_expr()
+            let method_view_origins = self.parse_optional_from_clause()
 
             self.parse_optional_where_clause()
             // §21.1 rule 1: the declared global write set, the last clause
@@ -3615,6 +3642,7 @@ impl Parser:
             let final_m_tp_start = if m_tp_count > 0: m_tp_start else: 0
             self.pool.add_fn_meta(fn_node, meta_flags, ret_type, m_params_start, param_count, final_m_tp_start, m_tp_count)
             self.attach_global_writes(fn_node, &method_global_writes)
+            self.attach_view_origins(fn_node, &method_view_origins)
             if self.pending_iter_of_self != 0:
                 self.pool.mark_iter_of_self_fn(fn_node)
                 self.pending_iter_of_self = 0

@@ -2103,6 +2103,13 @@ impl Sema:
     mut fn check_bodies():
         let count = self.ast.decl_count()
         self.prepare_body_order(count)
+        // §21.1 rule 6: every `from` clause before any body, so a call
+        // checked first reads its callee's declared origins.
+        for di in 0..count:
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) == NodeKind.NK_FN_DECL and self.ast.fn_view_origin_count(decl) > 0 and not self.decl_is_lazy_skipped(di):
+                self.update_module_context(di)
+                self.resolve_declared_view_origins(decl, self.ast.fn_decl_body_is_interface(decl))
         // WITH_SEMA_BODY_ORDER=reverse checks top-level bodies last to first
         // (the callee-first dependencies still apply): a program whose facts
         // or diagnostics change under it depends on declaration order.
@@ -2125,6 +2132,9 @@ impl Sema:
             ci = ci + 4
         self.local_file_id = saved_file_id
         self.validate_global_data_race_accesses()
+        self.resolve_ret_global_origin_fixpoint()
+        self.judge_declared_view_origins()
+        self.judge_placeholder_writes()
         self.check_calls_against_live_global_views()
 
     // #1473 (§21.1 Rule 6): a function whose declared return is a view — a
@@ -2419,9 +2429,11 @@ impl Sema:
     // `var`/`let` or a bundle interface global, by name or through a
     // namespace (`other.TOTAL`). A const is a value, not a place (§9.1c); a
     // field path (`CONFIG.limit`) is refused — a clause names whole globals.
-    // `interface_decl`: a `.wi` is read on demand, so a name whose line this
-    // program never read is no place here and no view of it can be live —
-    // it is skipped (the bundle's own build reads the whole `.wi`).
+    // `interface_decl`: a `.wi` is read on demand, and every name a parsed
+    // declaration's clause mentions is read with it
+    // (Frontend.note_interface_mentions), so a name that resolves to no
+    // global is one the interface does not declare: a loud error naming the
+    // `.wi` (emit_interface_clause_error), never a silently dropped write.
     mut fn resolve_declared_global_writes(node: i32, interface_decl: bool):
         let count = self.ast.fn_global_write_count(node)
         if count == 0 or self.declared_write_starts.contains(node):
@@ -2430,36 +2442,8 @@ impl Sema:
         self.declared_write_syms_flat.push(0)
         let start = self.declared_write_syms_flat.len() as i32 - 1
         for wi in 0..count:
-            let qualifier = self.ast.fn_global_write_path(node, wi)
-            let name = self.ast.fn_global_write_name(node, wi)
-            let name_text: str = with_str_clone_ref(self.pool_resolve(name))
-            var sym = 0
-            if qualifier == 0:
-                sym = name
-            else:
-                let qtext: str = with_str_clone_ref(self.pool_resolve(qualifier))
-                let dot = qtext.find(".")
-                let root_text = if dot > 0: qtext.slice(0, dot) else: qtext.clone()
-                let root = self.pool_lookup_symbol(root_text)
-                if root != 0 and self.is_clause_global(root):
-                    self.emit_error_with_help(f"`writes {qtext}.{name_text}` names part of the global `{root_text}`: a `writes` clause names whole globals", node, f"write `writes {root_text}`")
-                    continue
-                let ni = self.clause_namespace(qtext)
-                if ni < 0:
-                    if not interface_decl:
-                        self.emit_error(f"`writes {qtext}.{name_text}`: `{qtext}` is no namespace this module imports", node)
-                    continue
-                sym = self.namespace_member(ni, name, node)
-                if sym <= 0:
-                    if sym == 0 and not interface_decl:
-                        self.emit_error(f"`writes {qtext}.{name_text}`: `{qtext}` declares no `{name_text}`", node)
-                    continue
-            if self.const_global_syms.contains(sym):
-                self.emit_error(f"`writes {name_text}`: `{name_text}` is a const, a value and not a place (§9.1c); only a global `var` or `let` is written", node)
-                continue
-            if not self.is_clause_global(sym):
-                if not interface_decl:
-                    self.emit_error(f"`writes {name_text}`: `{name_text}` is no global", node)
+            let sym = self.resolve_clause_global("writes", self.ast.fn_global_write_path(node, wi), self.ast.fn_global_write_name(node, wi), node, interface_decl, "")
+            if sym <= 0:
                 continue
             var seen = false
             for si in start + 1..self.declared_write_syms_flat.len() as i32:
@@ -2468,6 +2452,356 @@ impl Sema:
             if not seen:
                 self.declared_write_syms_flat.push(sym)
         self.declared_write_syms_flat[start] = self.declared_write_syms_flat.len() as i32 - start - 1
+
+    // One entry of a `writes` or `from` clause that names a global, resolved
+    // in the declaring module: by name, or through a namespace
+    // (`other.TOTAL`). 0 after reporting why it names none — a field path
+    // (a clause names whole globals), a const (a value, not a place, §9.1c),
+    // anything else. `interface_decl` as for resolve_declared_global_writes.
+    // `none_text` replaces the plain "is no global" message.
+    mut fn resolve_clause_global(word: &str, qualifier: i32, name: i32, node: i32, interface_decl: bool, none_text: &str) -> i32:
+        let name_text: str = with_str_clone_ref(self.pool_resolve(name))
+        var sym = 0
+        if qualifier == 0:
+            sym = name
+        else:
+            let qtext: str = with_str_clone_ref(self.pool_resolve(qualifier))
+            let dot = qtext.find(".")
+            let root_text = if dot > 0: qtext.slice(0, dot) else: qtext.clone()
+            let root = self.pool_lookup_symbol(root_text)
+            if root != 0 and self.is_clause_global(root):
+                self.emit_error_with_help(f"`{word} {qtext}.{name_text}` names part of the global `{root_text}`: a `{word}` clause names whole globals", node, f"write `{word} {root_text}`")
+                return 0
+            let ni = self.clause_namespace(qtext)
+            if ni < 0:
+                if interface_decl:
+                    self.emit_interface_clause_error(word, f"{qtext}.{name_text}", node)
+                else:
+                    self.emit_error(f"`{word} {qtext}.{name_text}`: `{qtext}` is no namespace this module imports", node)
+                return 0
+            sym = self.namespace_member(ni, name, node)
+            if sym <= 0:
+                if sym == 0 and interface_decl:
+                    self.emit_interface_clause_error(word, f"{qtext}.{name_text}", node)
+                else if sym == 0:
+                    self.emit_error(f"`{word} {qtext}.{name_text}`: `{qtext}` declares no `{name_text}`", node)
+                return 0
+        if self.const_global_syms.contains(sym):
+            let use_text = if word == "writes": "only a global `var` or `let` is written" else: "a view of a const is a view of a value, not of a global's place"
+            self.emit_error(f"`{word} {name_text}`: `{name_text}` is a const, a value and not a place (§9.1c); {use_text}", node)
+            return 0
+        if not self.is_clause_global(sym):
+            if interface_decl:
+                self.emit_interface_clause_error(word, name_text, node)
+            else:
+                self.emit_error(if none_text.len() > 0: none_text.clone() else: f"`{word} {name_text}`: `{name_text}` is no global", node)
+            return 0
+        sym
+
+    // An interface declaration's clause names a global the interface does
+    // not declare (a hand-edited `.wi`): a `writes` entry would drop a write
+    // and a `from` entry an origin, so a view of the global would go
+    // untracked. Loud, naming the interface, the function and the name.
+    // Every name a parsed interface clause mentions is read from the `.wi`
+    // (Frontend.note_interface_mentions), so a miss is the interface's.
+    mut fn emit_interface_clause_error(word: &str, name_text: &str, node: i32):
+        let fn_text: str = self.from_clause_fn_name(node)
+        let path: str = self.decl_source_path_for_node(node)
+        self.emit_error(f"interface {path}: `fn {fn_text}` declares `{word} {name_text}`, but the interface declares no global `{name_text}` (§21.1 rules 1 and 6, D39)", node)
+
+    // §21.1 rule 6 (#1903, Eric 2026-10-03): "A returned view's origins are
+    // every parameter it derives from and every global the body returns a
+    // view of, directly or through a callee's returned view. A signature
+    // names a global origin with `from G`, beside `from p`." The `from`
+    // clause of declaration `node`, resolved in its module: a parameter
+    // (`self` included) by its name, as -1 - its index, else a global as its
+    // symbol (resolve_clause_global). Resolved for every declaration before
+    // any body is checked (check_bodies), so a call checked before its
+    // callee's body — a forward or mutually recursive one — reads the
+    // declared set (sig_ret_global_origins).
+    mut fn resolve_declared_view_origins(node: i32, interface_decl: bool):
+        let count = self.ast.fn_view_origin_count(node)
+        if count == 0 or self.declared_from_starts.contains(node):
+            return
+        self.declared_from_starts.insert(node, self.declared_from_flat.len() as i32)
+        self.declared_from_flat.push(0)
+        let start = self.declared_from_flat.len() as i32 - 1
+        let meta = self.ast.find_fn_meta(node)
+        let param_start = if meta >= 0: self.ast.fn_meta_param_start(meta) else: 0
+        let param_count = if meta >= 0: self.ast.fn_meta_param_count(meta) else: 0
+        let fn_text: str = self.from_clause_fn_name(node)
+        for oi in 0..count:
+            let qualifier = self.ast.fn_view_origin_path(node, oi)
+            let name = self.ast.fn_view_origin_name(node, oi)
+            var entry = 0
+            if qualifier == 0:
+                for pi in 0..param_count:
+                    if self.ast.fn_param_name(param_start, pi) == name:
+                        entry = -1 - pi
+            if entry == 0:
+                let name_text: str = with_str_clone_ref(self.pool_resolve(name))
+                entry = self.resolve_clause_global("from", qualifier, name, node, interface_decl, f"`from {name_text}`: `{name_text}` is neither a parameter of `{fn_text}` nor a global (§21.1 rule 6)")
+                if entry <= 0:
+                    continue
+            var seen = false
+            for si in start + 1..self.declared_from_flat.len() as i32:
+                if self.declared_from_flat[si] == entry:
+                    seen = true
+            if not seen:
+                self.declared_from_flat.push(entry)
+        self.declared_from_flat[start] = self.declared_from_flat.len() as i32 - start - 1
+
+    // The name a diagnostic gives the function declared at `node`.
+    fn from_clause_fn_name(node: i32) -> str:
+        let text: str = with_str_clone_ref(self.pool_resolve(self.ast.get_data0(node)))
+        text
+
+    // The resolved `from` clause of declaration `node`
+    // (resolve_declared_view_origins); empty for none.
+    fn declared_view_origin_entries(node: i32) -> Vec[i32]:
+        var out: Vec[i32] = Vec.new()
+        let start_opt = self.declared_from_starts.get(node)
+        if start_opt.is_none():
+            return out
+        let start: i32 = start_opt.unwrap()
+        for si in start + 1..start + 1 + self.declared_from_flat[start]:
+            out.push(self.declared_from_flat[si])
+        out
+
+    // The declaration whose `from` clause states signature `sig`'s origins
+    // (a specialization's is its generic declaration's); 0 for none.
+    fn sig_from_clause_node(sig: i32) -> i32:
+        if sig < 0 or self.declared_from_starts.len() == 0:
+            return 0
+        let node = self.receiver_decl_node_for_sig(sig)
+        if node != 0 and self.declared_from_starts.contains(node): node else: 0
+
+    // The globals a call of `sig` returns a view of: its `from` clause's,
+    // when it states one (checked against the body,
+    // check_declared_view_origins), else those its body returns a view of
+    // (note_returned_global_origins).
+    fn sig_ret_global_origins(sig: i32) -> Vec[i32]:
+        var out: Vec[i32] = Vec.new()
+        let from_node = self.sig_from_clause_node(sig)
+        if from_node != 0:
+            let entries = self.declared_view_origin_entries(from_node)
+            for ei in 0..entries.len() as i32:
+                if entries[ei] > 0:
+                    out.push(entries[ei])
+            return out
+        self.sig_raw_global_origins(sig)
+
+    // The globals `sig`'s body returns a view of, in the order first met —
+    // complete once the recursion fixpoint ran
+    // (resolve_ret_global_origin_fixpoint).
+    fn sig_derived_global_origins(sig: i32) -> Vec[i32]:
+        let raw = self.sig_raw_global_origins(sig)
+        var out: Vec[i32] = Vec.new()
+        for ri in 0..raw.len() as i32:
+            if not self.is_ret_origin_placeholder(raw[ri]):
+                out.push(raw[ri])
+        out
+
+    // Those globals and the placeholders of the callees whose sets they
+    // include (ret_origin_placeholder), in the order first met.
+    fn sig_raw_global_origins(sig: i32) -> Vec[i32]:
+        var out: Vec[i32] = Vec.new()
+        var e: i32 = self.ret_global_origin_heads.get(sig) ?? -1
+        while e >= 0:
+            out.push(self.ret_global_origin_entries[e * 3])
+            e = self.ret_global_origin_entries[e * 3 + 2]
+        // The chain is newest first; report in source order.
+        var rev: Vec[i32] = Vec.new()
+        var ri = out.len() as i32 - 1
+        while ri >= 0:
+            rev.push(out[ri])
+            ri = ri - 1
+        rev
+
+    // The node where `sig`'s body first returns a view of `sym`; 0 for none.
+    fn sig_derived_global_origin_node(sig: i32, sym: i32) -> i32:
+        var e: i32 = self.ret_global_origin_heads.get(sig) ?? -1
+        var found = 0
+        while e >= 0:
+            if self.ret_global_origin_entries[e * 3] == sym:
+                found = self.ret_global_origin_entries[e * 3 + 1]
+            e = self.ret_global_origin_entries[e * 3 + 2]
+        found
+
+    // A returned view's origins include every global it views (#1903):
+    // `deps` are the returned expression's view origins
+    // (collect_expr_view_deps) — a global named in the body, or one a
+    // callee's returned view carries (record_call_view_origins_args). Only
+    // the function's own returns count: a closure's return is the closure's.
+    mut fn note_returned_global_origins(deps: &Vec[i32], expr_node: i32):
+        let sig: i32 = self.current_fn_sig_idx
+        if sig < 0 or self.current_effect_body <= -2:
+            return
+        for di in 0..deps.len() as i32:
+            let sym = deps[di]
+            if self.names_global_place(sym) or self.is_ret_origin_placeholder(sym):
+                let _ = self.add_ret_global_origin(sig, sym, expr_node)
+
+    // §21.1 rule 6: a `from` clause is a checked contract. "A declared origin
+    // the body does not derive the view from is an error, never a silent
+    // widening"; an origin the body derives the view from that the clause
+    // leaves out would make the declaration narrower than the view, which a
+    // caller across a bundle boundary reads alone (D79) — also an error.
+    // Run once the body's effects are flushed (check_fn_body_with_sig_at).
+    mut fn check_declared_view_origins(node: i32, sig: i32):
+        if not self.declared_from_starts.contains(node) or sig < 0:
+            return
+        let fn_text: str = self.from_clause_fn_name(node)
+        let entries = self.declared_view_origin_entries(node)
+        let ret = self.sig_return_type(sig)
+        let ret_kind = if ret > 0: self.get_type_kind(self.resolve_alias(ret as TypeId)) else: TypeKind.TY_VOID
+        if ret <= 0 or (ret_kind != TypeKind.TY_REF and self.type_is_ephemeral_value(ret) == 0):
+            self.emit_error(f"`{fn_text}` returns no view: a `from` clause names the origins of a returned view (§21.1 rule 6)", node)
+            return
+        let meta = self.ast.find_fn_meta(node)
+        let param_start = if meta >= 0: self.ast.fn_meta_param_start(meta) else: 0
+        let param_count = self.sig_get_param_count(sig)
+        let derived_globals = self.sig_derived_global_origins(sig)
+        var clause = ""
+        for ei in 0..entries.len() as i32:
+            let entry = entries[ei]
+            let text: str = with_str_clone_ref(self.pool_resolve(if entry < 0: self.ast.fn_param_name(param_start, -1 - entry) else: entry))
+            clause = clause ++ (if ei == 0: "from " else: ", ") ++ text
+            let derived = if entry < 0: -1 - entry < param_count and (self.sig_param_effect(sig, -1 - entry) & EFF_ESCAPE_VIEW) != 0 else: derived_globals.contains(entry)
+            if not derived:
+                self.emit_error_with_help(f"`{fn_text}` declares its returned view `from {text}`, but its body never returns a view derived from `{text}`: a declared origin the body does not derive the view from is an error, never a silent widening (§21.1 rule 6)", node, f"remove `{text}` from the `from` clause")
+        let lead = if clause.len() == 0: "from" else: clause ++ ","
+        for pi in 0..param_count:
+            if (self.sig_param_effect(sig, pi) & EFF_ESCAPE_VIEW) == 0 or entries.contains(-1 - pi):
+                continue
+            let text: str = with_str_clone_ref(self.pool_resolve(self.ast.fn_param_name(param_start, pi)))
+            self.emit_error_with_help(f"`{fn_text}` returns a view derived from `{text}`, which its `from` clause does not name: the clause states every origin of the returned view (§21.1 rule 6)", node, f"write `{lead} {text}`")
+        for gi in 0..derived_globals.len() as i32:
+            let g = derived_globals[gi]
+            if entries.contains(g):
+                continue
+            let text: str = with_str_clone_ref(self.pool_resolve(g))
+            let at = self.sig_derived_global_origin_node(sig, g)
+            self.emit_error_with_help(f"`{fn_text}` returns a view of the global `{text}`, which its `from` clause does not name: the clause states every origin of the returned view (§21.1 rule 6)", if at != 0: at else: node, f"write `{lead} {text}`")
+
+    // The placeholder standing for `sig`'s final returned-view globals
+    // (ret_origin_placeholder_sigs), made on first use.
+    mut fn ret_origin_placeholder(sig: i32) -> i32:
+        let known = self.ret_origin_placeholder_syms.get(sig)
+        if known.is_some():
+            return known.unwrap()
+        let sym = self.pool_intern(f"$returned-view-globals#{sig}")
+        self.ret_origin_placeholder_syms.insert(sig, sym)
+        self.ret_origin_placeholder_sigs.insert(sym, sig)
+        sym
+
+    fn is_ret_origin_placeholder(sym: i32) -> bool: self.ret_origin_placeholder_sigs.len() > 0 and self.ret_origin_placeholder_sigs.contains(sym)
+
+    // Whether a call made now reads `callee`'s returned-view globals before
+    // its body is done: the function calls itself, or a body still in
+    // progress or not yet checked (recursion through others, a call the
+    // callee-first walk does not see).
+    fn ret_view_read_early(callee: i32) -> bool:
+        if callee == self.current_fn_sig_idx:
+            return true
+        if callee < 0 or callee >= self.sig_names.len() as i32:
+            return false
+        let di: i32 = self.body_decl_by_fn.get(self.sig_names[callee]) ?? -1
+        di >= 0 and di < self.body_order_state.len() as i32 and self.body_order_state[di] != 2
+
+    mut fn add_ret_global_origin(sig: i32, sym: i32, node: i32) -> bool:
+        var e: i32 = self.ret_global_origin_heads.get(sig) ?? -1
+        if e < 0:
+            self.ret_global_origin_sigs.push(sig)
+        while e >= 0:
+            if self.ret_global_origin_entries[e * 3] == sym:
+                return false
+            e = self.ret_global_origin_entries[e * 3 + 2]
+        let index = self.ret_global_origin_entries.len() as i32 / 3
+        self.ret_global_origin_entries.push(sym)
+        self.ret_global_origin_entries.push(node)
+        self.ret_global_origin_entries.push(self.ret_global_origin_heads.get(sig) ?? -1)
+        self.ret_global_origin_heads.insert(sig, index)
+        true
+
+    // §21.1 rule 6 across recursion: "a returned view's origins are ...
+    // every global the body returns a view of, directly or through a
+    // callee's returned view" — so each set is the least one closed under
+    // its placeholders: a placeholder for T in S's set brings all of T's.
+    // Union only grows and the sets are finite, so it terminates; the
+    // signatures and their entries are walked in a fixed order (first met),
+    // and the least fixpoint does not depend on it.
+    mut fn resolve_ret_global_origin_fixpoint():
+        if self.ret_origin_placeholder_sigs.len() == 0:
+            return
+        var changed = true
+        while changed:
+            changed = false
+            for si in 0..self.ret_global_origin_sigs.len() as i32:
+                let sig: i32 = self.ret_global_origin_sigs[si]
+                let raw = self.sig_raw_global_origins(sig)
+                for ri in 0..raw.len() as i32:
+                    if not self.is_ret_origin_placeholder(raw[ri]):
+                        continue
+                    let from_sig: i32 = self.ret_origin_placeholder_sigs.get(raw[ri]).unwrap()
+                    let inherited = self.sig_ret_global_origins(from_sig)
+                    for ii in 0..inherited.len() as i32:
+                        if self.add_ret_global_origin(sig, inherited[ii], 0):
+                            changed = true
+
+    // The globals `view` (a placeholder) stands for, once resolved.
+    fn placeholder_globals(sym: i32) -> Vec[i32]:
+        self.sig_derived_global_origins(self.ret_origin_placeholder_sigs.get(sym) ?? -1)
+
+    // A direct write of a global while a view tied to a placeholder is live
+    // (check_mutation_against_views) is kept with the diagnostic built
+    // there, and emitted once the placeholder's set is known to hold the
+    // global — the same diagnostic a view of the global itself gets.
+    mut fn judge_placeholder_writes():
+        var pending = move self.ret_view_placeholder_diags
+        self.ret_view_placeholder_diags = Vec.new()
+        // Popped from the back, then emitted front first.
+        var kept: Vec[Diagnostic] = Vec.new()
+        var di = pending.len() as i32 - 1
+        while di >= 0:
+            let diag = pending.pop().unwrap()
+            let written: i32 = self.ret_view_placeholder_writes[di * 2]
+            let holder: i32 = self.ret_view_placeholder_writes[di * 2 + 1]
+            if self.placeholder_globals(holder).contains(written):
+                kept.push(move diag)
+            di = di - 1
+        while kept.len() > 0:
+            self.diags.emit(kept.pop().unwrap())
+
+    // Each `from` clause against its body, once recursion's sets are whole.
+    mut fn judge_declared_view_origins():
+        let saved_file_id: i32 = self.local_file_id
+        var ci = 0
+        while ci + 2 < self.declared_from_checks.len() as i32:
+            self.local_file_id = self.declared_from_checks[ci + 2]
+            self.check_declared_view_origins(self.declared_from_checks[ci], self.declared_from_checks[ci + 1])
+            ci = ci + 3
+        self.local_file_id = saved_file_id
+
+    // A view-of-global check kept at a call (global_view_call_checks) whose
+    // global is a placeholder becomes one check per global it stands for.
+    mut fn expand_placeholder_view_checks():
+        if self.ret_origin_placeholder_sigs.len() == 0:
+            return
+        let rows = self.global_view_call_checks.len() as i32 / GLOBAL_VIEW_CHECK_STRIDE
+        let kept: Vec[i32] = Vec.new()
+        for ri in 0..rows:
+            let base = ri * GLOBAL_VIEW_CHECK_STRIDE
+            let sym: i32 = self.global_view_call_checks[base + 1]
+            var targets: Vec[i32] = Vec.new()
+            if self.is_ret_origin_placeholder(sym):
+                targets = self.placeholder_globals(sym)
+            else:
+                targets.push(sym)
+            for ti in 0..targets.len() as i32:
+                for fi in 0..GLOBAL_VIEW_CHECK_STRIDE:
+                    kept.push(if fi == 1: targets[ti] else: self.global_view_call_checks[base + fi])
+        self.global_view_call_checks = kept
 
     // A global a `writes` clause may name: a module `var`/`let` (not a
     // const) or a bundle interface global this program read.
@@ -2928,7 +3262,7 @@ impl Sema:
         for bi in 0..self.borrow_kinds.len() as i32:
             let ref_sym: i32 = self.borrow_refs[bi]
             let kind: i32 = self.borrow_kinds[bi]
-            if ref_sym == 0 or (kind != BorrowKind.SHARED and kind != BorrowKind.EXCLUSIVE) or not self.names_global_place(self.borrow_places[bi]):
+            if ref_sym == 0 or (kind != BorrowKind.SHARED and kind != BorrowKind.EXCLUSIVE) or (not self.names_global_place(self.borrow_places[bi]) and not self.is_ret_origin_placeholder(self.borrow_places[bi])):
                 continue
             let live = self.borrow_liveness_at(bi, site_node)
             if live.state != BORROW_LIVE or (at_end and live.last_use == 0 and not live.loop_view):
@@ -3171,6 +3505,7 @@ impl Sema:
         // reads the call graph for the interface (fn_global_effects). A body
         // expansion checks (a generic drop) may keep checks of its own.
         self.expand_global_dispatchers()
+        self.expand_placeholder_view_checks()
         if self.global_view_call_checks.len() == 0:
             return
         let check_count = self.global_view_call_checks.len() as i32 / GLOBAL_VIEW_CHECK_STRIDE
@@ -4143,6 +4478,13 @@ impl Sema:
                     if inferred != pin_bits:
                         self.emit_error("@[effect] pin on '" ++ param_name ++ "' does not match inferred effects (pinned: " ++ sema_effect_bits_text(pin_bits) ++ "; inferred: " ++ sema_effect_bits_text(inferred) ++ "); the pin is a checked contract", node)
 
+        // §21.1 rule 6 (#1903): a `from` clause is a checked contract too,
+        // judged once recursion's sets are whole (judge_declared_view_origins).
+        if sig_idx >= 0 and self.declared_from_starts.contains(node):
+            self.declared_from_checks.push(node)
+            self.declared_from_checks.push(sig_idx)
+            self.declared_from_checks.push(self.local_file_id)
+
         // Restore state
         self.current_fn_sig_idx = saved_eff_sig_idx
         self.current_fn_variadic = saved_fn_variadic
@@ -4229,6 +4571,19 @@ impl Sema:
             self.set_sig_param_direct_effect(sig_idx, pi, eff)
             self.set_sig_param_view_origin(sig_idx, pi, 0)
             self.set_sig_param_view_through(sig_idx, pi, 0)
+        // §21.1 rule 6 (#1903): a `from` clause states the origins — the
+        // parameters it names; its globals are read at each call
+        // (sig_ret_global_origins).
+        if self.declared_from_starts.contains(node):
+            let entries = self.declared_view_origin_entries(node)
+            for ei in 0..entries.len() as i32:
+                if entries[ei] < 0 and -1 - entries[ei] < param_count:
+                    let opi = -1 - entries[ei]
+                    let from_eff = self.sig_param_effect(sig_idx, opi) | EFF_ESCAPE_VIEW
+                    self.set_sig_param_effect(sig_idx, opi, from_eff)
+                    self.set_sig_param_direct_effect(sig_idx, opi, from_eff)
+                    self.set_sig_param_view_origin(sig_idx, opi, sema_param_origin_bit(opi))
+            return
         let origin = self.declared_view_origin(sig_idx)
         if origin == DECLARED_ORIGIN_NONE:
             return
@@ -12694,6 +13049,12 @@ impl Sema:
                 // Only the body block's tail is the return (#1406): an inner
                 // block's tail escapes just that block's own bindings.
                 self.check_view_escape_origins(tail, tail, if node == self.body_tail_block: -1 else: block_scope_start)
+                // #1903: the body's tail is the returned view; its global
+                // origins are read here, while its bindings' are in scope.
+                if node == self.body_tail_block and self.stmt_pos_depth == 0:
+                    var tail_deps: Vec[i32] = Vec.new()
+                    tail_deps = self.collect_expr_view_deps(tail, move tail_deps)
+                    self.note_returned_global_origins(&tail_deps, tail)
             else if tail_materializes == 0 and node != self.body_tail_block and tail_is_value != 0 and (self.type_is_ephemeral_value(tail_type as i32) != 0 or self.expr_is_ephemeral_value(tail) != 0):
                 // An inner block's tail that is an ephemeral VALUE — a stage
                 // over a generator viewing the block's `v`, a view-holding
@@ -14488,6 +14849,8 @@ impl Sema:
         var storage_mask = self.compute_expr_storage_origin_mask(expr_node)
         var deps: Vec[i32] = Vec.new()
         deps = self.collect_expr_view_deps(expr_node, move deps)
+        // #1903: and every global the returned view views.
+        self.note_returned_global_origins(&deps, expr_node)
         for pi in 0..self.current_fn_param_syms.len() as i32:
             if sema_param_origin_mask_contains(origin_mask, pi) != 0:
                 continue
@@ -14513,7 +14876,7 @@ impl Sema:
     mut fn record_builtin_receiver_view_origins(call_node: i32, recv_node: i32):
         self.record_view_producer_origins(call_node, recv_node)
 
-    fn record_call_view_origins(call_node: i32, sig_idx: i32, param_offset: i32, recv_node: i32, extra_start: i32, arg_count: i32, has_resolved: i32):
+    mut fn record_call_view_origins(call_node: i32, sig_idx: i32, param_offset: i32, recv_node: i32, extra_start: i32, arg_count: i32, has_resolved: i32):
         if call_node == 0 or sig_idx < 0:
             return
         // The call's arguments by PARAMETER index: the receiver first when
@@ -14539,7 +14902,7 @@ impl Sema:
     // per parameter (0 for a missing one), the receiver at index 0 when
     // `has_receiver`. A generic call records through this directly: its
     // arguments (a pipeline's lhs first) are not a contiguous AST run.
-    fn record_call_view_origins_args(call_node: i32, sig_idx: i32, has_receiver: bool, args: &Vec[i32]):
+    mut fn record_call_view_origins_args(call_node: i32, sig_idx: i32, has_receiver: bool, args: &Vec[i32]):
         let param_count = self.sig_get_param_count(sig_idx)
         var union_mask = 0
         var storage_mask = 0
@@ -14609,6 +14972,29 @@ impl Sema:
                 concrete_deps = self.collect_expr_view_deps(origin_arg, move concrete_deps)
                 if concrete_deps.len() as i32 == dep_len_before or self.expr_type_is_value(origin_arg):
                     concrete_deps = self.push_unique_i32(move concrete_deps, self.place_root_sym(origin_arg))
+        // #1903 (§21.1 rule 6): the result views every global the callee's
+        // returned view views, so a call that writes one while the result is
+        // live is refused (§21.1 rule 1, check_calls_against_live_global_views).
+        // A local of this function that shadows the global would take the
+        // tie in its place: refused, never a silent miss.
+        if self.ret_global_origin_heads.len() > 0 or self.declared_from_starts.len() > 0:
+            let globals = self.sig_ret_global_origins(sig_idx)
+            for gi in 0..globals.len() as i32:
+                if self.is_ret_origin_placeholder(globals[gi]):
+                    concrete_deps = self.push_unique_i32(move concrete_deps, globals[gi])
+                    continue
+                if not self.names_global_place(globals[gi]):
+                    let gname: str = with_str_clone_ref(self.pool_resolve(globals[gi]))
+                    let callee_name: str = with_str_clone_ref(self.pool_resolve(self.sig_names[sig_idx]))
+                    self.emit_error_with_help(f"the view `{callee_name}` returns views the global `{gname}`, which a local binding shadows here: the call's result cannot be tied to the global (§21.1 rule 6)", call_node, f"rename the local `{gname}`")
+                    continue
+                concrete_deps = self.push_unique_i32(move concrete_deps, globals[gi])
+        // A set read before the callee's body is done is completed later:
+        // the result also views the callee's placeholder.
+        if self.current_fn_sig_idx >= 0 and self.sig_from_clause_node(sig_idx) == 0 and self.ret_view_read_early(sig_idx):
+            let ret = self.sig_return_type(sig_idx)
+            if ret > 0 and (self.get_type_kind(self.resolve_alias(ret as TypeId)) == TypeKind.TY_REF or self.type_is_ephemeral_value(ret) != 0):
+                concrete_deps = self.push_unique_i32(move concrete_deps, self.ret_origin_placeholder(sig_idx))
         if union_mask != 0 or concrete_deps.len() > 0:
             self.set_expr_view_deps(call_node, union_mask, concrete_deps)
             self.set_expr_view_storage_mask(call_node, storage_mask)
@@ -31244,6 +31630,21 @@ impl Sema:
         let place = self.borrow_root_place(place_node)
         if place == 0:
             return
+        // #1903: a view a recursive call returned is tied to a placeholder
+        // for its callee's globals; a write of a global under it is judged
+        // once the sets are known (judge_placeholder_writes).
+        if self.ret_origin_placeholder_sigs.len() > 0 and self.names_global_place(place):
+            for pi in 0..self.borrow_kinds.len() as i32:
+                let holder = self.borrow_places[pi]
+                let held_ref = self.borrow_refs[pi]
+                if held_ref == 0 or not self.is_ret_origin_placeholder(holder):
+                    continue
+                let held = self.borrow_liveness_at(pi, err_node)
+                if held.state != BORROW_LIVE:
+                    continue
+                self.ret_view_placeholder_writes.push(place)
+                self.ret_view_placeholder_writes.push(holder)
+                self.ret_view_placeholder_diags.push(self.mutation_under_view_diag(place, pi, &held, err_node))
         let path_start = self.borrow_path_data.len() as i32
         let path_count = self.borrow_collect_path(place_node)
         var i = 0
@@ -31272,33 +31673,38 @@ impl Sema:
             if live.state == BORROW_DEAD_HERE:
                 i = i + 1
                 continue
-            let place_name = self.pool_resolve(place)
-            let ref_name: str = with_str_clone_ref(self.pool_resolve(ref_sym))
-            let binding_node = self.binding_decl_node(ref_sym)
-            let last_use = live.last_use
-            let is_gen_loop_view = live.gen_loop_view
-            let mutation_start = self.ast.get_start(err_node)
-            let mutation_end = self.ast.get_end(err_node)
-            let diag = Diagnostic.err("cannot mutate `" ++ place_name ++ "` while `" ++ ref_name ++ "` is a live view into it", Span { file: self.local_file_id, start: mutation_start, end: mutation_end })
-            let view_node = if binding_node != 0: binding_node else: self.borrow_creation_nodes[i]
-            if view_node != 0:
-                let cr_start = self.ast.get_start(view_node)
-                let cr_end = self.ast.get_end(view_node)
-                diag.add_label(Span { file: self.local_file_id, start: cr_start, end: cr_end }, "`" ++ ref_name ++ "` views a value stored in `" ++ place_name ++ "`")
-            diag.add_label(Span { file: self.local_file_id, start: mutation_start, end: mutation_end }, "mutation would invalidate that view")
-            if last_use != 0:
-                let lu_start = self.ast.get_start(last_use)
-                let lu_end = self.ast.get_end(last_use)
-                diag.add_label(Span { file: self.local_file_id, start: lu_start, end: lu_end }, "view is used here after the mutation")
-            if is_gen_loop_view:
-                diag.add_note("the generator `" ++ ref_name ++ "` is still running while the loop body runs (§13.4); collect the changes and apply them after the loop")
-            else if live.loop_view:
-                diag.add_note("the loop reads `" ++ place_name ++ "` again on its next iteration; collect the changes and apply them after the loop")
-            let fixed = self.with_copy_view_fixit(move diag, ref_sym, false)
-            // §8, §57: a facade resource that depends on the place says why.
-            let noted = self.with_facade_dependency_notes(move fixed, self.scope_lookup(ref_sym))
-            self.diags.emit(move noted)
+            self.diags.emit(self.mutation_under_view_diag(place, i, &live, err_node))
             return
+
+    // "cannot mutate `place` while `view` is a live view into it": the write
+    // at `err_node` under borrow row `i` (check_mutation_against_views).
+    mut fn mutation_under_view_diag(place: i32, i: i32, live: &SemaBorrowLiveness, err_node: i32) -> Diagnostic:
+        let ref_sym: i32 = self.borrow_refs[i]
+        let place_name = self.pool_resolve(place)
+        let ref_name: str = with_str_clone_ref(self.pool_resolve(ref_sym))
+        let binding_node = self.binding_decl_node(ref_sym)
+        let last_use = live.last_use
+        let is_gen_loop_view = live.gen_loop_view
+        let mutation_start = self.ast.get_start(err_node)
+        let mutation_end = self.ast.get_end(err_node)
+        let diag = Diagnostic.err("cannot mutate `" ++ place_name ++ "` while `" ++ ref_name ++ "` is a live view into it", Span { file: self.local_file_id, start: mutation_start, end: mutation_end })
+        let view_node = if binding_node != 0: binding_node else: self.borrow_creation_nodes[i]
+        if view_node != 0:
+            let cr_start = self.ast.get_start(view_node)
+            let cr_end = self.ast.get_end(view_node)
+            diag.add_label(Span { file: self.local_file_id, start: cr_start, end: cr_end }, "`" ++ ref_name ++ "` views a value stored in `" ++ place_name ++ "`")
+        diag.add_label(Span { file: self.local_file_id, start: mutation_start, end: mutation_end }, "mutation would invalidate that view")
+        if last_use != 0:
+            let lu_start = self.ast.get_start(last_use)
+            let lu_end = self.ast.get_end(last_use)
+            diag.add_label(Span { file: self.local_file_id, start: lu_start, end: lu_end }, "view is used here after the mutation")
+        if is_gen_loop_view:
+            diag.add_note("the generator `" ++ ref_name ++ "` is still running while the loop body runs (§13.4); collect the changes and apply them after the loop")
+        else if live.loop_view:
+            diag.add_note("the loop reads `" ++ place_name ++ "` again on its next iteration; collect the changes and apply them after the loop")
+        let fixed = self.with_copy_view_fixit(move diag, ref_sym, false)
+        // §8, §57: a facade resource that depends on the place says why.
+        self.with_facade_dependency_notes(move fixed, self.scope_lookup(ref_sym))
 
     // #1531: a binding that views a Copy value (`let x = s.n`, `let x =
     // v[0]`) named by a view diagnostic: the diagnostic offers the copy

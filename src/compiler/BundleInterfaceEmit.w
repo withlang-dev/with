@@ -117,6 +117,12 @@ type BundleEmitter {
     // every global the corpus declares, exported or private, by name
     // (check_declared_global_writes)
     corpus_global_names: HashMap[str, i32],
+    // §21.1 rule 6 (#1903, Eric 2026-10-03): every global a corpus
+    // function's `from` clause names, by name — part of the interface even
+    // when private: the `.wi` declares it without `pub` (an identity a
+    // consumer cannot name), and every exported function that writes it
+    // declares the write (check_declared_global_writes).
+    origin_global_names: HashMap[str, i32],
 }
 
 pub type BundleInterfaceText {
@@ -150,6 +156,7 @@ fn bx_new_emitter(corpus: &str, unlowered_globals: &Vec[str]) -> BundleEmitter:
         omitted: Vec.new(),
         call_index: SemaGlobalCallIndex { head: HashMap.new(), next: Vec.new() },
         corpus_global_names: HashMap.new(),
+        origin_global_names: HashMap.new(),
     }
 
 fn bx_str_less(a: &str, b: &str) -> bool: with_str_cmp_ref(a, b) < 0
@@ -462,11 +469,13 @@ impl BundleEmitter:
     mut fn emit_let(sema: &Sema, di: i32, node: i32):
         let ast = sema.ast
         let flags = ast.get_data2(node)
-        if (flags / 2) % 2 == 0:
-            return
-        let mod_path = with_str_clone_ref(self.decl_modules[di])
         let name = with_str_clone_ref(sema.pool_resolve(ast.get_data0(node)))
         let is_const = ast.is_const_decl_node(node) != 0
+        // A private global is printed only as a returned view's origin.
+        let is_pub = (flags / 2) % 2 != 0
+        if not is_pub and (is_const or not self.origin_global_names.contains(name)):
+            return
+        let mod_path = with_str_clone_ref(self.decl_modules[di])
         self.context = mod_path ++ ": " ++ (if is_const: "const " else: "global ") ++ name
         self.failed = false
         let tid_opt = sema.typed_binding_types.get(node)
@@ -498,9 +507,10 @@ impl BundleEmitter:
             self.omitted.push(mod_path ++ "\t" ++ name ++ "\truntime-init-global")
             self.push_export(BX_NOTE, mod_path, name, "// not exported at Level 0 (no compile-time initializer): " ++ (if is_mut: "var " else: "let ") ++ name ++ "\n", "")
             return
-        let keyword = if is_mut: "pub var " else: "pub let "
+        let keyword = (if is_pub: "pub " else: "") ++ (if is_mut: "var " else: "let ")
         let mut_text = if is_mut: "1" else: "0"
-        self.push_export(BX_GLOBAL, mod_path, name, keyword ++ name ++ ": " ++ spelling ++ "\n", "global\t" ++ mod_path ++ "\t" ++ name ++ "\t" ++ spelling ++ "\t" ++ mut_text ++ "\n")
+        let vis_text = if is_pub: "" else: "\tpriv"
+        self.push_export(BX_GLOBAL, mod_path, name, keyword ++ name ++ ": " ++ spelling ++ "\n", "global\t" ++ mod_path ++ "\t" ++ name ++ "\t" ++ spelling ++ "\t" ++ mut_text ++ vis_text ++ "\n")
 
     // The `.wi` line(s) of one function declaration ("" when refused or
     // skipped); pushes the export itself unless `in_impl` (the impl block
@@ -576,6 +586,10 @@ impl BundleEmitter:
         var params_row = ""
         var printed = 0
         let origin = sema.declared_view_origin(sig)
+        // §21.1 rule 6 (#1903): a `from` clause states the origins, in place
+        // of elision; its parameters are the ones that escape as views.
+        let from_entries = sema.declared_view_origin_entries(node)
+        let has_from = ast.fn_view_origin_count(node) > 0
         for pi in 0..param_count:
             let name_sym = ast.fn_param_name(param_start, pi)
             let pflags = ast.fn_param_flags(param_start, pi)
@@ -599,7 +613,7 @@ impl BundleEmitter:
                 receiver = if fn_param_is_move_self(pflags) != 0: "move " else if fn_param_is_mut_self(pflags) != 0: "mut " else: ""
                 receiver_row = if receiver_mode == ReceiverMode.Move: "move" else if receiver_mode == ReceiverMode.Mut: "mut" else if receiver_mode == ReceiverMode.Read: "read" else: "missing"
                 params_row = params_row ++ f"self:-:{vra}:{eff};"
-                self.note_effect_disagreement(sema, node, sig, pi, full, pname, eff, origin)
+                self.note_effect_disagreement(sema, node, sig, pi, full, pname, eff, if has_from: (if from_entries.contains(-1 - pi): pi else: DECLARED_ORIGIN_NONE) else: origin)
                 continue
             let spelling = self.spell(sema, ptid)
             if self.failed:
@@ -616,7 +630,7 @@ impl BundleEmitter:
             // A `once` callable is consumed by its one invocation: the
             // declared consume is the contract, not a mistaken `&T`.
             if not once:
-                self.note_effect_disagreement(sema, node, sig, pi, full, pname, eff, origin)
+                self.note_effect_disagreement(sema, node, sig, pi, full, pname, eff, if has_from: (if from_entries.contains(-1 - pi): pi else: DECLARED_ORIGIN_NONE) else: origin)
         if is_variadic:
             params = params ++ (if printed > 0: ", ..." else: "...")
             params_row = params_row ++ "...;"
@@ -643,9 +657,38 @@ impl BundleEmitter:
         let ret = self.spell(sema, sema.sig_return_type(sig))
         if self.failed:
             return ""
-        if origin == DECLARED_ORIGIN_AMBIGUOUS:
+        // A returned view of a global crosses the boundary only as a stated
+        // origin: the interface carries no body-inferred fact (D39), and
+        // elision names a parameter, never a global (§21.1 rule 6).
+        if not has_from and not ast.fn_decl_body_is_interface(node):
+            let derived_globals = sema.sig_derived_global_origins(sig)
+            if derived_globals.len() > 0:
+                var clause = ""
+                for pi in 0..param_count:
+                    if (sema.sig_param_effect(sig, pi) & EFF_ESCAPE_VIEW) != 0:
+                        clause = clause ++ (if clause.len() == 0: "from " else: ", ") ++ sema.pool_resolve(ast.fn_param_name(param_start, pi))
+                for gi in 0..derived_globals.len() as i32:
+                    clause = clause ++ (if clause.len() == 0: "from " else: ", ") ++ sema.pool_resolve(derived_globals[gi])
+                self.refuse("returns a view of the global `" ++ sema.pool_resolve(derived_globals[0]) ++ "`, an origin its declaration does not state: a bundle interface states every origin of a returned view (§21.1 rule 6, D39); write `" ++ clause ++ "` after the return type")
+                return ""
+        if origin == DECLARED_ORIGIN_AMBIGUOUS and not has_from:
             self.refuse("returns a reference with no unambiguous origin: name the origin in the source signature (D39 elision: receiver, else the single borrowed parameter)")
             return ""
+        var from_text = ""
+        var from_row = ""
+        if has_from:
+            from_text = " " ++ self.written_from_clause(sema, node)
+            for ei in 0..from_entries.len() as i32:
+                let entry = from_entries[ei]
+                if entry < 0:
+                    from_row = from_row ++ "param:" ++ sema.pool_resolve(ast.fn_param_name(param_start, -1 - entry)) ++ ";"
+                else:
+                    let entries = self.exported_global_entries(sema, entry)
+                    if entries.len() == 0:
+                        self.refuse("`from " ++ sema.pool_resolve(entry) ++ "` names a global outside this bundle that is no bundle export; a returned view's global origin is this bundle's global or an exported one (§21.1 rule 6)")
+                        return ""
+                    for xi in 0..entries.len() as i32:
+                        from_row = from_row ++ "global:" ++ entries[xi] ++ ";"
         let is_unsafe = sema.fn_symbol_is_unsafe(fn_sym) != 0
         let must_use = (flags / FnFlags.MUST_USE) % 2 != 0
         var printed_name = with_str_clone_ref(full)
@@ -656,11 +699,11 @@ impl BundleEmitter:
         // The `writes` clause is the declaration's last clause (§21.1 rule 1).
         let writes_text = if written_clause.len() > 0: " " ++ written_clause else: ""
         var head = if must_use: "@[must_use]\n" else: ""
-        head = head ++ (if is_pub: "pub " else: "") ++ (if is_unsafe: "unsafe " else: "") ++ receiver ++ "fn " ++ printed_name ++ "(" ++ params ++ ") -> " ++ ret ++ writes_text ++ "\n"
+        head = head ++ (if is_pub: "pub " else: "") ++ (if is_unsafe: "unsafe " else: "") ++ receiver ++ "fn " ++ printed_name ++ "(" ++ params ++ ") -> " ++ ret ++ from_text ++ writes_text ++ "\n"
         let vis = if is_pub: "pub" else: "priv"
         let unsafe_text = if is_unsafe: "1" else: "0"
         let must_use_text = if must_use: "must_use" else: "-"
-        let row = "fn\t" ++ mod_path ++ "\t" ++ full ++ "\t" ++ unsafe_text ++ "\t" ++ receiver_row ++ "\t" ++ must_use_text ++ "\tparams:" ++ params_row ++ "\tret:" ++ ret ++ f"\torigin:{origin}\tvis:" ++ vis ++ "\twrites:" ++ writes_row ++ "\n"
+        let row = "fn\t" ++ mod_path ++ "\t" ++ full ++ "\t" ++ unsafe_text ++ "\t" ++ receiver_row ++ "\t" ++ must_use_text ++ "\tparams:" ++ params_row ++ "\tret:" ++ ret ++ (if has_from: "\torigin:from:" ++ from_row else: f"\torigin:{origin}") ++ "\tvis:" ++ vis ++ "\twrites:" ++ writes_row ++ "\n"
         if in_impl:
             self.last_fn_row = row
         else:
@@ -715,6 +758,18 @@ impl BundleEmitter:
             out = out ++ (if wi == 0: "writes " else: ", ") ++ entry
         out
 
+    // The `from` clause as its author wrote it (`from p, other.G`), in source
+    // order; the `.wi` prints exactly that spelling (§21.1 rule 6).
+    fn written_from_clause(sema: &Sema, node: i32) -> str:
+        let ast = sema.ast
+        var out = ""
+        for oi in 0..ast.fn_view_origin_count(node):
+            let qualifier = ast.fn_view_origin_path(node, oi)
+            let name = with_str_clone_ref(sema.pool_resolve(ast.fn_view_origin_name(node, oi)))
+            let entry = if qualifier != 0: sema.pool_resolve(qualifier) ++ "." ++ name else: name
+            out = out ++ (if oi == 0: "from " else: ", ") ++ entry
+        out
+
     // The exported globals `sym` names, as "<module>#<name>": this corpus's
     // exports of that name (a write record names a global by its symbol,
     // so every export of the name is listed — over-requiring a declaration
@@ -731,6 +786,14 @@ impl BundleEmitter:
         if out.len() == 0 and sema.interface_global_index.contains(sym):
             out.push(sema.interface_global_paths.get(sym).unwrap() ++ "#" ++ name)
         out
+
+    // Whether this corpus exports a global named `name` with `pub` (an
+    // origin global is printed without it, emit_let).
+    fn global_is_pub_export(name: &str) -> bool:
+        for xi in 0..self.exports.len() as i32:
+            if self.exports[xi].kind == BX_GLOBAL and self.exports[xi].name == name and self.exports[xi].wi.starts_with("pub "):
+                return true
+        false
 
     // §21.1 rule 1 (D39, Eric 2026-09-29): an exported function's
     // transitive writes of exported globals — this bundle's, and another
@@ -762,7 +825,8 @@ impl BundleEmitter:
                 actual.push(with_str_clone_ref(entries[ei]))
                 if not declared.contains(entries[ei]):
                     let fix = if has_clause: "add '" ++ name ++ "' to " ++ fn_name ++ "'s `writes` clause" else: "add 'writes " ++ name ++ "' to " ++ fn_name ++ "'s declaration"
-                    self.refuse("writes exported global `" ++ name ++ "` (" ++ sema.fn_global_write_chain(sig, sym, &self.call_index) ++ ") but its declaration does not say so: a bundle function's global writes are a declared, checked contract, and no clause declares none (§21.1 rule 1, D39); " ++ fix)
+                    let what = if self.origin_global_names.contains(name) and not self.global_is_pub_export(name): "global `" ++ name ++ "`, an origin of an exported function's returned view," else: "exported global `" ++ name ++ "`"
+                    self.refuse("writes " ++ what ++ " (" ++ sema.fn_global_write_chain(sig, sym, &self.call_index) ++ ") but its declaration does not say so: a bundle function's global writes are a declared, checked contract, and no clause declares none (§21.1 rules 1 and 6, D39, D79); " ++ fix)
         for di in 0..declared.len() as i32:
             if not actual.contains(declared[di]):
                 self.warnings.push(self.context ++ ": declares a write of `" ++ declared[di] ++ "` its body never makes (a conservative contract: every caller treats it as written)")
@@ -1125,6 +1189,19 @@ impl BundleEmitter:
         // the exported globals (check_declared_global_writes), so every
         // global export is known before the first function prints.
         self.call_index = sema.global_call_index()
+        // §21.1 rule 6 (#1903): the globals a corpus function's `from`
+        // clause names are interface material before any storage prints.
+        for di in 0..dc:
+            let decl = ast.get_decl(di) as i32
+            if self.decl_modules[di].len() == 0 or ast.kind(decl) != NodeKind.NK_FN_DECL:
+                continue
+            let fn_flags = ast.get_data2(decl)
+            if fn_flags % 2 == 0 and sema.impl_node_for_method_decl(decl) == 0:
+                continue
+            let origin_entries = sema.declared_view_origin_entries(decl)
+            for oi in 0..origin_entries.len() as i32:
+                if origin_entries[oi] > 0:
+                    self.origin_global_names.insert(with_str_clone_ref(sema.pool_resolve(origin_entries[oi])), 1)
         for di in 0..dc:
             let mod_path = with_str_clone_ref(self.decl_modules[di])
             let decl = ast.get_decl(di) as i32

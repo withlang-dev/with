@@ -726,6 +726,13 @@ type AstPoolState {
     fn_global_write_counts: HashMap[i32, i32],  // fn_node → entry count
     fn_global_write_paths: Vec[i32],            // module path sym
     fn_global_write_names: Vec[i32],            // global name sym
+    // §21.1 rule 6 (#1903): a function's declared returned-view origins,
+    // `-> &T from p, other.G` — (module path sym or 0; name sym) pairs, a
+    // parameter (`self` included) or a global (Parser.parse_optional_from_clause).
+    fn_view_origin_starts: HashMap[i32, i32],   // fn_node → first entry in fn_view_origin_*
+    fn_view_origin_counts: HashMap[i32, i32],   // fn_node → entry count
+    fn_view_origin_paths: Vec[i32],             // module path sym
+    fn_view_origin_names: Vec[i32],             // parameter or global name sym
     // NK_COPY_ARG nodes that require a .clone() call (type is Clone-only, not Copy)
     copy_arg_needs_clone: HashMap[i32, i32],   // node → 1
     // D61: type symbols whose Debug impl the compiler generated (a derive,
@@ -841,6 +848,10 @@ fn AstPool.new -> AstPool:
             fn_global_write_counts: HashMap.new(),
             fn_global_write_paths: Vec.new(),
             fn_global_write_names: Vec.new(),
+            fn_view_origin_starts: HashMap.new(),
+            fn_view_origin_counts: HashMap.new(),
+            fn_view_origin_paths: Vec.new(),
+            fn_view_origin_names: Vec.new(),
             copy_arg_needs_clone: HashMap.new(),
             generated_debug_type_syms: Vec.new(),
             frozen: 0,
@@ -1584,6 +1595,25 @@ impl AstPool:
 
     fn fn_global_write_name(node: NodeId, idx: i32) -> i32:
         self.state.fn_global_write_names[self.state.fn_global_write_starts.get(node as i32).unwrap() + idx]
+
+    // §21.1 rule 6 (#1903): one origin a function's `from` clause declares.
+    fn add_fn_view_origin(node: NodeId, path_sym: i32, name_sym: i32):
+        let n = node as i32
+        if not self.state.fn_view_origin_starts.contains(n):
+            self.state.fn_view_origin_starts.insert(n, self.state.fn_view_origin_paths.len() as i32)
+            self.state.fn_view_origin_counts.insert(n, 0)
+        self.state.fn_view_origin_paths.push(path_sym)
+        self.state.fn_view_origin_names.push(name_sym)
+        let count: i32 = self.state.fn_view_origin_counts.get(n).unwrap()
+        self.state.fn_view_origin_counts.insert(n, count + 1)
+
+    fn fn_view_origin_count(node: NodeId) -> i32: self.state.fn_view_origin_counts.get(node as i32) ?? 0
+
+    fn fn_view_origin_path(node: NodeId, idx: i32) -> i32:
+        self.state.fn_view_origin_paths[self.state.fn_view_origin_starts.get(node as i32).unwrap() + idx]
+
+    fn fn_view_origin_name(node: NodeId, idx: i32) -> i32:
+        self.state.fn_view_origin_names[self.state.fn_view_origin_starts.get(node as i32).unwrap() + idx]
 
     // Record the extra-array slot holding the `contains` argument for an `in` node.
     fn set_membership_arg(node: NodeId, slot: i32):

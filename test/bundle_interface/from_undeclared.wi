@@ -1,0 +1,5 @@
+// §21.1 rule 6 (#1903): a `from` entry names a parameter or a global the
+// interface declares. `NOPE` is neither: an error naming the interface, the
+// function and the name, never a silently dropped origin.
+pub type Foo { x: i32 }
+pub fn first(a: &Foo) -> &Foo from a, NOPE
