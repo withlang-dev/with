@@ -5,6 +5,7 @@
 use Archive
 use compiler.Runtime
 use compiler.ConanRecipe
+use compiler.ProjectConfig
 use compiler.ConanPatch
 use compiler.ClangDriver
 use compiler.FrameworkStubs
@@ -1327,6 +1328,180 @@ fn conan_recipe_build_system(recipe: &str) -> str:
     if recipe.contains("MSBuild("): return "MSBuild"
     "a build system other than CMake"
 
+// ── CMake package configs for requirements (#1900) ─────────────────────
+// A source build finds a requirement with find_package(<file name>), and a
+// Conan Center binary package carries no config for it: Conan's CMakeDeps
+// generator writes one at install time. `with get` writes the same from what
+// it recorded for the package (metadata.json): `<file>Config.cmake`
+// declaring the recipe's CMake target over the package's libraries, include
+// directories, defines and link options — its requirements' folded in, as
+// CMakeDeps' target links theirs — and `<file>ConfigVersion.cmake` answering
+// find_package's version request (SameMajorVersion, CMakeDeps' default). The
+// names are the requirement recipe's own `cmake_file_name` and
+// `cmake_target_name`, else CMakeDeps' defaults (the package name;
+// `<name>::<name>`). A requirement built from source installed its own
+// config, and gets none from here.
+
+type ConanCMakeLinkSet {
+    visited: Vec[str],
+    includes: Vec[str],
+    defines: Vec[str],
+    libraries: Vec[str],
+    options: Vec[str],
+    problem: str,
+}
+
+/// The value of `self.cpp_info.set_property("<property>", "<value>")` in a
+/// recipe, or "" when it sets none (a component's property is not the
+/// package's).
+pub fn conan_recipe_cpp_info_property(recipe: &str, property: &str) -> str:
+    for quote in ["\"", "'"]:
+        let needle = "self.cpp_info.set_property(" ++ quote ++ property ++ quote ++ ","
+        let at = recipe.find(needle)
+        if at < 0: continue
+        var i = at + needle.len()
+        while i < recipe.len() and (recipe[i] == ' ' or recipe[i] == '\t'): i = i + 1
+        if i >= recipe.len() or (recipe[i] != '"' and recipe[i] != '\''): return ""
+        let close = recipe[i]
+        let start = i + 1
+        var end = start
+        while end < recipe.len() and recipe[end] != close and recipe[end] != '\n': end = end + 1
+        if end >= recipe.len() or recipe[end] != close: return ""
+        return recipe.slice(start, end)
+    ""
+
+// The file a package's library `name` is, under its recorded library
+// directories; "" when none is there (the link then names it, -l<name>).
+fn conan_cmake_library_file(lib_dirs: &Vec[str], name: &str) -> str:
+    for dir in lib_dirs:
+        for file in ["lib" ++ name ++ ".a", name ++ ".lib", "lib" ++ name ++ ".lib", "lib" ++ name ++ ".dylib", "lib" ++ name ++ ".so"]:
+            let path = dir ++ "/" ++ file
+            if runtime_file_exists(path) != 0: return path
+    ""
+
+fn conan_cmake_push_unique(items: Vec[str], item: &str) -> Vec[str]:
+    var out = items
+    if not out.contains(item): out.push(item.to_owned())
+    out
+
+/// Folds the package `reference` ("name/version") and its requirements into `set`.
+fn conan_cmake_collect(project_root: &str, reference: &str, set: ConanCMakeLinkSet, depth: i32) -> ConanCMakeLinkSet:
+    var out = set
+    if out.problem.len() > 0 or out.visited.contains(reference): return out
+    if depth > 32:
+        out.problem = "the requirements of " ++ reference ++ " nest more than 32 deep"
+        return out
+    out.visited.push(reference.to_owned())
+    let dep_dir = conan_absolute(project_root ++ "/.with/deps/c/" ++ reference)
+    let meta = runtime_read_file(dep_dir ++ "/metadata.json")
+    if meta.len() == 0:
+        out.problem = "no metadata.json for " ++ reference ++ " under " ++ dep_dir
+        return out
+    for include in project_config_json_str_array(meta, "include_paths"): out.includes = conan_cmake_push_unique(move out.includes, dep_dir ++ "/" ++ include)
+    for define in project_config_json_str_array(meta, "defines"): out.defines = conan_cmake_push_unique(move out.defines, define)
+    var lib_dirs: Vec[str] = Vec.new()
+    for lib_path in project_config_json_str_array(meta, "lib_paths"): lib_dirs.push(dep_dir ++ "/" ++ lib_path)
+    for lib in project_config_json_str_array(meta, "libs"):
+        let file = conan_cmake_library_file(&lib_dirs, lib)
+        if file.len() > 0:
+            out.libraries = conan_cmake_push_unique(move out.libraries, file)
+        else:
+            for dir in lib_dirs: out.options = conan_cmake_push_unique(move out.options, "-L" ++ dir)
+            out.libraries = conan_cmake_push_unique(move out.libraries, lib)
+    for framework_path in project_config_json_str_array(meta, "framework_paths"): out.options = conan_cmake_push_unique(move out.options, "-F" ++ dep_dir ++ "/" ++ framework_path)
+    // `-framework X` (and the other two-token Apple flags) stays one option:
+    // CMake de-duplicates and reorders bare options, which tears the pair.
+    let link_args = project_config_json_str_array(meta, "link_args")
+    var i = 0
+    while i < link_args.len() as i32:
+        let arg = link_args[i]
+        if (arg == "-framework" or arg == "-weak_framework" or arg == "-Xlinker") and i + 1 < link_args.len() as i32:
+            out.options = conan_cmake_push_unique(move out.options, "SHELL:" ++ arg ++ " " ++ link_args[i + 1])
+            i = i + 2
+            continue
+        out.options = conan_cmake_push_unique(move out.options, arg)
+        i = i + 1
+    for required in project_config_json_str_array(meta, "requires"):
+        out = conan_cmake_collect(project_root, required, move out, depth + 1)
+    out
+
+// One element of a CMake list inside a quoted argument; "" when it cannot be
+// one (a `;` would split it).
+fn conan_cmake_element(text: &str) -> str:
+    if text.contains(";"): return ""
+    text.replace("\\", "/").replace("\"", "\\\"").replace("$", "\\$")
+
+fn conan_cmake_list(items: &Vec[str]) -> str:
+    var out = ""
+    for item in items:
+        if out.len() > 0: out = out ++ ";"
+        out = out ++ conan_cmake_element(item)
+    out
+
+fn conan_cmake_list_problem(items: &Vec[str]) -> str:
+    for item in items:
+        if item.contains(";"): return "'" ++ item ++ "' holds a `;`, which a CMake list cannot carry"
+    ""
+
+/// A package's own CMake config, as a source build's `cmake --install` leaves it.
+fn conan_package_has_cmake_config(dep_dir: &str) -> bool:
+    for dir in ["lib/cmake", "share", "cmake", "lib"]:
+        for path in runtime_list_files(dep_dir ++ "/" ++ dir).split("\n"):
+            if path.ends_with("Config.cmake") or path.ends_with("-config.cmake"): return true
+    false
+
+/// Writes the config for requirement `reference` under `cmake_deps_dir` and
+/// returns the `-D<file>_DIR=<dir>` define CMake finds it by; "" when the
+/// package brought its own config. `problem` is set when it cannot.
+fn conan_write_cmake_package_config(project_root: &str, reference: &str, cmake_deps_dir: &str) -> ConanCMakeConfig:
+    let name = conan_ref_name(reference)
+    let version = conan_ref_version(reference)
+    let dep_dir = conan_absolute(project_root ++ "/.with/deps/c/" ++ reference)
+    if conan_package_has_cmake_config(dep_dir): return ConanCMakeConfig { define: "", problem: "" }
+    let folder = conan_recipe_folder(name, version)
+    let recipe = if folder.len() > 0: conan_http_get(conan_recipe_file_url(name, folder, "conanfile.py")) else: ""
+    var file_name = conan_recipe_cpp_info_property(recipe, "cmake_file_name")
+    if file_name.len() == 0: file_name = name.to_owned()
+    var target_name = conan_recipe_cpp_info_property(recipe, "cmake_target_name")
+    if target_name.len() == 0: target_name = name ++ "::" ++ name
+    let empty = ConanCMakeLinkSet { visited: Vec.new(), includes: Vec.new(), defines: Vec.new(), libraries: Vec.new(), options: Vec.new(), problem: "" }
+    let set = conan_cmake_collect(project_root, reference, empty, 0)
+    if set.problem.len() > 0: return ConanCMakeConfig { define: "", problem: set.problem.clone() }
+    for list in [&set.includes, &set.defines, &set.libraries, &set.options]:
+        let problem = conan_cmake_list_problem(list)
+        if problem.len() > 0: return ConanCMakeConfig { define: "", problem: reference ++ ": " ++ problem }
+    let dir = cmake_deps_dir ++ "/" ++ file_name
+    if runtime_mkdir_p(dir) != 0: return ConanCMakeConfig { define: "", problem: "could not create " ++ dir }
+    let target = conan_cmake_element(&target_name)
+    var config = "# Written by `with get` from " ++ reference ++ "'s package metadata: what Conan's CMakeDeps writes at install time (#1900).\n"
+    config = config ++ "if(NOT TARGET " ++ target ++ ")\n"
+    config = config ++ "  add_library(" ++ target ++ " INTERFACE IMPORTED)\n"
+    config = config ++ "  set_target_properties(" ++ target ++ " PROPERTIES\n"
+    config = config ++ "    INTERFACE_INCLUDE_DIRECTORIES \"" ++ conan_cmake_list(&set.includes) ++ "\"\n"
+    config = config ++ "    INTERFACE_COMPILE_DEFINITIONS \"" ++ conan_cmake_list(&set.defines) ++ "\"\n"
+    config = config ++ "    INTERFACE_LINK_LIBRARIES \"" ++ conan_cmake_list(&set.libraries) ++ "\"\n"
+    config = config ++ "    INTERFACE_LINK_OPTIONS \"" ++ conan_cmake_list(&set.options) ++ "\")\n"
+    config = config ++ "endif()\n"
+    config = config ++ "set(" ++ file_name ++ "_INCLUDE_DIRS \"" ++ conan_cmake_list(&set.includes) ++ "\")\n"
+    config = config ++ "set(" ++ file_name ++ "_LIBRARIES " ++ target ++ ")\n"
+    if runtime_write_file(dir ++ "/" ++ file_name ++ "Config.cmake", config) != 0:
+        return ConanCMakeConfig { define: "", problem: "could not write " ++ dir ++ "/" ++ file_name ++ "Config.cmake" }
+    // A version that is not a number ("system") answers no version request.
+    if version.len() > 0 and version[0] >= '0' and version[0] <= '9':
+        var major = version.to_owned()
+        let dot = version.find(".")
+        if dot > 0: major = version.slice(0, dot)
+        var check = "set(PACKAGE_VERSION \"" ++ conan_cmake_element(version) ++ "\")\n"
+        check = check ++ "if(PACKAGE_FIND_VERSION VERSION_GREATER PACKAGE_VERSION)\n  set(PACKAGE_VERSION_COMPATIBLE FALSE)\n"
+        check = check ++ "elseif(PACKAGE_FIND_VERSION_MAJOR STREQUAL \"" ++ conan_cmake_element(&major) ++ "\")\n  set(PACKAGE_VERSION_COMPATIBLE TRUE)\n"
+        check = check ++ "  if(PACKAGE_FIND_VERSION STREQUAL PACKAGE_VERSION)\n    set(PACKAGE_VERSION_EXACT TRUE)\n  endif()\n"
+        check = check ++ "else()\n  set(PACKAGE_VERSION_COMPATIBLE FALSE)\nendif()\n"
+        if runtime_write_file(dir ++ "/" ++ file_name ++ "ConfigVersion.cmake", check) != 0:
+            return ConanCMakeConfig { define: "", problem: "could not write " ++ dir ++ "/" ++ file_name ++ "ConfigVersion.cmake" }
+    ConanCMakeConfig { define: "-D" ++ file_name ++ "_DIR=" ++ dir, problem: "" }
+
+type ConanCMakeConfig { define: str, problem: str }
+
 fn conan_install_from_source(name: &str, version: &str, project_root: &str, depth: i32) -> str:
     let platform = conan_detect_os() ++ "/" ++ conan_detect_arch()
     let cmake_env_name = conan_package_cmake_env_name(name)
@@ -1445,6 +1620,12 @@ fn conan_install_from_source(name: &str, version: &str, project_root: &str, dept
         configure = conan_argv_append(configure, "-DCMAKE_CXX_STANDARD_LIBRARIES=" ++ standard_libraries)
         configure = conan_argv_append(configure, "-DCMAKE_TRY_COMPILE_PLATFORM_VARIABLES=CMAKE_C_STANDARD_LIBRARIES;CMAKE_CXX_STANDARD_LIBRARIES")
     if prefix_path.len() > 0: configure = conan_argv_append(configure, "-DCMAKE_PREFIX_PATH=" ++ prefix_path)
+    // #1900: each requirement's CMake package config, as CMakeDeps writes it.
+    for reference in resolved:
+        let written = conan_write_cmake_package_config(project_root, reference, work ++ "/cmake-deps")
+        if written.problem.len() > 0:
+            return conan_source_fail(dep_dir, "could not write the CMake package config of " ++ reference ++ " for " ++ name ++ "/" ++ version ++ ": " ++ written.problem)
+        if written.define.len() > 0: configure = conan_argv_append(configure, written.define)
     for define in variables.defines: configure = conan_argv_append(configure, define)
     for define in cmake_env.defines:
         runtime_eprint("  " ++ cmake_env_name ++ ": " ++ define)

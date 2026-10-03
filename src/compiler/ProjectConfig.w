@@ -459,7 +459,7 @@ fn project_config_load_dep_metadata(cfg: ProjectConfig, name: &str, version: &st
             out = project_config_load_dep_metadata(move out, req_name, req_version)
     out
 
-fn project_config_json_str_array(json: &str, key: &str) -> Vec[str]:
+pub fn project_config_json_str_array(json: &str, key: &str) -> Vec[str]:
     // Simple JSON array extractor: find "key": [...] and extract string values.
     var result: Vec[str] = Vec.new()
     let needle = "\"" ++ key ++ "\""
