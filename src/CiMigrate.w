@@ -1929,6 +1929,7 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: &str, pr
     let body_is_unsafe_context = ci_migrate_extern_fn_call_requires_unsafe(safe_name)
     ci_migrate_set_unsafe_function_body_context(body_is_unsafe_context)
     let body = ci_try_translate_fn_body(session, idx)
+    let body_tail_unit = ci_take_body_tail_unit()
     ci_migrate_set_unsafe_function_body_context(false)
     // #1878: the declarations the body's locals need, beside the function.
     let hoisted_decls = ci_take_body_hoisted_decls()
@@ -1947,7 +1948,8 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: &str, pr
         with_cimport_mark_name_emitted(name)
         g_migrate_fn_translated = g_migrate_fn_translated + 1
         let ret_render = ci_unsafe_fn_ptr_type(ret)
-        let ret_suffix = ci_ret_suffix(ret_render)
+        // A blank body is emitted as `return`, whose tail is Unit.
+        let ret_suffix = ci_def_ret_suffix(ret_render, body_tail_unit or ci_migrate_text_is_blank(body))
         let body_for_emit = if ret == "Unit" and ci_migrate_text_is_blank(body): "    return\n" else: body
         let visibility = if g_migrate_no_c_export != 0 and (storage != CX_SC_STATIC or header_owner.len() > 0): "pub " else: ""
         let fn_keyword = visibility ++ if ci_migrate_extern_fn_call_requires_unsafe(safe_name): "unsafe fn " else: "fn "

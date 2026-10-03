@@ -442,8 +442,11 @@ impl CiExprPool:
 pub type CiStmtId = distinct i32
 impl Copy for CiStmtId
 
+// CIS_EXPR flag: the C expression's value is `void` (#1838).
+pub const CI_STMT_EXPR_VOID: i32 = 1
+
 pub enum CiStmtKind: i32:
-    CIS_EXPR = 1             // d0 = expr_id
+    CIS_EXPR = 1             // d0 = expr_id; flags: CI_STMT_EXPR_VOID
     CIS_RETURN = 2           // d0 = expr_id (0 = bare return)
     CIS_BLOCK = 3            // d0 = stmts_extra_start, d1 = stmts_count, d2 = label_sym (0 if none)
     CIS_IF = 4               // d0 = cond_expr, d1 = then_block, d2 = else_block (0 if none)
@@ -575,6 +578,11 @@ impl CiStmtPool:
     // Statement constructor helpers.
     fn expr_stmt(expr: CiExprId) -> CiStmtId:
         self.add(CiStmtKind.CIS_EXPR, expr as i32, 0, 0, 0)
+
+    // An expression statement whose C expression is `void` (a call of a void
+    // function): its rendering, as a body's tail, infers Unit (#1838).
+    fn expr_stmt_void(expr: CiExprId) -> CiStmtId:
+        self.add(CiStmtKind.CIS_EXPR, expr as i32, 0, 0, CI_STMT_EXPR_VOID)
 
     fn return_(expr: CiExprId) -> CiStmtId:
         self.add(CiStmtKind.CIS_RETURN, expr as i32, 0, 0, 0)

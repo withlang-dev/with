@@ -134,6 +134,76 @@ fn ci_stmt_ir_ends_with_terminator(stmts: CiStmtPool, id: CiStmtId) -> bool:
         return (else_b as i32) != 0 and ci_stmt_ir_ends_with_terminator(stmts, then_b) and ci_stmt_ir_ends_with_terminator(stmts, else_b)
     false
 
+// Whether ci_print_stmt renders `id` as nothing: an unlabeled block whose
+// statements all render nothing (an empty statement, a discarded pure value).
+fn ci_stmt_ir_renders_nothing(stmts: CiStmtPool, id: CiStmtId) -> bool:
+    if (id as i32) == 0 or stmts.kind(id) != CiStmtKind.CIS_BLOCK or stmts.get_d2(id) != 0:
+        return false
+    let start = stmts.get_d0(id)
+    for i in 0..stmts.get_d1(id):
+        if not ci_stmt_ir_renders_nothing(stmts, (stmts.get_extra(start + i)) as CiStmtId):
+            return false
+    true
+
+// Whether the text ci_print_stmt renders for `id`, as the tail of a function
+// body with no return type, infers Unit (D43, #1838): only then may a C
+// `void` function omit `-> Unit`. It follows the printer's layout. `top` is
+// the body's own level, where a tail assignment is a statement; in an arm an
+// assignment is its value, and an empty arm prints `0`. Anything not shown to
+// be Unit answers false, which keeps `-> Unit`: never wrong, only spelled.
+pub fn ci_stmt_ir_tail_is_unit(stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, id: CiStmtId, top: bool) -> bool:
+    if (id as i32) == 0:
+        return false
+    let kind = stmts.kind(id)
+    if kind == CiStmtKind.CIS_RETURN or kind == CiStmtKind.CIS_BREAK or kind == CiStmtKind.CIS_CONTINUE:
+        return true
+    if kind == CiStmtKind.CIS_VAR_DECL or kind == CiStmtKind.CIS_WHILE or kind == CiStmtKind.CIS_DO_WHILE:
+        return true
+    if kind == CiStmtKind.CIS_EXPR:
+        return stmts.get_flags(id) == CI_STMT_EXPR_VOID
+    if kind == CiStmtKind.CIS_ASSIGN:
+        // A memcpy-shaped assignment renders as a `with_memcpy`/`with_memset`
+        // call, whose value is a pointer.
+        return top and not ci_type_needs_memcpy_assignment(types, exprs.get_type((stmts.get_d0(id)) as CiExprId))
+    if kind == CiStmtKind.CIS_BLOCK:
+        if stmts.get_d2(id) != 0:
+            return false
+        let start = stmts.get_d0(id)
+        let count = stmts.get_d1(id)
+        // The printer's `let x: T = with 0 as … { … }` form of a
+        // declare-then-assign block is decided on its last statement like
+        // any block: an assignment, Unit at the top.
+        var i = count - 1
+        while i >= 0:
+            let child = (stmts.get_extra(start + i)) as CiStmtId
+            if not ci_stmt_ir_renders_nothing(stmts, child):
+                return ci_stmt_ir_tail_is_unit(stmts, exprs, types, child, top)
+            i = i - 1
+        // Nothing rendered: the body is `return`; an arm prints `0`.
+        return top
+    if kind == CiStmtKind.CIS_IF:
+        let then_b = (stmts.get_d1(id)) as CiStmtId
+        let else_b = (stmts.get_d2(id)) as CiStmtId
+        if (else_b as i32) == 0:
+            return true
+        // A terminating then-arm prints the else-arm after the `if`, at
+        // this level.
+        if ci_stmt_ir_ends_with_terminator(stmts, then_b):
+            if ci_stmt_ir_renders_nothing(stmts, else_b):
+                return true
+            return ci_stmt_ir_tail_is_unit(stmts, exprs, types, else_b, top)
+        return ci_stmt_ir_tail_is_unit(stmts, exprs, types, then_b, false) and ci_stmt_ir_tail_is_unit(stmts, exprs, types, else_b, false)
+    if kind == CiStmtKind.CIS_MATCH:
+        var cursor = stmts.get_d1(id)
+        for ai in 0..stmts.get_d2(id):
+            let value_count = stmts.get_extra(cursor)
+            let body_id = (stmts.get_extra(cursor + 1 + value_count)) as CiStmtId
+            if not ci_stmt_ir_tail_is_unit(stmts, exprs, types, body_id, false):
+                return false
+            cursor = cursor + 2 + value_count
+        return true
+    false
+
 // Operator precedence table. Larger = binds tighter. Used by Phase-B
 // B3 to decide when to drop redundant parens; Phase A always wraps
 // binary / unary expressions in explicit parentheses.
