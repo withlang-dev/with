@@ -28874,7 +28874,7 @@ impl Sema:
     // parameter is filled only when T is Copy. #2049: a non-Copy `implicit T`
     // was filled with a copy of the binding — the consuming callee and the
     // binding's scope both freed the one value (DOUBLE FREE).
-    fn implicit_param_fillable(sig_idx: i32, pi: i32) -> bool:
+    mut fn implicit_param_fillable(sig_idx: i32, pi: i32) -> bool:
         if sig_idx < 0:
             return true
         let param_ty = self.sig_param_type(sig_idx, pi)
