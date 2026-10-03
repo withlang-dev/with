@@ -1654,27 +1654,25 @@ impl CCodegen:
             let tid: i32 = self.fat_thunk_tids[i]
             i = i + 1
             let ret_tid = self.sema.get_type_d2(tid as TypeId)
-            if self.returns_array(ret_tid):
-                self.fail("emit-c: a fn value whose type returns an array has no C lowering (C returns no arrays; a named function takes an out-pointer, #1775)")
-                return ""
             let start = self.sema.get_type_d0(tid as TypeId)
             let count = self.sema.get_type_d1(tid as TypeId)
-            var params = "void* __with_ctx"
-            var args = ""
+            // #1817: an array return's out-pointer sits right after the
+            // context and is forwarded first to the named target.
+            var params = "void* __with_ctx" ++ self.array_out_param(ret_tid, true, true)
+            var args = if self.returns_array(ret_tid): "__with_ret" else: ""
             for pi in 0..count:
                 let p_tid: i32 = self.sema.type_extra[(start + pi)]
                 // c_decl, not c_type-plus-name: pointer-to-array params need
                 // the name inside the declarator (int32_t (*_p0)[2]).
                 params = params ++ ", " ++ self.c_decl(p_tid, f"_p{pi}")
-                if pi > 0:
+                if args.len() > 0:
                     args = args ++ ", "
                 args = args ++ f"_p{pi}"
             let body_sym = self.canonical_body_sym(fn_sym)
             let target = if body_sym != 0: self.fn_c_name(body_sym) else: self.extern_sym_c_name(fn_sym)
-            let thunk_sig = self.fat_thunk_name(fn_sym, tid) ++ "(" ++ params ++ ")"
-            let thunk_decl = if self.type_is_pointer_to_array(ret_tid): self.c_decl(ret_tid, thunk_sig) else: self.c_type(ret_tid, 1) ++ " " ++ thunk_sig
+            let thunk_decl = self.return_decl(ret_tid, self.fat_thunk_name(fn_sym, tid) ++ "(" ++ params ++ ")")
             out = out ++ "static " ++ thunk_decl ++ " " ++ cc_lbrace() ++ " (void)__with_ctx; "
-            if self.is_void_tid(ret_tid) != 0:
+            if self.is_void_tid(ret_tid) != 0 or self.returns_array(ret_tid):
                 out = out ++ target ++ "(" ++ args ++ "); "
             else:
                 out = out ++ "return " ++ target ++ "(" ++ args ++ "); "
@@ -2260,6 +2258,30 @@ impl CCodegen:
         if ret_tid <= 0 or ret_tid == CC_PSEUDO_TID_VEC or ret_tid == CC_PSEUDO_TID_FMT_BUF:
             return false
         self.sema.get_type_kind(self.sema.resolve_alias(ret_tid)) == TypeKind.TY_ARRAY
+
+    // #1817: the ONE rule every fn shape reads. A function whose With type
+    // returns an array returns void in C and takes the destination as the
+    // leading out-pointer: a named function as `(void* __with_ret, params)`,
+    // and every fat fn value — the TY_FN typedef, a thunk materializing a
+    // named function, a closure — right after the context:
+    // `(void* ctx, void* __with_ret, params)`. The indirect call site passes
+    // (ctx, dest, args...) and the direct one (dest, args...). This renders
+    // the out-pointer's parameter text (with a leading ", " when `after` is
+    // set, i.e. it follows the context) and nothing for every other return.
+    fn array_out_param(ret_tid: i32, named: bool, after: bool) -> str:
+        if not self.returns_array(ret_tid):
+            return ""
+        (if after: ", " else: "") ++ (if named: "void* __with_ret" else: "void*")
+
+    // The C return-type-plus-declarator of a function or fn-pointer shape:
+    // `void` when the array goes through the out-pointer, the declarator
+    // inside the type for a pointer-to-array, the plain type otherwise.
+    mut fn return_decl(ret_tid: i32, declarator: &str) -> str:
+        if self.returns_array(ret_tid):
+            return "void " ++ declarator
+        if self.type_is_pointer_to_array(ret_tid):
+            return self.c_decl(ret_tid, declarator)
+        self.c_type(ret_tid, 1) ++ " " ++ declarator
 
     fn vec_element_tid(tid: i32) -> i32:
         let resolved = self.sema.resolve_alias(tid)
@@ -8801,17 +8823,20 @@ impl CCodegen:
                 return "    abort();"
             self.call_lends = Vec.new()
             var args = if self.callee_is_str_builtin_ref != 0: self.builtin_method_ref_args_text(body, d1) else: self.call_args_text(body, d1, d0)
+            // #1817 (array_out_param): the leading arguments in the one
+            // order every signature declares them — the fat pair's context
+            // first, then the destination array (it decays to the callee's
+            // out-pointer), then the With arguments.
             let fat_callee_place = self.indirect_callee_place_id(body, d0, d1)
-            if fat_callee_place >= 0:
-                let ctx_text = self.place_text(body, fat_callee_place) ++ ".ctx"
-                args = if args.len() > 0: ctx_text ++ ", " ++ args else: ctx_text
-            var call_line = ""
-            if self.is_void_tid(ret_tid) != 0:
-                call_line = callee ++ "(" ++ args ++ ");"
-            else if self.returns_array(ret_tid):
-                // The destination array decays to the callee's out-pointer.
+            var lead = if fat_callee_place >= 0: self.place_text(body, fat_callee_place) ++ ".ctx" else: ""
+            if self.returns_array(ret_tid):
                 let dest = self.place_text(body, d2)
-                call_line = callee ++ "(" ++ (if args.len() > 0: dest ++ ", " ++ args else: dest) ++ ");"
+                lead = if lead.len() > 0: lead ++ ", " ++ dest else: dest
+            if lead.len() > 0:
+                args = if args.len() > 0: lead ++ ", " ++ args else: lead
+            var call_line = ""
+            if self.is_void_tid(ret_tid) != 0 or self.returns_array(ret_tid):
+                call_line = callee ++ "(" ++ args ++ ");"
             else:
                 call_line = self.place_text(body, d2) ++ " = " ++ callee ++ "(" ++ args ++ ");"
             var out = ""
@@ -9137,25 +9162,23 @@ impl CCodegen:
                 continue
             seen_names.insert(c_name.clone(), 1)
             let ret_tid = self.sema.get_type_d2(tid)
-            if self.returns_array(ret_tid):
-                self.fail("emit-c: a fn value whose type returns an array has no C lowering (C returns no arrays; a named function takes an out-pointer, #1775)")
-                return ""
             let start = self.sema.get_type_d0(tid)
             let count = self.sema.get_type_d1(tid)
             if tid_kind == TypeKind.TY_FN:
                 // Fat fn value: {fn_ptr, ctx} matching native's closure
-                // convention — fn_ptr always takes the context first.
-                var fat_params = "void*"
+                // convention — fn_ptr always takes the context first, then
+                // (#1817) an array return's out-pointer.
+                var fat_params = "void*" ++ self.array_out_param(ret_tid, false, true)
                 for pi in 0..count:
                     fat_params = fat_params ++ ", " ++ self.c_type(self.sema.type_extra[(start + pi)], 0)
-                let fat_ptr = "(*fn_ptr)(" ++ fat_params ++ ")"
-                var member = ""
-                if self.type_is_pointer_to_array(ret_tid):
-                    member = self.c_decl(ret_tid, fat_ptr)
-                else:
-                    member = self.c_type(ret_tid, 1) ++ " " ++ fat_ptr
+                let member = self.return_decl(ret_tid, "(*fn_ptr)(" ++ fat_params ++ ")")
                 out = out ++ "typedef struct " ++ cc_lbrace() ++ " " ++ member ++ "; void* ctx; " ++ cc_rbrace() ++ " " ++ self.fn_type_c_name(tid as i32) ++ ";\n"
                 continue
+            if self.returns_array(ret_tid):
+                // A C function pointer is a foreign ABI surface: C has no
+                // function returning an array, so no C type spells this.
+                self.fail("emit-c: an extern \"C\" fn pointer type returning an array is impossible in C (a C function cannot return an array, and a foreign pointer type carries no out-pointer convention)")
+                return ""
             var params = ""
             let variadic = self.sema.fn_type_is_variadic(tid as i32)
             if count == 0:
@@ -9168,11 +9191,7 @@ impl CCodegen:
                 // #1832: a C variadic function pointer.
                 if variadic:
                     params = params ++ ", ..."
-            let fn_name = "(*" ++ self.fn_type_c_name(tid as i32) ++ ")(" ++ params ++ ")"
-            if self.type_is_pointer_to_array(ret_tid):
-                out = out ++ "typedef " ++ self.c_decl(ret_tid, fn_name) ++ ";\n"
-            else:
-                out = out ++ "typedef " ++ self.c_type(ret_tid, 1) ++ " " ++ fn_name ++ ";\n"
+            out = out ++ "typedef " ++ self.return_decl(ret_tid, "(*" ++ self.fn_type_c_name(tid as i32) ++ ")(" ++ params ++ ")") ++ ";\n"
         if out.len() > 0:
             out = out ++ "\n"
         out
@@ -9726,12 +9745,12 @@ impl CCodegen:
             if param_count == 0:
                 self.fail(f"emit-c: variadic definition {fn_name} has no named parameter, which C before C23 cannot express")
             params = params ++ ", ..."
-        if self.returns_array(ret_tid):
-            return "void " ++ fn_name ++ "(void* __with_ret" ++ (if params.len() > 0: ", " ++ params else: "") ++ ")"
-        let name = fn_name ++ "(" ++ params ++ ")"
-        if self.type_is_pointer_to_array(ret_tid):
-            return self.c_decl(ret_tid, name)
-        self.c_type(ret_tid, 1) ++ " " ++ name
+        // #1775/#1817 (array_out_param): a named function's out-pointer
+        // leads; there is no context before it.
+        let out_param = self.array_out_param(ret_tid, true, false)
+        if out_param.len() > 0:
+            params = if params.len() > 0: out_param ++ ", " ++ params else: out_param
+        self.return_decl(ret_tid, fn_name ++ "(" ++ params ++ ")")
 
     mut fn prepare_c_type_instantiations():
         for i in 0..self.mir_mod.bodies.len() as i32:
@@ -10119,9 +10138,6 @@ impl CCodegen:
                 if kind != TypeKind.TY_FN:
                     self.fail(f"emit-c: the closure at {site} has a non-callable type")
                     return
-                if self.returns_array(closure_body.local_type_ids[0]):
-                    self.fail(f"emit-c: a closure returning an array has no C lowering (C returns no arrays, #1775; {site})")
-                    return
                 let env_kind = self.closure_env_kind_for(closure_body, node)
                 self.closure_index_by_sym.insert(sym, self.closure_syms.len() as i32)
                 self.closure_syms.push(sym)
@@ -10175,15 +10191,14 @@ impl CCodegen:
 
     mut fn closure_fn_sig(idx: i32) -> str:
         let body = self.closure_body_at(idx)
-        var params = "void* __with_ctx"
+        let ret_tid = body.local_type_ids[0]
+        // #1817: the array out-pointer after the context, as the fat
+        // typedef declares it; TK_RETURN copies `_0` into it.
+        var params = "void* __with_ctx" ++ self.array_out_param(ret_tid, true, true)
         for pi in body.anonymous_capture_count..body.n_params:
             let li = pi + 1
             params = params ++ ", " ++ self.c_decl(body.local_type_ids[li], f"_{li}")
-        let ret_tid = body.local_type_ids[0]
-        let name = self.closure_fn_name(idx) ++ "(" ++ params ++ ")"
-        if self.type_is_pointer_to_array(ret_tid):
-            return self.c_decl(ret_tid, name)
-        self.c_type(ret_tid, 1) ++ " " ++ name
+        self.return_decl(ret_tid, self.closure_fn_name(idx) ++ "(" ++ params ++ ")")
 
     // Every closure's environment struct, owned-cell struct and glue, and
     // prototype: before any body, since a body creates or runs them.
