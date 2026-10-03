@@ -14203,7 +14203,8 @@ impl MirBuilder:
         var ci = start_idx
         while ci < task_ops.len():
             let task_op = task_ops[ci]
-            self.emit_handle_call(task_op, MirIntrinsic.FIBER_CANCEL, node)
+            let cancel_op = self.observing_operand(task_op)
+            self.emit_handle_call(cancel_op, MirIntrinsic.FIBER_CANCEL, node)
             self.lower_cleanup_await(task_op, node)
             ci = ci + 1
 
