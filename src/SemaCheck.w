@@ -29609,7 +29609,48 @@ impl Sema:
                 self.mark_resolved_call_arg_default(call_node, pi4 - param_offset)
         param_count - param_offset
 
+    // #2043 (D65): a method call that is a compiler builtin records which
+    // one, decided here from the resolution this check made; codegen's
+    // dispatch switches on the record.
     mut fn check_method_call_parts(expr: i32, field: i32, extra_start: i32, arg_count: i32, node: i32, known_recv_ty: i32) -> i32:
+        let ret = self.check_method_call_parts_inner(expr, field, extra_start, arg_count, node, known_recv_ty)
+        if ret != 0 and not self.call_builtins.contains(node):
+            let builtin = self.method_call_builtin(expr, field, ret)
+            if builtin != CallBuiltin.None:
+                self.call_builtins.insert(node, builtin as i32)
+        ret
+
+    // `made` is the type the call produces (Sema just checked it).
+    fn method_call_builtin(expr: i32, field: i32, made: i32) -> CallBuiltin:
+        if field == self.syms.new:
+            if made <= 0:
+                return CallBuiltin.None
+            if self.type_is_std_box_inst(made) != 0:
+                return CallBuiltin.BoxNew
+            let made_r = self.resolve_alias(made as TypeId) as i32
+            if self.get_type_kind(made_r as TypeId) == TypeKind.TY_GENERIC_INST and self.pool_resolve(self.get_type_d0(made_r as TypeId)) == "Atomic":
+                return CallBuiltin.AtomicNew
+            return CallBuiltin.None
+        var recv = self.typed_expr_types.get(expr) ?? 0
+        for _ in 0..4:
+            if recv <= 0: break
+            let r = self.resolve_alias(recv as TypeId)
+            let k = self.get_type_kind(r)
+            if k != TypeKind.TY_REF and k != TypeKind.TY_PTR: break
+            recv = self.get_type_d0(r)
+        let recv_r = if recv > 0: self.resolve_alias(recv as TypeId) as i32 else: 0
+        if recv_r <= 0 or self.get_type_kind(recv_r as TypeId) != TypeKind.TY_GENERIC_INST:
+            return CallBuiltin.None
+        let method = self.pool_resolve(field)
+        if self.type_is_std_box_inst(recv_r) != 0 and method == "into_inner":
+            return CallBuiltin.BoxIntoInner
+        let owner = self.pool_resolve(self.get_type_d0(recv_r as TypeId))
+        if owner == "Sender" and method == "send": return CallBuiltin.EndpointSend
+        if owner == "Receiver" and method == "recv": return CallBuiltin.EndpointRecv
+        if (owner == "Sender" or owner == "Receiver") and method == "close": return CallBuiltin.EndpointClose
+        CallBuiltin.None
+
+    mut fn check_method_call_parts_inner(expr: i32, field: i32, extra_start: i32, arg_count: i32, node: i32, known_recv_ty: i32) -> i32:
         let static_type_sym = self.static_receiver_base_sym(expr)
         let early_method_name: str = with_str_clone_ref(self.pool_resolve(field))
         if static_type_sym != 0 and self.pool_resolve(static_type_sym) == "Iter" and self.iterator_constructor_known_but_unimplemented(early_method_name):
@@ -29899,6 +29940,7 @@ impl Sema:
             let task_ty = arg_types[0]
             let scoped_args: Vec[i32] = Vec.new()
             scoped_args.push(self.unwrap_task_type(task_ty as TypeId) as i32)
+            self.call_builtins.insert(node, CallBuiltin.ScopeTrack as i32)
             return self.ensure_generic_inst_type(self.syms.scoped_task, scoped_args, 1) as i32
 
         // §18.2 (#1303): the receiver's own `spawn` method wins over the
@@ -29918,12 +29960,14 @@ impl Sema:
                 if self.get_type_d1(worker_fn_ty) != 0 or self.get_type_d2(worker_fn_ty) != self.ty_i32:
                     self.emit_error("spawn() requires a fn() -> i32 worker", node)
             if self.named_types.contains(self.syms.scoped_join_handle):
+                self.call_builtins.insert(node, CallBuiltin.ScopeSpawn as i32)
                 return self.named_types.get(self.syms.scoped_join_handle).unwrap()
             self.emit_error("ScopedJoinHandle is missing from the prelude", node)
             return 0
 
         if field == self.syms.join:
             if self.type_is_scoped_join_handle(obj_type as i32) != 0:
+                self.call_builtins.insert(node, CallBuiltin.ScopedJoin as i32)
                 if mc_resolved_arg_count != 0:
                     self.emit_error("join() expects zero arguments", node)
                     return 0
