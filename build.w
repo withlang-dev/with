@@ -1171,10 +1171,15 @@ fn package_current_host_target() -> Target:
         return target.dep("package-windows-aarch64")
     target.dep("package-darwin-aarch64")
 
-fn package_llvm_sdk_platform_target(name: &str, platform: &str, prefix: &str, build_cache: &str) -> Target:
+// The SDK archive of `prefix`, with its digest and manifest, in `dir`. An
+// SDK fetched into .deps is repackaged into out/release (the release
+// payload); a source-built one (sdk-package, sdk-cross-aarch64-package) into
+// out/sdk-release. One directory per packager: both once wrote
+// out/release/<asset>, two targets owning one file (#2014).
+fn package_llvm_sdk_platform_target(name: &str, dir: &str, platform: &str, prefix: &str, build_cache: &str) -> Target:
     let asset = sdk_asset_for_platform(platform)
     let sdk_base = "llvm-" ++ compiler_llvm_version() ++ "-" ++ sdk_host_tag_for_platform(platform)
-    var target = target_new(.Action, build_owned_text(name), "").output("out/release/" ++ name ++ ".passed")
+    var target = target_new(.Action, build_owned_text(name), "").output(dir ++ "/" ++ name ++ ".passed")
     target = target.dep("sdk-contract-tests")
     target.action = run_package_llvm_sdk_action
     target = target.arg(build_owned_text(platform))
@@ -1189,10 +1194,10 @@ fn package_llvm_sdk_platform_target(name: &str, platform: &str, prefix: &str, bu
     if platform == "darwin-aarch64":
         target = target.dep("darwin-sysroot")
         target = target.input(sdk_darwin_sysroot_pack())
-    target = target.extra_output("out/release/" ++ asset)
-    target = target.extra_output("out/release/" ++ asset ++ ".sha256")
-    target = target.extra_output("out/release/" ++ asset ++ ".manifest")
-    target = target.write_scope("out/release")
+    target = target.extra_output(dir ++ "/" ++ asset)
+    target = target.extra_output(dir ++ "/" ++ asset ++ ".sha256")
+    target = target.extra_output(dir ++ "/" ++ asset ++ ".manifest")
+    target = target.write_scope(build_owned_text(dir))
     target = target.write_scope("out/command/" ++ name)
     target.timeout(1800000)
 
@@ -1317,7 +1322,7 @@ fn add_sdk_cross_aarch64_targets(out0: Build, ctx: &BuildCtx) -> Build:
     // The host SDK build (sdk-llvm) supplies the tablegens the cross build runs.
     llvm = llvm.dep("sdk-llvm-source").dep("sdk-cross-aarch64-cmake").dep("sdk-cross-aarch64-runtimes").dep("sdk-llvm")
     out = out.add_target(llvm.timeout(21600000))
-    let package = package_llvm_sdk_platform_target("sdk-cross-aarch64-package", platform, prefix, llvm_build ++ "/CMakeCache.txt")
+    let package = package_llvm_sdk_platform_target("sdk-cross-aarch64-package", "out/sdk-release", platform, prefix, llvm_build ++ "/CMakeCache.txt")
     out = out.add_target(package.dep("sdk-cross-aarch64-llvm"))
     out
 
@@ -1512,7 +1517,7 @@ fn sdk_group_target() -> Target:
 
 fn sdk_package_target(ctx: &BuildCtx) -> Target:
     let platform = sdk_current_platform()
-    var target = package_llvm_sdk_platform_target("sdk-package", platform, sdk_output_prefix_arg(ctx, platform), sdk_output_llvm_cache_for_platform(platform))
+    var target = package_llvm_sdk_platform_target("sdk-package", "out/sdk-release", platform, sdk_output_prefix_arg(ctx, platform), sdk_output_llvm_cache_for_platform(platform))
     target.dep("sdk")
 
 // The unit digests of the two compiles `:fixpoint` compares.
@@ -2708,11 +2713,11 @@ pub fn build(ctx: BuildCtx) -> Build:
     sdk_contract = sdk_contract.extra_output("out/test-graph/sdk-contract-tests/repeat.tar.gz")
     sdk_contract = sdk_contract.write_scope("out/test-graph/sdk-contract-tests")
     out = out.add_target(sdk_contract)
-    out = out.add_target(package_llvm_sdk_platform_target("package-llvm-sdk-darwin-aarch64", "darwin-aarch64", sdk_default_prefix_for_platform("darwin-aarch64"), sdk_default_build_cache_for_platform("darwin-aarch64")))
-    out = out.add_target(package_llvm_sdk_platform_target("package-llvm-sdk-linux-x86_64", "linux-x86_64", sdk_default_prefix_for_platform("linux-x86_64"), sdk_default_build_cache_for_platform("linux-x86_64")))
-    out = out.add_target(package_llvm_sdk_platform_target("package-llvm-sdk-linux-aarch64", "linux-aarch64", sdk_default_prefix_for_platform("linux-aarch64"), sdk_default_build_cache_for_platform("linux-aarch64")))
-    out = out.add_target(package_llvm_sdk_platform_target("package-llvm-sdk-windows-x86_64", "windows-x86_64", sdk_default_prefix_for_platform("windows-x86_64"), sdk_default_build_cache_for_platform("windows-x86_64")))
-    out = out.add_target(package_llvm_sdk_platform_target("package-llvm-sdk-windows-aarch64", "windows-aarch64", sdk_default_prefix_for_platform("windows-aarch64"), sdk_default_build_cache_for_platform("windows-aarch64")))
+    out = out.add_target(package_llvm_sdk_platform_target("package-llvm-sdk-darwin-aarch64", "out/release", "darwin-aarch64", sdk_default_prefix_for_platform("darwin-aarch64"), sdk_default_build_cache_for_platform("darwin-aarch64")))
+    out = out.add_target(package_llvm_sdk_platform_target("package-llvm-sdk-linux-x86_64", "out/release", "linux-x86_64", sdk_default_prefix_for_platform("linux-x86_64"), sdk_default_build_cache_for_platform("linux-x86_64")))
+    out = out.add_target(package_llvm_sdk_platform_target("package-llvm-sdk-linux-aarch64", "out/release", "linux-aarch64", sdk_default_prefix_for_platform("linux-aarch64"), sdk_default_build_cache_for_platform("linux-aarch64")))
+    out = out.add_target(package_llvm_sdk_platform_target("package-llvm-sdk-windows-x86_64", "out/release", "windows-x86_64", sdk_default_prefix_for_platform("windows-x86_64"), sdk_default_build_cache_for_platform("windows-x86_64")))
+    out = out.add_target(package_llvm_sdk_platform_target("package-llvm-sdk-windows-aarch64", "out/release", "windows-aarch64", sdk_default_prefix_for_platform("windows-aarch64"), sdk_default_build_cache_for_platform("windows-aarch64")))
     out = out.add_target(package_llvm_sdk_current_host_target())
 
     out = out.add_target(sdk_source_target("sdk-ninja-source", sdk_ninja_source_url(), sdk_ninja_source_sha256(), sdk_ninja_archive(), sdk_source_root(), sdk_ninja_source_dir(), sdk_ninja_source_marker()))

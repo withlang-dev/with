@@ -133,11 +133,11 @@ jobs:
         run: |
           set -euo pipefail
           gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName
-          ls -l out/release/with-llvm-sdk-*.tar.gz out/release/with-llvm-sdk-*.tar.gz.sha256 out/release/with-llvm-sdk-*.tar.gz.manifest
+          ls -l out/sdk-release/with-llvm-sdk-*.tar.gz out/sdk-release/with-llvm-sdk-*.tar.gz.sha256 out/sdk-release/with-llvm-sdk-*.tar.gz.manifest
           gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --clobber \
-            out/release/with-llvm-sdk-*.tar.gz \
-            out/release/with-llvm-sdk-*.tar.gz.sha256 \
-            out/release/with-llvm-sdk-*.tar.gz.manifest
+            out/sdk-release/with-llvm-sdk-*.tar.gz \
+            out/sdk-release/with-llvm-sdk-*.tar.gz.sha256 \
+            out/sdk-release/with-llvm-sdk-*.tar.gz.manifest
 
   sdk-linux-x86_64:
     name: SDK linux-x86_64
@@ -220,11 +220,11 @@ jobs:
         run: |
           set -euo pipefail
           gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName
-          ls -l out/release/with-llvm-sdk-*.tar.gz out/release/with-llvm-sdk-*.tar.gz.sha256 out/release/with-llvm-sdk-*.tar.gz.manifest
+          ls -l out/sdk-release/with-llvm-sdk-*.tar.gz out/sdk-release/with-llvm-sdk-*.tar.gz.sha256 out/sdk-release/with-llvm-sdk-*.tar.gz.manifest
           gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --clobber \
-            out/release/with-llvm-sdk-*.tar.gz \
-            out/release/with-llvm-sdk-*.tar.gz.sha256 \
-            out/release/with-llvm-sdk-*.tar.gz.manifest
+            out/sdk-release/with-llvm-sdk-*.tar.gz \
+            out/sdk-release/with-llvm-sdk-*.tar.gz.sha256 \
+            out/sdk-release/with-llvm-sdk-*.tar.gz.manifest
 
   sdk-linux-aarch64:
     name: SDK linux-aarch64
@@ -348,11 +348,11 @@ jobs:
         run: |
           set -euo pipefail
           gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName
-          ls -l out/release/with-llvm-sdk-*.tar.gz out/release/with-llvm-sdk-*.tar.gz.sha256 out/release/with-llvm-sdk-*.tar.gz.manifest
+          ls -l out/sdk-release/with-llvm-sdk-*.tar.gz out/sdk-release/with-llvm-sdk-*.tar.gz.sha256 out/sdk-release/with-llvm-sdk-*.tar.gz.manifest
           gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --clobber \
-            out/release/with-llvm-sdk-*.tar.gz \
-            out/release/with-llvm-sdk-*.tar.gz.sha256 \
-            out/release/with-llvm-sdk-*.tar.gz.manifest
+            out/sdk-release/with-llvm-sdk-*.tar.gz \
+            out/sdk-release/with-llvm-sdk-*.tar.gz.sha256 \
+            out/sdk-release/with-llvm-sdk-*.tar.gz.manifest
 
   sdk-windows-x86_64:
     name: SDK windows-x86_64
@@ -456,11 +456,11 @@ jobs:
         run: |
           set -euo pipefail
           gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName
-          ls -l out/release/with-llvm-sdk-*.tar.gz out/release/with-llvm-sdk-*.tar.gz.sha256 out/release/with-llvm-sdk-*.tar.gz.manifest
+          ls -l out/sdk-release/with-llvm-sdk-*.tar.gz out/sdk-release/with-llvm-sdk-*.tar.gz.sha256 out/sdk-release/with-llvm-sdk-*.tar.gz.manifest
           gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --clobber \
-            out/release/with-llvm-sdk-*.tar.gz \
-            out/release/with-llvm-sdk-*.tar.gz.sha256 \
-            out/release/with-llvm-sdk-*.tar.gz.manifest
+            out/sdk-release/with-llvm-sdk-*.tar.gz \
+            out/sdk-release/with-llvm-sdk-*.tar.gz.sha256 \
+            out/sdk-release/with-llvm-sdk-*.tar.gz.manifest
 
   sdk-windows-aarch64:
     name: SDK windows-aarch64
@@ -597,8 +597,8 @@ jobs:
         run: |
           set -euo pipefail
           gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName
-          ls -l out/release/with-llvm-sdk-*.tar.gz out/release/with-llvm-sdk-*.tar.gz.sha256 out/release/with-llvm-sdk-*.tar.gz.manifest
+          ls -l out/sdk-release/with-llvm-sdk-*.tar.gz out/sdk-release/with-llvm-sdk-*.tar.gz.sha256 out/sdk-release/with-llvm-sdk-*.tar.gz.manifest
           gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --clobber \
-            out/release/with-llvm-sdk-*.tar.gz \
-            out/release/with-llvm-sdk-*.tar.gz.sha256 \
-            out/release/with-llvm-sdk-*.tar.gz.manifest
+            out/sdk-release/with-llvm-sdk-*.tar.gz \
+            out/sdk-release/with-llvm-sdk-*.tar.gz.sha256 \
+            out/sdk-release/with-llvm-sdk-*.tar.gz.manifest

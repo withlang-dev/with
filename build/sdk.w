@@ -632,7 +632,16 @@ pub fn run_package_llvm_sdk_action(ctx: ActionCtx) -> i32:
     var rc = sdk_validate_package_prefix(ctx, platform, prefix, build_cache)
     if rc != 0:
         return rc
-    let output_path = sdk_join("out/release", asset)
+    // Beside the target's stamp: out/release for a repackaged .deps SDK,
+    // out/sdk-release for a source-built one (build.w
+    // package_llvm_sdk_platform_target).
+    // Root-relative, as the .sha256 sidecar names the archive.
+    let stamp_dir = sdk_dirname(ctx.output())
+    let root_rel = sdk_rel_path(ctx.project_info().project_root(), stamp_dir)
+    let dir = if root_rel.len() > 0: root_rel else: stamp_dir
+    if dir == ".":
+        return sdk_fail(ctx, "requires a stamp output in the package directory")
+    let output_path = sdk_join(dir, asset)
     let entries = sdk_package_entries(ctx, prefix, sdk_base, platform)
     if entries.len() == 0:
         return sdk_fail(ctx, "SDK package would be empty")
@@ -661,8 +670,8 @@ pub fn run_package_llvm_sdk_action(ctx: ActionCtx) -> i32:
         if rel.starts_with("lib/LLVMWebAssembly") or rel.starts_with("lib/libLLVMWebAssembly"):
             if not selected.contains(sdk_base ++ "/" ++ rel ++ "\n"):
                 return sdk_fail(ctx, "SDK archive selection omitted " ++ rel)
-    if ctx.fs().mkdir_all("out/release") != 0:
-        return sdk_fail(ctx, "could not create out/release")
+    if ctx.fs().mkdir_all(dir) != 0:
+        return sdk_fail(ctx, "could not create " ++ dir)
     if ctx.fs().write_tar_gz(output_path, entries) != 0:
         return sdk_fail(ctx, "could not write SDK archive: " ++ output_path)
     let sha = ctx.fs().sha256_file(output_path)

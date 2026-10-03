@@ -15,7 +15,7 @@ runs:
       uses: actions/cache/restore@v4
       with:
         path: |
-          out/release/with-llvm-sdk-*.tar.gz*
+          out/sdk-release/with-llvm-sdk-*.tar.gz*
           out/test-graph/sdk-contract-tests
         key: source-sdk-${{ inputs.host-tag }}-22.1.6-${{ hashFiles('build.w', 'build/*.w', 'lib/std/build.w', 'lib/std/zl/*.w', 'lib/std/crypto/bigint.w', 'seed.lock', '.github/actions/source-sdk/action.yml') }}
 
@@ -216,7 +216,7 @@ runs:
           stage1=".deps/llvm-22.1.6-$host-stage1"
           rm -rf "$stage1"
           mv "out/sdk/$host/install/llvm-22.1.6-$host" "$stage1"
-          rm -rf "out/sdk/$host" out/release/with-llvm-sdk-*
+          rm -rf "out/sdk/$host" out/sdk-release/with-llvm-sdk-*
           export SDK_BOOTSTRAP_PREFIX="$stage1"
           echo "source-sdk: stage 1 was built by the runner's toolchain; rebuilding the SDK with stage 1's own tools ($stage1) and packaging only that"
           "$WITH" build :sdk-package
@@ -240,7 +240,7 @@ runs:
       uses: actions/upload-artifact@v4
       with:
         name: source-sdk-${{ inputs.host-tag }}
-        path: out/release/with-llvm-sdk-*.tar.gz*
+        path: out/sdk-release/with-llvm-sdk-*.tar.gz*
         if-no-files-found: error
         compression-level: 0
 
@@ -251,7 +251,7 @@ runs:
       run: |
         set -euo pipefail
         mkdir -p .deps/wasm-sdk
-        for archive in out/release/with-llvm-sdk-*.tar.gz; do
+        for archive in out/sdk-release/with-llvm-sdk-*.tar.gz; do
           if [[ "$RUNNER_OS" == macOS ]]; then
             shasum -a 256 -c "$archive.sha256"
           else
@@ -274,7 +274,7 @@ runs:
       uses: actions/cache/save@v4
       with:
         path: |
-          out/release/with-llvm-sdk-*.tar.gz*
+          out/sdk-release/with-llvm-sdk-*.tar.gz*
           out/test-graph/sdk-contract-tests
         key: ${{ steps.sdk-cache.outputs.cache-primary-key }}
 
