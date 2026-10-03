@@ -10,7 +10,7 @@
 use std.task.Task
 use std.collections.Atomic
 extern fn with_fiber_live_fibers() -> i32
-extern fn with_runtime_run_one_step() -> Unit
+extern fn with_runtime_run_one_step()
 
 var resumed: Atomic[i32]
 var batch_drops: Atomic[i32]
