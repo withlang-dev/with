@@ -10466,6 +10466,14 @@ impl MirBuilder:
     // result_ty: sema type of the unwrapped result (T from Task[T])
     // task_ty: sema type of the Task value (Task[T])
     // node: AST node for the await expression (for span/ast_node)
+    // The same place `op` names, read without taking it (a `move` becomes a
+    // `copy`); any other operand as it is.
+    mut fn observing_operand(op: i32) -> i32:
+        if op < 0 or op >= self.body.operand_kinds.len() as i32 or self.body.operand_kinds[op] != OperandKind.OK_MOVE:
+            return op
+        let place: i32 = self.body.operand_d0[op]
+        self.body.new_operand(OperandKind.OK_COPY, place)
+
     mut fn lower_single_await(task_op: i32, result_ty: i32, task_ty: i32, node: i32, await_owns: i32) -> i32:
         let no_siblings: Vec[i32] = Vec.new()
         self.lower_group_await(task_op, result_ty, task_ty, node, await_owns, &no_siblings, 0)
@@ -10479,12 +10487,17 @@ impl MirBuilder:
     // no one.
     mut fn lower_group_await(task_op: i32, result_ty: i32, task_ty: i32, node: i32, await_owns: i32, sibling_ops: &Vec[i32], next_sibling: i32) -> i32:
         let span = self.ast.get_start(node)
+        // #1993: each path reads the handle and takes it once. The await
+        // parks on it and cancel observes it (copy); the normal path's
+        // result read and the unwind path's cleanup await take it (move). A
+        // `move` at the park left every later read a read of moved storage.
+        let observe_op = self.observing_operand(task_op)
 
         // 1. Emit FIBER_AWAIT intrinsic call. Arg 1 (await_owns) tells codegen whether
         // this value-await OWNS the result buffer and must free it (§14.7/G3): 1 for a
         // temporary/owned-local await, 0 for a borrowed param (the owner's drop frees).
         let await_args: Vec[i32] = Vec.new()
-        await_args.push(task_op)
+        await_args.push(observe_op)
         await_args.push(self.const_operand(ConstKind.CK_INT, await_owns, self.sema.ty_i32))
         let await_args_id = self.body.new_call_args(await_args)
         self.body.set_call_intrinsic(await_args_id, MirIntrinsic.FIBER_AWAIT)
@@ -10523,7 +10536,7 @@ impl MirBuilder:
         // 3. Self-cancel BB: cancel child, join it for cleanup, then unwind.
         self.switch_to(self_cancel_bb)
         let cancel_args: Vec[i32] = Vec.new()
-        cancel_args.push(task_op)
+        cancel_args.push(self.observing_operand(task_op))
         let cancel_call_id = self.body.new_call_args(cancel_args)
         self.body.set_call_intrinsic(cancel_call_id, MirIntrinsic.FIBER_CANCEL)
         self.body.set_call_ast_node(cancel_call_id, node)

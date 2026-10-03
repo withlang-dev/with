@@ -29535,6 +29535,13 @@ impl Sema:
             if mc_resolved_arg_count != 0:
                 self.emit_error("task method expects zero arguments", node)
                 return 0
+            // #1993: join_cleanup releases the task (cancel, cleanup await,
+            // result freed): it consumes an owned Task binding, so a later
+            // use is a use of a moved value — it could only read a released
+            // handle. Lowering moves the binding into the cleanup await.
+            if field == self.syms.join_cleanup and self.ast.kind(expr) == NodeKind.NK_IDENT and self.type_is_task(obj_type as i32) != 0:
+                self.mark_moved_if_consumed(expr)
+                self.join_cleanup_consumed_calls.insert(node, 1)
             if field == self.syms.cancel or field == self.syms.join_cleanup:
                 return self.ty_void as i32
             return self.ty_bool as i32
