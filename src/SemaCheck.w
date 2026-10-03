@@ -31207,6 +31207,8 @@ impl Sema:
             let read_result = self.read_tracked_embed_file(source_path, path_value.text)
             if not read_result.ok:
                 self.emit_error(read_result.error_msg, node)
+            else:
+                self.embed_file_contents.insert(node, read_result.contents.clone())
             return self.ty_str as i32
         // Free math builtin: `cos(x)`, `pow(x, y)`. Width-generic — the result
         // is the argument's float type, and a second operand must share it.
