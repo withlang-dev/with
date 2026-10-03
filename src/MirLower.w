@@ -17737,10 +17737,13 @@ impl MirBuilder:
                 let task_op = self.lower_expr(task_node)
                 task_ops.push(task_op)
 
-            // 2. Emit select intrinsic call: passes all task operands, returns winner index
+            // 2. Emit select intrinsic call: passes all task operands, returns winner index.
+            // #2011: the select observes every task (copy); on each arm's
+            // path every task is taken once — the winner by its await, each
+            // loser by its cleanup await (its cancel observes).
             let select_args: Vec[i32] = Vec.new()
             for ai in 0..arm_count:
-                select_args.push(task_ops[ai])
+                select_args.push(self.observing_operand(task_ops[ai]))
             let select_call_id = self.body.new_call_args(select_args)
             let select_biased = self.ast.get_data2(node)
             let select_intrinsic = if select_biased != 0: MirIntrinsic.FIBER_SELECT_BIASED else: MirIntrinsic.FIBER_SELECT
@@ -17768,7 +17771,12 @@ impl MirBuilder:
             // 4. Switch on winner index
             let switch_op = self.body.new_operand(OperandKind.OK_COPY, select_result_place)
             let switch_table = self.body.new_switch_table(switch_vals, arm_bbs)
-            self.terminate(TermKind.TK_SWITCH_INT, switch_op, switch_table, join_bb, 0)
+            // #2011: the select returns one of the arm indices; no other value
+            // reaches the join. Its default edge went to the join and read the
+            // result no arm wrote on it (validate-all: "read of _4 reaches a
+            // path that never initialized it").
+            let no_winner_bb = self.new_unreachable_block()
+            self.terminate(TermKind.TK_SWITCH_INT, switch_op, switch_table, no_winner_bb, 0)
 
             // 5. Each arm: await winner, cancel losers, execute body
             for ai in 0..arm_count:
@@ -17808,7 +17816,7 @@ impl MirBuilder:
                     if li != ai:
                         let cancel_args: Vec[i32] = Vec.new()
                         let loser_task = task_ops[li]
-                        cancel_args.push(loser_task)
+                        cancel_args.push(self.observing_operand(loser_task))
                         let cancel_call_id = self.body.new_call_args(cancel_args)
                         self.body.set_call_intrinsic(cancel_call_id, MirIntrinsic.FIBER_CANCEL)
                         self.body.set_call_ast_node(cancel_call_id, node)
@@ -17820,11 +17828,18 @@ impl MirBuilder:
                         self.switch_to(after_cancel_bb)
                         self.lower_cleanup_await(loser_task, node)
 
-                // Execute arm body
+                // Execute arm body. #2011: its temporaries drop inside the arm,
+                // as an if branch's do (#729/#771) — left to the select's frame
+                // they dropped at the join on every arm's path, one that never
+                // wrote them among them. A temp moved into the result is
+                // cancelled by assign_operand_to_place before the frame closes.
+                let arm_temp_frame = self.push_stmt_temp_frame()
+                let arm_scoped = self.enter_body_scope(arm_body)
                 let body_op = self.lower_expr(arm_body)
-
-                // Store body result and branch to join
-                self.assign_operand_to_place(result_place, body_op, span)
+                if self.sema.body_can_fall_through(arm_body) != 0:
+                    self.assign_operand_to_place(result_place, body_op, span)
+                self.leave_body_scope(arm_scoped)
+                self.finish_stmt_temp_frame(arm_temp_frame)
                 self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
             self.switch_to(join_bb)
