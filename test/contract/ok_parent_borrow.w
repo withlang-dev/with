@@ -1,14 +1,11 @@
-//! expect-error: view `b` borrows from `st`, which `sqlite3_step` may have invalidated
+//! expect-contract: violations=0 ok
 
-// #1977, D51 §38 / spec §16.2b.7 ("unknown effect means invalidate"):
-// whether `step` invalidates a borrowed database handle is not inferred
-// from the handle's type — inferring "not invalidated" can create
-// unsafety — so `step` with no `preserves` invalidates every view of the
-// statement, the `BorrowedDatabase` included. The audit fix
-// (contract/ok_borrowed_resource_effect.w) leaves this refusal as it was.
-// A facade states that the handle is the statement's parent connection
-// with `returns borrow Database from parent Database of param 0` (D85,
-// #2003): then `step` leaves it valid (behav_c_facade_parent_borrow.w).
+// D85 (#2003; spec §16.2b.6): `returns borrow Database from parent
+// Database of param 0` hands out the parent connection of the statement
+// (sqlite3_db_handle). The contract view names the parent and the param it
+// is read through; the audit checks the presented method views through
+// that param (acceptance reads the same declared summary), so the borrow
+// is tied to the connection: `st.step()` leaves it valid.
 use c_import("typedef struct sqlite3 sqlite3;\ntypedef struct sqlite3_stmt sqlite3_stmt;\n#define SQLITE_OK 0\nint sqlite3_open(const char *filename, sqlite3 **ppDb);\nint sqlite3_close(sqlite3 *db);\nint sqlite3_prepare_v2(sqlite3 *db, const char *zSql, int nByte, sqlite3_stmt **ppStmt, const char **pzTail);\nint sqlite3_step(sqlite3_stmt *pStmt);\nint sqlite3_finalize(sqlite3_stmt *pStmt);\nint sqlite3_changes(sqlite3 *db);\nsqlite3 *sqlite3_db_handle(sqlite3_stmt *pStmt);\n")
 
 c facade sqlite:
@@ -30,7 +27,7 @@ c facade sqlite:
     fn sqlite3_changes
         lend
     fn sqlite3_db_handle
-        returns borrow Database from param 0
+        returns borrow Database from parent Database of param 0
         of Statement
         rename database
 

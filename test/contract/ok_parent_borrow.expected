@@ -1,0 +1,49 @@
+foreign-contract view	v1
+resource Database wraps *mut sqlite3; representation: pointer; facade:sqlite@test/contract/ok_parent_borrow.w; clause:resource@test/contract/ok_parent_borrow.w:12
+    producer: sqlite3_open -> Database.open; production: out parameter (param 1: *mut *mut sqlite3 ppDb); the slot starts NULL and is inspected after the call  [clause:from@test/contract/ok_parent_borrow.w:13]
+    status: ok SQLITE_OK; a status-returning producer is Result[Database, DatabaseError]  [clause:ok@test/contract/ok_parent_borrow.w:15]
+    destroyer: sqlite3_close; automatic: Drop calls it while the value is live  [clause:drop@test/contract/ok_parent_borrow.w:14]
+    dependency: none via sqlite3_open; it receives no modeled resource  [default:no resource parameter (§16.2b.6)]
+    thread: creator; operations and destruction on the creating thread, ownership stays there  [default:thread creator (§16.2b.10)]
+    view: BorrowedDatabase from sqlite3_db_handle, the Database parent of param 0: *mut sqlite3_stmt pStmt (Statement); it lives as long as that parent's origin, and an operation through it is an operation on that origin  [clause:fn@test/contract/ok_parent_borrow.w:29]
+    invalidation: views invalidated by: sqlite3_open, sqlite3_close, sqlite3_prepare_v2, sqlite3_changes; preserved across: none  [default:unknown effect is invalidate; `preserves param N` states otherwise (§16.2b.7)]
+resource Statement wraps *mut sqlite3_stmt; representation: pointer; facade:sqlite@test/contract/ok_parent_borrow.w; clause:resource@test/contract/ok_parent_borrow.w:16
+    producer: sqlite3_prepare_v2 -> Statement.prepare; production: out parameter (param 3: *mut *mut sqlite3_stmt ppStmt); the slot starts NULL and is inspected after the call  [clause:from@test/contract/ok_parent_borrow.w:17]
+    status: ok SQLITE_OK; a status-returning producer is Result[Statement, StatementError]  [clause:ok@test/contract/ok_parent_borrow.w:19]
+    destroyer: sqlite3_finalize; automatic: Drop calls it while the value is live  [clause:drop@test/contract/ok_parent_borrow.w:18]
+    dependency: parent Database via sqlite3_prepare_v2 param 0: *mut sqlite3 db; the product cannot outlive it  [clause:borrows@test/contract/ok_parent_borrow.w:20]
+    thread: creator; operations and destruction on the creating thread, ownership stays there  [default:thread creator (§16.2b.10)]
+    invalidation: views invalidated by: sqlite3_prepare_v2, sqlite3_step, sqlite3_finalize, sqlite3_db_handle, sqlite3.prepare_v2, sqlite3.db_handle; preserved across: none  [default:unknown effect is invalidate; `preserves param N` states otherwise (§16.2b.7)]
+fn sqlite3_prepare_v2; facade:sqlite@test/contract/ok_parent_borrow.w; clause:fn@test/contract/ok_parent_borrow.w:21
+    role: producer of Statement  [clause:resource@test/contract/ok_parent_borrow.w:16]
+    callbacks: may invoke applicable callbacks  [default:conservatively reentrant (§16.2b.9)]
+    effect: param 0: *mut sqlite3 db: lend, the described fn's assertion; receives Database  [default:a described fn lends its parameters (§16.2b.5)]
+    effect: param 1: *const i8 zSql: lend, the described fn's assertion  [default:a described fn lends its parameters (§16.2b.5)]
+    effect: param 2: i32 nByte: lend, the described fn's assertion  [default:a described fn lends its parameters (§16.2b.5)]
+    effect: param 3: *mut *mut sqlite3_stmt ppStmt: out parameter producing Statement  [clause:from@test/contract/ok_parent_borrow.w:17]
+    effect: param 4: *mut *const i8 pzTail: lend, the described fn's assertion  [default:a described fn lends its parameters (§16.2b.5)]
+    returns: i32  [default:as declared]
+    invalidates: Database (param 0: *mut sqlite3 db), Statement (param 3: *mut *mut sqlite3_stmt ppStmt)  [default:unknown effect is invalidate (§16.2b.7)]
+    presentation: rename prepare  [clause:rename@test/contract/ok_parent_borrow.w:22]
+fn sqlite3_step; facade:sqlite@test/contract/ok_parent_borrow.w; clause:fn@test/contract/ok_parent_borrow.w:25
+    callbacks: may invoke applicable callbacks  [default:conservatively reentrant (§16.2b.9)]
+    effect: param 0: *mut sqlite3_stmt pStmt: lend, an assertion about foreign behavior; receives Statement  [clause:lend@test/contract/ok_parent_borrow.w:26]
+    returns: i32  [default:as declared]
+    invalidates: Statement (param 0: *mut sqlite3_stmt pStmt)  [default:unknown effect is invalidate (§16.2b.7)]
+    presentation: Statement.step  [default:presentation sugar from the resource prefix (§16.2b.11)]
+fn sqlite3_changes; facade:sqlite@test/contract/ok_parent_borrow.w; clause:fn@test/contract/ok_parent_borrow.w:27
+    callbacks: may invoke applicable callbacks  [default:conservatively reentrant (§16.2b.9)]
+    effect: param 0: *mut sqlite3 db: lend, an assertion about foreign behavior; receives Database  [clause:lend@test/contract/ok_parent_borrow.w:28]
+    returns: i32  [default:as declared]
+    invalidates: Database (param 0: *mut sqlite3 db)  [default:unknown effect is invalidate (§16.2b.7)]
+    presentation: Database.changes  [default:presentation sugar from the resource prefix (§16.2b.11)]
+fn sqlite3_db_handle; facade:sqlite@test/contract/ok_parent_borrow.w; clause:fn@test/contract/ok_parent_borrow.w:29
+    callbacks: may invoke applicable callbacks  [default:conservatively reentrant (§16.2b.9)]
+    effect: param 0: *mut sqlite3_stmt pStmt: lend, the described fn's assertion; receives Statement  [default:a described fn lends its parameters (§16.2b.5)]
+    returns: borrow Database from parent Database of param 0: *mut sqlite3_stmt pStmt (Statement); Option[BorrowedDatabase], nullable, no Drop  [clause:returns borrow@test/contract/ok_parent_borrow.w:30]
+    invalidates: Statement (param 0: *mut sqlite3_stmt pStmt)  [default:unknown effect is invalidate (§16.2b.7)]
+    presentation: of Statement  [clause:of@test/contract/ok_parent_borrow.w:31]
+    presentation: rename database  [clause:rename@test/contract/ok_parent_borrow.w:32]
+    presentation: Statement.database  [clause:rename]
+note: contract-audit: resources=2 items=4 domains=0 conventions=0 advisories=0 profile-ambiguous=0 profile-shadowed=0
+contract-audit: violations=0 ok
