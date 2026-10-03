@@ -48,8 +48,13 @@ pub fn p7_join(a: &str, b: &str) -> str:
         return a ++ b
     a ++ "/" ++ b
 
+// A path is absolute with a leading separator or a drive letter (`W:\x`,
+// `W:/x`): a Windows case directory is spelled with one, and joining the
+// root onto it made `W:\root/W:\root/...` (#1885's fixture).
 pub fn p7_abs(path: &str) -> str:
-    if path.len() > 0 and path.byte_at(0) == 47:
+    if path.len() > 0 and (path[0] == '/' or path[0] == '\\'):
+        return path.to_owned()
+    if path.len() > 2 and path[1] == ':' and (path[2] == '/' or path[2] == '\\'):
         return path.to_owned()
     p7_join(p7_repo_root(), path)
 
