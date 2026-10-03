@@ -367,6 +367,27 @@ pub enum WithFormKind: i32:
     Guarded = 1
     GuardedMut = 2
 
+// D65 phase 5 (#1647): what a call whose callee is a bare name resolved
+// to, recorded by check_call. MirLower dispatches on it in one ordered
+// switch and never re-derives it from the name (a local lookup, a variant
+// or type table hit, symbol text).
+pub enum CallCalleeKind: i32:
+    None = 0
+    Function = 1
+    Callable = 2
+    Generic = 3
+    Variant = 4
+    Distinct = 5
+    TypeConstructor = 6
+    MathBuiltin = 7
+    Intrinsic = 8
+    SourceLocation = 9
+    StdDrop = 10
+    AtomicFence = 11
+    TypeLevelBuiltin = 12
+
+impl Copy for CallCalleeKind
+
 pub enum AllocConstructKind: i32:
     EXPLICIT_API = 1
     VEC_NEW = 2
@@ -1501,6 +1522,11 @@ pub type Sema {
     // call and `audit:resolution` verifies the MIR callee and argument count
     // against this fact. Absent for a call Sema resolved to a function symbol.
     call_callable_types: HashMap[i32, i32],
+    // D65 phase 5: each call's CallCalleeKind (a call whose callee is a
+    // name, or a type-level builtin), and the `T.new` a type-constructor
+    // call `T(..)` resolved to.
+    call_callee_kinds: HashMap[i32, i32],
+    type_ctor_call_syms: HashMap[i32, i32],
 
     // C11 6.5.2.2p6-7: the type each argument of a call to a C function is
     // passed as after the default argument promotions, keyed by the call
@@ -3300,6 +3326,8 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         typed_expr_types,
         typed_binding_types,
         call_callable_types,
+        call_callee_kinds: sema_new_map_i32_i32(),
+        type_ctor_call_syms: sema_new_map_i32_i32(),
 
         c_promoted_arg_starts: sema_new_map_i32_i32(),
         c_promoted_arg_data: Vec.new(),
