@@ -22,8 +22,8 @@
 // `github.event_name != 'push'`).
 //
 // Pins come from where they already live: seed.lock (the linux-aarch64 seed
-// version and digest) and .github/workflows/selfhost-linux-aarch64.yml (the
-// SDK release and the seed's runtime bundle). GH_TOKEN must be set.
+// version and digest) and sdk.lock (the SDK, which `build :deps` installs).
+// GH_TOKEN must be set.
 use std.process
 use std.fs
 
@@ -62,13 +62,6 @@ fn lock_value(text: &str, key: &str) -> str:
     for line in text.split("\n"):
         let l = line.trim()
         if l.starts_with(key ++ "="): return l.slice(key.len() + 1, l.len()).trim()
-    ""
-
-/// `  KEY: value` YAML env lines: the value for `key`, or "".
-fn yaml_env_value(text: &str, key: &str) -> str:
-    for line in text.split("\n"):
-        let l = line.trim()
-        if l.starts_with(key ++ ":"): return l.slice(key.len() + 1, l.len()).trim()
     ""
 
 fn publish_env(version: &str, channel: &str, assets: &str, extras: &str, builder: &str):
@@ -117,21 +110,15 @@ fn darwin_leg(version: &str, channel: &str) -> i32:
 
 /// The in-container script: bootstrap exactly as the linux-aarch64 lane
 /// does, then the same gates, packaging and publish. One string, one sh -c.
-fn linux_aarch64_script(version: &str, channel: &str, sha: &str, seed_version: &str, seed_sha: &str, rt_asset: &str, rt_version: &str, rt_sha: &str) -> str:
+fn linux_aarch64_script(version: &str, channel: &str, sha: &str, seed_version: &str, seed_sha: &str) -> str:
     "set -eu\n" ++
     "cd /work\n" ++
     "if [ ! -d with/.git ]; then git clone -q https://github.com/withlang-dev/with.git with; fi\n" ++
     "cd with && git fetch -q origin && git checkout -q " ++ sha ++ "\n" ++
-    "export LLVM_PREFIX=/work/with/.deps/llvm-22.1.6-linux-aarch64\n" ++
-    "mkdir -p .link-shim\n" ++
     "curl -fsSL -o src/main https://github.com/withlang-dev/with/releases/download/" ++ seed_version ++ "/with-linux-aarch64\n" ++
     "echo '" ++ seed_sha ++ "  src/main' | sha256sum -c - && chmod +x src/main\n" ++
-    "mkdir -p src/runtime && curl -fsSL -o /tmp/rt.tar.gz https://github.com/withlang-dev/with/releases/download/" ++ rt_version ++ "/" ++ rt_asset ++ "\n" ++
-    "echo '" ++ rt_sha ++ "  /tmp/rt.tar.gz' | sha256sum -c - && tar -xzf /tmp/rt.tar.gz -C src/runtime\n" ++
-    "WITH_LLVM_SDK_VERSION=sdk-linux-aarch64 WITH=/work/with/src/main ./src/main build :deps\n" ++
-    "ln -sf \"$LLVM_PREFIX/bin/ld.lld\" .link-shim/ld.lld && ln -sf \"$LLVM_PREFIX/bin/ld.lld\" .link-shim/ld64.lld && ln -sf \"$LLVM_PREFIX/bin/lld\" .link-shim/lld\n" ++
-    "echo \"$LLVM_PREFIX/bin/ld.lld\" > src/runtime/llvm_ld\n" ++
-    "export PATH=/work/with/.link-shim:$LLVM_PREFIX/bin:$PATH LD_LIBRARY_PATH=/work/with/.link-shim WITH_OUT_DIR=/work/with/out WITH_VERSION=" ++ version ++ "\n" ++
+    "WITH=/work/with/src/main ./src/main build :deps\n" ++
+    "export WITH_OUT_DIR=/work/with/out WITH_VERSION=" ++ version ++ "\n" ++
     "for t in '' :fixpoint :test :test-green :last-green; do WITH=/work/with/src/main ./src/main build $t; done\n" ++
     "LIBGL_ALWAYS_SOFTWARE=1 WITH=/work/with/out/release/bin/with xvfb-run -a -s '-screen 0 1280x800x24' ./out/release/bin/with build :release-uat\n" ++
     "for t in :package-current-host :package-llvm-sdk; do WITH=/work/with/out/release/bin/with ./out/release/bin/with build $t; done\n" ++
@@ -144,15 +131,10 @@ fn linux_aarch64_leg(version: &str, channel: &str) -> i32:
     let docker_version = argv2("docker", "--version")
     if step("docker available", &docker_version) != 0: return fail("docker is required for the linux-aarch64 leg")
     let lock = text_of("seed.lock")
-    let lane = text_of(".github/workflows/selfhost-linux-aarch64.yml")
     let seed_sha = lock_value(lock, "with-linux-aarch64")
     var seed_version = lock_value(lock, "with-linux-aarch64.version")
     if seed_version.len() == 0: seed_version = lock_value(lock, "version")
-    let rt_asset = yaml_env_value(lane, "WITH_RUNTIME_ASSET")
-    let rt_version = yaml_env_value(lane, "WITH_RUNTIME_VERSION")
-    let rt_sha = yaml_env_value(lane, "WITH_RUNTIME_SHA256")
     if seed_sha.len() != 64 or seed_version.len() == 0: return fail("seed.lock has no linux-aarch64 seed pin")
-    if rt_asset.len() == 0 or rt_version.len() == 0 or rt_sha.len() != 64: return fail("selfhost-linux-aarch64.yml has no runtime bundle pin (WITH_RUNTIME_*)")
     let sha = env("RELEASE_SOURCE_SHA")
     if sha.len() == 0: return fail("set RELEASE_SOURCE_SHA to the tagged commit (git rev-parse " ++ version ++ ")")
     var build_args: Vec[str] = Vec.new()
@@ -175,6 +157,8 @@ fn linux_aarch64_leg(version: &str, channel: &str) -> i32:
     run_args.push("docker")
     run_args.push("run")
     run_args.push("--rm")
+    // bubblewrap (:no-host-toolchain, in :test) needs namespaces.
+    run_args.push("--privileged")
     run_args.push("--platform")
     run_args.push("linux/arm64")
     run_args.push("-v")
@@ -184,7 +168,7 @@ fn linux_aarch64_leg(version: &str, channel: &str) -> i32:
     run_args.push("with-aarch64-host")
     run_args.push("sh")
     run_args.push("-c")
-    run_args.push(linux_aarch64_script(version, channel, sha, seed_version, seed_sha, rt_asset, rt_version, rt_sha))
+    run_args.push(linux_aarch64_script(version, channel, sha, seed_version, seed_sha))
     step("linux-aarch64 (container)", &run_args)
 
 fn main -> i32:

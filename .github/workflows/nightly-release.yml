@@ -889,10 +889,9 @@ jobs:
       # ships without .sha256/.manifest sidecars (as on Windows), so the archive
       # digest is pinned directly here instead of fetching sidecar files.
       WITH_SEED_REPO: withlang-dev/with
-      # Pinned to the v0.15.1.5 stable release asset, matching how the other
-      # three platforms pin (a versioned release, not a rolling tag). That asset
-      # was produced by this very job on the v0.15.1.5 tag, so the platform now
-      # bootstraps from its own fixpoint-verified output.
+      # The seed.lock pin (#1915): a self-contained compiler that embeds its
+      # runtime, sysroot and lld, so it needs no runtime bundle, linker shim
+      # or host libxml2.
       WITH_SEED_VERSION: v0.15.2.0
       WITH_SEED_ASSET: with-linux-aarch64
       WITH_SEED_SHA256: 3e54f7839dbf9549233a19753c897fb08f493fa8cfafeeec25b62fa87a43aac3
@@ -900,15 +899,6 @@ jobs:
       WITH_SDK_VERSION: nightly-sdk-20260930-e997223d40ce
       WITH_SDK_ASSET: with-llvm-sdk-22.1.6-linux-aarch64.tar.gz
       WITH_SDK_SHA256: 4fe9695ef30a05d2f15bd0095b2d8b892ae9102930ca520b382ab545a3727a2b
-      # This platform's compiler does not yet embed its own runtime object (see
-      # the note in selfhost-linux-aarch64.yml), so the seed resolves
-      # rt_linux_aarch64.o from <bindir>/runtime/ -- here src/runtime/, since the
-      # seed is installed as src/main.
-      WITH_RUNTIME_ASSET: with-linux-aarch64-runtime.tar.gz
-      # Runtime objects live on the rolling with-linux-aarch64 seed release, not
-      # on the versioned one, so they need their own tag.
-      WITH_RUNTIME_VERSION: with-linux-aarch64
-      WITH_RUNTIME_SHA256: bdfd139b898a0c0d2ad0d989c2c4f2c9c8a63487fb54c08649cd56f34a3844db
     steps:
       - name: Checkout source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -931,11 +921,10 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update -qq
-          # dev libs: the compiler link line uses -lz -lzstd -lxml2 (build/compiler.w).
           # bz2, sqlite3, curl: the facade tests c_import the host's bzlib.h,
           # sqlite3.h and curl/curl.h (a UAT project gets them from `with get`).
-          sudo apt-get install -y --no-install-recommends zlib1g-dev libzstd-dev libxml2-dev \
-            libbz2-dev libsqlite3-dev libcurl4-openssl-dev
+          # The compiler itself links nothing of the host (#1915, D81).
+          sudo apt-get install -y --no-install-recommends libbz2-dev libsqlite3-dev libcurl4-openssl-dev
 
       - name: Fetch verified LLVM SDK
         run: |
@@ -950,25 +939,6 @@ jobs:
           test -x "$prefix/bin/lld" || { echo "SDK lld missing"; exit 1; }
           echo "LLVM_PREFIX=$PWD/$prefix" >> "$GITHUB_ENV"
 
-      - name: Set up linker shim (SDK lld + libxml2 alias)
-        run: |
-          set -euo pipefail
-          mkdir -p .link-shim
-          # The seed emits -fuse-ld=lld; expose the SDK's lld under the names the
-          # driver looks for. If the SDK lld carries DT_NEEDED libxml2.so.16 while
-          # Ubuntu ships libxml2.so.2, alias it -- ABI-safe for linking (an ELF
-          # link never calls into libxml2). Harmless when unneeded.
-          ln -sf "$LLVM_PREFIX/bin/ld.lld" .link-shim/ld.lld
-          ln -sf "$LLVM_PREFIX/bin/ld.lld" .link-shim/ld64.lld
-          ln -sf "$LLVM_PREFIX/bin/lld"    .link-shim/lld
-          xml2="$(ldconfig -p | awk '/libxml2\.so\.2 /{print $NF; exit}')"
-          [ -n "$xml2" ] || xml2="$(ls /lib/aarch64-linux-gnu/libxml2.so.2* 2>/dev/null | head -1)"
-          [ -n "$xml2" ] || { echo "no system libxml2.so.2"; exit 1; }
-          ln -sf "$xml2" .link-shim/libxml2.so.16
-          LD_LIBRARY_PATH="$PWD/.link-shim:${LD_LIBRARY_PATH:-}" "$LLVM_PREFIX/bin/ld.lld" --version
-          echo "$PWD/.link-shim" >> "$GITHUB_PATH"
-          echo "LD_LIBRARY_PATH=$PWD/.link-shim:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
-
       - name: Fetch verified seed
         run: |
           set -euo pipefail
@@ -976,14 +946,6 @@ jobs:
             "https://github.com/$WITH_SEED_REPO/releases/download/$WITH_SEED_VERSION/$WITH_SEED_ASSET"
           printf '%s  %s\n' "$WITH_SEED_SHA256" src/main | sha256sum -c -
           chmod +x src/main
-          mkdir -p src/runtime
-          curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o "$RUNNER_TEMP/rt.tar.gz" \
-            "https://github.com/$WITH_SEED_REPO/releases/download/$WITH_RUNTIME_VERSION/$WITH_RUNTIME_ASSET"
-          printf '%s  %s\n' "$WITH_RUNTIME_SHA256" "$RUNNER_TEMP/rt.tar.gz" | sha256sum -c -
-          tar -xzf "$RUNNER_TEMP/rt.tar.gz" -C src/runtime
-          test -f src/runtime/rt_linux_aarch64.o || { echo "runtime bundle missing rt_linux_aarch64.o"; exit 1; }
-          # Absolute linker path, so written here rather than shipped.
-          echo "$LLVM_PREFIX/bin/ld.lld" > src/runtime/llvm_ld
           ./src/main version
           # Fail fast if the seed cannot link, rather than part-way through a build.
           printf 'fn main:\n    print("seed links")\n' > "$RUNNER_TEMP/seedcheck.w"
