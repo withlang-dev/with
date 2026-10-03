@@ -837,11 +837,18 @@ impl Codegen:
             for dtm_si in 0..dtm_stmt_count:
                 let dtm_stmt_id = dtm_stmt_start + dtm_si
                 if not self.mir_emit_stmt(dtm_body, dtm_stmt_id):
-                    if wl_get_bb_terminator(dtm_llbb) == 0:
+                    let fail_bb = wl_get_insert_block(self.builder)
+                    if fail_bb != 0 and wl_get_bb_terminator(fail_bb) == 0:
                         wl_build_unreachable(self.builder)
-            if wl_get_bb_terminator(dtm_llbb) == 0:
+            // A statement may end in a block of its own (checked arithmetic
+            // branches to `arith.ok`): the terminator goes where the builder
+            // is, as in every other MIR emitter, not into the MIR block's
+            // first LLVM block, which the statement already terminated.
+            let term_bb = wl_get_insert_block(self.builder)
+            if term_bb != 0 and wl_get_bb_terminator(term_bb) == 0:
                 if not self.mir_emit_term(dtm_body, dtm_bb):
-                    if wl_get_bb_terminator(dtm_llbb) == 0:
+                    let after_term_bb = wl_get_insert_block(self.builder)
+                    if after_term_bb != 0 and wl_get_bb_terminator(after_term_bb) == 0:
                         if final_ret_ty == wl_void_type(self.context):
                             let _ = wl_build_ret_void(self.builder)
                         else:
