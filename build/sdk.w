@@ -1981,12 +1981,11 @@ pub fn run_linux_sysroot_action(ctx: ActionCtx) -> i32:
     let pack_path = ctx.output()
     if pack_path.len() == 0:
         return sdk_fail(ctx, "requires an output path")
-    // The architecture: this target's argument, else the host's. A Linux
-    // compiler embeds its own; a Linux host also generates another
-    // architecture's for a cross build. Off Linux the pack is empty (and
-    // nothing is fetched).
+    // The architecture: this target's argument (linux-sysroot-<arch>), else
+    // the Linux host's own (linux-sysroot, which its compiler embeds). An
+    // architecture With carries no sysroot for gets an empty pack.
     let a = if ctx.args().len() > 0: sdk_owned_text(ctx.args()[0]) else: arch()
-    if not sdk_linux_arch_supported(a) or (ctx.args().len() == 0 and os() != "Linux"):
+    if not sdk_linux_arch_supported(a):
         return sdk_write_text(ctx, pack_path, "")
     let root = ctx.project_info().project_root()
     let prefix = compiler_default_llvm_prefix()

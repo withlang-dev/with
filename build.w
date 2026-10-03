@@ -144,8 +144,10 @@ fn add_cross_wasm_rt_targets(out0: Build, tag: &str, p: &str, group_name: &str) 
     cross_rt = cross_rt.dep(p ++ "fiber-stubs-object")
     out.add_target(cross_rt)
 
-// The target that generates an architecture's linux sysroot on this host.
-fn linux_sysroot_target_name(a: &str) -> str: if a == arch(): "linux-sysroot" else: "linux-sysroot-" ++ a
+// The target that generates an architecture's linux sysroot on this host:
+// `linux-sysroot` is a Linux host's own; every other architecture's, and
+// every one off Linux, is `linux-sysroot-<arch>`. One target per pack (#2014).
+fn linux_sysroot_target_name(a: &str) -> str: if a == arch() and os() == "Linux": "linux-sysroot" else: "linux-sysroot-" ++ a
 
 fn cross_llvm_prefix(tag: &str) -> str:
     let arch_tag = if tag == "linux_aarch64": "linux-aarch64" else: "linux-x86_64"
@@ -353,9 +355,10 @@ fn add_stage1_runtime_targets(out0: Build, host_runtime: &HostRuntimeSpec, corpu
     metadata = metadata.dep("sdk-clang-main")
     metadata = metadata.input("out/command/sdk-clang-main/done")
     metadata = metadata.input("sdk.lock")
-    // #1915: the rsp names the darwin sysroot as -syslibroot.
+    // #1915: the rsp names the darwin sysroot as -syslibroot, and a Linux
+    // host's own sysroot as --sysroot.
     metadata = metadata.dep("darwin-sysroot")
-    metadata = metadata.dep("linux-sysroot")
+    if os() == "Linux": metadata = metadata.dep("linux-sysroot")
     metadata = metadata.input(sdk_darwin_sysroot_pack())
     metadata = metadata.input(dir ++ "/llvm_bridge.o")
     metadata = metadata.input(dir ++ "/clang_bridge.o")
@@ -1290,7 +1293,7 @@ fn add_sdk_cross_aarch64_targets(out0: Build, ctx: &BuildCtx) -> Build:
     runtimes = runtimes.arg(build_owned_text(bootstrap)).arg(build_owned_text(prefix)).arg(sdk_llvm_source_dir()).arg(root ++ "/runtimes-" ++ tag).arg(sdk_jobs_arg(ctx)).arg("aarch64")
     runtimes = runtimes.input(sdk_llvm_source_marker()).input(build_owned_text(bootstrap)).input("build/sdk.w").input(sdk_linux_sysroot_pack_for("aarch64"))
     runtimes = runtimes.write_scope(build_owned_text(prefix)).write_scope(build_owned_text(root)).write_scope("out/command/sdk-cross-aarch64-runtimes")
-    runtimes = runtimes.dep("sdk-llvm-source").dep("linux-sysroot-aarch64")
+    runtimes = runtimes.dep("sdk-llvm-source").dep(linux_sysroot_target_name("aarch64"))
     out = out.add_target(runtimes.timeout(7200000))
     var ninja = target_new(.Action, "sdk-cross-aarch64-ninja", "").output(prefix ++ "/bin/ninja")
     ninja.action = run_sdk_ninja_action
@@ -2827,22 +2830,28 @@ pub fn build(ctx: BuildCtx) -> Build:
     darwin_sysroot = darwin_sysroot.timeout(600000)
     out = out.add_target(darwin_sysroot)
 
-    var linux_sysroot = target_new(.Action, "linux-sysroot", "").output(sdk_linux_sysroot_pack())
-    linux_sysroot.action = run_linux_sysroot_action
-    linux_sysroot = linux_sysroot.input("build/sdk.w")
-    linux_sysroot = linux_sysroot.input("sdk.lock")
-    if os() == "Linux" and sdk_linux_arch_supported(arch()):
-        linux_sysroot = linux_sysroot.dep("sysroot-zig-source")
-        linux_sysroot = linux_sysroot.input(sdk_zig_source_marker())
-    linux_sysroot = linux_sysroot.write_scope(sdk_linux_sysroot_dir())
-    linux_sysroot = linux_sysroot.write_scope("out/command/linux-sysroot")
-    linux_sysroot = linux_sysroot.timeout(1200000)
-    out = out.add_target(linux_sysroot)
+    // A Linux host's own sysroot (`linux-sysroot`, the pack its compiler
+    // embeds). Off Linux there is none: a placeholder here once wrote an empty
+    // pack over linux-sysroot-<host arch>'s, two targets owning one file (#2014).
+    if os() == "Linux":
+        var linux_sysroot = target_new(.Action, "linux-sysroot", "").output(sdk_linux_sysroot_pack())
+        linux_sysroot.action = run_linux_sysroot_action
+        linux_sysroot = linux_sysroot.input("build/sdk.w")
+        linux_sysroot = linux_sysroot.input("sdk.lock")
+        if sdk_linux_arch_supported(arch()):
+            linux_sysroot = linux_sysroot.dep("sysroot-zig-source")
+            linux_sysroot = linux_sysroot.input(sdk_zig_source_marker())
+        linux_sysroot = linux_sysroot.write_scope(sdk_linux_sysroot_dir())
+        linux_sysroot = linux_sysroot.write_scope("out/command/linux-sysroot")
+        linux_sysroot = linux_sysroot.timeout(1200000)
+        out = out.add_target(linux_sysroot)
     // Every other Linux architecture's sysroot, generated here for a cross
-    // build (the aarch64 SDK and compiler from linux-x86_64, and back).
+    // build (the aarch64 SDK and compiler from linux-x86_64, and back; both
+    // from macOS and Windows).
     for other in ["x86_64", "aarch64"]:
-        if other == arch() and os() == "Linux": continue
-        var linux_sysroot_arm = target_new(.Action, "linux-sysroot-" ++ other, "").output(sdk_linux_sysroot_pack_for(other))
+        let name = linux_sysroot_target_name(other)
+        if name == "linux-sysroot": continue
+        var linux_sysroot_arm = target_new(.Action, name.clone(), "").output(sdk_linux_sysroot_pack_for(other))
         linux_sysroot_arm.action = run_linux_sysroot_action
         linux_sysroot_arm = linux_sysroot_arm.arg(build_owned_text(other))
         linux_sysroot_arm = linux_sysroot_arm.input("build/sdk.w")
@@ -2850,16 +2859,19 @@ pub fn build(ctx: BuildCtx) -> Build:
         linux_sysroot_arm = linux_sysroot_arm.dep("sysroot-zig-source")
         linux_sysroot_arm = linux_sysroot_arm.input(sdk_zig_source_marker())
         linux_sysroot_arm = linux_sysroot_arm.write_scope(sdk_linux_sysroot_dir_for(other))
-        linux_sysroot_arm = linux_sysroot_arm.write_scope("out/command/linux-sysroot-" ++ other)
+        linux_sysroot_arm = linux_sysroot_arm.write_scope("out/command/" ++ name)
         linux_sysroot_arm = linux_sysroot_arm.timeout(1200000)
         out = out.add_target(linux_sysroot_arm)
 
+    // Off Linux the host pack is empty and reads no sysroot (build/sdk.w
+    // run_linux_link_pack_action).
     var linux_link_pack = target_new(.Action, "linux-link-pack", "").output(sdk_linux_link_pack())
     linux_link_pack.action = run_linux_link_pack_action
     linux_link_pack = linux_link_pack.input("build/sdk.w")
     linux_link_pack = linux_link_pack.input("sdk.lock")
-    linux_link_pack = linux_link_pack.input(sdk_linux_sysroot_pack())
-    linux_link_pack = linux_link_pack.dep("linux-sysroot")
+    if os() == "Linux":
+        linux_link_pack = linux_link_pack.input(sdk_linux_sysroot_pack())
+        linux_link_pack = linux_link_pack.dep("linux-sysroot")
     linux_link_pack = linux_link_pack.timeout(600000)
     out = out.add_target(linux_link_pack)
 
@@ -2944,7 +2956,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.input("sdk.lock")
     // #1915: the rsp names the darwin sysroot as -syslibroot.
     bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.dep("darwin-sysroot")
-    bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.dep("linux-sysroot")
+    if os() == "Linux": bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.dep("linux-sysroot")
     bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.input(sdk_darwin_sysroot_pack())
     bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.input("out/bootstrap-lib/llvm_bridge.o")
     bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.input("out/bootstrap-lib/clang_bridge.o")
@@ -3087,7 +3099,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     llvm_link_metadata = llvm_link_metadata.input("sdk.lock")
     // #1915: the rsp names the darwin sysroot as -syslibroot.
     llvm_link_metadata = llvm_link_metadata.dep("darwin-sysroot")
-    llvm_link_metadata = llvm_link_metadata.dep("linux-sysroot")
+    if os() == "Linux": llvm_link_metadata = llvm_link_metadata.dep("linux-sysroot")
     llvm_link_metadata = llvm_link_metadata.input(sdk_darwin_sysroot_pack())
     llvm_link_metadata = llvm_link_metadata.input("out/lib/llvm_bridge.o")
     llvm_link_metadata = llvm_link_metadata.input("out/lib/clang_bridge.o")
