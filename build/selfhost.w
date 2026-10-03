@@ -1488,6 +1488,28 @@ pub fn run_cli_selfhost_one_liner_action(ctx: ActionCtx) -> i32:
     rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-parity-jq-nested", bs_one_liner_args("-e", "use std.json\nprint(JsonDocument.parse(read_all()).root().field(\"b\").field(\"c\").raw())"), parity_json, "hi")
     if rc != 0: return rc
 
+    // #2015: a one-liner imports a std module beyond the ambient header, in
+    // every mode. -n/-p hoist a part's leading `use` lines out of the
+    // per-line loop; the body keeps its lines and columns.
+    rc = bs_expect_cli_success_exact(ctx, compiler_path, "one-liner-e-use", bs_one_liner_args("-e", "use std.time.now_ns; print(f\"{now_ns() > 0}\")"), "true")
+    if rc != 0: return rc
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-n-use", bs_one_liner_args("-n", "use std.time.now_ns; if now_ns() > 0: print(line)"), "a\nb\n", "a\nb")
+    if rc != 0: return rc
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-p-use", bs_one_liner_args("-p", "use std.time.now_ns\nuse std.time.now; line = line ++ f\" {now_ns() > 0} {now() > 0}\""), "a\n", "a true true")
+    if rc != 0: return rc
+    var use_parts: Vec[str] = Vec.new()
+    for a in ["-n", "use std.time.now_ns", "-n", "if now_ns() > 0: print(line.upper())"]: use_parts |> push(selfhost_owned_text(a))
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-n-use-own-part", use_parts, "a\n", "A")
+    if rc != 0: return rc
+    // A name that starts with `use` is code, not an import.
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-n-user-is-code", bs_one_liner_args("-n", "let user = line; print(user)"), "a\n", "a")
+    if rc != 0: return rc
+    let diag_use = bs_run_cli_capture_input(ctx, compiler_path, "one-liner-diag-n-after-use", bs_one_liner_args("-n", "use std.time.now_ns; print(missing_name)"), "a\n", 120000)
+    if diag_use.rc == 0:
+        return bs_fail(ctx, "one-liner with an unknown name after a use unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, diag_use.stderr, "<cli -n #1>:2:8", "one_liners")
+    if rc != 0: return rc
+
     args = Vec.new()
     args |> push("-e")
     args |> push("print(\"x\")")

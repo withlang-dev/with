@@ -591,6 +591,52 @@ fn cli_rewrite_semicolons(code: &str) -> str:
         out.push_str(code.slice(cursor as i64, code.len()))
     out.to_str()
 
+// The byte length of the `use` declarations `code` opens with, through the
+// newline that ends the last one (0 when it opens with anything else). Read
+// from the code's tokens, so a `use` inside a string or a name like `user`
+// is never one, and a braced import list may span lines.
+fn cli_leading_use_len(code: &str) -> i32:
+    var lexer = Lexer.init(code, 0)
+    let tokens = lexer.tokenize()
+    var end = 0
+    var i = 0
+    while i < tokens.len():
+        let tag = tokens.get_tag(i)
+        if tag == TokenKind.TK_NEWLINE:
+            i = i + 1
+            continue
+        if tag != TokenKind.TK_KW_USE:
+            break
+        var depth = 0
+        var j = i + 1
+        while j < tokens.len():
+            let t = tokens.get_tag(j)
+            if t == TokenKind.TK_EOF: break
+            if t == TokenKind.TK_L_PAREN or t == TokenKind.TK_L_BRACKET or t == TokenKind.TK_L_BRACE: depth = depth + 1
+            if t == TokenKind.TK_R_PAREN or t == TokenKind.TK_R_BRACKET or t == TokenKind.TK_R_BRACE: depth = depth - 1
+            if t == TokenKind.TK_NEWLINE and depth <= 0: break
+            j = j + 1
+        if j >= tokens.len() or tokens.get_tag(j) != TokenKind.TK_NEWLINE:
+            return code.len() as i32
+        var newline_at = tokens.get_start(j)
+        while newline_at < code.len() as i32 and code[newline_at] != '\n':
+            newline_at = newline_at + 1
+        if newline_at >= code.len() as i32:
+            return code.len() as i32
+        end = newline_at + 1
+        i = j + 1
+    end
+
+// `code` with its first `n` bytes blanked to spaces, newlines kept: the same
+// length, lines and columns.
+fn cli_blank_prefix(code: &str, n: i32) -> str:
+    if n <= 0: return with_str_clone_ref(code)
+    var out = StringBuilder.with_capacity(code.len())
+    for i in 0..n:
+        out.push_str(if code[i] == '\n': "\n" else: " ")
+    out.push_str(code.slice(n as i64, code.len()))
+    out.to_str()
+
 // §16.5: the C header path beside an artifact (libfoo.a -> libfoo.h).
 fn c_header_path_for(artifact_path: &str) -> str:
     var dot = -1
@@ -700,18 +746,33 @@ fn cli_build_synthetic_source(one: &CliOneLiner) -> CliSyntheticSource:
     // lines of a multi-line string literal, changing its value (#1334), and
     // shifted every column after the first line of the code away from what
     // its diagnostics' mapping expects.
-    source.push_str("var nr: i64 = 0\n")
     let lines_mode = one.mode == CliOneLinerMode.Lines
+    let flag = if lines_mode: "-n" else: "-p"
+    // A part's leading `use` declarations are the program's, not the loop
+    // body's (#2015): they are hoisted above the loop, and blanked to spaces
+    // in the body so every byte after them keeps its line and column.
+    var rewritten_parts: Vec[str] = Vec.new()
+    var use_lens: Vec[i32] = Vec.new()
+    for i in 0..one.code_parts.len():
+        let rewritten = cli_rewrite_semicolons(one.code_parts[i])
+        let use_len = cli_leading_use_len(rewritten)
+        if use_len > 0:
+            let uses = rewritten.slice(0, use_len as i64)
+            let start = source.len() as i32
+            source.push_str(uses)
+            source.push_str("\n")
+            syn = cli_synthetic_add_mapping(move syn, start, uses, f"<cli {flag} #{i + 1}>")
+        rewritten_parts.push(rewritten)
+        use_lens.push(use_len)
+    source.push_str("var nr: i64 = 0\n")
     source.push_str(if lines_mode: "for line in stdin.lines() {\n" else: "for __line in stdin.lines() {\n")
     source.push_str("nr = nr + 1\n")
     if not lines_mode: source.push_str("var line = __line.clone()\n")
-    let flag = if lines_mode: "-n" else: "-p"
-    for i in 0..one.code_parts.len():
-        let rewritten = cli_rewrite_semicolons(one.code_parts[i])
+    for i in 0..rewritten_parts.len():
         let start = source.len() as i32
-        source.push_str(rewritten)
+        source.push_str(cli_blank_prefix(rewritten_parts[i], use_lens[i]))
         source.push_str("\n")
-        syn = cli_synthetic_add_mapping(move syn, start, rewritten, f"<cli {flag} #{i + 1}>")
+        syn = cli_synthetic_add_mapping(move syn, start, rewritten_parts[i], f"<cli {flag} #{i + 1}>")
     if not lines_mode: source.push_str("print(line)\n")
     source.push_str("}\n")
     syn.source = source.to_str()
