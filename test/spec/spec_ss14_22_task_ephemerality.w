@@ -1,5 +1,7 @@
 //! check-only
 
+use std.task.Task
+
 async fn fetch(id: i32) -> i32:
     id + 1
 
