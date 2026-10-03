@@ -12,6 +12,10 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D86 — `assert`, `require`, `check` are compiler-known forms; the message operand is evaluated only on failure, under `??`'s right-operand rules](2026-10-03-D86-assert-require-check-are-compiler-known-forms-with-lazy-messages.md)
+- [D85 — A facade operation that hands out a borrow of its argument's parent names it: `returns borrow T from parent T of param N`](2026-10-03-D85-a-borrow-of-the-argument-s-parent-names-the-parent.md)
+- [D84 — A returned view's origins include every global it views; a global origin is part of the interface and widens D79's writes clause](2026-10-03-D84-a-returned-view-s-origins-include-the-globals-it-views.md)
+- [D83 — In an instance method declared in its type's own module, receiver fields are in scope by bare name; every collision is a shadowing error](2026-10-03-D83-receiver-fields-are-in-scope-by-bare-name-in-the-type-s-own-module.md)
 - [D82 — A destructor runs after an explicit field vacate; the vacated field is its empty value; the storage sentinel is not a disarm](2026-10-01-D82-a-drop-runs-after-an-explicit-field-vacate-the-field-is-its-empty-value.md)
 - [D81 — Zero dependencies: the compiler carries its SDK per platform; applications bring their own dependencies](2026-09-29-D81-zero-dependencies-the-compiler-carries-its-sdk-per-platform.md)
 - [D80 — SIMD masks and lane selection: `m.select(a, b)`, broadcast on every lane-wise operator, mask operators, `W = 128`](2026-09-29-D80-simd-masks-and-lane-selection-m-select-broadcast-on-every-lane-wise-operator.md)

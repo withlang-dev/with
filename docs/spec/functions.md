@@ -454,6 +454,8 @@ A method's receiver is expressed by a prefix keyword on `fn`. The receiver value
 type — is never spelled. Writing `self` (or its type) as a parameter is an
 unnecessary character and is being retired.
 
+In an instance method declared in its type's own module, a field of the receiver is in scope by its bare name; `self.field` remains valid. A parameter or local binding named like a receiver field is a shadowing error (§29.8). A bare name that names both a receiver field and a global or a module-level function is a shadowing error; `self.field` and the qualified name remain valid. A method declared in another module reaches the receiver's fields only through `self.`.
+
 Whether a function is an instance method or an associated function is decided by
 **location**, with no keyword: a `fn` declared **inside** an `impl`/`extend`/`type`
 is an instance method (receiver synthesised); a `fn` at **top level** — including

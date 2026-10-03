@@ -45,6 +45,8 @@ non-imported names permitted bare in `impl` and `extend` headers, and
 (b) the `--no-std` core surface. It does not grow to track the standard
 library.
 
+`assert`, `require`, `check` and their `std.testing` forms are compiler-known forms, not functions. Each evaluates its message operand only when its condition is false. The message operand follows the rules of the right operand of `??`: its effects do not run when the condition holds, and a move inside it is a conditional move.
+
 **Implicit standard-library availability.** Every public declaration of
 the standard library is available by its unqualified name as the
 lowest-priority resolution tier. Fallback declarations retain canonical

@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.16
+# The With Programming Language — Specification v7.17
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,15 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.17:** four rulings of 2026-10-03. §9.5: in an instance
+method declared in its type's own module, receiver fields are in scope by
+bare name; every collision is a shadowing error (D83; #1930). §21.1 rule 6:
+a returned view's origins include every global it views, `from G` names
+one, and a global origin widens a bundle's `writes` clause past exported
+globals (D84, amends D79; #1903). §16.2b.6: `returns borrow T from parent
+T of param N` (D85; #2003). §18.2: `assert`, `require`, `check` are
+compiler-known forms whose message is evaluated only on failure (D86;
+#1864). The implementation is NON-COMPLIANT until it catches up.
 **Changelog v7.16:** §4.3d masks (D80 amendment): a mask lane is
 writable, a `bool` literal in a mask context and a scalar operand of
 `m.select` broadcast, the width-cast example is `m as Mask[4, 8]`; `m == n`,

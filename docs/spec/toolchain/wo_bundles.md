@@ -461,7 +461,7 @@ caller must know it for correctness, it belongs in the contract.
 
 **Global writes are the declaration — D79.** A call writes every global
 its callee writes (§21.1 rule 1), so for a function that crosses a bundle
-boundary, which exported globals it writes is part of its contract. A
+boundary, which counted globals it writes is part of its contract. A
 `pub` function of a bundle states them in a trailing clause,
 `writes COUNTER` or `writes COUNTER, other.TOTAL`, the last clause of the
 declaration:
@@ -471,14 +471,17 @@ pub fn bump() writes COUNTER:
 pub fn get() -> &Foo from a writes COUNTER:
 ```
 
-A function with no clause writes no exported global, and the bundle build
-verifies both directions against the body. A body that writes an
-exported global its clause omits is an error, and the diagnostic offers
+A function with no clause writes no counted global, and the bundle build
+verifies both directions against the body. A body that writes a
+counted global its clause omits is an error, and the diagnostic offers
 the text to insert ("add `writes COUNTER` to `bump`'s declaration"). A
 clause that names a global the body does not write is a warning, not an
 error: declaring more is conservative, and it is how an author reserves a
-later write without changing callers. Only exported globals appear; a
-write to bundle-private state cannot conflict with a caller's view. A
+later write without changing callers. The counted globals are the
+exported globals, and every global that is an origin of an exported
+function's returned view (§21.1 rule 6; amended 2026-10-03, D84); a
+write to other bundle-private state cannot conflict with a caller's
+view. A
 function that calls another bundle's function declares at least that
 callee's set, checked from the two interfaces without either body. The
 clause names whole globals by name or path; a field of a global is not a

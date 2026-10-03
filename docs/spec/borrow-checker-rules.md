@@ -31,10 +31,8 @@ At every program point, the following must hold:
    diverge at any field access are non-overlapping and may coexist.
    Array/slice indices are conservatively treated as overlapping.
 
-6. **Returned-view origin tracking.** When a function returns a
-   reference or other view derived from one or more parameters, the
-   compiler records the set of possible origin parameters in the
-   function's effect summary. At the call site, the result is tied to
+6. **Returned-view origin tracking.** A returned view's origins are every parameter it derives from and every global the body returns a view of, directly or through a callee's returned view. A signature names a global origin with `from G`, beside `from p`. A declared origin the body does not derive the view from is an error, never a silent widening. A global origin is part of the function's interface (D79): a bundle interface records it by an identity that does not export the global, and every exported function that writes that global declares it in its writes clause, whether or not the global is exported.
+   At the call site, the result is tied to
    the intersection of those origin lifetimes. If any possible origin
    dies before the view's last use, the program is rejected.
 

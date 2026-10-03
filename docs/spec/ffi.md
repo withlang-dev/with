@@ -736,6 +736,8 @@ A layout such as `type App { db: Database, stmt: Statement }` is invalid when
 `stmt` borrows from `db`; the compatible patterns are a statement cache owned
 by the connection, or stable handles into owner-managed storage.
 
+An operation that hands out a borrow of its argument's parent states it: `returns borrow T from parent T of param N`. The parent is resolved through the argument resource's declared `borrows` clause; naming a parent the resource does not declare, or a type its parent does not have, is an error. The borrow lives as long as the parent's origin. Every operation through it is an operation on the parent's origin: it invalidates the parent's views exactly as the same call on the parent would.
+
 #### 16.2b.7 Origins, foreign-state domains and preservation
 
 Borrowed foreign memory always has a real origin: a modeled resource, a

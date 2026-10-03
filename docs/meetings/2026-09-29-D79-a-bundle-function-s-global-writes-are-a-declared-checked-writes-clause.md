@@ -5,6 +5,13 @@
 toolchain/wo_bundles.md "Global writes are the declaration", grammar
 `WRITES_CLAUSE`. Refines D39. Issues #1827, #1819.
 
+**Amended 2026-10-03 by D84** (Eric approved; #1903): where this entry
+says "only exported globals" appear or count, it now reads "exported
+globals, and every global that is an origin of an exported function's
+returned view". A global origin is part of the function's interface
+(§21.1 rule 6), so a write to it can conflict with a caller's view even
+when the global is not exported.
+
 **Context.** §21.1 rule 1 makes a call write every global its callee
 writes, so a view of a global may not be live across such a call. For a
 bundle function the caller has no body. 1288aa57 assumed every bundle call
