@@ -1122,6 +1122,26 @@ impl Sema:
             self.set_expr_view_deps(report_node, 0, empty_origins)
         final_type
 
+    // #1974 (§3.8; D22: an eliminator does not change what the eliminated
+    // value is): a default join — `??`, `unwrap_or`, `unwrap_or_else` — whose
+    // carrier payload is owned produces an owned value. Under a `&P` demand
+    // (a `&str` parameter) it meets the demand as every owned value does: the
+    // call borrows the result (auto-ref). So the demand on the join and on its
+    // fallback is `P`; asked to *be* `&P`, the owned payload arm was refused
+    // ("`??` expression of type `str` cannot produce `&str`") where
+    // `peek(make())` is accepted. A view payload keeps the reference demand:
+    // that join is a view, its origins the carrier's.
+    mut fn default_join_demand(expected: i32, payload_ty: i32) -> i32:
+        if expected == 0 or payload_ty == 0:
+            return expected
+        let er = self.resolve_alias(expected as TypeId)
+        if self.get_type_kind(er) != TypeKind.TY_REF or self.get_type_d1(er) != 0:
+            return expected
+        let pk = self.get_type_kind(self.resolve_alias(payload_ty as TypeId))
+        if pk == TypeKind.TY_REF or pk == TypeKind.TY_PTR or pk == TypeKind.TY_NEVER:
+            return expected
+        self.get_type_d0(er)
+
     mut fn resolve_contextual_default_join(expected: i32, carrier_node: i32, payload_ty: i32, default_node: i32, default_origin_node: i32, default_ty: i32, default_role: i32, report_node: i32, join_name: &str) -> i32:
         let nodes: Vec[i32] = Vec.new()
         nodes.push(0)
@@ -11692,7 +11712,7 @@ impl Sema:
             if unwrapped == 0:
                 self.emit_error("?? operator requires an Option or Result with a single success payload", node)
                 return 0
-            let join_expected = if self.has_expected_type != 0: self.expected_expr_type as i32 else: 0
+            let join_expected = self.default_join_demand(if self.has_expected_type != 0: self.expected_expr_type as i32 else: 0, unwrapped)
             // The payload type is not an expectation for the fallback. Only an
             // enclosing expectation is independent of this join; otherwise the
             // fallback's exact type participates as an owned anchor.
@@ -26528,7 +26548,7 @@ impl Sema:
                 self.emit_error("Option.unwrap_or_else() expects a zero-argument function", node)
                 return 0
             let default_ty = self.get_type_d2(fn_ty2)
-            let join_expected = if self.has_expected_type != 0: self.expected_expr_type as i32 else: 0
+            let join_expected = self.default_join_demand(if self.has_expected_type != 0: self.expected_expr_type as i32 else: 0, elem_ty)
             let joined = self.resolve_contextual_default_join(join_expected, recv_node, elem_ty, 0, self.lazy_default_origin_node(default_node), default_ty, D22_JOIN_ROLE_LAZY_RESULT, node, "Option.unwrap_or_else")
             self.complete_lazy_fallback_result(default_node, fn_ty2, joined)
             return joined
@@ -26677,7 +26697,7 @@ impl Sema:
                 self.emit_argument_type_mismatch("Result.or_else", 0, 0, 0, ok_ty, recovered_ok_ty, node)
             return mapped_ty
         if method_name == "unwrap_or_else":
-            let join_expected = if self.has_expected_type != 0: self.expected_expr_type as i32 else: 0
+            let join_expected = self.default_join_demand(if self.has_expected_type != 0: self.expected_expr_type as i32 else: 0, ok_ty)
             let joined = self.resolve_contextual_default_join(join_expected, recv_node, ok_ty, 0, self.lazy_default_origin_node(default_node), mapped_ty, D22_JOIN_ROLE_LAZY_RESULT, node, "Result.unwrap_or_else")
             self.complete_lazy_fallback_result(default_node, self.callable_fn_type(arg_types[0] as TypeId), joined)
             return joined
@@ -29680,7 +29700,7 @@ impl Sema:
                         return 0
                     let option_payload = self.get_generic_inst_arg(recv_type, 0)
                     let option_default_ty = arg_types[0]
-                    let option_join_expected = if self.has_expected_type != 0: self.expected_expr_type as i32 else: 0
+                    let option_join_expected = self.default_join_demand(if self.has_expected_type != 0: self.expected_expr_type as i32 else: 0, option_payload)
                     return self.resolve_contextual_default_join(option_join_expected, expr, option_payload, option_default_node, option_default_node, option_default_ty, D22_JOIN_ROLE_EXPR, node, "Option.unwrap_or")
                 if field == self.syms.is_some or field == self.syms.is_none:
                     return self.ty_bool as i32
@@ -29739,7 +29759,7 @@ impl Sema:
                         return 0
                     let result_payload = self.get_generic_inst_arg(recv_type, 0)
                     let result_default_ty = arg_types[0]
-                    let result_join_expected = if self.has_expected_type != 0: self.expected_expr_type as i32 else: 0
+                    let result_join_expected = self.default_join_demand(if self.has_expected_type != 0: self.expected_expr_type as i32 else: 0, result_payload)
                     return self.resolve_contextual_default_join(result_join_expected, expr, result_payload, result_default_node, result_default_node, result_default_ty, D22_JOIN_ROLE_EXPR, node, "Result.unwrap_or")
                 if field == self.syms.is_ok or field == self.syms.is_err:
                     return self.ty_bool as i32
