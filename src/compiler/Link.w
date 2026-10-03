@@ -8,7 +8,6 @@ use compiler.WasmHost
 use compiler.LldDriver
 use compiler.EmbeddedSysroot
 use std.string.StringBuilder
-use std.collections.Atomic
 use TargetSpec
 use compiler.EmbeddedClangResourceData
 
@@ -55,16 +54,6 @@ pub fn link_stage_set_rt_in_unit(on: i32) -> Unit:
 
 fn link_stage_rt_in_unit() -> i32:
     link_stage_rt_in_unit_flag
-
-var link_stage_temp_archives: Vec[str] = Vec.new()
-var link_stage_temp_archives_lock: Atomic[i32]
-
-fn link_stage_temp_archives_lock_acquire():
-    while link_stage_temp_archives_lock.swap(1, .Acquire) != 0:
-        let _ = 0
-
-fn link_stage_temp_archives_lock_release():
-    link_stage_temp_archives_lock.store(0, .Release)
 
 pub type LinkStageEnvVar {
     name: str,
@@ -246,13 +235,6 @@ pub fn link_stage_cleanup_files(files: &Vec[str]):
     for i in 0..files.len() as i32:
         let _remove = runtime_remove_file(files[i])
 
-fn link_stage_register_temp_archive(path: &str):
-    // Comptime parallel() links on concurrent threads; an unguarded push to this
-    // shared registry races vec_grow (double free of the old buffer, #617).
-    link_stage_temp_archives_lock_acquire()
-    link_stage_temp_archives.push(with_str_clone_ref(path))
-    link_stage_temp_archives_lock_release()
-
 pub fn link_stage_basename(path: &str) -> str:
     var last_slash = -1
     for i in 0..path.len() as i32:
@@ -286,11 +268,10 @@ fn link_stage_cleanup_owned_temp_archives_in(dir: &str, pid_text: &str):
             let remove_path = if link_stage_str_contains(path, "/"): path else: dir ++ "/" ++ path
             let _remove = runtime_remove_file(remove_path)
 
+// A link's runtime archives are content-named and kept (link_stage_make_archive);
+// what this process can leave is a `<obj>.<pid>.<nanos>.a` it made and did
+// not rename into place.
 pub fn link_stage_cleanup_current_process_temp_archives():
-    link_stage_temp_archives_lock_acquire()
-    link_stage_cleanup_files(link_stage_temp_archives)
-    link_stage_temp_archives = Vec.new()
-    link_stage_temp_archives_lock_release()
     let root = link_stage_artifact_root()
     let pid_text = f"{runtime_getpid()}"
     link_stage_cleanup_owned_temp_archives_in(root ++ "/lib", pid_text)
@@ -1925,11 +1906,24 @@ fn link_stage_make_archive(obj_path: &str) -> str:
         return with_str_clone_ref(obj_path)
     // Wrap a .o file in a .a archive so the linker treats it as a library
     // (only pulling in symbols that aren't already defined).
-    let ar_path = obj_path ++ f".{runtime_getpid()}.{runtime_clock_nanos()}.a"
-    let out = link_stage_make_archive_to_path(obj_path, ar_path)
-    if out.len() > 0:
-        link_stage_register_temp_archive(out)
-    out
+    // #2016: the archive is named by the object's content and kept: the
+    // program's debug map records its path, so a name made of the pid and
+    // the clock made every link of the same program different bytes. A
+    // concurrent link of the same object makes the same file; each writes
+    // its own and renames it into place.
+    // `.ar-<hex>`, never `.<digit>`: link_stage_is_temp_archive_path takes
+    // `.o.<digit>` for a per-link temporary and removes it after the link.
+    let ar_path = obj_path ++ ".ar-" ++ bundle_text_sha256(runtime_read_file(obj_path)).slice(0, 16) ++ ".a"
+    if runtime_file_exists(ar_path) != 0:
+        return ar_path
+    let tmp_path = obj_path ++ f".{runtime_getpid()}.{runtime_clock_nanos()}.a"
+    let made = link_stage_make_archive_to_path(obj_path, tmp_path)
+    if made.len() == 0:
+        return ""
+    if runtime_rename(made, ar_path) != 0:
+        let _remove = runtime_remove_file(made)
+        return ""
+    ar_path
 
 pub fn link_stage_make_archive_to_path(obj_path: &str, ar_path: &str) -> str:
     let members: Vec[str] = Vec.new()

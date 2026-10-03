@@ -43,5 +43,16 @@ fn main:
         assert(false)
     assert(read_file(p7_join(b, "out/bin/tool")).unwrap() == bin)
 
+    // Built, not served, in a third directory: the same bytes. (The link's
+    // runtime archives were named by pid and clock, and the debug map
+    // recorded the name.)
+    assert(set_env("WITH_BUILD_CACHE_DIR", "none") == 0)
+    let c = tool_case("2016-prefix-map-c")
+    let rebuilt = p7_run(c, "2016-prefix-map-c", p7_build_target_args(":tool"))
+    p7_assert_success(rebuilt, "tool in c")
+    if read_file(p7_join(c, "out/bin/tool")).unwrap() != bin:
+        print("FAILED: the tool built in " ++ c ++ " differs from the one built in " ++ a)
+        assert(false)
+
     let _done = remove_tree(store)
     print("ok")
