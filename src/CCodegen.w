@@ -7713,34 +7713,41 @@ impl CCodegen:
 
         ""
 
-    mut fn emit_builtin_numeric_call_term(body: &MirBody, kind: CcBuiltin, args_id: i32, dest_place: i32, next_bb: i32, argc: i32, ret_tid: i32, has_ret: i32) -> str:
-        if kind == CcBuiltin.ROTATE_LEFT:
-            if argc < 2:
-                self.fail("rotate_left expects two arguments")
-                return "    abort();"
-            let val = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
-            let n = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
-            var out = ""
-            if has_ret != 0:
-                let dst = self.place_text(body, dest_place)
-                out = out ++ "    " ++ cc_lbrace() ++ " uint32_t __with_v = (uint32_t)(" ++ val ++ "); uint32_t __with_n = (uint32_t)(" ++ n ++ ") & 31u;"
-                out = out ++ " " ++ dst ++ " = (int32_t)((__with_v << __with_n) | (__with_v >> (32u - __with_n))); " ++ cc_rbrace() ++ "\n"
-            else:
-                out = out ++ "    (void)0;\n"
-            out = out ++ f"    goto bb{next_bb};"
-            return out
+    // `dst = val.rotate_left(n)` (or right) at the value's own width W: the
+    // count is taken modulo W, a count of 0 leaves the value, and no shift
+    // is ever by W (undefined in C). The LLVM backend's llvm.fshl/fshr and
+    // comptime_rotate_bits compute the same bits (#1006). The old text was
+    // 32-bit only and shifted by 32 for a count of 0.
+    mut fn rotate_text(val_tid: i32, dst: &str, val: &str, n: &str, left: bool) -> str:
+        let resolved = self.sema.resolve_alias(val_tid as TypeId)
+        if self.sema.get_type_kind(resolved) != TypeKind.TY_INT:
+            self.fail("rotate on a non-integer type " ++ self.sema.type_name(val_tid))
+            return "abort();"
+        let width = self.sema.get_type_d0(resolved)
+        let unsigned_ty = if width == 8: "uint8_t" else if width == 16: "uint16_t" else if width == 32: "uint32_t" else if width == 64: "uint64_t" else if width == 128: "unsigned __int128" else: ""
+        if unsigned_ty.len() == 0:
+            self.fail(f"emit-c has no rotate for {width}-bit integers")
+            return "abort();"
+        let first = if left: "<<" else: ">>"
+        let second = if left: ">>" else: "<<"
+        var out = cc_lbrace() ++ " " ++ unsigned_ty ++ " __with_v = (" ++ unsigned_ty ++ ")(" ++ val ++ "); unsigned __with_n = (unsigned)((uint64_t)(" ++ n ++ f") & {width - 1}u);"
+        out = out ++ " " ++ dst ++ " = (" ++ self.c_type(val_tid, 0) ++ ")(__with_n == 0 ? __with_v : (" ++ unsigned_ty ++ ")((__with_v " ++ first ++ " __with_n) | (__with_v " ++ second ++ f" ({width}u - __with_n)))); " ++ cc_rbrace()
+        out
 
-        if kind == CcBuiltin.ROTATE_RIGHT:
+    mut fn emit_builtin_numeric_call_term(body: &MirBody, kind: CcBuiltin, args_id: i32, dest_place: i32, next_bb: i32, argc: i32, ret_tid: i32, has_ret: i32) -> str:
+        if kind == CcBuiltin.ROTATE_LEFT or kind == CcBuiltin.ROTATE_RIGHT:
+            let left = kind == CcBuiltin.ROTATE_LEFT
             if argc < 2:
-                self.fail("rotate_right expects two arguments")
+                self.fail(if left: "rotate_left expects two arguments" else: "rotate_right expects two arguments")
                 return "    abort();"
-            let val = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
-            let n = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
             var out = ""
             if has_ret != 0:
+                let val_operand = self.call_arg_operand(body, args_id, 0)
+                let val_tid = self.operand_tid(body, val_operand)
                 let dst = self.place_text(body, dest_place)
-                out = out ++ "    " ++ cc_lbrace() ++ " uint32_t __with_v = (uint32_t)(" ++ val ++ "); uint32_t __with_n = (uint32_t)(" ++ n ++ ") & 31u;"
-                out = out ++ " " ++ dst ++ " = (int32_t)((__with_v >> __with_n) | (__with_v << (32u - __with_n))); " ++ cc_rbrace() ++ "\n"
+                let val = self.operand_text(body, val_operand)
+                let n = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
+                out = out ++ "    " ++ self.rotate_text(val_tid, dst, val, n, left) ++ "\n"
             else:
                 out = out ++ "    (void)0;\n"
             out = out ++ f"    goto bb{next_bb};"
