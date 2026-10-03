@@ -30877,13 +30877,17 @@ impl Sema:
         if root == 0:
             return 0
         // Spans are per-file byte offsets and the pool holds every module, so
-        // the window scan below can match a same-named identifier from another
-        // file whose offsets happen to land inside [root_start, root_end] —
-        // phantom "future uses" that shift with any upstream edit. Nodes carry
-        // no file identity, so first require a real use somewhere in root's
-        // subtree; this only ever prunes matches the subtree provably lacks.
+        // the window scan below compares a candidate's offsets only within
+        // root's own file (Ast.file). Without that, a same-named identifier
+        // in another module whose offsets land inside [root_start, root_end]
+        // was a phantom "future use" that moved with any upstream edit: four
+        // lines added to Sema.w put types_identical's `count` (Sema.w:5338)
+        // inside the window of MirLower.w's `for i in 0..count`, and `with
+        // check src/main.w` refused update_string_fields_after_aggregate. The
+        // subtree prune below still skips the scan when root lacks the symbol.
         if self.expr_uses_symbol(root, sym) == 0:
             return 0
+        let root_file = self.ast.file(root as NodeId)
         let root_start = self.ast.get_start(root)
         let root_end = self.ast.get_end(root)
         var found = 0
@@ -30893,7 +30897,7 @@ impl Sema:
         // mutate()` legal while still rejecting `(mutate(), use_view)`.
         for ni in 0..self.ast.node_count():
             let candidate = ni as NodeId
-            if self.ast.kind(candidate) != NodeKind.NK_IDENT or self.ast.get_data0(candidate) != sym:
+            if self.ast.kind(candidate) != NodeKind.NK_IDENT or self.ast.get_data0(candidate) != sym or self.ast.file(candidate) != root_file:
                 continue
             let start = self.ast.get_start(candidate)
             if start > after and start >= root_start and self.ast.get_end(candidate) <= root_end:
