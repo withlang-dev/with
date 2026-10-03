@@ -137,6 +137,14 @@ pub fn run_publish_release_asset_action(ctx: ActionCtx) -> i32:
     let scratch = "out/tmp/publish-release-asset"
     if fs.mkdir_all(scratch) != 0:
         return rp_fail(&ctx, "could not create " ++ scratch)
+    // Every later step reads a gh failure as an answer ("not on the repo");
+    // a host without gh must say so instead (the linux-aarch64 container had
+    // none, and a pushed commit was reported as unpushed).
+    let gh_version: Vec[str] = Vec.new()
+    gh_version.push("--version")
+    let probe = rp_gh(&ctx, scratch, "gh-version", &gh_version)
+    if probe.rc != 0:
+        return rp_fail(&ctx, f"gh does not run on this host (exit {probe.rc}); install the GitHub CLI to publish")
 
     if source_sha.len() == 0:
         var argv: Vec[str] = Vec.new()
@@ -281,12 +289,14 @@ pub fn run_publish_release_asset_action(ctx: ActionCtx) -> i32:
     for asset in assets:
         let name = rp_basename(asset)
         let digest_query = ".assets[] | select(.name == \"" ++ name ++ "\") | .digest"
-        var digest_rest: Vec[str] = Vec.new()
-        digest_rest.push("--json")
-        digest_rest.push("assets")
-        digest_rest.push("--jq")
-        digest_rest.push(digest_query ++ "")
-        let digest_args = rp_release_args("view", tag, repo, &digest_rest)
+        // The REST API, not `gh release view --json assets`: gh before 2.68
+        // (Ubuntu 24.04 ships 2.45) has no asset digest field and printed
+        // nothing, which read as a mismatch after a good upload.
+        var digest_args: Vec[str] = Vec.new()
+        digest_args.push("api")
+        digest_args.push("repos/" ++ repo ++ "/releases/tags/" ++ tag)
+        digest_args.push("--jq")
+        digest_args.push(digest_query ++ "")
         let published = rp_gh(&ctx, scratch, "digest", &digest_args)
         if published.rc != 0 or published.stdout.trim() != "sha256:" ++ rp_sidecar_digest(fs, asset):
             return rp_fail(&ctx, name ++ ": published digest '" ++ published.stdout.trim() ++ "' does not match the sidecar")

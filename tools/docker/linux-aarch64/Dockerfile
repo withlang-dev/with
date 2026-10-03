@@ -8,7 +8,7 @@
 #
 # The compiler builds and links with nothing of the host (#1915, D81): no
 # gcc, libstdc++, zlib, zstd or libxml2. What is here is git and curl for the
-# clone and the seed, bubblewrap for :no-host-toolchain's sandbox (run the
+# clone and the seed, gh for :publish-release-asset, bubblewrap for :no-host-toolchain's sandbox (run the
 # container --privileged so it can make namespaces), strace for diagnosis, and
 # the X/GL packages the raylib release UAT renders through. The SDK, seed and
 # clone live on the mounted volume (see docs/spec/toolchain/with-release-runbook.md,
@@ -16,7 +16,7 @@
 FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends \
-        ca-certificates curl git xz-utils strace bubblewrap \
+        ca-certificates curl git gh xz-utils strace bubblewrap \
         xvfb xauth libgl1-mesa-dri libgl-dev libx11-dev libxext-dev libxfixes-dev \
         libxi-dev libxinerama-dev libxrandr-dev libxcursor-dev \
     && rm -rf /var/lib/apt/lists/*
