@@ -3177,21 +3177,50 @@ pub fn with_vec_new_with_capacity_out(out: *mut u8, elem_size: i64, cap: i64):
     vec_set_len(out, 0)
     vec_set_cap(out, cap)
     if cap > 0:
-        vec_set_ptr_field(out, rt_alloc_with_origin(cap * elem_size, DBG_ORIGIN_VEC))
+        vec_set_ptr_field(out, vec_buffer_alloc(cap * elem_size, elem_size))
     else:
         vec_set_ptr_field(out, 0 as *mut u8)
+
+// #2022: a Vec buffer is aligned for its element. The header carries only the
+// element size (with-abi.md §3), and TypeLayout rounds every size up to its
+// type's alignment (§2), so the largest power of two dividing the size, at
+// most §16.4's 65536, is at least the element's alignment. The allocator's
+// payloads are 16-aligned; a buffer that needs more is placed at that
+// alignment inside a larger block whose start is the word below the buffer.
+fn vec_buffer_align(es: i64) -> i64:
+    if es <= 0:
+        return RT_ALLOC_HEADER_SIZE
+    var align = RT_ALLOC_HEADER_SIZE
+    while align < 65536 and es % (align * 2) == 0:
+        align = align * 2
+    align
+
+fn vec_buffer_alloc(bytes: i64, es: i64) -> *mut u8:
+    let align = vec_buffer_align(es)
+    if align <= RT_ALLOC_HEADER_SIZE:
+        return rt_alloc_with_origin(bytes, DBG_ORIGIN_VEC)
+    let block = rt_alloc_with_origin(bytes + align, DBG_ORIGIN_VEC) as i64
+    let buffer = (block + 8 + align - 1) & (0 - align)
+    unsafe *((buffer - 8) as *mut i64) = block
+    buffer as *mut u8
+
+// The allocation a buffer from vec_buffer_alloc lives in.
+fn vec_buffer_block(p: *mut u8, es: i64) -> *mut u8:
+    if vec_buffer_align(es) <= RT_ALLOC_HEADER_SIZE:
+        return p
+    unsafe *((p as i64 - 8) as *const *mut u8)
 
 fn vec_grow(v: *mut u8):
     let old_cap = vec_get_cap(v)
     let new_cap = if old_cap < 8: 8 as i64 else: old_cap * 2
     let es = vec_get_elem_size(v)
-    let new_ptr = rt_alloc_with_origin(new_cap * es, DBG_ORIGIN_VEC)
+    let new_ptr = vec_buffer_alloc(new_cap * es, es)
     let old_ptr = vec_get_ptr_field(v)
     let vlen = vec_get_len(v)
     if old_ptr as i64 != 0 and vlen > 0:
         rt_memcpy(new_ptr, old_ptr as *const u8, vlen * es)
     if old_ptr as i64 != 0 and old_cap > 0:
-        rt_free_sized(old_ptr, old_cap * es)
+        rt_free_sized(vec_buffer_block(old_ptr, es), old_cap * es)
     vec_set_ptr_field(v, new_ptr)
     vec_set_cap(v, new_cap)
 
@@ -3247,7 +3276,7 @@ pub fn with_vec_clear(v: *mut u8):
 // benchmark reloaded five headers after every store before this).
 pub fn with_vec_free_buffer(p: *mut u8, cap: i64, es: i64) -> Unit:
     if p as i64 != 0 and cap > 0 and es > 0:
-        rt_free_sized(p, cap * es)
+        rt_free_sized(vec_buffer_block(p, es), cap * es)
 
 pub fn with_vec_free(v: *mut u8) -> Unit:
     with_vec_free_buffer(vec_get_ptr_field(v), vec_get_cap(v), vec_get_elem_size(v))
@@ -3279,7 +3308,7 @@ pub fn with_vec_free_buffer_drop_origin(p: *mut u8, cap: i64, es: i64, drop_orig
                 dbg_puts(drop_origin, drop_origin_len)
             dbg_puts("\n" as *const u8, 1)
             with_panic_core(make_str("corrupt vec header: freed memory reused or overwritten" as *const u8, 54), make_str("" as *const u8, 0), 0)
-        rt_free_sized_with_drop_origin(p, cap * es, drop_origin, drop_origin_len)
+        rt_free_sized_with_drop_origin(vec_buffer_block(p, es), cap * es, drop_origin, drop_origin_len)
 
 // #747 (#691 second half): dropping a str frees its buffer. A str place is
 // {data_ptr, len}; only a pointer that is the START of a live allocation
