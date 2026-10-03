@@ -3,7 +3,7 @@
 type Invalid[T] { value: T }
 
 impl[T] Invalid[T]:
-    fn write(value: T): self.value = value
+    fn write(v: T): self.value = v
 
 fn main:
     let value = Invalid { value: 0 }

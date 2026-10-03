@@ -20,12 +20,12 @@ fn make(id: i32, slot: *mut i32) -> R:
     unsafe { R { id: id, ptr: with_alloc(16), slot: slot } }
 
 extend R:
-    mut fn replace(id: i32):
-        self = make(id, self.slot)
-    mut fn replace_if(id: i32, go: bool):
+    mut fn replace(new_id: i32):
+        self = make(new_id, self.slot)
+    mut fn replace_if(new_id: i32, go: bool):
         if not go:
             return
-        self.replace(id)
+        self.replace(new_id)
 
 fn main:
     var drops: i32 = 0

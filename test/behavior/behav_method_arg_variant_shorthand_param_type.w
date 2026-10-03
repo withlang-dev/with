@@ -44,8 +44,8 @@ fn G.make(kind: Kind) -> i32: ord(kind)
 type Slot[T] { v: T }
 extend Slot[T]:
     fn tag(self: &Self, kind: Kind) -> i32: ord(kind) * 10
-    fn put(mut self: Self, v: T, kind: Kind) -> i32:
-        self.v = v
+    fn put(mut self: Self, value: T, kind: Kind) -> i32:
+        self.v = value
         ord(kind)
 
 fn main:

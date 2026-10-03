@@ -14,9 +14,9 @@ type Root {
 }
 
 impl Root:
-    mut fn sync(snapshot: Snapshot):
+    mut fn sync(new_snapshot: Snapshot):
         // D32: field vacates need a mutable path — rebind the owned param.
-        var owned = snapshot
+        var owned = new_snapshot
         self.active = move owned.items
         self.snapshot = owned
 

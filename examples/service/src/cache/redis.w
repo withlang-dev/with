@@ -15,8 +15,8 @@ type RedisCache {
 }
 
 extend RedisCache:
-    fn new(prefix: str) -> RedisCache:
-        RedisCache { prefix }
+    fn new(key_prefix: str) -> RedisCache:
+        RedisCache { prefix: key_prefix }
 
     fn prefixed_key(self: &RedisCache, key: str) -> str:
         f"{self.prefix}:{key}"
