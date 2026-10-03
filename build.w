@@ -990,13 +990,13 @@ fn release_compiler_bin(name: &str) -> str:
 fn release_platform_asset_bin() -> str:
     let host_os = os()
     let host_arch = arch()
-    if host_os == "Macos" and comp_arch_is_aarch64(host_arch):
+    if host_os == "Macos" and host_arch == "aarch64":
         return "out/release/with-darwin-aarch64"
     if host_os == "Linux" and host_arch == "x86_64":
         return "out/release/with-linux-x86_64"
     if host_os == "Windows" and host_arch == "x86_64":
         return "out/release/with-windows-x86_64.exe"
-    if host_os == "Windows" and (host_arch == "armv8" or host_arch == "aarch64"):
+    if host_os == "Windows" and host_arch == "aarch64":
         return "out/release/with-windows-aarch64.exe"
     release_compiler_bin("with")
 
@@ -1012,7 +1012,7 @@ fn release_uat_platform_asset_dep(t: Target) -> Target:
     t
 
 fn host_runtime_spec() -> HostRuntimeSpec:
-    if os() == "Linux" and comp_arch_is_aarch64(arch()):
+    if os() == "Linux" and arch() == "aarch64":
         return HostRuntimeSpec {
             platform_source: "rt/linux_aarch64.w",
             compat_source: "rt/compat_runtime.w",
@@ -1045,7 +1045,7 @@ fn host_runtime_spec() -> HostRuntimeSpec:
             fiber_core_source: "rt/fiber_core_windows.w",
             fiber_asm_source: "runtime/fiber_asm_windows_x86_64.s",
         }
-    if os() == "Windows" and (arch() == "armv8" or arch() == "aarch64"):
+    if os() == "Windows" and arch() == "aarch64":
         return HostRuntimeSpec {
             platform_source: "rt/windows_aarch64.w",
             compat_source: "rt/compat_runtime.w",
@@ -1070,16 +1070,16 @@ fn host_runtime_spec() -> HostRuntimeSpec:
 fn release_asset_for_host() -> str:
     if os() == "Linux" and arch() == "x86_64":
         return "with-linux-x86_64"
-    if os() == "Macos" and comp_arch_is_aarch64(arch()):
+    if os() == "Macos" and arch() == "aarch64":
         return "with-darwin-aarch64"
     if os() == "Windows" and arch() == "x86_64":
         return "with-windows-x86_64.exe"
-    if os() == "Windows" and (arch() == "armv8" or arch() == "aarch64"):
+    if os() == "Windows" and arch() == "aarch64":
         return "with-windows-aarch64.exe"
     // linux-aarch64 was missing here, so on that host every consumer — the
     // seed-driver gate above all — fell through to the darwin asset and
     // compared the driving compiler against the darwin digest.
-    if os() == "Linux" and (arch() == "armv8" or arch() == "aarch64"):
+    if os() == "Linux" and arch() == "aarch64":
         return "with-linux-aarch64"
     "with-darwin-aarch64"
 
@@ -1096,13 +1096,13 @@ fn release_platform_tag() -> str:
 fn supported_release_platform_tag() -> str:
     if os() == "Linux" and arch() == "x86_64":
         return "linux-x86_64"
-    if os() == "Macos" and comp_arch_is_aarch64(arch()):
+    if os() == "Macos" and arch() == "aarch64":
         return "darwin-aarch64"
     if os() == "Windows" and arch() == "x86_64":
         return "windows-x86_64"
-    if os() == "Windows" and (arch() == "armv8" or arch() == "aarch64"):
+    if os() == "Windows" and arch() == "aarch64":
         return "windows-aarch64"
-    if os() == "Linux" and (arch() == "armv8" or arch() == "aarch64"):
+    if os() == "Linux" and arch() == "aarch64":
         return "linux-aarch64"
     ""
 

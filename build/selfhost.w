@@ -97,30 +97,30 @@ fn bs_host_platform_runtime_object() -> str:
     let host_arch = arch()
     if host_os == "Linux" and host_arch == "x86_64":
         return "rt_linux_x86_64.o"
-    if host_os == "Linux" and comp_arch_is_aarch64(host_arch):
+    if host_os == "Linux" and host_arch == "aarch64":
         return "rt_linux_aarch64.o"
-    if host_os == "Macos" and comp_arch_is_aarch64(host_arch):
+    if host_os == "Macos" and host_arch == "aarch64":
         return "rt_darwin_aarch64.o"
     if host_os == "Windows" and host_arch == "x86_64":
         return "rt_windows_x86_64.o"
-    if host_os == "Windows" and (host_arch == "armv8" or host_arch == "aarch64"):
+    if host_os == "Windows" and host_arch == "aarch64":
         return "rt_windows_aarch64.o"
     ""
 
 fn bs_host_target_triple() -> str:
     let host_os = os()
     let host_arch = arch()
-    if host_os == "Macos" and comp_arch_is_aarch64(host_arch):
+    if host_os == "Macos" and host_arch == "aarch64":
         return "aarch64-apple-darwin"
     if host_os == "Macos" and host_arch == "x86_64":
         return "x86_64-apple-darwin"
     if host_os == "Linux" and host_arch == "x86_64":
         return "x86_64-unknown-linux-gnu"
-    if host_os == "Linux" and comp_arch_is_aarch64(host_arch):
+    if host_os == "Linux" and host_arch == "aarch64":
         return "aarch64-unknown-linux-gnu"
     if host_os == "Windows" and host_arch == "x86_64":
         return "x86_64-w64-windows-gnu"
-    if host_os == "Windows" and (host_arch == "armv8" or host_arch == "aarch64"):
+    if host_os == "Windows" and host_arch == "aarch64":
         return "aarch64-pc-windows-msvc"
     ""
 
@@ -3787,7 +3787,7 @@ fn bs_check_emit_c_array_ref(ctx: &ActionCtx, compiler_path: &str, case_dir: &st
     bs_edge_assert_exact(ctx, run_result.stdout, "", "emit_c_array_ref", "stdout")
 
 fn bs_check_darwin_arm64_c_abi_direct_aggregates(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
-    if not (os() == "Macos" and comp_arch_is_aarch64(arch())):
+    if not (os() == "Macos" and arch() == "aarch64"):
         return 0
 
     let root = ctx.project_info().project_root()

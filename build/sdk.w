@@ -98,15 +98,15 @@ fn sdk_exe_name(name: &str) -> str:
     sdk_owned_text(name)
 
 pub fn sdk_current_platform() -> str:
-    if os() == "Macos" and comp_arch_is_aarch64(arch()):
+    if os() == "Macos" and arch() == "aarch64":
         return "darwin-aarch64"
     if os() == "Linux" and arch() == "x86_64":
         return "linux-x86_64"
-    if os() == "Linux" and comp_arch_is_aarch64(arch()):
+    if os() == "Linux" and arch() == "aarch64":
         return "linux-aarch64"
     if os() == "Windows" and arch() == "x86_64":
         return "windows-x86_64"
-    if os() == "Windows" and (arch() == "armv8" or arch() == "aarch64"):
+    if os() == "Windows" and arch() == "aarch64":
         return "windows-aarch64"
     ""
 
@@ -1250,7 +1250,7 @@ pub fn run_sdk_llvm_action(ctx: ActionCtx) -> i32:
                 return sdk_fail(ctx, "SDKROOT must be set for macOS SDK rebuilds; the graph will not shell out to xcrun")
             configure.push("-DCMAKE_OSX_SYSROOT=" ++ sdkroot)
             configure.push("-DCMAKE_OSX_DEPLOYMENT_TARGET=" ++ deployment_target)
-            if comp_arch_is_aarch64(arch()):
+            if arch() == "aarch64":
                 configure.push("-DCMAKE_OSX_ARCHITECTURES=arm64")
             else if arch() == "x86_64":
                 configure.push("-DCMAKE_OSX_ARCHITECTURES=x86_64")

@@ -154,7 +154,7 @@ fn wo_store_install_dir(ctx: &BuildCtx) -> str:
 pub fn wo_host_target() -> str:
     let host_os = os()
     let host_arch = arch()
-    let arch_name = if comp_arch_is_aarch64(host_arch): "aarch64" else: wo_owned_text(host_arch)
+    let arch_name = wo_owned_text(host_arch)
     if host_os == "Macos":
         return "darwin_" ++ arch_name
     if host_os == "Linux":

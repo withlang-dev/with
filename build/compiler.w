@@ -244,19 +244,6 @@ fn comp_tool_from_env(primary: &str, legacy: &str, fallback: &str) -> str:
         return old
     compiler_owned_text(fallback)
 
-// True when a host-arch string denotes ARM64.
-//
-// arch() is unified on "aarch64" (rt/darwin_aarch64.w). This predicate exists
-// only because build.w and build/*.w are INTERPRETED BY THE SEED: a seed built
-// before that unification still reports "armv8" on darwin, so the build layer
-// must accept both until every pinned seed carries the unified spelling.
-//
-// This is the ONLY place in the tree that still knows the legacy spelling
-// (aside from ConanClient, where "armv8" is Conan's own ecosystem name and is
-// correct). Delete the "armv8" branch after the next reseed.
-pub fn comp_arch_is_aarch64(a: &str) -> bool:
-    a == "aarch64" or a == "armv8"
-
 // The home directory the build layer's stores live under: $HOME, else on
 // Windows %USERPROFILE% with '\\' as '/' (cmd.exe and PowerShell set no
 // HOME, #1884). The driver expands an install destination's `$HOME/` the
@@ -296,15 +283,15 @@ fn comp_slashes(path: &str) -> str:
 fn comp_default_llvm_prefix() -> str:
     let host_os = os()
     let host_arch = arch()
-    if host_os == "Macos" and comp_arch_is_aarch64(host_arch):
+    if host_os == "Macos" and host_arch == "aarch64":
         return ".deps/llvm-" ++ COMPILER_LLVM_VERSION ++ "-darwin-arm64"
     if host_os == "Linux" and host_arch == "x86_64":
         return ".deps/llvm-" ++ COMPILER_LLVM_VERSION ++ "-linux-x86_64"
-    if host_os == "Linux" and comp_arch_is_aarch64(host_arch):
+    if host_os == "Linux" and host_arch == "aarch64":
         return ".deps/llvm-" ++ COMPILER_LLVM_VERSION ++ "-linux-aarch64"
     if host_os == "Windows" and host_arch == "x86_64":
         return ".deps/llvm-" ++ COMPILER_LLVM_VERSION ++ "-windows-x86_64-msvc"
-    if host_os == "Windows" and (host_arch == "armv8" or host_arch == "aarch64"):
+    if host_os == "Windows" and host_arch == "aarch64":
         return ".deps/llvm-" ++ COMPILER_LLVM_VERSION ++ "-windows-aarch64-msvc"
     COMPILER_FALLBACK_LLVM_PREFIX
 
@@ -336,11 +323,11 @@ pub fn llvm_sdk_host_asset() -> str:
     let host_os = os()
     let host_arch = arch()
     var tag = ""
-    if host_os == "Macos" and comp_arch_is_aarch64(host_arch): tag = "darwin-aarch64"
+    if host_os == "Macos" and host_arch == "aarch64": tag = "darwin-aarch64"
     else if host_os == "Linux" and host_arch == "x86_64": tag = "linux-x86_64"
-    else if host_os == "Linux" and comp_arch_is_aarch64(host_arch): tag = "linux-aarch64"
+    else if host_os == "Linux" and host_arch == "aarch64": tag = "linux-aarch64"
     else if host_os == "Windows" and host_arch == "x86_64": tag = "windows-x86_64"
-    else if host_os == "Windows" and (host_arch == "armv8" or host_arch == "aarch64"): tag = "windows-aarch64"
+    else if host_os == "Windows" and host_arch == "aarch64": tag = "windows-aarch64"
     if tag.len() == 0: return ""
     "with-llvm-sdk-" ++ COMPILER_LLVM_VERSION ++ "-" ++ tag ++ ".tar.gz"
 
@@ -439,7 +426,7 @@ fn comp_link_path_is_dynamic(path: &str) -> bool:
 // the windows-gnu x86_64 SDK included (#1915).
 pub fn compiler_default_libclang_archive_path() -> str:
     let prefix = compiler_default_llvm_prefix()
-    if os() == "Windows" and comp_arch_is_aarch64(arch()):
+    if os() == "Windows" and arch() == "aarch64":
         return prefix ++ "/lib/libclang.lib"
     prefix ++ "/lib/libclang.a"
 
@@ -2964,7 +2951,7 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
         // libc++ (libc++abi inside it) and libunwind; Link.w adds the libc,
         // compiler-rt and the in-box DLLs as for every program. Nothing of
         // Visual Studio or a Windows Kit.
-        let libc_lib = llvm_prefix ++ "/libc/windows/" ++ (if comp_arch_is_aarch64(arch()): "aarch64" else: "x86_64") ++ "-w64-mingw32/lib"
+        let libc_lib = llvm_prefix ++ "/libc/windows/" ++ (if arch() == "aarch64": "aarch64" else: "x86_64") ++ "-w64-mingw32/lib"
         let cxx_libs: Vec[str] = Vec.new()
         cxx_libs.push(libc_lib ++ "/libc++.a")
         cxx_libs.push(libc_lib ++ "/libunwind.a")

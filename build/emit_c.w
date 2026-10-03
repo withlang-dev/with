@@ -120,13 +120,13 @@ fn emitc_host_platform_runtime_object() -> str:
     let host_arch = arch()
     if host_os == "Linux" and host_arch == "x86_64":
         return "rt_linux_x86_64.o"
-    if host_os == "Linux" and comp_arch_is_aarch64(host_arch):
+    if host_os == "Linux" and host_arch == "aarch64":
         return "rt_linux_aarch64.o"
-    if host_os == "Macos" and comp_arch_is_aarch64(host_arch):
+    if host_os == "Macos" and host_arch == "aarch64":
         return "rt_darwin_aarch64.o"
     if host_os == "Windows" and host_arch == "x86_64":
         return "rt_windows_x86_64.o"
-    if host_os == "Windows" and (host_arch == "armv8" or host_arch == "aarch64"):
+    if host_os == "Windows" and host_arch == "aarch64":
         return "rt_windows_aarch64.o"
     ""
 
@@ -136,7 +136,7 @@ fn emitc_push_host_c_flags(argv: Vec[str]) -> Vec[str]:
         argv |> push("-fuse-ld=lld")
     if os() == "Windows":
         argv |> push("-target")
-        if arch() == "armv8" or arch() == "aarch64":
+        if arch() == "aarch64":
             argv |> push("aarch64-pc-windows-msvc")
         else:
             argv |> push("x86_64-pc-windows-msvc")
@@ -153,7 +153,7 @@ fn emitc_push_host_c_flags(argv: Vec[str]) -> Vec[str]:
 // hardcoded fallbacks below embed this; env overrides (set by the
 // runner / cross SDK) take precedence and are used verbatim.
 fn emitc_windows_lib_arch():
-    if arch() == "armv8" or arch() == "aarch64": "arm64" else: "x64"
+    if arch() == "aarch64": "arm64" else: "x64"
 
 fn emitc_windows_um_libdir():
     let dir = env("WITH_WINDOWS_UM_LIBDIR")
