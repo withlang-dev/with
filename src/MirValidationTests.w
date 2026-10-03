@@ -1281,6 +1281,46 @@ pub fn mir_test_reset_of_init:
     assert(drop_state_verdict(8, true) == "")
     // A value with no drop glue owns nothing to lose.
     assert(drop_state_verdict(6, false) == "")
+    // #2049: a carrier whose payload a decomposition moved out (`?`'s pass
+    // path: `_t = move _1<as v0>.f0; _1 = const zst`) is a shell; its blank
+    // loses nothing. A carrier nothing was moved out of still is a loss.
+    assert(decomposed_reset_verdict(true) == "")
+    assert(decomposed_reset_verdict(false).contains("reset of _1 on a path where it was never moved: the value it holds is lost"))
+
+// `_1` (an enum with drop glue) is written, `move _1<as v0>.f0` taken out of
+// it when `payload_moved`, then the whole `_1` blanked.
+fn decomposed_reset_verdict(payload_moved: bool) -> str:
+    var mir_mod = MirModule.init()
+    for kind in [0, TypeKind.TY_ENUM, TypeKind.TY_STRUCT]:
+        mir_mod.sema_type_kinds.push(kind)
+        mir_mod.sema_type_d0.push(0)
+        mir_mod.sema_type_d1.push(0)
+        mir_mod.sema_type_d2.push(0)
+    let carrier_ty = 1
+    let payload_ty = 2
+    for ty in [carrier_ty, payload_ty]:
+        mir_mod.sema_moved_drop_types.insert(ty, 1)
+        mir_mod.sema_dropped_types.insert(ty, 1)
+    var body = MirBody.init_for_fn(1)
+    let carrier_local = body.new_temp(carrier_ty)
+    let carrier = body.new_place(carrier_local)
+    let payload = body.new_field_place(body.new_downcast_place(carrier, 0), 0, payload_ty)
+    let taken_local = body.new_temp(payload_ty)
+    let taken = body.new_place(taken_local)
+    let entry = body.new_block()
+    let no_fields: Vec[i32] = Vec.new()
+    let no_field_table = body.new_agg_fields(&no_fields, &no_fields)
+    let init = body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, no_field_table, 0)
+    let blank = body.new_const(ConstKind.CK_ZERO_SIZED, 0, 0, 0, carrier_ty)
+    let reset = body.new_rvalue(RvalueKind.RK_USE, body.new_operand(OperandKind.OK_CONSTANT, blank), 0, 0)
+    let take = body.new_rvalue(RvalueKind.RK_USE, body.new_operand(OperandKind.OK_MOVE, payload), 0, 0)
+    body.push_stmt(entry, StmtKind.StorageLive, carrier_local, 0, 0)
+    body.push_stmt(entry, StmtKind.Assign, carrier, init, 0)
+    if payload_moved:
+        body.push_stmt(entry, StmtKind.Assign, taken, take, 0)
+    body.push_stmt(entry, StmtKind.Assign, carrier, reset, 0)
+    body.set_terminator(entry, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    validate_ownership_body(mir_mod, body)
 
 // #1742: `call fn 7(copy _1)` where the signature snapshot says parameter
 // 0 of fn 7 takes ownership (`consumes`), and this body also drops `_1`.

@@ -2,7 +2,7 @@
 
 type Context { multiplier: i32 }
 
-fn compute(x: i32, ctx: implicit Context) -> i32:
+fn compute(x: i32, ctx: implicit &Context) -> i32:
     x * ctx.multiplier
 
 fn test_automatic_resolution:

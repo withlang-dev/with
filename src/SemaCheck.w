@@ -23181,8 +23181,9 @@ impl Sema:
                                 while si >= 0:
                                     let bind_ty: i32 = self.implicit_binding_types[si]
                                     if self.types_compatible(expected_ty, bind_ty) != 0:
-                                        let bind_sym = self.implicit_binding_syms[si]
+                                        let bind_sym: i32 = self.implicit_binding_syms[si]
                                         resolved_map.insert(pi, 0 - bind_sym)
+                                        self.note_implicit_fill(bind_sym, sig_idx, pi, node)
                                         break
                                     si = si - 1
                             // Fill defaults
@@ -28866,6 +28867,37 @@ impl Sema:
             return self.check_method_call_parts(expr, target, extra_start, arg_count, node, recv_ty)
         self.check_method_call_parts(expr, field, extra_start, arg_count, node, 0)
 
+    // D5 (§3.8, §7.3a): an implicit fill passes the `with` binding as the
+    // argument, and the signature decides what that does to it — a `&T`
+    // parameter borrows it, a plain non-Copy `T` moves it. A second fill of
+    // a moved context is a use of a moved value at that call. #2049: the fill
+    // recorded no move, so `compute(1); compute(2)` against `ctx: implicit
+    // Ctx` handed one value to two owners (MirLower passed a copy).
+    mut fn note_implicit_fill(bind_sym: i32, sig_idx: i32, pi: i32, call_node: i32):
+        if sig_idx < 0 or bind_sym == 0 or self.scope_has(bind_sym) == 0:
+            return
+        let param_ty = self.sig_param_type(sig_idx, pi)
+        let param_kind = self.get_type_kind(self.resolve_alias(param_ty as TypeId))
+        if param_kind == TypeKind.TY_REF or param_kind == TypeKind.TY_PTR or self.sig_param_uses_value_ref_abi(sig_idx, pi) != 0:
+            return
+        let tid = self.scope_lookup(bind_sym)
+        if self.is_copy(tid as TypeId) != 0 or self.is_copy(param_ty as TypeId) != 0:
+            return
+        if self.scope_lookup_state(bind_sym) == VarState.MOVED:
+            let ctx_name = self.pool_resolve(bind_sym).clone()
+            let ty_name = self.type_name(param_ty as i32)
+            self.emit_error_with_help("use of moved value", call_node, f"the implicit context `{ctx_name}` was moved into an earlier call whose parameter takes it by value; declare the parameter `implicit &{ty_name}` to borrow the context instead")
+            return
+        if self.type_needs_drop(tid as i32) != 0 and self.outer_binding_has_unsupported_move_context(bind_sym) != 0:
+            self.emit_error("conditional move of Drop value requires drop-state tracking", call_node)
+            return
+        self.move_site_node = call_node
+        self.scope_set_state(bind_sym, VarState.MOVED)
+        self.move_site_node = 0
+        self.effect_note_origin_node = call_node
+        self.note_param_effect(bind_sym, EFF_CONSUME)
+        self.effect_note_origin_node = 0
+
     // One named-argument binding rule for free functions, static methods and
     // instance methods. Bind names before filling omitted parameters; the
     // number of supplied arguments says nothing about which ones are absent.
@@ -28927,6 +28959,7 @@ impl Sema:
                 let bind_ty: i32 = self.implicit_binding_types[si]
                 if self.types_compatible(expected_ty, bind_ty) != 0:
                     resolved_map.insert(pi, 0 - self.implicit_binding_syms[si])
+                    self.note_implicit_fill(self.implicit_binding_syms[si], sig_idx, pi, call_node)
                     break
                 si -= 1
         for pi in param_offset..param_count:
@@ -28995,8 +29028,9 @@ impl Sema:
             while si >= 0:
                 let bind_ty: i32 = self.implicit_binding_types[si]
                 if self.types_compatible(expected_ty, bind_ty) != 0:
-                    let bind_sym = self.implicit_binding_syms[si]
+                    let bind_sym: i32 = self.implicit_binding_syms[si]
                     resolved_map.insert(pi, 0 - bind_sym)
+                    self.note_implicit_fill(bind_sym, sig_idx, pi, call_node)
                     filled = 1
                     found = 1
                     break
