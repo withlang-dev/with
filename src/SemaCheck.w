@@ -6935,6 +6935,17 @@ impl Sema:
         else:
             self.callable_opaque_idents.insert(node, 1)
 
+    // #2011: an awaited owned Task or ScopedTask binding (a `let` or a
+    // parameter of that type, not a view of one) is consumed by the await;
+    // a ScopedTask awaits like a Task (§14.11.1) and lowers the same way.
+    mut fn mark_awaited_task_moved(expr: i32):
+        if self.ast.kind(expr) != NodeKind.NK_IDENT or not self.typed_expr_types.contains(expr):
+            return
+        let ty: i32 = self.typed_expr_types.get(expr).unwrap()
+        if self.type_is_task(ty) == 0 and self.type_is_scoped_task(ty) == 0:
+            return
+        self.mark_moved_if_consumed(expr)
+
     fn symbol_is_current_fn_param(sym: i32) -> bool:
         for pi in 0..self.current_fn_param_syms.len() as i32:
             if self.current_fn_param_syms[pi] == sym:
@@ -9948,6 +9959,7 @@ impl Sema:
                 let unwrapped_elems: Vec[i32] = Vec.new()
                 for ei in 0..elem_count:
                     let elem_node = self.ast.get_extra(extra_s + ei)
+                    self.mark_awaited_task_moved(elem_node)
                     var elem_ty = 0
                     if self.typed_expr_types.contains(elem_node):
                         elem_ty = self.typed_expr_types.get(elem_node).unwrap()
@@ -9960,12 +9972,11 @@ impl Sema:
                 return unwrapped_tuple as TypeId
             if self.expr_is_awaitable_task_value(inner) == 0:
                 self.emit_error("await requires a Task value", node)
-            // §14.7: `.await` does NOT consume the task — it drives it to completion
-            // and returns the result, but the task remains observable afterwards
-            // (`task.was_cancelled()`, `task.is_done()` are valid post-await). So
-            // await must not mark the awaited binding moved or record a consume
-            // effect; doing so both broke §14.7 observation and mis-classified an
-            // awaited task parameter as owned.
+            // #2011 (§22, concurrency.md: `t.await // OK: consumes the task`):
+            // `.await` takes the result and releases the task, so it consumes
+            // an owned Task binding and a later read is a use of a moved
+            // value. A view of a task (`&Task[T]`) is awaited in place.
+            self.mark_awaited_task_moved(inner)
             // Unwrap Task[T] → T for the .await expression type
             let await_result_ty = self.unwrap_task_type(inner_ty)
             self.typed_expr_types.insert(node, await_result_ty as i32)
