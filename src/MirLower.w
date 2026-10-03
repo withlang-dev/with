@@ -13965,12 +13965,16 @@ impl MirBuilder:
         let result_place = self.place_for_local(result_local)
         let next_bb = self.new_block()
 
+        // Tag the call with its intrinsic kind for codegen dispatch — the call
+        // this terminator makes (args_id), before the terminator is set. Read
+        // back as "the last call created" after it, the tag landed on the
+        // cancelled-return check terminate adds for a call reaching a
+        // may-suspend closure (#1985), and `xs.map(n => f(n).await)` lowered
+        // as a plain call to the map symbol (D65 #1639 validator, #2011).
+        let call_id = args_id
+        self.body.set_call_intrinsic(call_id, intrinsic)
         self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
         self.switch_to(next_bb)
-
-        // Tag call with intrinsic kind for codegen dispatch.
-        let call_id = self.body.call_arg_starts.len() as i32 - 1
-        self.body.set_call_intrinsic(call_id, intrinsic)
         if intrinsic == MirIntrinsic.MATH_FN:
             let math_method_name = self.pool.resolve_symbol(method_sym)
             let math_method_id = math_fn_lookup(math_method_name)
