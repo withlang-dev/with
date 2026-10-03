@@ -116,6 +116,12 @@ pub type Codegen {
     analysis_query: str,
     analysis_report: AnalysisReport,
     analysis_last_marshal_strategy: AnalysisMarshalStrategy,
+    // D65 phase 2 (#1647): per mode-provenance site, the decisions taken,
+    // those where the owner's fact and the LLVM type disagree, and the first
+    // such disagreement.
+    mode_site_decisions: Vec[i32],
+    mode_site_disagree: Vec[i32],
+    mode_site_first: Vec[str],
 
     // Current function state
     current_ret_type: i64,
@@ -817,6 +823,37 @@ impl Codegen:
     // Coverage proof for the instrumentation itself. Every reachable ordinary MIR
     // call argument must pass through one recorded marshalling branch; otherwise an
     // uninstrumented Codegen path could hide a contract divergence.
+    // ── D65 phase 2 (#1647): mode provenance ─────────────────────────
+    // Each site below once decided a passing mode or a place category from
+    // the LLVM type of a value. The owner of that fact is FnAbi's PassMode
+    // (D6) or Sema's place category (D65); codegen materializes it. A site
+    // now calls mode_decide with both answers: the decision is the owner's,
+    // and the LLVM type is verification only.
+    mut fn mode_decide(site: i32, fact: bool, llvm: bool, fn_sym: i32, subject: i32) -> bool:
+        if self.analysis_enabled != 0:
+            while self.mode_site_decisions.len() as i32 < MODE_SITE_COUNT:
+                self.mode_site_decisions.push(0)
+                self.mode_site_disagree.push(0)
+                self.mode_site_first.push("")
+            self.mode_site_decisions[site] = self.mode_site_decisions[site] + 1
+            if fact != llvm:
+                if self.mode_site_disagree[site] == 0:
+                    self.mode_site_first[site] = f"{self.sema_symbol_text(fn_sym)} subject {subject}: fact={fact} llvm-pointer={llvm}"
+                self.mode_site_disagree[site] = self.mode_site_disagree[site] + 1
+        fact
+
+    // One verdict per site: an owner fact the LLVM representation
+    // contradicts is a violation — either the fact or the representation is
+    // wrong, and codegen re-deriving the fact would have hidden it.
+    mut fn audit_mode_provenance():
+        if self.analysis_enabled == 0:
+            return
+        for site in 0..self.mode_site_decisions.len() as i32:
+            let name = mode_site_name(site)
+            if self.mode_site_disagree[site] > 0:
+                self.analysis_fail(f"mode-provenance: {name}: {mode_site_owner(site)} and the LLVM type disagree in {self.mode_site_disagree[site]} of {self.mode_site_decisions[site]} decisions; first: {self.mode_site_first[site]}")
+            self.analysis_report.note(f"mode-provenance: {name} decisions={self.mode_site_decisions[site]} disagree={self.mode_site_disagree[site]}")
+
     mut fn audit_codegen_call_coverage():
         if self.analysis_enabled == 0 or self.analysis_query != "audit":
             return
@@ -965,6 +1002,9 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         analysis_query: "",
         analysis_report: AnalysisReport.init(),
         analysis_last_marshal_strategy: AnalysisMarshalStrategy.DirectValue,
+        mode_site_decisions: Vec.new(),
+        mode_site_disagree: Vec.new(),
+        mode_site_first: Vec.new(),
         current_ret_type: 0,
         mir_emit_mutual_tail_call: 0,
         async_trampolines: HashMap.new(),
@@ -5215,6 +5255,34 @@ impl Codegen:
             return with_str_clone_ref(name)
         fn_abi_anonymous_symbol(sym)
 
+// D65 phase 2 (#1647): the codegen sites that once took a passing mode or
+// a place category from an LLVM type. mode_decide counts them per site.
+pub const MODE_SITE_FIELD_TYPE_THROUGH_ADDRESS: i32 = 0
+pub const MODE_SITE_FIELD_PTR_THROUGH_ADDRESS: i32 = 1
+pub const MODE_SITE_INDEX_THROUGH_ADDRESS: i32 = 2
+pub const MODE_SITE_INDEX_RAW_POINTER: i32 = 3
+pub const MODE_SITE_EVAL_INDIRECT_LOCAL: i32 = 4
+pub const MODE_SITE_MARSHAL_EXISTING_POINTER: i32 = 5
+pub const MODE_SITE_PARAM_BY_ADDRESS: i32 = 6
+pub const MODE_SITE_PARAM_PLACE_ALIAS: i32 = 7
+pub const MODE_SITE_COUNT: i32 = 8
+
+pub fn mode_site_name(site: i32) -> str:
+    if site == MODE_SITE_FIELD_TYPE_THROUGH_ADDRESS: return "projected-type field through an address"
+    if site == MODE_SITE_FIELD_PTR_THROUGH_ADDRESS: return "place-ptr field through an address"
+    if site == MODE_SITE_INDEX_THROUGH_ADDRESS: return "place-ptr index through an address"
+    if site == MODE_SITE_INDEX_RAW_POINTER: return "place-ptr raw-pointer index"
+    if site == MODE_SITE_EVAL_INDIRECT_LOCAL: return "operand read of an indirect local"
+    if site == MODE_SITE_MARSHAL_EXISTING_POINTER: return "marshal_ref_addr existing pointer"
+    if site == MODE_SITE_PARAM_BY_ADDRESS: return "prologue parameter passed by address"
+    if site == MODE_SITE_PARAM_PLACE_ALIAS: return "prologue share-place parameter alias"
+    "unknown"
+
+pub fn mode_site_owner(site: i32) -> str:
+    if site == MODE_SITE_MARSHAL_EXISTING_POINTER: return "the operand's Sema category"
+    if site == MODE_SITE_PARAM_BY_ADDRESS or site == MODE_SITE_PARAM_PLACE_ALIAS or site == MODE_SITE_EVAL_INDIRECT_LOCAL: return "FnAbi's PassMode"
+    "Sema's place category"
+
 // Symbol-naming rules live in src/FnAbi.w (docs/spec/abi/with-abi.md §5); this is
 // the adapter that feeds them the codegen mode.
 impl Codegen:
@@ -5807,6 +5875,17 @@ impl Codegen:
         wl_build_insert_value(self.builder, fat, wl_const_null(wl_ptr_type(self.context)), 1)
 
     fn fn_abi_arg(abi: i32, pi: i32) -> ArgAbi: self.fn_abi_args[self.fn_abis[abi].arg_start + pi]
+
+    // FnAbi's answer for whether parameter `pi` of `fn_sym` arrives as an
+    // address — PM_INDIRECT (a copy the caller made), PM_INDIRECT_PLACE (the
+    // caller's place) or a reference receiver — the fact a prologue binds the
+    // parameter from.
+    fn fn_abi_param_by_address(fn_sym: i32, pi: i32) -> bool:
+        let d = self.fn_abi_symbols.get(fn_sym) ?? -1
+        if d < 0 or pi < 0 or pi >= self.fn_abis[d].arg_count:
+            return false
+        let arg = self.fn_abi_arg(d, pi)
+        arg.pass == PM_INDIRECT or arg.pass == PM_INDIRECT_PLACE or arg.reference
 
     // Both MIR operands and synthesized/thunk values arrive here after their
     // semantic adjustments. Only this routine turns an ArgAbi into a value,

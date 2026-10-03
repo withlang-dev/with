@@ -98,6 +98,20 @@ carry a `MirIntrinsic` and are recognized by it). Red in `audit:all`.
 Fixture: `test/analysis/` planted configurations + `behav_callable_alias_field_call.w`.
 
 ### Phase 2 — codegen mode provenance (would have caught the `&fn` crash)
+Status: implemented for the sites #1647 named (#1647, wave-d65). Each
+site calls `Codegen.mode_decide(site, fact, llvm, …)`: the decision is the
+owner's fact — FnAbi's PassMode (`fn_abi_param_by_address`, receivers by
+place), Sema's category of a place step (`mir_place_step_holds_address`,
+`mir_sema_type_is_raw_pointer`) or of an operand (`mir_operand_is_fn_item`,
+`mir_sema_type_is_raw_pointer_or_ref`, `mir_param_slot_holds_address`) — and
+the LLVM type is verification. `audit:codegen` (`audit_mode_provenance`)
+reports per site; a disagreement is a violation. Before the change the lane
+was red over `src/main.w` on all nine live sites; the two method-owner
+fallbacks of the field walks never fired and were deleted. The downcast
+sites and the null constant read the `Option`-of-pointer niche, which is
+codegen-owned representation, and stay LLVM-typed. Not yet converted:
+`mir_try_place_ptr_for_ref` (value-vs-slot by LLVM type and the name
+`self`) and `mir_operand_local_holds_pointer`.
 Every `analysis_last_marshal_strategy` must be derivable from the argument's
 `PassMode` and the operand's MIR category, never from `wl_get_type_kind` of
 the evaluated value. Concretely: `marshal_ref_addr`'s "already a pointer"

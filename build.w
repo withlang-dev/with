@@ -2496,6 +2496,14 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
     // audit reds over correct programs.
     if deep_debug_analyze_expect(ctx, root, compiler, build_project_abs(root, "test/behavior/behav_c_facade_resource_in_place_pinned.w"), out_dir, "analyze-audit-in-place-pinned", "audit:all", "violations=0 ok") != 0:
         return 1
+    // D65 phase 2 (#1647): the codegen mode-provenance lane runs and every
+    // site's owner fact agrees with the LLVM representation. The &fn
+    // marshalling fixture passes a function item, a callable binding and a
+    // reference through by-address parameters.
+    if deep_debug_analyze_expect(ctx, root, compiler, build_project_abs(root, "test/behavior/behav_fn_abi_callable.w"), out_dir, "analyze-mode-provenance", "audit:codegen", "mode-provenance: marshal_ref_addr existing pointer decisions=") != 0:
+        return 1
+    if deep_debug_analyze_expect(ctx, root, compiler, build_project_abs(root, "test/behavior/behav_fn_abi_callable.w"), out_dir, "analyze-mode-provenance-ok", "audit:codegen", "violations=0 ok") != 0:
+        return 1
     if deep_debug_analyze_expect(ctx, root, compiler, build_project_abs(root, "test/behavior/behav_c_facade_resource_in_place_drop_once.w"), out_dir, "analyze-audit-in-place-drop-once", "audit:all", "violations=0 ok") != 0:
         return 1
     // #1381: a downcast place has no type of its own; typed as the enum it

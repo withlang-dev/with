@@ -1205,7 +1205,7 @@ impl Codegen:
             let pk = body.proj_kinds[(p_start + i)]
             let pd = body.proj_d0[(p_start + i)]
             if pk == ProjKind.PK_FIELD or pk == ProjKind.PK_TUPLE_INDEX:
-                if wl_get_type_kind(cur_ty) == wl_pointer_type_kind():
+                if self.mode_decide(MODE_SITE_FIELD_TYPE_THROUGH_ADDRESS, self.mir_place_step_holds_address(base_local, i == 0, cur_sema_ty), wl_get_type_kind(cur_ty) == wl_pointer_type_kind(), body.fn_sym, place_id):
                     let pointee_sema = self.mir_unwrap_ref_like_sema_type(cur_sema_ty)
                     if pointee_sema > 0 and pointee_sema != cur_sema_ty:
                         let pointee_ty = self.mir_sema_type_to_llvm(pointee_sema)
@@ -1218,11 +1218,6 @@ impl Codegen:
                             let type_name_sym = self.mir_type_cg_name_at(sema_ty)
                             if type_name_sym != 0:
                                 cur_ty = self.resolve_named_type(type_name_sym)
-                    // Fallback: use method owner type for self parameter
-                    if (cur_ty == 0 or wl_get_type_kind(cur_ty) == wl_pointer_type_kind()) and self.current_method_owner_sym != 0:
-                        let proj_owner_ty = self.current_method_owner_llvm_type()
-                        if proj_owner_ty != 0:
-                            cur_ty = proj_owner_ty
                 let variant_owner_sema_ty = cur_sema_ty
                 let field_sema_ty = if active_variant_idx >= 0:
                     self.mir_enum_payload_sema_type(variant_owner_sema_ty, active_variant_idx, pd)
@@ -1405,7 +1400,7 @@ impl Codegen:
             let pk = body.proj_kinds[(p_start + i)]
             let pd = body.proj_d0[(p_start + i)]
             if pk == ProjKind.PK_FIELD or pk == ProjKind.PK_TUPLE_INDEX:
-                if cur_ty == 0 or wl_get_type_kind(cur_ty) == wl_pointer_type_kind():
+                if self.mode_decide(MODE_SITE_FIELD_PTR_THROUGH_ADDRESS, self.mir_place_step_holds_address(base_local, i == 0, cur_sema_ty), cur_ty == 0 or wl_get_type_kind(cur_ty) == wl_pointer_type_kind(), body.fn_sym, place_id):
                     // Base is a pointer (e.g., self param) — load the pointer first
                     if cur_ty == 0:
                         cur_ptr = wl_build_load(self.builder, wl_ptr_type(self.context), cur_ptr)
@@ -1426,11 +1421,6 @@ impl Codegen:
                                 cur_ty = self.resolve_named_type(type_name_sym)
                             if cur_ty == 0:
                                 cur_ty = self.mir_sema_type_to_llvm(sema_ty)
-                    // Fallback: use method owner type for self parameter
-                    if (cur_ty == 0 or wl_get_type_kind(cur_ty) == wl_pointer_type_kind()) and self.current_method_owner_sym != 0:
-                        let owner_ty = self.current_method_owner_llvm_type()
-                        if owner_ty != 0:
-                            cur_ty = owner_ty
                 let variant_owner_sema_ty = cur_sema_ty
                 let field_sema_ty = if active_variant_idx >= 0:
                     self.mir_enum_payload_sema_type(variant_owner_sema_ty, active_variant_idx, pd)
@@ -1578,7 +1568,7 @@ impl Codegen:
                 // names, as the field projection above does; keying on the
                 // LLVM `ptr` alone read `xs[1]` through a captured Vec as
                 // `p[1]` — the high half of the data pointer.
-                if wl_get_type_kind(cur_ty) == wl_pointer_type_kind() and cur_sema_ty > 0 and self.mir_type_kind_at(self.mir_resolve_alias_at(cur_sema_ty)) != TypeKind.TY_PTR:
+                if self.mode_decide(MODE_SITE_INDEX_THROUGH_ADDRESS, self.mir_place_step_holds_address(base_local, i == 0, cur_sema_ty) and not self.mir_sema_type_is_raw_pointer(cur_sema_ty), wl_get_type_kind(cur_ty) == wl_pointer_type_kind() and cur_sema_ty > 0 and self.mir_type_kind_at(self.mir_resolve_alias_at(cur_sema_ty)) != TypeKind.TY_PTR, body.fn_sym, place_id):
                     cur_ptr = wl_build_load(self.builder, wl_ptr_type(self.context), cur_ptr)
                     let pointee_sema = self.mir_unwrap_ref_like_sema_type(cur_sema_ty)
                     if pointee_sema > 0 and pointee_sema != cur_sema_ty:
@@ -1603,7 +1593,7 @@ impl Codegen:
                     cur_ty = elem_llvm
                     if elem_sema > 0:
                         cur_sema_ty = elem_sema
-                else if wl_get_type_kind(cur_ty) == wl_pointer_type_kind():
+                else if self.mode_decide(MODE_SITE_INDEX_RAW_POINTER, self.mir_sema_type_is_raw_pointer(cur_sema_ty), wl_get_type_kind(cur_ty) == wl_pointer_type_kind(), body.fn_sym, place_id):
                     // Raw pointer indexing: load the pointer, then GEP.
                     if elem_llvm == 0:
                         return 0
@@ -1925,6 +1915,10 @@ impl Codegen:
                     ptr_ty = self.mir_sema_type_to_llvm(sema_ty)
             if ptr_ty == 0:
                 return wl_get_undef(fallback_ty)
+            // An unprojected local FnAbi passes by address (an indirect local)
+            // is read through the address its slot holds. Decided before the
+            // bitpacked view below: that one applies to projected places only.
+            let reads_indirect_local = p_count == 0 and self.mode_decide(MODE_SITE_EVAL_INDIRECT_LOCAL, self.mir_indirect_value_local_types.contains(local_id), wl_get_type_kind(ptr_ty) == wl_pointer_type_kind() and self.mir_indirect_value_local_types.contains(local_id), body.fn_sym, local_id)
             // Bitpacked field extraction: if this place has a bitpacked projection,
             // load the full backing integer, then apply shift+mask to extract the field.
             let bp_proj = self.bitpacked_place_proj.get(od)
@@ -1932,7 +1926,7 @@ impl Codegen:
                 // Override ptr_ty to the backing integer type (the alloca type)
                 ptr_ty = wl_get_allocated_type(ptr)
             var loaded: i64 = 0
-            if p_count == 0 and wl_get_type_kind(ptr_ty) == wl_pointer_type_kind():
+            if reads_indirect_local:
                 let indirect_value_ty_opt = self.mir_indirect_value_local_types.get(local_id)
                 if indirect_value_ty_opt.is_some():
                     let indirect_value_ty = indirect_value_ty_opt.unwrap() as i64
@@ -2048,6 +2042,37 @@ impl Codegen:
                 return self.mir_sema_type_int_width(pointee)
         64
 
+    // Sema's category of one place step (D65): its storage holds an address
+    // to load through before projecting. A reference or raw-pointer value
+    // does; at the base, so does a local FnAbi passes by address (an
+    // indirect local: a by-address parameter or a by-place capture).
+    fn mir_place_step_holds_address(base_local: i32, at_base: bool, cur_sema_ty: i32) -> bool:
+        if at_base and self.mir_indirect_value_local_types.contains(base_local):
+            return true
+        self.mir_sema_type_is_raw_pointer_or_ref(cur_sema_ty)
+
+    // A parameter's slot holds the ADDRESS of its value (an indirect local)
+    // when FnAbi passes it by address and Sema types the local as the value
+    // itself: a by-copy or by-place aggregate, a reference receiver. An
+    // explicit `&T` parameter is passed as a pointer too, but its local IS
+    // the reference value (D6: an explicit `&T` is a reference value).
+    fn mir_param_slot_holds_address(body: &MirBody, fn_sym: i32, pi: i32) -> bool:
+        if not self.fn_abi_param_by_address(fn_sym, pi):
+            return false
+        let local_sema_ty = if pi + 1 < body.local_type_ids.len() as i32: body.local_type_ids[(pi + 1)] else: 0
+        local_sema_ty > 0 and not self.mir_sema_type_is_raw_pointer_or_ref(local_sema_ty)
+
+    fn mir_sema_type_is_raw_pointer(sema_ty: i32) -> bool:
+        sema_ty > 0 and self.mir_type_kind_at(self.mir_resolve_alias_at(sema_ty)) == TypeKind.TY_PTR
+
+    // MIR's category of an operand: a function item (`const fn`), whose
+    // value is its code pointer.
+    fn mir_operand_is_fn_item(body: &MirBody, operand_id: i32) -> bool:
+        if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32 or body.operand_kinds[operand_id] != OperandKind.OK_CONSTANT:
+            return false
+        let const_id = body.operand_d0[operand_id]
+        const_id >= 0 and const_id < body.const_kinds.len() as i32 and body.const_kinds[const_id] == ConstKind.CK_FN
+
     fn mir_sema_type_is_raw_pointer_or_ref(sema_ty: i32) -> bool:
         if sema_ty <= 0: return false
         let resolved = self.mir_resolve_alias_at(sema_ty)
@@ -2150,18 +2175,6 @@ impl Codegen:
         if dot <= 0:
             return 0
         self.method_owner_cg_sym(name.slice(0, dot as i64))
-
-    mut fn current_method_owner_llvm_type() -> i64:
-        let owner = self.current_method_owner_from_name()
-        if owner == 0:
-            return 0
-        let named_ty = self.resolve_named_type(self.split_owner_sym(owner))
-        if named_ty != 0:
-            return named_ty
-        let owner_sema = self.mono_struct_sema_type(owner)
-        if owner_sema > 0:
-            return self.sema_type_to_llvm(owner_sema)
-        0
 
     fn mir_current_owner_projected_nominal_sym(body: &MirBody, place_id: i32) -> i32:
         if place_id < 0 or place_id >= body.place_locals.len() as i32:
@@ -6251,7 +6264,11 @@ impl Codegen:
             self.analysis_last_marshal_strategy = AnalysisMarshalStrategy.ExistingPointer
             return raw_val
         let val_ty = wl_type_of(raw_val)
-        if wl_get_type_kind(val_ty) == wl_pointer_type_kind():
+        // The operand's category decides (D65): an explicit reference or raw
+        // pointer VALUE is already the address the parameter wants; a
+        // function item's value is its code pointer and becomes a pair.
+        let fn_item = self.mir_operand_is_fn_item(body, operand_id)
+        if self.mode_decide(MODE_SITE_MARSHAL_EXISTING_POINTER, fn_item or self.mir_sema_type_is_raw_pointer_or_ref(sema), wl_get_type_kind(val_ty) == wl_pointer_type_kind(), body.fn_sym, operand_id):
             // A bare function item (`const fn`) evaluates to its CODE pointer, not
             // to a pointer at the callee's referent: a `&fn(A) -> R` parameter is
             // read as the fat pair {fn, ctx} through the reference, so the item
@@ -16777,7 +16794,8 @@ impl Codegen:
             if self.bind_fn_abi_owned_place(body, name_sym, pi, p_name, param_val): continue
             let body_sig = self.sema.get_sig(name_sym)
             let sema_share = body_sig >= 0 and pi < self.sema.sig_get_param_count(body_sig) and self.sema.sig_param_uses_value_ref_abi(body_sig, pi) != 0
-            if (sema_share or self.is_ref_param(name_sym, pi)) and (p_type_node == 0 or self.pool.kind(p_type_node) != NodeKind.NK_TYPE_REF) and wl_get_type_kind(param_type) == wl_pointer_type_kind():
+            let place_param_fact = (sema_share or self.is_ref_param(name_sym, pi)) and (p_type_node == 0 or self.pool.kind(p_type_node) != NodeKind.NK_TYPE_REF)
+            if self.mode_decide(MODE_SITE_PARAM_PLACE_ALIAS, place_param_fact, (sema_share or self.is_ref_param(name_sym, pi)) and (p_type_node == 0 or self.pool.kind(p_type_node) != NodeKind.NK_TYPE_REF) and wl_get_type_kind(param_type) == wl_pointer_type_kind(), body.fn_sym, pi):
                 var value_ref_ty = self.mir_sema_type_to_llvm(if pi + 1 < body.local_type_ids.len() as i32: body.local_type_ids[(pi + 1)] else: 0)
                 if value_ref_ty == 0 and p_type_node != 0:
                     value_ref_ty = self.resolve_type(p_type_node)
@@ -16878,12 +16896,12 @@ impl Codegen:
                 self.mir_local_values.insert(pi + 1, param_val)
             let plain_storage = if self.mir_local_ptrs.get(pi + 1).is_some(): self.mir_local_ptrs.get(pi + 1).unwrap() as i64 else: param_val
             self.record_codegen_param_binding(body, name_sym, pi, AnalysisMarshalStrategy.CalleeDirectValue, param_val, plain_storage)
-            if wl_get_type_kind(param_type) == wl_pointer_type_kind() and pi + 1 < body.local_type_ids.len() as i32:
-                let local_sema_ty = body.local_type_ids[(pi + 1)]
-                if local_sema_ty > 0:
-                    let semantic_ty = self.mir_sema_type_to_llvm(local_sema_ty)
-                    if semantic_ty != 0 and wl_get_type_kind(semantic_ty) != wl_pointer_type_kind():
-                        self.mir_indirect_value_local_types.insert(pi + 1, semantic_ty)
+            // FnAbi decides whether the parameter arrives as an address (D6,
+            // D65): then the slot holds the address of the value.
+            if pi + 1 < body.local_type_ids.len() as i32 and body.local_type_ids[(pi + 1)] > 0:
+                let semantic_ty = self.mir_sema_type_to_llvm(body.local_type_ids[(pi + 1)])
+                if semantic_ty != 0 and self.mode_decide(MODE_SITE_PARAM_BY_ADDRESS, self.mir_param_slot_holds_address(body, name_sym, pi), wl_get_type_kind(param_type) == wl_pointer_type_kind() and wl_get_type_kind(semantic_ty) != wl_pointer_type_kind(), body.fn_sym, pi):
+                    self.mir_indirect_value_local_types.insert(pi + 1, semantic_ty)
 
             if p_type_node != 0:
                 let pk = self.pool.kind(p_type_node)
@@ -16913,7 +16931,10 @@ impl Codegen:
                                     owner_ty = self.mir_sema_type_to_llvm(local_sema_ty)
                             if owner_ty == 0:
                                 owner_ty = self.resolve_named_type(method_owner_sym)
-                            if owner_ty != 0 and wl_get_type_kind(param_type) == wl_pointer_type_kind():
+                            // The receiver is the caller's receiver PLACE whatever
+                            // Sema types the local (`&Self` for a read receiver,
+                            // D21): FnAbi passing it by address decides alone.
+                            if owner_ty != 0 and self.mode_decide(MODE_SITE_PARAM_BY_ADDRESS, self.fn_abi_param_by_address(name_sym, pi), wl_get_type_kind(param_type) == wl_pointer_type_kind(), body.fn_sym, pi):
                                 self.mir_indirect_value_local_types.insert(pi + 1, owner_ty)
                 if method_owner_sym != 0:
                     if p_name == self.sym_self:
@@ -16926,7 +16947,10 @@ impl Codegen:
                                     owner_ty = self.mir_sema_type_to_llvm(local_sema_ty)
                             if owner_ty == 0:
                                 owner_ty = self.resolve_named_type(method_owner_sym)
-                            if owner_ty != 0 and wl_get_type_kind(param_type) == wl_pointer_type_kind():
+                            // The receiver is the caller's receiver PLACE whatever
+                            // Sema types the local (`&Self` for a read receiver,
+                            // D21): FnAbi passing it by address decides alone.
+                            if owner_ty != 0 and self.mode_decide(MODE_SITE_PARAM_BY_ADDRESS, self.fn_abi_param_by_address(name_sym, pi), wl_get_type_kind(param_type) == wl_pointer_type_kind(), body.fn_sym, pi):
                                 self.mir_indirect_value_local_types.insert(pi + 1, owner_ty)
                 let trait_sym = self.dyn_trait_from_type_node(p_type_node)
                 if trait_sym != 0:
@@ -17244,7 +17268,8 @@ impl Codegen:
             if self.bind_fn_abi_owned_place(body, mono_sym, pi, p_name, param_val): continue
             let body_sig = self.sema.get_sig(mono_sym)
             let sema_share = body_sig >= 0 and pi < self.sema.sig_get_param_count(body_sig) and self.sema.sig_param_uses_value_ref_abi(body_sig, pi) != 0
-            if (sema_share or self.is_ref_param(mono_sym, pi)) and (p_type_node == 0 or self.pool.kind(p_type_node) != NodeKind.NK_TYPE_REF) and wl_get_type_kind(param_type) == wl_pointer_type_kind():
+            let place_param_fact = (sema_share or self.is_ref_param(mono_sym, pi)) and (p_type_node == 0 or self.pool.kind(p_type_node) != NodeKind.NK_TYPE_REF)
+            if self.mode_decide(MODE_SITE_PARAM_PLACE_ALIAS, place_param_fact, (sema_share or self.is_ref_param(mono_sym, pi)) and (p_type_node == 0 or self.pool.kind(p_type_node) != NodeKind.NK_TYPE_REF) and wl_get_type_kind(param_type) == wl_pointer_type_kind(), body.fn_sym, pi):
                 var value_ref_ty = self.mir_sema_type_to_llvm(if pi + 1 < body.local_type_ids.len() as i32: body.local_type_ids[(pi + 1)] else: 0)
                 if value_ref_ty == 0 and p_type_node != 0:
                     value_ref_ty = self.resolve_type(p_type_node)
@@ -17342,12 +17367,12 @@ impl Codegen:
                 self.mir_local_values.insert(pi + 1, param_val)
             let plain_storage = if self.mir_local_ptrs.get(pi + 1).is_some(): self.mir_local_ptrs.get(pi + 1).unwrap() as i64 else: param_val
             self.record_codegen_param_binding(body, mono_sym, pi, AnalysisMarshalStrategy.CalleeDirectValue, param_val, plain_storage)
-            if wl_get_type_kind(param_type) == wl_pointer_type_kind() and pi + 1 < body.local_type_ids.len() as i32:
-                let local_sema_ty = body.local_type_ids[(pi + 1)]
-                if local_sema_ty > 0:
-                    let semantic_ty = self.mir_sema_type_to_llvm(local_sema_ty)
-                    if semantic_ty != 0 and wl_get_type_kind(semantic_ty) != wl_pointer_type_kind():
-                        self.mir_indirect_value_local_types.insert(pi + 1, semantic_ty)
+            // FnAbi decides whether the parameter arrives as an address (D6,
+            // D65): then the slot holds the address of the value.
+            if pi + 1 < body.local_type_ids.len() as i32 and body.local_type_ids[(pi + 1)] > 0:
+                let semantic_ty = self.mir_sema_type_to_llvm(body.local_type_ids[(pi + 1)])
+                if semantic_ty != 0 and self.mode_decide(MODE_SITE_PARAM_BY_ADDRESS, self.mir_param_slot_holds_address(body, mono_sym, pi), wl_get_type_kind(param_type) == wl_pointer_type_kind() and wl_get_type_kind(semantic_ty) != wl_pointer_type_kind(), body.fn_sym, pi):
+                    self.mir_indirect_value_local_types.insert(pi + 1, semantic_ty)
 
             if p_type_node != 0:
                 let pk = self.pool.kind(p_type_node)
@@ -17376,7 +17401,10 @@ impl Codegen:
                                     owner_ty = self.mir_sema_type_to_llvm(local_sema_ty)
                             if owner_ty == 0:
                                 owner_ty = self.resolve_named_type(method_owner_sym)
-                            if owner_ty != 0 and wl_get_type_kind(param_type) == wl_pointer_type_kind():
+                            // The receiver is the caller's receiver PLACE whatever
+                            // Sema types the local (`&Self` for a read receiver,
+                            // D21): FnAbi passing it by address decides alone.
+                            if owner_ty != 0 and self.mode_decide(MODE_SITE_PARAM_BY_ADDRESS, self.fn_abi_param_by_address(mono_sym, pi), wl_get_type_kind(param_type) == wl_pointer_type_kind(), body.fn_sym, pi):
                                 self.mir_indirect_value_local_types.insert(pi + 1, owner_ty)
                 if method_owner_sym != 0:
                     if p_name == self.sym_self:
@@ -17389,7 +17417,10 @@ impl Codegen:
                                     owner_ty = self.mir_sema_type_to_llvm(local_sema_ty)
                             if owner_ty == 0:
                                 owner_ty = self.resolve_named_type(method_owner_sym)
-                            if owner_ty != 0 and wl_get_type_kind(param_type) == wl_pointer_type_kind():
+                            // The receiver is the caller's receiver PLACE whatever
+                            // Sema types the local (`&Self` for a read receiver,
+                            // D21): FnAbi passing it by address decides alone.
+                            if owner_ty != 0 and self.mode_decide(MODE_SITE_PARAM_BY_ADDRESS, self.fn_abi_param_by_address(mono_sym, pi), wl_get_type_kind(param_type) == wl_pointer_type_kind(), body.fn_sym, pi):
                                 self.mir_indirect_value_local_types.insert(pi + 1, owner_ty)
                 let trait_sym = self.dyn_trait_from_type_node(p_type_node)
                 if trait_sym != 0:
