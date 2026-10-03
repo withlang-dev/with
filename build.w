@@ -96,9 +96,19 @@ fn cross_triple(tag: &str) -> str:
 
 // The pcre2-style bundle plan for a cross tag: the same corpus, compiled by
 // the release compiler with --target=<triple> into its own store slot and
-// out/wo/<tag>/ (build/wo.w; #946).
+// out/wo/<tag>/ (build/wo.w; #946). For the host's own tag (the linux_x86_64
+// cross compiler built on linux-x86_64) it is the host plan: both once
+// installed into one store slot, <store>/<name>/<tag>-<abi>, two targets
+// owning each file (#2014).
 fn cross_wo_plan(ctx: &BuildCtx, host_plan: &WoBundle, tag: &str) -> WoBundle:
-    wo_bundle_plan_for_target(ctx, host_plan.name, host_plan.corpus_rel, host_plan.root, tag, cross_triple(tag))
+    let triple = if tag == wo_host_target(): "" else: cross_triple(tag)
+    wo_bundle_plan_for_target(ctx, host_plan.name, host_plan.corpus_rel, host_plan.root, tag, triple)
+
+// A cross compiler's bundle targets: none for a host plan, which the host
+// graph already builds and installs.
+fn cross_wo_bundle_targets(out: Build, ctx: &BuildCtx, plan: &WoBundle) -> Build:
+    if plan.triple.len() == 0: return out
+    wo_bundle_targets(move out, ctx, plan, release_compiler_bin("with"), "build")
 
 // Every registered corpus's plan for one cross tag, in registry order.
 fn cross_wo_plans(ctx: &BuildCtx, host_plans: &Vec[WoBundle], tag: &str) -> Vec[WoBundle]:
@@ -229,7 +239,7 @@ fn add_cross_rt_targets(out0: Build, ctx: &BuildCtx, tag: &str, p: &str, group_n
     // Each cross compiler embeds every corpus bundle compiled for its own
     // target by the release compiler (#946).
     for pi in 0..plans.len() as i32:
-        out = wo_bundle_targets(move out, ctx, plans[pi], release_compiler_bin("with"), "build")
+        out = cross_wo_bundle_targets(move out, ctx, plans[pi])
         cross_embedded = target_with_wo_blobs(move cross_embedded, plans[pi])
     out = add_empty_darwin_sysroot_blob_target(move out, p, dir)
     // #1915 (D81): the target's sysroot, compiler-rt and libc++ (a pack the
@@ -3513,7 +3523,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     cross_win_embedded = cross_win_embedded.dep("cross-win-rt-platform-object")
     let corpus_plans_windows_x86_64 = cross_wo_plans(ctx, &corpus_plans, "windows_x86_64")
     for pi in 0..corpus_plans_windows_x86_64.len() as i32:
-        out = wo_bundle_targets(move out, ctx, corpus_plans_windows_x86_64[pi], release_compiler_bin("with"), "build")
+        out = cross_wo_bundle_targets(move out, ctx, corpus_plans_windows_x86_64[pi])
         cross_win_embedded = target_with_wo_blobs(move cross_win_embedded, corpus_plans_windows_x86_64[pi])
     out = add_empty_darwin_sysroot_blob_target(move out, "cross-win-", cross_windows_dir())
     cross_win_embedded = target_with_empty_darwin_sysroot_blob(move cross_win_embedded, "cross-win-", cross_windows_dir())
@@ -3592,7 +3602,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     cross_winarm_embedded = cross_winarm_embedded.dep("cross-winarm-rt-platform-object")
     let corpus_plans_windows_aarch64 = cross_wo_plans(ctx, &corpus_plans, "windows_aarch64")
     for pi in 0..corpus_plans_windows_aarch64.len() as i32:
-        out = wo_bundle_targets(move out, ctx, corpus_plans_windows_aarch64[pi], release_compiler_bin("with"), "build")
+        out = cross_wo_bundle_targets(move out, ctx, corpus_plans_windows_aarch64[pi])
         cross_winarm_embedded = target_with_wo_blobs(move cross_winarm_embedded, corpus_plans_windows_aarch64[pi])
     out = add_empty_darwin_sysroot_blob_target(move out, "cross-winarm-", cross_windows_aarch64_dir())
     cross_winarm_embedded = target_with_empty_darwin_sysroot_blob(move cross_winarm_embedded, "cross-winarm-", cross_windows_aarch64_dir())
