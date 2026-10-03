@@ -4342,6 +4342,20 @@ impl Codegen:
     // #1457) and records which declaration it is; the owner is that
     // declaration's codegen symbol (its #1446 alias when it has one), never
     // the identity text, which names no type.
+    // #2043 (D65): the owner of a method function, from the owner key Sema
+    // registered it under (method_owner_keys; a specialization inherits its
+    // template's) — never from the text before the first `.` of its symbol.
+    // 0 for a function that is no method.
+    fn fn_method_owner_cg_sym(fn_sym: i32) -> i32:
+        if fn_sym == 0:
+            return 0
+        let text = self.intern.resolve(fn_sym)
+        let sema_sym = if text.len() > 0: self.sema.pool_lookup_symbol(text) else: 0
+        let key: i32 = self.sema.method_owner_keys.get(sema_sym) ?? 0
+        if key == 0:
+            return 0
+        self.method_owner_cg_sym(self.sema.pool_resolve(key))
+
     fn method_owner_cg_sym(owner_text: &str) -> i32:
         let sema_sym = self.sema.pool_lookup_symbol(owner_text)
         if sema_sym != 0 and self.sema.type_identity_tids.contains(sema_sym):
@@ -5584,11 +5598,12 @@ impl Codegen:
 
         // Check if method (has dot in name); for missing symbol text, infer owner
         // from `self: Type` in param 0.
-        var method_owner_sym = 0
+        // The owner is Sema's record for the function (#2043); the text after
+        // the `.` is only the method's short name for its key.
+        let method_owner_sym = self.fn_method_owner_cg_sym(name_sym)
         var method_key_sym: i32 = 0
         for di in 0..name_str.len() as i32:
-            if name_str[di] == 46:
-                method_owner_sym = self.method_owner_cg_sym(name_str.slice(0, di as i64))
+            if name_str[di] == 46 and method_owner_sym != 0:
                 let short_method_name = name_str.slice((di + 1) as i64, name_str.len() as i64)
                 if short_method_name.len() > 0:
                     let short_method_sym = self.intern.intern(short_method_name)

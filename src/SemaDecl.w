@@ -1726,6 +1726,7 @@ impl Sema:
         let key = sema_pair_key(state_sym, self.pool_intern("each"))
         self.method_lookup.sig_lookup.insert(key, each_sig_idx)
         self.method_lookup.fn_lookup.insert(key, each_sym)
+        self.method_owner_keys.insert(each_sym, state_sym)
 
         self.generator_fn_run_syms.insert(fn_sym, run_sym)
         self.generator_fn_each_syms.insert(fn_sym, each_sym)
@@ -2340,6 +2341,10 @@ impl Sema:
         let method_sym = self.method_decl_name_symbol(parsed_fn_sym)
         if owner_sym == 0 or method_sym == 0:
             return 0
+        // #2043 (D65): the owner key this method registers under, by the
+        // function's symbol; codegen reads it instead of splitting the
+        // symbol's text at its first `.`.
+        self.method_owner_keys.insert(fn_sym, owner_sym)
         if self.method_decl_is_extension(node) != 0:
             // Registration runs once per check pass; without the identity
             // guard the same extension appears N times and a SINGLE
@@ -2526,6 +2531,7 @@ impl Sema:
                 let key = sema_pair_key(impl_key, method_sym)
                 self.method_lookup.sig_lookup.insert(key, sig_idx)
                 self.method_lookup.fn_lookup.insert(key, fn_sym)
+                self.method_owner_keys.insert(fn_sym, impl_key)
                 self.method_symbol_flags.insert(fn_sym, 1)
 
     fn top_level_let_type_ann_extra(flags: i32) -> i32:
