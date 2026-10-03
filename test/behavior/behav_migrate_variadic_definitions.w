@@ -22,7 +22,10 @@ fn main:
     assert(source.contains("__local_ap.arg[c_int]()"))
     assert(source.contains("__local_ap.arg[f64]()"))
     assert(source.contains("var __local_args_1: c_va_list = va_start()"))
-    assert(source.contains("fn stop() -> Unit"))
+    // A `void` function whose tail is Unit is spelled without `-> Unit`
+    // (#1838); either spelling pins that it has no `...`.
+    assert(source.contains("pub fn stop():\n"))
+    assert(not source.contains("fn stop() -> Unit"))
     assert(not source.contains("fn stop(...)"))
     assert(not source.contains("va_end"))
     assert(not source.contains("with_va_"))
