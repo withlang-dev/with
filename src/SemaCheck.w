@@ -1464,6 +1464,20 @@ impl Sema:
         self.in_param_type_position = self.in_param_type_position - 1
         tid
 
+    // #1975: a C function has no array in its signature. "A function
+    // declarator shall not specify a return type that is ... an array type"
+    // (C11 6.7.6.3p1), and an array parameter is adjusted to a pointer
+    // (6.7.6.3p7), so `[T; N]` by value has no C ABI either way. One rule for
+    // an `extern "C" fn` type and an `extern fn` declaration.
+    mut fn reject_c_abi_array(tid: i32, at: i32, is_return: bool, what: &str):
+        if tid == 0 or self.get_type_kind(self.resolve_alias(tid as TypeId)) != TypeKind.TY_ARRAY:
+            return
+        let shown = self.type_name(tid)
+        if is_return:
+            self.emit_error_with_help(f"{what} cannot return an array: no C function returns one (C11 6.7.6.3p1), so `{shown}` has no C ABI", at, "return a struct that wraps the array, or take an out-pointer (`*mut T`) the function fills")
+        else:
+            self.emit_error_with_help(f"{what} cannot take an array by value: C adjusts an array parameter to a pointer (C11 6.7.6.3p7), so `{shown}` has no C ABI", at, "take a pointer to the first element (`*const T`), or wrap the array in a struct and pass that")
+
     mut fn resolve_type_expr(node: i32) -> TypeId:
         if node == 0:
             return 0 as TypeId
@@ -1589,9 +1603,14 @@ impl Sema:
             let param_types: Vec[i32] = Vec.new()
             for pi in 0..param_count:
                 let p_node = self.ast.get_extra(extra_start + pi)
-                param_types.push(self.resolve_type_expr(p_node) as i32)
+                let p_ty = self.resolve_type_expr(p_node) as i32
+                param_types.push(p_ty)
+                if kind == NodeKind.NK_TYPE_EXTERN_FN:
+                    self.reject_c_abi_array(p_ty, p_node, false, "an `extern \"C\" fn` type")
             // No return annotation on a fn type means Unit, not TY_ERR.
             let ret = if ret_node != 0: self.resolve_type_expr(ret_node) else: self.ty_void
+            if kind == NodeKind.NK_TYPE_EXTERN_FN:
+                self.reject_c_abi_array(ret as i32, ret_node, true, "an `extern \"C\" fn` type")
             let fn_kind = if kind == NodeKind.NK_TYPE_EXTERN_FN: TypeKind.TY_EXTERN_FN else: TypeKind.TY_FN
             return self.ensure_callable_type(fn_kind, param_types, param_count, ret, self.fn_type_node_flags(node))
 

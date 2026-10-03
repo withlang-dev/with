@@ -2171,6 +2171,7 @@ impl Sema:
             let p_tid = self.resolve_type_expr(p_type_node)
             if self.is_opaque_value_type(p_tid) != 0:
                 self.emit_error("opaque types cannot be passed by value; use a pointer or reference", p_type_node)
+            self.reject_c_abi_array(p_tid as i32, p_type_node, false, "an `extern fn`")
             self.sig_params.push(p_tid as i32)
 
         // No return annotation means Unit, same as the no-meta branch above —
@@ -2179,6 +2180,7 @@ impl Sema:
         let ret_type = if ret_node != 0: self.resolve_type_expr(ret_node) else: self.ty_void
         if self.is_opaque_value_type(ret_type) != 0:
             self.emit_error("opaque types cannot be returned by value; use a pointer or reference", ret_node)
+        self.reject_c_abi_array(ret_type as i32, ret_node, true, "an `extern fn`")
 
         let fn_extra_start = self.type_extra.len() as i32
         for pi in 0..param_count:
