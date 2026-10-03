@@ -207,7 +207,10 @@ pub fn corpus_migrate_options(corpus: &Corpus, source: &str, output: &str) -> Mi
 // headers of the pinned Zig source (build/sdk.w), which every host can
 // generate. On macOS that tree is the darwin sysroot the compiler embeds;
 // elsewhere `corpus-c-model` writes the same headers.
-pub fn corpus_c_model_target() -> str: "arm64-apple-macosx"
+// The triple names its macOS version: left to clang it is the migrating
+// Mac's own OS version, and off macOS none at all (the darwin headers then
+// leave _FORTIFY_SOURCE off and <string.h> declares another memset).
+pub fn corpus_c_model_target() -> str: "arm64-apple-macosx11.0"
 pub fn corpus_c_model_dir() -> str: if os() == "Macos": "out/gen/darwin-sysroot" else: "out/gen/corpus-c-model"
 pub fn corpus_c_model_stamp() -> str: if os() == "Macos": "out/gen/darwin-sysroot.pack" else: "out/gen/corpus-c-model.ready"
 pub fn corpus_c_model_dep() -> str: if os() == "Macos": "darwin-sysroot" else: "corpus-c-model"
