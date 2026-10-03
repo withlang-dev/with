@@ -1,18 +1,23 @@
 //! expect-debug-alloc: leak count=0
 //! expect-stdout: hit
+//! expect-stdout: hit again
 //! expect-stdout: miss
-// #2049: the Option[Captures] a `=~` condition tests is owned by the
-// condition. With a compiled Regex nothing binds captures, and nothing
-// dropped it: every match leaked its Captures. (A literal's `$N` bindings and
-// Captures are scoped to the branch or loop body; behav_regex_capture_fstring
-// and behav_regex_language_semantics validate that in deep-debug-tool-tests.)
+//! expect-stdout: 2
+// #2049: `=~` observes both operands. A named compiled Regex was moved
+// into a statement temporary that died with the first condition, so every
+// later `=~ re` matched against the reset blank (and never matched); and
+// the Option[Captures] the condition tests was never dropped (a leak per
+// match). deep-debug-tool-tests validates this program's ownership.
 use std.regex
 
 fn main:
     let re = Regex.compile("([a-z])(\\d)").unwrap()
     if "a1 b2" =~ re:
         print("hit")
+    if "c3" =~ re:
+        print("hit again")
     if "zzz" =~ re:
         print("hit")
     else:
         print("miss")
+    print(f"{re.num_captures()}")
