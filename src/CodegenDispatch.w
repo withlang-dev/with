@@ -8523,26 +8523,26 @@ impl Codegen:
             return wl_get_undef(if ret_ty == wl_void_type(self.context): wl_i32_type(self.context) else: ret_ty)
         wl_build_call(self.builder, ft, f, vec_data_i64(args), args.len() as i32)
 
-    mut fn mir_emit_free_channel_builtin(body: &MirBody, callee_sym: i32, args_id: i32, dest_place: i32, next_bb: i32) -> bool:
+    mut fn mir_emit_free_channel_builtin(body: &MirBody, builtin: CallBuiltin, args_id: i32, dest_place: i32, next_bb: i32) -> bool:
         let i64_ty = wl_i64_type(self.context)
         let i32_ty = wl_i32_type(self.context)
         let ptr_ty = wl_ptr_type(self.context)
         let void_ty = wl_void_type(self.context)
         let argc = body.call_arg_counts[args_id]
         var result: i64 = 0
-        if callee_sym == self.sym_channel:
+        if builtin == CallBuiltin.Channel:
             let cap = if argc >= 1: self.coerce_int(self.mir_intrinsic_arg(body, args_id, 0), i32_ty) else: wl_const_int(i32_ty, 0, 0)
             let ps: Vec[i64] = [i32_ty, i32_ty, ptr_ty]
             let args: Vec[i64] = [cap, wl_const_int(i32_ty, 8, 0), wl_const_null(ptr_ty)]
             result = self.call_runtime_checked("with_channel_create", i64_ty, &ps, &args)
-        else if callee_sym == self.sym_send:
+        else if builtin == CallBuiltin.Send:
             let handle = self.coerce_int(self.mir_intrinsic_arg(body, args_id, 0), i64_ty)
             let slot = self.create_entry_alloca(i64_ty)
             wl_build_store(self.builder, self.coerce_int(self.mir_intrinsic_arg(body, args_id, 1), i64_ty), slot)
             let ps: Vec[i64] = [i64_ty, ptr_ty]
             let args: Vec[i64] = [handle, slot]
             self.call_runtime_checked("with_channel_send", void_ty, &ps, &args)
-        else if callee_sym == self.sym_recv:
+        else if builtin == CallBuiltin.Recv:
             let handle = self.coerce_int(self.mir_intrinsic_arg(body, args_id, 0), i64_ty)
             let slot = self.create_entry_alloca(i64_ty)
             wl_build_store(self.builder, wl_const_int(i64_ty, 0, 0), slot)
@@ -14965,15 +14965,9 @@ impl Codegen:
                 var gc_callee_sym = 0
                 if gc_co_k == OperandKind.OK_CONSTANT and gc_co_d >= 0 and gc_co_d < body.const_kinds.len() as i32:
                     gc_callee_sym = body.const_d0[gc_co_d]
-                var gc_builtin_name = self.codegen_symbol_text(gc_callee_sym)
-                if self.pool.kind(gc_node) == NodeKind.NK_CALL:
-                    let gc_builtin_callee = self.pool.get_data0(gc_node)
-                    if self.pool.kind(gc_builtin_callee) == NodeKind.NK_INDEX or self.pool.kind(gc_builtin_callee) == NodeKind.NK_TYPE_GENERIC:
-                        let gc_builtin_base = self.pool.get_data0(gc_builtin_callee)
-                        if self.pool.kind(gc_builtin_base) == NodeKind.NK_IDENT:
-                            let gc_builtin_ast_name = self.intern.resolve(self.pool.get_data0(gc_builtin_base))
-                            if gc_builtin_ast_name.len() > 0:
-                                gc_builtin_name = with_str_clone_ref(gc_builtin_ast_name)
+                // Which builtin a call is is Sema's record (#2043); the AST
+                // spelling of the callee never decides it.
+                let gc_call_builtin = self.sema.call_builtin(gc_node)
                 let gc_name = if gc_callee_sym > 0: self.codegen_symbol_text(gc_callee_sym) else: "?"
                 if gc_name == "track":
                     if self.mir_emit_async_scope_track_call(body, args_id, dest_place, next_bb):
@@ -15122,10 +15116,9 @@ impl Codegen:
                 // Generic builtins use the same MIR intrinsic tag but are handled
                 // by the builtin branch below; do not route them through the
                 // user generic-function map.
-                let gc_is_generic_builtin =
-                    gc_builtin_name == "transmute" or gc_builtin_name == "sizeof" or gc_builtin_name == "size_of" or
-                    gc_builtin_name == "alignof" or gc_builtin_name == "align_of" or gc_builtin_name == "nameof" or
-                    gc_builtin_name == "type_name" or gc_builtin_name == "embed_file" or gc_builtin_name == "chan"
+                let gc_is_generic_builtin = gc_call_builtin == CallBuiltin.Transmute or gc_call_builtin == CallBuiltin.SizeOf or
+                    gc_call_builtin == CallBuiltin.AlignOf or gc_call_builtin == CallBuiltin.NameOf or
+                    gc_call_builtin == CallBuiltin.EmbedFile or gc_call_builtin == CallBuiltin.Chan
                 let gc_fallback_mir_count = body.call_arg_counts[args_id]
                 let gc_fallback_ast_count = if self.pool.kind(gc_node) == NodeKind.NK_CALL: self.pool.get_data2(gc_node) else: -1
                 var gc_is_static_field_access_call = false
@@ -15283,7 +15276,9 @@ impl Codegen:
                 if gc_callee_sym > 0:
                     // MIR's operands are the builtin's arguments (#2043).
                     let gc_arg_count = body.call_arg_counts[args_id]
-                    if gc_callee_sym == self.sym_src and gc_arg_count == 0:
+                    // Which builtin is Sema's record (#2043), never the spelling.
+                    let gc_builtin = gc_call_builtin
+                    if gc_builtin == CallBuiltin.Src:
                         let gc_result = self.gen_src_intrinsic(gc_node)
                         if dest_place >= 0 and gc_result != 0:
                             let gc_ret_ty = wl_type_of(gc_result)
@@ -15297,7 +15292,7 @@ impl Codegen:
                             let gc_next_val = self.mir_bb_values[next_bb]
                             wl_build_br(self.builder, gc_next_val)
                         return true
-                    if gc_callee_sym == self.sym_transmute or gc_builtin_name == "transmute":
+                    if gc_builtin == CallBuiltin.Transmute:
                         let gc_result = self.gen_transmute(gc_node, body, args_id)
                         if dest_place >= 0 and gc_result != 0:
                             let gc_ret_ty = wl_type_of(gc_result)
@@ -15311,8 +15306,8 @@ impl Codegen:
                             let gc_next_val = self.mir_bb_values[next_bb]
                             wl_build_br(self.builder, gc_next_val)
                         return true
-                    if gc_callee_sym == self.sym_sizeof or gc_callee_sym == self.sym_size_of or gc_callee_sym == self.sym_alignof or gc_callee_sym == self.sym_align_of or gc_builtin_name == "sizeof" or gc_builtin_name == "size_of" or gc_builtin_name == "alignof" or gc_builtin_name == "align_of":
-                        let gc_result = self.gen_sizeof_alignof(gc_callee_sym, gc_node)
+                    if gc_builtin == CallBuiltin.SizeOf or gc_builtin == CallBuiltin.AlignOf:
+                        let gc_result = self.gen_sizeof_alignof(gc_builtin == CallBuiltin.SizeOf, gc_node)
                         if dest_place >= 0 and gc_result != 0:
                             let gc_ret_ty = wl_type_of(gc_result)
                             if gc_ret_ty != wl_void_type(self.context):
@@ -15325,7 +15320,7 @@ impl Codegen:
                             let gc_next_val = self.mir_bb_values[next_bb]
                             wl_build_br(self.builder, gc_next_val)
                         return true
-                    if gc_callee_sym == self.sym_nameof or gc_callee_sym == self.sym_type_name or gc_builtin_name == "nameof" or gc_builtin_name == "type_name":
+                    if gc_builtin == CallBuiltin.NameOf:
                         let gc_result = self.gen_nameof(gc_node)
                         if dest_place >= 0 and gc_result != 0:
                             let gc_ret_ty = wl_type_of(gc_result)
@@ -15339,7 +15334,7 @@ impl Codegen:
                             let gc_next_val = self.mir_bb_values[next_bb]
                             wl_build_br(self.builder, gc_next_val)
                         return true
-                    if (gc_callee_sym == self.sym_embed_file or gc_builtin_name == "embed_file") and gc_arg_count == 1:
+                    if gc_builtin == CallBuiltin.EmbedFile:
                         let gc_result = self.gen_embed_file(gc_node)
                         if dest_place >= 0 and gc_result != 0:
                             let gc_ret_ty = wl_type_of(gc_result)
@@ -15355,7 +15350,7 @@ impl Codegen:
                         return true
 
                     // chan[T](capacity) → (Sender[T], Receiver[T])
-                    if gc_callee_sym == self.sym_chan or gc_builtin_name == "chan":
+                    if gc_builtin == CallBuiltin.Chan:
                         self.ensure_async_runtime_declared()
                         // Extract element type from generic call's type argument
                         var chan_elem_size: i64 = 4  // default for i32
@@ -15439,8 +15434,8 @@ impl Codegen:
                     // recv(ch), close(ch) over an i64 handle and integer
                     // payloads (check_intrinsic_call), lowered against
                     // rt/channel_runtime.w's entry points (#2047).
-                    if gc_callee_sym == self.sym_channel or gc_callee_sym == self.sym_send or gc_callee_sym == self.sym_recv or gc_callee_sym == self.sym_close:
-                        return self.mir_emit_free_channel_builtin(body, gc_callee_sym, args_id, dest_place, next_bb)
+                    if gc_builtin == CallBuiltin.Channel or gc_builtin == CallBuiltin.Send or gc_builtin == CallBuiltin.Recv or gc_builtin == CallBuiltin.Close:
+                        return self.mir_emit_free_channel_builtin(body, gc_builtin, args_id, dest_place, next_bb)
 
                 let gc_callee_field = self.pool.get_data0(gc_node)
 
@@ -19401,7 +19396,7 @@ impl Codegen:
         let derived = if self.analysis_enabled != 0: self.resolve_type(type_node) else: fact
         self.fact_decide(MODE_SITE_SIZEOF_TYPE_ARG, fact, derived, self.current_function_name_sym, type_node)
 
-    mut fn gen_sizeof_alignof(name_sym: i32, node: i32) -> i64:
+    mut fn gen_sizeof_alignof(is_size: bool, node: i32) -> i64:
         let callee_node = self.pool.get_data0(node)
         let callee_kind = self.pool.kind(callee_node)
         if callee_kind != NodeKind.NK_TYPE_GENERIC and callee_kind != NodeKind.NK_INDEX:
@@ -19426,7 +19421,7 @@ impl Codegen:
         // alignment for vectors over 16 bytes.
         if sema_tid > 0 and self.cg_sema_is_vector_or_mask(sema_tid):
             let vector_size = self.sema.type_layout_vector_size_of(self.sema.resolve_alias(sema_tid as TypeId) as i32)
-            let vector_value = if name_sym == self.sym_sizeof or name_sym == self.sym_size_of: vector_size else: type_layout_vector_align(vector_size)
+            let vector_value = if is_size: vector_size else: type_layout_vector_align(vector_size)
             return wl_const_int(wl_i64_type(self.context), vector_value, 0)
         let type_val = self.sema_type_level_arg_llvm(sema_tid, tp_node)
         if type_val == 0:
@@ -19434,7 +19429,7 @@ impl Codegen:
             self.had_error = 1
             return wl_const_int(wl_i64_type(self.context), 0, 0)
         let dl = wl_get_module_data_layout(self.llmod)
-        if name_sym == self.sym_sizeof or name_sym == self.sym_size_of:
+        if is_size:
             return wl_const_int(wl_i64_type(self.context), wl_abi_size_of(dl, type_val), 0)
         // alignof is the layout model's (TypeLayout), which honors §16.4
         // @[align]; LLVM's i8-padded struct body keeps the size but reports
