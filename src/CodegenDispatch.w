@@ -16456,6 +16456,14 @@ impl Codegen:
 
         if tk == TermKind.TK_RETURN:
             // Async block trampoline: store result into rbuf (with write guard), ret void
+            // #2006: the return slot (MIR local 0) is always storage: every
+            // body emitter (gen_function_mir, its mono twin, closures, async
+            // blocks, default trait methods, global initializers) inserts
+            // mir_local_ptrs/mir_local_types[0] before its first block. A
+            // missing slot reports a BUG through the caller, never a default
+            // value returned in the program's place.
+            if not self.mir_local_ptrs.get(0).is_some() or (self.mir_local_types.get(0) ?? 0) == 0:
+                return false
             if self.async_block_rbuf != 0:
                 let ab_ret_ptr_opt = self.mir_local_ptrs.get(0)
                 if ab_ret_ptr_opt.is_some():
@@ -16487,41 +16495,19 @@ impl Codegen:
                 return true
             let fn_has_sret_opt = self.fn_abi_has_sret(self.current_function_name_sym)
             let fn_has_sret = if fn_has_sret_opt.is_some(): fn_has_sret_opt.unwrap() else: 0
-            let ret_ptr_opt = self.mir_local_ptrs.get(0)
+            // The slot and its type exist (checked above).
+            let ret_ptr = self.mir_local_ptrs.get(0).unwrap() as i64
+            let ret_ptr_ty = self.mir_local_types.get(0).unwrap() as i64
             if fn_has_sret != 0:
                 let sret_ptr = wl_get_param(self.current_function, 0)
-                var sret_val = self.build_default_value(self.current_ret_type)
-                if ret_ptr_opt.is_some():
-                    let ret_ptr = ret_ptr_opt.unwrap() as i64
-                    var ret_ptr_ty = self.current_ret_type
-                    let ret_ptr_ty_opt = self.mir_local_types.get(0)
-                    if ret_ptr_ty_opt.is_some():
-                        ret_ptr_ty = ret_ptr_ty_opt.unwrap() as i64
-                    if ret_ptr_ty != 0:
-                        let ret_val = wl_build_load(self.builder, ret_ptr_ty, ret_ptr)
-                        sret_val = self.enforce_coerced_type(ret_val, self.current_ret_type, "return type mismatch")
-                wl_build_store(self.builder, sret_val, sret_ptr)
+                let ret_val = wl_build_load(self.builder, ret_ptr_ty, ret_ptr)
+                wl_build_store(self.builder, self.enforce_coerced_type(ret_val, self.current_ret_type, "return type mismatch"), sret_ptr)
                 let _ = wl_build_ret_void(self.builder)
                 return true
             let fn_direct_ret_ty_opt = self.fn_abi_direct_ret_type(self.current_function_name_sym)
             let fn_direct_ret_ty = if fn_direct_ret_ty_opt.is_some(): fn_direct_ret_ty_opt.unwrap() as i64 else: 0
             let fn_value_ty = wl_global_get_value_type(self.current_function)
             let fn_abi_ret_ty = if fn_value_ty != 0: wl_get_return_type(fn_value_ty) else: self.current_ret_type
-            if not ret_ptr_opt.is_some():
-                let default_ret = self.build_default_value(self.current_ret_type)
-                let final_ret = if fn_direct_ret_ty != 0: self.c_abi_pack_direct_value(default_ret, fn_abi_ret_ty) else: default_ret
-                let _ = wl_build_ret(self.builder, final_ret)
-                return true
-            let ret_ptr = ret_ptr_opt.unwrap() as i64
-            var ret_ptr_ty = self.current_ret_type
-            let ret_ptr_ty_opt = self.mir_local_types.get(0)
-            if ret_ptr_ty_opt.is_some():
-                ret_ptr_ty = ret_ptr_ty_opt.unwrap() as i64
-            if ret_ptr_ty == 0:
-                let default_ret2 = self.build_default_value(self.current_ret_type)
-                let final_ret2 = if fn_direct_ret_ty != 0: self.c_abi_pack_direct_value(default_ret2, fn_abi_ret_ty) else: default_ret2
-                let _ = wl_build_ret(self.builder, final_ret2)
-                return true
             let ret_val = wl_build_load(self.builder, ret_ptr_ty, ret_ptr)
             let semantic_ret = self.enforce_coerced_type(ret_val, self.current_ret_type, "return type mismatch")
             let final_ret = if fn_direct_ret_ty != 0: self.c_abi_pack_direct_value(semantic_ret, fn_abi_ret_ty) else: semantic_ret
@@ -16588,6 +16574,44 @@ impl Codegen:
             return true
 
         false
+
+    // #2006 (No Silent Fallbacks): a MIR statement or terminator codegen
+    // could not emit is a compiler BUG, never a placeholder. Post-Sema MIR is
+    // valid by contract (D65), so every `false` from mir_emit_stmt /
+    // mir_emit_term, and a body with no block, lands here: it names the
+    // function and the source location, and sets had_error so the unit is
+    // never linked. The `unreachable` only keeps the half-built function
+    // well formed for the verifier; nothing runs it. Every emitter's
+    // fallback was a constant `ret 0`/`null` or a bare `unreachable`, and
+    // the program compiled.
+    mut fn mir_emit_failed(what: &str, fn_name: &str, loc_node: i32, span: i32):
+        let file_id = if loc_node > 0: self.pool.file(loc_node) as i32 else: 0
+        let offset = if span > 0: span else: if loc_node > 0: self.pool.get_start(loc_node) else: 0
+        let loc = self.sema.source_location_for_file_id(file_id, offset)
+        with_eprint(f"error: BUG: codegen could not emit {what} of '{fn_name}' at {self.debug_source_path(file_id)}:{loc.line + 1}:{loc.col + 1} (#2006: post-Sema MIR must lower)\n")
+        self.had_error = 1
+        let bb = wl_get_insert_block(self.builder)
+        if bb != 0 and wl_get_bb_terminator(bb) == 0:
+            wl_build_unreachable(self.builder)
+
+    // One MIR block's statements, then its terminator where the builder
+    // stands (a statement may end in a block of its own: checked arithmetic
+    // ends in `arith.ok`). False after mir_emit_failed reported a failure.
+    // For the synthesized bodies (default trait methods, global
+    // initializers, async blocks), which carry no debug scope of their own.
+    mut fn mir_emit_block_or_report(body: &MirBody, bb: i32, fn_name: &str, loc_node: i32) -> bool:
+        let stmt_start = body.bb_stmt_starts[bb]
+        for si in 0..body.bb_stmt_counts[bb]:
+            let stmt_id = stmt_start + si
+            if not self.mir_emit_stmt(body, stmt_id):
+                self.mir_emit_failed(f"statement {stmt_id} in bb{bb}", fn_name, loc_node, body.stmt_spans[stmt_id])
+                return false
+        let term_bb = wl_get_insert_block(self.builder)
+        if term_bb != 0 and wl_get_bb_terminator(term_bb) == 0:
+            if not self.mir_emit_term(body, bb):
+                self.mir_emit_failed(f"the terminator of bb{bb}", fn_name, loc_node, body.bb_term_spans[bb])
+                return false
+        true
 
     fn mir_cleanup_dump_enabled(name_str: &str) -> bool:
         let _ = self
@@ -16965,15 +16989,9 @@ impl Codegen:
         if self.mir_bb_values.len() as i32 > 0:
             wl_build_br(self.builder, self.mir_bb_values[0])
         else:
-            let fallthrough_has_sret_opt = self.fn_abi_has_sret(name_sym)
-            let fallthrough_has_sret = if fallthrough_has_sret_opt.is_some(): fallthrough_has_sret_opt.unwrap() else: 0
-            if fallthrough_has_sret != 0:
-                wl_build_store(self.builder, self.build_default_value(self.current_ret_type), wl_get_param(function, 0))
-                let _ = wl_build_ret_void(self.builder)
-            else if self.current_ret_type == wl_void_type(self.context):
-                let _ = wl_build_ret_void(self.builder)
-            else:
-                let _ = wl_build_ret(self.builder, self.build_default_value(self.current_ret_type))
+            // Unreachable: every body is built by MirBuilder.init, which
+            // creates its entry block first, so a body has at least one block.
+            self.mir_emit_failed("a body with no block", name_str, fn_node, 0)
 
         let reachable_bbs = self.mir_reachable_blocks(body)
         let saved_fn_scope: i64 = self.di_current_scope
@@ -17015,9 +17033,7 @@ impl Codegen:
                 if not self.mir_emit_stmt(body, stmt_id):
                     if self.debug_mir_codegen_enabled():
                         with_eprint(f"[mir-cg] fn={name_str} bb={bb} stmt_fail={stmt_id}")
-                    let fail_bb = wl_get_insert_block(self.builder)
-                    if fail_bb != 0 and wl_get_bb_terminator(fail_bb) == 0:
-                        wl_build_unreachable(self.builder)
+                    self.mir_emit_failed(f"statement {stmt_id} in bb{bb}", name_str, fn_node, stmt_span)
                     break
             let term_bb = wl_get_insert_block(self.builder)
             if term_bb != 0 and wl_get_bb_terminator(term_bb) == 0:
@@ -17030,9 +17046,8 @@ impl Codegen:
                     if ok:
                         ok_i = 1
                     with_eprint(f"[mir-cg] fn={name_str} bb={bb} term_ok={ok_i}")
-                let after_term_bb = wl_get_insert_block(self.builder)
-                if not ok and after_term_bb != 0 and wl_get_bb_terminator(after_term_bb) == 0:
-                    wl_build_unreachable(self.builder)
+                if not ok:
+                    self.mir_emit_failed(f"the terminator of bb{bb}", name_str, fn_node, term_span)
 
         self.di_current_scope = saved_fn_scope
 
@@ -17435,15 +17450,9 @@ impl Codegen:
         if self.mir_bb_values.len() as i32 > 0:
             wl_build_br(self.builder, self.mir_bb_values[0])
         else:
-            let fallthrough_has_sret_opt = self.fn_abi_has_sret(mono_sym)
-            let fallthrough_has_sret = if fallthrough_has_sret_opt.is_some(): fallthrough_has_sret_opt.unwrap() else: 0
-            if fallthrough_has_sret != 0:
-                wl_build_store(self.builder, self.build_default_value(self.current_ret_type), wl_get_param(function, 0))
-                let _ = wl_build_ret_void(self.builder)
-            else if self.current_ret_type == wl_void_type(self.context):
-                let _ = wl_build_ret_void(self.builder)
-            else:
-                let _ = wl_build_ret(self.builder, self.build_default_value(self.current_ret_type))
+            // Unreachable: see gen_function_mir (MirBuilder.init makes the
+            // entry block).
+            self.mir_emit_failed("a body with no block", name_str, fn_node, 0)
 
         let reachable_bbs = self.mir_reachable_blocks(body)
         let mono_fn_scope: i64 = self.di_current_scope
@@ -17463,18 +17472,14 @@ impl Codegen:
                 if body.stmt_spans[stmt_id] > 0:
                     self.debug_set_location(body.stmt_spans[stmt_id])
                 if not self.mir_emit_stmt(body, stmt_id):
-                    let fail_bb = wl_get_insert_block(self.builder)
-                    if fail_bb != 0 and wl_get_bb_terminator(fail_bb) == 0:
-                        wl_build_unreachable(self.builder)
+                    self.mir_emit_failed(f"statement {stmt_id} in bb{bb}", name_str, fn_node, body.stmt_spans[stmt_id])
                     break
             let term_bb = wl_get_insert_block(self.builder)
             if term_bb != 0 and wl_get_bb_terminator(term_bb) == 0:
                 if body.bb_term_spans[bb] > 0:
                     self.debug_set_location(body.bb_term_spans[bb])
-                let ok = self.mir_emit_term(body, bb)
-                let after_term_bb = wl_get_insert_block(self.builder)
-                if not ok and after_term_bb != 0 and wl_get_bb_terminator(after_term_bb) == 0:
-                    wl_build_unreachable(self.builder)
+                if not self.mir_emit_term(body, bb):
+                    self.mir_emit_failed(f"the terminator of bb{bb}", name_str, fn_node, body.bb_term_spans[bb])
         self.di_current_scope = mono_fn_scope
 
         self.mir_terminate_default_unreachable()
@@ -18535,10 +18540,13 @@ impl Codegen:
             self.mir_bb_values.push(cl_llbb)
 
         // Branch from entry to first MIR BB
+        let closure_name = f"closure in {self.intern.resolve(parent.fn_sym)}"
         if self.mir_bb_values.len() as i32 > 0:
             wl_build_br(self.builder, self.mir_bb_values[0])
         else:
-            let _ = wl_build_ret(self.builder, wl_const_int(ret_ty, 0, 0))
+            // Unreachable: a closure's body is lowered by MirBuilder.init,
+            // which creates the entry block (prepared_anonymous_body).
+            self.mir_emit_failed("a body with no block", closure_name, node, 0)
 
         // Emit MIR statements and terminators
         let closure_scope: i64 = self.di_current_scope
@@ -18555,17 +18563,14 @@ impl Codegen:
                 if closure_body.stmt_spans[cl_stmt_id] > 0:
                     self.debug_set_location(closure_body.stmt_spans[cl_stmt_id])
                 if not self.mir_emit_stmt(closure_body, cl_stmt_id):
-                    let fail_bb = wl_get_insert_block(self.builder)
-                    if fail_bb != 0 and wl_get_bb_terminator(fail_bb) == 0:
-                        wl_build_unreachable(self.builder)
+                    self.mir_emit_failed(f"statement {cl_stmt_id} in bb{cl_bb}", closure_name, node, closure_body.stmt_spans[cl_stmt_id])
+                    break
             let term_bb = wl_get_insert_block(self.builder)
             if term_bb != 0 and wl_get_bb_terminator(term_bb) == 0:
                 if closure_body.bb_term_spans[cl_bb] > 0:
                     self.debug_set_location(closure_body.bb_term_spans[cl_bb])
                 if not self.mir_emit_term(closure_body, cl_bb):
-                    let after_term_bb = wl_get_insert_block(self.builder)
-                    if after_term_bb != 0 and wl_get_bb_terminator(after_term_bb) == 0:
-                        let _ = wl_build_ret(self.builder, wl_const_int(ret_ty, 0, 0))
+                    self.mir_emit_failed(f"the terminator of bb{cl_bb}", closure_name, node, closure_body.bb_term_spans[cl_bb])
         self.di_current_scope = closure_scope
 
         self.mir_terminate_default_unreachable()
@@ -19883,25 +19888,20 @@ impl Codegen:
         for bi in 0..bb_count:
             let bb = wl_append_bb(ctx, tramp_fn, "bb")
             self.mir_bb_values.push(bb)
+        let ab_name = f"async block in {self.intern.resolve(parent.fn_sym)}"
         if bb_count > 0:
             wl_build_br(self.builder, self.mir_bb_values[0])
+        else:
+            // Unreachable: an async block's body is lowered by
+            // MirBuilder.init, which creates the entry block.
+            self.mir_emit_failed("a body with no block", ab_name, node, 0)
 
-        // Emit MIR statements and terminators
+        // Emit MIR statements and terminators. A statement's result was
+        // ignored here (a failed one left its block half-built and the
+        // program compiled); TK_RETURN's intercept stores into rbuf.
         for bi in 0..bb_count:
-            let bb = self.mir_bb_values[bi]
-            wl_position_at_end(self.builder, bb)
-            let stmt_start = ab_body.bb_stmt_starts[bi]
-            let stmt_count = ab_body.bb_stmt_counts[bi]
-            for si in 0..stmt_count:
-                self.mir_emit_stmt(ab_body, stmt_start + si)
-            let term = ab_body.term_kind(bi)
-            if term == TermKind.TK_RETURN:
-                // TK_RETURN intercept handles store to rbuf + ret void
-                if not self.mir_emit_term(ab_body, bi):
-                    let _ = wl_build_unreachable(self.builder)
-            else:
-                if not self.mir_emit_term(ab_body, bi):
-                    let _ = wl_build_unreachable(self.builder)
+            wl_position_at_end(self.builder, self.mir_bb_values[bi])
+            let _ = self.mir_emit_block_or_report(ab_body, bi, ab_name, node)
 
         // 7. Restore codegen state
         self.async_block_rbuf = saved_async_rbuf

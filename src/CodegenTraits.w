@@ -823,35 +823,18 @@ impl Codegen:
         if self.mir_bb_values.len() as i32 > 0:
             wl_build_br(self.builder, self.mir_bb_values[0])
         else:
-            let _ = wl_build_ret(self.builder, wl_const_int(final_ret_ty, 0, 0))
+            // Unreachable: dtm_builder came from MirBuilder.init above, which
+            // creates the entry block.
+            self.mir_emit_failed("a body with no block", mangled, body_node, 0)
 
-        // Emit MIR statements and terminators
+        // Emit MIR statements and terminators: a failure is a reported BUG
+        // (#2006), never a `ret 0`; the terminator goes where the builder
+        // stands, after a statement that ends in a block of its own.
         for dtm_bb in 0..dtm_body.block_count():
             if dtm_bb < 0 or dtm_bb >= self.mir_bb_values.len() as i32:
                 continue
-            let dtm_llbb: i64 = self.mir_bb_values[dtm_bb]
-            wl_position_at_end(self.builder, dtm_llbb)
-            let dtm_stmt_start = dtm_body.bb_stmt_starts[dtm_bb]
-            let dtm_stmt_count = dtm_body.bb_stmt_counts[dtm_bb]
-            for dtm_si in 0..dtm_stmt_count:
-                let dtm_stmt_id = dtm_stmt_start + dtm_si
-                if not self.mir_emit_stmt(dtm_body, dtm_stmt_id):
-                    let fail_bb = wl_get_insert_block(self.builder)
-                    if fail_bb != 0 and wl_get_bb_terminator(fail_bb) == 0:
-                        wl_build_unreachable(self.builder)
-            // A statement may end in a block of its own (checked arithmetic
-            // branches to `arith.ok`): the terminator goes where the builder
-            // is, as in every other MIR emitter, not into the MIR block's
-            // first LLVM block, which the statement already terminated.
-            let term_bb = wl_get_insert_block(self.builder)
-            if term_bb != 0 and wl_get_bb_terminator(term_bb) == 0:
-                if not self.mir_emit_term(dtm_body, dtm_bb):
-                    let after_term_bb = wl_get_insert_block(self.builder)
-                    if after_term_bb != 0 and wl_get_bb_terminator(after_term_bb) == 0:
-                        if final_ret_ty == wl_void_type(self.context):
-                            let _ = wl_build_ret_void(self.builder)
-                        else:
-                            let _ = wl_build_ret(self.builder, wl_const_int(final_ret_ty, 0, 0))
+            wl_position_at_end(self.builder, self.mir_bb_values[dtm_bb])
+            let _ = self.mir_emit_block_or_report(dtm_body, dtm_bb, mangled, body_node)
 
         self.mir_terminate_default_unreachable()
         // Synthesized bodies must pass the same cleanup + verification as
@@ -1709,7 +1692,10 @@ impl Codegen:
         // zeroed storage. Report it here rather than emitting silently broken code.
         let uak = validate_use_after_kill(&init_body, &self.intern)
         if uak.len() > 0:
-            with_eprint("error: const initializer MIR is invalid: " ++ uak)
+            // #2006: an error line with the build still green is a silent
+            // fallback; the unit must not link.
+            with_eprint("error: BUG: const initializer MIR is invalid: " ++ uak)
+            self.had_error = 1
         self.mir_scan_memory_locals(init_body)
 
         // Void results keep the dead i32 slot — alloca of void traps in LLVM.
@@ -1724,30 +1710,20 @@ impl Codegen:
             let llbb = wl_append_bb(self.context, function, f"mir.bb{bb}")
             self.mir_bb_values.push(llbb)
 
+        let init_label = f"initializer of {self.intern.resolve(name_sym)}"
         if self.mir_bb_values.len() as i32 > 0:
             wl_build_br(self.builder, self.mir_bb_values[0])
         else:
-            let _ = wl_build_ret(self.builder, wl_const_null(ret_ty))
+            // Unreachable: init_builder came from MirBuilder.init above,
+            // which creates the entry block.
+            self.mir_emit_failed("a body with no block", init_label, value_node, 0)
 
+        // A failure is a reported BUG (#2006), never a `ret null`.
         for bb in 0..init_body.block_count():
             if bb < 0 or bb >= self.mir_bb_values.len() as i32:
                 continue
-            let llbb = self.mir_bb_values[bb]
-            wl_position_at_end(self.builder, llbb)
-            let stmt_start = init_body.bb_stmt_starts[bb]
-            let stmt_count = init_body.bb_stmt_counts[bb]
-            for si in 0..stmt_count:
-                let stmt_id = stmt_start + si
-                if not self.mir_emit_stmt(init_body, stmt_id):
-                    let fail_bb = wl_get_insert_block(self.builder)
-                    if fail_bb != 0 and wl_get_bb_terminator(fail_bb) == 0:
-                        wl_build_unreachable(self.builder)
-            let term_bb = wl_get_insert_block(self.builder)
-            if term_bb != 0 and wl_get_bb_terminator(term_bb) == 0:
-                if not self.mir_emit_term(init_body, bb):
-                    let after_term_bb = wl_get_insert_block(self.builder)
-                    if after_term_bb != 0 and wl_get_bb_terminator(after_term_bb) == 0:
-                        let _ = wl_build_ret(self.builder, wl_const_null(ret_ty))
+            wl_position_at_end(self.builder, self.mir_bb_values[bb])
+            let _ = self.mir_emit_block_or_report(init_body, bb, init_label, value_node)
         self.mir_terminate_default_unreachable()
 
         self.mir_local_ptrs = saved_mir_locals
