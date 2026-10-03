@@ -5152,14 +5152,16 @@ impl MirBuilder:
         self.set_string_place_flags(dest_place, 2)
         dest_place
 
-    // Whether a comparison reads an operand of type `ty` in place: an owned
-    // non-Copy value it must not consume. A reference or pointer operand is
-    // Copy, and a `&T` compares through lower_expr's own view rule (#1137).
-    fn comparison_operand_observes(ty: i32) -> bool:
-        if self.sema.is_copy_frozen(ty) != 0:
-            return false
-        let tk = self.sema.get_type_kind(self.sema.resolve_alias(ty))
-        tk != TypeKind.TY_REF and tk != TypeKind.TY_PTR
+    // #2049: a comparison observes its operands — strings are read in place
+    // above, and every other operand is read, never moved. A non-Copy
+    // struct, enum or array side lowered as `move` of its place (`lhs == rhs`
+    // of two `Entry` params, `missing == None`) with no reset, so the owner's
+    // drop (a local's scope exit, a temporary's statement end) ran after a
+    // path that "moved" it.
+    mut fn comparison_operand(is_cmp: bool, op: i32) -> i32:
+        if not is_cmp or op < 0 or self.body.operand_kinds[op] != OperandKind.OK_MOVE:
+            return op
+        self.body.new_operand(OperandKind.OK_COPY, self.body.operand_d0[op])
 
     mut fn lower_bin_op(op: i32, lhs_expr: i32, rhs_expr: i32, node: i32):
         // Short-circuit evaluation for logical and/or
@@ -5237,20 +5239,14 @@ impl MirBuilder:
         // value it read `move v.text` (#1394), a move no reset follows and
         // the owner's drop frees again.
         let observes_strings = is_cmp and self.type_id_is_str_or_str_ref(lhs_ty) != 0 and self.type_id_is_str_or_str_ref(rhs_ty) != 0
-        // #2049: a comparison observes every operand, not only strings. A
-        // non-Copy struct, enum or array side lowered as a value read `move`
-        // of a local (`lhs == rhs` of two `Entry` params, `missing == None`)
-        // that nothing reset, and its owner's scope-exit drop ran over it.
-        let lhs_observed = is_cmp and lhs_ty != 0 and (if observes_strings: self.type_id_is_str(lhs_ty) != 0 else: self.comparison_operand_observes(lhs_ty))
-        let rhs_observed = is_cmp and rhs_ty != 0 and (if observes_strings: self.type_id_is_str(rhs_ty) != 0 else: self.comparison_operand_observes(rhs_ty))
-        let lhs = if lhs_observed: self.lower_observer_probe_arg(lhs_expr) else: self.lower_expr(lhs_expr)
+        let lhs = if observes_strings and self.type_id_is_str(lhs_ty) != 0: self.lower_observer_probe_arg(lhs_expr) else: self.comparison_operand(is_cmp, self.lower_expr(lhs_expr))
         if self.is_bare_none(rhs_expr) and (lhs_tk == TypeKind.TY_PTR or lhs_tk == TypeKind.TY_REF):
             self.expected_type = lhs_ty
         else if is_cmp and lhs_ty != 0:
             self.expected_type = lhs_ty
         else:
             self.expected_type = saved_expected
-        let rhs = if rhs_observed: self.lower_observer_probe_arg(rhs_expr) else: self.lower_expr(rhs_expr)
+        let rhs = if observes_strings and self.type_id_is_str(rhs_ty) != 0: self.lower_observer_probe_arg(rhs_expr) else: self.comparison_operand(is_cmp, self.lower_expr(rhs_expr))
         self.expected_type = saved_expected
         let rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, op, lhs, rhs)
         var ty = self.expr_type(node)
