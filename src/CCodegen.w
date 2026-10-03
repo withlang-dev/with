@@ -1346,6 +1346,13 @@ impl CCodegen:
         let _ = self
         f"payload{variant_index}"
 
+    // The member path from an enum value to payload field `field_idx` of
+    // `variant_index`: the variant's member itself when it has one field,
+    // else that field of the variant's payload struct (#2017).
+    fn payload_enum_field_path(enum_tid: i32, variant_index: i32, field_idx: i32) -> str:
+        let member = "." ++ self.payload_enum_variant_field(variant_index)
+        if self.sema.type_reflection_variant_payload_count(enum_tid, variant_index) == 1: member else: member ++ "." ++ cc_payload_struct_field(field_idx)
+
     fn payload_enum_named_variant(enum_tid: i32, variant_sym: i32) -> i32:
         if self.type_is_payload_enum(enum_tid) == 0 or variant_sym == 0:
             return -1
@@ -1410,6 +1417,9 @@ impl CCodegen:
             out = out ++ ", ." ++ self.payload_enum_variant_field(variant_index) ++ " = " ++ payload_text
         out ++ cc_rbrace()
 
+// A field of a multi-field variant's payload struct (#2017).
+fn cc_payload_struct_field(field_idx: i32): f"field{field_idx}"
+
 fn cc_str_concat_expr(left: &str, right: &str) -> str:
     "with_str_concat_ref(" ++ left ++ ", " ++ right ++ ")"
 
@@ -1461,15 +1471,15 @@ impl CCodegen:
         let payload_count = self.sema.type_reflection_variant_payload_count(enum_tid, variant_index)
         if payload_count <= 0:
             return out
-        if payload_count != 1:
-            // The C layout has no multi-payload variants (the type emitter
-            // fails first); this is the same loud failure, never a placeholder.
-            self.fail("emit-c does not yet support formatting enum variant '" ++ variant_name ++ "' with multiple payloads in " ++ context)
-            return ""
-        let payload_tid = self.sema.type_reflection_variant_payload_type_frozen(enum_tid, variant_index, 0)
-        let payload_expr = expr ++ "." ++ self.payload_enum_variant_field(variant_index)
-        let payload_text = self.display_format_expr(payload_tid, payload_expr, context)
-        cc_str_concat_expr(cc_str_concat_expr(out, "WITH_STR_LIT(\"(\")"), cc_str_concat_expr(payload_text, "WITH_STR_LIT(\")\")"))
+        // `Name(a, b)`, the LLVM backend's display of a payload variant.
+        out = cc_str_concat_expr(out, "WITH_STR_LIT(\"(\")")
+        for pi in 0..payload_count:
+            if pi > 0:
+                out = cc_str_concat_expr(out, "WITH_STR_LIT(\", \")")
+            let payload_tid = self.sema.type_reflection_variant_payload_type_frozen(enum_tid, variant_index, pi)
+            let payload_expr = expr ++ self.payload_enum_field_path(enum_tid, variant_index, pi)
+            out = cc_str_concat_expr(out, self.display_format_expr(payload_tid, payload_expr, context))
+        cc_str_concat_expr(out, "WITH_STR_LIT(\")\")")
 
     mut fn payload_enum_format_expr(enum_tid: i32, expr: &str, context: &str) -> str:
         let variant_count = self.sema.type_reflection_variant_count(enum_tid)
@@ -1777,11 +1787,21 @@ impl CCodegen:
             return tid
         let start = body.place_proj_starts[place_id]
         let count = body.place_proj_counts[place_id]
+        // A payload enum's downcast names its variant; the field after it is
+        // that variant's payload field `pd` (MirCore's projection typing).
+        var downcast_enum_tid = 0
+        var downcast_variant = -1
         for i in 0..count:
             let pk = body.proj_kinds[(start + i)]
             let pd = body.proj_d0[(start + i)]
             let resolved = self.sema.resolve_alias(tid as TypeId)
             let tk = self.sema.get_type_kind(resolved)
+            if pk == ProjKind.PK_FIELD and downcast_variant >= 0:
+                tid = self.sema.type_reflection_variant_payload_type_frozen(downcast_enum_tid, downcast_variant, pd)
+                downcast_variant = -1
+                if tid == 0:
+                    return 0
+                continue
             if pk == ProjKind.PK_FIELD:
                 if tk == TypeKind.TY_TUPLE:
                     let field_idx = self.tuple_field_index(resolved as i32, pd)
@@ -1836,7 +1856,12 @@ impl CCodegen:
                 return 0
             if pk == ProjKind.PK_DOWNCAST:
                 if self.type_is_payload_enum(tid) != 0:
-                    if self.sema.type_reflection_variant_payload_count(tid, pd) == 1:
+                    let payload_count = self.sema.type_reflection_variant_payload_count(tid, pd)
+                    if payload_count > 0 and i + 1 < count and body.proj_kinds[(start + i + 1)] == ProjKind.PK_FIELD:
+                        downcast_enum_tid = tid
+                        downcast_variant = pd
+                        continue
+                    if payload_count == 1:
                         tid = self.sema.type_reflection_variant_payload_type_frozen(tid, pd, 0)
                         continue
                     return 0
@@ -1864,11 +1889,21 @@ impl CCodegen:
             return tid
         let start = body.place_proj_starts[place_id]
         let count = body.place_proj_counts[place_id]
+        // A payload enum's downcast names its variant; the field after it is
+        // that variant's payload field `pd` (MirCore's projection typing).
+        var downcast_enum_tid = 0
+        var downcast_variant = -1
         for i in 0..count:
             let pk = body.proj_kinds[(start + i)]
             let pd = body.proj_d0[(start + i)]
             let resolved = self.sema.resolve_alias(tid as TypeId)
             let tk = self.sema.get_type_kind(resolved)
+            if pk == ProjKind.PK_FIELD and downcast_variant >= 0:
+                tid = self.sema.type_reflection_variant_payload_type_frozen(downcast_enum_tid, downcast_variant, pd)
+                downcast_variant = -1
+                if tid == 0:
+                    return 0
+                continue
             if pk == ProjKind.PK_FIELD:
                 if tk == TypeKind.TY_TUPLE:
                     let field_idx = self.tuple_field_index(resolved as i32, pd)
@@ -1925,7 +1960,12 @@ impl CCodegen:
                 return 0
             if pk == ProjKind.PK_DOWNCAST:
                 if self.type_is_payload_enum(tid) != 0:
-                    if self.sema.type_reflection_variant_payload_count(tid, pd) == 1:
+                    let payload_count = self.sema.type_reflection_variant_payload_count(tid, pd)
+                    if payload_count > 0 and i + 1 < count and body.proj_kinds[(start + i + 1)] == ProjKind.PK_FIELD:
+                        downcast_enum_tid = tid
+                        downcast_variant = pd
+                        continue
+                    if payload_count == 1:
                         tid = self.sema.type_reflection_variant_payload_type_frozen(tid, pd, 0)
                         continue
                     return 0
@@ -1950,11 +1990,21 @@ impl CCodegen:
             return tid
         let start = body.place_proj_starts[place_id]
         let count = body.place_proj_counts[place_id]
+        // A payload enum's downcast names its variant; the field after it is
+        // that variant's payload field `pd` (MirCore's projection typing).
+        var downcast_enum_tid = 0
+        var downcast_variant = -1
         for i in 0..count:
             let pk = body.proj_kinds[(start + i)]
             let pd = body.proj_d0[(start + i)]
             let resolved = self.sema.resolve_alias(tid as TypeId)
             let tk = self.sema.get_type_kind(resolved)
+            if pk == ProjKind.PK_FIELD and downcast_variant >= 0:
+                tid = self.sema.type_reflection_variant_payload_type_frozen(downcast_enum_tid, downcast_variant, pd)
+                downcast_variant = -1
+                if tid == 0:
+                    return 0
+                continue
             if pk == ProjKind.PK_FIELD:
                 if tk == TypeKind.TY_TUPLE:
                     let field_idx = self.tuple_field_index(resolved as i32, pd)
@@ -2008,7 +2058,12 @@ impl CCodegen:
                 return 0
             if pk == ProjKind.PK_DOWNCAST:
                 if self.type_is_payload_enum(tid) != 0:
-                    if self.sema.type_reflection_variant_payload_count(tid, pd) == 1:
+                    let payload_count = self.sema.type_reflection_variant_payload_count(tid, pd)
+                    if payload_count > 0 and i + 1 < count and body.proj_kinds[(start + i + 1)] == ProjKind.PK_FIELD:
+                        downcast_enum_tid = tid
+                        downcast_variant = pd
+                        continue
+                    if payload_count == 1:
                         tid = self.sema.type_reflection_variant_payload_type_frozen(tid, pd, 0)
                         continue
                     return 0
@@ -3164,11 +3219,20 @@ impl CCodegen:
             current_tid = self.place_local_tid(body, place_id)
         let start = body.place_proj_starts[place_id]
         let count = body.place_proj_counts[place_id]
+        // A payload enum's downcast names its variant; the field after it is
+        // that variant's payload field `pd` (MirCore's projection typing).
+        var downcast_enum_tid = 0
+        var downcast_variant = -1
         for i in 0..count:
             let pk = body.proj_kinds[(start + i)]
             let pd = body.proj_d0[(start + i)]
             let resolved = self.sema.resolve_alias(current_tid as TypeId)
             let tk = self.sema.get_type_kind(resolved)
+            if pk == ProjKind.PK_FIELD and downcast_variant >= 0:
+                out = out ++ self.payload_enum_field_path(downcast_enum_tid, downcast_variant, pd)
+                current_tid = self.sema.type_reflection_variant_payload_type_frozen(downcast_enum_tid, downcast_variant, pd)
+                downcast_variant = -1
+                continue
             if pk == ProjKind.PK_FIELD:
                 if tk == TypeKind.TY_TUPLE:
                     let field_idx = self.tuple_field_index(resolved as i32, pd)
@@ -3245,15 +3309,18 @@ impl CCodegen:
             if pk == ProjKind.PK_DOWNCAST:
                 if self.type_is_payload_enum(current_tid) != 0:
                     let payload_count = self.sema.type_reflection_variant_payload_count(current_tid, pd)
-                    if payload_count == 1:
-                        out = out ++ "." ++ self.payload_enum_variant_field(pd)
-                        current_tid = self.sema.type_reflection_variant_payload_type_frozen(current_tid, pd, 0)
-                        continue
                     if payload_count == 0:
                         self.fail(f"payload downcast for unit enum variant {pd}")
-                    else:
-                        self.fail(f"C backend does not support enum variants with {payload_count} payload fields")
-                    current_tid = 0
+                        current_tid = 0
+                        continue
+                    if i + 1 < count and body.proj_kinds[(start + i + 1)] == ProjKind.PK_FIELD:
+                        downcast_enum_tid = current_tid
+                        downcast_variant = pd
+                        continue
+                    // A trailing downcast names the variant's payload member:
+                    // its one field, or its payload struct (#2017).
+                    out = out ++ "." ++ self.payload_enum_variant_field(pd)
+                    current_tid = if payload_count == 1: self.sema.type_reflection_variant_payload_type_frozen(current_tid, pd, 0) else: 0
                     continue
                 out = f"{out}/*downcast{pd}*/"
                 current_tid = 0
@@ -3880,8 +3947,23 @@ impl CCodegen:
                         payload_text = self.fat_fn_literal(payload_fn_sym, self.sema.resolve_alias(payload_tid) as i32)
                 return self.payload_enum_literal(dst_tid, variant_index, payload_text)
             else if count > 1:
-                self.fail(f"C backend does not support enum variants with {count} payload fields")
-                return ""
+                // The variant's payload struct, field by field (#2017).
+                if count != self.sema.type_reflection_variant_payload_count(dst_tid, variant_index):
+                    self.fail(f"enum variant {variant_index} built from {count} operands for its {self.sema.type_reflection_variant_payload_count(dst_tid, variant_index)} payload fields")
+                    return ""
+                var fields_text = cc_lbrace()
+                for pi in 0..count:
+                    if pi > 0:
+                        fields_text = fields_text ++ ", "
+                    let field_op: i32 = body.agg_field_operands[(start + pi)]
+                    var field_text = self.operand_text(body, field_op)
+                    let field_tid = self.sema.type_reflection_variant_payload_type_frozen(dst_tid, variant_index, pi)
+                    if self.fn_tid_is_fat(field_tid) != 0:
+                        let field_fn_sym = self.operand_ck_fn_sym(body, field_op)
+                        if field_fn_sym != 0:
+                            field_text = self.fat_fn_literal(field_fn_sym, self.sema.resolve_alias(field_tid) as i32)
+                    fields_text = fields_text ++ "." ++ cc_payload_struct_field(pi) ++ " = " ++ field_text
+                return self.payload_enum_literal(dst_tid, variant_index, fields_text ++ cc_rbrace())
             var unit_variant: i32 = variant_index
             if self.sema.type_reflection_variant_payload_count(dst_tid, unit_variant) != 0:
                 unit_variant = self.payload_enum_single_unit_variant(dst_tid)
@@ -9363,11 +9445,18 @@ impl CCodegen:
                         let payload_count = self.sema.type_reflection_variant_payload_count(resolved as i32, vi)
                         if payload_count == 0:
                             continue
-                        if payload_count != 1:
-                            self.fail(f"C backend does not support enum variants with {payload_count} payload fields")
-                            return ""
-                        let payload_tid = self.sema.type_reflection_variant_payload_type_frozen(resolved as i32, vi, 0)
-                        out = out ++ "        " ++ self.c_decl(payload_tid, self.payload_enum_variant_field(vi)) ++ ";\n"
+                        if payload_count == 1:
+                            let payload_tid = self.sema.type_reflection_variant_payload_type_frozen(resolved as i32, vi, 0)
+                            out = out ++ "        " ++ self.c_decl(payload_tid, self.payload_enum_variant_field(vi)) ++ ";\n"
+                            continue
+                        // Several payload fields are a struct of them in
+                        // declaration order (with-abi.md §2, TypeLayout's
+                        // TY_ENUM rule), C's own struct placement (#2017).
+                        out = out ++ "        struct " ++ cc_lbrace() ++ "\n"
+                        for pi in 0..payload_count:
+                            let field_tid = self.sema.type_reflection_variant_payload_type_frozen(resolved as i32, vi, pi)
+                            out = out ++ "            " ++ self.c_decl(field_tid, cc_payload_struct_field(pi)) ++ ";\n"
+                        out = out ++ "        " ++ cc_rbrace() ++ " " ++ self.payload_enum_variant_field(vi) ++ ";\n"
                     out = out ++ "    " ++ cc_rbrace() ++ ";\n"
                 out = out ++ cc_rbrace() ++ ";\n\n"
                 continue
