@@ -3694,11 +3694,26 @@ impl Sema:
             return sym
         let head: i32 = self.displaced_fn_index.get(sym).unwrap()
         var chosen = 0
+        // #1882: a c_import's displaced definition carries its importer's
+        // path, but it is the importer's IMPORT (tier 3), not its own
+        // declaration (tier 2): the module's own `fn twice` outranks the
+        // header's `twice`, which its namespace still names (D70).
+        var own_import = 0
         var i = head
         while i >= 0 and chosen == 0:
             if self.displaced_fn_paths[i] == self.current_module_path:
-                chosen = self.displaced_fn_syms[i]
+                if self.ci_syms.contains(self.displaced_fn_syms[i]):
+                    if own_import == 0: own_import = self.displaced_fn_syms[i]
+                else:
+                    chosen = self.displaced_fn_syms[i]
             i = self.displaced_fn_prev[i]
+        if chosen == 0 and own_import != 0:
+            var own = if self.decl_visibility_index.contains(sym): self.decl_visibility_index.get(sym).unwrap() else: -1
+            while own >= 0:
+                if self.decl_visibility_paths[own] == self.current_module_path:
+                    return sym
+                own = self.decl_visibility_prev[own]
+            chosen = own_import
         if chosen == 0:
             // §18.2 tier 3 (Eric's ruling, #1221/#993): of the fns the
             // current module's explicit imports provide, the import written

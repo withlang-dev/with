@@ -1972,6 +1972,7 @@ impl Zcu:
         pool = self.render_c_facades_frontend(pool)
         self.displace_colliding_globals(pool)
         self.displace_c_import_wrappers(pool)
+        self.displace_colliding_c_import_fns(pool)
         if do_profile:
             let cimport_ns = runtime_clock_nanos() - t_cimport
             runtime_eprint(f"[profile] frontend.c_import  {cimport_ns / 1000000}.{(cimport_ns % 1000000) / 1000} ms")
@@ -2391,6 +2392,42 @@ impl Zcu:
                 if extern_names[e] == name and extern_paths[e] != path and (from_import or extern_imports[e]):
                     frontend_displace_fn_decl(pool, self.pool, decl, path)
                     break
+
+    // #1882 (§18.2, D70: every import is a namespace): a function a c_import
+    // header DEFINES — a `static inline` body, a rendered wrapper — is its
+    // importer's import, not a global declaration. When another owner
+    // already holds its short name — a bundle's private
+    // `u128_mul_would_overflow` (lib/std/re/defs.w, reached over the prelude
+    // edge), a user module's own fn, another import's definition — the flat
+    // table bound that owner's calls to the header's function ("expects 1
+    // argument(s), found 2" from inside the bundle) or gave two bodies one
+    // symbol ("body index map mismatch"). The import's function is displaced
+    // to its importer's module-qualified identity; the importer's calls bind
+    // to it (resolve_displaced_fn_ident: the current module's own displaced
+    // declaration) and every other owner's calls to their own. Non-import
+    // declarations take their names first, whatever the merge order; each
+    // c_import is an owner of its own (#1753). A header's extern stays the
+    // one global C symbol (D29).
+    fn displace_colliding_c_import_fns(pool: AstPool):
+        let taken: HashMap[i32, str] = HashMap.new()
+        for pass in 0..2:
+            for di in 0..pool.decl_count():
+                let decl = pool.get_decl(di) as i32
+                let kind = pool.kind(decl)
+                if kind != NodeKind.NK_FN_DECL and kind != NodeKind.NK_EXTERN_FN:
+                    continue
+                if frontend_fn_decl_is_method(pool, self.pool, decl):
+                    continue
+                let from_c_import = di < self.decl_is_c_import.len() as i32 and self.decl_is_c_import[di] != 0
+                if (pass == 0) == from_c_import:
+                    continue
+                let path = self.decl_source_path_frontend(di)
+                let owner = if from_c_import: path ++ f"/c_import{self.decl_is_c_import[di]}" else: path.clone()
+                let name = pool.get_data0(decl)
+                if not taken.contains(name):
+                    taken.insert(name, frontend_owned_text(owner))
+                else if from_c_import and taken.get(name).unwrap() != owner and frontend_fn_decl_is_displaceable(pool, self.pool, decl):
+                    frontend_displace_fn_decl(pool, self.pool, decl, owner)
 
     mut fn parse_interface_chunk(pool: AstPool, path: &str, chunk: &str) -> AstPool:
         var out = pool

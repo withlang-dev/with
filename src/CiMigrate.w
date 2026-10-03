@@ -493,18 +493,16 @@ fn ci_migrate_render_preamble_fn(signature: &str, colon_expr: &str, brace_expr: 
 
 // The helper a `__builtin_<op>_overflow` call names. The migrator's preamble
 // defines `__with_builtin_<op>_overflow_<ty>` for every width; a c_import
-// translation defines `__c_import_<op>_overflow_<ty>` beside the bodies that
-// call it (#1877). The spellings differ on purpose: a c_import-origin name is
-// global (SemaDecl's c_import scoping), and the `.wo` bundles' shared defs
-// (lib/std/re/defs.w) reach every compilation over the prelude edge, so a
-// c_import definition of the bundle's name would capture the bundle's own
-// calls (#1882).
-pub fn ci_overflow_helper_name(op: &str, ty: &str) -> str:
-    let prefix = if ci_translate_in_migrate_mode(): "__with_builtin_" else: "__c_import_"
-    prefix ++ op ++ "_overflow_" ++ ty
+// translation defines the same name beside the bodies that call it (#1877).
+// The `.wo` bundles' shared defs (lib/std/re/defs.w) reach every
+// compilation over the prelude edge with their own definitions of these
+// names; an import's definition is its importer's, displaced to the
+// importer's identity when another owner holds the name
+// (Frontend.displace_colliding_c_import_fns, #1882), so neither captures
+// the other's calls.
+pub fn ci_overflow_helper_name(op: &str, ty: &str): "__with_builtin_" ++ op ++ "_overflow_" ++ ty
 
-pub fn ci_u128_mul_helper_name() -> str:
-    if ci_translate_in_migrate_mode(): "u128_mul_would_overflow" else: "__c_import_u128_mul_would_overflow"
+pub fn ci_u128_mul_helper_name(): "u128_mul_would_overflow"
 
 fn ci_migrate_render_overflow_helper(name: &str, op: &str, ty: &str, is_signed: bool):
     let token = if op == "add": "+%" else if op == "sub": "-%" else: "*%"

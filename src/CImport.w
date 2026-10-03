@@ -321,7 +321,7 @@ fn c_import_included_files_clear():
 pub fn c_import_included_files() -> str:
     g_cimport_included_files ++ ""
 
-// #1877: the `__c_import_<op>_overflow_<ty>` helpers this import's
+// #1877: the `__with_builtin_<op>_overflow_<ty>` helpers this import's
 // inline bodies call (`__builtin_mul_overflow` and kin). The migrator's
 // preamble defines every width; a header import defines each one it names,
 // once, in its own translation — a name nothing defines is a dangling
