@@ -19107,8 +19107,7 @@ impl Codegen:
     // audit:codegen compares.
     mut fn sema_type_level_arg_llvm(sema_tid: i32, type_node: i32) -> i64:
         let fact = if sema_tid > 0: self.sema_type_to_llvm(sema_tid) else: 0
-        let derived = if self.analysis_enabled != 0: self.resolve_type(type_node) else: fact
-        self.fact_decide(MODE_SITE_SIZEOF_TYPE_ARG, fact, derived, self.current_function_name_sym, type_node)
+        self.verify_ast_type(MODE_SITE_SIZEOF_TYPE_ARG, fact, type_node, self.current_function_name_sym, type_node)
 
     mut fn gen_sizeof_alignof(is_size: bool, node: i32) -> i64:
         let callee_node = self.pool.get_data0(node)

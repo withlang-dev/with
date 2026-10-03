@@ -122,6 +122,15 @@ pub type Codegen {
     mode_site_decisions: Vec[i32],
     mode_site_disagree: Vec[i32],
     mode_site_first: Vec[str],
+    // #2043 (D65 phase 5): codegen's own derivations of a fact Sema owns —
+    // an AST type node resolved, a constant expression evaluated — counted
+    // per kind where they decide, with the first one. A derivation run as
+    // verification (verify_ast_type) decides nothing and is not counted;
+    // nested calls belong to the outermost (ast_derivation_depth).
+    ast_derivation_counts: Vec[i32],
+    ast_derivation_first: Vec[str],
+    ast_derivation_depth: i32,
+    ast_verifying: i32,
 
     // Current function state
     current_ret_type: i64,
@@ -874,6 +883,40 @@ impl Codegen:
                 self.analysis_fail(f"mode-provenance: {name}: {mode_site_owner(site)} and {mode_site_derivation(site)} disagree in {self.mode_site_disagree[site]} of {self.mode_site_decisions[site]} decisions; first: {self.mode_site_first[site]}")
             self.analysis_report.note(f"mode-provenance: {name} decisions={self.mode_site_decisions[site]} disagree={self.mode_site_disagree[site]}")
 
+    // #2043 (D65 phase 5): a derivation codegen ran from the AST for a fact
+    // Sema owns. Every one is a decision the owner's record should have
+    // made; nested calls belong to the outermost, and a derivation under
+    // verify_ast_type is verification.
+    mut fn note_ast_derivation(kind: i32, node: i32):
+        if self.analysis_enabled == 0 or self.ast_derivation_depth != 0 or self.ast_verifying != 0:
+            return
+        while self.ast_derivation_counts.len() as i32 < AST_DERIVATION_COUNT:
+            self.ast_derivation_counts.push(0)
+            self.ast_derivation_first.push("")
+        if self.ast_derivation_counts[kind] == 0:
+            let in_fn = if self.current_function_name_sym != 0: self.sema_symbol_text(self.current_function_name_sym) else: "<declarations>"
+            self.ast_derivation_first[kind] = f"{in_fn}: node {node} at {self.current_decl_source_file}:{self.pool.get_start(node)}"
+        self.ast_derivation_counts[kind] = self.ast_derivation_counts[kind] + 1
+
+    // The owner's type for `type_node` is the decision; under analysis the
+    // node's AST resolution is the verification audit:codegen compares.
+    mut fn verify_ast_type(site: i32, fact: i64, type_node: i32, fn_sym: i32, subject: i32) -> i64:
+        if self.analysis_enabled == 0:
+            return fact
+        self.ast_verifying = self.ast_verifying + 1
+        let derived = self.resolve_type(type_node)
+        self.ast_verifying = self.ast_verifying - 1
+        self.fact_decide(site, fact, derived, fn_sym, subject)
+
+    mut fn audit_ast_derivations():
+        if self.analysis_enabled == 0:
+            return
+        for kind in 0..AST_DERIVATION_COUNT:
+            let count = if kind < self.ast_derivation_counts.len() as i32: self.ast_derivation_counts[kind] else: 0
+            if count > 0:
+                self.analysis_fail(f"ast-derivation: {ast_derivation_name(kind)}: {count} decisions codegen derived from the AST instead of reading {ast_derivation_owner(kind)}; first: {self.ast_derivation_first[kind]}")
+            self.analysis_report.note(f"ast-derivation: {ast_derivation_name(kind)} decisions={count}")
+
     mut fn audit_codegen_call_coverage():
         if self.analysis_enabled == 0 or self.analysis_query != "audit":
             return
@@ -1025,6 +1068,10 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         mode_site_decisions: Vec.new(),
         mode_site_disagree: Vec.new(),
         mode_site_first: Vec.new(),
+        ast_derivation_counts: Vec.new(),
+        ast_derivation_first: Vec.new(),
+        ast_derivation_depth: 0,
+        ast_verifying: 0,
         current_ret_type: 0,
         mir_emit_mutual_tail_call: 0,
         async_trampolines: HashMap.new(),
@@ -3016,6 +3063,13 @@ impl Codegen:
         self.resolve_type(ret_type_node)
 
     mut fn resolve_type(type_node: i32) -> i64:
+        self.note_ast_derivation(AST_DERIVATION_TYPE, type_node)
+        self.ast_derivation_depth = self.ast_derivation_depth + 1
+        let ty = self.derive_type_from_ast(type_node)
+        self.ast_derivation_depth = self.ast_derivation_depth - 1
+        ty
+
+    mut fn derive_type_from_ast(type_node: i32) -> i64:
         if type_node == 0: return wl_void_type(self.context)
         if type_node < 0 or type_node >= self.pool.node_count():
             with_eprint(f"error: invalid type node {type_node} during code generation")
@@ -3588,6 +3642,13 @@ impl Codegen:
                 self.had_error = 1
 
     mut fn type_expr_to_sema_type(type_node: i32) -> i32:
+        self.note_ast_derivation(AST_DERIVATION_TYPE, type_node)
+        self.ast_derivation_depth = self.ast_derivation_depth + 1
+        let ty = self.derive_sema_type_from_ast(type_node)
+        self.ast_derivation_depth = self.ast_derivation_depth - 1
+        ty
+
+    mut fn derive_sema_type_from_ast(type_node: i32) -> i32:
         if type_node == 0:
             return self.sema.ty_void as i32
         let kind = self.pool.kind(type_node)
@@ -5108,9 +5169,9 @@ impl Codegen:
         let fact = if sema_ty > 0: self.sema_type_to_llvm(sema_ty) else: 0
         if fact == 0:
             return if template: self.resolve_type(type_node) else: 0
-        let generic_inst = self.sema.get_type_kind(self.sema.resolve_alias(sema_ty as TypeId)) == TypeKind.TY_GENERIC_INST
-        let derived = if self.analysis_enabled != 0 and not generic_inst: self.resolve_type(type_node) else: fact
-        self.fact_decide(MODE_SITE_STRUCT_FIELD_TYPE, fact, derived, owner_sym, subject)
+        if self.sema.get_type_kind(self.sema.resolve_alias(sema_ty as TypeId)) == TypeKind.TY_GENERIC_INST:
+            return self.fact_decide(MODE_SITE_STRUCT_FIELD_TYPE, fact, fact, owner_sym, subject)
+        self.verify_ast_type(MODE_SITE_STRUCT_FIELD_TYPE, fact, type_node, owner_sym, subject)
 
     // Sema's type of payload `pi` of variant `vi` of an enum declaration
     // (its TY_ENUM record: name, count, payload types per variant).
@@ -5386,6 +5447,21 @@ pub fn mode_site_derivation(site: i32) -> str:
     if site == MODE_SITE_CAPTURE_BY_PLACE or site == MODE_SITE_CLOSURE_OWNED_ENV: return "the closure's AST spelling"
     if site == MODE_SITE_FIELD_DECL_CARRIED: return "a lookup of the field's name in Sema's record"
     "the LLVM type"
+
+// #2043 (D65 phase 5): the kinds of fact codegen once derived from the AST
+// itself. note_ast_derivation counts them; audit:codegen wants zero.
+pub const AST_DERIVATION_TYPE: i32 = 0
+pub const AST_DERIVATION_CONST: i32 = 1
+pub const AST_DERIVATION_COUNT: i32 = 2
+
+pub fn ast_derivation_name(kind: i32) -> str:
+    if kind == AST_DERIVATION_TYPE: return "AST type node resolved by codegen"
+    if kind == AST_DERIVATION_CONST: return "constant expression evaluated by codegen"
+    "unknown"
+
+pub fn ast_derivation_owner(kind: i32) -> str:
+    if kind == AST_DERIVATION_TYPE: return "the type Sema recorded for the node"
+    "the value Sema evaluated"
 
 // Symbol-naming rules live in src/FnAbi.w (docs/spec/abi/with-abi.md §5); this is
 // the adapter that feeds them the codegen mode.
