@@ -1892,6 +1892,16 @@ impl Codegen:
         let vk = wl_get_type_kind(val_ty)
         let tk = wl_get_type_kind(target_ty)
 
+        // #1994: Unit has one value. A zero-size member (`{}`, a tuple's Unit
+        // element) holds it in no bytes, and the `i32` carrier materializes
+        // it as a value; neither side has bits to convert.
+        let val_empty = vk == wl_struct_type_kind() and wl_count_struct_elem_types(val_ty) == 0
+        let target_empty = tk == wl_struct_type_kind() and wl_count_struct_elem_types(target_ty) == 0
+        if target_empty and not val_empty and (vk == wl_integer_type_kind() or vk == wl_void_type_kind()):
+            return wl_const_null(target_ty)
+        if val_empty and not target_empty and tk == wl_integer_type_kind() and wl_get_int_type_width(target_ty) == 32:
+            return wl_const_int(target_ty, 0, 0)
+
         if vk == wl_integer_type_kind() and tk == wl_pointer_type_kind():
             if self.is_const_int_value(val) and wl_const_int_sext_val(val) == 0:
                 return wl_const_null(target_ty)
@@ -3068,7 +3078,13 @@ impl Codegen:
             let elem_types: Vec[i64] = Vec.new()
             for i in 0..elem_count:
                 let et_node = self.pool.get_extra(extra_start + i)
-                elem_types.push(self.resolve_type(et_node))
+                // A Unit element is a zero-size member (#1994), not the
+                // `i32` carrier a Unit value is materialized as.
+                let et_sema = self.type_expr_to_sema_type(et_node)
+                if et_sema > 0 and self.sema.get_type_kind(self.sema.resolve_alias(et_sema)) == TypeKind.TY_VOID:
+                    elem_types.push(wl_void_type(self.context))
+                else:
+                    elem_types.push(self.resolve_type(et_node))
             // #1964: TypeLayout's placement over the resolved element types
             // (a type node may name a generic parameter, which only this
             // resolution substitutes); the Sema path proves the same rule.
@@ -4838,9 +4854,10 @@ impl Codegen:
     // The model places; codegen materializes, and every tuple access reads
     // the positions through tuple_elem_index. Named, so two tuples whose
     // padded bodies are one literal never share a position table.
-    mut fn tuple_type_from_layout(elem_tys: &Vec[i64], offsets: &Vec[i64], size: i64, align: i64) -> i64:
+    mut fn tuple_type_from_layout(elem_tys0: &Vec[i64], offsets: &Vec[i64], size: i64, align: i64) -> i64:
+        let elem_tys = self.tuple_member_types(elem_tys0)
         let n = elem_tys.len() as i32
-        let literal = wl_struct_type(self.context, vec_data_i64(elem_tys), n, 0)
+        let literal = wl_struct_type(self.context, vec_data_i64(&elem_tys), n, 0)
         if self.tuple_measures(literal, offsets, size, align):
             return literal
         var key = f"{literal}/{size}/{align}"
@@ -4888,7 +4905,8 @@ impl Codegen:
     // element types, each at declared_align_of (§16.4/§4.3d — the alignment
     // TypeLayout gives the type it was emitted from), so both paths produce
     // one type, as #1958's Sema-less Option does.
-    mut fn tuple_type_from_elems(elem_tys: &Vec[i64]) -> i64:
+    mut fn tuple_type_from_elems(elem_tys0: &Vec[i64]) -> i64:
+        let elem_tys = self.tuple_member_types(elem_tys0)
         let offsets: Vec[i64] = Vec.new()
         var at: i64 = 0
         var align: i64 = 1
@@ -4900,7 +4918,21 @@ impl Codegen:
             offsets.push(off)
             at = off + self.abi_size_of(elem_tys[i])
         let size = if at % align == 0: at else: at + (align - at % align)
-        self.tuple_type_from_layout(elem_tys, &offsets, size, align)
+        self.tuple_type_from_layout(&elem_tys, &offsets, size, align)
+
+    // #1994: a tuple's members, a zero-size element (`Unit`, `Never`: §1,
+    // no bytes in a layout) as the empty struct `{}` rather than the `void`
+    // its value type lowers to — `void` is no member LLVM can place or size.
+    // The element keeps its position, at its offset, occupying nothing.
+    fn tuple_member_types(elem_tys: &Vec[i64]) -> Vec[i64]:
+        let members: Vec[i64] = Vec.new()
+        for i in 0..elem_tys.len() as i32:
+            let elem = elem_tys[i]
+            if elem != 0 and wl_get_type_kind(elem) == wl_void_type_kind():
+                members.push(wl_struct_type(self.context, 0, 0, 0))
+            else:
+                members.push(elem)
+        members
 
     // Whether LLVM type `ty` (a tuple body) measures `size` bytes aligned
     // `align` with element i at offsets[i].

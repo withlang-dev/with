@@ -5955,7 +5955,9 @@ impl MirBuilder:
         let base_expr = self.ast.get_data0(node)
         let field_idx = self.ast.get_data1(node)
         let field_ty = self.expr_type(node)
-        if field_ty == 0 or field_ty == self.sema.ty_void as i32:
+        // A Unit field (`t.0` of `(Unit, i32)`, #1994) is a zero-size place
+        // like any other projection; only an untyped access is unsupported.
+        if field_ty == 0:
             self.mark_unsupported()
             return self.place_for_local(0)
         let base = self.lower_field_base_place_for_field(base_expr, field_idx)
