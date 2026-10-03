@@ -106,7 +106,9 @@ All additive to `rt/rt_core.w`; pure `.w`.
   (Not "never-reuse" — that would break the slab; a never-reuse UAF mode is a later refinement.)
 - **Leak at exit.** `with_runtime_shutdown` (on the native `with run`/`build` exit path)
   prints `debug-alloc: LEAK addr=<a> size=<n> origin=<site>` for every still-live entry,
-  then a `leak count=<k>`. Runtime code can call
+  then `debug-alloc: leak count=<k> allocations=<n>`. The line is unconditional: a
+  program that never allocated prints `leak count=0 allocations=0`, so a run with no
+  report is a run whose debug allocator did not reach a normal exit. Runtime code can call
   `with_debug_alloc_mark_root(ptr, reason_ptr, reason_len)` to label an intentional
   process-lifetime root. `WITH_DEBUG_ALLOC_FILTER=all|non-root|roots` controls whether
   all leaks, only non-root leaks, or only root leaks are printed. A field-drop that never

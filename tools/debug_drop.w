@@ -102,7 +102,12 @@ fn main:
         else if run.report.contains("LEAK addr="):
             print(line_after_prefix(run.report, "debug-alloc: leak count="))
             print("verdict: LEAK (resolve alloc site with tools/debug_drop_sites.lldb)")
+        else if not run.report.contains("debug-alloc: leak count="):
+            // The exit report is unconditional; without it the allocator
+            // never reported (the program died first, or did not run).
+            print("verdict: NO REPORT (the debug allocator printed no exit report; the run did not reach a normal exit)")
         else:
+            print(line_after_prefix(run.report, "debug-alloc: leak count="))
             print("verdict: clean (no double-free, no leak)")
         exit_code(0)
 

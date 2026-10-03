@@ -829,6 +829,12 @@ fn classify_cell(dir: &str, idx: i32, rc: i32, expect_sum: i32, expect_clean: bo
         return "UNEXPECTED-CLEAN"
     if rc != 0 and find_sub(err, "leak count") < 0:
         return "RUN-FAIL"
+    // The exit report is unconditional (`leak count=K allocations=N`): a clean exit
+    // without it means the debug allocator never reported, which is no verdict
+    // (a baseline seed older than the unconditional report reads NO-REPORT on a
+    // cell that never allocates; the candidate passing it classes as FIXED).
+    if find_sub(err, "leak count") < 0:
+        return "NO-REPORT"
     let got = last_int_line(out)
     let want = f"{expect_sum}"
     if got != want:
