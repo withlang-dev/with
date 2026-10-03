@@ -94,14 +94,11 @@ impl Diagnostic:
         self.origin_line = line
         self.origin_node = node
 
-    mut fn add_label(span: Span, text: &str) -> Unit:
-        self.labels.push(DiagnosticLabel { span, message: diagnostic_owned_text(text) })
+    mut fn add_label(span: Span, text: &str): self.labels.push(DiagnosticLabel { span, message: diagnostic_owned_text(text) })
 
-    mut fn add_note(text: &str) -> Unit:
-        self.notes.push(diagnostic_owned_text(text))
+    mut fn add_note(text: &str): self.notes.push(diagnostic_owned_text(text))
 
-    mut fn add_help(text: &str) -> Unit:
-        self.helps.push(diagnostic_owned_text(text))
+    mut fn add_help(text: &str): self.helps.push(diagnostic_owned_text(text))
 
     fn render(source: &Source):
         let no_paths: Vec[str] = Vec.new()
