@@ -1,6 +1,6 @@
-# The With ABI (version 12)
+# The With ABI (version 13)
 
-Status: DRAFT v12 (2026-09-30), the convention as the compiler implements
+Status: DRAFT v13 (2026-10-02), the convention as the compiler implements
 it today, written down so `.wo` bundles (decisions.md D38,
 `docs/spec/toolchain/wo_bundles.md`) can depend on it. Nothing here is a new rule. The
 sources named in §7 define the ABI; this document describes them, and at
@@ -23,6 +23,8 @@ a With value type, not as a contract With makes with another language.
 - Raw pointers (`*const T`, `*mut T`), references (`&T`), and
   `extern fn` values are one pointer word — 8 bytes on every native target,
   4 on `wasm32` (`target_spec_ptr_bytes`).
+- A pointer to a trait object is fat: `&dyn T`, `*dyn T` and `Box[dyn T]`
+  are `{ data, vtable }`, two pointer words (v13).
 - Ordinary With function values use `{ function pointer, environment pointer }`.
   Named functions acquire an adapter thunk when converted to this representation.
 - A reference is a **value of pointer type**: it is passed as that pointer,
@@ -83,13 +85,14 @@ generated code and `rt/rt_core.w`:
 | slices `[]T`, `[]mut T` | fat: `{ ptr, len: i64 }` | 16 |
 | `&str` view (§1) | `{ ptr: *const u8, len: i64 }`, str's layout | 16 |
 
-`Option[&T]` and `Option[*T]` lower to a **nullable pointer**: null is
+`Option[T]` whose payload is a single non-null address — `&T`, `*T`, an
+`extern fn`, a std `Box[T]` — lowers to that **nullable pointer**: null is
 `None`, a live address is `Some` (the D22 lookup representation shared by
-`HashMap.get` and `SlotMap.get`). `Option[&str]` is not one of them: its
-payload is a view value, not an address, so it is an ordinary tagged enum,
-and a lookup that finds a str slot builds `Some` from the view read out of
-the slot. Every other `Option[T]` and every `Result[T, E]` is an ordinary
-tagged enum under §2.
+`HashMap.get` and `SlotMap.get`). `&str` (a view) and `&dyn`/`Box[dyn]`
+(fat, §1) do not: their payload is not one address, so they are ordinary
+tagged enums, and a lookup that finds a str slot builds `Some` from the
+view read out of the slot. Every other `Option[T]` and every
+`Result[T, E]` is an ordinary tagged enum under §2.
 
 ## 4. Function calls
 
@@ -208,6 +211,17 @@ ABI-owned file when D30's in-unit runtime retirement lands; until then a
 layout change there is caught by the `wo-drift` lane, not by this check.
 
 ## Version history
+
+- **v13** (2026-10-02): an enum's payload area sits at the largest
+  payload's alignment and the enum is aligned to the larger of tag and
+  payload (§2 as written); payloads were packed at offset 4. `E64` 12→16,
+  `Result[i64, str]` 20→24. TypeLayout is read by codegen for every enum,
+  `Option` and `Result` body and the emitted size is verified against it.
+  `Option[T]` over a single non-null address — `&T`, `*T`, an `extern fn`,
+  a std `Box[T]` — is the nullable pointer (§3; `Box` and `extern fn` were
+  always emitted so, the model now says so); `&dyn T`, `*dyn T` and
+  `Box[dyn T]` are two words (§1). Objects built under v12 that exchange
+  affected values must be rebuilt.
 
 - **v12** (2026-09-30): empty ordinary `Drop` structs now carry D72's
   hidden liveness byte, as nonempty live-zero `Drop` structs already did.
