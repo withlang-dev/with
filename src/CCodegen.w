@@ -8167,8 +8167,61 @@ impl CCodegen:
             out = out ++ f"    goto bb{next_bb};"
             return out
 
+        let intrinsic = body.call_intrinsic(args_id)
+        if intrinsic == MirIntrinsic.COLLECTION_LITERAL or intrinsic == MirIntrinsic.MAP_LITERAL:
+            return self.emit_collection_literal_term(body, intrinsic, args_id, dest_place, next_bb)
+
         self.fail("emit-c does not support generic intrinsic " ++ if name.len() > 0: name else: "<unknown>")
         "\n"
+
+    // `[a, b]` into a Vec or HashSet and `[k: v]` into a HashMap (MirLower's
+    // COLLECTION_LITERAL / MAP_LITERAL): the collection built empty and each
+    // element pushed or inserted in order, as the LLVM backend's
+    // mir_emit_collection_literal_intrinsic_call and this backend's own
+    // VEC_PUSH / MAP_NEW / MAP_INSERT do (#2017).
+    mut fn emit_collection_literal_term(body: &MirBody, intrinsic: MirIntrinsic, args_id: i32, dest_place: i32, next_bb: i32) -> str:
+        let dst_tid = self.place_tid(body, dest_place)
+        let resolved = self.sema.resolve_alias(dst_tid as TypeId) as i32
+        let base = self.generic_inst_base_name(resolved)
+        let argc = self.call_arg_count(body, args_id)
+        let dst = self.place_text(body, dest_place)
+        var out = "    " ++ cc_lbrace()
+        if intrinsic == MirIntrinsic.COLLECTION_LITERAL and base == "Vec":
+            let elem_tid = self.sema.get_generic_inst_arg(resolved, 0)
+            let elem_ty = self.c_type(elem_tid, 0)
+            out = out ++ " " ++ self.c_type(dst_tid, 0) ++ " __with_lit; with_vec_new_out((uint8_t*)&__with_lit, sizeof(" ++ elem_ty ++ "));"
+            for i in 0..argc:
+                let elem_text = self.collection_literal_elem_text(body, args_id, i, elem_tid)
+                out = out ++ " " ++ cc_lbrace() ++ " " ++ elem_ty ++ " __with_e = " ++ elem_text ++ "; with_vec_push(&__with_lit, &__with_e); " ++ cc_rbrace()
+            out = out ++ " " ++ dst ++ " = __with_lit; " ++ cc_rbrace() ++ "\n"
+            return out ++ f"    goto bb{next_bb};"
+        let is_set = intrinsic == MirIntrinsic.COLLECTION_LITERAL and base == "HashSet"
+        if not is_set and not (intrinsic == MirIntrinsic.MAP_LITERAL and base == "HashMap"):
+            self.fail("emit-c has no collection literal for " ++ self.sema.type_name(dst_tid))
+            return "\n"
+        let key_tid = self.hashmap_key_tid(resolved)
+        // A set's value is a present marker sized as MAP_NEW sizes it.
+        let val_tid = if is_set: self.sema.ty_i64 as i32 else: self.hashmap_value_tid(resolved)
+        let key_ty = self.c_type(key_tid, 0)
+        let val_ty = self.c_type(val_tid, 0)
+        let is_str_key = if self.sema.get_type_kind(self.sema.resolve_alias(key_tid as TypeId)) == TypeKind.TY_STR: "1" else: "0"
+        out = out ++ " void* __with_h = with_hashmap_new(sizeof(" ++ key_ty ++ "), sizeof(" ++ val_ty ++ "));"
+        let entry_count = if is_set: argc else: argc / 2
+        for i in 0..entry_count:
+            let key_idx = if is_set: i else: i * 2
+            let key_text = self.collection_literal_elem_text(body, args_id, key_idx, key_tid)
+            let val_text = if is_set: "1" else: self.collection_literal_elem_text(body, args_id, key_idx + 1, val_tid)
+            out = out ++ " " ++ cc_lbrace() ++ " " ++ key_ty ++ " __with_k = " ++ key_text ++ "; " ++ val_ty ++ " __with_v = " ++ val_text ++ "; with_hashmap_insert(__with_h, &__with_k, &__with_v, " ++ is_str_key ++ "); " ++ cc_rbrace()
+        out = out ++ " " ++ dst ++ " = (int64_t)(intptr_t)__with_h; " ++ cc_rbrace() ++ "\n"
+        out ++ f"    goto bb{next_bb};"
+
+    mut fn collection_literal_elem_text(body: &MirBody, args_id: i32, index: i32, elem_tid: i32) -> str:
+        let operand = self.call_arg_operand(body, args_id, index)
+        if self.fn_tid_is_fat(elem_tid) != 0:
+            let fn_sym = self.operand_ck_fn_sym(body, operand)
+            if fn_sym != 0:
+                return self.fat_fn_literal(fn_sym, self.sema.resolve_alias(elem_tid as TypeId) as i32)
+        self.operand_text(body, operand)
 
     mut fn emit_builtin_numeric_format_call_term(body: &MirBody, kind: CcBuiltin, args_id: i32, dest_place: i32, next_bb: i32, argc: i32, ret_tid: i32, has_ret: i32) -> str:
         var out = self.emit_builtin_numeric_call_term(body, kind, args_id, dest_place, next_bb, argc, ret_tid, has_ret)
