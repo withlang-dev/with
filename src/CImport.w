@@ -3004,6 +3004,13 @@ pub fn ci_translate_typedef(session: i64, idx: i32, count: i32) -> str:
             if not ci_record_definition_exists(session, name, is_forward_union):
                 let safe_name = ci_escape_reserved(name)
                 with_cimport_mark_name_emitted(name)
+                // `typedef struct node node;`: the struct's own forward
+                // declaration already declared the opaque `node`. A second
+                // `type node = opaque` was a second type of one name, and
+                // `struct_node` aliased the first while `node` named the
+                // second (#2043).
+                if ci_type_name_is_emitted(name):
+                    return ""
                 ci_mark_type_name_emitted(name)
                 let rendered = "type " ++ safe_name ++ " = opaque\n"
                 if ci_migrate_shared_decl_add("type", name, rendered):

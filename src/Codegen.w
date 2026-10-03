@@ -905,7 +905,17 @@ impl Codegen:
         self.ast_verifying = self.ast_verifying + 1
         let derived = self.resolve_type(type_node)
         self.ast_verifying = self.ast_verifying - 1
-        self.fact_decide(site, fact, derived, fn_sym, subject)
+        self.mode_record(site, fact == derived, fn_sym, subject, f"owner={self.llvm_type_label(fact)} derived={self.llvm_type_label(derived)} node {type_node}")
+        fact
+
+    // An LLVM type for a finding: its kind and, for a named struct, its name.
+    fn llvm_type_label(ty: i64) -> str:
+        if ty == 0: return "none"
+        let kind = wl_get_type_kind(ty)
+        if kind == wl_struct_type_kind(): return f"struct `{wl_get_struct_name(ty)}`"
+        if kind == wl_pointer_type_kind(): return "ptr"
+        if kind == wl_void_type_kind(): return "void"
+        f"llvm-kind-{kind}"
 
     // The same for a declaration's return type, whose AST resolution treats
     // an explicit `-> Unit` as void (resolve_return_type).
