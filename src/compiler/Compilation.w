@@ -2073,9 +2073,11 @@ impl Compilation:
         let mir_err = validate_typed_mir_module(mir_mod)
         if do_profile:
             profile_emit("mir.validate", t_mir_validate, "")
+        // D65 phase 5 (#2043): MIR built from a program Sema accepted is the
+        // compiler's; an invalid body is the compiler's bug, named as such.
         if mir_validation_has_error(mir_err):
             let diag_span = compilation_mir_error_span(self.zcu, active_pool, mir_err.fn_sym, mir_err.span)
-            sema.diags.emit(Diagnostic.err("invalid MIR before codegen: " ++ mir_err.message, diag_span))
+            sema.diags.emit(Diagnostic.err("internal compiler error: invalid MIR before codegen (a bug in the With compiler, not in this program): " ++ mir_err.message, diag_span))
             self.zcu.diagnostics = move sema.diags
             self.zcu.sync_from_sema(move sema)
             compilation_debug_pool_flow("run_mir_lower:after_sync", self.zcu.pool, active_pool, self.zcu.last_sema)
