@@ -530,7 +530,7 @@ pub fn run_package_bootstrap_c_action(ctx: ActionCtx) -> i32:
     if rc != 0: return rc
     rc = pkg_write_text(ctx, pkg_join(stage_root, "runtime/bootstrap_types.h"), pkg_bootstrap_types_header())
     if rc != 0: return rc
-    rc = pkg_copy_file(ctx, "out/gen/wl_decls.h", pkg_join(stage_root, "runtime/wl_decls.h"))
+    rc = pkg_copy_file(ctx, "out/bootstrap-c/src/wl_decls.h", pkg_join(stage_root, "runtime/wl_decls.h"))
     if rc != 0: return rc
 
     rc = pkg_copy_file(ctx, "scripts/bootstrap/linux_platform.c", pkg_join(stage_root, "src/linux_platform.c"))
