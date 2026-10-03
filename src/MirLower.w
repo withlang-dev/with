@@ -7434,7 +7434,10 @@ impl MirBuilder:
     // panicked "index out of bounds" in math_fn_arity once `t.get(id).arity`
     // (a call, materialized) became `t[id].arity` (a place). A view-typed
     // tail stays lazy: it is a reference value for a `&`-typed destination,
-    // and Sema refuses one that outlives its origin.
+    // and Sema refuses one that outlives its origin. A raw pointer is not a
+    // view: `t[i].p` copies the pointer the element stores, and left lazy it
+    // read the freed Vec the same way (#1991; the read-after-drop validator
+    // named `drop(_1); _0 = copy _1.repr` in a facade resource's tail).
     mut fn materialize_tail_read_of_dropped_local(result: i32, tail_expr: i32) -> i32:
         if self.body.operand_kinds[result] != OperandKind.OK_COPY:
             return result
@@ -7454,7 +7457,7 @@ impl MirBuilder:
         let read_ty = self.operand_type(result)
         let resolved = self.sema.resolve_alias(read_ty as TypeId)
         let tk = self.sema.get_type_kind(resolved)
-        if tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR:
+        if tk == TypeKind.TY_REF:
             return result
         let read_tmp = self.new_temp(read_ty)
         let read_place = self.place_for_local(read_tmp)
