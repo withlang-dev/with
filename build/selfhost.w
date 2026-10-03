@@ -7960,7 +7960,41 @@ pub fn run_cli_selfhost_build_w_action(ctx: ActionCtx) -> i32:
     if rc != 0: return rc
     rc = bs_check_build_w_action_no_deps(ctx, compiler_path, bs_join(base_dir, "action_no_deps"))
     if rc != 0: return rc
+    rc = bs_check_build_w_shared_output(ctx, compiler_path, bs_join(base_dir, "shared_output"))
+    if rc != 0: return rc
     bs_check_build_w_action_failures(ctx, compiler_path, bs_join(base_dir, "action_failures"))
+
+// #2014: two targets declaring one output are refused when the graph loads,
+// even when the command selects only one of them (linux-sysroot and
+// linux-sysroot-aarch64 both wrote out/gen/linux-sysroot-aarch64.pack).
+fn bs_check_build_w_shared_output(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    var rc = bs_write_project_manifest(ctx, case_dir, "sharedoutput")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(case_dir, "src/main.w"), "fn main:\n    print(\"unused\")\n", ctx.target_name(), "shared output source")
+    if rc != 0: return rc
+    let build =
+        "use std.build\n\n" ++
+        "fn write_a(ctx: ActionCtx) -> i32: ctx.fs().write_text(ctx.output(), \"a\")\n\n" ++
+        "fn write_b(ctx: ActionCtx) -> i32: ctx.fs().write_text(ctx.output(), \"b\")\n\n" ++
+        "pub fn build(ctx: BuildCtx) -> Build:\n" ++
+        "    var out = ctx.new_build()\n" ++
+        "    var a = target_new(.Action, \"writer-a\", \"\").output(\"out/action/shared.txt\")\n" ++
+        "    a.action = write_a\n" ++
+        "    out = out.add_target(a)\n" ++
+        "    var b = target_new(.Action, \"writer-b\", \"\").output(\"out/action/shared.txt\")\n" ++
+        "    b.action = write_b\n" ++
+        "    out = out.add_target(b)\n" ++
+        "    out.default(\"writer-a\")\n"
+    rc = bs_build_w_write_fixture(ctx, bs_join(case_dir, "build.w"), build, ctx.target_name(), "shared output build.w")
+    if rc != 0: return rc
+    let shared = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-shared-output", bs_blob_to_args(bs_argv_append("", "build")), 120000, case_dir)
+    if shared.rc == 0:
+        return bs_fail(ctx, "build_w_shared_output: building one of two targets that declare one output unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, shared.stderr, "is declared by both target 'writer-a' and target 'writer-b'", "build_w_shared_output")
+    if rc != 0: return rc
+    if ctx.fs().exists(bs_join(case_dir, "out/action/shared.txt")):
+        return bs_fail(ctx, "build_w_shared_output: the refused graph still ran a writer")
+    0
 
 
 fn bs_copy_fixture_file(ctx: &ActionCtx, src: &str, dst: &str, label: &str) -> i32:

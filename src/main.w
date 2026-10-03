@@ -3330,6 +3330,8 @@ fn run_build_command(options: BuildCommandOptions, graph_options: &BuildGraphCom
             if not graph.ok:
                 with_eprint("error: " ++ graph.error_msg)
                 return 1
+            if build_graph_validate_outputs(root, graph, "") != 0:
+                return 1
             if graph_options.selected_target == "effects":
                 return build_cache_print_effects(root, graph, "")
             var selected_target_name = graph_options.selected_target.clone()
@@ -3442,6 +3444,8 @@ fn run_run_project_command(selected_target_hint: &str, opt_level: i32, no_std: b
     let graph = load_result.graph
     if not graph.ok:
         with_eprint("error: " ++ graph.error_msg)
+        return 1
+    if build_graph_validate_outputs(root, graph, "") != 0:
         return 1
     var selected_target_name = with_str_clone_ref(selected_target_hint)
     if selected_target_name.len() == 0:

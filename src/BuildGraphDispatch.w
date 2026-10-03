@@ -17,34 +17,40 @@ pub type BuildGraphDispatchResult {
 fn build_graph_dispatch_result(handled: bool, rc: i32) -> BuildGraphDispatchResult:
     BuildGraphDispatchResult { handled, rc }
 
-fn build_graph_output_seen(outputs: &Vec[str], path: &str) -> bool:
-    for i in 0..outputs.len() as i32:
-        if outputs[i] == path:
-            return true
-    false
+// Every output a graph declares, with the target (or generated source) that
+// declares it: one file has exactly one producer.
+type BuildGraphOutputOwners {
+    paths: Vec[str],
+    owners: Vec[str],
+}
 
-// Returns false when the path is a duplicate; the caller records
-// accepted paths itself (a plain Vec param cannot be mutated, §3.8).
-fn build_graph_output_is_new(outputs: &Vec[str], path: &str) -> bool:
-    if path.len() == 0:
-        return true
-    not build_graph_output_seen(outputs, path)
+impl BuildGraphOutputOwners:
+    // The owner already declaring `path`, or "" when it is new.
+    fn owner_of(path: &str) -> str:
+        for i in 0..self.paths.len() as i32:
+            if self.paths[i] == path: return with_str_clone_ref(self.owners[i])
+        ""
 
-fn build_graph_record_output(outputs: Vec[str], path: &str) -> Vec[str]:
-    var out = outputs
-    if path.len() > 0:
-        out.push(with_str_clone_ref(path))
-    out
+    // 0 after recording `path` for `owner`; 1 after naming both declarers.
+    mut fn claim(path: &str, owner: &str) -> i32:
+        if path.len() == 0: return 0
+        let first = self.owner_of(path)
+        if first.len() > 0:
+            build_graph_rt_eprint("error: duplicate build.w output path: " ++ path ++ " is declared by both " ++ first ++ " and " ++ owner ++ "; every output has exactly one producing target")
+            return 1
+        self.paths.push(with_str_clone_ref(path))
+        self.owners.push(with_str_clone_ref(owner))
+        0
 
+// Run over the whole graph a build.w declares, not only the targets one
+// command selects: two targets that declare one output make its bytes depend
+// on which ran last, whether or not this command runs both (#2014).
 pub fn build_graph_validate_outputs(root: &str, graph: &BuildGraph, output_path: &str) -> i32:
-    var outputs: Vec[str] = Vec.new()
+    var seen = BuildGraphOutputOwners { paths: Vec.new(), owners: Vec.new() }
     for gi in 0..graph.generated_sources.len() as i32:
         let generated = graph.generated_sources[gi]
-        let generated_path = resolve_join(root, generated.path)
-        if not build_graph_output_is_new(outputs, generated_path):
-            build_graph_rt_eprint("error: duplicate build.w output path: " ++ generated.path)
+        if seen.claim(resolve_join(root, generated.path), "generated source '" ++ generated.path ++ "'") != 0:
             return 1
-        outputs = build_graph_record_output(move outputs, generated_path)
     for ti in 0..graph.targets.len() as i32:
         let target = &graph.targets[ti]
         var path = ""
@@ -60,16 +66,12 @@ pub fn build_graph_validate_outputs(root: &str, graph: &BuildGraph, output_path:
             path = build_graph_expand_install_path(root, target.output)
         else if target.output.len() > 0:
             path = build_graph_resolve_project_path(root, target.output)
-        if not build_graph_output_is_new(outputs, path):
-            build_graph_rt_eprint("error: duplicate build.w output path for target '" ++ target.name ++ "': " ++ path)
+        let owner = "target '" ++ target.name ++ "'"
+        if seen.claim(path, owner) != 0:
             return 1
-        outputs = build_graph_record_output(move outputs, path)
         for oi in 0..target.extra_outputs.len() as i32:
-            let extra_path = build_graph_resolve_project_path(root, target.extra_outputs[oi])
-            if not build_graph_output_is_new(outputs, extra_path):
-                build_graph_rt_eprint("error: duplicate build.w output path for target '" ++ target.name ++ "': " ++ extra_path)
+            if seen.claim(build_graph_resolve_project_path(root, target.extra_outputs[oi]), owner) != 0:
                 return 1
-            outputs = build_graph_record_output(move outputs, extra_path)
     0
 
 pub fn build_graph_write_generated_sources(root: &str, graph: &BuildGraph) -> i32:
