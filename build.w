@@ -2526,6 +2526,22 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
         ctx.diagnostics().error("deep-debug-tool-tests: could not write carrier fixture")
     if deep_debug_analyze_expect(ctx, root, compiler, build_project_abs(root, carrier_input), out_dir, "analyze-audit-carriers", "audit:all", "violations=0 ok") != 0:
         return 1
+    // #2023: analyze compiles its file as the root, like check: top-level
+    // statements are the implicit main (it refused them: "expected
+    // declaration"). The program passes a Vec element view to str.slice's
+    // i64 parameters, which reached codegen unmaterialized.
+    let implicit_main_input = build_project_join(out_dir, "implicit-main-input.w")
+    let implicit_main_source =
+        "var ss: Vec[i64] = Vec.new()\n" ++
+        "ss.push(1)\n" ++
+        "let s = ss[0]\n" ++
+        "print(\"ab\".slice(0, s) ++ \"ab\".slice(0, ss[0]))\n"
+    if fs.write_text(implicit_main_input, implicit_main_source) != 0:
+        ctx.diagnostics().error("deep-debug-tool-tests: could not write implicit-main fixture")
+    if deep_debug_analyze_expect(ctx, root, compiler, build_project_abs(root, implicit_main_input), out_dir, "analyze-audit-implicit-main", "audit:all", "violations=0 ok") != 0:
+        return 1
+    if deep_debug_tool_expect(ctx, root, compiler, build_project_abs(root, implicit_main_input), out_dir, "validate-ownership-implicit-main", "--validate-ownership", "", "validate-ownership: ok") != 0:
+        return 1
     // #1822: a `mut fn` receiver replaced whole is the caller's place, left
     // Init for the caller to drop; the ownership validator called it a leak.
     if deep_debug_analyze_expect(ctx, root, compiler, build_project_abs(root, "test/behavior/behav_1822_mut_receiver_replaced_whole.w"), out_dir, "analyze-audit-receiver-replaced", "audit:all", "violations=0 ok") != 0:

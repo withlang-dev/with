@@ -1687,7 +1687,7 @@ impl Compilation:
         true
 
     mut fn emit_typed_file(source_path: &str) -> bool:
-        let pool = self.compile_file(source_path)
+        let pool = self.compile_entry_file(source_path)
         if pool.decl_count() == 0:
             return false
         self.emit_typed(pool)
@@ -1701,7 +1701,7 @@ impl Compilation:
         true
 
     mut fn print_mir_file(source_path: &str) -> bool:
-        let pool = self.compile_file(source_path)
+        let pool = self.compile_entry_file(source_path)
         if pool.decl_count() == 0:
             return false
         self.print_mir(pool)
@@ -1714,7 +1714,7 @@ impl Compilation:
         dump_drop_state_module(self.zcu.last_mir_module, self.zcu.pool, self.zcu.last_sema)
 
     mut fn dump_drop_state_file(source_path: &str) -> str:
-        let pool = self.compile_file(source_path)
+        let pool = self.compile_entry_file(source_path)
         if pool.decl_count() == 0:
             return ""
         self.dump_drop_state(pool)
@@ -1727,7 +1727,7 @@ impl Compilation:
         trace_place_module(self.zcu.last_mir_module, self.zcu.pool, self.zcu.last_sema, spec)
 
     mut fn trace_place_file(source_path: &str, spec: &str) -> str:
-        let pool = self.compile_file(source_path)
+        let pool = self.compile_entry_file(source_path)
         if pool.decl_count() == 0:
             return ""
         self.trace_place(pool, spec)
@@ -1740,7 +1740,7 @@ impl Compilation:
         explain_mir_origin_module(self.zcu.last_mir_module, self.zcu.pool, self.zcu.last_sema, spec)
 
     mut fn explain_mir_origin_file(source_path: &str, spec: &str) -> str:
-        let pool = self.compile_file(source_path)
+        let pool = self.compile_entry_file(source_path)
         if pool.decl_count() == 0:
             return ""
         self.explain_mir_origin(pool, spec)
@@ -1753,7 +1753,7 @@ impl Compilation:
         trace_ownership_module(self.zcu.last_mir_module, self.zcu.pool, self.zcu.last_sema, spec)
 
     mut fn trace_ownership_file(source_path: &str, spec: &str) -> str:
-        let pool = self.compile_file(source_path)
+        let pool = self.compile_entry_file(source_path)
         if pool.decl_count() == 0:
             return ""
         self.trace_ownership(pool, spec)
@@ -1766,7 +1766,7 @@ impl Compilation:
         dump_drop_plan_module(self.zcu.last_mir_module, self.zcu.pool, self.zcu.last_sema)
 
     mut fn dump_drop_plan_file(source_path: &str) -> str:
-        let pool = self.compile_file(source_path)
+        let pool = self.compile_entry_file(source_path)
         if pool.decl_count() == 0:
             return ""
         self.dump_drop_plan(pool)
@@ -1779,13 +1779,13 @@ impl Compilation:
         dump_place_map_module(self.zcu.last_mir_module, self.zcu.pool, self.zcu.last_sema)
 
     mut fn dump_place_map_file(source_path: &str) -> str:
-        let pool = self.compile_file(source_path)
+        let pool = self.compile_entry_file(source_path)
         if pool.decl_count() == 0:
             return ""
         self.dump_place_map(pool)
 
     mut fn dump_abi_file(source_path: &str) -> str:
-        let pool = self.compile_file(source_path)
+        let pool = self.compile_entry_file(source_path)
         if pool.decl_count() == 0:
             return ""
         self.zcu.last_sema.dump_abi()
@@ -1814,7 +1814,10 @@ fn analysis_request_inner(request: &str):
 impl Compilation:
     pub mut fn analyze_file(source_path: &str, request: &str) -> CompilerAnalysisResult:
         self.zcu.analysis_partial_semantics = 1
-        let pool = self.compile_file(source_path)
+        // The analyzed file is the root, compiled as `check` and `build`
+        // compile it: an entry source whose top-level statements are its
+        // implicit main (§18.5b). compile_file refused them (#2023).
+        let pool = self.compile_entry_file(source_path)
         let after_mir = analysis_request_after_mir(request)
         let inner_request = analysis_request_inner(request)
         // Sema diagnostics return an empty public AstPool, but the synchronized
@@ -1863,13 +1866,13 @@ impl Compilation:
         trace_cleanup_edge_module(self.zcu.last_mir_module, self.zcu.pool, self.zcu.last_sema, spec)
 
     mut fn trace_cleanup_edge_file(source_path: &str, spec: &str) -> str:
-        let pool = self.compile_file(source_path)
+        let pool = self.compile_entry_file(source_path)
         if pool.decl_count() == 0:
             return ""
         self.trace_cleanup_edge(pool, spec)
 
     mut fn validate_ownership_file(source_path: &str) -> str:
-        let pool = self.compile_file(source_path)
+        let pool = self.compile_entry_file(source_path)
         if pool.decl_count() == 0:
             return "compile failed before ownership validation"
         let _ = self.run_mir_lower(pool)
@@ -1883,7 +1886,7 @@ impl Compilation:
         "ok"
 
     mut fn validate_all_file(source_path: &str) -> str:
-        let pool = self.compile_file(source_path)
+        let pool = self.compile_entry_file(source_path)
         if pool.decl_count() == 0:
             return "compile failed before validation"
         let _ = self.run_mir_lower(pool)
@@ -1908,7 +1911,7 @@ impl Compilation:
         text
 
     mut fn dump_async_mir_file(source_path: &str) -> str:
-        let pool = self.compile_file(source_path)
+        let pool = self.compile_entry_file(source_path)
         if pool.decl_count() == 0:
             return ""
         self.dump_async_mir(pool)
