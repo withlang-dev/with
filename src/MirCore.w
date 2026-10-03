@@ -4313,10 +4313,9 @@ pub fn validate_typed_mir_body(mir_mod: &MirModule, body: &MirBody) -> MirValida
                    mir_validate_compare_sensitive_type(mir_mod, rhs_ty) and
                    mir_validate_type_compatible_fast(mir_mod, lhs_ty, rhs_ty) == 0 and
                    mir_validate_type_compatible_fast(mir_mod, rhs_ty, lhs_ty) == 0:
-                    let __lk = mir_mod.mir_get_type_kind(mir_mod.mir_resolve_alias(lhs_ty)) as i32
-                    let __rk = mir_mod.mir_get_type_kind(mir_mod.mir_resolve_alias(rhs_ty)) as i32
-                    with_eprint(f"DEBUG cmp fail: lhs_ty={lhs_ty} lhs_kind={__lk} rhs_ty={rhs_ty} rhs_kind={__rk}")
-                    return mir_validation_fail(body.fn_sym, span, "comparison operands have incompatible MIR types")
+                    let lhs_kind = mir_mod.mir_get_type_kind(mir_mod.mir_resolve_alias(lhs_ty)) as i32
+                    let rhs_kind = mir_mod.mir_get_type_kind(mir_mod.mir_resolve_alias(rhs_ty)) as i32
+                    return mir_validation_fail(body.fn_sym, span, f"comparison operands have incompatible MIR types (lhs ty={lhs_ty} kind={lhs_kind}, rhs ty={rhs_ty} kind={rhs_kind})")
 
             if rk == RvalueKind.RK_CAST:
                 let src_ty = if rv_d2 > 0: rv_d2 else: mir_validate_operand_type(mir_mod, body, rv_d0)
