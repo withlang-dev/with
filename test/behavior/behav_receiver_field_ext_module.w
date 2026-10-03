@@ -1,4 +1,5 @@
-//! expect-stdout: 10\n6
+//! expect-stdout: 10
+//! expect-stdout: 6
 
 // §9.5 (#1930): a method declared in another module than its type's reaches
 // the receiver's fields only through `self.`; the type's own module's

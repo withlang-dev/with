@@ -1,4 +1,13 @@
-//! expect-stdout: 3 3\n4\n15\n3\n8\nhi there\n11\n2 5\n15\n10
+//! expect-stdout: 3 3
+//! expect-stdout: 4
+//! expect-stdout: 15
+//! expect-stdout: 3
+//! expect-stdout: 8
+//! expect-stdout: hi there
+//! expect-stdout: 11
+//! expect-stdout: 2 5
+//! expect-stdout: 15
+//! expect-stdout: 10
 
 // §9.5 (#1930): in an instance method declared in its type's own module, a
 // field of the receiver is in scope by its bare name; `self.field` remains
