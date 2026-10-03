@@ -839,7 +839,7 @@ pub fn mir_test_resolution_callees() -> Unit:
 // the projection, its type, and its base after Sema's autoderef (the module
 // identity of #1446/#1457: two declarations of one name are two TypeIds) —
 // and a `let`'s alias-or-owner materialization against Sema's category.
-pub fn mir_test_resolution_places() -> Unit:
+pub fn mir_test_resolution_places():
     let f = 7
     // Agreement.
     assert(mir_field_place_verdict(ProjKind.PK_FIELD, f, f, 10, 10, 20, 20) == "")
