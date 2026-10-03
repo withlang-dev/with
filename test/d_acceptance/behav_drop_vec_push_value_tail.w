@@ -5,7 +5,6 @@
 // ordinary return move transfers the sole owner to the caller, which drops the
 // element and buffer exactly once.
 
-use std.builtins.print_i32
 var COUNT = 0
 
 type W { tag: i32 }

@@ -1,5 +1,4 @@
 //! expect-stdout: 0
-use std.builtins.int_to_string
 fn apply(f: fn(i32) -> i32, x: i32) -> i32: f(x)
 
 fn main:

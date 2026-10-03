@@ -1,4 +1,6 @@
-//! expect-run-output: "3\n2\n1\n"
+//! expect-stdout: 3
+//! expect-stdout: 2
+//! expect-stdout: 1
 
 fn main:
     defer: write("1\n")

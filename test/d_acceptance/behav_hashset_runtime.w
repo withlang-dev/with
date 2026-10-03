@@ -1,4 +1,3 @@
-use std.collections.HashSet
 fn main:
     var direct: HashSet[i32] = HashSet.new()
     direct.insert(4)

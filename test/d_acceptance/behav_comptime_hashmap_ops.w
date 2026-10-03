@@ -1,6 +1,5 @@
 //! expect-stdout: ok
 
-use std.collections.HashMap
 comptime fn build_map() -> HashMap[str, i32]:
     var m = HashMap[str, i32].new()
     m.insert("alpha", 1)

@@ -1,7 +1,6 @@
 //! expect-stdout: first=10
 //! expect-stdout: ok
 
-use std.builtins.int_to_string
 fn main:
     let arr = [10, 20, 30, 40]
     // [first, ..rest] matches any array with at least 1 element

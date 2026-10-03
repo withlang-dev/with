@@ -3,7 +3,6 @@
 // A5: moving a Vec field out through a move-self receiver transfers ownership
 // to the returned Vec. The consumed owner must not also drop the moved field.
 
-use std.builtins.print_i32
 type W { slot: *mut i32 }
 impl Drop for W:
     fn drop(move self: Self):
@@ -18,7 +17,9 @@ fn make_holder(slot: *mut i32) -> Holder:
     Holder { values: values }
 
 fn Holder.into_values(move self: Holder) -> Vec[W]:
-    self.values
+    // D32: field vacates need a mutable path — rebind the consumed self.
+    var owned = self
+    return move owned.values
 
 fn run(slot: *mut i32):
     let holder = make_holder(slot)

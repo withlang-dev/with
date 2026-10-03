@@ -1,7 +1,6 @@
 //! expect-stdout: ok
 
 use std.rc
-use std.task.Task
 
 async fn work(owner: Rc[i32]) -> i32:
     owner.strong_count() as i32

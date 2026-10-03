@@ -1,6 +1,5 @@
 //! expect-stdout: ok
 
-use std.collections.HashMap
 fn main:
     var direct: HashMap[str, i32] = HashMap.new()
     direct.insert("a", 7)

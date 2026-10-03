@@ -1,7 +1,6 @@
 //! expect-stdout: 10 20 30
 //! expect-stdout: ok
 
-use std.builtins.int_to_string
 fn main:
     let arr = [10, 20, 30]
     // Exact match: [a, b, c] matches [3 x i32]

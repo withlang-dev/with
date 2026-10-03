@@ -1,6 +1,5 @@
 //! expect-stdout: ok
 
-use std.task.Task
 async fn compute(x: i32) -> i32:
     x * x
 

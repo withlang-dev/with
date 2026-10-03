@@ -1,6 +1,5 @@
 //! expect-stdout: ok
 
-use std.collections.HashMap
 fn take_int(x: Int) -> i64:
     x
 

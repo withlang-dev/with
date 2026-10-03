@@ -1,5 +1,5 @@
 //! expect-stdout: 20
-use std.builtins.int_to_string
+//! expect-stdout: 40
 fn double(x: i32) -> i32:
     x * 2
 

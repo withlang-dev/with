@@ -1,6 +1,5 @@
 //! expect-stdout: ok
 
-use std.builtins.int_to_string
 trait Showable:
     fn show(self: &Self) -> str
 

@@ -10,82 +10,76 @@
 // `run`   prints the debug-alloc verdict lines (DOUBLE FREE / LEAK / count).
 // `check` runs each fixture under the debug allocator and asserts the captured
 //         output contains the fixture's `//! expect-debug-alloc: <substr>`
-//         directive. Exits non-zero if any fixture fails (the commit-gate lane).
+//         directive, and that the program's stdout is exactly its
+//         `//! expect-stdout:` lines: every line, in order, once each — the
+//         test runner's rule (#1855), here over the run the fixture pins,
+//         the one under the debug allocator (#1865). Exits non-zero if any
+//         fixture fails (the commit-gate lane).
 //
 // Source SITES for a flagged address are resolved separately with lldb; see
 // tools/debug_drop_sites.lldb and tools/debug_drop_fields.lldb.
 
+use std.fs
 use std.process
 use std.time.now_ns
 
-extern fn with_exec_argv_capture(argv: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32) -> i32
-extern fn with_fs_read_file(path: &str) -> str
+// One run under the debug allocator: the exit code is part of the verdict
+// (a fixture that expects a clean report must also exit 0, so an inline
+// `assert(drops == N)` abort or a SIGSEGV fails the lane even when the
+// report line still matches — #697: fixtures crashed AFTER printing the
+// expected line and passed). `report` is stderr then stdout.
+type DebugAllocRun { rc: i32, report: str, stdout: str }
 
-fn exec_capture(argv: &str, outp: &str, errp: &str, timeout: i32) -> i32:
-    unsafe:
-        with_exec_argv_capture(argv, outp, errp, timeout)
-
-fn read_file(path: &str) -> str:
-    unsafe:
-        with_fs_read_file(path)
-
-// NUL-joined argv (the tool_process_argv encoding the exec runtime expects).
-fn argv4(a: &str, b: &str, c: &str, d: &str) -> str:
-    a ++ "\0" ++ b ++ "\0" ++ c ++ "\0" ++ d ++ "\0"
-
-fn argv5(a: &str, b: &str, c: &str, d: &str, e: &str) -> str:
-    a ++ "\0" ++ b ++ "\0" ++ c ++ "\0" ++ d ++ "\0" ++ e ++ "\0"
-
-// Run `<with-bin> run --debug-alloc <repro>`; return (exit code, captured
-// stderr+stdout text). The exit code is part of the verdict: a fixture that
-// expects a clean report must also exit 0, so an inline `assert(drops == N)`
-// abort or a SIGSEGV fails the lane even when the report line still matches
-// (#697: fixtures crashed AFTER printing the expected line and passed).
-fn run_under_debug_alloc(with_bin: &str, repro: &str, filter: &str) -> (i32, str):
+fn run_under_debug_alloc(with_bin: &str, repro: &str, filter: &str) -> DebugAllocRun:
     // Per process: concurrent lanes (two batteries, an agent's run) shared
     // one capture file and read each other's half-written report (#2004).
     let outp = f"/tmp/debug_drop_{pid()}_out.txt"
     let errp = f"/tmp/debug_drop_{pid()}_err.txt"
-    let argv = if filter.len() > 0:
-        argv5(with_bin, "run", "--debug-alloc", "--debug-alloc-filter=" ++ filter, repro)
-    else:
-        argv4(with_bin, "run", "--debug-alloc", repro)
-    let rc = exec_capture(argv, outp, errp, 60000)
-    (rc, read_file(errp) ++ "\n" ++ read_file(outp))
-
-// Index of `sub` in `s`, or -1.
-fn find_sub(s: &str, sub: &str) -> i64:
-    let n = s.len()
-    let m = sub.len()
-    if m == 0:
-        return 0
-    var i: i64 = 0
-    while i + m <= n:
-        var j: i64 = 0
-        var ok = true
-        while j < m:
-            if s[i + j] != sub[j]:
-                ok = false
-                break
-            j = j + 1
-        if ok:
-            return i
-        i = i + 1
-    -1
+    var argv: Vec[str] = Vec.new()
+    argv.push(with_bin.clone())
+    argv.push("run")
+    argv.push("--debug-alloc")
+    if filter.len() > 0: argv.push("--debug-alloc-filter=" ++ filter)
+    argv.push(repro.clone())
+    let finished = run_to_files(&argv, outp, errp, 60000)
+    let stdout = read_file(outp) ?? ""
+    DebugAllocRun { rc: finished.code, report: (read_file(errp) ?? "") ++ "\n" ++ stdout, stdout }
 
 // Text from just after `prefix` to end of that line, leading spaces trimmed.
 fn line_after_prefix(src: &str, prefix: &str) -> str:
-    let idx = find_sub(src, prefix)
-    if idx < 0:
-        return ""
+    let idx = src.find(prefix)
+    if idx < 0: return ""
     var start = idx + prefix.len()
-    let n = src.len()
-    while start < n and src[start] == 32:        // skip spaces
-        start = start + 1
+    while start < src.len() and src[start] == ' ': start = start + 1
     var end = start
-    while end < n and src[end] != 10:            // to newline
-        end = end + 1
+    while end < src.len() and src[end] != '\n': end = end + 1
     src.slice(start, end)
+
+// Every `//! expect-stdout:` value, in order.
+fn expected_stdout_lines(source: &str) -> Vec[str]:
+    var lines: Vec[str] = Vec.new()
+    for line in source.split("\n"):
+        if line.starts_with("//! expect-stdout:"):
+            var value = line.slice("//! expect-stdout:".len(), line.len())
+            if value.starts_with(" "): value = value.slice(1, value.len())
+            lines.push(value)
+    lines
+
+// "" when stdout is exactly the expected lines; otherwise what differs first.
+fn stdout_mismatch(expected: &Vec[str], stdout: &str) -> str:
+    var actual: Vec[str] = Vec.new()
+    for line in stdout.split("\n"): actual.push(line.clone())
+    // print ends every line: the text after the last newline is empty.
+    if actual.len() > 0 and actual[actual.len() as i32 - 1].len() == 0: let _ = actual.pop()
+    let n = if expected.len() < actual.len(): expected.len() else: actual.len()
+    for k in 0..n as i32:
+        if expected[k] != actual[k]:
+            return f"stdout line {k + 1}: expected '" ++ expected[k] ++ "', got '" ++ actual[k] ++ "'"
+    if actual.len() < expected.len():
+        return f"stdout has {actual.len()} line(s), expected {expected.len()}; first missing: '" ++ expected[actual.len() as i32] ++ "'"
+    if actual.len() > expected.len():
+        return f"stdout has {actual.len()} line(s), expected {expected.len()}; first unlisted: '" ++ actual[expected.len() as i32] ++ "'"
+    ""
 
 fn main:
     let a = args()
@@ -97,14 +91,16 @@ fn main:
 
     if mode == "run":
         let repro = a[3]
-        let filter = line_after_prefix(read_file(repro), "debug-alloc-filter:")
-        let (rc, report) = run_under_debug_alloc(with_bin, repro, filter)
-        print("=== debug-alloc: " ++ repro ++ " (exit " ++ f"{rc}" ++ ") ===")
-        if report.contains("DOUBLE FREE"):
-            print(line_after_prefix(report, "debug-alloc: DOUBLE FREE"))
+        // Bound, not passed inline: #1974.
+        let source = read_file(repro) ?? ""
+        let filter = line_after_prefix(source, "debug-alloc-filter:")
+        let run = run_under_debug_alloc(with_bin, repro, filter)
+        print("=== debug-alloc: " ++ repro ++ f" (exit {run.rc}) ===")
+        if run.report.contains("DOUBLE FREE"):
+            print(line_after_prefix(run.report, "debug-alloc: DOUBLE FREE"))
             print("verdict: DOUBLE FREE (resolve sites with tools/debug_drop_sites.lldb)")
-        else if report.contains("LEAK addr="):
-            print(line_after_prefix(report, "debug-alloc: leak count="))
+        else if run.report.contains("LEAK addr="):
+            print(line_after_prefix(run.report, "debug-alloc: leak count="))
             print("verdict: LEAK (resolve alloc site with tools/debug_drop_sites.lldb)")
         else:
             print("verdict: clean (no double-free, no leak)")
@@ -120,23 +116,26 @@ fn main:
     //   - clean fixtures must exit 0 (enforced below); a fixture expecting a
     //     failure report (DOUBLE FREE / first_drop=) may abort
     if mode == "check":
-        var failed: i64 = 0
-        var i: i64 = 3
-        while i < a.len():
+        var failed = 0
+        for i in 3..a.len() as i32:
             let fx = a[i]
-            let want = line_after_prefix(read_file(fx), "expect-debug-alloc:")
-            let filter = line_after_prefix(read_file(fx), "debug-alloc-filter:")
+            let source = read_file(fx) ?? ""
+            let want = line_after_prefix(source, "expect-debug-alloc:")
+            let filter = line_after_prefix(source, "debug-alloc-filter:")
             print("START " ++ fx)
             let started = now_ns()
-            let (rc, report) = run_under_debug_alloc(with_bin, fx, filter)
+            let run = run_under_debug_alloc(with_bin, fx, filter)
             let elapsed_ms = (now_ns() - started) / 1000000
             let expects_abort = want.contains("DOUBLE FREE") or want.contains("first_drop=")
-            if want.len() > 0 and report.contains(want) and (expects_abort or rc == 0):
+            let expected = expected_stdout_lines(source)
+            let stdout_diff = if expected.len() > 0: stdout_mismatch(&expected, run.stdout) else: ""
+            if want.len() > 0 and run.report.contains(want) and (expects_abort or run.rc == 0) and stdout_diff.len() == 0:
                 print("PASS " ++ fx ++ f" ({elapsed_ms} ms)")
             else:
-                print("FAIL " ++ fx ++ "  (want: '" ++ want ++ "', exit " ++ f"{rc}" ++ f", {elapsed_ms} ms)")
+                var why = "want: '" ++ want ++ f"', exit {run.rc}"
+                if stdout_diff.len() > 0: why = why ++ "; " ++ stdout_diff
+                print("FAIL " ++ fx ++ "  (" ++ why ++ f", {elapsed_ms} ms)")
                 failed = failed + 1
-            i = i + 1
         if failed > 0:
             print("debug-alloc lane: FAILED")
             exit_code(1)

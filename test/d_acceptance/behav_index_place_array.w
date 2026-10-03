@@ -3,7 +3,6 @@
 
 // §2.4 IndexPlace for arrays — place projection via PK_INDEX.
 
-use std.builtins.int_to_string
 type Point { x: i32, y: i32 }
 
 fn main:

@@ -1,11 +1,12 @@
 //! expect-stdout: ok
+//! expect-stdout: 1
+//! expect-stdout: 2
 
 // Was test/compile_errors/err_consume_iter_vec_drop.w (#607: `for w in xs` on a
 // Drop-element Vec rejected as "not yet supported"). Eric's #712 ruling landed
 // spec §13 borrow iteration: `for w in xs` now iterates by view, each element
 // drops exactly once when the Vec does, and the collection stays valid.
 
-use std.builtins.print_i32
 type W { tag: i32 }
 impl Drop for W:
     fn drop(move self: Self):

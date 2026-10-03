@@ -1,6 +1,5 @@
 //! expect-stdout: ok
 
-use std.collections.HashMap
 fn test_hashmap_values:
     let empty: HashMap[str, i32] = HashMap.new()
     let empty_values = empty.values()

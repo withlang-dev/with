@@ -19,6 +19,7 @@ use build.sema_order
 use build.tools_lane
 use build.benchmarks
 use build.host_toolchain
+use build.acceptance
 use std.sysinfo
 fn build_owned_text(s: &str): s ++ ""
 
@@ -3751,6 +3752,23 @@ pub fn build(ctx: BuildCtx) -> Build:
     debug_alloc_tests = debug_alloc_tests.write_scope("out/debug-alloc-tests")
     out = out.add_target(debug_alloc_tests)
 
+    // The D acceptance corpus (D29, #1865; build/acceptance.w): a copy that
+    // gains the imports the std fallback tier will resolve, then the
+    // exact-stdout runner over it.
+    var d_acceptance_corpus = target_new(.Action, "d-acceptance-corpus", "").output("out/d-acceptance/corpus")
+    d_acceptance_corpus.action = run_d_acceptance_corpus_action
+    d_acceptance_corpus = d_acceptance_corpus.input(release_compiler_bin("with"))
+    d_acceptance_corpus = d_acceptance_corpus.input("test/d_acceptance")
+    d_acceptance_corpus = d_acceptance_corpus.input("test/behavior/lib")
+    d_acceptance_corpus = d_acceptance_corpus.input("tools/insert_std_uses.w")
+    d_acceptance_corpus = d_acceptance_corpus.dep("build")
+    d_acceptance_corpus = d_acceptance_corpus.write_scope("out/d-acceptance")
+    out = out.add_target(d_acceptance_corpus)
+    var d_acceptance_tests = target_new(.Test, "d-acceptance-tests", "out/d-acceptance/corpus/*.w")
+    d_acceptance_tests = d_acceptance_tests.arg("compiler=" ++ release_compiler_bin("with"))
+    d_acceptance_tests = d_acceptance_tests.dep("d-acceptance-corpus")
+    out = out.add_target(d_acceptance_tests)
+
     var deep_debug_tool_tests = target_new(.Action, "deep-debug-tool-tests", "").output("out/deep-debug-tool-tests")
     deep_debug_tool_tests = deep_debug_tool_tests.allow_parallel()
     deep_debug_tool_tests.action = run_deep_debug_tool_tests_action
@@ -4120,6 +4138,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("seed-driver")
     tests = tests.dep("reseed-check-build-w")
     tests = tests.dep("behavior-tests")
+    tests = tests.dep("d-acceptance-tests")
     tests = tests.dep("native-compile-error-tests")
     tests = tests.dep("native-codegen-tests")
     tests = tests.dep("native-spec-tests")

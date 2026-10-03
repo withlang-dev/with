@@ -6,7 +6,6 @@
 // idiom `let tx = pair.0; let rx = pair.1`. Without the consume, `pair` and the
 // extracted bindings both drop -> count 4 (double-free).
 
-use std.builtins.print_i32
 type W { slot: *mut i32 }
 impl Drop for W:
     fn drop(move self: Self):
@@ -14,9 +13,9 @@ impl Drop for W:
             *self.slot = *self.slot + 1
 
 fn run(slot: *mut i32):
-    let pair = (W { slot: slot }, W { slot: slot })
-    let a = pair.0
-    let b = pair.1
+    var pair = (W { slot: slot }, W { slot: slot })
+    let a = move pair.0
+    let b = move pair.1
 
 fn main:
     var count = 0

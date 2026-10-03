@@ -1,6 +1,5 @@
 //! expect-stdout: ok
 
-use std.fixed_string.FixedString
 fn main:
     var s = FixedString[4].new()
     assert(s.is_empty())

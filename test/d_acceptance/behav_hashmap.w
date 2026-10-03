@@ -3,7 +3,6 @@
 // Behavior test: HashMap
 // Tests: basic HashMap operations (the HashMap used throughout compiler)
 
-use std.collections.HashMap
 fn test_hashmap_basic:
     var m = HashMap[str, i32].new()
     m.insert("hello", 1)

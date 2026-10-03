@@ -1,6 +1,5 @@
 //! expect-stdout: 42
 
-use std.builtins.int_to_string
 trait Container:
     type Item
     fn get(self: &Self) -> Self.Item

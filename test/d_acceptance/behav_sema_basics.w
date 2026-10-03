@@ -1,9 +1,9 @@
+//! expect-stdout: 10
 //! expect-stdout: ok
 
 // Behavior test: basic semantic analysis
 // Tests: scoping, function calls, type checking, variable binding
 
-use std.builtins.int_to_string
 fn add(a: i32, b: i32) -> i32:
     a + b
 

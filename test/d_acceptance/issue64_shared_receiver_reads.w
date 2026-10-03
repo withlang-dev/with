@@ -1,6 +1,5 @@
 //! expect-stdout: ok
 
-use std.collections.HashMap
 type Inner {
     tags: Vec[i32],
     label: str,

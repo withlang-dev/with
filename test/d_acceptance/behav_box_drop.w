@@ -1,4 +1,3 @@
-use std.box.Box
 global var BOX_DROP_TRACE = ""
 
 type BoxDropGuard { id: str }

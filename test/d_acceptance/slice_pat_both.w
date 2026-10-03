@@ -1,7 +1,6 @@
 //! expect-stdout: first=10 last=50
 //! expect-stdout: ok
 
-use std.builtins.int_to_string
 fn main:
     let arr = [10, 20, 30, 40, 50]
     // [first, ..middle, last] — extract both ends

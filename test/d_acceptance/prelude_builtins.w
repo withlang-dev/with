@@ -1,11 +1,10 @@
+//! expect-stdout: 7
+//! expect-stdout: 8
+//! expect-stdout: true
 //! expect-stdout: ok
 
 // Test: std.builtins names are available through the ambient prelude.
 
-use std.builtins.int_to_string
-use std.builtins.print_i32
-use std.builtins.print_i64
-use std.builtins.print_bool
 fn main:
     assert(true)
     require(true, "require should pass")

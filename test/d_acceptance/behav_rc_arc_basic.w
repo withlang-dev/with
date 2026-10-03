@@ -1,5 +1,3 @@
-use std.rc.Rc
-use std.rc.Arc
 global var RC_ARC_DROP_TRACE = ""
 
 type RefCountGuard { id: str }
@@ -15,7 +13,7 @@ type RefCountPayload {
 
 impl RefCountPayload:
     fn label(self: &Self) -> str:
-        self.name
+        self.name.clone()
 
 fn test_rc_clone_count_and_last_drop:
     RC_ARC_DROP_TRACE = ""
