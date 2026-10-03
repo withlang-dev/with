@@ -762,13 +762,16 @@ fn win_remove_tree_w(wpath: *const u16, attrs: u32, tag: u32) -> i32:
         FindClose(h)
     win_rmdir_w(wpath)
 
-// The given path, classified as a listing would (see windows_x86_64.w).
-fn win_remove_tree_top(wpath: *const u16) -> i32:
+// The given path, classified as a listing would, for the three walkers
+// (#1952; see windows_x86_64.w).
+fn win_top_entry(wpath: *const u16, attrs_out: *mut u32, tag_out: *mut u32) -> i32:
     let attrs = GetFileAttributesW(wpath)
     if attrs == 0xffffffff:
         return win_neg_error()
+    unsafe *attrs_out = attrs
+    unsafe *tag_out = 0
     if (attrs & FILE_ATTRIBUTE_REPARSE_POINT) == 0:
-        return win_remove_tree_w(wpath, attrs, 0)
+        return 0
     var entry: [4096]u16 = [0; 4096]
     let entry_ptr = &raw mut entry as *mut u16
     var len = win_strlen16(wpath)
@@ -783,7 +786,15 @@ fn win_remove_tree_top(wpath: *const u16) -> i32:
     if h == INVALID_HANDLE_VALUE:
         return win_neg_error()
     FindClose(h)
-    win_remove_tree_w(wpath, win_find_attrs(data_ptr), win_find_tag(data_ptr))
+    unsafe *attrs_out = win_find_attrs(data_ptr)
+    unsafe *tag_out = win_find_tag(data_ptr)
+    0
+
+fn win_remove_tree_top(wpath: *const u16) -> i32:
+    var attrs: u32 = 0
+    var tag: u32 = 0
+    let rc = win_top_entry(wpath, &raw mut attrs as *mut u32, &raw mut tag as *mut u32)
+    if rc != 0: rc else: win_remove_tree_w(wpath, attrs, tag)
 
 pub fn rt_remove_tree(path: *const u8) -> i32:
     var wpath: [4096]u16 = [0; 4096]
@@ -828,9 +839,15 @@ fn win_copy_file(src: *const u16, dst: *const u16) -> i32:
 
 // As win_remove_tree_w: `child_src` holds the pattern first, then each child.
 // A child whose path does not fit fails the copy (it was skipped silently).
-fn win_copy_tree_w(src: *const u16, dst: *const u16) -> i32:
-    if not win_is_dir(src):
+// An entry is classified by `attrs` and `tag` as its listing reports them; a
+// link is never entered: a file symlink copies as the file it names, a
+// directory junction or symlink is refused with -21 (#1952; see
+// windows_x86_64.w).
+fn win_copy_tree_w(src: *const u16, dst: *const u16, attrs: u32, tag: u32) -> i32:
+    if (attrs & FILE_ATTRIBUTE_DIRECTORY) == 0:
         return win_copy_file(src, dst)
+    if win_is_link(attrs, tag):
+        return -21
     let mkdir_rc = win_mkdir_w(dst)
     if mkdir_rc != 0 and not win_is_dir(dst):
         return mkdir_rc
@@ -854,7 +871,7 @@ fn win_copy_tree_w(src: *const u16, dst: *const u16) -> i32:
             if rc == 0:
                 rc = win_wpath_join(dst, name, dst_ptr, 4096)
             if rc == 0:
-                rc = win_copy_tree_w(src_ptr as *const u16, dst_ptr as *const u16)
+                rc = win_copy_tree_w(src_ptr as *const u16, dst_ptr as *const u16, win_find_attrs(data_ptr as *const u8), win_find_tag(data_ptr as *const u8))
             if rc != 0:
                 let _close = FindClose(h)
                 return rc
@@ -872,7 +889,12 @@ pub fn rt_copy_tree(src: *const u8, dst: *const u8) -> i32:
     let dst_rc = win_utf8_to_utf16_buf(dst, &raw mut dstw as *mut [4096]u16 as *mut u16, 4096)
     if dst_rc != 0:
         return dst_rc
-    win_copy_tree_w(&srcw as *const [4096]u16 as *const u16, &dstw as *const [4096]u16 as *const u16)
+    var attrs: u32 = 0
+    var tag: u32 = 0
+    let top_rc = win_top_entry(&srcw as *const [4096]u16 as *const u16, &raw mut attrs as *mut u32, &raw mut tag as *mut u32)
+    if top_rc != 0:
+        return top_rc
+    win_copy_tree_w(&srcw as *const [4096]u16 as *const u16, &dstw as *const [4096]u16 as *const u16, attrs, tag)
 
 pub fn rt_symlink(target: *const u8, link_path: *const u8) -> i32:
     var targetw: [4096]u16 = [0; 4096]
@@ -906,15 +928,14 @@ fn win_list_child_text(parent: &str, name: *const u16) -> str:
         return parent ++ name_text
     parent ++ "/" ++ name_text
 
-// `wpath` is where the walk is; `path` is how the listing spells it.
-fn win_list_files_walk(wpath: *const u16, path: &str, out: str) -> str:
+// `wpath` is where the walk is; `path` is how the listing spells it; `attrs`
+// and `tag` classify it as its listing does: a link is a leaf, the link
+// itself (#1952; see windows_x86_64.w).
+fn win_list_files_walk(wpath: *const u16, path: &str, attrs: u32, tag: u32, out: str) -> str:
     // Parity with the unix walk (a failed lstat returns `out`): a path that
     // does not exist lists nothing, a file lists itself, a directory lists
     // its tree (#1081; see windows_x86_64.w).
-    let attrs = GetFileAttributesW(wpath)
-    if attrs == 0xffffffff:
-        return out
-    if (attrs & FILE_ATTRIBUTE_DIRECTORY) == 0:
+    if (attrs & FILE_ATTRIBUTE_DIRECTORY) == 0 or win_is_link(attrs, tag):
         return out ++ path ++ "\n"
     var result = out
     var star: [2]u16 = [42, 0]
@@ -933,7 +954,7 @@ fn win_list_files_walk(wpath: *const u16, path: &str, out: str) -> str:
             // Unreachable under MAX_PATH (see windows_x86_64.w).
             if win_wpath_join(wpath, name, child_ptr, 4096) == 0:
                 let child_text = win_list_child_text(path, name)
-                result = win_list_files_walk(child_ptr as *const u16, child_text, result)
+                result = win_list_files_walk(child_ptr as *const u16, child_text, win_find_attrs(data_ptr as *const u8), win_find_tag(data_ptr as *const u8), result)
         if FindNextFileW(h, data_ptr) == 0:
             break
     let _close = FindClose(h)
@@ -945,7 +966,11 @@ pub fn rt_list_files(path: *const u8) -> str:
     if win_utf8_to_utf16_buf(path, &raw mut wpath as *mut [4096]u16 as *mut u16, 4096) != 0:
         return win_empty_str()
     let path_text = with_str_from_cstr(path)
-    win_list_files_walk(&wpath as *const [4096]u16 as *const u16, path_text, win_empty_str())
+    var attrs: u32 = 0
+    var tag: u32 = 0
+    if win_top_entry(&wpath as *const [4096]u16 as *const u16, &raw mut attrs as *mut u32, &raw mut tag as *mut u32) != 0:
+        return win_empty_str()
+    win_list_files_walk(&wpath as *const [4096]u16 as *const u16, path_text, attrs, tag, win_empty_str())
 
 pub fn rt_access(path: *const u8, mode: i32) -> i32:
     let _ = mode
