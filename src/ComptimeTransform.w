@@ -57,7 +57,10 @@ fn astpool_clone_deep(src: AstPool) -> AstPool:
 
     for di in 0..src.decl_count():
         out.add_decl(src.get_decl(di))
+    for mhi in 0..src.state.module_header_files.len() as i32:
+        out.record_module_header(src.state.module_header_files[mhi], src.state.module_header_names[mhi])
     out.set_local_decl_count(src.local_decl_count())
+
     out.set_prelude_decl_count(src.prelude_decl_count())
 
     var fn_meta = 0

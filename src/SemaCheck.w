@@ -10482,12 +10482,44 @@ impl Sema:
             return true
         let name: str = with_str_clone_ref(self.pool_resolve(sym))
         let owner_name: str = with_str_clone_ref(self.pool_resolve(self.ast.get_data0(owner)))
-        self.emit_error_with_help(f"shadowing is not allowed for '{name}': it names a field of the receiver `{owner_name}` and {other} (§9.5)", node, f"write `self.{name}` for the field, or the other declaration's qualified name")
+        let qualified = self.receiver_field_other_qualified(sym)
+        let other_form = if qualified.len() > 0: f"`{qualified}` for the other" else: "the other's qualified name"
+        self.emit_error_with_help(f"bare '{name}' names both a field of the receiver `{owner_name}` and {other} (§9.5)", node, f"write `self.{name}` for the field, or {other_form}")
         false
 
-    // What else a bare `sym` names from the current module, "" for nothing.
-    fn receiver_field_name_other_meaning(sym: i32) -> str:
+    // The qualified spelling that reaches the other declaration a bare
+    // receiver field name collides with, "" when none is found here.
+    mut fn receiver_field_other_qualified(sym: i32) -> str:
         let name: str = with_str_clone_ref(self.pool_resolve(sym))
+        if self.is_intrinsic_fn_sym(sym) != 0 or self.generic_builtin_syms().contains(&sym):
+            return f"builtins.{name}"
+        var i = if self.decl_visibility_index.contains(sym): self.decl_visibility_index.get(sym).unwrap() else: -1
+        while i >= 0:
+            let path: str = with_str_clone_ref(self.decl_visibility_paths[i])
+            if path == self.current_module_path:
+                return f"{self.module_self_name()}.{name}"
+            if sema_path_is_std_builtins(path):
+                return f"builtins.{name}"
+            i = self.decl_visibility_prev[i]
+        let cur = self.module_index_by_path.get(with_str_clone_ref(self.current_module_path)) ?? -1
+        i = if self.decl_visibility_index.contains(sym): self.decl_visibility_index.get(sym).unwrap() else: -1
+        while i >= 0:
+            for ni in 0..self.ns_names.len() as i32:
+                if self.ns_modules[ni] == cur and self.ns_targets[ni] >= 0 and self.module_paths[self.ns_targets[ni]] == self.decl_visibility_paths[i]:
+                    return f"{self.ns_names[ni]}.{name}"
+            i = self.decl_visibility_prev[i]
+        ""
+
+    // What else a bare `sym` names from the current module, "" for nothing:
+    // any other name in scope (§9.5), the module's self-name and `builtins`
+    // included.
+    mut fn receiver_field_name_other_meaning(sym: i32) -> str:
+        let name: str = with_str_clone_ref(self.pool_resolve(sym))
+        if name == self.module_self_name():
+            return f"this module's own name `{name}` (§18.1)"
+        if name == "builtins":
+            return "the `builtins` namespace (§18.2)"
+
         if self.scope_lookup(sym) >= 0 and not self.scope_binding_is_local(sym):
             let binding_decl = self.binding_decl_node(sym)
             let hidden = if binding_decl != 0: self.decl_node_visible_from_current(binding_decl) == 0 and self.has_extern_var_decl(sym) == 0
@@ -10501,7 +10533,7 @@ impl Sema:
         // prelude one is: the field does not take precedence over it.
         if self.is_intrinsic_fn_sym(sym) != 0 or self.generic_builtin_syms().contains(&sym):
             return f"the function `{name}`"
-        var di =if self.displaced_fn_index.contains(sym): self.displaced_fn_index.get(sym).unwrap() else: -1
+        var di = if self.displaced_fn_index.contains(sym): self.displaced_fn_index.get(sym).unwrap() else: -1
         while di >= 0:
             let path = self.displaced_fn_paths[di]
             if path == self.current_module_path or self.module_is_visible_from_current(path) != 0:
@@ -10553,8 +10585,11 @@ impl Sema:
             self.typed_expr_types.insert(node, self.ty_str as i32)
             return self.ty_str as i32
 
-        // Check local/param scope (always visible — local bindings are never c_import)
-        let tid = self.scope_lookup(sym)
+        // Check local/param scope (always visible — local bindings are never c_import).
+        // §18.1/§18.2: a qualified name names a declaration; a local of the
+        // short name does not shadow it.
+        let tid = if self.ast.is_namespace_bound(node as NodeId) and self.scope_binding_is_local(sym): -1 else: self.scope_lookup(sym)
+
         // A parameter or local shadows every global of its name. The checks below
         // look the name up again, and found another module's private global:
         // a top-level `let ptr` broke every imported function with a `ptr`
@@ -22997,15 +23032,21 @@ impl Sema:
         if text.len() == 0:
             return 0
         let root = self.namespace_root_sym(base)
+        let is_path = self.ast.kind(base) != NodeKind.NK_IDENT
         if self.scope_lookup(root) >= 0 and (self.scope_binding_is_local(root) or self.symbol_visible_from_current(root) != 0):
             return 0
-        if self.primitive_type_by_sym(root) != 0 or self.lookup_named_type_visible(root) != 0 or self.get_visible_sig(root) >= 0 or self.generic_fn_node_for_symbol(root) != 0:
+        if self.primitive_type_by_sym(root) != 0 or self.lookup_named_type_visible(root) != 0:
+            return 0
+        // §18.1: the module's self-name qualifies its own declarations, a
+        // function that shares the name notwithstanding (`main.f()` in
+        // main.w; the bare `main` is still the function). §18.2: so does
+        // `builtins` for the prelude's functions and the intrinsics.
+        let self_qualifier = not is_path and text == self.module_self_name()
+        let builtins_qualifier = not is_path and text == "builtins"
+        if not self_qualifier and not builtins_qualifier and (self.get_visible_sig(root) >= 0 or self.generic_fn_node_for_symbol(root) != 0):
             return 0
         let cur_opt = self.module_index_by_path.get(with_str_clone_ref(self.current_module_path))
-        if not cur_opt.is_some():
-            return 0
-        let cur: i32 = cur_opt.unwrap()
-        let is_path = self.ast.kind(base) != NodeKind.NK_IDENT
+        let cur: i32 = cur_opt ?? -1
         var found = -1
         var clash = -1
         for ni in 0..self.ns_names.len() as i32:
@@ -23018,7 +23059,12 @@ impl Sema:
                 found = ni
             else if self.ns_targets[ni] != self.ns_targets[found] or (self.ns_targets[ni] < 0 and self.ns_offsets[ni] != self.ns_offsets[found]):
                 clash = ni
+        // An import's namespace of the name outranks both qualifiers.
         if found < 0:
+            if self_qualifier:
+                return self.bind_qualified_module_member(node, with_str_clone_ref(self.current_module_path), member, text)
+            if builtins_qualifier:
+                return self.bind_builtins_member(node, member)
             return 0
         if clash >= 0:
             let a = self.namespace_import_text(found)
@@ -23072,12 +23118,70 @@ impl Sema:
     // declares, or — for a c_import — the value or fn that `use c_import`
     // produced. 0 when there is none, -1 when an error was reported.
     mut fn namespace_member(ni: i32, member: i32, node: i32) -> i32:
-        let target = self.ns_targets[ni]
-        let member_name: str = with_str_clone_ref(self.pool_resolve(member))
+        let target: i32 = self.ns_targets[ni]
         if target < 0:
             return self.namespace_c_import_member(self.ns_offsets[ni], member)
         let path: str = with_str_clone_ref(self.module_paths[target])
+        self.module_member_at_path(path, member, node)
+
+
+    // §18.1: `selfname.member` — the current module's own declaration
+    // `member`, whatever shadows the bare name here.
+    mut fn bind_qualified_module_member(node: i32, path: &str, member: i32, text: &str) -> i32:
+        let sym = self.module_member_at_path(path, member, node)
+        if sym < 0:
+            return -1
+        if sym == 0:
+            let member_name: str = with_str_clone_ref(self.pool_resolve(member))
+            self.emit_error(f"'{text}' names this module, which declares no '{member_name}' (§18.1)", node)
+            return -1
+        self.ast.bind_namespace_ident(node as NodeId, sym, self.named_type_candidate_tid_in(member, path))
+        1
+
+    // §18.2: `builtins.name` — a prelude function (std.builtins' own
+    // declaration) or a compiler intrinsic callable by a bare name, without
+    // a `use`, whatever shadows the bare name here.
+    mut fn bind_builtins_member(node: i32, member: i32) -> i32:
         var i = if self.decl_visibility_index.contains(member): self.decl_visibility_index.get(member).unwrap() else: -1
+        while i >= 0:
+            if sema_path_is_std_builtins(self.decl_visibility_paths[i]):
+                return self.bind_qualified_module_member(node, with_str_clone_ref(self.decl_visibility_paths[i]), member, "builtins")
+            i = self.decl_visibility_prev[i]
+        i = if self.displaced_fn_index.contains(member): self.displaced_fn_index.get(member).unwrap() else: -1
+        while i >= 0:
+            if sema_path_is_std_builtins(self.displaced_fn_paths[i]):
+                return self.bind_qualified_module_member(node, with_str_clone_ref(self.displaced_fn_paths[i]), member, "builtins")
+            i = self.displaced_fn_prev[i]
+        if self.is_intrinsic_fn_sym(member) != 0 or self.generic_builtin_syms().contains(&member):
+            self.ast.bind_namespace_ident(node as NodeId, member, 0)
+            self.builtins_intrinsic_nodes.insert(node, 1)
+            return 1
+        let member_name: str = with_str_clone_ref(self.pool_resolve(member))
+        self.emit_error(f"builtins provides no '{member_name}': `builtins.` names the prelude's functions and the compiler's intrinsics (§18.2)", node)
+        -1
+
+    // §18.1: the current module's self-name — the last segment of its
+    // `module` header, else its file's stem made an identifier.
+    mut fn module_self_name() -> str:
+        if self.self_name_cache_path == self.current_module_path:
+            return with_str_clone_ref(self.self_name_cache)
+        var file = -1
+        for di in 0..self.decl_source_paths.len() as i32:
+            if self.decl_source_paths[di] == self.current_module_path and di < self.decl_source_file_ids.len() as i32:
+                file = self.decl_source_file_ids[di]
+                break
+        let header = if file >= 0: self.ast.module_header_name(file) else: 0
+        let name = if header != 0: with_str_clone_ref(self.pool_resolve(header)) else: sema_module_stem_self_name(self.current_module_path)
+        self.self_name_cache_path = with_str_clone_ref(self.current_module_path)
+        self.self_name_cache = with_str_clone_ref(name)
+        name
+
+    // The declaration `member` names in the module at `path`: its own (flat
+    // or displaced, #1703), a std.math builtin, else 0; -1 after an error.
+    mut fn module_member_at_path(path: &str, member: i32, node: i32) -> i32:
+        let member_name: str = with_str_clone_ref(self.pool_resolve(member))
+        var i = if self.decl_visibility_index.contains(member): self.decl_visibility_index.get(member).unwrap() else: -1
+
         while i >= 0:
             if self.decl_visibility_paths[i] == path:
                 if self.decl_visible_from_current(path, self.decl_visibility_pub[i]) == 0:
@@ -23251,6 +23355,13 @@ impl Sema:
         // method or a qualified extension call.
         if self.rewrite_namespace_access(callee, true) < 0:
             return 0
+        // §18.2: `builtins.sizeof[T]()` — the qualified type-argument builtin.
+        if self.ast.kind(callee) == NodeKind.NK_INDEX and self.ast.kind(self.ast.get_data0(callee)) == NodeKind.NK_FIELD_ACCESS:
+            if self.rewrite_namespace_access(self.ast.get_data0(callee), true) < 0:
+                return 0
+        // §18.2: `builtins.sin(x)` is the intrinsic whatever else `sin` names.
+        if self.builtins_intrinsic_nodes.contains(callee) and self.generic_builtin_callee_name(callee).len() == 0:
+            return self.check_builtins_intrinsic_call(node, self.ast.get_data0(callee), extra_start, arg_count)
         // §4.3d: `f32x4(...)`, `m32x4(...)`, `Vector[N, T](...)`,
         // `f32x4.splat(s)`, `from_bits`.
         let vector_call = self.check_vector_call(node, callee, extra_start, arg_count)
@@ -23421,6 +23532,10 @@ impl Sema:
             // gate, or a local callable named like another module's private
             // fn mis-errors (in-unit runtime locals vs user top-levels).
             local_tid = self.scope_lookup(fn_sym)
+            // §18.1/§18.2: a qualified name (`selfname.f`, `ns.f`) names a
+            // declaration; a local of the short name does not shadow it.
+            if local_tid >= 0 and self.ast.is_namespace_bound(callee as NodeId) and self.scope_binding_is_local(fn_sym):
+                local_tid = -1
             if local_tid >= 0:
                 callable_value_tid = self.callable_any_fn_type(local_tid as TypeId)
                 // D63: `fn(A) -> R` is not Copy — `let g = f` or passing `f`
@@ -30959,7 +31074,19 @@ impl Sema:
             return 1
         0
 
+    // §18.2: `builtins.name(..)` bound to an intrinsic (bind_builtins_member).
+    mut fn check_builtins_intrinsic_call(node: i32, fn_sym: i32, extra_start: i32, arg_count: i32) -> i32:
+        let arg_types: Vec[i32] = Vec.new()
+        for ai in 0..arg_count:
+            arg_types.push(self.check_expr(self.ast.get_extra(extra_start + ai)) as i32)
+        if self.check_comptime_call_restriction(fn_sym, node) != 0:
+            return 0
+        let ret = self.check_intrinsic_call(fn_sym, node, &arg_types, arg_count)
+        self.typed_expr_types.insert(node, ret)
+        ret
+
     mut fn check_intrinsic_call(fn_sym: i32, node: i32, arg_types: &Vec[i32], arg_count: i32) -> i32:
+
         let args_start = self.ast.get_data1(node)
         if fn_sym == self.syms.channel:
             if arg_count > 1:
