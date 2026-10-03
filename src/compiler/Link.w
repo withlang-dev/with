@@ -1483,6 +1483,70 @@ pub fn link_stage_coff_undefined_symbols(path: &str) -> str:
         i = i + 1 + aux
     out.to_str()
 
+// An ELF64 field the reader takes as 32 bits: -1 when its high word is set
+// (no object this compiler links has a section or table past 4 GiB).
+fn link_stage_read_u64_le_small(data: &str, offset: i32) -> i64:
+    let high = link_stage_read_u32_le(data, offset + 4)
+    if high != 0: -1 else: link_stage_read_u32_le(data, offset)
+
+// The global and weak symbols a 64-bit little-endian ELF relocatable object
+// references and does not define (st_shndx SHN_UNDEF), one per line — what
+// `nm -u` prints. "<not-elf>" when the file is no ELF object at all,
+// "<probe-failed>" when it is one this reader cannot read. Read in-process,
+// so a Linux link needs no host nm (#1915, D81).
+pub fn link_stage_elf_undefined_symbols(path: &str) -> str:
+    let data = runtime_read_file(path)
+    if data.len() < 64 or data[0] != 0x7f or data[1] != 'E' or data[2] != 'L' or data[3] != 'F':
+        return "<not-elf>"
+    // EI_CLASS ELFCLASS64, EI_DATA ELFDATA2LSB.
+    if data[4] != 2 or data[5] != 1:
+        return "<probe-failed>"
+    let size = data.len() as i32
+    let shoff = link_stage_read_u64_le_small(data, 0x28) as i32
+    let shentsize = link_stage_read_u16_le(data, 0x3a) as i32
+    var shnum = link_stage_read_u16_le(data, 0x3c) as i32
+    if shoff <= 0 or shentsize < 64 or shoff + shentsize > size:
+        return "<probe-failed>"
+    // More than 0xff00 sections: e_shnum is 0 and section 0's sh_size holds it.
+    if shnum == 0: shnum = link_stage_read_u64_le_small(data, shoff + 0x20) as i32
+    if shnum <= 0 or shoff + shnum * shentsize > size:
+        return "<probe-failed>"
+    for s in 0..shnum:
+        let sh = shoff + s * shentsize
+        // SHT_SYMTAB; sh_link names its string table.
+        if link_stage_read_u32_le(data, sh + 4) == 2:
+            let symoff = link_stage_read_u64_le_small(data, sh + 0x18) as i32
+            let symsize = link_stage_read_u64_le_small(data, sh + 0x20) as i32
+            let strndx = link_stage_read_u32_le(data, sh + 0x28) as i32
+            if symoff < 0 or symsize < 0 or symoff + symsize > size or strndx <= 0 or strndx >= shnum:
+                return "<probe-failed>"
+            let strsh = shoff + strndx * shentsize
+            let stroff = link_stage_read_u64_le_small(data, strsh + 0x18) as i32
+            let strsize = link_stage_read_u64_le_small(data, strsh + 0x20) as i32
+            if stroff < 0 or strsize < 0 or stroff + strsize > size:
+                return "<probe-failed>"
+            var out = StringBuilder.new()
+            // Elf64_Sym: st_name u32, st_info u8, st_other u8, st_shndx u16,
+            // st_value u64, st_size u64. Entry 0 is the null symbol.
+            var at = symoff + 24
+            while at + 24 <= symoff + symsize:
+                let bind = (data[at + 4] as i32) >> 4
+                let shndx = link_stage_read_u16_le(data, (at + 6) as i64)
+                // STB_GLOBAL or STB_WEAK, SHN_UNDEF.
+                if (bind == 1 or bind == 2) and shndx == 0:
+                    let name = link_stage_read_u32_le(data, at) as i32
+                    if name <= 0 or name >= strsize:
+                        return "<probe-failed>"
+                    var end = stroff + name
+                    while end < stroff + strsize and data[end] != 0:
+                        end = end + 1
+                    out.push_str(data.slice((stroff + name) as i64, end as i64))
+                    out.push_str("\n")
+                at = at + 24
+            return out.to_str()
+    // No symbol table: nothing referenced.
+    ""
+
 fn link_stage_undefined_symbols_for_object(obj_path: &str) -> str:
     // A native macOS object is read in-process: no host nm (#1915).
     if runtime_sysinfo_os() == "Macos" and target_spec_is_native():
@@ -1497,6 +1561,14 @@ fn link_stage_undefined_symbols_for_object(obj_path: &str) -> str:
         if symbols == "<probe-failed>":
             with_eprint(f"warning: link: {obj_path} is not a COFF object this compiler can read for undefined symbols; linking every embedded bundle\n")
         return symbols
+    // An ELF object, native or cross, is read in-process too (#1915, D81):
+    // a Linux host without binutils has no nm, its probe failed, and the
+    // compiler's own link then left out LLVM and libclang.
+    let elf = link_stage_elf_undefined_symbols(obj_path)
+    if elf == "<probe-failed>":
+        with_eprint(f"warning: link: {obj_path} is not a 64-bit little-endian ELF object this compiler can read for undefined symbols; linking every embedded bundle\n")
+    if elf != "<not-elf>":
+        return elf
     let report_path = obj_path ++ ".undef"
     let null_path = if runtime_sysinfo_os() == "Windows": "NUL" else: "/dev/null"
     var argv = ""
