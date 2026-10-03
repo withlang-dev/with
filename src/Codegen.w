@@ -135,6 +135,11 @@ pub type Codegen {
     // being emitted: the function's own, or a specialization's template
     // (#1745). Closures and drop glue emitted inside keep it.
     current_function_tier_node: i32,
+    // #1983/D65: the codegen symbol of the top-level body being emitted (a
+    // specialization's mono symbol, or the function's own); closures
+    // emitted inside keep it. Sema keys the facts it recorded while checking
+    // an instance (specialization_type_args) by that symbol.
+    current_body_owner_sym: i32,
     current_method_owner_sym: i32,
     current_drop_origin_ptr: i64,
     current_drop_origin_len: i64,
@@ -834,6 +839,14 @@ impl Codegen:
             self.mode_record(site, fact == llvm, fn_sym, subject, f"fact={fact} llvm-pointer={llvm}")
         fact
 
+    // The same rule for a fact that is a value (a field index, an LLVM
+    // type): the owner's answer is the decision, the re-derivation the
+    // site once used is verification only.
+    mut fn fact_decide(site: i32, fact: i64, derived: i64, fn_sym: i32, subject: i32) -> i64:
+        if self.analysis_enabled != 0:
+            self.mode_record(site, fact == derived, fn_sym, subject, f"owner={fact} derived={derived}")
+        fact
+
     mut fn mode_record(site: i32, agree: bool, fn_sym: i32, subject: i32, detail: str):
         while self.mode_site_decisions.len() as i32 < MODE_SITE_COUNT:
             self.mode_site_decisions.push(0)
@@ -854,7 +867,7 @@ impl Codegen:
         for site in 0..self.mode_site_decisions.len() as i32:
             let name = mode_site_name(site)
             if self.mode_site_disagree[site] > 0:
-                self.analysis_fail(f"mode-provenance: {name}: {mode_site_owner(site)} and the LLVM type disagree in {self.mode_site_disagree[site]} of {self.mode_site_decisions[site]} decisions; first: {self.mode_site_first[site]}")
+                self.analysis_fail(f"mode-provenance: {name}: {mode_site_owner(site)} and {mode_site_derivation(site)} disagree in {self.mode_site_disagree[site]} of {self.mode_site_decisions[site]} decisions; first: {self.mode_site_first[site]}")
             self.analysis_report.note(f"mode-provenance: {name} decisions={self.mode_site_decisions[site]} disagree={self.mode_site_disagree[site]}")
 
     mut fn audit_codegen_call_coverage():
@@ -1015,6 +1028,7 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         current_function_name_sym: 0,
         current_function_node: 0,
         current_function_tier_node: 0,
+        current_body_owner_sym: 0,
         current_method_owner_sym: 0,
         current_drop_origin_ptr: 0,
         current_drop_origin_len: 0,
@@ -5281,7 +5295,9 @@ pub const MODE_SITE_PARAM_PLACE_ALIAS: i32 = 7
 // #1647: a reference's place pointer (mir_try_place_ptr_for_ref).
 pub const MODE_SITE_REF_VALUE_IS_ADDRESS: i32 = 8
 pub const MODE_SITE_REF_SLOT_HOLDS_POINTER: i32 = 9
-pub const MODE_SITE_COUNT: i32 = 10
+// #1647: a value a site once re-derived — a type-level argument.
+pub const MODE_SITE_SIZEOF_TYPE_ARG: i32 = 10
+pub const MODE_SITE_COUNT: i32 = 11
 
 pub fn mode_site_name(site: i32) -> str:
     if site == MODE_SITE_FIELD_TYPE_THROUGH_ADDRESS: return "projected-type field through an address"
@@ -5294,12 +5310,19 @@ pub fn mode_site_name(site: i32) -> str:
     if site == MODE_SITE_PARAM_PLACE_ALIAS: return "prologue share-place parameter alias"
     if site == MODE_SITE_REF_VALUE_IS_ADDRESS: return "place-for-ref local value is the address"
     if site == MODE_SITE_REF_SLOT_HOLDS_POINTER: return "place-for-ref slot holds a pointer value"
+    if site == MODE_SITE_SIZEOF_TYPE_ARG: return "sizeof/alignof type argument"
     "unknown"
 
 pub fn mode_site_owner(site: i32) -> str:
     if site == MODE_SITE_MARSHAL_EXISTING_POINTER: return "the operand's Sema category"
     if site == MODE_SITE_PARAM_BY_ADDRESS or site == MODE_SITE_PARAM_PLACE_ALIAS or site == MODE_SITE_EVAL_INDIRECT_LOCAL or site == MODE_SITE_REF_VALUE_IS_ADDRESS: return "FnAbi's PassMode"
+    if site == MODE_SITE_SIZEOF_TYPE_ARG: return "Sema's type argument"
     "Sema's place category"
+
+// What a site re-derived its fact from before it read the owner.
+pub fn mode_site_derivation(site: i32) -> str:
+    if site == MODE_SITE_SIZEOF_TYPE_ARG: return "the AST type node"
+    "the LLVM type"
 
 // Symbol-naming rules live in src/FnAbi.w (docs/spec/abi/with-abi.md §5); this is
 // the adapter that feeds them the codegen mode.

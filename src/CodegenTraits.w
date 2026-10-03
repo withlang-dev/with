@@ -2196,7 +2196,7 @@ impl Codegen:
                             self.pool.get_extra(tp_start)
                         else:
                             self.pool.get_data1(callee)
-                        let type_val = self.resolve_type(tp_node)
+                        let type_val = self.sema_type_level_arg_llvm(self.sema_type_level_arg(tp_node), tp_node)
                         if type_val != 0:
                             let dl = wl_get_module_data_layout(self.llmod)
                             if name_sym == self.sym_sizeof or name_sym == self.sym_size_of:

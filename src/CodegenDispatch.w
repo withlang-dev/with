@@ -16689,6 +16689,8 @@ impl Codegen:
         let saved_tb_syms = move self.type_binding_syms
         let saved_tb_tys = move self.type_binding_types
         let saved_tb_len: i32 = self.type_bindings_len
+        let saved_body_owner_sym: i32 = self.current_body_owner_sym
+        self.current_body_owner_sym = name_sym
         self.set_mono_type_bindings(name_sym)
         let fn_has_sret_opt = self.fn_abi_has_sret(name_sym)
         let fn_has_sret = if fn_has_sret_opt.is_some(): fn_has_sret_opt.unwrap() else: 0
@@ -17062,6 +17064,7 @@ impl Codegen:
         self.tailrec_body_bb = saved_tailrec_bb
         self.tailrec_fn_sym = saved_tailrec_sym
         self.type_binding_syms = saved_tb_syms
+        self.current_body_owner_sym = saved_body_owner_sym
         self.type_binding_types = saved_tb_tys
         self.type_bindings_len = saved_tb_len
 
@@ -17145,6 +17148,8 @@ impl Codegen:
         let saved_tb_syms = move self.type_binding_syms
         let saved_tb_tys = move self.type_binding_types
         let saved_tb_len: i32 = self.type_bindings_len
+        let saved_body_owner_sym: i32 = self.current_body_owner_sym
+        self.current_body_owner_sym = mono_sym
         self.set_mono_type_bindings(mono_sym)
         let fn_has_sret_opt = self.fn_abi_has_sret(mono_sym)
         let fn_has_sret = if fn_has_sret_opt.is_some(): fn_has_sret_opt.unwrap() else: 0
@@ -17518,6 +17523,7 @@ impl Codegen:
         self.tailrec_fn_sym = saved_tail_sym
         self.tailrec_param_allocas = saved_tail_allocas
         self.type_binding_syms = saved_tb_syms
+        self.current_body_owner_sym = saved_body_owner_sym
         self.type_binding_types = saved_tb_tys
         self.type_bindings_len = saved_tb_len
         self.restore_loop_state(saved_loops)
@@ -19424,6 +19430,22 @@ impl Codegen:
         if dtm_debug:
             with_eprint(f"[mono-bind] fn={self.intern.resolve(fn_sym)} sym={fn_sym} no-specialization")
 
+    // The type argument of a type-level builtin call (`sizeof[T]()`) as Sema
+    // checked it in the body being emitted (#1983, D65): for a
+    // specialization, the type recorded under its substitution; otherwise
+    // frozen resolution. Codegen never re-resolves the node itself.
+    fn sema_type_level_arg(type_node: i32) -> i32:
+        let owner = if self.current_body_owner_sym != 0: self.sema.pool_lookup_symbol(self.intern.resolve(self.current_body_owner_sym)) else: 0
+        self.sema.type_level_arg_in_body(owner, type_node)
+
+    // Its LLVM type. Under analysis the node's own resolution (which binds
+    // the instance's type parameters codegen-side) is the verification
+    // audit:codegen compares.
+    mut fn sema_type_level_arg_llvm(sema_tid: i32, type_node: i32) -> i64:
+        let fact = if sema_tid > 0: self.sema_type_to_llvm(sema_tid) else: 0
+        let derived = if self.analysis_enabled != 0: self.resolve_type(type_node) else: fact
+        self.fact_decide(MODE_SITE_SIZEOF_TYPE_ARG, fact, derived, self.current_function_name_sym, type_node)
+
     mut fn gen_sizeof_alignof(name_sym: i32, node: i32) -> i64:
         let callee_node = self.pool.get_data0(node)
         let callee_kind = self.pool.kind(callee_node)
@@ -19441,23 +19463,17 @@ impl Codegen:
             self.pool.get_extra(tp_start)
         else:
             self.pool.get_data1(callee_node)
+        // The type argument is Sema's (D65, #1983): the type it checked the
+        // call with in this body — a specialization's own instance included.
+        let sema_tid = self.sema_type_level_arg(tp_node)
         // §4.3d: a vector's size and alignment are Sema's layout facts
         // (TypeLayout), which on AArch64 differ from LLVM's `<N x T>`
         // alignment for vectors over 16 bytes.
-        let tp_arg_kind = self.pool.kind(tp_node)
-        var tp_base_sym = 0
-        if tp_arg_kind == NodeKind.NK_TYPE_GENERIC:
-            tp_base_sym = self.pool.get_data0(tp_node)
-        else if tp_arg_kind == NodeKind.NK_INDEX and self.pool.kind(self.pool.get_data0(tp_node)) == NodeKind.NK_IDENT:
-            tp_base_sym = self.pool.get_data0(self.pool.get_data0(tp_node))
-        let tp_base_text = if tp_base_sym != 0: self.intern.resolve(tp_base_sym).clone() else: ""
-        let tp_names_type = tp_arg_kind == NodeKind.NK_IDENT or tp_arg_kind == NodeKind.NK_TYPE_NAMED or tp_base_text == "Vector" or tp_base_text == "Mask"
-        let vector_tid = if tp_names_type: self.sema.resolve_type_level_arg_expr_frozen(tp_node) else: 0
-        if vector_tid > 0 and self.cg_sema_is_vector_or_mask(vector_tid):
-            let vector_size = self.sema.type_layout_vector_size_of(self.sema.resolve_alias(vector_tid as TypeId) as i32)
+        if sema_tid > 0 and self.cg_sema_is_vector_or_mask(sema_tid):
+            let vector_size = self.sema.type_layout_vector_size_of(self.sema.resolve_alias(sema_tid as TypeId) as i32)
             let vector_value = if name_sym == self.sym_sizeof or name_sym == self.sym_size_of: vector_size else: type_layout_vector_align(vector_size)
             return wl_const_int(wl_i64_type(self.context), vector_value, 0)
-        let type_val = self.resolve_type(tp_node)
+        let type_val = self.sema_type_level_arg_llvm(sema_tid, tp_node)
         if type_val == 0:
             with_eprint(f"error: sizeof/alignof type argument did not resolve (node={tp_node}, fn={self.intern.resolve(self.current_function_name_sym)})")
             self.had_error = 1
@@ -19468,13 +19484,13 @@ impl Codegen:
         // alignof: report the layout-model alignment, which honors §16.4 @[align]
         // field annotations (LLVM's i8-padded struct representation keeps the
         // correct size/stride but reports only the member ABI alignment).
-        let tp_kind = self.pool.kind(tp_node)
-        if tp_kind == NodeKind.NK_IDENT or tp_kind == NodeKind.NK_TYPE_NAMED:
-            let ty_sym = self.pool.get_data0(tp_node)
-            if self.sema.named_types.contains(ty_sym):
-                let model_align = self.sema.type_layout_align_of_frozen(self.sema.named_types.get(ty_sym).unwrap())
-                if model_align > 0:
-                    return wl_const_int(wl_i64_type(self.context), model_align, 0)
+        // The declaration is Sema's resolution of the argument, never a
+        // lookup of its spelling (a name two modules declare is two types).
+        let align_kind = self.sema.get_type_kind(self.sema.resolve_alias(sema_tid as TypeId))
+        if align_kind == TypeKind.TY_STRUCT or align_kind == TypeKind.TY_ENUM:
+            let model_align = self.sema.type_layout_align_of_frozen(sema_tid)
+            if model_align > 0:
+                return wl_const_int(wl_i64_type(self.context), model_align, 0)
         wl_const_int(wl_i64_type(self.context), wl_abi_align_of(dl, type_val) as i64, 0)
 
     // ── nameof/type_name intrinsic ─────────────────────────────────────
