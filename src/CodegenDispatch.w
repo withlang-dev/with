@@ -1850,8 +1850,11 @@ impl Codegen:
                 if callable_value:
                     return self.gen_fn_to_fat_ptr_thunk(found, callable_ty)
                 return found
-            with_eprint(f"warning: [ck-fn] NOT FOUND sym={fn_sym} name={fn_name}")
-            return wl_get_undef(fallback_ty)
+            // #1859: a function constant with no function behind it is a
+            // compiler defect — Sema resolved the name, MirLower emitted the
+            // constant, and codegen declared nothing for it. An undef value
+            // here compiled and jumped into garbage at run time; it is a BUG.
+            sema_phase_bug(f"BUG: function constant names no function: sym={fn_sym} name={fn_name} (not in fn_values or the LLVM module)")
 
         wl_get_undef(fallback_ty)
 
