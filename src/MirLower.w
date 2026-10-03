@@ -13409,8 +13409,25 @@ impl MirBuilder:
                         // here: gen_closure resolves the node through this
                         // body's CK_CLOSURE constant, never from the AST.
                         let gc_closure_op = self.lower_closure(0, 0, self.ast.get_data1(gc_ma_node), self.ast.get_data2(gc_ma_node), gc_ma_node)
-                        gc_closure_ops.push(gc_closure_op)
-                        gc_args.push(gc_closure_op)
+                        // #1904 (§16.2b.9, §12.4): a closure literal given to
+                        // a `&U` parameter — a facade callback method's
+                        // userdata — is auto-borrowed exactly as a bound
+                        // closure is through lower_call_arg; passed by value
+                        // it was "a value where the callee parameter is a
+                        // reference to it". The literal's temp is this
+                        // statement's and is dropped with it.
+                        let gc_closure_param_ty = if gc_sig_idx >= 0: self.sema.sig_param_type(gc_sig_idx, gc_mai + gc_param_offset) else: 0
+                        let gc_closure_ty = self.expr_type(gc_ma_node)
+                        if gc_closure_param_ty != 0 and gc_closure_ty != 0 and self.sema.can_auto_ref_arg_frozen(gc_closure_param_ty, gc_closure_ty) != 0:
+                            let gc_closure_place = self.materialize_operand(gc_closure_op, gc_closure_ty, self.ast.get_start(gc_ma_node))
+                            let gc_closure_ref = self.body.new_rvalue(RvalueKind.RK_REF, BorrowKind.SHARED, gc_closure_place, 0)
+                            let gc_ref_temp = self.new_temp(gc_closure_param_ty)
+                            let gc_ref_place = self.place_for_local(gc_ref_temp)
+                            self.body.push_stmt(self.cur_bb, StmtKind.Assign, gc_ref_place, gc_closure_ref, self.ast.get_start(gc_ma_node))
+                            gc_args.push(self.body.new_operand(OperandKind.OK_COPY, gc_ref_place))
+                        else:
+                            gc_closure_ops.push(gc_closure_op)
+                            gc_args.push(gc_closure_op)
                 let gc_args_id = self.body.new_call_args(gc_args)
                 self.body.set_call_intrinsic(gc_args_id, MirIntrinsic.GENERIC_CALL)
                 self.require_generic_call_contract(gc_args_id, callee_sym, method_sym, self_expr, has_recorded_method_sig, "method-gc")
