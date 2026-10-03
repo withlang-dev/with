@@ -22,7 +22,11 @@
 // Sema's autoderef) and every immutable non-Copy `let` (alias of a place
 // iff Sema bound a view). Phase 4 covers call-argument transfer: a named
 // owned binding moves only into a parameter Sema consumes and is copied
-// only into one it borrows. Phase 2 (codegen mode provenance) is
+// only into one it borrows. Phase 5 covers resolved calls: a direct call
+// lowered from a source call calls the function Sema resolved it to and
+// hands its value to the conversion Sema recorded (MIR knows nothing about
+// facades: a C name's bridge, case or presented view reaches MIR only as
+// those records). Phase 2 (codegen mode provenance) is
 // audit:codegen's; the plan is docs/spec/implementation/mir-sema-hardening.md.
 
 use AnalysisTypes
