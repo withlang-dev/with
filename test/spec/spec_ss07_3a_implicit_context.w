@@ -11,10 +11,10 @@ fn make_context(id: i64) -> Context:
         trace_id: TraceId { value: id },
     }
 
-fn trace_id(ctx: implicit Context) -> i64:
+fn trace_id(ctx: implicit &Context) -> i64:
     ctx.trace_id.value
 
-fn traced_sum(x: i64, ctx: implicit Context, extra: i64 = 1) -> i64:
+fn traced_sum(x: i64, ctx: implicit &Context, extra: i64 = 1) -> i64:
     x + ctx.trace_id.value + extra
 
 fn main:

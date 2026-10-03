@@ -12401,30 +12401,21 @@ impl MirBuilder:
             exact_type = self.sema.get_type_d0(self.sema.resolve_alias(exact_type as TypeId))
         operand
 
-    // D5 (§3.8, §7.3a): an implicit fill is the `with` binding `bind_sym`
-    // passed as argument `param_i`; the signature decides. A plain non-Copy
-    // `T` parameter takes it (Sema's note_implicit_fill recorded the move),
-    // so the binding moves and is reset; a `&T` or share-place parameter
-    // borrows it. #2049: every fill was a `copy`, and a consuming callee and
-    // the binding's own scope both freed the one value.
+    // D87 (§7.3a): an implicit fill observes the `with` binding `bind_sym`
+    // and never consumes it — Sema fills an `implicit &T` parameter, or an
+    // `implicit T` one only when T is Copy. A fill of any other parameter is
+    // Sema's contradiction, reported here, never lowered as a copy: #2049's
+    // copy into a consuming `implicit Ctx` freed the binding twice.
     mut fn lower_implicit_fill(bind_sym: i32, sig_idx: i32, param_i: i32) -> i32:
         let op = self.lower_var(bind_sym, 0, 0)
-        if sig_idx < 0 or param_i < 0 or param_i >= self.sema.sig_get_param_count(sig_idx) or op < 0:
-            return op
-        let kind = self.body.operand_kinds[op]
-        if kind != OperandKind.OK_COPY and kind != OperandKind.OK_MOVE:
-            return op
-        let param_ty = self.sema.sig_param_type(sig_idx, param_i)
-        let param_kind = self.sema.get_type_kind(self.sema.resolve_alias(param_ty))
-        if param_kind == TypeKind.TY_REF or param_kind == TypeKind.TY_PTR or self.sema.sig_param_uses_value_ref_abi(sig_idx, param_i) != 0 or self.sema.is_copy_frozen(param_ty) != 0:
-            return op
-        let place: i32 = self.body.operand_d0[op]
-        let local = mir_place_plain_local(&self.body, place)
-        if local < 0 or self.body.local_is_global[local] != 0 or self.sema.is_copy_frozen(self.local_type(local)) != 0:
-            return op
-        let moved = self.body.new_operand(OperandKind.OK_MOVE, place)
-        self.consume_moved_operand(moved)
-        moved
+        if sig_idx >= 0 and param_i >= 0 and param_i < self.sema.sig_get_param_count(sig_idx):
+            let param_ty = self.sema.sig_param_type(sig_idx, param_i)
+            let param_kind = self.sema.get_type_kind(self.sema.resolve_alias(param_ty))
+            if param_kind != TypeKind.TY_REF and self.sema.is_copy_frozen(param_ty) == 0:
+                sema_phase_bug(f"BUG: an implicit fill reached a non-Copy by-value parameter {param_i} (D87: an implicit fill never consumes; Sema fills only `implicit &T` or a Copy `implicit T`)")
+        if op >= 0 and self.body.operand_kinds[op] == OperandKind.OK_MOVE:
+            return self.body.new_operand(OperandKind.OK_COPY, self.body.operand_d0[op])
+        op
 
     mut fn lower_call_arg(arg_node: i32, sig_idx: i32, callable_fn_tid: i32, arg_i: i32, callee_sym: i32 = 0) -> i32:
         let saved_expected = self.expected_type

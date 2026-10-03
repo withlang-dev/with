@@ -35,8 +35,12 @@ pub type FrameArena {
     high_water_bytes: i64,
 }
 
+// A scope's scratch allocator (§8.3.2.5). Its allocations hang off one heap
+// cell, so allocating takes `&self`: a context borrowed as `implicit
+// &Context` allocates through it (D87, §7.3a). Its owner — the `with` scope
+// holding the context — frees every allocation once, when it drops.
 pub type TempArena {
-    allocations: Vec[i64],
+    head: *mut i64,
 }
 
 @[no_await_guard]
@@ -261,27 +265,33 @@ pub fn ArenaScope.allocation_count(self: &ArenaScope) -> i32:
     self.allocations
 
 pub fn scratch_arena() -> TempArena:
-    TempArena { allocations: Vec.new() }
+    TempArena { head: alloc_zeroed(1, 8) as *mut i64 }
 
-pub fn TempArena.alloc(mut self: TempArena, size: i32) -> *i8:
-    let ptr = alloc(if size > 0: size else: 1)
-    self.allocations.push(ptr as i64)
-    ptr
+// Every block carries a 16-byte header (alignment kept) whose first word
+// links the block allocated before it; the arena's cell holds the newest.
+fn temp_arena_link(head: *mut i64, block: *i8) -> *i8:
+    unsafe *(block as *mut i64) = unsafe *head
+    unsafe *head = block as i64
+    (block as i64 + 16) as *i8
 
-pub fn TempArena.alloc_zeroed(mut self: TempArena, count: i32, size: i32) -> *i8:
-    let ptr = alloc_zeroed(count, size)
-    self.allocations.push(ptr as i64)
-    ptr
+pub fn TempArena.alloc(self: &TempArena, size: i32) -> *i8:
+    temp_arena_link(self.head, alloc((if size > 0: size else: 1) + 16))
+
+pub fn TempArena.alloc_zeroed(self: &TempArena, count: i32, size: i32) -> *i8:
+    temp_arena_link(self.head, alloc_zeroed(1, count * size + 16))
 
 pub fn TempArena.reset(mut self: TempArena) -> Unit:
-    for raw in self.allocations:
-        if raw != 0:
-            free_mem(raw as *i8)
-    self.allocations = Vec.new()
+    var block = unsafe *self.head
+    while block != 0:
+        let next = unsafe *(block as *mut i64)
+        free_mem(block as *i8)
+        block = next
+    unsafe *self.head = 0
 
 impl Drop for TempArena:
     move fn drop() -> Unit:
         self.reset()
+        free_mem(self.head as *i8)
 
 fn pool_effective_item_size(size: i32) -> i32:
     let base = if size > 0: size else: 1

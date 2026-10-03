@@ -2,7 +2,7 @@
 
 type Ctx { multiplier: i32 }
 
-fn scale(x: i32, ctx: implicit Ctx) -> i32:
+fn scale(x: i32, ctx: implicit &Ctx) -> i32:
     x * ctx.multiplier
 
 fn apply(f: fn(i32) -> i32, x: i32) -> i32:

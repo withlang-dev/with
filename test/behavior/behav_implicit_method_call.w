@@ -3,7 +3,7 @@
 type Ctx { multiplier: i32 }
 type Scale { value: i32 }
 
-fn Scale.apply(self: &Self, ctx: implicit Ctx) -> i32:
+fn Scale.apply(self: &Self, ctx: implicit &Ctx) -> i32:
     self.value * ctx.multiplier
 
 fn main:
