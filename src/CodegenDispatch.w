@@ -17892,24 +17892,24 @@ impl Codegen:
             if self.find_binding_type(bind_syms, bind_tys, tp_syms[ti]) == 0:
                 return 0
 
-        let saved_bind_syms = move self.type_binding_syms
-        let saved_bind_tys = move self.type_binding_types
-        let saved_bind_len: i32 = self.type_bindings_len
-        let fresh_bind_syms: Vec[i32] = Vec.new()
-        let fresh_bind_tys: Vec[i64] = Vec.new()
-        self.type_binding_syms = fresh_bind_syms
-        self.type_binding_types = fresh_bind_tys
-        self.type_bindings_len = 0
+        // #1647 (D65): the owner is the instance Sema created for the bound
+        // arguments, laid out from Sema's record.
+        let inst_args: Vec[i32] = Vec.new()
         for ti in 0..tp_syms.len() as i32:
-            let tp_sym = tp_syms[ti]
-            let bty = self.find_binding_type(bind_syms, bind_tys, tp_sym)
-            self.type_binding_syms.push(tp_sym)
-            self.type_binding_types.push(bty)
-            self.type_bindings_len = self.type_bindings_len + 1
-        let mono_ty = self.monomorphize_struct(owner_sym, 0, 0)
-        self.type_binding_syms = saved_bind_syms
-        self.type_binding_types = saved_bind_tys
-        self.type_bindings_len = saved_bind_len
+            var arg_sema = 0
+            for bi in 0..bind_syms.len() as i32:
+                if bind_syms[bi] == tp_syms[ti]:
+                    arg_sema = bind_sema_tys[bi]
+                    break
+            if arg_sema <= 0:
+                return 0
+            inst_args.push(arg_sema)
+        let owner_text = with_str_clone_ref(self.intern.resolve(owner_sym))
+        let sema_owner_sym = if owner_text.len() > 0: self.sema.pool_lookup_symbol(owner_text) else: 0
+        let inst_tid = self.sema.find_generic_inst_type(sema_owner_sym, inst_args, tp_syms.len() as i32) as i32
+        if inst_tid <= 0:
+            return 0
+        let mono_ty = self.get_or_create_generic_struct_type(inst_tid)
 
         let mono_sym = self.find_struct_type_by_llvm(mono_ty)
         if mono_sym != 0:
