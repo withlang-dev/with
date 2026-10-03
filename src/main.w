@@ -1661,6 +1661,12 @@ fn build_runner_ensure(root: &str, options: &BuildCommandOptions) -> str:
         if build_runner_copy(shared, bin_path):
             let _k = with_fs_write_file(key_path, key)
             return bin_path
+    // #1906: the runner links against one named root of this driver's
+    // generation, never a probed one. Without it there is nothing of this
+    // generation to link, and the caller says so.
+    let link_root = build_runner_link_root(root)
+    if link_root.len() == 0 and build_runner_runtime_dirs_present(root):
+        return ""
     let entry_path = resolve_join(root, "__with_build_runner.w")
     let t0 = with_clock_nanos()
     var comp = Compilation.init()
@@ -1669,22 +1675,26 @@ fn build_runner_ensure(root: &str, options: &BuildCommandOptions) -> str:
     comp.configure_options(move runner_options)
     comp.set_tool_mode_entry_path(entry_path)
     let no_settings: Vec[str] = Vec.new()
-    // #1797: the runner links exactly as stage1 does — against the bootstrap
-    // link root this run prepared for this seed (prepare-bootstrap-link-root
-    // removes out/lib's stale probes so out/bootstrap-lib is selected), with
-    // WITH_OUT_DIR naming that root as the build's say-so. The caller only
-    // compiles it once that root is this compiler's generation; before, a
-    // seed older than #1720's D30 check took whatever complete directory
-    // was on disk and died on an undefined runtime symbol.
+    // #1797/#1906: the runner links exactly as stage1 does — against a
+    // runtime root the build names (WITH_RUNTIME_ROOT), which Link.w refuses
+    // when its .producer is another generation and never trades for another
+    // directory. Under WITH_OUT_DIR alone the link probed out/lib first, and
+    // a seed-compiled runner took the tree's own runtime whenever the stage
+    // chain had re-created it after prepare-bootstrap-link-root last ran
+    // (its freshness said nothing about out/lib): rt_compat_setenv_str read
+    // an address as a length, SIGSEGV in the runner's first set_env.
     let outer_out_dir = with_getenv_str("WITH_OUT_DIR")
+    let outer_runtime_root = with_getenv_str("WITH_RUNTIME_ROOT")
     let _e_in = with_setenv_str("WITH_OUT_DIR", resolve_join(root, "out"))
+    let _e_root_in = if link_root.len() > 0: with_setenv_str("WITH_RUNTIME_ROOT", link_root) else: 0
     let built = comp.build_binary_from_source_to_path_with_build_settings(entry_path, build_runner_entry_source(), bin_path, no_settings, no_settings, no_settings)
     let _e_out = with_setenv_str("WITH_OUT_DIR", outer_out_dir)
+    let _e_root_out = with_setenv_str("WITH_RUNTIME_ROOT", outer_runtime_root)
     if built == "" or comp.has_errors():
         // Not silent (#1797): the fallback evaluator is the bootstrap path,
         // and when it cannot run an action the build fails there with a
         // message about that action, not about this link.
-        with_eprint("error: build runner compile failed (diagnostics above); actions fall back to comptime evaluation by the driver, which may not evaluate every action of this tree. A runtime symbol undefined at the runner's link means a stale out/lib or out/bootstrap-lib from another compiler generation (#1797): remove out/lib, out/bootstrap-lib and out/tmp/with_runtime, then rebuild")
+        with_eprint("error: build runner compile failed (diagnostics above; linked against " ++ link_root ++ "); actions fall back to comptime evaluation by the driver, which may not evaluate every action of this tree")
         let _rm = with_fs_remove_file(key_path)
         return ""
     let _k = with_fs_write_file(key_path, key)
@@ -1711,22 +1721,38 @@ fn build_runner_copy(from: &str, to: &str) -> bool:
         return false
     true
 
-// #1797: the runner may be linked now when no runtime directory the link
-// could take belongs to another compiler generation: a complete out/lib or
-// out/bootstrap-lib (the cimport_stubs.o probe Link.w uses) must be this
-// compiler's generation (its .producer, or byte for byte its embedded
-// rt_core.o where none is recorded — #1815); an absent one is nothing to mistrust
-// (a user project has neither, and the runner links from the embedded
-// runtime as it always did).
-fn build_runner_runtime_dirs_are_this_generation(root: &str) -> bool:
+// #1906: the runtime root the runner links against — the first complete
+// runtime directory of this driver's generation (its .producer, or byte for
+// byte its embedded rt_core.o where none is recorded — #1815): the seed's
+// out/bootstrap-lib, or out/lib when a tree compiler drives the build. ""
+// when neither is: the runner cannot be linked yet. The link names this
+// root explicitly (WITH_RUNTIME_ROOT), so a directory of another
+// generation is never a candidate, whatever is on disk beside it.
+fn build_runner_link_root(root: &str) -> str:
     let dirs: Vec[str] = Vec.new()
-    dirs.push("out/lib")
     dirs.push("out/bootstrap-lib")
+    dirs.push("out/lib")
+    let platform_object = link_stage_host_platform_runtime_object()
     for i in 0..dirs.len() as i32:
         let dir = resolve_join(root, dirs[i])
-        if with_fs_file_exists(dir ++ "/cimport_stubs.o") != 0 and not link_stage_runtime_dir_is_this_generation(dir):
-            return false
-    true
+        if with_fs_file_exists(dir ++ "/cimport_stubs.o") == 0: continue
+        if platform_object.len() > 0 and with_fs_file_exists(dir ++ "/" ++ platform_object) == 0: continue
+        if link_stage_runtime_dir_is_this_generation(dir): return dir
+    ""
+
+// A project with no runtime directory at all links its runner from the
+// driver's embedded runtime, as it always did; one with a directory of
+// another generation and none of this one waits for prepare.
+fn build_runner_runtime_dirs_present(root: &str) -> bool:
+    with_fs_file_exists(resolve_join(root, "out/bootstrap-lib/cimport_stubs.o")) != 0 or with_fs_file_exists(resolve_join(root, "out/lib/cimport_stubs.o")) != 0
+
+// The runner's absence is said once, naming the dependency that builds its
+// root.
+fn build_runner_explain_no_root(root: &str, target_name: &str) -> i32:
+    let generation = if compiler_generation_is_stamped(): compiler_generation() else: "unstamped"
+    let message = "no runtime objects of this driver's generation (" ++ generation ++ ") under out/bootstrap-lib or out/lib to link the action runner against; `prepare-bootstrap-link-root` (a dependency of '" ++ target_name ++ "') builds them"
+    with_eprint("[build] " ++ message ++ "; until then actions evaluate in the driver's comptime evaluator")
+    0
 
 fn build_runner_fallback_list_path(root: &str) -> str:
     resolve_join(root, "out/.build-state/runner-fallback.list")
@@ -2437,19 +2463,18 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
     var runner_checked = false
     var runner_path = ""
     var runner_fallback: Vec[str] = Vec.new()
-    // #1075/#1074/#1797: the runner links against the bootstrap link root
-    // (out/bootstrap-lib: the tree's runtime objects and, on Windows, the
-    // LLVM linker metadata), so it is compiled only once that root is this
-    // seed's: when prepare-bootstrap-link-root has completed in this run
-    // (executed, or fresh for this seed), or when no complete out/lib or
-    // out/bootstrap-lib belongs to another generation
-    // (build_runner_runtime_dirs_are_this_generation; a project with neither
-    // links the runner from the embedded runtime, as it always did).
-    // Existence of the files said nothing about which
-    // generation built them: a seed older than #1720's check linked a
-    // 2026-09-22 out/lib, the runner died on an undefined runtime symbol,
-    // and the comptime fallback failed the build before stage1. Until the
-    // root is ready, actions evaluate at comptime, as before.
+    // #1075/#1074/#1797/#1906: the runner links against a runtime root of
+    // this driver's generation (build_runner_link_root: the seed's
+    // out/bootstrap-lib, or out/lib under a tree compiler), named to the
+    // link explicitly. It is compiled once prepare-bootstrap-link-root has
+    // completed in this run (or is not in the graph: --no-deps, a project
+    // without one) AND such a root exists; the prepare's freshness alone
+    // said nothing about out/lib, which the stage chain re-creates after it
+    // (#1906), and existence of the files said nothing about which
+    // generation built them (#1797). A project with no runtime directory
+    // links the runner from the embedded runtime, as it always did. Until
+    // the root is ready, actions evaluate at comptime, as before, and the
+    // driver says so (build_runner_explain_no_root).
     let bootstrap_root_target = "prepare-bootstrap-link-root"
     var bootstrap_root_scheduled = false
     for bi in 0..graph.targets.len() as i32:
@@ -2576,12 +2601,14 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                     survey_failed.push(with_str_clone_ref(target.name))
                     continue
                 return preflight_rc
-        var bootstrap_ready = bootstrap_root_scheduled and completed_targets.contains(bootstrap_root_target)
-        if not bootstrap_ready and not runner_checked:
-            bootstrap_ready = build_runner_runtime_dirs_are_this_generation(root)
-        if target.kind == 23 and not runner_checked and bootstrap_ready and not build_action_worker_env_enabled() and not options.strict_effects:
-            runner_checked = true
-            runner_path = build_runner_ensure(root, options)
+        if target.kind == 23 and not runner_checked and not build_action_worker_env_enabled() and not options.strict_effects:
+            let prepare_done = not bootstrap_root_scheduled or completed_targets.contains(bootstrap_root_target)
+            if build_runner_link_root(root).len() > 0 or (prepare_done and not build_runner_runtime_dirs_present(root)):
+                runner_checked = true
+                runner_path = build_runner_ensure(root, options)
+            else if prepare_done:
+                runner_checked = true
+                if build_runner_explain_no_root(root, target.name) != 0: return 1
             if runner_path.len() > 0:
                 runner_fallback = build_runner_load_fallback(root)
                 let _e1 = with_setenv_str("WITH_BUILD_RUNNER_ROOT", root)

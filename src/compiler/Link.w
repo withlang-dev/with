@@ -1889,7 +1889,7 @@ fn link_stage_platform_runtime_object() -> str:
         return ""
     link_stage_host_platform_runtime_object()
 
-fn link_stage_host_platform_runtime_object() -> str:
+pub fn link_stage_host_platform_runtime_object() -> str:
     let os = runtime_sysinfo_os()
     let arch = runtime_sysinfo_arch()
     if os == "Linux" and arch == "x86_64":
