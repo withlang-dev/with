@@ -8510,6 +8510,64 @@ impl Codegen:
             if method_name == "split_at_mut": return MirIntrinsic.SPLIT_AT_MUT
         MirIntrinsic.NONE
 
+    // A call into a runtime entry point, checked against its declaration
+    // (#2047): an argument count or type that disagrees with the function
+    // the module declares is a compiler bug reported here, not a call LLVM
+    // makes with whatever bits arrive. The free channel builtins called
+    // with_channel_send(ptr, i64) against `(i64, *const u8)` for months.
+    mut fn call_runtime_checked(name: &str, ret_ty: i64, param_tys: &Vec[i64], args: &Vec[i64]) -> i64:
+        var f = wl_get_named_function(self.llmod, name)
+        if f == 0:
+            let ft = wl_function_type(ret_ty, vec_data_i64(param_tys), param_tys.len() as i32, 0)
+            f = wl_add_function(self.llmod, name, ft)
+        let ft = wl_global_get_value_type(f)
+        let count = wl_count_param_types(ft)
+        var ok = count == args.len() as i32 and count == param_tys.len() as i32 and wl_get_return_type(ft) == ret_ty
+        if ok:
+            for i in 0..args.len() as i32:
+                if wl_type_of(args[i]) != param_tys[i] or wl_get_fn_param_type(ft, i) != param_tys[i]:
+                    ok = false
+        if not ok:
+            with_eprint(f"error: BUG: call of runtime `{name}` does not match its declaration (params={count}, args={args.len()}) in {self.intern.resolve(self.current_function_name_sym)}")
+            self.had_error = 1
+            return wl_get_undef(if ret_ty == wl_void_type(self.context): wl_i32_type(self.context) else: ret_ty)
+        wl_build_call(self.builder, ft, f, vec_data_i64(args), args.len() as i32)
+
+    mut fn mir_emit_free_channel_builtin(body: &MirBody, callee_sym: i32, args_id: i32, dest_place: i32, next_bb: i32) -> bool:
+        let i64_ty = wl_i64_type(self.context)
+        let i32_ty = wl_i32_type(self.context)
+        let ptr_ty = wl_ptr_type(self.context)
+        let void_ty = wl_void_type(self.context)
+        let argc = body.call_arg_counts[args_id]
+        var result: i64 = 0
+        if callee_sym == self.sym_channel:
+            let cap = if argc >= 1: self.coerce_int(self.mir_intrinsic_arg(body, args_id, 0), i32_ty) else: wl_const_int(i32_ty, 0, 0)
+            let ps: Vec[i64] = [i32_ty, i32_ty, ptr_ty]
+            let args: Vec[i64] = [cap, wl_const_int(i32_ty, 8, 0), wl_const_null(ptr_ty)]
+            result = self.call_runtime_checked("with_channel_create", i64_ty, &ps, &args)
+        else if callee_sym == self.sym_send:
+            let handle = self.coerce_int(self.mir_intrinsic_arg(body, args_id, 0), i64_ty)
+            let slot = self.create_entry_alloca(i64_ty)
+            wl_build_store(self.builder, self.coerce_int(self.mir_intrinsic_arg(body, args_id, 1), i64_ty), slot)
+            let ps: Vec[i64] = [i64_ty, ptr_ty]
+            let args: Vec[i64] = [handle, slot]
+            self.call_runtime_checked("with_channel_send", void_ty, &ps, &args)
+        else if callee_sym == self.sym_recv:
+            let handle = self.coerce_int(self.mir_intrinsic_arg(body, args_id, 0), i64_ty)
+            let slot = self.create_entry_alloca(i64_ty)
+            wl_build_store(self.builder, wl_const_int(i64_ty, 0, 0), slot)
+            let ps: Vec[i64] = [i64_ty, ptr_ty]
+            let args: Vec[i64] = [handle, slot]
+            self.call_runtime_checked("with_channel_recv", i32_ty, &ps, &args)
+            result = self.coerce_int(wl_build_load(self.builder, i64_ty, slot), i32_ty)
+        else:
+            let handle = self.coerce_int(self.mir_intrinsic_arg(body, args_id, 0), i64_ty)
+            let ps: Vec[i64] = [i64_ty]
+            let args: Vec[i64] = [handle]
+            self.call_runtime_checked("with_channel_close", void_ty, &ps, &args)
+        self.mir_finish_intrinsic_call(body, dest_place, next_bb, result)
+        true
+
     mut fn mir_finish_intrinsic_call(body: &MirBody, dest_place: i32, next_bb: i32, result: i64):
         if dest_place >= 0 and result != 0:
             let result_ty = wl_type_of(result)
@@ -15387,74 +15445,12 @@ impl Codegen:
                             wl_build_br(self.builder, self.mir_bb_values[next_bb])
                         return true
 
-                    // Channel builtins: Channel(cap), send(ch, val), recv(ch), close(ch)
-                    if gc_callee_sym == self.sym_channel:
-                        self.ensure_async_runtime_declared()
-                        let ch_fn = wl_get_named_function(self.llmod, "with_channel_create")
-                        if ch_fn != 0 and gc_arg_count >= 1:
-                            let gc_mir_s = body.call_arg_starts[args_id]
-                            let cap_op = body.call_arg_operands[gc_mir_s]
-                            let cap_val = self.mir_eval_operand(body, cap_op, wl_i32_type(self.context))
-                            let ch_args: Vec[i64] = Vec.new()
-                            ch_args.push(self.coerce_int(cap_val, wl_i32_type(self.context)))
-                            let ch_result = wl_build_call(self.builder, wl_global_get_value_type(ch_fn), ch_fn, vec_data_i64(&ch_args), 1)
-                            if dest_place >= 0:
-                                let gc_local = body.place_locals[dest_place]
-                                let gc_alloca = self.create_entry_alloca(wl_type_of(ch_result))
-                                wl_build_store(self.builder, ch_result, gc_alloca)
-                                self.mir_local_ptrs.insert(gc_local, gc_alloca)
-                                self.mir_local_types.insert(gc_local, wl_type_of(ch_result))
-                        if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
-                            wl_build_br(self.builder, self.mir_bb_values[next_bb])
-                        return true
-                    if gc_callee_sym == self.sym_send and gc_arg_count >= 2:
-                        self.ensure_async_runtime_declared()
-                        let send_fn = wl_get_named_function(self.llmod, "with_channel_send")
-                        if send_fn != 0:
-                            let gc_mir_s = body.call_arg_starts[args_id]
-                            let ch_op = body.call_arg_operands[gc_mir_s]
-                            let val_op = body.call_arg_operands[(gc_mir_s + 1)]
-                            let ch_val = self.mir_eval_operand(body, ch_op, wl_ptr_type(self.context))
-                            let send_val = self.mir_eval_operand(body, val_op, wl_i64_type(self.context))
-                            let send_args: Vec[i64] = Vec.new()
-                            send_args.push(ch_val)
-                            send_args.push(self.coerce_int(send_val, wl_i64_type(self.context)))
-                            let _ = wl_build_call(self.builder, wl_global_get_value_type(send_fn), send_fn, vec_data_i64(&send_args), 2)
-                        if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
-                            wl_build_br(self.builder, self.mir_bb_values[next_bb])
-                        return true
-                    if gc_callee_sym == self.sym_recv and gc_arg_count >= 1:
-                        self.ensure_async_runtime_declared()
-                        let recv_fn = wl_get_named_function(self.llmod, "with_channel_recv")
-                        if recv_fn != 0:
-                            let gc_mir_s = body.call_arg_starts[args_id]
-                            let ch_op = body.call_arg_operands[gc_mir_s]
-                            let ch_val = self.mir_eval_operand(body, ch_op, wl_ptr_type(self.context))
-                            let recv_args: Vec[i64] = Vec.new()
-                            recv_args.push(ch_val)
-                            let gc_result = wl_build_call(self.builder, wl_global_get_value_type(recv_fn), recv_fn, vec_data_i64(&recv_args), 1)
-                            if dest_place >= 0:
-                                let gc_local = body.place_locals[dest_place]
-                                let gc_alloca = self.create_entry_alloca(wl_i64_type(self.context))
-                                wl_build_store(self.builder, gc_result, gc_alloca)
-                                self.mir_local_ptrs.insert(gc_local, gc_alloca)
-                                self.mir_local_types.insert(gc_local, wl_i64_type(self.context))
-                        if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
-                            wl_build_br(self.builder, self.mir_bb_values[next_bb])
-                        return true
-                    if gc_callee_sym == self.sym_close and gc_arg_count >= 1:
-                        self.ensure_async_runtime_declared()
-                        let close_fn = wl_get_named_function(self.llmod, "with_channel_close")
-                        if close_fn != 0:
-                            let gc_mir_s = body.call_arg_starts[args_id]
-                            let ch_op = body.call_arg_operands[gc_mir_s]
-                            let ch_val = self.mir_eval_operand(body, ch_op, wl_ptr_type(self.context))
-                            let close_args: Vec[i64] = Vec.new()
-                            close_args.push(ch_val)
-                            let _ = wl_build_call(self.builder, wl_global_get_value_type(close_fn), close_fn, vec_data_i64(&close_args), 1)
-                        if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
-                            wl_build_br(self.builder, self.mir_bb_values[next_bb])
-                        return true
+                    // The free channel builtins Channel(cap), send(ch, v),
+                    // recv(ch), close(ch) over an i64 handle and integer
+                    // payloads (check_intrinsic_call), lowered against
+                    // rt/channel_runtime.w's entry points (#2047).
+                    if gc_callee_sym == self.sym_channel or gc_callee_sym == self.sym_send or gc_callee_sym == self.sym_recv or gc_callee_sym == self.sym_close:
+                        return self.mir_emit_free_channel_builtin(body, gc_callee_sym, args_id, dest_place, next_bb)
 
                 let gc_callee_field = self.pool.get_data0(gc_node)
 
