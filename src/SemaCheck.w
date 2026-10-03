@@ -22290,8 +22290,8 @@ impl Sema:
         self.emit_no_await_guard_may_suspend_call(node, fn_sym)
         self.note_allocating_callee(node, fn_sym)
         let param_count = self.sig_get_param_count(sig_idx)
-        if arg_count != param_count:
-            self.emit_error("wrong argument count", node)
+        // #1973: the one arity rule; the receiver is the first argument here.
+        let _ = self.check_call_arity(node, fn_sym, param_count, self.sig_is_variadic(sig_idx) != 0, arg_count, 0, pkg_name ++ "." ++ method_name, "qualified extension method")
         for ai in 0..arg_count:
             let arg_node = self.ast.get_extra(extra_start + ai)
             let expected_ty = if ai < param_count: self.sig_param_type(sig_idx, ai) else: 0
@@ -22894,34 +22894,10 @@ impl Sema:
                     self.untyped_callee_calls.push(sig_idx)
                     self.untyped_callee_calls.push(fn_sym)
                     self.untyped_callee_calls.push(self.local_file_id)
-            // Check arg count (supports default parameters via required-count
-            // metadata packed into fn_meta flags by the parser).
+            // The one arity rule (#1973); a pipeline's piped value is one of
+            // the arguments the call supplies.
             let expected = self.sig_get_param_count(sig_idx)
-            let min_expected = self.fn_min_expected_arg_count(fn_sym, expected)
-            let actual = resolved_arg_count + param_offset
-            // Skip arg count check when named args were resolved (already filled defaults)
-            if self.ast.has_call_named_args(node) == 0 and self.has_resolved_call_args(node) == 0:
-                if self.sig_is_variadic(sig_idx) == 0:
-                    if actual < min_expected or actual > expected:
-                        // Check if missing params include implicit ones
-                        var has_unfilled_implicit = 0
-                        if self.fn_decl_nodes.contains(fn_sym) and actual < expected:
-                            let fn_node_check = self.fn_decl_nodes.get(fn_sym).unwrap()
-                            let meta_check = self.ast.find_fn_meta(fn_node_check)
-                            if meta_check >= 0:
-                                let ps_check = self.ast.fn_meta_param_start(meta_check)
-                                for pi in actual..expected:
-                                    let pflags = self.ast.fn_param_flags(ps_check, pi)
-                                    if fn_param_is_implicit(pflags) != 0:
-                                        has_unfilled_implicit = 1
-                        if has_unfilled_implicit != 0:
-                            self.emit_error("implicit parameter not provided; add a 'with' binding of the matching type", node)
-                        else:
-                            let fn_name: str = self.pool_resolve(fn_sym)
-                            if min_expected == expected:
-                                self.emit_error(f"function '{fn_name}' expects {expected} argument(s), found {actual}", node)
-                            else:
-                                self.emit_error(f"function '{fn_name}' expects {min_expected}-{expected} argument(s), found {actual}", node)
+            let _ = self.check_call_arity(node, fn_sym, expected, self.sig_is_variadic(sig_idx) != 0, resolved_arg_count + param_offset, 0, self.pool_resolve(fn_sym), "function")
 
             let sc_mut_args: Vec[i32] = Vec.new()
             let sc_all_args: Vec[i32] = Vec.new()
@@ -23304,6 +23280,47 @@ impl Sema:
         if kind == NodeKind.NK_ASSIGN:
             self.verify_tail_position(self.ast.get_data1(node), fn_sym, 0)
             return
+
+    // One arity rule for every call that reaches a declared signature (#1973):
+    // free functions, static and instance methods, generic methods and trait
+    // methods all read it. `supplied` counts the arguments the call supplies
+    // after named binding and default/implicit filling; `receiver` is 1 when
+    // the call's receiver fills the signature's first parameter (a method
+    // called on a value), and the counts the message names leave it out.
+    // A call whose arguments were bound by name or filled from defaults was
+    // settled by that resolution (resolve_named_call_args reports a missing
+    // parameter itself). Returns false when the call was refused.
+    mut fn check_call_arity(node: i32, fn_sym: i32, expected: i32, variadic: bool, supplied: i32, receiver: i32, callee_name: &str, what: &str) -> bool:
+        if expected < 0 or variadic:
+            return true
+        if self.ast.has_call_named_args(node) != 0 or self.has_resolved_call_args(node) != 0:
+            return true
+        let min_expected = self.fn_min_expected_arg_count(fn_sym, expected)
+        let actual = supplied + receiver
+        if actual >= min_expected and actual <= expected:
+            return true
+        if fn_sym != 0 and self.fn_decl_nodes.contains(fn_sym) and actual < expected:
+            let meta_check = self.ast.find_fn_meta(self.fn_decl_nodes.get(fn_sym).unwrap())
+            if meta_check >= 0:
+                let ps_check = self.ast.fn_meta_param_start(meta_check)
+                for pi in actual..expected:
+                    if fn_param_is_implicit(self.ast.fn_param_flags(ps_check, pi)) != 0:
+                        self.emit_error("implicit parameter not provided; add a 'with' binding of the matching type", node)
+                        return false
+        if receiver != 0 and expected == 0:
+            // A function of the type (`fn Item.tag()` at top level: no
+            // receiver, functions.md D7 table) called on a value: the value has no
+            // parameter to fill.
+            self.emit_error(f"'{callee_name}' is a function of the type and takes no receiver; call it as `{callee_name}(...)`", node)
+            return false
+        let shown_max = expected - receiver
+        let shown_min = min_expected - receiver
+        let shown_actual = supplied
+        if shown_min == shown_max:
+            self.emit_error(f"{what} '{callee_name}' expects {shown_max} argument(s), found {shown_actual}", node)
+        else:
+            self.emit_error(f"{what} '{callee_name}' expects {shown_min}-{shown_max} argument(s), found {shown_actual}", node)
+        false
 
     fn fn_min_expected_arg_count(fn_sym: i32, fallback_expected: i32) -> i32:
         if fallback_expected <= 0:
@@ -25782,12 +25799,11 @@ impl Sema:
             return 0
 
         let param_offset = if is_static != 0: 0 else: 1
-        let expected_args = param_count - param_offset
         // arg_count < 0: a compiler-synthesized call whose receiver alone
         // decides the specialization (D69's `for` over a generic Gen impl);
-        // it has no argument nodes to check.
-        if arg_count >= 0 and arg_count != expected_args:
-            self.emit_error("wrong argument count", node)
+        // it has no argument nodes to check. #1973: the one arity rule.
+        if arg_count >= 0:
+            let _ = self.check_call_arity(node, method_fn_sym, param_count, false, arg_count, param_offset, self.pool_resolve(method_fn_sym), if param_offset == 1: "method" else: "function")
         // #604 stage 1 applies to a method's arguments as to a free call's
         // (D64 found the gap: `n.read(buf)` over a `[]mut u8` refused the
         // array a free `fill(buf)` accepted): a Vec/array argument coerces to
@@ -27858,9 +27874,8 @@ impl Sema:
         else:
             self.check_trait_receiver_mode(&info, receiver_expr, node)
 
-        let expected_args = info.param_count - 1
-        if arg_count != expected_args:
-            self.emit_error("wrong argument count", node)
+        // #1973: the one arity rule, receiver excluded.
+        let _ = self.check_call_arity(node, 0, info.param_count, false, arg_count, 1, self.pool_resolve(trait_sym) ++ "." ++ self.pool_resolve(method_sym), "dyn trait method")
 
         for ai in 0..arg_count:
             let param_i = ai + 1
@@ -28009,9 +28024,8 @@ impl Sema:
         if found_info.param_count <= 0:
             self.emit_error("trait method has no self parameter", node)
             return 0
-        let expected_args = found_info.param_count - 1
-        if arg_count != expected_args:
-            self.emit_error("wrong argument count", node)
+        // #1973: the one arity rule, receiver excluded.
+        let _ = self.check_call_arity(node, found_fn, found_info.param_count, false, arg_count, 1, self.pool_resolve(found_trait) ++ "." ++ self.pool_resolve(method_sym), "trait method")
 
         self.check_trait_receiver_mode(&found_info, expr, node)
         for ai in 0..arg_count:
@@ -28343,6 +28357,7 @@ impl Sema:
                 si = si - 1
             if found == 0:
                 missing_implicit = 1
+        var missing_required = false
         for pi2 in actual..param_count:
             if resolved_map.contains(pi2):
                 continue
@@ -28351,9 +28366,15 @@ impl Sema:
                 resolved_map.insert(pi2, default_node)
                 resolved_defaults.insert(pi2, 1)
                 filled = 1
+            else if fn_param_is_implicit(self.ast.fn_param_flags(param_start, pi2)) == 0:
+                missing_required = true
         if missing_implicit != 0:
             self.emit_error("implicit parameter not provided; add a 'with' binding of the matching type", call_node)
-        if filled == 0:
+        // #1973: a required parameter with no argument and no default is
+        // not filled — storing the partial list (a 0 for the missing slot)
+        // settled the call's arity and MIR passed Unit. The supplied
+        // arguments stand, and check_call_arity reports the count.
+        if filled == 0 or (missing_required and missing_implicit == 0):
             return arg_count
         let final_args: Vec[i32] = Vec.new()
         for pi3 in param_offset..param_count:
@@ -28974,6 +28995,12 @@ impl Sema:
                 if is_static_receiver != 0 and self.sig_receiver_mode(sig_idx) != ReceiverMode.None and mc_resolved_arg_count < self.sig_get_param_count(sig_idx):
                     let qualified = self.pool_resolve(type_name_sym) ++ "." ++ self.pool_resolve(field)
                     self.emit_error("'" ++ qualified ++ "' takes `self`, and this call has no receiver; call it on a value, or declare it outside the impl as `fn " ++ qualified ++ "(...)` to make it a function of the type", node)
+                    return 0
+                // #1973: the free call's arity rule, receiver excluded. The
+                // method path had none: `self.make(3)` against `make(a, b)`
+                // reached MIR and failed LLVM verification.
+                let mc_arity_name = self.pool_resolve(type_name_sym) ++ "." ++ self.pool_resolve(field)
+                if not self.check_call_arity(node, method_fn_sym, self.sig_get_param_count(sig_idx), self.sig_is_variadic(sig_idx) != 0, mc_resolved_arg_count, call_param_offset, mc_arity_name, if call_param_offset == 1: "method" else: "function"):
                     return 0
                 if call_param_offset == 1 and self.sig_get_param_count(sig_idx) > 0:
                     let exact_receiver_ty = self.recorded_expr_type_or_zero(expr)
