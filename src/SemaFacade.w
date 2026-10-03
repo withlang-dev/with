@@ -4694,7 +4694,21 @@ impl Sema:
         if sig < 0 or self.facade_pair_op_by_sig.contains(sig):
             return
         self.facade_pair_op_by_sig.insert(sig, self.facade_pair_ops.len() as i32)
-        self.facade_pair_ops.push(FacadePairOp { contract: ci, resource: ri, action, slot, userdata_tid, guard_ok, invokes })
+        // Every pair operation is a method of its resource: the receiver is
+        // the resource it acts on. A userdata setter retains the referent
+        // of its last parameter, the `&U` (facade_note_pair_op_sig).
+        let retained_param = if action == FOREIGN_PAIR_USERDATA: self.sig_get_param_count(sig) - 1 else: -1
+        self.facade_pair_ops.push(FacadePairOp { contract: ci, resource: ri, action, slot, userdata_tid, guard_ok, invokes, subject_param: 0, retained_param })
+
+    // The presented operation a pair op is, for a diagnostic: 'Host.method'.
+    fn facade_pair_op_display(op: i32) -> str:
+        let ci = self.facade_pair_ops[op].contract
+        let ri = self.facade_pair_ops[op].resource
+        let fname: str = self.pool_resolve(self.foreign_contracts[ci].fn_sym)
+        "'" ++ self.pool_resolve(self.facade_resources[ri].name) ++ "." ++ self.facade_presented(ri, fname) ++ "'"
+
+    // A pair resource, for a diagnostic: 'Name'.
+    fn facade_pair_resource_display(ri: i32) -> str: "'" ++ self.pool_resolve(self.facade_resources[ri].name) ++ "'"
 
     // A pair setter's concrete signature, at the call that specializes it
     // (SemaCheck.w check_selected_generic_call_args / the generic method

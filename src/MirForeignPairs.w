@@ -15,7 +15,10 @@
 // destroyed). A helper call that receives the resource is not modeled: it
 // is checked as callback-capable and leaves the pair unknown until a reset.
 // Nothing here reads a name or an AST spelling; the facts are Sema's tables
-// and the MIR itself.
+// and the MIR itself. Which argument an operation acts on and which one a
+// setter retains are Sema's (FacadePairOp.subject_param, retained_param),
+// and so are the names a finding gives (D65 phase 5, #2043): this pass
+// decides only where along the CFG a state holds.
 
 use Ast
 use Diagnostic
@@ -192,17 +195,18 @@ impl PairsBody:
             if ri < 0 and self.is_ref(key) and self.ref_origin[key] >= 0: ri = self.key_resource[self.ref_origin[key]]
         if ri < 0:
             return "the resource"
-        "'" ++ sema.pool_resolve(sema.facade_resources[ri].name) ++ "'"
+        sema.facade_pair_resource_display(ri)
 
-    // The key a userdata setter's `&U` argument (its last) refers to: the
-    // referent of the reference when the body took it, else the reference
-    // itself (a parameter: its frame bounds the retention here).
-    fn userdata_origin(body: &MirBody, call_id: i32) -> i32:
+    // The key the argument a userdata setter retains (Sema's
+    // FacadePairOp.retained_param, its `&U`) refers to: the referent of the
+    // reference when the body took it, else the reference itself (a
+    // parameter: its frame bounds the retention here).
+    fn userdata_origin(body: &MirBody, call_id: i32, param: i32) -> i32:
         let start = body.call_arg_starts[call_id]
         let count = body.call_arg_counts[call_id]
-        if count == 0:
+        if param < 0 or param >= count:
             return -1
-        let place = pairs_operand_place(body, body.call_arg_operands[(start + count - 1)])
+        let place = pairs_operand_place(body, body.call_arg_operands[(start + param)])
         let key = self.key_of(place)
         if key < 0:
             return -1
@@ -280,7 +284,7 @@ impl PairsBody:
             if (action == FOREIGN_PAIR_CALLBACK or action == FOREIGN_PAIR_USERDATA) and ok >= 0 and dest >= 0:
                 self.guard_ok[dest] = ok
             if action == FOREIGN_PAIR_USERDATA:
-                let origin = self.userdata_origin(body, call_id)
+                let origin = self.userdata_origin(body, call_id, sema.facade_pair_ops[opi].retained_param)
                 if origin >= 0:
                     self.origin_key[origin] = 1
                     self.origin_bb[origin] = bb
@@ -432,13 +436,16 @@ impl PairsBody:
             let ok = sema.facade_pair_ops[opi].guard_ok
             let u_tid = sema.facade_pair_ops[opi].userdata_tid
             let invokes = sema.facade_pair_ops[opi].invokes != 0
-            let recv = self.key_of(pairs_operand_place(body, body.call_arg_operands[start]))
+            let subject = sema.facade_pair_ops[opi].subject_param
+            if subject < 0 or subject >= count:
+                return
+            let recv = self.key_of(pairs_operand_place(body, body.call_arg_operands[(start + subject)]))
             if recv < 0:
                 return
             let dest = self.key_of(body.term_data2(bb))
             if action == FOREIGN_PAIR_CALLBACK or action == FOREIGN_PAIR_USERDATA:
                 let guard = if ok >= 0: dest else: -1
-                let origin = if action == FOREIGN_PAIR_USERDATA: self.userdata_origin(body, call_id) else: -1
+                let origin = if action == FOREIGN_PAIR_USERDATA: self.userdata_origin(body, call_id, sema.facade_pair_ops[opi].retained_param) else: -1
                 self.push(pairs_step(FOREIGN_STEP_APPLY, recv, -1, pairs_block(action, u_tid, origin, guard, true, invokes)), pairs_site(PAIRS_SITE_INVOKE, bb, -1, recv, opi))
             else:
                 self.push(pairs_step(FOREIGN_STEP_APPLY, recv, -1, pairs_block(action, 0, -1, -1, false, invokes)), pairs_site(PAIRS_SITE_INVOKE, bb, -1, recv, opi))
@@ -538,10 +545,7 @@ fn pairs_site_span(ast: AstPool, body: &MirBody, pb: &PairsBody, site: PairsStep
 fn pairs_op_name(sema: &Sema, op: i32) -> str:
     if op < 0:
         return "destroying it"
-    let ci = sema.facade_pair_ops[op].contract
-    let ri = sema.facade_pair_ops[op].resource
-    let fname: str = sema.pool_resolve(sema.foreign_contracts[ci].fn_sym)
-    "'" ++ sema.pool_resolve(sema.facade_resources[ri].name) ++ "." ++ sema.facade_presented(ri, fname) ++ "'"
+    sema.facade_pair_op_display(op)
 
 // A finding, reported by compiler/Compilation.w in the body's own file.
 pub type PairsFinding {
@@ -556,12 +560,14 @@ pub type PairsFinding {
 fn pairs_describe(ast: AstPool, sema: &Sema, body: &MirBody, pb: &PairsBody, site: PairsStepSite) -> PairsFinding:
     let (start, end) = pairs_site_span(ast, body, pb, site)
     // A dying or moving origin names the resource that retained it: the
-    // receiver of the setter that did.
+    // subject of the setter that did.
     var named = site.key
     if (site.kind == PAIRS_SITE_EXPIRE or site.kind == PAIRS_SITE_MOVED) and site.key >= 0 and site.key < pb.origin_bb.len() as i32 and pb.origin_bb[site.key] >= 0:
         let call_id = body.term_data1(pb.origin_bb[site.key])
-        if call_id >= 0 and call_id < body.call_arg_starts.len() as i32 and body.call_arg_counts[call_id] > 0:
-            named = pb.key_of(pairs_operand_place(body, body.call_arg_operands[body.call_arg_starts[call_id]]))
+        let opi = if call_id >= 0 and call_id < body.call_sig_indices.len() as i32: sema.facade_pair_op_for_sig(body.call_sig_indices[call_id]) else: -1
+        let subject = if opi >= 0: sema.facade_pair_ops[opi].subject_param else: -1
+        if subject >= 0 and call_id < body.call_arg_starts.len() as i32 and subject < body.call_arg_counts[call_id]:
+            named = pb.key_of(pairs_operand_place(body, body.call_arg_operands[body.call_arg_starts[call_id] + subject]))
     let resource = pb.resource_name(sema, named)
     if site.kind == PAIRS_SITE_INVOKE:
         return PairsFinding { fn_sym: body.fn_sym, start, end, message: pairs_op_name(sema, site.op) ++ " may invoke the callback pair of " ++ resource ++ ", and on this path the pair is not proven compatible (§16.2b.9)", note: "a callback set without its userdata, a setter whose failure was not handled, or a helper call that may have changed the pair leaves it unproven", help: "set both the callback and its userdata, branch on the setter's status against its 'ok' constant, or run the resource's abandonment path first" }

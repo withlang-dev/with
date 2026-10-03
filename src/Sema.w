@@ -627,6 +627,8 @@ pub type FacadePairOp {
     userdata_tid: i32,  // the concrete `U` a setter installs (the specialization's), or 0
     guard_ok: i64,      // the setter's success status (`ok CONST` on the operation), or -1: uninterpreted
     invokes: i32,       // 1 unless the operation is `callbacks none`
+    subject_param: i32, // the parameter that receives the resource the operation acts on
+    retained_param: i32, // the parameter whose referent a userdata setter retains (its `&U`), or -1
 }
 
 // Context shared by free and receiver callback calls. Userdata is checked
