@@ -1677,6 +1677,11 @@ impl Codegen:
 
         cur_ptr
 
+    // The constant pointer at `address`: null for 0, else `inttoptr` of the
+    // value at 64 bits, so a negative address is all ones above its literal.
+    fn const_int_address(address: i64, pointer_ty: i64):
+        if address == 0: wl_const_null(pointer_ty) else: wl_const_int_to_ptr(wl_const_int(wl_i64_type(self.context), address, 1), pointer_ty)
+
     mut fn mir_const_value(body: &MirBody, const_id: i32, expected_ty: i64) -> i64:
         var materialize_ty = expected_ty
         if materialize_ty == 0 and const_id >= 0 and const_id < body.const_types.len() as i32:
@@ -1694,9 +1699,11 @@ impl Codegen:
 
         if ck == ConstKind.CK_INT:
             let int_value = mir_const_int_value(body, const_id)
-            // Null pointer: ConstKind.CK_INT 0 with pointer expected type
-            if int_value == 0 and materialize_ty != 0 and wl_get_type_kind(materialize_ty) == wl_pointer_type_kind():
-                return wl_const_null(materialize_ty)
+            // An integer constant of a pointer type is that address: 0 is
+            // null, and `-1 as extern "C" fn(...)` (SQLITE_TRANSIENT) is all
+            // ones at pointer width, never an i32 in a pointer's place.
+            if materialize_ty != 0 and wl_get_type_kind(materialize_ty) == wl_pointer_type_kind():
+                return self.const_int_address(int_value, materialize_ty)
             if materialize_ty != 0:
                 let ek = wl_get_type_kind(materialize_ty)
                 if ek == wl_float_type_kind() or ek == wl_double_type_kind():
@@ -1711,9 +1718,17 @@ impl Codegen:
                 let ek = wl_get_type_kind(materialize_ty)
                 if ek == wl_float_type_kind() or ek == wl_double_type_kind():
                     return wl_const_real(materialize_ty, self.exact_int_expr_to_f64(cd))
+                // A module constant `-1 as extern "C" fn(...)` folds to its
+                // literal under the binding's pointer type: the address.
+                if ek == wl_pointer_type_kind():
+                    let address = self.pool.int_literal_expr_bits(cd, 64, 1)
+                    if address.ok != 0 and address.overflow == 0:
+                        return self.const_int_address(address.lo, materialize_ty)
             let exact = self.exact_int_const_llvm(cd, body.const_types[const_id])
             if exact != 0:
                 return exact
+            self.had_error = 1
+            self.codegen_error_detail = f"BUG: exact integer constant {const_id} has no lowering at Sema type {body.const_types[const_id]}"
             return wl_get_undef(fallback_ty)
 
         if ck == ConstKind.CK_BOOL:
@@ -11624,22 +11639,17 @@ impl Codegen:
             let rot_val = self.mir_intrinsic_arg(body, args_id, 0)
             let rot_amt = self.mir_intrinsic_arg(body, args_id, 1)
             let rot_ty = wl_type_of(rot_val)
-            let rot_width = wl_get_int_type_width(rot_ty)
-            let rot_w_const = wl_const_int(rot_ty, rot_width as i64, 0)
-            // Coerce shift amount to same type as value
-            let rot_n = self.coerce_value_to_type(rot_amt, rot_ty)
-            if intrinsic == MirIntrinsic.ROTATE_LEFT:
-                // (x << n) | (x >> (W - n))
-                let shl = wl_build_shl(self.builder, rot_val, rot_n)
-                let sub = wl_build_sub(self.builder, rot_w_const, rot_n)
-                let shr = wl_build_lshr(self.builder, rot_val, sub)
-                result = wl_build_or(self.builder, shl, shr)
-            else:
-                // (x >> n) | (x << (W - n))
-                let shr = wl_build_lshr(self.builder, rot_val, rot_n)
-                let sub = wl_build_sub(self.builder, rot_w_const, rot_n)
-                let shl = wl_build_shl(self.builder, rot_val, sub)
-                result = wl_build_or(self.builder, shr, shl)
+            // A funnel shift of x with itself is the rotate, its count taken
+            // modulo the width as comptime_rotate_bits takes it. The shift
+            // pair `(x << n) | (x >> (W - n))` shifts by W when n is 0 or W,
+            // which is poison, and a branch on it is UB.
+            let rot_overloads: Vec[i64] = Vec.new()
+            rot_overloads.push(rot_ty)
+            let rot_args: Vec[i64] = Vec.new()
+            rot_args.push(rot_val)
+            rot_args.push(rot_val)
+            rot_args.push(self.coerce_value_to_type(rot_amt, rot_ty))
+            result = self.cg_vector_intrinsic(if intrinsic == MirIntrinsic.ROTATE_LEFT: "llvm.fshl" else: "llvm.fshr", rot_overloads, rot_args)
 
         else if intrinsic == MirIntrinsic.INT_SWAP_BYTES:
             let sb_val = self.mir_intrinsic_arg(body, args_id, 0)
