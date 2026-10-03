@@ -11,14 +11,14 @@
 type Buf { data: Vec[i32], tag: i32 }
 
 extend Buf:
-    mut fn reset(tag: i32):
+    mut fn reset(new_tag: i32):
         var d: Vec[i32] = Vec.new()
-        d.push(tag)
-        self = Buf { data: d, tag: tag }
-    mut fn reset_if(tag: i32, go: bool):
+        d.push(new_tag)
+        self = Buf { data: d, tag: new_tag }
+    mut fn reset_if(new_tag: i32, go: bool):
         if not go:
             return
-        self.reset(tag)
+        self.reset(new_tag)
     move fn consume() -> i32: self.tag
 
 fn make(tag: i32) -> Buf:

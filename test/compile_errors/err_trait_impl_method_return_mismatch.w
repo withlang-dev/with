@@ -8,8 +8,8 @@ type Cell {
 }
 
 impl Sink for Cell:
-    fn set(mut self: Self, value: i32) -> i32:
-        value
+    fn set(mut self: Self, v: i32) -> i32:
+        v
 
 fn main:
     var c = Cell { value: 0 }

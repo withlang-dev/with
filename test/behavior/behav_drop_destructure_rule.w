@@ -25,8 +25,8 @@ impl Drop for E:
 
 impl R:
     move fn take() -> i32:
-        let { repr, other: _ } = self
-        repr
+        let { repr: r, other: _ } = self
+        r
 
 impl E:
     move fn pid() -> i32:
@@ -39,8 +39,8 @@ impl Drop for Wrapped:
     move fn drop():
         // A total destructure inside `drop` itself: the field is read and no
         // second Drop runs.
-        let { inner } = self
-        print(f"drop-self {inner} {count}")
+        let { inner: v } = self
+        print(f"drop-self {v} {count}")
 
 fn whole():
     let r = R { repr: 1, other: 0 }
