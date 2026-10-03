@@ -11944,6 +11944,10 @@ impl MirBuilder:
     // `node` is the call.
     mut fn lower_precondition_form(fn_op: i32, sig_idx: i32, form_sym: i32, ret_ty: i32, lead: i32, arg_exprs_start: i32, arg_exprs_count: i32, node: i32) -> i32:
         // The operands in parameter order; whether each is its default.
+        // Sema states the filled list, defaults included, for every call
+        // that leaves parameters to their defaults (#2024,
+        // SemaCheck.w resolve_named_call_args); a call without one spells
+        // every argument.
         let arg_nodes: Vec[i32] = Vec.new()
         let arg_defaults: Vec[bool] = Vec.new()
         if lead != 0:
@@ -11957,17 +11961,10 @@ impl MirBuilder:
             for i in 0..arg_exprs_count:
                 arg_nodes.push(self.ast.get_extra(arg_exprs_start + i))
                 arg_defaults.push(false)
-            let fn_node: i32 = if self.sema.fn_decl_nodes.contains(form_sym): self.sema.fn_decl_nodes.get(form_sym).unwrap() else: 0
-            let meta = if fn_node != 0: self.ast.find_fn_meta(fn_node) else: -1
-            if meta >= 0:
-                let param_start = self.ast.fn_meta_param_start(meta)
-                for di in arg_nodes.len() as i32..self.ast.fn_meta_param_count(meta):
-                    let def_node = self.ast.get_fn_param_default(param_start, di)
-                    if def_node != 0:
-                        arg_nodes.push(def_node)
-                        arg_defaults.push(true)
         if arg_nodes.len() == 0 or arg_nodes[0] <= 0 or sig_idx < 0:
             sema_phase_bug(f"BUG: precondition form call has no condition or signature: node={node} sig={sig_idx}")
+        if arg_nodes.len() as i32 != self.sema.sig_get_param_count(sig_idx):
+            sema_phase_bug(f"BUG: precondition form call has {arg_nodes.len()} operands for {self.sema.sig_get_param_count(sig_idx)} parameters; Sema states no filled list: node={node}")
         let cond_op = self.lower_call_arg(arg_nodes[0], sig_idx, 0, 0, form_sym)
         let fail_bb = self.new_block()
         let pass_bb = self.new_block()
@@ -12077,7 +12074,11 @@ impl MirBuilder:
     // non-generic method path for `mut self` callees, where the receiver must be
     // an OK_COPY borrow of the caller's place rather than an OK_MOVE consumed
     // argument (§9.5/#641a). Remaining arg nodes shift to sig positions 1..n.
-    mut fn lower_call_with_arg_nodes_recv(fn_op: i32, callee_sym: i32, recv_op: i32, arg_node_vec: &Vec[i32], ret_type_id: i32, node: i32) -> i32:
+    // `args_node` is the call whose Sema-resolved arguments (defaults among
+    // them) `arg_node_vec` ends with, when not `node` itself: a pipeline
+    // stage's call (#2024).
+    mut fn lower_call_with_arg_nodes_recv(fn_op: i32, callee_sym: i32, recv_op: i32, arg_node_vec: &Vec[i32], ret_type_id: i32, node: i32, args_node: i32 = 0) -> i32:
+        let resolved_node = if args_node != 0: args_node else: node
         var sig_idx = self.call_sig_for_sym(callee_sym)
         let recorded_sig = self.sema.resolved_call_sigs.get(node).copied()
         if recorded_sig.is_some():
@@ -12092,13 +12093,13 @@ impl MirBuilder:
         if recv_op >= 0:
             args.push(recv_op)
             arg_pos = 1
-        let default_offset = if self.sema.has_resolved_call_args(node) != 0: arg_node_vec.len() as i32 - self.sema.get_resolved_call_arg_count(node) else: 0
+        let default_offset = if self.sema.has_resolved_call_args(resolved_node) != 0: arg_node_vec.len() as i32 - self.sema.get_resolved_call_arg_count(resolved_node) else: 0
         for i in 0..arg_node_vec.len() as i32:
             let arg_node = arg_node_vec[i]
             if arg_node < 0:
                 args.push(self.lower_var(0 - arg_node, 0, 0))
-            else if i >= default_offset and self.sema.resolved_call_arg_is_default(node, i - default_offset) != 0:
-                args.push(self.lower_default_call_arg(arg_node, node, sig_idx, 0, i + arg_pos))
+            else if i >= default_offset and self.sema.resolved_call_arg_is_default(resolved_node, i - default_offset) != 0:
+                args.push(self.lower_default_call_arg(arg_node, resolved_node, sig_idx, 0, i + arg_pos))
             else:
                 args.push(self.lower_call_arg(arg_node, sig_idx, 0, i + arg_pos, callee_sym))
         let args_id = self.body.new_call_args(args)
@@ -15965,7 +15966,9 @@ impl MirBuilder:
         success_fields.push(raw_op)
         self.assign_enum_variant_to_place(result_place, result_ty, success_sym, success_fields, self.ast.get_start(node))
 
-    mut fn lower_pipeline(lhs_expr: i32, fn_expr: i32, args_start: i32, args_count: i32, node: i32) -> i32:
+    // `call_node` holds the stage's Sema-filled arguments: its call
+    // (`x |> f(a)`), or the pipeline itself for a bare stage (`x |> f`).
+    mut fn lower_pipeline(lhs_expr: i32, fn_expr: i32, args_start: i32, args_count: i32, node: i32, call_node: i32) -> i32:
         if self.sema.pipeline_method_calls.contains(node):
             let method_sym: i32 = self.sema.pipeline_method_calls.get(node).unwrap()
             if self.sema.pipeline_carrier_kinds.contains(node) and self.sema.pipeline_carrier_kinds.get(node).unwrap() != 0:
@@ -16001,10 +16004,16 @@ impl MirBuilder:
                 0
         let arg_nodes: Vec[i32] = Vec.new()
         arg_nodes.push(lhs_expr)
-        for i in 0..args_count:
-            arg_nodes.push(self.ast.get_extra(args_start + i))
+        // #2024: the stage call's argument list as Sema filled it (its
+        // defaults included), after the piped value.
+        if call_node != 0 and self.sema.has_resolved_call_args(call_node) != 0:
+            for i in 0..self.sema.get_resolved_call_arg_count(call_node):
+                arg_nodes.push(self.sema.get_resolved_call_arg(call_node, i))
+        else:
+            for i in 0..args_count:
+                arg_nodes.push(self.ast.get_extra(args_start + i))
         let ret_ty = self.expr_type(node)
-        self.lower_call_with_arg_nodes(fn_op, callee_sym, arg_nodes, ret_ty, node)
+        self.lower_call_with_arg_nodes_recv(fn_op, callee_sym, -1, arg_nodes, ret_ty, node, call_node)
 
     // §12.4: a closure captures by place. A binding that is a local is
     // captured as that local; one that names a place without a local of its
@@ -16956,8 +16965,9 @@ impl MirBuilder:
                     let form_fn_op = self.lower_callable_expr(self.ast.get_data0(rhs))
                     let form_ret = if form_sig >= 0: self.sema.sig_return_type(form_sig) else: 0
                     return self.lower_precondition_form(form_fn_op, form_sig, form_sym, form_ret, self.ast.get_data0(node), self.ast.get_data1(rhs), self.ast.get_data2(rhs), rhs)
-                return self.lower_pipeline(self.ast.get_data0(node), self.ast.get_data0(rhs), self.ast.get_data1(rhs), self.ast.get_data2(rhs), node)
-            return self.lower_pipeline(self.ast.get_data0(node), rhs, 0, 0, node)
+                return self.lower_pipeline(self.ast.get_data0(node), self.ast.get_data0(rhs), self.ast.get_data1(rhs), self.ast.get_data2(rhs), node, rhs)
+            // A bare stage's filled arguments are stated on the pipeline (#2024).
+            return self.lower_pipeline(self.ast.get_data0(node), rhs, 0, 0, node, node)
 
         if kind == NodeKind.NK_WITH_EXPR:
             let source = self.ast.get_data0(node)

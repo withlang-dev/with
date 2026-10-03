@@ -21183,7 +21183,18 @@ impl Sema:
         // D65 (§12): a function the stage names is the call's callee, not a
         // callable value (`text |> escape_lexeme`).
         self.fn_callable_values.remove(rhs)
-        if rhs_ty != 0:
+        // #2024: a bare stage `x |> f` is the call `f(x)`: the callee's
+        // defaults fill the parameters after the piped one. The filled list
+        // is stated on the pipeline node (MirLower.w lower_pipeline).
+        if rhs_ty != 0 and self.ast.kind(rhs) == NodeKind.NK_IDENT and self.fn_value_ident_sigs.contains(rhs):
+            let stage_sig: i32 = self.fn_value_ident_sigs.get(rhs).unwrap()
+            let stage_sym = self.ast.get_data0(rhs)
+            let filled = self.resolve_named_call_args(node, stage_sig, stage_sym, 1, 0, 0)
+            if self.has_resolved_call_args(node) != 0:
+                for ai in 0..filled:
+                    let default_node = self.get_resolved_call_arg(node, ai)
+                    if default_node > 0:
+                        let _ = self.check_call_argument_expr(node, ai, stage_sym, default_node, self.sig_param_type(stage_sig, ai + 1) as i32)
             let resolved = self.resolve_alias(rhs_ty)
             if self.get_type_kind(resolved) == TypeKind.TY_FN:
                 let ret_ty = self.get_type_d2(resolved)
@@ -22638,6 +22649,10 @@ impl Sema:
                 self.emit_error("named arguments are not supported for closures or function pointers", node)
 
         let param_offset = if self.in_pipeline_rhs != 0: 1 else: 0
+        // The piped value is this stage call's first argument, not that of
+        // a call among its arguments: `x |> f(g())` passes `x` to `f` only.
+        // (check_pipeline restores the flag after the stage.)
+        self.in_pipeline_rhs = 0
         // A concrete signature wins over generic-node bookkeeping. Different
         // symbol pools can reuse integer ids, so a stale/raw generic map hit must
         // not turn an ordinary helper call into a generic instantiation.
@@ -28384,13 +28399,25 @@ impl Sema:
     mut fn resolve_named_call_args(call_node: i32, sig_idx: i32, fn_sym: i32, param_offset: i32, extra_start: i32, arg_count: i32):
         if self.has_resolved_call_args(call_node) != 0:
             return self.get_resolved_call_arg_count(call_node)
-        if self.ast.has_call_named_args(call_node) == 0 or sig_idx < 0 or not self.fn_decl_nodes.contains(fn_sym):
+        if sig_idx < 0 or not self.fn_decl_nodes.contains(fn_sym):
             return arg_count
         let fn_node: i32 = self.fn_decl_nodes.get(fn_sym).unwrap()
         let meta = self.ast.find_fn_meta(fn_node)
         if meta < 0: return arg_count
         let param_count = self.sig_get_param_count(sig_idx)
         let ps = self.ast.fn_meta_param_start(meta)
+        // #2024 (D65): a positional call that leaves trailing parameters to
+        // their defaults gets its filled argument list here too, so every
+        // call spelling — a pipeline stage included — lowers the list Sema
+        // states. A missing parameter without a default stays the arity
+        // check's (or, for an implicit one, check_call's `with` fill) to
+        // resolve.
+        if self.ast.has_call_named_args(call_node) == 0:
+            if arg_count + param_offset >= param_count:
+                return arg_count
+            for pi in arg_count + param_offset..param_count:
+                if self.ast.get_fn_param_default(ps, pi) == 0:
+                    return arg_count
         var resolved_map: HashMap[i32, i32] = HashMap.new()
         var resolved_defaults: HashMap[i32, i32] = HashMap.new()
         var first_named_idx = arg_count
