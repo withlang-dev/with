@@ -1527,6 +1527,9 @@ pub type Sema {
     // call `T(..)` resolved to.
     call_callee_kinds: HashMap[i32, i32],
     type_ctor_call_syms: HashMap[i32, i32],
+    // The contents an `embed_file(path)` call embeds, read when Sema
+    // evaluated the path (check_intrinsic_call); codegen emits it.
+    embed_file_contents: HashMap[i32, str],
 
     // C11 6.5.2.2p6-7: the type each argument of a call to a C function is
     // passed as after the default argument promotions, keyed by the call
@@ -3292,6 +3295,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         call_callable_types,
         call_callee_kinds: sema_new_map_i32_i32(),
         type_ctor_call_syms: sema_new_map_i32_i32(),
+        embed_file_contents: HashMap.new(),
 
         c_promoted_arg_starts: sema_new_map_i32_i32(),
         c_promoted_arg_data: Vec.new(),

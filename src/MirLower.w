@@ -16943,7 +16943,16 @@ impl MirBuilder:
             // codegen's builtin dispatch reads it from the call node.
             if self.ast.kind(callee) == NodeKind.NK_IDENT and callee_kind == CallCalleeKind.Intrinsic:
                 let bu_fn_op = self.const_operand(ConstKind.CK_FN, self.ast.get_data0(callee), 0)
+                // The builtin's arguments are MIR operands like any call's;
+                // codegen reads them, never the AST (#2043).
                 let bu_args: Vec[i32] = Vec.new()
+                let bu_resolved = self.sema.has_resolved_call_args(node) != 0
+                let bu_count = if bu_resolved: self.sema.get_resolved_call_arg_count(node) else: self.ast.get_data2(node)
+                for bu_ai in 0..bu_count:
+                    let bu_arg = if bu_resolved: self.sema.get_resolved_call_arg(node, bu_ai) else: self.ast.get_extra(self.ast.get_data1(node) + bu_ai)
+                    let bu_op = self.lower_expr(bu_arg)
+                    self.consume_moved_operand(bu_op)
+                    bu_args.push(bu_op)
                 let bu_args_id = self.body.new_call_args(bu_args)
                 self.body.set_call_intrinsic(bu_args_id, MirIntrinsic.GENERIC_CALL)
                 self.body.set_call_ast_node(bu_args_id, node)

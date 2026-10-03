@@ -592,8 +592,15 @@ fn resolution_audit_callee_kinds(report: &AnalysisReport, sema: &Sema, mir_mod: 
             let callee = sema.ast.get_data0(node)
             if sema.ast.kind(callee) != NodeKind.NK_IDENT: continue
             checked = checked + 1
-            if sema.call_callee_kind(node) == CallCalleeKind.None:
+            let kind = sema.call_callee_kind(node)
+            if kind == CallCalleeKind.None:
                 report.fail(f"resolution: {pool.resolve(body.fn_sym)} at {resolution_where(sema, &site, node)}: MIR lowered a call of `{pool.resolve(sema.ast.get_data0(callee))}` Sema recorded no callee kind for")
+            // #2043: a builtin's arguments are its MIR operands; a call that
+            // carries fewer leaves codegen reading another call's operands.
+            if kind == CallCalleeKind.Intrinsic:
+                let source_argc = if sema.has_resolved_call_args(node) != 0: sema.get_resolved_call_arg_count(node) else: sema.ast.get_data2(node)
+                if body.call_arg_counts[call_id] != source_argc:
+                    report.fail(f"resolution: {pool.resolve(body.fn_sym)} at {resolution_where(sema, &site, node)}: builtin `{pool.resolve(sema.ast.get_data0(callee))}` lowered with {body.call_arg_counts[call_id]} MIR operands for {source_argc} arguments")
     report.note(f"resolution-audit: name-callee-kinds judged={checked}")
     checked
 

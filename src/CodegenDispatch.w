@@ -15233,7 +15233,8 @@ impl Codegen:
 
                 // Handle builtins directly (no gen_expr needed)
                 if gc_callee_sym > 0:
-                    let gc_arg_count = self.pool.get_data2(gc_node)
+                    // MIR's operands are the builtin's arguments (#2043).
+                    let gc_arg_count = body.call_arg_counts[args_id]
                     if gc_callee_sym == self.sym_src and gc_arg_count == 0:
                         let gc_result = self.gen_src_intrinsic(gc_node)
                         if dest_place >= 0 and gc_result != 0:
@@ -19169,25 +19170,16 @@ impl Codegen:
         let loc_str = f"{source_path}:{line}:{col}"
         self.gen_string_literal_raw(loc_str)
 
+    // #2043 (D65): the contents Sema read when it evaluated the path
+    // (check_intrinsic_call); codegen neither evaluates the argument nor
+    // reads the file.
     mut fn gen_embed_file(node: i32) -> i64:
-        let args_start = self.pool.get_data1(node)
-        let arg_node = self.pool.get_extra(args_start)
-        let current_source_file = with_str_clone_ref(self.current_decl_source_file)
-        let path_value = self.try_eval_const_string(arg_node, current_source_file, 0)
-        if not path_value.ok:
-            with_eprint("error: embed_file() argument must be a compile-time string")
+        let contents = self.sema.embed_file_contents.get(node)
+        if contents.is_none():
+            with_eprint(f"error: BUG: embed_file() call has no contents recorded by Sema: node={node}")
             self.had_error = 1
             return wl_get_undef(wl_i32_type(self.context))
-        let base_path = if self.current_decl_source_file.len() > 0 and self.current_decl_source_file != "<unknown>":
-            with_str_clone_ref(self.current_decl_source_file)
-        else:
-            with_str_clone_ref(self.source_file)
-        let read_result = self.read_tracked_embed_file(base_path, path_value.text)
-        if not read_result.ok:
-            with_eprint("error: " ++ read_result.error_msg)
-            self.had_error = 1
-            return wl_get_undef(wl_i32_type(self.context))
-        self.gen_string_literal_raw(read_result.contents)
+        self.gen_string_literal_raw(contents.unwrap())
 
     fn extract_str_ptr(str_val: i64) -> i64:
         // Extract ptr (field 0) from str struct
