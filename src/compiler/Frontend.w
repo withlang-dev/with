@@ -2066,7 +2066,7 @@ impl Zcu:
 
         // §9.5: a bare receiver field name in its type's own module's methods,
         // on the final pool (the comptime transform may replace it).
-        pool.resolve_receiver_field_names(self.pool)
+        pool.resolve_receiver_field_names(self.pool, &self.decl_is_c_import)
 
         // The comptime transform may replace the AstPool and remap every node. Cache
         // only the final pool: MIR preparation must never re-enter Sema with the
