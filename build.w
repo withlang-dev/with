@@ -13,6 +13,7 @@ use build.retention
 use build.release_uat
 use build.package
 use build.sdk
+use build.source_fetch
 use build.wo
 use build.examples
 use build.sema_order
@@ -899,7 +900,7 @@ fn gate_fixed_targets() -> Vec[str]:
     // Built by push: the pinned seed evaluating build.w cannot take .len() of a
     // collection literal (the #1122 class).
     var fixed: Vec[str] = Vec.new()
-    for name in "build selfcheck reseed-check-build-w abi-hash-check unit-return-review spec-inventory-check sema-order-check examples-tests benchmarks-check c-migrator-basic-tests deep-debug-tool-tests user-programs-safe no-host-toolchain corpus-drift-check".split(" "): fixed.push(name.clone())
+    for name in "build selfcheck reseed-check-build-w abi-hash-check unit-return-review spec-inventory-check sema-order-check examples-tests benchmarks-check c-migrator-basic-tests deep-debug-tool-tests user-programs-safe no-host-toolchain source-fetch-tests corpus-drift-check".split(" "): fixed.push(name.clone())
     fixed
 
 fn gate_times_ledger_path() -> str: "out/.build-state/battery-times.tsv"
@@ -3042,6 +3043,19 @@ pub fn build(ctx: BuildCtx) -> Build:
     no_host_toolchain = no_host_toolchain.write_scope("out/command/no-host-toolchain")
     out = out.add_target(no_host_toolchain)
 
+    // #2062: a pinned source archive comes from the first of its sources
+    // that delivers it, and a source that is down or silent costs seconds
+    // (build/source_fetch.w). Loopback only; no host beyond this one.
+    var source_fetch_tests = target_new(.Action, "source-fetch-tests", "").output("out/.build-state/source-fetch-tests.txt")
+    source_fetch_tests.action = run_source_fetch_tests_action
+    source_fetch_tests = source_fetch_tests.input("build/source_fetch.w")
+    source_fetch_tests = source_fetch_tests.input("build/https_fetch.w")
+    source_fetch_tests = source_fetch_tests.input("build/silent_listener.w")
+    source_fetch_tests = source_fetch_tests.write_scope("out/.build-state")
+    source_fetch_tests = source_fetch_tests.write_scope("out/command/source-fetch-tests")
+    source_fetch_tests = source_fetch_tests.allow_network()
+    out = out.add_target(source_fetch_tests.timeout(300000))
+
     var libc_surface = target_new(.Action, "libc-surface-check", "").output("out/.build-state/libc-surface-check.txt")
     libc_surface.action = run_check_libc_surface_action
     libc_surface = libc_surface.write_scope("out/.build-state")
@@ -4406,6 +4420,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     battery_checks = battery_checks.dep("test-with-audits")
     battery_checks = battery_checks.dep("user-programs-safe")
     battery_checks = battery_checks.dep("no-host-toolchain")
+    battery_checks = battery_checks.dep("source-fetch-tests")
     battery_checks = battery_checks.dep("last-green")
     out = out.add_target(battery_checks)
 
