@@ -44,13 +44,14 @@ impl BuildGraphOutputOwners:
 
 // Run over the whole graph a build.w declares, not only the targets one
 // command selects: two targets that declare one output make its bytes depend
-// on which ran last, whether or not this command runs both (#2014).
+// on which ran last, whether or not this command runs both (#2014). Every
+// shared output is named, not only the first.
 pub fn build_graph_validate_outputs(root: &str, graph: &BuildGraph, output_path: &str) -> i32:
     var seen = BuildGraphOutputOwners { paths: Vec.new(), owners: Vec.new() }
+    var shared = 0
     for gi in 0..graph.generated_sources.len() as i32:
         let generated = graph.generated_sources[gi]
-        if seen.claim(resolve_join(root, generated.path), "generated source '" ++ generated.path ++ "'") != 0:
-            return 1
+        shared = shared + seen.claim(resolve_join(root, generated.path), "generated source '" ++ generated.path ++ "'")
     for ti in 0..graph.targets.len() as i32:
         let target = &graph.targets[ti]
         var path = ""
@@ -67,12 +68,10 @@ pub fn build_graph_validate_outputs(root: &str, graph: &BuildGraph, output_path:
         else if target.output.len() > 0:
             path = build_graph_resolve_project_path(root, target.output)
         let owner = "target '" ++ target.name ++ "'"
-        if seen.claim(path, owner) != 0:
-            return 1
+        shared = shared + seen.claim(path, owner)
         for oi in 0..target.extra_outputs.len() as i32:
-            if seen.claim(build_graph_resolve_project_path(root, target.extra_outputs[oi]), owner) != 0:
-                return 1
-    0
+            shared = shared + seen.claim(build_graph_resolve_project_path(root, target.extra_outputs[oi]), owner)
+    if shared > 0: 1 else: 0
 
 pub fn build_graph_write_generated_sources(root: &str, graph: &BuildGraph) -> i32:
     for gi in 0..graph.generated_sources.len() as i32:
