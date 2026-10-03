@@ -257,6 +257,42 @@ fn comp_tool_from_env(primary: &str, legacy: &str, fallback: &str) -> str:
 pub fn comp_arch_is_aarch64(a: &str) -> bool:
     a == "aarch64" or a == "armv8"
 
+// The home directory the build layer's stores live under: $HOME, else on
+// Windows %USERPROFILE% with '\\' as '/' (cmd.exe and PowerShell set no
+// HOME, #1884). The driver expands an install destination's `$HOME/` the
+// same way (src/BuildGraphSupport.w build_graph_home_dir). Graph time reads
+// both as inputs; with neither set the build stops here, naming them,
+// rather than placing a store at `/.local/...` (#1884: the wo store became
+// "/.local/with-wo" and failed late as an escape).
+pub fn comp_home_dir(ctx: &BuildCtx) -> str:
+    let home = comp_home_lookup(ctx)
+    if home.len() == 0:
+        let names = if os() == "Windows": "HOME and USERPROFILE are" else: "HOME is"
+        ctx.diagnostics().error(names ++ " unset or empty: the build's stores (~/.local/with-wo, ~/.local/with-green) have no home directory; set HOME, or WITH_WO_DIR and WITH_GREEN_DIR")
+    home
+
+// The home directory, "" when there is none: for a caller that only asks
+// whether an explicit store lies beneath it.
+pub fn comp_home_lookup(ctx: &BuildCtx) -> str:
+    let home = ctx.env_input("HOME")
+    if home.len() > 0 or os() != "Windows":
+        return home
+    comp_slashes(ctx.env_input("USERPROFILE"))
+
+// comp_home_dir for an action, which reads the environment it runs in: the
+// same rule, so an action finds the store the graph declared.
+pub fn comp_home_dir_env() -> str:
+    let home = env("HOME")
+    if home.len() > 0 or os() != "Windows":
+        return home
+    comp_slashes(env("USERPROFILE"))
+
+fn comp_slashes(path: &str) -> str:
+    var out = ""
+    for i in 0..path.len() as i32:
+        out = out ++ (if path[i] == '\\': "/" else: path.slice(i, i + 1))
+    out
+
 fn comp_default_llvm_prefix() -> str:
     let host_os = os()
     let host_arch = arch()

@@ -545,7 +545,7 @@ pub fn build_cache_record_test_success(root: &str, target: &BuildGraphTarget, te
 pub fn build_cache_test_verdict_store(root: &str) -> str:
     let explicit = build_graph_rt_getenv("WITH_TEST_VERDICT_DIR")
     if explicit.len() > 0: return explicit
-    let home = build_graph_rt_getenv("HOME")
+    let home = build_graph_home_dir()
     if home.len() > 0: return home ++ "/.local/with-test-verdicts"
     build_cache_state_dir(root) ++ "/test-verdicts"
 
@@ -562,7 +562,7 @@ pub fn build_cache_test_verdicts_path(root: &str, compiler_fp: &str, target_name
 pub fn build_cache_runner_store_path(key: &str) -> str:
     var dir = build_graph_rt_getenv("WITH_BUILD_RUNNER_DIR") ++ ""
     if dir.len() == 0:
-        let home = build_graph_rt_getenv("HOME")
+        let home = build_graph_home_dir()
         if home.len() == 0: return ""
         dir = home ++ "/.local/with-build-runners"
     dir ++ "/" ++ build_cache_sha256_text(key)

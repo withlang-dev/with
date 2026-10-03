@@ -3151,7 +3151,14 @@ fn cli_fast_install_blessed(root: &str, target_name: &str) -> i32:
     // kept its inode, and macOS SIGKILLed the next launch (2026-09-22, after
     // this path had printed success). Temp sibling + rename + `<dest> version`
     // proving the installed file starts and is this compiler.
-    let dest = with_getenv_str("HOME") ++ "/.local/bin/with"
+    // The home as every other store resolves it: $HOME, else %USERPROFILE%
+    // on Windows (#1884); with neither, the install stops here rather than
+    // writing /.local/bin/with.
+    let home = build_graph_home_dir()
+    if home.len() == 0:
+        with_eprint("[" ++ target_name ++ "] error: HOME (or USERPROFILE on Windows) is unset or empty: no home for ~/.local/bin/with\n")
+        return 1
+    let dest = home ++ "/.local/bin/with"
     if build_graph_install_path(f"[{target_name}]", compiler_path, data, dest, 0o755, "version") != 0:
         return 1
     with_write("[" ++ target_name ++ "] " ++ dest ++ " <- out/release/bin/with (" ++ verified_by ++ ")\n")

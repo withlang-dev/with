@@ -126,27 +126,15 @@ pub fn wo_manifest_field(manifest: &str, key: &str) -> str:
         start = end + 1
     ""
 
-// The home directory: $HOME, else on Windows %USERPROFILE% ('\\' as '/'),
-// which a Windows shell other than Git Bash sets instead (#1915). The
-// driver expands an install destination's `$HOME/` the same way
-// (src/BuildGraphSupport.w build_graph_home_dir).
-fn wo_home(ctx: &BuildCtx) -> str:
-    let home = ctx.env_input("HOME")
-    if home.len() > 0 or os() != "Windows":
-        return home
-    let profile = ctx.env_input("USERPROFILE")
-    var out = ""
-    for i in 0..profile.len() as i32:
-        out = out ++ (if profile[i] == '\\': "/" else: profile.slice(i, i + 1))
-    out
-
-// The store directory: $WITH_WO_DIR, else ~/.local/with-wo. Both are
-// graph inputs (env_input), so a change re-plans.
+// The store directory: $WITH_WO_DIR, else ~/.local/with-wo, the home as
+// build/compiler.w comp_home_dir resolves it: %USERPROFILE% on Windows
+// without HOME, and a loud stop when there is none (#1884). Every input is
+// read through env_input, so a change re-plans.
 pub fn wo_store_dir(ctx: &BuildCtx) -> str:
     let explicit = ctx.env_input("WITH_WO_DIR")
     if explicit.len() > 0:
         return explicit
-    wo_home(ctx) ++ "/.local/with-wo"
+    comp_home_dir(ctx) ++ "/.local/with-wo"
 
 // The store as an .Install destination: the kind writes outside the project
 // only under `$HOME/`, so a store beneath the home directory is spelled
@@ -154,7 +142,7 @@ pub fn wo_store_dir(ctx: &BuildCtx) -> str:
 // store under out/).
 fn wo_store_install_dir(ctx: &BuildCtx) -> str:
     let store = wo_store_dir(ctx)
-    let home = wo_home(ctx)
+    let home = comp_home_lookup(ctx)
     if home.len() > 0 and store.starts_with(home ++ "/"):
         return "$HOME/" ++ store.slice(home.len() + 1, store.len())
     store

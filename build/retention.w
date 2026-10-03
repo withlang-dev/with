@@ -524,7 +524,9 @@ fn ret_git_commit(ctx: &ActionCtx) -> str:
 
 pub fn ret_green_store_path() -> str:
     let explicit = env("WITH_GREEN_DIR")
-    let dir = if explicit.len() > 0: explicit else: env("HOME") ++ "/.local/with-green"
+    // The home as the graph resolved it (build.w green_store_install_path,
+    // #1884).
+    let dir = if explicit.len() > 0: explicit else: comp_home_dir_env() ++ "/.local/with-green"
     dir ++ "/green.tsv"
 
 /// An untracked path that is not a build input: a user's own program under

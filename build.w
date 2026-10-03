@@ -1530,10 +1530,12 @@ fn install_file_target(name: &str, source: &str, dest: &str, mode: &str, dep: &s
 // ran; nothing noticed until the next `with` invocation).
 // The green store as an .Install destination: $WITH_GREEN_DIR, else
 // ~/.local/with-green (build/retention.w ret_green_store_path reads the same
-// two). The kind writes outside the project only under `$HOME/`.
+// two). The kind writes outside the project only under `$HOME/`. The home
+// is build/compiler.w comp_home_dir's (#1884: %USERPROFILE% on Windows
+// without HOME, a loud stop with neither).
 fn green_store_install_path(ctx: &BuildCtx) -> str:
     let explicit = ctx.env_input("WITH_GREEN_DIR")
-    let home = ctx.env_input("HOME")
+    let home = if explicit.len() > 0: comp_home_lookup(ctx) else: comp_home_dir(ctx)
     let dir = if explicit.len() > 0: explicit else: home ++ "/.local/with-green"
     if home.len() > 0 and dir.starts_with(home ++ "/"):
         return "$HOME/" ++ dir.slice(home.len() + 1, dir.len()) ++ "/green.tsv"
