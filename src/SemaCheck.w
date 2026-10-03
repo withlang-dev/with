@@ -7083,6 +7083,23 @@ impl Sema:
         let path = self.fn_symbol_source_path(fn_sym)
         sema_path_is_std_module(path, "builtins") or sema_path_is_std_module(path, "testing")
 
+    // std.sync's (and std.collections') `fence`: the declaration MIR lowers
+    // to the atomic fence intrinsic. Its module decides, never the name.
+    fn fn_symbol_is_std_fence(fn_sym: i32) -> bool:
+        if self.pool_resolve(fn_sym) != "fence":
+            return false
+        let path = self.fn_symbol_source_path(fn_sym)
+        sema_path_is_std_module(path, "sync") or sema_path_is_std_module(path, "collections")
+
+    // D65 phase 5 (#1647): the one record of what a call's callee resolved
+    // to; check_call writes it at the branch that decides.
+    mut fn note_call_callee(node: i32, kind: CallCalleeKind):
+        self.call_callee_kinds.insert(node, kind as i32)
+
+    fn call_callee_kind(node: i32) -> CallCalleeKind:
+        let raw = self.call_callee_kinds.get(node) ?? 0
+        raw as CallCalleeKind
+
     mut fn check_std_builtins_diverging_call_surface(fn_sym: i32, node: i32, arg_count: i32) -> i32:
         let name: str = self.pool_resolve(fn_sym)
         if name != "panic" and name != "todo" and name != "unreachable":
@@ -22904,6 +22921,8 @@ impl Sema:
             return vector_call
 
         // sizeof[T]() / alignof[T]() / transmute[T]() / nameof[T]() builtins
+        if self.is_sizeof_or_alignof(callee) != 0 or self.is_nameof_call(callee) != 0 or self.is_transmute_call(callee) != 0 or self.is_chan_call(callee) != 0:
+            self.note_call_callee(node, CallCalleeKind.TypeLevelBuiltin)
         if self.is_sizeof_or_alignof(callee) != 0:
             let type_arg_node = self.sizeof_alignof_type_arg_node(callee)
             if type_arg_node == 0:
@@ -23050,6 +23069,7 @@ impl Sema:
                 return self.ty_void as i32
             let yield_carrier = if call_name == "_Payload": self.comprehension_carrier_of(node) else: 0
             if yield_carrier != 0:
+                self.note_call_callee(node, CallCalleeKind.Variant)
                 return self.check_comprehension_yield(node, yield_carrier)
             if call_name == "_Payload":
                 // Try expected type first, then fall back to Some (most common)
@@ -23455,12 +23475,16 @@ impl Sema:
                 if drop_arg_nd > 0:
                     self.mark_moved_if_consumed(drop_arg_nd)
             self.comp_resolved.insert(node, fn_sym)
+            self.note_call_callee(node, CallCalleeKind.StdDrop)
             self.typed_expr_types.insert(node, self.ty_void as i32)
             return self.ty_void as i32
 
         // Known function
         if sig_idx >= 0:
             self.comp_resolved.insert(node, fn_sym)
+            // std's `fence` is the atomic fence intrinsic: its declaration,
+            // not its name, says so (a user's own `fence` is a function).
+            self.note_call_callee(node, if self.fn_symbol_is_std_fence(fn_sym): CallCalleeKind.AtomicFence else: CallCalleeKind.Function)
             self.emit_no_await_guard_may_suspend_call(node, fn_sym)
             if self.task_fns.contains(fn_sym):
                 self.note_allocation_site(node, AllocConstructKind.ASYNC_FIBER, 0, 0)
@@ -23603,6 +23627,7 @@ impl Sema:
 
         if callable_value_tid != 0:
             let call_name = if self.ast.kind(callee) == NodeKind.NK_IDENT: with_str_clone_ref(self.pool_resolve(fn_sym)) else: ""
+            self.note_call_callee(node, CallCalleeKind.Callable)
             return self.check_callable_value_call(call_name, callable_value_tid, callable_closure_node, node, resolved_extra_start, resolved_arg_count, param_offset, has_resolved, arg_types)
 
         // Local variable (not callable)
@@ -23619,6 +23644,7 @@ impl Sema:
             if deferred_closure_args.len() > 0:
                 arg_types = self.check_deferred_generic_closure_args(fn_node, fn_sym, &deferred_closure_args, move arg_types, &checked_arg_nodes, node)
             self.resolved_generic_call_nodes.insert(node, fn_node)
+            self.note_call_callee(node, CallCalleeKind.Generic)
             self.emit_no_await_guard_may_suspend_call(node, fn_sym)
             self.note_allocating_callee(node, fn_sym)
             let ret = self.check_generic_call(fn_sym, fn_node, arg_types, checked_arg_nodes, resolved_arg_count, node)
@@ -23659,6 +23685,7 @@ impl Sema:
                             self.emit_argument_type_mismatch(variant_name2, fn_sym, ai, ai, expected_ty, arg_ty, if payload_arg_node > 0: payload_arg_node else: node)
             let resolved_variant_sym = self.qualified_enum_variant_sym(final_variant_ty as i32, fn_sym)
             self.comp_resolved.insert(node, resolved_variant_sym)
+            self.note_call_callee(node, CallCalleeKind.Variant)
             self.typed_expr_types.insert(node, final_variant_ty as i32)
             if self.type_is_ephemeral_value(final_variant_ty as i32) != 0 or self.nodes_hold_ephemeral_value(&checked_arg_nodes):
                 self.record_transparent_view_origins_from_nodes(node, &checked_arg_nodes)
@@ -23670,6 +23697,7 @@ impl Sema:
             if arg_count != 1:
                 self.emit_error("distinct type constructor requires exactly 1 argument", node)
                 return 0
+            self.note_call_callee(node, CallCalleeKind.Distinct)
             let dt_inner = self.unwrap_builtin_arg_distinct(dt_tid)
             let dt_arg_ty = arg_types[0]
             let dt_arg_node = if has_resolved != 0: self.get_resolved_call_arg(node, 0) else: self.ast.get_extra(resolved_extra_start)
@@ -23687,6 +23715,8 @@ impl Sema:
             let new_sym = self.pool_intern(new_name)
             let new_sig = self.get_sig(new_sym)
             if new_sig >= 0:
+                self.note_call_callee(node, CallCalleeKind.TypeConstructor)
+                self.type_ctor_call_syms.insert(node, new_sym)
                 let new_ret = self.sig_return_type(new_sig)
                 let new_expected = self.sig_get_param_count(new_sig)
                 if arg_count > new_expected:
@@ -23698,6 +23728,10 @@ impl Sema:
         if self.is_intrinsic_fn_sym(fn_sym) != 0:
             let ret = self.check_intrinsic_call(fn_sym, node, arg_types, arg_count)
             self.typed_expr_types.insert(node, ret)
+            let intrinsic_kind = if self.math_builtin_calls.contains(node): CallCalleeKind.MathBuiltin
+                else if fn_sym == self.syms.src: CallCalleeKind.SourceLocation
+                else: CallCalleeKind.Intrinsic
+            self.note_call_callee(node, intrinsic_kind)
             return ret
 
         if self.ast.kind(callee) != NodeKind.NK_IDENT:

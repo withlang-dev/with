@@ -12192,32 +12192,19 @@ impl MirBuilder:
         let sema_sym = self.sema.pool_lookup_symbol(name)
         self.sema.get_sig(sema_sym)
 
-    fn sym_is_generic_fn(sym: i32) -> bool:
-        if sym == 0:
-            return false
-        if self.call_sig_for_sym(sym) >= 0:
-            return false
-        if self.sema.generic_fn_node_for_symbol(sym) != 0:
-            return true
-        let name = self.pool.resolve_symbol(sym)
-        if name.len() == 0:
-            return false
-        let sema_sym = self.sema.pool_lookup_symbol(name)
-        sema_sym != 0 and self.sema.get_sig(sema_sym) < 0 and self.sema.generic_fn_node_for_symbol(sema_sym) != 0
+    // D65 phase 5 (#1647): whether a MIR callee symbol names a generic
+    // template, by Sema's identity for the symbol (the same name in Sema's
+    // pool), never by probing Sema's tables with a MIR-pool integer.
+    fn sym_is_generic_fn(sym: i32): self.generic_fn_node_for_sym(sym) != 0
 
     fn generic_fn_node_for_sym(sym: i32) -> i32:
-        if not self.sym_is_generic_fn(sym):
+        if sym == 0:
             return 0
-        let direct = self.sema.generic_fn_node_for_symbol(sym)
-        if direct != 0:
-            return direct
         let name = self.pool.resolve_symbol(sym)
-        if name.len() == 0:
+        let sema_sym = if name.len() > 0: self.sema.pool_lookup_symbol(name) else: 0
+        if sema_sym == 0 or self.sema.get_sig(sema_sym) >= 0:
             return 0
-        let sema_sym = self.sema.pool_lookup_symbol(name)
-        if sema_sym != 0:
-            return self.sema.generic_fn_node_for_symbol(sema_sym)
-        0
+        self.sema.generic_fn_node_for_symbol(sema_sym)
 
     fn callee_has_move_self(fn_sym: i32) -> bool:
         var fn_node = 0
@@ -16766,14 +16753,15 @@ impl MirBuilder:
                 let generic_method_base = self.ast.get_data0(callee)
                 if self.ast.kind(generic_method_base) == NodeKind.NK_FIELD_ACCESS:
                     return self.lower_method_call(self.ast.get_data0(generic_method_base), self.ast.get_data1(generic_method_base), self.ast.get_data1(node), self.ast.get_data2(node), node)
+            // D65 phase 5 (#1647): Sema's record of what the callee resolved
+            // to decides the lowering; MIR never re-derives it from the name.
+            let callee_kind = self.sema.call_callee_kind(node)
             var generic_builtin_sym = 0
-            if self.ast.kind(callee) == NodeKind.NK_INDEX or self.ast.kind(callee) == NodeKind.NK_TYPE_GENERIC:
+            if callee_kind == CallCalleeKind.TypeLevelBuiltin:
                 let gb_base = self.ast.get_data0(callee)
-                if self.ast.kind(gb_base) == NodeKind.NK_IDENT:
-                    let gb_sym = self.ast.get_data0(gb_base)
-                    let gb_name = self.pool.resolve(gb_sym)
-                    if gb_name == "transmute" or gb_name == "sizeof" or gb_name == "size_of" or gb_name == "alignof" or gb_name == "align_of" or gb_name == "nameof" or gb_name == "type_name" or gb_name == "chan":
-                        generic_builtin_sym = gb_sym
+                if self.ast.kind(gb_base) != NodeKind.NK_IDENT:
+                    sema_phase_bug(f"BUG: type-level builtin call has no builtin name: node={node}")
+                generic_builtin_sym = self.ast.get_data0(gb_base)
             if generic_builtin_sym > 0:
                 let gc_fn_op = self.const_operand(ConstKind.CK_FN, generic_builtin_sym, 0)
                 let gc_args: Vec[i32] = Vec.new()
@@ -16787,7 +16775,7 @@ impl MirBuilder:
                     // is, or its scope-exit drop frees what the result now owns
                     // (#1605: `spawn_os` transmuted the closure and then freed
                     // the environment under the thread).
-                    if self.pool.resolve(generic_builtin_sym) == "transmute":
+                    if self.sema.is_transmute_call(callee) != 0:
                         self.consume_moved_operand(gc_arg_op)
                     gc_args.push(gc_arg_op)
                 let gc_args_id = self.body.new_call_args(gc_args)
@@ -16804,7 +16792,7 @@ impl MirBuilder:
                 return self.call_result_operand(gc_result, gc_place, gc_ret_ty)
             // A free math builtin: Sema decided (math_builtin_calls); honor it
             // before variant, src(), drop, generic, or signature dispatch.
-            if self.ast.kind(callee) == NodeKind.NK_IDENT and self.sema.math_builtin_calls.contains(node):
+            if self.ast.kind(callee) == NodeKind.NK_IDENT and callee_kind == CallCalleeKind.MathBuiltin:
                 // The annotation demands an owned i32 (D22): no view into
                 // self.sema stays live across the mutating lowering call.
                 let math_id: i32 = self.sema.math_builtin_calls.get(node).unwrap()
@@ -16819,15 +16807,17 @@ impl MirBuilder:
             // "unresolved bare function" named after the binding, with its
             // arguments dropped (#1635: `call const fn sym(r)()`, then codegen's
             // unhandled GENERIC_CALL FATAL).
-            if self.ast.kind(callee) == NodeKind.NK_IDENT and self.ident_names_local_callable(callee):
+            if self.ast.kind(callee) == NodeKind.NK_IDENT and callee_kind == CallCalleeKind.Callable:
                 let lc_call_ty = self.expr_type(node)
                 return self.lower_call(callee, self.ast.get_data1(node), self.ast.get_data2(node), lc_call_ty, node)
             // Check for enum variant constructor call: Some(v), Ok(v), Err(e), etc.
-            if self.ast.kind(callee) == NodeKind.NK_IDENT:
+            if self.ast.kind(callee) == NodeKind.NK_IDENT and callee_kind == CallCalleeKind.Variant:
                 var vc_sym = self.ast.get_data0(callee)
                 // Resolve for-comprehension _Payload marker
                 if self.sema.comp_resolved.contains(node):
                     vc_sym = self.sema.comp_resolved.get(node).unwrap()
+                if not self.sema.variant_lookup.contains(vc_sym):
+                    sema_phase_bug(f"BUG: Sema resolved a variant constructor call to a symbol with no variant: node={node}")
                 if self.sema.variant_lookup.contains(vc_sym):
                     var vc_result_ty = self.expr_type(node)
                     // #671: only an expected type that actually carries this
@@ -16880,43 +16870,37 @@ impl MirBuilder:
                     self.body.push_stmt(self.cur_bb, StmtKind.Assign, vc_place, vc_rv, self.ast.get_start(node))
                     return self.body.new_operand(OperandKind.OK_COPY, vc_place)
             // Distinct type constructor: Meters(42) → transparent (just the inner value)
-            if self.ast.kind(callee) == NodeKind.NK_IDENT:
-                let dt_sym = self.ast.get_data0(callee)
-                if self.sema.distinct_type_names.contains(dt_sym):
-                    let dt_tid: i32 = self.sema.distinct_type_names.get(dt_sym).unwrap()
-                    let dt_args_start = self.ast.get_data1(node)
-                    let dt_args_count = self.ast.get_data2(node)
-                    if dt_args_count == 1:
-                        let dt_arg = self.ast.get_extra(dt_args_start)
-                        let dt_val = self.lower_expr(dt_arg)
-                        // Transparent: distinct types have same LLVM type as inner,
-                        // so the constructor is just the inner value itself
-                        return dt_val
-            // Callable type syntax: TypeName(args) → TypeName.new(args)
-            if self.ast.kind(callee) == NodeKind.NK_IDENT:
-                let ct_sym = self.ast.get_data0(callee)
-                if self.sema.type_decl_nodes.contains(ct_sym):
-                    let ct_new_name = self.pool.resolve(ct_sym) ++ ".new"
-                    let ct_new_sym = self.pool.intern(ct_new_name)
-                    let ct_new_sig = self.sema.get_sig(ct_new_sym)
-                    if ct_new_sig >= 0:
-                        let ct_fn_op = self.const_operand(ConstKind.CK_FN, ct_new_sym, 0)
-                        let ct_ret_ty = self.expr_type(node)
-                        return self.lower_call_redirected(ct_fn_op, ct_new_sym, self.ast.get_data1(node), self.ast.get_data2(node), ct_ret_ty, node)
+            if self.ast.kind(callee) == NodeKind.NK_IDENT and callee_kind == CallCalleeKind.Distinct:
+                let dt_args_start = self.ast.get_data1(node)
+                if self.ast.get_data2(node) != 1:
+                    sema_phase_bug(f"BUG: Sema accepted a distinct type constructor without exactly one argument: node={node}")
+                // Transparent: distinct types have same LLVM type as inner,
+                // so the constructor is just the inner value itself
+                return self.lower_expr(self.ast.get_extra(dt_args_start))
+            // Callable type syntax: TypeName(args) → the `TypeName.new` Sema resolved
+            if self.ast.kind(callee) == NodeKind.NK_IDENT and callee_kind == CallCalleeKind.TypeConstructor:
+                let ct_sema_sym: i32 = self.sema.type_ctor_call_syms.get(node) ?? 0
+                if ct_sema_sym == 0:
+                    sema_phase_bug(f"BUG: type constructor call has no recorded `new`: node={node}")
+                let ct_new_sym = self.pool.intern(self.sema.pool_resolve(ct_sema_sym))
+                let ct_fn_op = self.const_operand(ConstKind.CK_FN, ct_new_sym, 0)
+                let ct_ret_ty = self.expr_type(node)
+                return self.lower_call_redirected(ct_fn_op, ct_new_sym, self.ast.get_data1(node), self.ast.get_data2(node), ct_ret_ty, node)
+            if self.ast.kind(callee) == NodeKind.NK_IDENT and callee_kind == CallCalleeKind.SourceLocation:
+                return self.source_location_operand(node)
+            if self.ast.kind(callee) == NodeKind.NK_IDENT and callee_kind == CallCalleeKind.StdDrop:
+                return self.lower_std_drop_call(node)
             // Generic function call — delegate to codegen's monomorphize_generic_call
-            if self.ast.kind(callee) == NodeKind.NK_IDENT:
+            if self.ast.kind(callee) == NodeKind.NK_IDENT and callee_kind == CallCalleeKind.Generic:
                 let gc_sym = self.ast.get_data0(callee)
-                if gc_sym == self.sema.syms.src:
-                    return self.source_location_operand(node)
                 // Sema may select a presented facade template under a raw C
                 // spelling. Carry that selection into the MIR callee too;
                 // the concrete signature alone does not change its operand.
                 let gc_selected = self.sema.comp_resolved.get(node)
                 let gc_fn_sym = if gc_selected.is_some(): gc_selected.unwrap() else: self.sema_symbol_for_ast_symbol(gc_sym)
-                if self.sema.fn_symbol_is_std_builtins_drop(gc_sym) != 0:
-                    return self.lower_std_drop_call(node)
-                let selected_gc_fn_node = self.sema.resolved_generic_call_nodes.get(node)
-                let gc_fn_node = if selected_gc_fn_node.is_some(): selected_gc_fn_node.unwrap() else: self.generic_fn_node_for_sym(gc_fn_sym)
+                let gc_fn_node: i32 = self.sema.resolved_generic_call_nodes.get(node) ?? 0
+                if gc_fn_node == 0:
+                    sema_phase_bug(f"BUG: Sema resolved a generic call without recording its template: node={node}")
                 if gc_fn_node != 0:
                     // User generic calls use Sema's concrete signature for both
                     // ownership lowering and the eventual ABI contract.
@@ -16955,46 +16939,43 @@ impl MirBuilder:
                     self.terminate(TermKind.TK_CALL, gc_fn_op, gc_args_id, gc_place, gc_next)
                     self.switch_to(gc_next)
                     return self.call_result_operand(gc_result, gc_place, gc_ret_ty)
-            // Check for builtin calls (embed_file, src, etc.) — no sig, not a
-            // local or alias binding (those returned above)
-            if self.ast.kind(callee) == NodeKind.NK_IDENT:
-                let bu_sym = self.ast.get_data0(callee)
-                let bu_sig = self.sema.get_sig(bu_sym)
-                if bu_sig < 0 and not self.ident_names_local_callable(callee):
-                    // Unresolved bare function — route through gen_call
-                    let bu_fn_op = self.const_operand(ConstKind.CK_FN, bu_sym, 0)
-                    let bu_args: Vec[i32] = Vec.new()
-                    let bu_args_id = self.body.new_call_args(bu_args)
-                    self.body.set_call_intrinsic(bu_args_id, MirIntrinsic.GENERIC_CALL)
-                    self.body.set_call_ast_node(bu_args_id, node)
-                    var bu_ret_ty = self.expr_type(node)
-                    if bu_ret_ty == 0:
-                        bu_ret_ty = self.sema.ty_i32 as i32
-                    let bu_result = self.new_temp(bu_ret_ty)
-                    let bu_place = self.place_for_local(bu_result)
-                    let bu_next = self.new_block()
-                    self.terminate(TermKind.TK_CALL, bu_fn_op, bu_args_id, bu_place, bu_next)
-                    self.switch_to(bu_next)
-                    return self.call_result_operand(bu_result, bu_place, bu_ret_ty)
-            // Intrinsic free functions: fence(order)
-            if self.ast.kind(callee) == NodeKind.NK_IDENT:
-                let ifn_sym = self.ast.get_data0(callee)
-                let ifn_name = self.pool.resolve(ifn_sym)
-                if ifn_name == "fence":
-                    let ifn_args: Vec[i32] = Vec.new()
-                    let ifn_as = self.ast.get_data1(node)
-                    let ifn_ac = self.ast.get_data2(node)
-                    for ifn_ai in 0..ifn_ac:
-                        ifn_args.push(self.lower_expr(self.ast.get_extra(ifn_as + ifn_ai)))
-                    let ifn_args_id = self.body.new_call_args(ifn_args)
-                    self.body.set_call_intrinsic(ifn_args_id, MirIntrinsic.ATOMIC_FENCE)
-                    let ifn_callee = self.unit_operand()
-                    let ifn_result = self.new_temp(self.sema.ty_void as i32)
-                    let ifn_place = self.place_for_local(ifn_result)
-                    let ifn_next = self.new_block()
-                    self.terminate(TermKind.TK_CALL, ifn_callee, ifn_args_id, ifn_place, ifn_next)
-                    self.switch_to(ifn_next)
-                    return self.unit_operand()
+            // A builtin Sema resolved the call to (embed_file, channel, ...):
+            // codegen's builtin dispatch reads it from the call node.
+            if self.ast.kind(callee) == NodeKind.NK_IDENT and callee_kind == CallCalleeKind.Intrinsic:
+                let bu_fn_op = self.const_operand(ConstKind.CK_FN, self.ast.get_data0(callee), 0)
+                let bu_args: Vec[i32] = Vec.new()
+                let bu_args_id = self.body.new_call_args(bu_args)
+                self.body.set_call_intrinsic(bu_args_id, MirIntrinsic.GENERIC_CALL)
+                self.body.set_call_ast_node(bu_args_id, node)
+                var bu_ret_ty = self.expr_type(node)
+                if bu_ret_ty == 0:
+                    bu_ret_ty = self.sema.ty_i32 as i32
+                let bu_result = self.new_temp(bu_ret_ty)
+                let bu_place = self.place_for_local(bu_result)
+                let bu_next = self.new_block()
+                self.terminate(TermKind.TK_CALL, bu_fn_op, bu_args_id, bu_place, bu_next)
+                self.switch_to(bu_next)
+                return self.call_result_operand(bu_result, bu_place, bu_ret_ty)
+            // std's `fence(order)`: the atomic fence intrinsic (Sema's
+            // declaration identity, not the name).
+            if self.ast.kind(callee) == NodeKind.NK_IDENT and callee_kind == CallCalleeKind.AtomicFence:
+                let ifn_args: Vec[i32] = Vec.new()
+                let ifn_as = self.ast.get_data1(node)
+                for ifn_ai in 0..self.ast.get_data2(node):
+                    ifn_args.push(self.lower_expr(self.ast.get_extra(ifn_as + ifn_ai)))
+                let ifn_args_id = self.body.new_call_args(ifn_args)
+                self.body.set_call_intrinsic(ifn_args_id, MirIntrinsic.ATOMIC_FENCE)
+                let ifn_callee = self.unit_operand()
+                let ifn_result = self.new_temp(self.sema.ty_void as i32)
+                let ifn_place = self.place_for_local(ifn_result)
+                let ifn_next = self.new_block()
+                self.terminate(TermKind.TK_CALL, ifn_callee, ifn_args_id, ifn_place, ifn_next)
+                self.switch_to(ifn_next)
+                return self.unit_operand()
+            // A name callee Sema resolved to nothing MIR lowers is a Sema
+            // hole (#1635's class), never a guess from the name.
+            if self.ast.kind(callee) == NodeKind.NK_IDENT and callee_kind != CallCalleeKind.Function:
+                sema_phase_bug(f"BUG: call of `{self.pool.resolve(self.ast.get_data0(callee))}` has callee kind {callee_kind as i32} at expression lowering: node={node}")
             let call_ty = self.expr_type(node)
             return self.lower_call(callee, self.ast.get_data1(node), self.ast.get_data2(node), call_ty, node)
 
