@@ -121,6 +121,17 @@ fn failed_targets(log: &str) -> str:
         if name.len() > 0 and not out.contains(" " ++ name ++ " "): out = out ++ name ++ " "
     out.trim().clone()
 
+// What a red step reports: the targets it names, or — when it failed before
+// naming any (a held build lock, a driver that could not start) — its first
+// `error:` line, so a red is never reported with nothing after the colon.
+fn red_report(log: &str) -> str:
+    let named = failed_targets(log)
+    if named.len() > 0: return named
+    let text = read_file(log) ?? ""
+    for line in text.split("\n"):
+        if line.starts_with("error: "): return line.clone()
+    "no target named and no error line; see " ++ log
+
 // The child runs on its own OS thread (std.process has no non-blocking
 // wait): the worker runs the command and writes its exit code to live_done,
 // and the main thread polls the log meanwhile.
@@ -230,12 +241,12 @@ merge_times(ledger, "out/.build-state/build-times.tsv")
 if rc == 0:
     rc = step_live("battery-checks", "WITH=$PWD/src/main src/main build :battery-checks" ++ flags ++ " > out/battery/checks.log 2>&1", "out/battery/checks.log", status)
     merge_times(ledger, "out/.build-state/build-times.tsv")
-    let failed = failed_targets("out/battery/checks.log")
-    if failed.len() > 0:
+    if rc != 0:
+        let failed = red_report("out/battery/checks.log")
         print("failed: " ++ failed)
         append(status, "failed: " ++ failed)
 else:
-    let failed = failed_targets("out/battery/gate.log")
+    let failed = red_report("out/battery/gate.log")
     print("RED (gate): " ++ failed)
     append(status, "RED (gate): " ++ failed)
 let verdict = if rc == 0: "GREEN" else: "RED"
