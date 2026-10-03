@@ -8,7 +8,6 @@ use Diagnostic
 use Source
 use Overflow
 use AnalysisTypes
-use compiler.TrackedInputs
 use MirCore
 use MirLower
 use SemaTypes
@@ -284,7 +283,9 @@ impl Codegen:
                     with_eprint("error: cannot lower dyn trait method '" ++ self.intern.resolve(method_sym) ++ "' because a non-receiver parameter mentions Self")
                     self.had_error = 1
                 return 0
-            var p_ty = self.resolve_type(p_type_node)
+            // #2043: Sema's type for the declared parameter, as for the return.
+            let p_fact = self.sema_type_to_llvm(self.sema.resolve_type_expr_frozen(p_type_node) as i32)
+            let p_ty = self.verify_ast_type(MODE_SITE_DECL_TYPE_NODE, p_fact, p_type_node, trait_sym, pi)
             if p_ty == 0:
                 if report_errors:
                     with_eprint("error: cannot resolve parameter type for dyn trait method '" ++ self.intern.resolve(method_sym) ++ "'")
@@ -478,73 +479,6 @@ impl Codegen:
 
         wrapper_fn
 
-    mut fn resolve_trait_method_type_for_impl(type_node: i32, impl_type_sym: i32) -> i64:
-        return self.resolve_trait_method_type_for_impl_with_trait(type_node, impl_type_sym, 0, 0)
-
-    mut fn resolve_trait_method_type_for_impl_with_trait(type_node: i32, impl_type_sym: i32, trait_sym: i32, impl_node: i32) -> i64:
-        if type_node == 0:
-            return 0
-        var concrete_ty: i64 = 0
-        let st = self.struct_type_map.get(impl_type_sym)
-        if st.is_some():
-            concrete_ty = self.struct_llvm_types[st.unwrap()]
-        else:
-            let et = self.enum_type_map.get(impl_type_sym)
-            if et.is_some():
-                concrete_ty = self.enum_llvm_types[et.unwrap()]
-        if concrete_ty == 0:
-            return self.resolve_type(type_node)
-
-        let saved_syms = move self.type_binding_syms
-        let saved_tys = move self.type_binding_types
-        let saved_len: i32 = self.type_bindings_len
-        let fresh_syms: Vec[i32] = Vec.new()
-        let fresh_tys: Vec[i64] = Vec.new()
-        self.type_binding_syms = fresh_syms
-        self.type_binding_types = fresh_tys
-        self.type_bindings_len = 0
-        var found_self = false
-        for i in 0..saved_len:
-            let sym = saved_syms[i]
-            var ty: i64 = saved_tys[i]
-            if sym == self.sym_Self:
-                ty = concrete_ty
-                found_self = true
-            self.type_binding_syms.push(sym)
-            self.type_binding_types.push(ty)
-            self.type_bindings_len = self.type_bindings_len + 1
-        if not found_self:
-            self.type_binding_syms.push(self.sym_Self)
-            self.type_binding_types.push(concrete_ty)
-            self.type_bindings_len = self.type_bindings_len + 1
-
-        // Bind trait type params from impl trait type args
-        if trait_sym != 0 and impl_node != 0:
-            let tp_count_opt = self.trait_tp_counts.get(trait_sym)
-            if tp_count_opt.is_some():
-                let tp_count: i32 = tp_count_opt.unwrap()
-                let tp_start: i32 = self.trait_tp_starts.get(trait_sym).unwrap()
-                let tta_idx = self.pool.find_impl_trait_type_args(impl_node)
-                if tta_idx >= 0:
-                    let arg_start: i32 = self.pool.state.impl_trait_type_args[(tta_idx + 1)]
-                    let arg_count: i32 = self.pool.state.impl_trait_type_args[(tta_idx + 2)]
-                    var ti = 0
-                    while ti < tp_count and ti < arg_count:
-                        let tp_sym: i32 = self.trait_tp_flat_syms[(tp_start + ti)]
-                        let arg_node = self.pool.get_extra(arg_start + ti)
-                        let arg_ty = self.resolve_type(arg_node)
-                        if arg_ty != 0:
-                            self.type_binding_syms.push(tp_sym)
-                            self.type_binding_types.push(arg_ty)
-                            self.type_bindings_len = self.type_bindings_len + 1
-                        ti = ti + 1
-
-        let resolved = self.resolve_type(type_node)
-        self.type_binding_syms = saved_syms
-        self.type_binding_types = saved_tys
-        self.type_bindings_len = saved_len
-        resolved
-
     mut fn generate_default_trait_method_for_impl_ext(impl_type_sym: i32, method_idx: i32, trait_sym: i32, impl_node: i32):
         // Set up trait type param bindings before generating the method.
         // #691: scope the extra bindings by remembering lengths and popping
@@ -570,8 +504,9 @@ impl Codegen:
                     var ti = 0
                     while ti < tp_count and ti < arg_count:
                         let tp_sym: i32 = self.trait_tp_flat_syms[(tp_start + ti)]
-                        let arg_node = self.pool.get_extra(arg_start + ti)
-                        let arg_ty = self.resolve_type(arg_node)
+                        // #2043: the argument's type as Sema bound it for the
+                        // impl's default methods.
+                        let arg_ty = self.sema_type_to_llvm(self.sema.impl_trait_arg_type_ids.get(self.pool.get_extra(arg_start + ti)) ?? 0)
                         if arg_ty != 0:
                             self.type_binding_syms.push(tp_sym)
                             self.type_binding_types.push(arg_ty)
@@ -651,7 +586,6 @@ impl Codegen:
         let saved_allocas = move self.local_allocas
         let saved_types = move self.local_types
         let saved_muts = move self.local_muts
-        let saved_fn_sigs = move self.local_fn_sigs
         let saved_pointees = move self.local_pointee_structs
         let saved_task_locals = move self.task_locals
         let saved_trait_locals = move self.trait_locals
@@ -682,7 +616,6 @@ impl Codegen:
         let fresh_local_allocas: HashMap[i32, i64] = HashMap.new()
         let fresh_local_types: HashMap[i32, i64] = HashMap.new()
         let fresh_local_muts: HashMap[i32, i32] = HashMap.new()
-        let fresh_local_fn_sigs: HashMap[i32, i64] = HashMap.new()
         let fresh_local_pointees: HashMap[i32, i32] = HashMap.new()
         let fresh_task_locals: HashMap[i32, i32] = HashMap.new()
         let fresh_trait_locals: HashMap[i32, i32] = HashMap.new()
@@ -697,7 +630,6 @@ impl Codegen:
         self.local_allocas = fresh_local_allocas
         self.local_types = fresh_local_types
         self.local_muts = fresh_local_muts
-        self.local_fn_sigs = fresh_local_fn_sigs
         self.local_pointee_structs = fresh_local_pointees
         self.task_locals = fresh_task_locals
         self.trait_locals = fresh_trait_locals
@@ -856,7 +788,6 @@ impl Codegen:
         self.local_allocas = saved_allocas
         self.local_types = saved_types
         self.local_muts = saved_muts
-        self.local_fn_sigs = saved_fn_sigs
         self.local_pointee_structs = saved_pointees
         self.task_locals = saved_task_locals
         self.trait_locals = saved_trait_locals
@@ -1225,23 +1156,6 @@ type ConstIntEval { ok: bool, value: i64 }
 fn const_int_ok(value: i64) -> ConstIntEval: ConstIntEval { ok: true, value }
 fn const_int_fail() -> ConstIntEval: ConstIntEval { ok: false, value: 0 }
 
-type ConstStringEval {
-    ok: bool,
-    text: str,
-}
-
-fn const_string_eval_fail -> ConstStringEval:
-    ConstStringEval {
-        ok: false,
-        text: "",
-    }
-
-fn const_string_eval_ok(text: &str) -> ConstStringEval:
-    ConstStringEval {
-        ok: true,
-        text: with_str_clone_ref(text),
-    }
-
 impl Codegen:
     fn codegen_const_int_width(type_id: i32) -> i32:
         let numeric = self.sema.numeric_operand_type(type_id)
@@ -1345,85 +1259,6 @@ impl Codegen:
             if self.pool.get_data0(decl) == sym:
                 return di
         -1
-
-    mut fn record_tracked_input(path: &str):
-        var paths = move self.tracked_input_paths
-        self.tracked_input_paths = tracked_input_insert_unique(move paths, path)
-
-    mut fn read_tracked_embed_file(source_path: &str, raw_path: &str) -> TrackedReadResult:
-        let result = tracked_embed_read(source_path, raw_path, self.tracked_input_root)
-        if result.ok:
-            self.record_tracked_input(result.resolved_path)
-        result
-
-    mut fn try_eval_const_string(node: i32, source_path: &str, depth: i32) -> ConstStringEval:
-        self.note_ast_derivation(AST_DERIVATION_CONST, node)
-        self.ast_derivation_depth = self.ast_derivation_depth + 1
-        let value = self.eval_const_string_from_ast(node, source_path, depth)
-        self.ast_derivation_depth = self.ast_derivation_depth - 1
-        value
-
-    mut fn eval_const_string_from_ast(node: i32, source_path: &str, depth: i32) -> ConstStringEval:
-        if node == 0 or depth > 32:
-            return const_string_eval_fail()
-
-        let kind = self.pool.kind(node)
-        if kind == NodeKind.NK_STRING_LIT or kind == NodeKind.NK_C_STRING_LIT:
-            let sym = self.pool.get_data0(node)
-            let raw = self.intern.resolve(sym)
-            if raw.len() >= 5 and raw[0] == 1 and raw[1] == 114 and raw[2] == 97 and raw[3] == 119 and raw[4] == 1:
-                return const_string_eval_ok(raw.slice(5, raw.len()))
-            return const_string_eval_ok(self.decode_string_escapes(raw))
-
-        if kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_GROUPED:
-            return self.try_eval_const_string(self.pool.get_data0(node), source_path, depth + 1)
-
-        if kind == NodeKind.NK_BINARY:
-            let op = self.pool.get_data0(node)
-            if op == BinaryOp.OP_CONCAT or op == BinaryOp.OP_ADD:
-                let lhs = self.try_eval_const_string(self.pool.get_data1(node), source_path, depth + 1)
-                if not lhs.ok:
-                    return lhs
-                let rhs = self.try_eval_const_string(self.pool.get_data2(node), source_path, depth + 1)
-                if not rhs.ok:
-                    return rhs
-                return const_string_eval_ok(lhs.text ++ rhs.text)
-
-        if kind == NodeKind.NK_IDENT:
-            let sym = self.pool.get_data0(node)
-            let decl_index = self.find_module_let_decl_index(sym)
-            if decl_index < 0:
-                return const_string_eval_fail()
-            let decl = self.pool.get_decl(decl_index)
-            let flags = self.pool.get_data2(decl)
-            if flags % 2 != 0:
-                return const_string_eval_fail()
-            var value_node = self.pool.get_data1(decl)
-            if value_node == 0:
-                return const_string_eval_fail()
-            if self.pool.kind(value_node) == NodeKind.NK_COMPTIME:
-                value_node = self.pool.get_data0(value_node)
-            return self.try_eval_const_string(value_node, self.decl_source_path(decl_index), depth + 1)
-
-        if kind == NodeKind.NK_CALL:
-            let callee = self.pool.get_data0(node)
-            if self.pool.kind(callee) != NodeKind.NK_IDENT:
-                return const_string_eval_fail()
-            let callee_sym = self.pool.get_data0(callee)
-            if callee_sym != self.sema.syms.embed_file or self.pool.get_data2(node) != 1:
-                return const_string_eval_fail()
-            let args_start = self.pool.get_data1(node)
-            let path_value = self.try_eval_const_string(self.pool.get_extra(args_start), source_path, depth + 1)
-            if not path_value.ok:
-                return path_value
-            let read_result = self.read_tracked_embed_file(source_path, path_value.text)
-            if not read_result.ok:
-                with_eprint("error: " ++ read_result.error_msg)
-                self.had_error = 1
-                return const_string_eval_fail()
-            return const_string_eval_ok(read_result.contents)
-
-        const_string_eval_fail()
 
     mut fn try_resolve_vec_new_global_type(value_node: i32, flags: i32) -> i32:
         if value_node == 0 or self.pool.kind(value_node) != NodeKind.NK_CALL:
@@ -1584,7 +1419,6 @@ impl Codegen:
         let saved_allocas = move self.local_allocas
         let saved_types = move self.local_types
         let saved_muts = move self.local_muts
-        let saved_fn_sigs = move self.local_fn_sigs
         let saved_pointees = move self.local_pointee_structs
         let saved_tasks = move self.task_locals
         let saved_trait_locals = move self.trait_locals
@@ -1619,7 +1453,6 @@ impl Codegen:
         let fresh_local_allocas: HashMap[i32, i64] = HashMap.new()
         let fresh_local_types: HashMap[i32, i64] = HashMap.new()
         let fresh_local_muts: HashMap[i32, i32] = HashMap.new()
-        let fresh_local_fn_sigs: HashMap[i32, i64] = HashMap.new()
         let fresh_local_pointees: HashMap[i32, i32] = HashMap.new()
         let fresh_task_locals: HashMap[i32, i32] = HashMap.new()
         let fresh_trait_locals: HashMap[i32, i32] = HashMap.new()
@@ -1638,7 +1471,6 @@ impl Codegen:
         self.local_allocas = fresh_local_allocas
         self.local_types = fresh_local_types
         self.local_muts = fresh_local_muts
-        self.local_fn_sigs = fresh_local_fn_sigs
         self.local_pointee_structs = fresh_local_pointees
         self.task_locals = fresh_task_locals
         self.trait_locals = fresh_trait_locals
@@ -1747,7 +1579,6 @@ impl Codegen:
         self.local_allocas = saved_allocas
         self.local_types = saved_types
         self.local_muts = saved_muts
-        self.local_fn_sigs = saved_fn_sigs
         self.local_pointee_structs = saved_pointees
         self.task_locals = saved_tasks
         self.trait_locals = saved_trait_locals
@@ -1970,18 +1801,18 @@ impl Codegen:
         if kind == NodeKind.NK_NULL_LIT:
             return wl_const_null(ptr_ty)
 
-        let current_source_file = self.current_decl_source_file.clone()
-        let str_value = self.try_eval_const_string(cur, current_source_file, 0)
-        if str_value.ok:
-            return self.const_c_string_pointer(str_value.text, ptr_ty)
+        // #2043: a string constant's value is Sema's (const_string_value).
+        let str_value = self.sema.const_string_value(cur)
+        if str_value.is_some():
+            return self.const_c_string_pointer(str_value.unwrap(), ptr_ty)
         // `c"…".ptr` (a migrated C string constant, `as *const i8` stripped
         // above) is the same address constant.
         if kind == NodeKind.NK_FIELD_ACCESS and self.intern.resolve(self.pool.get_data1(cur)) == "ptr":
             let base = self.unwrap_const_expr_node(self.pool.get_data0(cur))
             if base != 0 and self.pool.kind(base) == NodeKind.NK_C_STRING_LIT:
-                let base_value = self.try_eval_const_string(base, current_source_file, 0)
-                if base_value.ok:
-                    return self.const_c_string_pointer(base_value.text, ptr_ty)
+                let base_value = self.sema.const_string_value(base)
+                if base_value.is_some():
+                    return self.const_c_string_pointer(base_value.unwrap(), ptr_ty)
 
         if kind == NodeKind.NK_IDENT:
             let sym = self.pool.get_data0(cur)
@@ -2468,9 +2299,10 @@ impl Codegen:
                         let _ = self.record_module_binding_global(name_sym, global_ty, init, is_mut)
                         return
 
-        let current_source_file = self.current_decl_source_file.clone()
-        let str_value = self.try_eval_const_string(value_node, current_source_file, 0)
-        if str_value.ok:
+        // #2043: a string constant's value is Sema's (const_string_value).
+        let const_text = self.sema.const_string_value(value_node)
+        if const_text.is_some():
+            let text = const_text.unwrap()
             let st_opt = self.struct_type_map.get(self.sym_str)
             if not st_opt.is_some():
                 with_eprint("warning: [string-global] str struct type not found")
@@ -2481,15 +2313,15 @@ impl Codegen:
                 return
             let name_str = self.intern.resolve(name_sym)
             let bytes_name = name_str ++ ".__bytes"
-            let bytes_ty = wl_array_type(wl_i8_type(self.context), str_value.text.len() + 1)
+            let bytes_ty = wl_array_type(wl_i8_type(self.context), text.len() + 1)
             let bytes_global = wl_add_global(self.llmod, bytes_ty, bytes_name)
-            wl_set_initializer(bytes_global, wl_const_string(self.context, str_value.text, 0))
+            wl_set_initializer(bytes_global, wl_const_string(self.context, text, 0))
             wl_set_global_constant(bytes_global, 1)
             wl_set_linkage(bytes_global, wl_private_linkage())
 
             let fields: Vec[i64] = Vec.new()
             fields.push(wl_const_bitcast(bytes_global, wl_ptr_type(self.context)))
-            fields.push(wl_const_int(wl_i64_type(self.context), str_value.text.len(), 1))
+            fields.push(wl_const_int(wl_i64_type(self.context), text.len(), 1))
             let str_init = wl_const_named_struct(str_ty, vec_data_i64(&fields), 2)
 
             let _ = self.define_module_binding_global(name_sym, str_ty, str_init, is_mut)

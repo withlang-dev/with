@@ -437,44 +437,45 @@ fn comptime_hex_digit_value(ch: i32) -> i32:
         return ch - 55
     -1
 
-fn comptime_decode_string_escapes(text: &str) -> str:
+// A string literal's value from its interned payload: a raw-marked payload
+// is already its value; otherwise the escapes decode. Sema's constant
+// strings (#2043) read it too. Decoding never grows the input, so one
+// buffer of the payload's length holds it (a part per byte was a string
+// per byte of an embedded source literal).
+pub fn comptime_decode_string_escapes(text: &str) -> str:
     let raw_prefix = "\x01raw\x01"
     if text.starts_with(raw_prefix):
         return text.slice(raw_prefix.len(), text.len())
-    let parts: Vec[str] = Vec.new()
+    var out = StringBuilder.with_capacity(text.len())
     let len = text.len() as i32
     var i = 0
     while i < len:
         let ch = text[i]
-        if ch == 92 and i + 1 < len:
+        if ch == '\\' and i + 1 < len:
             i = i + 1
             let esc = text[i]
-            if esc == 120 and i + 2 < len:
-                let hi = comptime_hex_digit_value(text[(i + 1)])
-                let lo = comptime_hex_digit_value(text[(i + 2)])
+            if esc == 'x' and i + 2 < len:
+                let hi = comptime_hex_digit_value(text[i + 1])
+                let lo = comptime_hex_digit_value(text[i + 2])
                 if hi >= 0 and lo >= 0:
-                    parts.push(str_from_byte(hi * 16 + lo))
+                    out.push_char(hi * 16 + lo)
                     i = i + 2
                 else:
-                    parts.push(text.slice(i as i64, (i + 1) as i64))
-            else if esc == 110:
-                parts.push("\n")
-            else if esc == 116:
-                parts.push("\t")
-            else if esc == 114:
-                parts.push("\r")
-            else if esc == 48:
-                parts.push(str_from_byte(0))
-            else if esc == 92:
-                parts.push("\\")
-            else if esc == 34:
-                parts.push("\"")
+                    out.push_char(esc)
+            else if esc == 'n':
+                out.push_char('\n')
+            else if esc == 't':
+                out.push_char('\t')
+            else if esc == 'r':
+                out.push_char('\r')
+            else if esc == '0':
+                out.push_char(0)
             else:
-                parts.push(text.slice(i as i64, (i + 1) as i64))
+                out.push_char(esc)
         else:
-            parts.push(text.slice(i as i64, (i + 1) as i64))
+            out.push_char(ch)
         i = i + 1
-    with_str_concat_n(parts.ptr, parts.len())
+    out.to_str()
 
 fn comptime_tool_path_is_project_relative(path: &str) -> bool:
     if path.len() == 0:

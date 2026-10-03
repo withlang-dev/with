@@ -1041,13 +1041,9 @@ impl Codegen:
         let flags = self.pool.get_data2(decl)
         if flags % 2 != 0:
             return false
-        var value_node = self.pool.get_data1(decl)
-        if value_node == 0:
-            return false
-        if self.pool.kind(value_node) == NodeKind.NK_COMPTIME:
-            value_node = self.pool.get_data0(value_node)
-        let value = self.try_eval_const_string(value_node, self.decl_source_path(decl_index), 0)
-        if not value.ok:
+        // #2043: the constant's value is Sema's (const_string_value).
+        let value = self.sema.const_string_value(self.pool.get_data1(decl))
+        if value.is_none():
             return false
         let str_sym = self.intern.intern("str")
         let st_opt = self.struct_type_map.get(str_sym)
@@ -1056,7 +1052,7 @@ impl Codegen:
         let str_ty = self.struct_llvm_types[st_opt.unwrap()]
         if llvm_ty != str_ty:
             return false
-        wl_build_store(self.builder, self.gen_string_literal_raw(value.text), ptr)
+        wl_build_store(self.builder, self.gen_string_literal_raw(value.unwrap()), ptr)
         true
 
 
@@ -10761,7 +10757,7 @@ impl Codegen:
                     if asm_out_count == 1:
                         let asm_out_type_node = self.pool.get_extra(asm_extra_start + 1)
                         if asm_out_type_node != 0:
-                            asm_ret_ty = self.resolve_type(asm_out_type_node)
+                            asm_ret_ty = self.body_type_node_llvm(asm_out_type_node)
                             if asm_ret_ty == 0:
                                 asm_ret_ty = wl_i64_type(self.context)
                         else if asm_input_vals.len() > 0:
@@ -10774,7 +10770,7 @@ impl Codegen:
                         // result stores directly into the tuple destination.
                         let asm_out_tys: Vec[i64] = Vec.new()
                         for asm_oi in 0..asm_out_count:
-                            var asm_ot = self.resolve_type(self.pool.get_extra(asm_extra_start + 1 + asm_oi))
+                            var asm_ot = self.body_type_node_llvm(self.pool.get_extra(asm_extra_start + 1 + asm_oi))
                             if asm_ot == 0:
                                 asm_ot = wl_i64_type(self.context)
                             asm_out_tys.push(asm_ot)
@@ -16348,7 +16344,6 @@ impl Codegen:
         let fresh_local_allocas: HashMap[i32, i64] = HashMap.new()
         let fresh_local_types: HashMap[i32, i64] = HashMap.new()
         let fresh_local_muts: HashMap[i32, i32] = HashMap.new()
-        let fresh_local_fn_sigs: HashMap[i32, i64] = HashMap.new()
         let fresh_local_pointee_structs: HashMap[i32, i32] = HashMap.new()
         let fresh_local_sema_types: HashMap[i32, i32] = HashMap.new()
         let fresh_task_locals: HashMap[i32, i32] = HashMap.new()
@@ -16360,7 +16355,6 @@ impl Codegen:
         self.local_allocas = fresh_local_allocas
         self.local_types = fresh_local_types
         self.local_muts = fresh_local_muts
-        self.local_fn_sigs = fresh_local_fn_sigs
         self.local_pointee_structs = fresh_local_pointee_structs
         self.local_sema_types = fresh_local_sema_types
         self.task_locals = fresh_task_locals
@@ -16433,11 +16427,8 @@ impl Codegen:
         if fn_direct_types_opt.is_some():
             fn_direct_types = vec_copy_i64(fn_direct_types_opt.unwrap())
 
-        var method_owner_sym = 0
-        for di in 0..name_str.len() as i32:
-            if name_str[di] == 46:
-                method_owner_sym = self.method_owner_cg_sym(name_str.slice(0, di as i64))
-                break
+        // The method owner Sema recorded for this function (#2043).
+        let method_owner_sym = self.fn_method_owner_cg_sym(name_sym)
         self.current_method_owner_sym = method_owner_sym
 
         let max_params = param_count
@@ -16461,8 +16452,10 @@ impl Codegen:
             let place_param_fact = (sema_share or self.is_ref_param(name_sym, pi)) and (p_type_node == 0 or self.pool.kind(p_type_node) != NodeKind.NK_TYPE_REF)
             if self.mode_decide(MODE_SITE_PARAM_PLACE_ALIAS, place_param_fact, (sema_share or self.is_ref_param(name_sym, pi)) and (p_type_node == 0 or self.pool.kind(p_type_node) != NodeKind.NK_TYPE_REF) and wl_get_type_kind(param_type) == wl_pointer_type_kind(), body.fn_sym, pi):
                 var value_ref_ty = self.mir_sema_type_to_llvm(if pi + 1 < body.local_type_ids.len() as i32: body.local_type_ids[(pi + 1)] else: 0)
-                if value_ref_ty == 0 and p_type_node != 0:
-                    value_ref_ty = self.resolve_type(p_type_node)
+                if value_ref_ty == 0 and body_sig >= 0 and pi < self.sema.sig_get_param_count(body_sig):
+                    // #2043: Sema's signature types a parameter its MIR local does not.
+                    let sig_fact = self.mir_sema_type_to_llvm(self.sema.sig_param_type(body_sig, pi))
+                    value_ref_ty = self.verify_ast_type(MODE_SITE_BODY_TYPE_NODE, sig_fact, p_type_node, body.fn_sym, pi)
                 if value_ref_ty != 0 and wl_get_type_kind(value_ref_ty) != wl_pointer_type_kind():
                     self.record_local(p_name, param_val, value_ref_ty, 1)
                     self.record_local_sema_type(p_name, if pi + 1 < body.local_type_ids.len() as i32: body.local_type_ids[(pi + 1)] else: 0)
@@ -16490,9 +16483,6 @@ impl Codegen:
                 self.mir_local_types.insert(pi + 1, param_type)
                 if p_type_node != 0:
                     let pk = self.pool.kind(p_type_node)
-                    if pk == NodeKind.NK_TYPE_FN:
-                        let fn_sig = self.build_fn_type_from_ast(p_type_node)
-                        self.record_local_fn_sig(p_name, fn_sig)
                     if pk == NodeKind.NK_TYPE_PTR or pk == NodeKind.NK_TYPE_REF:
                         let pointee_node = self.pool.get_data0(p_type_node)
                         if self.pool.kind(pointee_node) == NodeKind.NK_TYPE_NAMED:
@@ -16501,10 +16491,7 @@ impl Codegen:
                                 self.record_local_pointee_struct(p_name, ps)
                     if pk == NodeKind.NK_TYPE_NAMED:
                         let p_sym = self.pool.get_data0(p_type_node)
-                        if method_owner_sym == 0 and p_name == self.sym_self and self.struct_type_map.get(p_sym).is_some():
-                            if p_sym != self.sym_str:
-                                method_owner_sym = p_sym
-                                self.current_method_owner_sym = method_owner_sym
+                        self.check_self_owner_recorded(method_owner_sym, p_name, p_sym)
                 self.record_codegen_param_binding(body, name_sym, pi, AnalysisMarshalStrategy.CalleeDirectValue, param_val, direct_alloca)
                 continue
             if pi < fn_byval_types.len() and fn_byval_types[pi] != 0:
@@ -16525,9 +16512,6 @@ impl Codegen:
                 self.mir_local_types.insert(pi + 1, param_type)
                 if p_type_node != 0:
                     let pk = self.pool.kind(p_type_node)
-                    if pk == NodeKind.NK_TYPE_FN:
-                        let fn_sig = self.build_fn_type_from_ast(p_type_node)
-                        self.record_local_fn_sig(p_name, fn_sig)
                     if pk == NodeKind.NK_TYPE_PTR or pk == NodeKind.NK_TYPE_REF:
                         let pointee_node = self.pool.get_data0(p_type_node)
                         if self.pool.kind(pointee_node) == NodeKind.NK_TYPE_NAMED:
@@ -16536,10 +16520,7 @@ impl Codegen:
                                 self.record_local_pointee_struct(p_name, ps)
                     if pk == NodeKind.NK_TYPE_NAMED:
                         let p_sym = self.pool.get_data0(p_type_node)
-                        if method_owner_sym == 0 and p_name == self.sym_self and self.struct_type_map.get(p_sym).is_some():
-                            if p_sym != self.sym_str:
-                                method_owner_sym = p_sym
-                                self.current_method_owner_sym = method_owner_sym
+                        self.check_self_owner_recorded(method_owner_sym, p_name, p_sym)
                 self.record_codegen_param_binding(body, name_sym, pi, AnalysisMarshalStrategy.CalleeOwnedCopy, param_val, byval_alloca)
                 continue
             var p_sema_ty2 = if pi + 1 < body.local_type_ids.len() as i32: body.local_type_ids[(pi + 1)] else: 0
@@ -16569,9 +16550,6 @@ impl Codegen:
 
             if p_type_node != 0:
                 let pk = self.pool.kind(p_type_node)
-                if pk == NodeKind.NK_TYPE_FN:
-                    let fn_sig = self.build_fn_type_from_ast(p_type_node)
-                    self.record_local_fn_sig(p_name, fn_sig)
                 if pk == NodeKind.NK_TYPE_PTR or pk == NodeKind.NK_TYPE_REF:
                     let pointee_node = self.pool.get_data0(p_type_node)
                     if self.pool.kind(pointee_node) == NodeKind.NK_TYPE_NAMED:
@@ -16580,11 +16558,7 @@ impl Codegen:
                             self.record_local_pointee_struct(p_name, ps)
                 if pk == NodeKind.NK_TYPE_NAMED:
                     let p_sym = self.pool.get_data0(p_type_node)
-                    if method_owner_sym == 0 and p_name == self.sym_self and self.struct_type_map.get(p_sym).is_some():
-                        // str is in struct_type_map but passes by value, not pointer
-                        if p_sym != self.sym_str:
-                            method_owner_sym = p_sym
-                            self.current_method_owner_sym = method_owner_sym
+                    self.check_self_owner_recorded(method_owner_sym, p_name, p_sym)
                     if method_owner_sym != 0 and (p_sym == self.sym_Self or p_sym == method_owner_sym):
                         if method_owner_sym != self.sym_str:
                             self.record_local_pointee_struct(p_name, method_owner_sym)
@@ -16736,7 +16710,6 @@ impl Codegen:
         let saved_allocas = move self.local_allocas
         let saved_types = move self.local_types
         let saved_muts = move self.local_muts
-        let saved_fn_sigs = move self.local_fn_sigs
         let saved_pointees = move self.local_pointee_structs
         let saved_task_locals = move self.task_locals
         let saved_trait_locals = move self.trait_locals
@@ -16807,7 +16780,6 @@ impl Codegen:
         let fresh_local_allocas: HashMap[i32, i64] = HashMap.new()
         let fresh_local_types: HashMap[i32, i64] = HashMap.new()
         let fresh_local_muts: HashMap[i32, i32] = HashMap.new()
-        let fresh_local_fn_sigs: HashMap[i32, i64] = HashMap.new()
         let fresh_local_pointee_structs: HashMap[i32, i32] = HashMap.new()
         let fresh_local_sema_types: HashMap[i32, i32] = HashMap.new()
         let fresh_task_locals: HashMap[i32, i32] = HashMap.new()
@@ -16823,7 +16795,6 @@ impl Codegen:
         self.local_allocas = fresh_local_allocas
         self.local_types = fresh_local_types
         self.local_muts = fresh_local_muts
-        self.local_fn_sigs = fresh_local_fn_sigs
         self.local_pointee_structs = fresh_local_pointee_structs
         self.local_sema_types = fresh_local_sema_types
         self.task_locals = fresh_task_locals
@@ -16899,7 +16870,7 @@ impl Codegen:
             fn_direct_types = vec_copy_i64(fn_direct_types_opt.unwrap())
 
         // The method owner Sema recorded for this function (#2043).
-        var method_owner_sym = self.fn_method_owner_cg_sym(mono_sym)
+        let method_owner_sym = self.fn_method_owner_cg_sym(mono_sym)
         self.current_method_owner_sym = method_owner_sym
 
         let max_params = param_count
@@ -16925,8 +16896,10 @@ impl Codegen:
             let place_param_fact = (sema_share or self.is_ref_param(mono_sym, pi)) and (p_type_node == 0 or self.pool.kind(p_type_node) != NodeKind.NK_TYPE_REF)
             if self.mode_decide(MODE_SITE_PARAM_PLACE_ALIAS, place_param_fact, (sema_share or self.is_ref_param(mono_sym, pi)) and (p_type_node == 0 or self.pool.kind(p_type_node) != NodeKind.NK_TYPE_REF) and wl_get_type_kind(param_type) == wl_pointer_type_kind(), body.fn_sym, pi):
                 var value_ref_ty = self.mir_sema_type_to_llvm(if pi + 1 < body.local_type_ids.len() as i32: body.local_type_ids[(pi + 1)] else: 0)
-                if value_ref_ty == 0 and p_type_node != 0:
-                    value_ref_ty = self.resolve_type(p_type_node)
+                if value_ref_ty == 0 and body_sig >= 0 and pi < self.sema.sig_get_param_count(body_sig):
+                    // #2043: Sema's signature types a parameter its MIR local does not.
+                    let sig_fact = self.mir_sema_type_to_llvm(self.sema.sig_param_type(body_sig, pi))
+                    value_ref_ty = self.verify_ast_type(MODE_SITE_BODY_TYPE_NODE, sig_fact, p_type_node, body.fn_sym, pi)
                 if value_ref_ty != 0 and wl_get_type_kind(value_ref_ty) != wl_pointer_type_kind():
                     self.record_local(p_name, param_val, value_ref_ty, 1)
                     self.record_local_sema_type(p_name, if pi + 1 < body.local_type_ids.len() as i32: body.local_type_ids[(pi + 1)] else: 0)
@@ -16953,9 +16926,6 @@ impl Codegen:
                 self.mir_local_types.insert(pi + 1, param_type)
                 if p_type_node != 0:
                     let pk = self.pool.kind(p_type_node)
-                    if pk == NodeKind.NK_TYPE_FN:
-                        let fn_sig = self.build_fn_type_from_ast(p_type_node)
-                        self.record_local_fn_sig(p_name, fn_sig)
                     if pk == NodeKind.NK_TYPE_PTR or pk == NodeKind.NK_TYPE_REF:
                         let pointee_node = self.pool.get_data0(p_type_node)
                         if self.pool.kind(pointee_node) == NodeKind.NK_TYPE_NAMED:
@@ -16964,10 +16934,7 @@ impl Codegen:
                                 self.record_local_pointee_struct(p_name, ps)
                     if pk == NodeKind.NK_TYPE_NAMED:
                         let p_sym = self.pool.get_data0(p_type_node)
-                        if method_owner_sym == 0 and p_name == self.sym_self and self.struct_type_map.get(p_sym).is_some():
-                            if p_sym != self.sym_str:
-                                method_owner_sym = p_sym
-                                self.current_method_owner_sym = method_owner_sym
+                        self.check_self_owner_recorded(method_owner_sym, p_name, p_sym)
                 self.record_codegen_param_binding(body, mono_sym, pi, AnalysisMarshalStrategy.CalleeDirectValue, param_val, direct_alloca)
                 continue
             if pi < fn_byval_types.len() and fn_byval_types[pi] != 0:
@@ -16987,9 +16954,6 @@ impl Codegen:
                 self.mir_local_types.insert(pi + 1, param_type)
                 if p_type_node != 0:
                     let pk = self.pool.kind(p_type_node)
-                    if pk == NodeKind.NK_TYPE_FN:
-                        let fn_sig = self.build_fn_type_from_ast(p_type_node)
-                        self.record_local_fn_sig(p_name, fn_sig)
                     if pk == NodeKind.NK_TYPE_PTR or pk == NodeKind.NK_TYPE_REF:
                         let pointee_node = self.pool.get_data0(p_type_node)
                         if self.pool.kind(pointee_node) == NodeKind.NK_TYPE_NAMED:
@@ -16998,10 +16962,7 @@ impl Codegen:
                                 self.record_local_pointee_struct(p_name, ps)
                     if pk == NodeKind.NK_TYPE_NAMED:
                         let p_sym = self.pool.get_data0(p_type_node)
-                        if method_owner_sym == 0 and p_name == self.sym_self and self.struct_type_map.get(p_sym).is_some():
-                            if p_sym != self.sym_str:
-                                method_owner_sym = p_sym
-                                self.current_method_owner_sym = method_owner_sym
+                        self.check_self_owner_recorded(method_owner_sym, p_name, p_sym)
                 self.record_codegen_param_binding(body, mono_sym, pi, AnalysisMarshalStrategy.CalleeOwnedCopy, param_val, byval_alloca)
                 continue
             var p_sema_ty2 = if pi + 1 < body.local_type_ids.len() as i32: body.local_type_ids[(pi + 1)] else: 0
@@ -17030,9 +16991,6 @@ impl Codegen:
 
             if p_type_node != 0:
                 let pk = self.pool.kind(p_type_node)
-                if pk == NodeKind.NK_TYPE_FN:
-                    let fn_sig = self.build_fn_type_from_ast(p_type_node)
-                    self.record_local_fn_sig(p_name, fn_sig)
                 if pk == NodeKind.NK_TYPE_PTR or pk == NodeKind.NK_TYPE_REF:
                     let pointee_node = self.pool.get_data0(p_type_node)
                     if self.pool.kind(pointee_node) == NodeKind.NK_TYPE_NAMED:
@@ -17041,10 +16999,7 @@ impl Codegen:
                             self.record_local_pointee_struct(p_name, ps)
                 if pk == NodeKind.NK_TYPE_NAMED:
                     let p_sym = self.pool.get_data0(p_type_node)
-                    if method_owner_sym == 0 and p_name == self.sym_self and self.struct_type_map.get(p_sym).is_some():
-                        if p_sym != self.sym_str:
-                            method_owner_sym = p_sym
-                            self.current_method_owner_sym = method_owner_sym
+                    self.check_self_owner_recorded(method_owner_sym, p_name, p_sym)
                     if method_owner_sym != 0 and (p_sym == self.sym_Self or p_sym == method_owner_sym):
                         if method_owner_sym != self.sym_str:
                             self.record_local_pointee_struct(p_name, method_owner_sym)
@@ -17137,7 +17092,6 @@ impl Codegen:
         self.local_allocas = saved_allocas
         self.local_types = saved_types
         self.local_muts = saved_muts
-        self.local_fn_sigs = saved_fn_sigs
         self.local_pointee_structs = saved_pointees
         self.task_locals = saved_task_locals
         self.trait_locals = saved_trait_locals
@@ -18963,7 +18917,7 @@ impl Codegen:
             self.pool.get_extra(tp_start)
         else:
             self.pool.get_data1(callee_node)
-        let target_ty = self.resolve_type(tp_node)
+        let target_ty = self.body_type_node_llvm(tp_node)
         if target_ty == 0:
             return wl_get_undef(wl_i32_type(self.context))
         // Evaluate the argument
@@ -19030,6 +18984,18 @@ impl Codegen:
     fn sema_type_level_arg(type_node: i32) -> i32:
         let owner = if self.current_body_owner_sym != 0: self.sema.pool_lookup_symbol(self.intern.resolve(self.current_body_owner_sym)) else: 0
         self.sema.type_level_arg_in_body(owner, type_node)
+
+    // #2043: a body's type node — a transmute target, an asm output — as
+    // Sema checked it in the body being emitted; under analysis the node's
+    // AST resolution is the verification. A node Sema never typed is a bug.
+    mut fn body_type_node_llvm(type_node: i32) -> i64:
+        let tid = self.sema_type_level_arg(type_node)
+        let fact = if tid > 0: self.sema_type_to_llvm(tid) else: 0
+        let ty = self.verify_ast_type(MODE_SITE_BODY_TYPE_NODE, fact, type_node, self.current_function_name_sym, type_node)
+        if ty == 0:
+            with_eprint(f"error: BUG: type node {type_node} in {self.sema_symbol_text(self.current_function_name_sym)} has no type Sema checked (#2043)")
+            self.had_error = 1
+        ty
 
     // Its LLVM type. Under analysis the node's own resolution (which binds
     // the instance's type parameters codegen-side) is the verification
