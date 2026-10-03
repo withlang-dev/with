@@ -8,7 +8,7 @@ fn label(host: str, port: i32, timeout: i32 = 30) -> str:
 
 type Ctx { tag: str }
 
-fn tag_value(value: str, ctx: implicit Ctx, suffix: str = "!") -> str:
+fn tag_value(value: str, ctx: implicit &Ctx, suffix: str = "!") -> str:
     f"{ctx.tag}:{value}{suffix}"
 
 fn test_default_param:

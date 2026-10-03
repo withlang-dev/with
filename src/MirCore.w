@@ -2715,6 +2715,20 @@ fn mir_copy_into_consuming_param(mir_mod: &MirModule, body: &MirBody, bb: i32, d
         return f"copy of {place_text} into parameter {ai} of fn sym{sym}, which takes ownership of it, while this body drops {place_text} too: two owners free one value (§2.5.1)"
     ""
 
+// Whether whole-local place `place_id` still holds its value only as a shell:
+// some tracked sub-place was moved out, blanked or dropped (not Init). A
+// projection place is never judged a shell.
+fn mir_local_partially_vacated(body: &MirBody, keys: &MirDropStateKeys, state: &MirDropStateMap, place_id: i32) -> bool:
+    if place_id < 0 or place_id >= body.place_locals.len() or body.place_proj_counts[place_id] != 0:
+        return false
+    let local_id = body.place_locals[place_id]
+    if local_id < 0 or local_id + 1 >= keys.child_starts.len() as i32:
+        return false
+    for ci in keys.child_starts[local_id]..keys.child_starts[local_id + 1]:
+        if state.get(keys, keys.children[ci]) != MirDropState.Init:
+            return true
+    false
+
 // Every move of a statement or terminator checked by the #1415 rule.
 fn validate_moves_through_references(mir_mod: &MirModule, body: &MirBody) -> str:
     for bb in 0..body.block_count():
@@ -2960,7 +2974,11 @@ pub fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
                 // Moved, MaybeMoved, Reset, Uninit, Maybe and MaybeGarbage
                 // stay legal (a reset after a move, at a conditional-move
                 // join, a zero-init).
-                if mir_rvalue_is_zero_fill(body, body.stmt_data1(stmt_id)) != 0 and state.place(blocks.keys, d0) == MirDropState.Init and mir_mod.sema_moved_drop_types.contains(mir_validate_place_type(mir_mod, body, d0)):
+                // A shell a sub-place move vacated is not a lost value either:
+                // `?`'s pass path and a record update move the payload or
+                // fields out and blank the carrier — the same partial-move
+                // judgment the leak-at-return rule below makes (#2049).
+                if mir_rvalue_is_zero_fill(body, body.stmt_data1(stmt_id)) != 0 and state.place(blocks.keys, d0) == MirDropState.Init and mir_mod.sema_moved_drop_types.contains(mir_validate_place_type(mir_mod, body, d0)) and not mir_local_partially_vacated(body, blocks.keys, state, d0):
                     return f"fn sym{body.fn_sym} stmt{stmt_id} span={span}: reset of {mir_place_text(body, d0)} on a path where it was never moved: the value it holds is lost (§2.5.1)"
             state.transfer_stmt(blocks.keys, body, stmt_id)
         if body.term_kind(bb) == TermKind.TK_CALL and blocks.computed[bb] != 0:
@@ -3018,13 +3036,7 @@ pub fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
                     continue
                 if state.place(blocks.keys, place_id) != MirDropState.Init:
                     continue
-                var partial = false
-                if local_id + 1 < blocks.keys.child_starts.len() as i32:
-                    for ci in blocks.keys.child_starts[local_id]..blocks.keys.child_starts[local_id + 1]:
-                        let cs = state.get(blocks.keys, blocks.keys.children[ci])
-                        if cs != MirDropState.Init:
-                            partial = true
-                if partial:
+                if mir_local_partially_vacated(body, blocks.keys, state, place_id):
                     continue
                 return f"fn sym{body.fn_sym} bb{bb}: owned local {mir_place_text(body, place_id)} is still Init at return — no path drops or moves it (a leak)"
         state.transfer_term(blocks.keys, body, bb)
