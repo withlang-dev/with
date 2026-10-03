@@ -5,14 +5,18 @@
 //! expect-stdout: unit ok
 //! expect-stdout: sum 34
 //! expect-stdout: display Pair(3, 4) Triple(5, 6, 7) Named(hello, 9) Empty
+//! expect-stdout: tuple payload 3 4
 
 // #2017: an enum variant with several payload fields lays them out as a
 // struct in the payload area (with-abi.md §2); the C backend refused every
 // such variant ("C backend does not support enum variants with 2 payload
-// fields"), so the compiler's own C could not be emitted.
+// fields"), so the compiler's own C could not be emitted. A one-field
+// variant whose payload is a tuple read its payload field as the tuple's
+// first element (`tuple payload 3 0`).
 
 enum Shape { Pair(i32, i64) | Triple(i8, i32, i64) | Named(label: str, n: i32) | Empty }
 enum Tagged[T] { Two(a: i32, b: i32, t: T) | Nothing }
+enum Boxed { Tup((i32, i64)) | Bare }
 
 fn make_pair(a: i32): Shape.Pair(a, a as i64 + 1)
 
@@ -45,3 +49,6 @@ fn main:
     show(&e)
     print(f"sum {weight(&p) + weight(&t) + weight(&n) + weight(&e)}")
     print(f"display {p} {t} {n} {e}")
+    match Boxed.Tup((3, 4)):
+        .Tup(pair) => print(f"tuple payload {pair.0} {pair.1}")
+        .Bare => print("tuple payload none")
