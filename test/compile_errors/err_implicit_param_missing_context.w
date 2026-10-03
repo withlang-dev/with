@@ -2,7 +2,7 @@
 
 type Ctx { value: i32 }
 
-fn f(x: i32, ctx: implicit Ctx) -> i32:
+fn f(x: i32, ctx: implicit &Ctx) -> i32:
     x + ctx.value
 
 fn main:
