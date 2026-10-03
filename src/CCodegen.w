@@ -2807,6 +2807,17 @@ impl CCodegen:
                 return true
         false
 
+    // MIR declares the local's type: a payload enum other than Option
+    // (`zip_current_entry(h)?`'s Result) is what its downcasts project, never
+    // an Option of the type a payload is copied into. The Option guess typed
+    // such a Result local Option[ZipEntry] and refused its Err downcast as a
+    // unit variant (#2017).
+    fn local_declared_non_option_payload_enum(body: &MirBody, local_id: i32) -> bool:
+        let declared = self.sema.resolve_alias(self.local_declared_tid(body, local_id) as TypeId) as i32
+        if self.type_is_payload_enum(declared) == 0:
+            return false
+        self.sema.get_type_kind(declared as TypeId) != TypeKind.TY_GENERIC_INST or self.sema.get_generic_inst_base(declared) != self.sema.syms.option
+
     mut fn local_payload_downcast_option_tid(body: &MirBody, local_id: i32) -> i32:
         if local_id < 0:
             return 0
@@ -2818,6 +2829,8 @@ impl CCodegen:
                 return 0
             return value
         self.local_downcast_option_cache.insert(cache_key, -1)
+        if self.local_declared_non_option_payload_enum(body, local_id):
+            return 0
         var out = 0
         for bb in 0..body.block_count():
             let start = body.bb_stmt_starts[bb]
@@ -2908,7 +2921,7 @@ impl CCodegen:
                 if not self.place_has_downcast(body, src_place):
                     continue
                 let src_local = self.place_local_id(body, src_place)
-                if src_local < 0:
+                if src_local < 0 or self.local_declared_non_option_payload_enum(body, src_local):
                     continue
                 let dst_tid = self.place_tid(body, body.stmt_d0[stmt_id])
                 let opt_tid = self.option_tid_for_payload(dst_tid)
@@ -3310,7 +3323,7 @@ impl CCodegen:
                 if self.type_is_payload_enum(current_tid) != 0:
                     let payload_count = self.sema.type_reflection_variant_payload_count(current_tid, pd)
                     if payload_count == 0:
-                        self.fail(f"payload downcast for unit enum variant {pd}")
+                        self.fail(f"payload downcast for unit variant {pd} of enum " ++ self.sema.type_name(current_tid))
                         current_tid = 0
                         continue
                     if i + 1 < count and body.proj_kinds[(start + i + 1)] == ProjKind.PK_FIELD:
@@ -10463,7 +10476,13 @@ impl CCodegen:
         let param_count = if sig_idx >= 0: self.sema.sig_get_param_count(sig_idx) else: 0
         // A specialization's type-level builtin arguments (`sizeof[PullCore[G]]`,
         // #1766) are Sema's recorded facts (type_level_arg_in_body, #1983).
-        self.emit_body_text(body, fn_sig, param_count, "")
+        let was_ok = self.had_error == 0
+        let text = self.emit_body_text(body, fn_sig, param_count, "")
+        // A refusal names the function it stopped in (#2017: a bare
+        // "payload downcast for unit enum variant 1" over the whole compiler).
+        if was_ok and self.had_error != 0:
+            self.err_msg = "in " ++ self.fn_c_name(fn_sym) ++ ": " ++ self.err_msg
+        text
 
     // The C function over a MIR body: `fn_sig {`, `prologue` (a closure's
     // capture locals, #1766), the declaration of every local past the
