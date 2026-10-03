@@ -1755,17 +1755,22 @@ fn build_runner_link_root(root: &str) -> str:
 fn build_runner_runtime_dirs_present(root: &str) -> bool:
     with_fs_file_exists(resolve_join(root, "out/bootstrap-lib/cimport_stubs.o")) != 0 or with_fs_file_exists(resolve_join(root, "out/lib/cimport_stubs.o")) != 0
 
-// The runner's absence is said once, naming the dependency that builds its
-// root: with --no-deps the action then evaluates in the driver's comptime
-// evaluator, which may not evaluate every action of this tree (#1835), and
-// a `--no-deps` run refuses rather than silently change worlds.
-fn build_runner_explain_no_root(root: &str, target_name: &str, no_deps: bool) -> i32:
+// The target that builds the runner's link root.
+const BUILD_RUNNER_ROOT_PREPARE: str = "prepare-bootstrap-link-root"
+
+// The runner's absence is said once. A `--no-deps` run that skipped the
+// prepare building its root refuses, naming it, rather than silently change
+// worlds (#1835): the action would evaluate in the driver's comptime
+// evaluator, which may not evaluate every action of this tree. A run that
+// skipped nothing (the target does not depend on the prepare: `:seed`)
+// evaluates at comptime with or without --no-deps, and says so.
+fn build_runner_explain_no_root(root: &str, target_name: &str, skipped_root_prepare: bool) -> i32:
     let generation = if compiler_generation_is_stamped(): compiler_generation() else: "unstamped"
-    let message = "no runtime objects of this driver's generation (" ++ generation ++ ") under out/bootstrap-lib or out/lib to link the action runner against; `prepare-bootstrap-link-root` (a dependency of '" ++ target_name ++ "') builds them"
-    if no_deps:
-        with_eprint("error: --no-deps: " ++ message ++ " and --no-deps skipped it; run `with build :" ++ target_name ++ "` without --no-deps, or `with build :prepare-bootstrap-link-root` first")
+    let message = "no runtime objects of this driver's generation (" ++ generation ++ ") under out/bootstrap-lib or out/lib to link the action runner against"
+    if skipped_root_prepare:
+        with_eprint("error: --no-deps: " ++ message ++ "; `" ++ BUILD_RUNNER_ROOT_PREPARE ++ "` (a dependency of '" ++ target_name ++ "') builds them and --no-deps skipped it; run `with build :" ++ target_name ++ "` without --no-deps, or `with build :" ++ BUILD_RUNNER_ROOT_PREPARE ++ "` first")
         return 1
-    with_eprint("[build] " ++ message ++ "; until then actions evaluate in the driver's comptime evaluator")
+    with_eprint("[build] " ++ message ++ "; actions evaluate in the driver's comptime evaluator")
     0
 
 fn build_runner_fallback_list_path(root: &str) -> str:
@@ -2430,7 +2435,7 @@ fn build_graph_enforce_rss(root: &str, graph: &BuildGraph, name: &str, peak: i64
         with_eprint("error: could not invalidate build cache for '" ++ name ++ "'")
     1
 
-unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, action_sema: *mut Sema, options: &BuildCommandOptions, survey: bool, no_deps: bool) -> i32:
+unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, action_sema: *mut Sema, options: &BuildCommandOptions, survey: bool, skipped_root_prepare: bool) -> i32:
     let no_strings: Vec[str] = Vec.new()
     if graph.targets.len() == 0:
         with_eprint("error: build.w did not declare any targets")
@@ -2489,7 +2494,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
     // links the runner from the embedded runtime, as it always did. Until
     // the root is ready, actions evaluate at comptime, as before, and the
     // driver says so (build_runner_explain_no_root).
-    let bootstrap_root_target = "prepare-bootstrap-link-root"
+    let bootstrap_root_target = BUILD_RUNNER_ROOT_PREPARE
     var bootstrap_root_scheduled = false
     for bi in 0..graph.targets.len() as i32:
         if (&graph.targets[bi]).name == bootstrap_root_target: bootstrap_root_scheduled = true
@@ -2627,7 +2632,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                 runner_path = build_runner_ensure(root, options)
             else if prepare_done:
                 runner_checked = true
-                if build_runner_explain_no_root(root, target.name, no_deps) != 0: return 1
+                if build_runner_explain_no_root(root, target.name, skipped_root_prepare) != 0: return 1
             if runner_path.len() > 0:
                 runner_fallback = build_runner_load_fallback(root)
                 let _e1 = with_setenv_str("WITH_BUILD_RUNNER_ROOT", root)
@@ -3271,7 +3276,10 @@ fn run_build_command(options: BuildCommandOptions, graph_options: &BuildGraphCom
                 return 0
             if not repo_lock_acquire(selected_target_name):
                 return 1
-            let build_rc = unsafe { run_build_graph(root, cfg, selected_graph, &raw mut load_result.sema as *mut Sema, actual_options, graph_options.survey, graph_options.no_deps) }
+            // #1835: what --no-deps skipped is what the target's full closure
+            // holds beyond itself; only a skipped root prepare is refused.
+            let skipped_root_prepare = graph_options.no_deps and build_graph_find_target_index_by_name(&build_graph_filter_target(&graph, selected_target_name), BUILD_RUNNER_ROOT_PREPARE) >= 0
+            let build_rc = unsafe { run_build_graph(root, cfg, selected_graph, &raw mut load_result.sema as *mut Sema, actual_options, graph_options.survey, skipped_root_prepare) }
             repo_lock_release()
             link_stage_cleanup_current_process_temp_archives()
             build_report_wall(selected_target_name, cmd_t0)
