@@ -8082,6 +8082,20 @@ impl Sema:
     fn closure_capture_consumes(closure_node: i32, idx: i32) -> i32:
         if (self.closure_capture_summary_eff(closure_node, idx) & (EFF_CONSUME | EFF_ESCAPE_VALUE)) != 0: 1 else: 0
 
+    // D62/D65: Sema's capture mode for capture `idx` of a closure — by place
+    // (a pointer to the creating frame's slot, Copy or not) unless the
+    // closure is `move`, which takes the value. Every downstream stage reads
+    // this; none re-reads the closure's spelling.
+    fn closure_capture_by_place(closure_node: i32, idx: i32) -> bool:
+        (self.closure_capture_summary_eff(closure_node, idx) & EFF_CAPTURE_BY_PLACE) != 0
+
+    // D63: the closure value owns its environment — some capture is held by
+    // value, not by place (a `move` closure with captures).
+    fn closure_env_owned(closure_node: i32) -> bool:
+        for ci in 0..self.closure_capture_summary_count(closure_node):
+            if not self.closure_capture_by_place(closure_node, ci): return true
+        false
+
     fn closure_capture_summary_eff(closure_node: i32, idx: i32) -> i32:
         if not self.closure_capture_summary_starts.contains(closure_node):
             return 0

@@ -98,6 +98,8 @@ type ClosureCaptureSource {
     // 0 for a local captured as itself.
     value_ty: i32,
     name: i32,
+    // MIR's materialization (MirBody.anonymous_capture_kinds, MIR_CAPTURE_*).
+    kind: i32,
 }
 impl Copy for ClosureCaptureSource
 
@@ -8560,6 +8562,7 @@ impl MirBuilder:
     mut fn add_protocol_capture(source_local: i32, ty: i32, name: i32) -> i32:
         let local = self.body.new_local(ty, 0, name, 1)
         self.body.anonymous_capture_sources.push(source_local)
+        self.body.anonymous_capture_kinds.push(MIR_CAPTURE_PROTOCOL)
         local
 
     fn for_label(for_node: i32) -> i32:
@@ -16030,21 +16033,22 @@ impl MirBuilder:
     mut fn closure_capture_source(sym: i32, node: i32, index: i32) -> ClosureCaptureSource:
         let local = self.lookup_local(sym)
         if local >= 0:
-            return ClosureCaptureSource { local, capture_ty: self.local_type(local), value_ty: 0, name: sym }
+            return ClosureCaptureSource { local, capture_ty: self.local_type(local), value_ty: 0, name: sym, kind: MIR_CAPTURE_LOCAL }
         let alias_place = self.lookup_alias_place(sym)
         let alias_ty = self.lookup_alias_type(sym)
         if alias_place < 0 or alias_ty == 0:
             sema_phase_bug(f"BUG: closure capture names no local or place: node={node} symbol={sym}")
-        // A `move ||` closure snapshots: a Copy place's value is copied into a
-        // local of this frame, which the closure takes.
-        if self.ast.kind(node) == NodeKind.NK_CLOSURE and self.ast.is_move_closure(node) != 0:
+        // A capture Sema has the closure take by value (`move ||`, D62)
+        // snapshots: a Copy place's value is copied into a local of this
+        // frame, which the closure takes.
+        if not self.sema.closure_capture_by_place(node, index):
             if self.sema.is_copy_frozen(alias_ty) == 0:
                 sema_phase_bug(f"BUG: a move closure captures a non-Copy view binding by value: node={node} symbol={sym}")
             let copy_local = self.new_temp(alias_ty)
             let copy_place = self.place_for_local(copy_local)
             let copy_op = self.body.new_operand(OperandKind.OK_COPY, alias_place)
             self.assign_operand_to_place(copy_place, copy_op, self.ast.get_start(node))
-            return ClosureCaptureSource { local: copy_local, capture_ty: alias_ty, value_ty: 0, name: self.pool.intern(f"$capture_copy${node}${index}") }
+            return ClosureCaptureSource { local: copy_local, capture_ty: alias_ty, value_ty: 0, name: self.pool.intern(f"$capture_copy${node}${index}"), kind: MIR_CAPTURE_SNAPSHOT }
         let ref_ty = self.sema.find_exact_type(TypeKind.TY_REF, alias_ty, 0, 0) as i32
         if ref_ty == 0:
             sema_phase_bug(f"BUG: closure capture of a place has no preregistered &T: node={node} symbol={sym}")
@@ -16052,11 +16056,12 @@ impl MirBuilder:
         let rv = self.body.new_rvalue(RvalueKind.RK_REF, BorrowKind.SHARED, alias_place, 0)
         let ref_place = self.place_for_local(ref_local)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, ref_place, rv, self.ast.get_start(node))
-        ClosureCaptureSource { local: ref_local, capture_ty: ref_ty, value_ty: alias_ty, name: self.pool.intern(f"$capture_ref${node}${index}") }
+        ClosureCaptureSource { local: ref_local, capture_ty: ref_ty, value_ty: alias_ty, name: self.pool.intern(f"$capture_ref${node}${index}"), kind: MIR_CAPTURE_PLACE_REF }
 
     mut fn bind_capture(sym: i32, source: ClosureCaptureSource):
         let capture_local = self.body.new_local(source.capture_ty, 0, source.name, 1)
         self.body.anonymous_capture_sources.push(source.local)
+        self.body.anonymous_capture_kinds.push(source.kind)
         if source.value_ty == 0:
             self.bind_local(sym, capture_local)
             return
@@ -16090,14 +16095,13 @@ impl MirBuilder:
         // drop of the local must therefore keep its null guard — Stage 4
         // elides the guard for a local never recorded as moved.
         if not is_async:
-            let is_move = self.ast.is_move_closure(node) != 0
             for ci in 0..captures.len() as i32:
                 let consumed_local = self.lookup_local(captures[ci])
                 if consumed_local < 0 or self.sema.type_needs_drop_frozen(self.local_type(consumed_local)) == 0:
                     continue
                 // D63: `move ||` takes the value at creation — codegen resets
                 // the outer slot — so its drop keeps the guard too.
-                if is_move or self.sema.closure_capture_consumes(node, ci) != 0:
+                if not self.sema.closure_capture_by_place(node, ci) or self.sema.closure_capture_consumes(node, ci) != 0:
                     self.body.mark_local_ever_moved(consumed_local)
         let capture_sources: Vec[ClosureCaptureSource] = Vec.new()
         if not is_async:
@@ -16119,6 +16123,7 @@ impl MirBuilder:
                 let capture_local = child.body.new_local(capture_ty, 0, sym, 1)
                 child.bind_local(sym, capture_local)
                 child.body.anonymous_capture_sources.push(local)
+                child.body.anonymous_capture_kinds.push(MIR_CAPTURE_LOCAL)
             else:
                 child.bind_capture(sym, capture_sources[ci])
         for i in 0..param_count:

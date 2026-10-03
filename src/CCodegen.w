@@ -10313,7 +10313,8 @@ impl CCodegen:
         let count = body.anonymous_capture_count
         if count == 0:
             return CC_CLOSURE_ENV_NONE
-        if self.ast.is_move_closure(node as NodeId) == 0:
+        // Sema's capture record decides (D62, D65), not the spelling.
+        if not self.sema.closure_env_owned(node):
             return CC_CLOSURE_ENV_BY_PLACE
         var offset: i64 = 0
         var max_align: i64 = 1

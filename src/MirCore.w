@@ -441,6 +441,12 @@ pub type MirBody {
     // The creating body's local each capture (locals 1..count) is taken
     // from, by id (codegen builds the environment from these).
     anonymous_capture_sources: Vec[i32],
+    // ... and how MIR materialized each (MIR_CAPTURE_*): the local itself,
+    // a snapshot copy, a reference to an alias place, or a protocol capture
+    // MIR adds by place (a gen-loop's flag, return slot and producer).
+    // audit:resolution judges the first three against Sema's capture mode
+    // (D62); a protocol capture is MIR's own and follows Sema's record.
+    anonymous_capture_kinds: Vec[i32],
 
     // Locals
     local_type_ids: Vec[i32],
@@ -759,6 +765,7 @@ fn MirBody.init_for_fn(fn_sym: i32) -> MirBody:
         anonymous_type: 0,
         anonymous_capture_count: 0,
         anonymous_capture_sources: Vec.new(),
+        anonymous_capture_kinds: Vec.new(),
         local_type_ids: Vec.new(),
         local_mutables: Vec.new(),
         local_names: Vec.new(),
@@ -4155,6 +4162,21 @@ pub fn mir_index_place_verdict(proj_kind: i32, mir_ty: i32, sema_ty: i32, sema_v
 pub fn mir_view_origin_verdict(sema_has_origins: bool, root_named: bool, root_name_in_origins: bool) -> str:
     if sema_has_origins and root_named and not root_name_in_origins:
         return "MIR aliases a place rooted at a binding Sema did not record as the view's origin"
+    ""
+
+// MirBody.anonymous_capture_kinds.
+pub const MIR_CAPTURE_LOCAL: i32 = 0
+pub const MIR_CAPTURE_SNAPSHOT: i32 = 1
+pub const MIR_CAPTURE_PLACE_REF: i32 = 2
+pub const MIR_CAPTURE_PROTOCOL: i32 = 3
+
+// #1647 (D62/D65): one closure capture's MIR materialization against
+// Sema's capture mode. "" when they agree.
+pub fn mir_capture_verdict(mir_kind: i32, sema_by_place: bool) -> str:
+    if mir_kind == MIR_CAPTURE_SNAPSHOT and sema_by_place:
+        return "MIR snapshots a capture Sema holds by place: the closure reads a copy the creating frame never sees written"
+    if mir_kind == MIR_CAPTURE_PLACE_REF and not sema_by_place:
+        return "MIR captures a reference to a place Sema has the closure take by value"
     ""
 
 pub fn mir_resolution_check_call(mir_mod: &MirModule, body: &MirBody, bb: i32, answer: &CalleeResolution) -> str:

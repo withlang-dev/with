@@ -938,6 +938,14 @@ pub fn mir_test_resolution_places():
     assert(mir_view_origin_verdict(true, true, true) == "")
     assert(mir_view_origin_verdict(false, true, false) == "")
     assert(mir_view_origin_verdict(true, false, false) == "")
+    // A closure capture: a snapshot of a by-place capture (D62), a
+    // reference for a by-value one, and the agreements.
+    assert(mir_capture_verdict(MIR_CAPTURE_SNAPSHOT, true).contains("snapshots"))
+    assert(mir_capture_verdict(MIR_CAPTURE_PLACE_REF, false).contains("by value"))
+    assert(mir_capture_verdict(MIR_CAPTURE_SNAPSHOT, false) == "")
+    assert(mir_capture_verdict(MIR_CAPTURE_PLACE_REF, true) == "")
+    assert(mir_capture_verdict(MIR_CAPTURE_LOCAL, true) == "")
+    assert(mir_capture_verdict(MIR_CAPTURE_PROTOCOL, false) == "")
 
 // #1627: an enum aggregate whose `&T` payload slot receives the `T` value
 // itself — `Option[&Ctx].Some(ctx)` lowered `move ctx` there, and every

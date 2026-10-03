@@ -5332,11 +5332,13 @@ pub const MODE_SITE_PARAM_PLACE_ALIAS: i32 = 7
 pub const MODE_SITE_REF_VALUE_IS_ADDRESS: i32 = 8
 pub const MODE_SITE_REF_SLOT_HOLDS_POINTER: i32 = 9
 // #1647: values a site once re-derived — a type-level argument, a field's
-// LLVM type, a field's index.
+// LLVM type, a field's index — and a closure's capture record.
 pub const MODE_SITE_SIZEOF_TYPE_ARG: i32 = 10
 pub const MODE_SITE_STRUCT_FIELD_TYPE: i32 = 11
 pub const MODE_SITE_FIELD_INDEX: i32 = 12
-pub const MODE_SITE_COUNT: i32 = 13
+pub const MODE_SITE_CAPTURE_BY_PLACE: i32 = 13
+pub const MODE_SITE_CLOSURE_OWNED_ENV: i32 = 14
+pub const MODE_SITE_COUNT: i32 = 15
 
 pub fn mode_site_name(site: i32) -> str:
     if site == MODE_SITE_FIELD_TYPE_THROUGH_ADDRESS: return "projected-type field through an address"
@@ -5352,6 +5354,8 @@ pub fn mode_site_name(site: i32) -> str:
     if site == MODE_SITE_SIZEOF_TYPE_ARG: return "sizeof/alignof type argument"
     if site == MODE_SITE_STRUCT_FIELD_TYPE: return "struct field LLVM type"
     if site == MODE_SITE_FIELD_INDEX: return "field projection index"
+    if site == MODE_SITE_CAPTURE_BY_PLACE: return "closure capture by place"
+    if site == MODE_SITE_CLOSURE_OWNED_ENV: return "closure owns its environment"
     "unknown"
 
 pub fn mode_site_owner(site: i32) -> str:
@@ -5360,12 +5364,14 @@ pub fn mode_site_owner(site: i32) -> str:
     if site == MODE_SITE_SIZEOF_TYPE_ARG: return "Sema's type argument"
     if site == MODE_SITE_STRUCT_FIELD_TYPE: return "Sema's field type"
     if site == MODE_SITE_FIELD_INDEX: return "Sema's field declaration"
+    if site == MODE_SITE_CAPTURE_BY_PLACE or site == MODE_SITE_CLOSURE_OWNED_ENV: return "Sema's capture facts"
     "Sema's place category"
 
 // What a site re-derived its fact from before it read the owner.
 pub fn mode_site_derivation(site: i32) -> str:
     if site == MODE_SITE_SIZEOF_TYPE_ARG or site == MODE_SITE_STRUCT_FIELD_TYPE: return "the AST type node"
     if site == MODE_SITE_FIELD_INDEX: return "the LLVM struct registry"
+    if site == MODE_SITE_CAPTURE_BY_PLACE or site == MODE_SITE_CLOSURE_OWNED_ENV: return "the closure's AST spelling"
     "the LLVM type"
 
 // Symbol-naming rules live in src/FnAbi.w (docs/spec/abi/with-abi.md §5); this is

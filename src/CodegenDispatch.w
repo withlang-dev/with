@@ -18312,16 +18312,18 @@ impl Codegen:
         // §12.4 / #1481: every non-move closure captures a non-Copy value by
         // place (a pointer to the outer slot), let-bound or direct argument;
         // only `move ||` copies the bytes into the environment.
-        let can_capture_by_ref = self.pool.is_move_closure(node) == 0
-        let force_by_place_capture = self.pool.is_by_place_closure(node) == 1 and self.pool.is_move_closure(node) == 0
         let capture_ref_modes: Vec[i32] = Vec.new()
         for ci in 0..capture_count:
-            let sym = captures[ci]
             // §12.4: "Captures are by place regardless of whether the type
             // is Copy" — a Copy capture is a pointer to the outer slot too;
             // a read through it copies. Only `move ||` copies into the
-            // environment.
-            let by_ref = if force_by_place_capture or can_capture_by_ref: 1 else: 0
+            // environment. The mode is Sema's capture record (D62, D65);
+            // the closure's spelling is verification. A protocol capture MIR
+            // adds after Sema's (a gen-loop's flag, return slot, producer) is
+            // MIR's own, by place.
+            let protocol = ci < closure_body.anonymous_capture_kinds.len() as i32 and closure_body.anonymous_capture_kinds[ci] == MIR_CAPTURE_PROTOCOL
+            let by_place = protocol or self.sema.closure_capture_by_place(node, ci)
+            let by_ref = if self.mode_decide(MODE_SITE_CAPTURE_BY_PLACE, by_place, self.pool.is_move_closure(node) == 0, self.current_function_name_sym, node): 1 else: 0
             capture_ref_modes.push(by_ref)
 
         // Build capture struct type from captured variable types
@@ -18412,7 +18414,7 @@ impl Codegen:
         // {drop_fn, clone_fn, env} whose captures the body works on IN PLACE
         // (a consuming body blanks the slot it moved out of, so the cell's
         // drop fn never drops it again).
-        let owned_env = not is_extern_closure and capture_count > 0 and self.pool.is_move_closure(node) == 1
+        let owned_env = not is_extern_closure and capture_count > 0 and self.mode_decide(MODE_SITE_CLOSURE_OWNED_ENV, self.sema.closure_env_owned(node), self.pool.is_move_closure(node) == 1, self.current_function_name_sym, node)
         let cap_sema_types: Vec[i32] = Vec.new()
         for ci in 0..capture_count:
             cap_sema_types.push(closure_body.local_type_ids[ci + 1])

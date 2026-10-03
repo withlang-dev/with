@@ -477,6 +477,37 @@ fn resolution_audit_view_origins(report: &AnalysisReport, sema: &Sema, mir_mod: 
     report.note(f"resolution-audit: alias-lets judged={checked} with-sema-origins={with_origins}")
     checked
 
+// Every closure capture MIR materialized as a snapshot or as a reference
+// to an alias place agrees with Sema's capture mode, and a closure has the
+// captures Sema recorded (D62/D63: the capture record is Sema's).
+fn resolution_audit_captures(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> i32:
+    var checked = 0
+    for bi in 0..mir_mod.bodies.len() as i32:
+        let body = &mir_mod.bodies[bi]
+        if body.lowering_failed != 0: continue
+        for ci in 0..body.const_kinds.len() as i32:
+            if body.const_kinds[ci] != ConstKind.CK_CLOSURE: continue
+            let node = body.const_d0[ci]
+            if node <= 0 or node >= sema.ast.node_count() or sema.ast.kind(node) != NodeKind.NK_CLOSURE: continue
+            let child_idx = mir_mod.find_body(body.const_d1[ci])
+            if child_idx < 0: continue
+            let child = &mir_mod.bodies[child_idx]
+            let site = resolution_site(sema, pool, body, source_path, source_text)
+            let sema_count = sema.closure_capture_summary_count(node)
+            var mir_count = 0
+            for k in 0..child.anonymous_capture_kinds.len() as i32:
+                if child.anonymous_capture_kinds[k] != MIR_CAPTURE_PROTOCOL: mir_count = mir_count + 1
+            if mir_count != sema_count:
+                report.fail(f"resolution: {pool.resolve(body.fn_sym)} at {resolution_where(sema, &site, node)}: the closure has {mir_count} captures in MIR, {sema_count} in Sema's capture record")
+                continue
+            for k in 0..sema_count:
+                if k >= child.anonymous_capture_kinds.len() as i32: break
+                checked = checked + 1
+                let verdict = mir_capture_verdict(child.anonymous_capture_kinds[k], sema.closure_capture_by_place(node, k))
+                if verdict.len() > 0:
+                    report.fail(f"resolution: {pool.resolve(body.fn_sym)} at {resolution_where(sema, &site, node)}: capture {k} `{sema.pool_resolve(sema.closure_capture_summary_sym(node, k))}`: {verdict}")
+    checked
+
 // Phase 4: every call argument that reads a named owned binding transfers
 // it the way Sema's signature says (D5/D65): a share-place parameter or an
 // extern bit-copy parameter borrows, any other non-Copy parameter consumes.
@@ -529,6 +560,7 @@ pub fn analysis_audit_resolution(report: &AnalysisReport, sema: &Sema, mir_mod: 
     let effects = resolution_audit_call_effects(report, sema, mir_mod, pool, source_path, source_text)
     let index_places = resolution_audit_index_places(report, sema, mir_mod, pool, source_path, source_text)
     let view_origins = resolution_audit_view_origins(report, sema, mir_mod, pool, source_path, source_text)
-    report.note(f"resolution-audit: field-places={field_places} let-bindings={lets} call-arguments={effects} index-places={index_places} alias-lets={view_origins}")
+    let captures = resolution_audit_captures(report, sema, mir_mod, pool, source_path, source_text)
+    report.note(f"resolution-audit: field-places={field_places} let-bindings={lets} call-arguments={effects} index-places={index_places} alias-lets={view_origins} closure-captures={captures}")
     let unlowered = resolution_audit_unlowered_calls(report, sema, mir_mod, pool, source_path, source_text)
     report.note(f"resolution-audit: mir-calls={calls} sema-calls-in-lowered-bodies-without-mir-call={unlowered}")
