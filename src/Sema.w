@@ -612,6 +612,10 @@ pub type FacadeCallEffect {
     touch_domains: Vec[i32], // facade_domain_list indices
     borrow_domain: i32,      // facade_domain_list index, or -1
     borrow_param: i32,       // a presented call's origin parameter (a C string it is lent), or -1
+    // A producer sig's C parameter per presented one (its out slot gone, an
+    // init's preinit parameters ahead), as the mask was projected; empty for
+    // every other call (facade_effect_source_param inverts their projection).
+    param_sources: Vec[i32],
 }
 
 pub type Sema {

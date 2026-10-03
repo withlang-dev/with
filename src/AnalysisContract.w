@@ -705,6 +705,18 @@ pub fn analysis_audit_contract(report: &AnalysisReport, sema: &Sema, source_path
     // left a stale view of `owner` accepted while this audit said `ok`. The
     // raw C signature's bits index its C parameters and name the ones that
     // receive a resource (facade_param_receives).
+    //
+    // #1977 (D65: the audit reads the fact acceptance reads): a presented
+    // bit is checked through the C parameter it was projected from
+    // (facade_effect_source_param, which acceptance's poisoning names), and
+    // that C parameter must receive a resource — the fact the mask was built
+    // from (facade_touch_params_mask). The audit asked instead whether the
+    // presented parameter's *type* holds a resource (facade_type_holds_resource),
+    // which is acceptance's "this binding is a resource, not a view" question:
+    // a `BorrowedDatabase` (`returns borrow Database`) or `FailedDatabase`
+    // receiver is the resource C receives, yet reads as holding none, so
+    // `b.changes()` and `failed.errmsg()` were reported as naming the wrong
+    // parameter while acceptance (correctly) poisoned that receiver's views.
     for fx in 0..sema.facade_call_effects.len() as i32:
         let e = &sema.facade_call_effects[fx]
         let count = sema.sig_get_param_count(e.sig)
@@ -719,7 +731,8 @@ pub fn analysis_audit_contract(report: &AnalysisReport, sema: &Sema, source_path
             if pi >= count:
                 report.fail(f"contract: {form} invalidates views of its parameter {pi}, and it has {count}; the effect was not projected from the C parameter indices onto the presented ones (#1674, §16.2b.14)")
                 continue
-            let holds = if raw: sema.facade_param_receives(e.fn_sym, pi).len() == 1 else: sema.facade_type_holds_resource(sema.sig_param_type(e.sig, pi), 0)
+            let source = if raw: pi else: sema.facade_effect_source_param(fx, pi)
+            let holds = sema.facade_param_receives(e.fn_sym, source).len() == 1
             if not holds:
                 report.fail(f"contract: {form} invalidates views of its parameter {pi}, which holds no modeled resource; the effect names the wrong parameter (#1674, §16.2b.14)")
     // Profile checks (§63; stage 11, §16.2b.12): an ambiguous match is a

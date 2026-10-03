@@ -1,4 +1,5 @@
 //! expect-check-fail: view `v` borrows from `o`, which `st_new` may have invalidated
+//! expect-check-fail: state `preserves param 3` on fn st_new
 
 // #1674 (§16.2b.7, §16.2b.14): a producer rendered as a method of its parent
 // (`d.st_new(flags, o)` for `st_new(db *, st **out, int, other *)`)
@@ -8,6 +9,8 @@
 // parameters: `o` kept its C index 3 on a three-parameter method, bit 1 fell
 // on `flags`, and a view of `o` survived the call. audit:contract reported
 // `ok` over it until it checked each rendered effect against its signature.
+// #1977: the help names C's `o`, param 3; the producer's projection was
+// read as the identity and named param 2, `flags`.
 use c_import("typedef struct db db;
 typedef struct st st;
 typedef struct Value { int n; } Value;

@@ -2733,8 +2733,12 @@ impl Sema:
 
     // Diagnostics name the C parameter the clause must preserve, even
     // though invalidation applies to its projected With argument.
+    // A producer's projection is recorded on its effect (#1977: it read as
+    // the identity, so `d.st_new(flags, o)`'s `o` named C's `flags`).
     fn facade_effect_source_param(fx: i32, presented: i32) -> i32:
         let effect = &self.facade_call_effects[fx]
+        if presented >= 0 and presented < effect.param_sources.len() as i32 and effect.param_sources[presented] >= 0:
+            return effect.param_sources[presented]
         let raw_sig = self.get_sig(effect.fn_sym)
         if effect.contract < 0 or effect.sig == raw_sig or self.facade_fn_is_resource_op(effect.fn_sym):
             return presented
@@ -3678,18 +3682,32 @@ impl Sema:
                 let slot = self.facade_owner_skip(ri, owner)
                 let raw_mask = self.facade_touch_params_mask(f, ci, if owner == FACADE_DEP_INIT: 1 else: 0)
                 var mask = 0
+                // #1977: the C parameter each presented one came from — the
+                // projection below, kept so a presented bit names its source
+                // (facade_effect_source_param) instead of reading as the C
+                // parameter at the presented index.
+                var sources: Vec[i32] = Vec.new()
                 for c_pi in 0..self.sig_get_param_count(self.get_sig(f)):
-                    if (raw_mask & sema_param_origin_bit(c_pi)) == 0 or c_pi == slot:
+                    if c_pi == slot or (owner == FACADE_DEP_INIT and c_pi == 0):
                         continue
                     var pi = c_pi
                     if owner == FACADE_DEP_INIT:
                         pi = shift + c_pi - 1
                     else if slot >= 0 and c_pi > slot:
                         pi = c_pi - 1
-                    mask = mask | sema_param_origin_bit(pi)
+                    while sources.len() as i32 <= pi:
+                        sources.push(-1)
+                    sources[pi] = c_pi
+                    if (raw_mask & sema_param_origin_bit(c_pi)) != 0:
+                        mask = mask | sema_param_origin_bit(pi)
                 if mask != 0 or domains.len() > 0:
                     for si in 0..sigs.len() as i32:
+                        let fresh = not self.facade_call_effect_index.contains(sigs[si])
+                        let fx = self.facade_call_effects.len() as i32
                         self.facade_add_call_effect(sigs[si], f, ci, mask, &domains, -1, -1)
+                        if fresh:
+                            for k in 0..sources.len() as i32:
+                                self.facade_call_effects[fx].param_sources.push(sources[k])
 
         // Every c_import function: the raw call, and the fn item's rendered
         // method when it has one.
@@ -3785,7 +3803,7 @@ impl Sema:
         for i in 0..domains.len() as i32:
             touched.push(domains[i])
         self.facade_call_effect_index.insert(sig, self.facade_call_effects.len() as i32)
-        self.facade_call_effects.push(FacadeCallEffect { sig, fn_sym, contract: ci, touch_params: mask, touch_domains: touched, borrow_domain: borrow, borrow_param })
+        self.facade_call_effects.push(FacadeCallEffect { sig, fn_sym, contract: ci, touch_params: mask, touch_domains: touched, borrow_domain: borrow, borrow_param, param_sources: Vec.new() })
 
     // The parameters of `fn_sym` (from `first`) that receive one modeled
     // resource and are not preserved by its fn item, as origin bits.
