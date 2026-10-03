@@ -5961,9 +5961,11 @@ impl Sema:
             return
         let idx = self.concrete_specialization_nodes.len() as i32
         // #2043: a method's specialization is owned as its template is.
-        let template_owner = self.method_owner_keys.get(self.fn_decl_semantic_symbol(fn_node, self.ast.get_data0(fn_node))) ?? 0
+        let template_sym = self.fn_decl_semantic_symbol(fn_node, self.ast.get_data0(fn_node))
+        let template_owner = self.method_owner_keys.get(template_sym) ?? 0
         if template_owner != 0:
             self.method_owner_keys.insert(mono_sym, template_owner)
+            self.method_name_syms.insert(mono_sym, self.method_name_syms.get(template_sym) ?? 0)
         self.concrete_specialization_by_sym.insert(mono_sym, idx)
         self.concrete_specialization_nodes.push(fn_node)
         self.concrete_specialization_syms.push(mono_sym)
@@ -10228,13 +10230,17 @@ impl Sema:
                     let asm_out_node = self.ast.get_extra(asm_extra_start + 1)
                     if asm_out_node != 0:
                         asm_result_ty = self.resolve_type_expr(asm_out_node) as i32
+                        self.note_type_level_arg(asm_out_node, asm_result_ty)
                     else if asm_in_count > 0:
                         // Read-write "+r": output type is the (last) input's type.
                         asm_result_ty = self.check_expr(self.ast.get_extra(asm_in_base + 1 + asm_in_count - 1)) as i32
                 if asm_out_count > 1:
                     let asm_elems: Vec[i32] = Vec.new()
                     for asm_oi in 0..asm_out_count:
-                        asm_elems.push(self.resolve_type_expr(self.ast.get_extra(asm_extra_start + 1 + asm_oi)) as i32)
+                        let asm_out_node = self.ast.get_extra(asm_extra_start + 1 + asm_oi)
+                        let asm_out_ty = self.resolve_type_expr(asm_out_node) as i32
+                        self.note_type_level_arg(asm_out_node, asm_out_ty)
+                        asm_elems.push(asm_out_ty)
                     asm_result_ty = self.ensure_tuple_type(asm_elems, asm_out_count) as i32
             self.typed_expr_types.insert(node, asm_result_ty)
             return asm_result_ty as TypeId
@@ -23215,6 +23221,7 @@ impl Sema:
         if target_ty == 0:
             self.emit_error("transmute target type could not be resolved", target_node)
             return 0
+        self.note_type_level_arg(target_node, target_ty)
         let value_node = self.ast.get_extra(extra_start)
         let source_ty = self.check_expr_value_context(value_node) as i32
         if source_ty == 0:
@@ -23721,8 +23728,7 @@ impl Sema:
                 return 0
             if self.reject_opaque_value_type(layout_ty, type_arg_node, self.sizeof_alignof_name(callee)) != 0:
                 return 0
-            if self.current_specialization_sym != 0:
-                self.specialization_type_args.insert(sema_pair_key(self.current_specialization_sym, type_arg_node), layout_ty as i32)
+            self.note_type_level_arg(type_arg_node, layout_ty)
             self.typed_expr_types.insert(node, self.ty_i64 as i32)
             return self.ty_i64 as i32
         if self.is_nameof_call(callee) != 0:
@@ -25602,10 +25608,64 @@ impl Sema:
     // under its substitution (0 when the instance never checked the call, a
     // phase bug its caller reports loudly); for any other body the node
     // resolves the same everywhere, so frozen resolution answers.
+    // A body's type nodes a backend reads — a sizeof/alignof or transmute
+    // type argument, an asm output type (#2043) — are this record.
     fn type_level_arg_in_body(body_sym: i32, type_node: i32) -> i32:
         if self.concrete_specialization_by_sym.contains(body_sym):
             return self.specialization_type_args.get(sema_pair_key(body_sym, type_node)) ?? 0
         self.resolve_type_level_arg_expr_frozen(type_node)
+
+    // Record `type_node`'s type as the specialization being checked sees
+    // it; outside one the node resolves the same everywhere.
+    mut fn note_type_level_arg(type_node: i32, ty: i32):
+        if self.current_specialization_sym != 0 and type_node != 0 and ty > 0:
+            self.specialization_type_args.insert(sema_pair_key(self.current_specialization_sym, type_node), ty)
+
+    // #2043 (D65): the value of a constant string expression — a literal, a
+    // concatenation of constants, an immutable module `let` naming one, or
+    // `embed_file` (the contents check_intrinsic_call read). A backend emits
+    // the value; it never evaluates the expression itself. None when the
+    // expression is not one of these.
+    fn const_string_value(node: i32) -> Option[str]: self.const_string_value_at(node, 0)
+
+    fn const_string_value_at(node: i32, depth: i32) -> Option[str]:
+        if node == 0 or depth > 32:
+            return None
+        let kind = self.ast.kind(node)
+        if kind == NodeKind.NK_STRING_LIT or kind == NodeKind.NK_C_STRING_LIT:
+            return Some(comptime_decode_string_escapes(self.pool_resolve(self.ast.get_data0(node))))
+        if kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_GROUPED:
+            return self.const_string_value_at(self.ast.get_data0(node), depth + 1)
+        if kind == NodeKind.NK_BINARY:
+            let op = self.ast.get_data0(node)
+            if op != BinaryOp.OP_CONCAT and op != BinaryOp.OP_ADD:
+                return None
+            let lhs = self.const_string_value_at(self.ast.get_data1(node), depth + 1)
+            if lhs.is_none():
+                return None
+            let rhs = self.const_string_value_at(self.ast.get_data2(node), depth + 1)
+            if rhs.is_none():
+                return None
+            return Some(lhs.unwrap() ++ rhs.unwrap())
+        if kind == NodeKind.NK_IDENT:
+            let decl = self.module_let_decl_node(self.ast.get_data0(node))
+            if decl == 0 or self.ast.get_data2(decl) % 2 != 0:
+                return None
+            return self.const_string_value_at(self.ast.get_data1(decl), depth + 1)
+        if kind == NodeKind.NK_CALL:
+            let contents = self.embed_file_contents.get(node)
+            if contents.is_none():
+                return None
+            return Some(contents.unwrap().clone())
+        None
+
+    // The module-level `let` declaring `sym`, 0 when none does.
+    fn module_let_decl_node(sym: i32) -> i32:
+        for di in 0..self.ast.decl_count():
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) == NodeKind.NK_LET_DECL and self.ast.get_data0(decl) == sym:
+                return decl
+        0
 
     // #1647 (D65): a runtime index expression's element place type and the
     // type of the base it indexes, recorded for the body being checked (the
