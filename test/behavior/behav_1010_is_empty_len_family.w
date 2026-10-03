@@ -37,5 +37,5 @@ fn main:
     print(f"set {hs0} {hs.is_empty()}")
     var sm = SlotMap[i32].new()
     let sm0 = sm.is_empty()
-    let _h = sm.insert(1)
+    sm.insert(1)
     print(f"slotmap {sm0} {sm.is_empty()}")
