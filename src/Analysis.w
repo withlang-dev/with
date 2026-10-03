@@ -183,13 +183,17 @@ fn analysis_collect_method_registrations(report: &AnalysisReport, sema: &Sema, s
         let trait_impl = impl_node != 0 and sema.ast.get_data2(impl_node) != 0
         let extension = sema.method_decl_is_extension(node) != 0
         let generic = sema.generic_fn_nodes.contains(effective)
-        let key = sema_pair_key(owner, method)
+        // The registries key a method by its owner's declaration key: the
+        // name, or the declaration's identity symbol when more than one
+        // file declares the name (#1457). Read that key; never rebuild it.
+        let owner_key = sema.method_decl_owner_key_symbol(node, parsed)
+        let key = sema_pair_key(owner_key, method)
         var exact = false
         var registry = "missing"
         var registry_index = -1
 
         if extension:
-            registry_index = analysis_extension_registration_index(sema, owner, method, effective, sig)
+            registry_index = analysis_extension_registration_index(sema, owner_key, method, effective, sig)
             exact = registry_index >= 0 and (not generic or sema.generic_fn_registration_contains(effective, node) != 0)
             registry = "extension"
         else if generic:
@@ -225,7 +229,7 @@ fn analysis_collect_method_registrations(report: &AnalysisReport, sema: &Sema, s
             (if exact: AnalysisMethodRegistrationFlag.Exact as i32 else: AnalysisMethodRegistrationFlag.Missing as i32)
         fact.source_file = sema.decl_source_file_id_for_index(di)
         fact.name = with_str_clone_ref(sema.pool_resolve(base))
-        fact.detail = f"owner={sema.pool_resolve(owner)} method={sema.pool_resolve(method)} effective={sema.pool_resolve(effective)} sig={sig} registry={registry} registry-index={registry_index} generic={generic} trait-impl={trait_impl} scoped-extension={extension} exact={exact}"
+        fact.detail = f"owner={sema.pool_resolve(owner)} owner-key={sema.pool_resolve(owner_key)} method={sema.pool_resolve(method)} effective={sema.pool_resolve(effective)} sig={sig} registry={registry} registry-index={registry_index} generic={generic} trait-impl={trait_impl} scoped-extension={extension} exact={exact}"
         let fact_path = analysis_decl_path(sema, di, source_path)
         let fact_source = analysis_decl_source(sema, di, source_text)
         fact = analysis_with_node_location(move fact, sema, node, fact_path, fact_source)

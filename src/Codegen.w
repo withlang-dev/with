@@ -4285,6 +4285,20 @@ impl Codegen:
     // `Self` in a method of a split name is the declaration visible from the
     // method's own module (sync_decl_context set it), not the name's first
     // registration.
+    // The codegen symbol of a method's owner, from the owner part of the
+    // method symbol. Sema keys a method of a type whose name more than one
+    // file declares by that declaration's identity (`Name$m$<path>`,
+    // #1457) and records which declaration it is; the owner is that
+    // declaration's codegen symbol (its #1446 alias when it has one), never
+    // the identity text, which names no type.
+    fn method_owner_cg_sym(owner_text: &str) -> i32:
+        let sema_sym = self.sema.pool_lookup_symbol(owner_text)
+        if sema_sym != 0 and self.sema.type_identity_tids.contains(sema_sym):
+            let tid = self.sema.resolve_alias(self.sema.type_identity_tids.get(sema_sym).unwrap() as TypeId) as i32
+            let name_sym = self.intern.intern(self.sema.pool_resolve(self.sema.type_identity_names.get(sema_sym).unwrap()))
+            return self.nominal_cg_sym_for_tid(tid, name_sym)
+        self.intern.intern(owner_text)
+
     fn split_owner_sym(owner_sym: i32) -> i32:
         if not self.nominal_split_names.contains(owner_sym):
             return owner_sym
@@ -5400,7 +5414,7 @@ impl Codegen:
         var method_key_sym: i32 = 0
         for di in 0..name_str.len() as i32:
             if name_str[di] == 46:
-                method_owner_sym = self.intern.intern(name_str.slice(0, di as i64))
+                method_owner_sym = self.method_owner_cg_sym(name_str.slice(0, di as i64))
                 let short_method_name = name_str.slice((di + 1) as i64, name_str.len() as i64)
                 if short_method_name.len() > 0:
                     let short_method_sym = self.intern.intern(short_method_name)

@@ -2149,7 +2149,7 @@ impl Codegen:
                 break
         if dot <= 0:
             return 0
-        self.intern.intern(name.slice(0, dot as i64))
+        self.method_owner_cg_sym(name.slice(0, dot as i64))
 
     mut fn current_method_owner_llvm_type() -> i64:
         let owner = self.current_method_owner_from_name()
@@ -16755,7 +16755,7 @@ impl Codegen:
         var method_owner_sym = 0
         for di in 0..name_str.len() as i32:
             if name_str[di] == 46:
-                method_owner_sym = self.intern.intern(name_str.slice(0, di as i64))
+                method_owner_sym = self.method_owner_cg_sym(name_str.slice(0, di as i64))
                 break
         self.current_method_owner_sym = method_owner_sym
 
@@ -17220,7 +17220,7 @@ impl Codegen:
         var method_owner_sym = 0
         for di in 0..name_str.len() as i32:
             if name_str[di] == 46:
-                method_owner_sym = self.intern.intern(name_str.slice(0, di as i64))
+                method_owner_sym = self.method_owner_cg_sym(name_str.slice(0, di as i64))
                 break
         self.current_method_owner_sym = method_owner_sym
 

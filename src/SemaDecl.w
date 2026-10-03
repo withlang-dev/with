@@ -63,7 +63,88 @@ fn disc_text(value: i64, signed: bool) -> str:
 // ── Pass 1: Declaration collection ───────────────────────────────
 
 impl Sema:
+    // #1457: the type names more than one source file declares. Runs before
+    // any type is registered (collect_declarations) and reads only the decl
+    // table, so the method symbols minted here, in collect_fn_decl and the
+    // receiver-side method_owner_symbol_for_type all take the same answer.
+    // Every declaration counts, demanded or not: over-approximating only
+    // changes the spelling of that name's method symbols, under-approximating
+    // would let two modules' methods share one symbol again.
+    mut fn compute_colliding_type_names():
+        self.colliding_type_names = sema_new_map_i32_i32()
+        self.type_identity_syms = sema_new_map_i64_i32()
+        let first_paths: HashMap[i32, i32] = HashMap.new()
+        let dc = self.ast.decl_count()
+        for di in 0..dc:
+            let decl = self.ast.get_decl(di)
+            // A generic receiver keys by its instantiation's base name
+            // (method_owner_symbol_for_type), so only non-generic
+            // declarations take an identity key.
+            if self.ast.kind(decl) != NodeKind.NK_TYPE_DECL or self.type_decl_tp_count(decl) != 0:
+                continue
+            let name = self.ast.get_data0(decl)
+            let path_sym = self.pool_intern(self.decl_source_path_for_index(di))
+            if first_paths.contains(name):
+                if first_paths.get(name).unwrap() != path_sym:
+                    self.colliding_type_names.insert(name, 1)
+            else:
+                first_paths.insert(name, path_sym)
+        for di in 0..dc:
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) != NodeKind.NK_TYPE_DECL:
+                continue
+            let name = self.ast.get_data0(decl)
+            if not self.colliding_type_names.contains(name):
+                continue
+            let path: str = self.decl_source_path_for_index(di)
+            let key = sema_pair_key(name, self.pool_intern(path))
+            if not self.type_identity_syms.contains(key):
+                let identity = self.pool_intern(self.pool_resolve(name) ++ "$m$" ++ f"{sema_extension_path_hash(path)}")
+                self.type_identity_syms.insert(key, identity)
+
+    // The symbol a method table keys a declaration of `name_sym` in module
+    // `path` under: the name itself unless the name is declared in more than
+    // one file, then that declaration's identity symbol.
+    fn type_identity_symbol(name_sym: i32, path: &str) -> i32:
+        if name_sym == 0 or not self.colliding_type_names.contains(name_sym):
+            return name_sym
+        let path_sym = self.pool_lookup_symbol(path)
+        if path_sym == 0:
+            return name_sym
+        let key = sema_pair_key(name_sym, path_sym)
+        if self.type_identity_syms.contains(key): self.type_identity_syms.get(key).unwrap() else: name_sym
+
+    // The owner key of a method declaration: its owner's identity when the
+    // owner's name is declared in more than one file. The declaration's own
+    // module's type first (§18.1); an impl of a same-named type imported from
+    // elsewhere resolves it the way the impl's module sees it.
+    fn method_decl_owner_key_symbol(decl: i32, parsed_fn_sym: i32) -> i32:
+        let owner = self.method_decl_owner_symbol(decl, parsed_fn_sym)
+        if owner == 0 or not self.colliding_type_names.contains(owner):
+            return owner
+        let own_path: str = self.decl_source_path_for_node(decl)
+        let own_path_sym = self.pool_lookup_symbol(own_path)
+        if own_path_sym != 0 and self.type_identity_syms.contains(sema_pair_key(owner, own_path_sym)):
+            return self.type_identity_syms.get(sema_pair_key(owner, own_path_sym)).unwrap()
+        let tid = self.lookup_named_type_visible(owner)
+        if tid == 0:
+            return owner
+        self.type_identity_symbol_for_tid(owner, tid)
+
+    // The identity symbol of the registered declaration `tid` of `name_sym`,
+    // from the candidate that registered it.
+    fn type_identity_symbol_for_tid(name_sym: i32, tid: i32) -> i32:
+        if name_sym == 0 or not self.colliding_type_names.contains(name_sym):
+            return name_sym
+        var i = self.named_type_candidate_head(name_sym)
+        while i >= 0:
+            if self.named_type_candidate_tids[i] == tid:
+                return self.type_identity_symbol(name_sym, self.named_type_candidate_paths[i])
+            i = self.named_type_candidate_next[i]
+        name_sym
+
     mut fn compute_method_origins():
+        self.compute_colliding_type_names()
         let dc = self.ast.decl_count()
         for di in 0..dc:
             let decl = self.ast.get_decl(di)
@@ -106,9 +187,9 @@ impl Sema:
         for di in 0..dc:
             let decl = self.ast.get_decl(di)
             if self.ast.kind(decl) == NodeKind.NK_FN_DECL:
-                let fn_name = self.ast.get_data0(decl)
                 let parsed_fn_name = self.extract_decl_name_after(decl, "fn")
                 if sema_str_contains_char(parsed_fn_name, 46) != 0:
+                    let fn_name = self.intern_method_decl_base_symbol(decl, self.ast.get_data0(decl))
                     self.method_symbol_flags.insert(fn_name, 1)
                     if not self.method_decl_origins.contains(di):
                         self.method_has_inherent.insert(fn_name, 1)
@@ -1643,20 +1724,6 @@ impl Sema:
         self.fn_decl_source_paths.insert(run_sym, with_str_clone_ref(self.current_module_path))
         self.fn_decl_source_paths.insert(each_sym, with_str_clone_ref(self.current_module_path))
 
-    // Whether two declarations of one method symbol belong to different
-    // types that share a name (#1457): distinct declaring files, a method
-    // owner, and more than one registered declaration of the owner's name.
-    fn method_decls_collide_across_types(existing_node: i32, node: i32, parsed_fn_name: i32) -> bool:
-        let owner = self.method_decl_owner_symbol(node, parsed_fn_name)
-        if owner == 0 or owner != self.method_decl_owner_symbol(existing_node, self.ast.get_data0(existing_node)):
-            return false
-        var declared = 0
-        var i = self.named_type_candidate_head(owner)
-        while i >= 0:
-            declared = declared + 1
-            i = self.named_type_candidate_next[i]
-        declared > 1
-
     fn fn_decl_has_refutable_param_pattern(node: i32) -> i32:
         let meta = self.ast.find_fn_meta(node)
         if meta < 0:
@@ -1776,18 +1843,6 @@ impl Sema:
                         let fn_name_str: str = self.pool_resolve(fn_name)
                         self.emit_error(f"function '{fn_name_str}' is already defined", node)
                         return
-                else if self.method_decls_collide_across_types(existing_node, node, parsed_fn_name):
-                    // Two modules each declare a type of this name with a
-                    // method of this name. Both methods share one symbol, so
-                    // the later one shadowed the earlier and its body was never
-                    // checked (invalid MIR, "body index map mismatch"). Until a
-                    // method's symbol carries its declaration (#1457, the
-                    // method half), the collision is reported here.
-                    let owner_text: str = self.pool_resolve(self.method_decl_owner_symbol(node, parsed_fn_name))
-                    let method_text: str = self.pool_resolve(self.method_decl_name_symbol(parsed_fn_name))
-                    let other_path: str = self.decl_source_path_for_index(existing_di)
-                    self.emit_error(f"method '{method_text}' is declared for two different types named '{owner_text}' (the other is in {other_path}); a method name shared by same-named types in two modules is not supported yet (#1457)", node)
-                    return
         if self.ast.is_no_alloc_fn_node(node as NodeId) != 0:
             self.no_alloc_fns.insert(fn_name, 1)
 
@@ -2182,23 +2237,31 @@ impl Sema:
             return 0
         self.pool_lookup_symbol(parsed.slice((dot + 1) as i64, parsed.len()))
 
+    // A method's base symbol: `Owner.method` for an impl method, the parsed
+    // `Owner.method` for the dotted form, and `Owner$m$<path>.method` for
+    // either when the owner's name is declared in more than one file (#1457).
+    // The two spellings below differ only in whether the text is interned.
     fn method_decl_base_symbol(decl: i32, parsed_fn_sym: i32) -> i32:
-        if self.impl_owner_type_sym_for_decl(decl) == 0:
-            return parsed_fn_sym
+        let in_impl = self.impl_owner_type_sym_for_decl(decl) != 0
         let owner = self.method_decl_owner_symbol(decl, parsed_fn_sym)
+        let key = self.method_decl_owner_key_symbol(decl, parsed_fn_sym)
+        if not in_impl and key == owner:
+            return parsed_fn_sym
         let method = self.method_decl_name_symbol(parsed_fn_sym)
-        if owner == 0 or method == 0:
+        if key == 0 or method == 0:
             return 0
-        self.pool_lookup_symbol(self.pool_resolve(owner) ++ "." ++ self.pool_resolve(method))
+        self.pool_lookup_symbol(self.pool_resolve(key) ++ "." ++ self.pool_resolve(method))
 
     mut fn intern_method_decl_base_symbol(decl: i32, parsed_fn_sym: i32) -> i32:
-        if self.impl_owner_type_sym_for_decl(decl) == 0:
-            return parsed_fn_sym
+        let in_impl = self.impl_owner_type_sym_for_decl(decl) != 0
         let owner = self.method_decl_owner_symbol(decl, parsed_fn_sym)
+        let key = self.method_decl_owner_key_symbol(decl, parsed_fn_sym)
+        if not in_impl and key == owner:
+            return parsed_fn_sym
         let method = self.method_decl_name_symbol(parsed_fn_sym)
-        if owner == 0 or method == 0:
+        if key == 0 or method == 0:
             return 0
-        self.pool_intern(self.pool_resolve(owner) ++ "." ++ self.pool_resolve(method))
+        self.pool_intern(self.pool_resolve(key) ++ "." ++ self.pool_resolve(method))
 
     fn impl_node_for_method_decl(decl: i32) -> i32:
         let decl_index = self.find_decl_index(decl)
@@ -2260,7 +2323,7 @@ impl Sema:
         self.ast.is_extend_impl_node(impl_node as NodeId)
 
     mut fn register_extension_method_candidate(node: i32, fn_sym: i32, parsed_fn_sym: i32, sig_idx: i32, decl_index: i32) -> i32:
-        let owner_sym = self.method_decl_owner_symbol(node, parsed_fn_sym)
+        let owner_sym = self.method_decl_owner_key_symbol(node, parsed_fn_sym)
         let method_sym = self.method_decl_name_symbol(parsed_fn_sym)
         if owner_sym == 0 or method_sym == 0:
             return 0
@@ -2295,7 +2358,7 @@ impl Sema:
         if self.register_extension_method_candidate(node, fn_sym, parsed_fn_sym, sig_idx, decl_index) != 0:
             return
 
-        let owner_sym = self.method_decl_owner_symbol(node, parsed_fn_sym)
+        let owner_sym = self.method_decl_owner_key_symbol(node, parsed_fn_sym)
         let method_sym = self.method_decl_name_symbol(parsed_fn_sym)
         if owner_sym == 0 or method_sym == 0:
             return

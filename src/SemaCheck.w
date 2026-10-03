@@ -25185,13 +25185,18 @@ impl Sema:
             return self.pool_lookup_symbol("str")
         0
 
+    // The symbol the method tables key a receiver type under. A named type
+    // declared in more than one file keys by its declaration's identity
+    // symbol (#1457), the same one its methods were registered under.
     fn method_owner_symbol_for_type(tid: i32) -> i32:
-        let resolved = self.resolve_alias(tid)
+        var resolved = self.resolve_alias(tid)
         if self.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST:
             return self.get_generic_inst_base(resolved as i32)
         let named = self.get_type_name(resolved)
         if named != 0:
-            return named
+            while self.get_type_kind(resolved) == TypeKind.TY_REF or self.get_type_kind(resolved) == TypeKind.TY_PTR:
+                resolved = self.resolve_alias(self.get_type_d0(resolved) as TypeId)
+            return self.type_identity_symbol_for_tid(named, resolved as i32)
         self.dyn_arg_concrete_type_symbol(resolved as i32)
 
     fn lookup_generic_method_fn(owner_sym: i32, method_sym: i32) -> i32:

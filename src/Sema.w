@@ -1943,6 +1943,17 @@ pub type Sema {
     named_type_candidate_ci: Vec[i32],         // parallel: 1 when a c_import expansion declared it
     named_type_candidate_heads: HashMap[i32, i32], // symbol -> newest candidate index
     named_type_candidate_next: Vec[i32],       // previous candidate for the same symbol
+    // #1457: type names declared in more than one source file. A method of
+    // such a type carries its declaration: its symbol and its method-table
+    // key use the owner's identity symbol (`Name$m$<path hash>`, the way an
+    // extension method's `$ext$` symbol does), so each module's `Item.total`
+    // is its own (§18.1). Computed once from the decl table
+    // (compute_method_origins) so the declaring side and the lookup side
+    // read one answer.
+    colliding_type_names: HashMap[i32, i32],   // name symbol -> 1
+    type_identity_syms: HashMap[i64, i32],     // pair(name symbol, path symbol) -> identity symbol
+    type_identity_tids: HashMap[i32, i32],     // identity symbol -> the declaration's TypeId
+    type_identity_names: HashMap[i32, i32],    // identity symbol -> the declared name symbol
     decl_visibility_syms: Vec[i32],            // top-level symbol visibility candidates
     decl_visibility_paths: Vec[str],           // parallel declaring module path
     decl_visibility_pub: Vec[i32],             // parallel public flag
@@ -2257,7 +2268,7 @@ fn sema_new_map_i32_str -> HashMap[i32, str]:
 fn sema_new_map_str_i32 -> HashMap[str, i32]:
     HashMap.new()
 
-fn sema_new_map_i64_i32 -> HashMap[i64, i32]:
+pub fn sema_new_map_i64_i32 -> HashMap[i64, i32]:
     HashMap.new()
 
 pub fn sema_new_vec_str -> Vec[str]:
@@ -3380,6 +3391,10 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         named_type_candidate_ci: Vec.new(),
         named_type_candidate_heads: sema_new_map_i32_i32(),
         named_type_candidate_next: Vec.new(),
+        colliding_type_names: sema_new_map_i32_i32(),
+        type_identity_syms: sema_new_map_i64_i32(),
+        type_identity_tids: sema_new_map_i32_i32(),
+        type_identity_names: sema_new_map_i32_i32(),
         decl_visibility_syms: Vec.new(),
         decl_visibility_paths: sema_new_vec_str(),
         decl_visibility_pub: Vec.new(),
@@ -3628,6 +3643,13 @@ impl Sema:
     // `decl_node` is the declaring type declaration, 0 for a builtin.
     mut fn record_named_type_with_pub(sym: i32, tid: i32, is_pub: i32, decl_node: i32) -> Unit:
         self.named_types.insert(sym, tid)
+        // #1457: the declaration an identity symbol names, for the stages
+        // that receive a method symbol and need its owner's type.
+        if decl_node != 0 and self.colliding_type_names.contains(sym):
+            let identity = self.type_identity_symbol(sym, self.current_module_path)
+            if identity != sym:
+                self.type_identity_tids.insert(identity, tid)
+                self.type_identity_names.insert(identity, sym)
         self.index_named_type_candidate(sym, self.named_type_candidate_syms.len() as i32)
         self.named_type_candidate_syms.push(sym)
         self.named_type_candidate_tids.push(tid)
