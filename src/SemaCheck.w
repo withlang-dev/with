@@ -17522,11 +17522,22 @@ impl Sema:
                 // Never silent: an untyped literal was lowered by name (#1457).
                 self.emit_error("`Self` is not bound here: a `Self { .. }` literal needs an enclosing method of a type", node)
                 return 0
-        if tid != 0 and self.pool_resolve(name) == "Self":
-            let self_lit_res = self.resolve_alias(tid as TypeId)
-            if self.get_type_kind(self_lit_res) == TypeKind.TY_GENERIC_INST:
-                name = self.get_type_d0(self_lit_res)
+        // #1982: a name for a generic struct's instance — an alias
+        // (`AtomicI64 = Atomic[i64]`, std.sync) or a type parameter bound to
+        // one — is the base struct's literal with the instance as its type.
+        // It was left untyped (the literal below only knew a struct name) and
+        // MIR lowered it by name.
+        var named_instance: TypeId = 0 as TypeId
+        if tid != 0:
+            let lit_res = self.resolve_alias(tid as TypeId)
+            if self.get_type_kind(lit_res) == TypeKind.TY_GENERIC_INST:
+                if self.pool_resolve(name) != "Self":
+                    named_instance = lit_res
+                name = self.get_type_d0(lit_res)
                 tid = self.lookup_named_type_visible(name)
+                if tid == 0 and named_instance != 0 and self.named_types.contains(name):
+                    // The alias is visible here; its base need not be.
+                    tid = self.named_types.get(name).unwrap()
         if tid == 0:
             if self.private_symbol_path_from_current(name).len() > 0:
                 self.emit_private_symbol_error(name, node)
@@ -17564,6 +17575,8 @@ impl Sema:
                         expected_struct_ty = expected_resolved
                     else if expected_tk == TypeKind.TY_GENERIC_INST and same_expected_base:
                         expected_struct_ty = expected_resolved
+                if named_instance != 0:
+                    expected_struct_ty = named_instance
                 if expected_struct_ty == 0:
                     let td_node = self.struct_literal_decl_node(name, tid)
                     if td_node != 0 and self.type_decl_tp_count(td_node) == 0:
@@ -17734,6 +17747,9 @@ impl Sema:
                                     if not self.ephemeral_types.contains(name):
                                         self.check_ephemeral_task_storage(decl_default, "non-ephemeral struct")
                                     let _ = default_ty
+                if named_instance != 0:
+                    self.typed_expr_types.insert(node, named_instance as i32)
+                    return named_instance as i32
                 // Check if struct has type params — infer GenericInst
                 let gi_probe_node = self.struct_literal_decl_node(name, tid)
                 if gi_probe_node != 0:
@@ -17755,6 +17771,16 @@ impl Sema:
                     return expected_struct_ty as i32
                 self.typed_expr_types.insert(node, resolved as i32)
                 return resolved as i32
+            // #1982: a name that resolves to a type with no fields to
+            // initialize — a type parameter instantiated with `i32` in
+            // `fn mk[T](x: T) -> T: T { v: 1 }` — left the literal untyped,
+            // and MIR projected field 24 of a scalar (invalid MIR after Sema).
+            let lit_name: str = self.pool_resolve(name)
+            let lit_ty_name = self.type_name(resolved as i32)
+            if self.in_concrete_generic_body != 0 and lit_name != lit_ty_name:
+                self.emit_error_with_help(f"struct literal of `{lit_name}`, which is `{lit_ty_name}` in this instantiation and not a struct", node, "a generic body is checked for each instantiation (§11.2); a struct literal needs a struct type, so construct the value through a trait method of the type parameter's bound, or take it as a parameter")
+            else:
+                self.emit_error(f"struct literal of `{lit_name}`, which is `{lit_ty_name}` and not a struct", node)
         0
 
     mut fn check_match_expr(node: i32) -> i32:
