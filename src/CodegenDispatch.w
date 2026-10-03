@@ -18357,17 +18357,30 @@ impl Codegen:
     // The address of a creating body's local, for a closure capture. An
     // indirect local (a by-place capture or a place parameter) holds a pointer
     // to its value in its slot; the capture takes that pointer, not the slot.
-    fn mir_capture_source_ptr(local_id: i32) -> i64:
+    // The storage a by-place capture of `parent`'s local `local_id` points at.
+    mut fn mir_capture_source_ptr(parent: &MirBody, local_id: i32) -> i64:
         if local_id < 0:
             return 0
         let slot_opt = self.mir_local_ptrs.get(local_id)
         if self.mir_indirect_value_local_types.get(local_id).is_some():
+            var address: i64 = 0
             if slot_opt.is_some():
-                return wl_build_load(self.builder, wl_ptr_type(self.context), slot_opt.unwrap() as i64)
-            let value_opt = self.mir_local_values.get(local_id)
-            if value_opt.is_some():
-                return value_opt.unwrap() as i64
-            return 0
+                address = wl_build_load(self.builder, wl_ptr_type(self.context), slot_opt.unwrap() as i64)
+            else:
+                let value_opt = self.mir_local_values.get(local_id)
+                if value_opt.is_none():
+                    return 0
+                address = value_opt.unwrap() as i64
+            // #2025: a read receiver is typed `&Self` but held as the caller's
+            // place, so its value is that address: the capture is a slot
+            // holding it, as for any reference local. Its place is not the
+            // address itself — the closure read the receiver's bytes as one.
+            let sema_ty = if local_id < parent.local_type_ids.len() as i32: parent.local_type_ids[local_id] else: 0
+            if self.mir_sema_type_is_raw_pointer_or_ref(sema_ty):
+                let holder = self.create_entry_alloca(wl_ptr_type(self.context))
+                wl_build_store(self.builder, address, holder)
+                return holder
+            return address
         if slot_opt.is_some(): slot_opt.unwrap() as i64 else: 0
 
     // The closure constant's d2: MirLower sets it when the closure expression
@@ -18758,7 +18771,7 @@ impl Codegen:
                 // later local is never taken for it, and a source that is
                 // itself a by-place capture of an enclosing closure passes on
                 // the place it points at.
-                let alloca = self.mir_capture_source_ptr(closure_body.anonymous_capture_sources[ci])
+                let alloca = self.mir_capture_source_ptr(parent, closure_body.anonymous_capture_sources[ci])
                 if alloca == 0:
                     sema_phase_bug(f"BUG: closure capture {ci} has no storage in its creating body: node={node} parent={parent.fn_sym}")
                 if alloca != 0:
