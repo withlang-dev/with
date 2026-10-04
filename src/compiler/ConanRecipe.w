@@ -309,14 +309,18 @@ impl CrParser:
             var fallback = CrValue.none()
             if self.accept(","): fallback = self.expression(env)
             if not self.accept(")") or not name.starts_with("\""): return CrValue.unknown()
-            let found = cr_option_value(env.recipe, name.slice(1, name.len()))
+            let found = cr_option_value(env.recipe, name.slice(1, name.len()), env.os)
             return if found.kind == CRV_UNKNOWN: fallback else: found
-        if t.starts_with("self.options."): return cr_option_value(env.recipe, t.slice(13, t.len()))
+        if t.starts_with("self.options."): return cr_option_value(env.recipe, t.slice(13, t.len()), env.os)
         CrValue.unknown()
 
-// An option's declared default. `shared` is decided here: a static library.
-fn cr_option_value(recipe: &str, name: &str) -> CrValue:
+// The value a source build gives an option: its declared default, except
+// that `shared` is a static library, and that on Windows the TLS backend is
+// the system's own (Schannel) where the recipe offers it: OpenSSL is built
+// by a Perl script, and the SDK carries no Perl (D81).
+fn cr_option_value(recipe: &str, name: &str, os: &str) -> CrValue:
     if name == "shared": return CrValue.of_bool(false)
+    if name == "with_ssl" and os == "Windows" and recipe.contains("\"schannel\""): return CrValue.of_text("schannel")
     let literal = cr_default_option(recipe, name)
     if literal.len() == 0: return CrValue.unknown()
     var parser = CrParser { tokens: cr_tokens(literal), at: 0 }
@@ -459,3 +463,29 @@ pub fn conan_recipe_requires(env: &CrEnv) -> ConanRequires:
         if guarded.verdict < 0: undecided.push(reference ++ "  (if " ++ guarded.why ++ ")")
         else: refs.push(reference)
     ConanRequires { refs, undecided }
+
+// The options a source build is made with, as a binary's conaninfo spells
+// them (`name=value`): what cr_option_value gives each declared option. The
+// link metadata of a built package is read against these, as a downloaded
+// binary's is read against its own.
+pub fn conan_recipe_built_options(recipe: &str, os: &str) -> Vec[str]:
+    let out: Vec[str] = Vec.new()
+    let start = recipe.find("default_options")
+    if start < 0: return out
+    let rest = recipe.slice(start, recipe.len())
+    let end = rest.find("}")
+    if end < 0: return out
+    var block = ""
+    for raw in rest.slice(0, end).split("\n"):
+        let hash = raw.find("#")
+        block = block ++ raw.slice(0, if hash >= 0: hash else: raw.len()) ++ "\n"
+    for entry in block.split(","):
+        let pair = entry.split(":")
+        if pair.len() < 2: continue
+        let name = cr_unquote(pair[0].split("{")[pair[0].split("{").len() - 1])
+        if name.len() == 0: continue
+        let value = cr_option_value(recipe, name, os)
+        if value.kind == CRV_BOOL: out.push(name ++ (if value.truth: "=True" else: "=False"))
+        else if value.kind == CRV_TEXT: out.push(name ++ "=" ++ value.text)
+        else if value.kind == CRV_NONE: out.push(name ++ "=None")
+    out

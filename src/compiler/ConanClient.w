@@ -1931,7 +1931,9 @@ fn conan_install_from_source(name: &str, version: &str, project_root: &str, dept
     if conan_run_tool(install, 300000) != 0:
         return conan_source_fail(dep_dir, name ++ "/" ++ version ++ " did not build (the compiler's output is above" ++ (if build_rc != 0: "; the build step failed" else: "") ++ ")")
     let _work = runtime_remove_tree(work)
-    if conan_write_binary_metadata(name, version, "built", "built", source.sha256, dep_dir, resolved, &conan_recipe_options_unknown()) != 0:
+    // The options this build was made with decide its link metadata.
+    let built_options = ConanRecipeOptions { known: true, values: conan_recipe_built_options(recipe, conan_detect_os()) }
+    if conan_write_binary_metadata(name, version, "built", "built", source.sha256, dep_dir, resolved, &built_options) != 0:
         return conan_source_fail(dep_dir, "could not write metadata for " ++ name ++ "/" ++ version)
     runtime_eprint("  built " ++ name ++ "/" ++ version ++ " into .with/deps/c/" ++ name ++ "/" ++ version ++ "/")
     version.to_owned()
