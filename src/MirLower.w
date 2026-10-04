@@ -7118,6 +7118,11 @@ impl MirBuilder:
         let flags = self.ast.get_data2(node)
         let mutable = flags % 2
         let is_discard_binding = if name_sym != 0 and self.pool.resolve_symbol(name_sym) == "_": 1 else: 0
+        // D5/P1 (#2043): Sema recorded that this wildcard names a place it
+        // leaves untouched; there is nothing to bind, move or drop.
+        if self.sema.discard_place_lets.contains(node):
+            self.body.note_let_binding(node, -1)
+            return
 
         let bind_ty = self.binding_type(node)
         if mutable == 0:
@@ -12009,8 +12014,8 @@ impl MirBuilder:
         self.body.new_operand(OperandKind.OK_COPY, value_place)
 
     mut fn lower_call(fn_expr: i32, arg_exprs_start: i32, arg_exprs_count: i32, ret_type_id: i32, node: i32) -> i32:
-        var fn_op = self.lower_callable_expr(fn_expr)
-        var sig_idx = self.call_sig_for_expr(fn_expr)
+        var fn_op = self.lower_callable_expr(fn_expr, node)
+        var sig_idx = self.call_sig_for_expr(fn_expr, node)
         let recorded_sig = self.sema.resolved_call_sigs.get(node).copied()
         if recorded_sig.is_some():
             sig_idx = recorded_sig.unwrap()
@@ -12059,7 +12064,7 @@ impl MirBuilder:
                 args.push(self.lower_call_arg(arg_node, sig_idx, callable_fn_tid, i, bc_callee_sym))
 
             // Fill in default parameter values for missing arguments
-            if fn_expr != 0 and self.ast.kind(fn_expr) == NodeKind.NK_IDENT and not self.ident_names_local_callable(fn_expr):
+            if fn_expr != 0 and self.ast.kind(fn_expr) == NodeKind.NK_IDENT and self.sema.call_callee_kind(node) != CallCalleeKind.Callable:
                 let callee_sym = self.ast.get_data0(fn_expr)
                 if self.sema.fn_decl_nodes.contains(callee_sym):
                     let fn_node = self.sema.fn_decl_nodes.get(callee_sym).unwrap()
@@ -12324,32 +12329,19 @@ impl MirBuilder:
         let sema_sym = self.sema.pool_lookup_symbol(name)
         self.sema.get_sig(sema_sym)
 
-    fn sym_is_generic_fn(sym: i32) -> bool:
-        if sym == 0:
-            return false
-        if self.call_sig_for_sym(sym) >= 0:
-            return false
-        if self.sema.generic_fn_node_for_symbol(sym) != 0:
-            return true
-        let name = self.pool.resolve_symbol(sym)
-        if name.len() == 0:
-            return false
-        let sema_sym = self.sema.pool_lookup_symbol(name)
-        sema_sym != 0 and self.sema.get_sig(sema_sym) < 0 and self.sema.generic_fn_node_for_symbol(sema_sym) != 0
+    // D65 phase 5 (#1647): whether a MIR callee symbol names a generic
+    // template, by Sema's identity for the symbol (the same name in Sema's
+    // pool), never by probing Sema's tables with a MIR-pool integer.
+    fn sym_is_generic_fn(sym: i32): self.generic_fn_node_for_sym(sym) != 0
 
     fn generic_fn_node_for_sym(sym: i32) -> i32:
-        if not self.sym_is_generic_fn(sym):
+        if sym == 0:
             return 0
-        let direct = self.sema.generic_fn_node_for_symbol(sym)
-        if direct != 0:
-            return direct
         let name = self.pool.resolve_symbol(sym)
-        if name.len() == 0:
+        let sema_sym = if name.len() > 0: self.sema.pool_lookup_symbol(name) else: 0
+        if sema_sym == 0 or self.sema.get_sig(sema_sym) >= 0:
             return 0
-        let sema_sym = self.sema.pool_lookup_symbol(name)
-        if sema_sym != 0:
-            return self.sema.generic_fn_node_for_symbol(sema_sym)
-        0
+        self.sema.generic_fn_node_for_symbol(sema_sym)
 
     fn callee_has_move_self(fn_sym: i32) -> bool:
         var fn_node = 0
@@ -12382,27 +12374,13 @@ impl MirBuilder:
         let ps = self.ast.fn_meta_param_start(meta)
         fn_param_is_mut_self(self.ast.fn_param_flags(ps, 0)) != 0
 
-    // D29 precedence: a lexical binding wins before any module-level
-    // interpretation. Sema resolves the callee of `check(1)` to the local
-    // `check` (its scope lookup runs before the global gate); the name-keyed
+    // A callee Sema resolved to a callable value (a parameter, local or
+    // let-alias of a callable, D29) has no signature of its own: the
     // signature and declaration tables must not be consulted for it, or a
     // parameter named like `std.builtins.check` inherits that fn's signature
-    // and its `loc = src()` default (#1230: one extra `str` argument on the
-    // indirect call, rejected by the LLVM verifier).
-    fn ident_names_local_callable(fn_expr: i32) -> bool:
-        if fn_expr == 0 or self.ast.kind(fn_expr) != NodeKind.NK_IDENT:
-            return false
-        // §18.1/§18.2: a qualified callee names a declaration (Sema bound it).
-        if self.ast.is_namespace_bound(fn_expr as NodeId):
-            return false
-
-        let sym = self.ast.get_data0(fn_expr)
-        self.lookup_local(sym) >= 0 or self.lookup_alias_place(sym) >= 0
-
-    fn call_sig_for_expr(fn_expr: i32) -> i32:
-        if fn_expr == 0:
-            return -1
-        if self.ast.kind(fn_expr) != NodeKind.NK_IDENT or self.ident_names_local_callable(fn_expr):
+    // and its `loc = src()` default (#1230). Sema's record decides (#2043).
+    fn call_sig_for_expr(fn_expr: i32, call_node: i32) -> i32:
+        if fn_expr == 0 or self.ast.kind(fn_expr) != NodeKind.NK_IDENT or self.sema.call_callee_kind(call_node) == CallCalleeKind.Callable:
             return -1
         self.call_sig_for_sym(self.ast.get_data0(fn_expr))
 
@@ -12414,7 +12392,7 @@ impl MirBuilder:
             return 0
         self.sema.callable_any_fn_type(expr_tid as TypeId)
 
-    mut fn lower_callable_expr(callee: i32) -> i32:
+    mut fn lower_callable_expr(callee: i32, call_node: i32) -> i32:
         // `(self.run)(body)` names the same place as `self.run(...)` would.
         var node = callee
         while node != 0 and self.ast.kind(node) == NodeKind.NK_GROUPED:
@@ -12430,7 +12408,9 @@ impl MirBuilder:
             // A bare function NAME is an ident of callable type with no place.
             // A let-alias of a callable place (`let r = c.run`) names that
             // place too (#1635): read it in place, never move it out.
-            let is_local_callable = callee_kind == NodeKind.NK_IDENT and self.ident_names_local_callable(node)
+            // Sema states it (#2043): a name it resolved to a callable value
+            // is observed in place; a function name has no place.
+            let is_local_callable = callee_kind == NodeKind.NK_IDENT and self.sema.call_callee_kind(call_node) == CallCalleeKind.Callable
             if is_local_callable or callee_kind == NodeKind.NK_FIELD_ACCESS or callee_kind == NodeKind.NK_INDEX:
                 let callee_place = self.lower_expr_place(node)
                 if callee_place >= 0:
@@ -13113,284 +13093,8 @@ impl MirBuilder:
             return self.body.new_operand(OperandKind.OK_COPY, place)
         self.body.new_operand(OperandKind.OK_MOVE, place)
 
-    fn classify_intrinsic(recv_type: i32, method_name: &str) -> MirIntrinsic:
-        if recv_type == 0 or method_name.len() == 0:
-            return MirIntrinsic.NONE
-        let resolved = self.sema.auto_deref_ref_ptr_type(recv_type as TypeId)
-        // Check primitive types first (no type_name_sym for TypeKind.TY_STR, TypeKind.TY_INT, etc.)
-        let tk = self.sema.get_type_kind(resolved)
-        if tk == TypeKind.TY_STR:
-            let str_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.STR_LEN, method_name)
-            if str_len_intrinsic != MirIntrinsic.NONE: return str_len_intrinsic
-            if method_name == "byte_at": return MirIntrinsic.STR_BYTE_AT
-            if method_name == "slice": return MirIntrinsic.STR_SLICE
-            if method_name == "contains": return MirIntrinsic.STR_CONTAINS
-            if method_name == "starts_with": return MirIntrinsic.STR_STARTS_WITH
-            if method_name == "ends_with": return MirIntrinsic.STR_ENDS_WITH
-            if method_name == "find": return MirIntrinsic.STR_FIND
-            if method_name == "split": return MirIntrinsic.STR_SPLIT
-            if method_name == "trim": return MirIntrinsic.STR_TRIM
-            if method_name == "to_upper" or method_name == "upper": return MirIntrinsic.STR_TO_UPPER
-            if method_name == "to_lower" or method_name == "lower": return MirIntrinsic.STR_TO_LOWER
-            if method_name == "replace": return MirIntrinsic.STR_REPLACE
-            if method_name == "index_of": return MirIntrinsic.STR_INDEX_OF
-            if method_name == "repeat": return MirIntrinsic.STR_REPEAT
-            return MirIntrinsic.NONE
-        if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE:
-            let arr_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.ARR_LEN, method_name)
-            if arr_len_intrinsic != MirIntrinsic.NONE: return arr_len_intrinsic
-            if method_name == "split_at": return MirIntrinsic.SPLIT_AT
-            if method_name == "split_at_mut": return MirIntrinsic.SPLIT_AT_MUT
-            return MirIntrinsic.NONE
-        if tk == TypeKind.TY_INT:
-            if method_name == "rotate_left": return MirIntrinsic.ROTATE_LEFT
-            if method_name == "rotate_right": return MirIntrinsic.ROTATE_RIGHT
-            if method_name == "swap_bytes": return MirIntrinsic.INT_SWAP_BYTES
-            if method_name == "popcount": return MirIntrinsic.POPCOUNT
-            if method_name == "clz": return MirIntrinsic.CLZ
-            if method_name == "ctz": return MirIntrinsic.CTZ
-            if method_name == "bitreverse": return MirIntrinsic.BITREVERSE
-            if method_name == "min": return MirIntrinsic.MIN
-            if method_name == "max": return MirIntrinsic.MAX
-            if method_name == "abs": return MirIntrinsic.ABS
-        if tk == TypeKind.TY_FLOAT:
-            if method_name == "min": return MirIntrinsic.MIN
-            if method_name == "max": return MirIntrinsic.MAX
-            if method_name == "abs": return MirIntrinsic.ABS
-            if method_name == "mul_add": return MirIntrinsic.FMA
-            if math_fn_lookup(method_name) >= 0: return MirIntrinsic.MATH_FN
-        let type_name_sym = self.sema.get_type_name(resolved)
-        if type_name_sym == 0:
-            return MirIntrinsic.NONE
-        var type_name = self.sema.pool_resolve_symbol(type_name_sym)
-        if type_name.len() == 0:
-            type_name = self.pool.resolve_symbol(type_name_sym)
-        // Channel endpoints are classified here, not by name in codegen, so
-        // the MIR call carries its intrinsic: the suspension checker sees the
-        // park, and the lowering adds the §14.7 cancellation point (#1293).
-        if type_name == "Sender":
-            if method_name == "send": return MirIntrinsic.CHAN_SEND
-            if method_name == "close": return MirIntrinsic.CHAN_CLOSE
-            return MirIntrinsic.NONE
-        if type_name == "Receiver":
-            if method_name == "recv": return MirIntrinsic.CHAN_RECV
-            if method_name == "close": return MirIntrinsic.CHAN_CLOSE
-            return MirIntrinsic.NONE
-        if type_name == "Task" or type_name == "ScopedTask":
-            if method_name == "cancel": return MirIntrinsic.FIBER_CANCEL
-            if method_name == "is_done": return MirIntrinsic.FIBER_IS_DONE
-            if method_name == "was_cancelled": return MirIntrinsic.FIBER_WAS_CANCELLED_RETURN
-            return MirIntrinsic.NONE
-        if type_name == "Vec":
-            if method_name == "new": return MirIntrinsic.VEC_NEW
-            if method_name == "with_capacity": return MirIntrinsic.VEC_WITH_CAPACITY
-            if method_name == "push": return MirIntrinsic.VEC_PUSH
-            if method_name == "get": return MirIntrinsic.VEC_GET
-            if method_name == "is_empty": return MirIntrinsic.VEC_IS_EMPTY
-            let vec_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.VEC_LEN, method_name)
-            if vec_len_intrinsic != MirIntrinsic.NONE: return vec_len_intrinsic
-            if method_name == "remove": return MirIntrinsic.VEC_REMOVE
-            if method_name == "clear": return MirIntrinsic.VEC_CLEAR
-            if method_name == "pop": return MirIntrinsic.VEC_POP
-            if method_name == "iter": return MirIntrinsic.VEC_ITER
-            if method_name == "iter_ref": return MirIntrinsic.VEC_ITER_REF
-            if method_name == "slot": return MirIntrinsic.VEC_SLOT
-            if method_name == "get_disjoint": return MirIntrinsic.VEC_GET_DISJOINT
-            if method_name == "range": return MirIntrinsic.VEC_RANGE
-            if method_name == "split_at": return MirIntrinsic.SPLIT_AT
-            if method_name == "split_at_mut": return MirIntrinsic.SPLIT_AT_MUT
-            if method_name == "iter_place": return MirIntrinsic.VEC_ITER_PLACE
-            if method_name == "map": return MirIntrinsic.VEC_MAP
-            if method_name == "filter": return MirIntrinsic.VEC_FILTER
-            if method_name == "fold": return MirIntrinsic.VEC_FOLD
-            if method_name == "contains": return MirIntrinsic.VEC_CONTAINS
-            if method_name == "join": return MirIntrinsic.VEC_JOIN
-            return MirIntrinsic.NONE
-        if type_name == "FixedString" or type_name.starts_with("FixedString__"):
-            if method_name == "new": return MirIntrinsic.FIXED_STRING_NEW
-            if method_name == "len": return MirIntrinsic.FIXED_STRING_LEN
-            if method_name == "len_i32": return MirIntrinsic.FIXED_STRING_LEN32
-            if method_name == "len_i64": return MirIntrinsic.FIXED_STRING_LEN64
-            if method_name == "capacity": return MirIntrinsic.FIXED_STRING_CAPACITY
-            if method_name == "is_empty": return MirIntrinsic.FIXED_STRING_IS_EMPTY
-            if method_name == "clear": return MirIntrinsic.FIXED_STRING_CLEAR
-            if method_name == "push_byte": return MirIntrinsic.FIXED_STRING_PUSH_BYTE
-            if method_name == "push_str": return MirIntrinsic.FIXED_STRING_PUSH_STR
-            if method_name == "as_view": return MirIntrinsic.FIXED_STRING_AS_VIEW
-            if method_name == "equals": return MirIntrinsic.FIXED_STRING_EQUALS
-            return MirIntrinsic.NONE
-        if type_name == "VecIter" or type_name == "VecIterRef":
-            if method_name == "next":
-                if type_name == "VecIterRef": return MirIntrinsic.VECITERREF_NEXT
-                return MirIntrinsic.VECITER_NEXT
-            if method_name == "map": return MirIntrinsic.ITER_MAP
-            if method_name == "filter": return MirIntrinsic.ITER_FILTER
-            if method_name == "filter_map": return MirIntrinsic.ITER_FILTER_MAP
-            if method_name == "take": return MirIntrinsic.ITER_TAKE
-            if method_name == "drop": return MirIntrinsic.ITER_DROP
-            if method_name == "take_while": return MirIntrinsic.ITER_TAKE_WHILE
-            if method_name == "drop_while": return MirIntrinsic.ITER_DROP_WHILE
-            if method_name == "zip": return MirIntrinsic.ITER_ZIP
-            if method_name == "enumerate": return MirIntrinsic.ITER_ENUMERATE
-            if method_name == "chain": return MirIntrinsic.ITER_CHAIN
-            if method_name == "zip_with": return MirIntrinsic.ITER_ZIP_WITH
-            if method_name == "step_by": return MirIntrinsic.ITER_STEP_BY
-            if method_name == "flat_map": return MirIntrinsic.ITER_FLAT_MAP
-            if method_name == "fold": return MirIntrinsic.ITER_FOLD
-            if method_name == "reduce": return MirIntrinsic.ITER_REDUCE
-            if method_name == "sum": return MirIntrinsic.ITER_SUM
-            if method_name == "product": return MirIntrinsic.ITER_PRODUCT
-            if method_name == "min": return MirIntrinsic.ITER_MIN
-            if method_name == "max": return MirIntrinsic.ITER_MAX
-            if method_name == "min_by": return MirIntrinsic.ITER_MIN_BY
-            if method_name == "max_by": return MirIntrinsic.ITER_MAX_BY
-            if method_name == "find": return MirIntrinsic.ITER_FIND
-            if method_name == "position": return MirIntrinsic.ITER_POSITION
-            if method_name == "any": return MirIntrinsic.ITER_ANY
-            if method_name == "all": return MirIntrinsic.ITER_ALL
-            if method_name == "none": return MirIntrinsic.ITER_NONE
-            if method_name == "for_each": return MirIntrinsic.ITER_FOR_EACH
-            if method_name == "count": return MirIntrinsic.ITER_COUNT
-            if method_name == "collect": return MirIntrinsic.ITER_COLLECT
-            if method_name == "partition": return MirIntrinsic.ITER_PARTITION
-            if method_name == "unzip": return MirIntrinsic.ITER_UNZIP
-            return MirIntrinsic.NONE
-        if type_name == "MapIter" or type_name == "FilterIter" or type_name == "FilterMapIter" or type_name == "TakeIter" or type_name == "DropIter" or type_name == "TakeWhileIter" or type_name == "DropWhileIter" or type_name == "ZipIter" or type_name == "EnumerateIter" or type_name == "ChainIter" or type_name == "ZipWithIter" or type_name == "StepByIter" or type_name == "FlatMapIter":
-            if method_name == "next":
-                if type_name == "MapIter": return MirIntrinsic.MAPITER_NEXT
-                if type_name == "FilterIter": return MirIntrinsic.FILTERITER_NEXT
-                if type_name == "FilterMapIter": return MirIntrinsic.FILTERMAPITER_NEXT
-                if type_name == "TakeIter": return MirIntrinsic.TAKEITER_NEXT
-                if type_name == "DropIter": return MirIntrinsic.DROPITER_NEXT
-                if type_name == "TakeWhileIter": return MirIntrinsic.TAKEWHILEITER_NEXT
-                if type_name == "DropWhileIter": return MirIntrinsic.DROPWHILEITER_NEXT
-                if type_name == "ZipIter": return MirIntrinsic.ZIPITER_NEXT
-                if type_name == "EnumerateIter": return MirIntrinsic.ENUMERATEITER_NEXT
-                if type_name == "ChainIter": return MirIntrinsic.CHAINITER_NEXT
-                if type_name == "ZipWithIter": return MirIntrinsic.ZIPWITHITER_NEXT
-                if type_name == "StepByIter": return MirIntrinsic.STEPBYITER_NEXT
-                if type_name == "FlatMapIter": return MirIntrinsic.FLATMAPITER_NEXT
-            if method_name == "map": return MirIntrinsic.ITER_MAP
-            if method_name == "filter": return MirIntrinsic.ITER_FILTER
-            if method_name == "filter_map": return MirIntrinsic.ITER_FILTER_MAP
-            if method_name == "take": return MirIntrinsic.ITER_TAKE
-            if method_name == "drop": return MirIntrinsic.ITER_DROP
-            if method_name == "take_while": return MirIntrinsic.ITER_TAKE_WHILE
-            if method_name == "drop_while": return MirIntrinsic.ITER_DROP_WHILE
-            if method_name == "zip": return MirIntrinsic.ITER_ZIP
-            if method_name == "enumerate": return MirIntrinsic.ITER_ENUMERATE
-            if method_name == "chain": return MirIntrinsic.ITER_CHAIN
-            if method_name == "zip_with": return MirIntrinsic.ITER_ZIP_WITH
-            if method_name == "step_by": return MirIntrinsic.ITER_STEP_BY
-            if method_name == "flat_map": return MirIntrinsic.ITER_FLAT_MAP
-            if method_name == "fold": return MirIntrinsic.ITER_FOLD
-            if method_name == "reduce": return MirIntrinsic.ITER_REDUCE
-            if method_name == "sum": return MirIntrinsic.ITER_SUM
-            if method_name == "product": return MirIntrinsic.ITER_PRODUCT
-            if method_name == "min": return MirIntrinsic.ITER_MIN
-            if method_name == "max": return MirIntrinsic.ITER_MAX
-            if method_name == "min_by": return MirIntrinsic.ITER_MIN_BY
-            if method_name == "max_by": return MirIntrinsic.ITER_MAX_BY
-            if method_name == "find": return MirIntrinsic.ITER_FIND
-            if method_name == "position": return MirIntrinsic.ITER_POSITION
-            if method_name == "any": return MirIntrinsic.ITER_ANY
-            if method_name == "all": return MirIntrinsic.ITER_ALL
-            if method_name == "none": return MirIntrinsic.ITER_NONE
-            if method_name == "for_each": return MirIntrinsic.ITER_FOR_EACH
-            if method_name == "count": return MirIntrinsic.ITER_COUNT
-            if method_name == "collect": return MirIntrinsic.ITER_COLLECT
-            if method_name == "partition": return MirIntrinsic.ITER_PARTITION
-            if method_name == "unzip": return MirIntrinsic.ITER_UNZIP
-            return MirIntrinsic.NONE
-        if type_name == "VecSlot":
-            if method_name == "get": return MirIntrinsic.VECSLOT_GET
-            if method_name == "set": return MirIntrinsic.VECSLOT_SET
-            return MirIntrinsic.NONE
-        if type_name == "SlotMap":
-            if method_name == "new": return MirIntrinsic.SLOTMAP_NEW
-            if method_name == "insert": return MirIntrinsic.SLOTMAP_INSERT
-            if method_name == "get": return MirIntrinsic.SLOTMAP_GET
-            if method_name == "slot": return MirIntrinsic.SLOTMAP_SLOT
-            if method_name == "remove": return MirIntrinsic.SLOTMAP_REMOVE
-            if method_name == "replace": return MirIntrinsic.SLOTMAP_REPLACE
-            if method_name == "contains": return MirIntrinsic.SLOTMAP_CONTAINS
-            let slotmap_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.SLOTMAP_LEN, method_name)
-            if slotmap_len_intrinsic != MirIntrinsic.NONE: return slotmap_len_intrinsic
-            if method_name == "get_disjoint": return MirIntrinsic.SLOTMAP_GET_DISJOINT
-            return MirIntrinsic.NONE
-        if type_name == "SlotMapSlot":
-            if method_name == "get": return MirIntrinsic.SLOTMAPSLOT_GET
-            if method_name == "set": return MirIntrinsic.SLOTMAPSLOT_SET
-            return MirIntrinsic.NONE
-        if type_name == "VecRange":
-            if method_name == "get": return MirIntrinsic.VECRANGE_GET
-            if method_name == "set": return MirIntrinsic.VECRANGE_SET
-            if method_name == "split_at": return MirIntrinsic.SPLIT_AT
-            if method_name == "split_at_mut": return MirIntrinsic.SPLIT_AT_MUT
-            let vecrange_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.VECRANGE_LEN, method_name)
-            if vecrange_len_intrinsic != MirIntrinsic.NONE: return vecrange_len_intrinsic
-            return MirIntrinsic.NONE
-        if type_name == "VecIterPlace":
-            if method_name == "next": return MirIntrinsic.VECITERPLACE_NEXT
-            return MirIntrinsic.NONE
-        if type_name == "HashMap":
-            if method_name == "new": return MirIntrinsic.MAP_NEW
-            if method_name == "insert": return MirIntrinsic.MAP_INSERT
-            if method_name == "get": return MirIntrinsic.MAP_GET
-            if method_name == "contains": return MirIntrinsic.MAP_CONTAINS
-            let map_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.MAP_LEN, method_name)
-            if map_len_intrinsic != MirIntrinsic.NONE: return map_len_intrinsic
-            if method_name == "remove": return MirIntrinsic.MAP_REMOVE
-            if method_name == "clear": return MirIntrinsic.MAP_CLEAR
-            if method_name == "increment": return MirIntrinsic.MAP_INCREMENT
-            if method_name == "decrement": return MirIntrinsic.MAP_DECREMENT
-            if method_name == "update": return MirIntrinsic.MAP_UPDATE
-            if method_name == "keys": return MirIntrinsic.MAP_KEYS
-            if method_name == "values": return MirIntrinsic.MAP_VALUES
-            if method_name == "items": return MirIntrinsic.MAP_ITEMS
-            if method_name == "entry": return MirIntrinsic.MAP_ENTRY
-            return MirIntrinsic.NONE
-        if type_name == "HashMapEntry":
-            if method_name == "or_insert": return MirIntrinsic.ENTRY_OR_INSERT
-            if method_name == "get": return MirIntrinsic.ENTRY_GET
-            if method_name == "set": return MirIntrinsic.ENTRY_SET
-            return MirIntrinsic.NONE
-        if type_name == "HashSet":
-            if method_name == "new": return MirIntrinsic.MAP_NEW
-            if method_name == "insert": return MirIntrinsic.MAP_INSERT
-            if method_name == "contains": return MirIntrinsic.MAP_CONTAINS
-            let set_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.MAP_LEN, method_name)
-            if set_len_intrinsic != MirIntrinsic.NONE: return set_len_intrinsic
-            if method_name == "remove": return MirIntrinsic.MAP_REMOVE
-            if method_name == "clear": return MirIntrinsic.MAP_CLEAR
-            return MirIntrinsic.NONE
-        if type_name == "Option":
-            if method_name == "is_some": return MirIntrinsic.OPT_IS_SOME
-            if method_name == "is_none": return MirIntrinsic.OPT_IS_NONE
-            if method_name == "unwrap": return MirIntrinsic.OPT_UNWRAP
-            if method_name == "expect": return MirIntrinsic.OPT_EXPECT
-            if method_name == "filter": return MirIntrinsic.OPT_FILTER
-            return MirIntrinsic.NONE
-        if type_name == "Result":
-            if method_name == "is_ok": return MirIntrinsic.OPT_IS_SOME
-            if method_name == "unwrap": return MirIntrinsic.OPT_UNWRAP
-            if method_name == "expect": return MirIntrinsic.OPT_EXPECT
-            return MirIntrinsic.NONE
-        if type_name == "Atomic":
-            if method_name == "load": return MirIntrinsic.ATOMIC_LOAD
-            if method_name == "store": return MirIntrinsic.ATOMIC_STORE
-            if method_name == "swap": return MirIntrinsic.ATOMIC_SWAP
-            if method_name == "fetch_add": return MirIntrinsic.ATOMIC_FETCH_ADD
-            if method_name == "fetch_sub": return MirIntrinsic.ATOMIC_FETCH_SUB
-            if method_name == "fetch_and": return MirIntrinsic.ATOMIC_FETCH_AND
-            if method_name == "fetch_or": return MirIntrinsic.ATOMIC_FETCH_OR
-            if method_name == "fetch_xor": return MirIntrinsic.ATOMIC_FETCH_XOR
-            if method_name == "fetch_min": return MirIntrinsic.ATOMIC_FETCH_MIN
-            if method_name == "fetch_max": return MirIntrinsic.ATOMIC_FETCH_MAX
-            if method_name == "compare_exchange": return MirIntrinsic.ATOMIC_CAS
-            if method_name == "compare_exchange_weak": return MirIntrinsic.ATOMIC_CAS_WEAK
-            return MirIntrinsic.NONE
-        MirIntrinsic.NONE
+    // Sema owns which intrinsic a builtin method call is (#2043).
+    fn classify_intrinsic(recv_type: i32, method_name: &str): self.sema.builtin_method_intrinsic(recv_type, method_name)
 
     mut fn receiver_option_intrinsic(recv_expr: i32) -> MirIntrinsic:
         // Check if recv_expr is a call to an intrinsic method that returns Option.
@@ -16958,14 +16662,15 @@ impl MirBuilder:
                 let generic_method_base = self.ast.get_data0(callee)
                 if self.ast.kind(generic_method_base) == NodeKind.NK_FIELD_ACCESS:
                     return self.lower_method_call(self.ast.get_data0(generic_method_base), self.ast.get_data1(generic_method_base), self.ast.get_data1(node), self.ast.get_data2(node), node)
+            // D65 phase 5 (#1647): Sema's record of what the callee resolved
+            // to decides the lowering; MIR never re-derives it from the name.
+            let callee_kind = self.sema.call_callee_kind(node)
             var generic_builtin_sym = 0
-            if self.ast.kind(callee) == NodeKind.NK_INDEX or self.ast.kind(callee) == NodeKind.NK_TYPE_GENERIC:
+            if callee_kind == CallCalleeKind.TypeLevelBuiltin:
                 let gb_base = self.ast.get_data0(callee)
-                if self.ast.kind(gb_base) == NodeKind.NK_IDENT:
-                    let gb_sym = self.ast.get_data0(gb_base)
-                    let gb_name = self.pool.resolve(gb_sym)
-                    if gb_name == "transmute" or gb_name == "sizeof" or gb_name == "size_of" or gb_name == "alignof" or gb_name == "align_of" or gb_name == "nameof" or gb_name == "type_name" or gb_name == "chan":
-                        generic_builtin_sym = gb_sym
+                if self.ast.kind(gb_base) != NodeKind.NK_IDENT:
+                    sema_phase_bug(f"BUG: type-level builtin call has no builtin name: node={node}")
+                generic_builtin_sym = self.ast.get_data0(gb_base)
             if generic_builtin_sym > 0:
                 let gc_fn_op = self.const_operand(ConstKind.CK_FN, generic_builtin_sym, 0)
                 let gc_args: Vec[i32] = Vec.new()
@@ -16979,7 +16684,7 @@ impl MirBuilder:
                     // is, or its scope-exit drop frees what the result now owns
                     // (#1605: `spawn_os` transmuted the closure and then freed
                     // the environment under the thread).
-                    if self.pool.resolve(generic_builtin_sym) == "transmute":
+                    if self.sema.is_transmute_call(callee) != 0:
                         self.consume_moved_operand(gc_arg_op)
                     gc_args.push(gc_arg_op)
                 let gc_args_id = self.body.new_call_args(gc_args)
@@ -16996,7 +16701,7 @@ impl MirBuilder:
                 return self.call_result_operand(gc_result, gc_place, gc_ret_ty)
             // A free math builtin: Sema decided (math_builtin_calls); honor it
             // before variant, src(), drop, generic, or signature dispatch.
-            if self.ast.kind(callee) == NodeKind.NK_IDENT and self.sema.math_builtin_calls.contains(node):
+            if self.ast.kind(callee) == NodeKind.NK_IDENT and callee_kind == CallCalleeKind.MathBuiltin:
                 // The annotation demands an owned i32 (D22): no view into
                 // self.sema stays live across the mutating lowering call.
                 let math_id: i32 = self.sema.math_builtin_calls.get(node).unwrap()
@@ -17011,15 +16716,17 @@ impl MirBuilder:
             // "unresolved bare function" named after the binding, with its
             // arguments dropped (#1635: `call const fn sym(r)()`, then codegen's
             // unhandled GENERIC_CALL FATAL).
-            if self.ast.kind(callee) == NodeKind.NK_IDENT and self.ident_names_local_callable(callee):
+            if self.ast.kind(callee) == NodeKind.NK_IDENT and callee_kind == CallCalleeKind.Callable:
                 let lc_call_ty = self.expr_type(node)
                 return self.lower_call(callee, self.ast.get_data1(node), self.ast.get_data2(node), lc_call_ty, node)
             // Check for enum variant constructor call: Some(v), Ok(v), Err(e), etc.
-            if self.ast.kind(callee) == NodeKind.NK_IDENT:
+            if self.ast.kind(callee) == NodeKind.NK_IDENT and callee_kind == CallCalleeKind.Variant:
                 var vc_sym = self.ast.get_data0(callee)
                 // Resolve for-comprehension _Payload marker
                 if self.sema.comp_resolved.contains(node):
                     vc_sym = self.sema.comp_resolved.get(node).unwrap()
+                if not self.sema.variant_lookup.contains(vc_sym):
+                    sema_phase_bug(f"BUG: Sema resolved a variant constructor call to a symbol with no variant: node={node}")
                 if self.sema.variant_lookup.contains(vc_sym):
                     var vc_result_ty = self.expr_type(node)
                     // #671: only an expected type that actually carries this
@@ -17072,43 +16779,37 @@ impl MirBuilder:
                     self.body.push_stmt(self.cur_bb, StmtKind.Assign, vc_place, vc_rv, self.ast.get_start(node))
                     return self.body.new_operand(OperandKind.OK_COPY, vc_place)
             // Distinct type constructor: Meters(42) → transparent (just the inner value)
-            if self.ast.kind(callee) == NodeKind.NK_IDENT:
-                let dt_sym = self.ast.get_data0(callee)
-                if self.sema.distinct_type_names.contains(dt_sym):
-                    let dt_tid: i32 = self.sema.distinct_type_names.get(dt_sym).unwrap()
-                    let dt_args_start = self.ast.get_data1(node)
-                    let dt_args_count = self.ast.get_data2(node)
-                    if dt_args_count == 1:
-                        let dt_arg = self.ast.get_extra(dt_args_start)
-                        let dt_val = self.lower_expr(dt_arg)
-                        // Transparent: distinct types have same LLVM type as inner,
-                        // so the constructor is just the inner value itself
-                        return dt_val
-            // Callable type syntax: TypeName(args) → TypeName.new(args)
-            if self.ast.kind(callee) == NodeKind.NK_IDENT:
-                let ct_sym = self.ast.get_data0(callee)
-                if self.sema.type_decl_nodes.contains(ct_sym):
-                    let ct_new_name = self.pool.resolve(ct_sym) ++ ".new"
-                    let ct_new_sym = self.pool.intern(ct_new_name)
-                    let ct_new_sig = self.sema.get_sig(ct_new_sym)
-                    if ct_new_sig >= 0:
-                        let ct_fn_op = self.const_operand(ConstKind.CK_FN, ct_new_sym, 0)
-                        let ct_ret_ty = self.expr_type(node)
-                        return self.lower_call_redirected(ct_fn_op, ct_new_sym, self.ast.get_data1(node), self.ast.get_data2(node), ct_ret_ty, node)
+            if self.ast.kind(callee) == NodeKind.NK_IDENT and callee_kind == CallCalleeKind.Distinct:
+                let dt_args_start = self.ast.get_data1(node)
+                if self.ast.get_data2(node) != 1:
+                    sema_phase_bug(f"BUG: Sema accepted a distinct type constructor without exactly one argument: node={node}")
+                // Transparent: distinct types have same LLVM type as inner,
+                // so the constructor is just the inner value itself
+                return self.lower_expr(self.ast.get_extra(dt_args_start))
+            // Callable type syntax: TypeName(args) → the `TypeName.new` Sema resolved
+            if self.ast.kind(callee) == NodeKind.NK_IDENT and callee_kind == CallCalleeKind.TypeConstructor:
+                let ct_sema_sym: i32 = self.sema.type_ctor_call_syms.get(node) ?? 0
+                if ct_sema_sym == 0:
+                    sema_phase_bug(f"BUG: type constructor call has no recorded `new`: node={node}")
+                let ct_new_sym = self.pool.intern(self.sema.pool_resolve(ct_sema_sym))
+                let ct_fn_op = self.const_operand(ConstKind.CK_FN, ct_new_sym, 0)
+                let ct_ret_ty = self.expr_type(node)
+                return self.lower_call_redirected(ct_fn_op, ct_new_sym, self.ast.get_data1(node), self.ast.get_data2(node), ct_ret_ty, node)
+            if self.ast.kind(callee) == NodeKind.NK_IDENT and callee_kind == CallCalleeKind.SourceLocation:
+                return self.source_location_operand(node)
+            if self.ast.kind(callee) == NodeKind.NK_IDENT and callee_kind == CallCalleeKind.StdDrop:
+                return self.lower_std_drop_call(node)
             // Generic function call — delegate to codegen's monomorphize_generic_call
-            if self.ast.kind(callee) == NodeKind.NK_IDENT:
+            if self.ast.kind(callee) == NodeKind.NK_IDENT and callee_kind == CallCalleeKind.Generic:
                 let gc_sym = self.ast.get_data0(callee)
-                if gc_sym == self.sema.syms.src:
-                    return self.source_location_operand(node)
                 // Sema may select a presented facade template under a raw C
                 // spelling. Carry that selection into the MIR callee too;
                 // the concrete signature alone does not change its operand.
                 let gc_selected = self.sema.comp_resolved.get(node)
                 let gc_fn_sym = if gc_selected.is_some(): gc_selected.unwrap() else: self.sema_symbol_for_ast_symbol(gc_sym)
-                if self.sema.fn_symbol_is_std_builtins_drop(gc_sym) != 0:
-                    return self.lower_std_drop_call(node)
-                let selected_gc_fn_node = self.sema.resolved_generic_call_nodes.get(node)
-                let gc_fn_node = if selected_gc_fn_node.is_some(): selected_gc_fn_node.unwrap() else: self.generic_fn_node_for_sym(gc_fn_sym)
+                let gc_fn_node: i32 = self.sema.resolved_generic_call_nodes.get(node) ?? 0
+                if gc_fn_node == 0:
+                    sema_phase_bug(f"BUG: Sema resolved a generic call without recording its template: node={node}")
                 if gc_fn_node != 0:
                     // User generic calls use Sema's concrete signature for both
                     // ownership lowering and the eventual ABI contract.
@@ -17147,46 +16848,52 @@ impl MirBuilder:
                     self.terminate(TermKind.TK_CALL, gc_fn_op, gc_args_id, gc_place, gc_next)
                     self.switch_to(gc_next)
                     return self.call_result_operand(gc_result, gc_place, gc_ret_ty)
-            // Check for builtin calls (embed_file, src, etc.) — no sig, not a
-            // local or alias binding (those returned above)
-            if self.ast.kind(callee) == NodeKind.NK_IDENT:
-                let bu_sym = self.ast.get_data0(callee)
-                let bu_sig = self.sema.get_sig(bu_sym)
-                if bu_sig < 0 and not self.ident_names_local_callable(callee):
-                    // Unresolved bare function — route through gen_call
-                    let bu_fn_op = self.const_operand(ConstKind.CK_FN, bu_sym, 0)
-                    let bu_args: Vec[i32] = Vec.new()
-                    let bu_args_id = self.body.new_call_args(bu_args)
-                    self.body.set_call_intrinsic(bu_args_id, MirIntrinsic.GENERIC_CALL)
-                    self.body.set_call_ast_node(bu_args_id, node)
-                    var bu_ret_ty = self.expr_type(node)
-                    if bu_ret_ty == 0:
-                        bu_ret_ty = self.sema.ty_i32 as i32
-                    let bu_result = self.new_temp(bu_ret_ty)
-                    let bu_place = self.place_for_local(bu_result)
-                    let bu_next = self.new_block()
-                    self.terminate(TermKind.TK_CALL, bu_fn_op, bu_args_id, bu_place, bu_next)
-                    self.switch_to(bu_next)
-                    return self.call_result_operand(bu_result, bu_place, bu_ret_ty)
-            // Intrinsic free functions: fence(order)
-            if self.ast.kind(callee) == NodeKind.NK_IDENT:
-                let ifn_sym = self.ast.get_data0(callee)
-                let ifn_name = self.pool.resolve(ifn_sym)
-                if ifn_name == "fence":
-                    let ifn_args: Vec[i32] = Vec.new()
-                    let ifn_as = self.ast.get_data1(node)
-                    let ifn_ac = self.ast.get_data2(node)
-                    for ifn_ai in 0..ifn_ac:
-                        ifn_args.push(self.lower_expr(self.ast.get_extra(ifn_as + ifn_ai)))
-                    let ifn_args_id = self.body.new_call_args(ifn_args)
-                    self.body.set_call_intrinsic(ifn_args_id, MirIntrinsic.ATOMIC_FENCE)
-                    let ifn_callee = self.unit_operand()
-                    let ifn_result = self.new_temp(self.sema.ty_void as i32)
-                    let ifn_place = self.place_for_local(ifn_result)
-                    let ifn_next = self.new_block()
-                    self.terminate(TermKind.TK_CALL, ifn_callee, ifn_args_id, ifn_place, ifn_next)
-                    self.switch_to(ifn_next)
-                    return self.unit_operand()
+            // A builtin Sema resolved the call to (embed_file, channel, ...):
+            // codegen's builtin dispatch reads it from the call node.
+            if self.ast.kind(callee) == NodeKind.NK_IDENT and callee_kind == CallCalleeKind.Intrinsic:
+                let bu_fn_op = self.const_operand(ConstKind.CK_FN, self.ast.get_data0(callee), 0)
+                // The builtin's arguments are MIR operands like any call's;
+                // codegen reads them, never the AST (#2043).
+                let bu_args: Vec[i32] = Vec.new()
+                let bu_resolved = self.sema.has_resolved_call_args(node) != 0
+                let bu_count = if bu_resolved: self.sema.get_resolved_call_arg_count(node) else: self.ast.get_data2(node)
+                for bu_ai in 0..bu_count:
+                    let bu_arg = if bu_resolved: self.sema.get_resolved_call_arg(node, bu_ai) else: self.ast.get_extra(self.ast.get_data1(node) + bu_ai)
+                    let bu_op = self.lower_expr(bu_arg)
+                    self.consume_moved_operand(bu_op)
+                    bu_args.push(bu_op)
+                let bu_args_id = self.body.new_call_args(bu_args)
+                self.body.set_call_intrinsic(bu_args_id, MirIntrinsic.GENERIC_CALL)
+                self.body.set_call_ast_node(bu_args_id, node)
+                var bu_ret_ty = self.expr_type(node)
+                if bu_ret_ty == 0:
+                    bu_ret_ty = self.sema.ty_i32 as i32
+                let bu_result = self.new_temp(bu_ret_ty)
+                let bu_place = self.place_for_local(bu_result)
+                let bu_next = self.new_block()
+                self.terminate(TermKind.TK_CALL, bu_fn_op, bu_args_id, bu_place, bu_next)
+                self.switch_to(bu_next)
+                return self.call_result_operand(bu_result, bu_place, bu_ret_ty)
+            // std's `fence(order)`: the atomic fence intrinsic (Sema's
+            // declaration identity, not the name).
+            if self.ast.kind(callee) == NodeKind.NK_IDENT and callee_kind == CallCalleeKind.AtomicFence:
+                let ifn_args: Vec[i32] = Vec.new()
+                let ifn_as = self.ast.get_data1(node)
+                for ifn_ai in 0..self.ast.get_data2(node):
+                    ifn_args.push(self.lower_expr(self.ast.get_extra(ifn_as + ifn_ai)))
+                let ifn_args_id = self.body.new_call_args(ifn_args)
+                self.body.set_call_intrinsic(ifn_args_id, MirIntrinsic.ATOMIC_FENCE)
+                let ifn_callee = self.unit_operand()
+                let ifn_result = self.new_temp(self.sema.ty_void as i32)
+                let ifn_place = self.place_for_local(ifn_result)
+                let ifn_next = self.new_block()
+                self.terminate(TermKind.TK_CALL, ifn_callee, ifn_args_id, ifn_place, ifn_next)
+                self.switch_to(ifn_next)
+                return self.unit_operand()
+            // A name callee Sema resolved to nothing MIR lowers is a Sema
+            // hole (#1635's class), never a guess from the name.
+            if self.ast.kind(callee) == NodeKind.NK_IDENT and callee_kind != CallCalleeKind.Function:
+                sema_phase_bug(f"BUG: call of `{self.pool.resolve(self.ast.get_data0(callee))}` has callee kind {callee_kind as i32} at expression lowering: node={node}")
             let call_ty = self.expr_type(node)
             return self.lower_call(callee, self.ast.get_data1(node), self.ast.get_data2(node), call_ty, node)
 
@@ -17199,7 +16906,7 @@ impl MirBuilder:
                     let form_sym: i32 = self.sema.precondition_form_calls.get(rhs).unwrap()
                     let recorded = self.sema.resolved_call_sigs.get(rhs).copied()
                     let form_sig = if recorded.is_some(): recorded.unwrap() else: self.call_sig_for_sym(form_sym)
-                    let form_fn_op = self.lower_callable_expr(self.ast.get_data0(rhs))
+                    let form_fn_op = self.lower_callable_expr(self.ast.get_data0(rhs), rhs)
                     let form_ret = if form_sig >= 0: self.sema.sig_return_type(form_sig) else: 0
                     return self.lower_precondition_form(form_fn_op, form_sig, form_sym, form_ret, self.ast.get_data0(node), self.ast.get_data1(rhs), self.ast.get_data2(rhs), rhs)
                 return self.lower_pipeline(self.ast.get_data0(node), self.ast.get_data0(rhs), self.ast.get_data1(rhs), self.ast.get_data2(rhs), node, rhs)
