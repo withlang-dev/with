@@ -208,23 +208,6 @@ fn sdk_str_compare(a: &str, b: &str) -> i32:
         return -1
     1
 
-fn sdk_sort_strings(items: Vec[str]) -> Vec[str]:
-    var sorted: Vec[str] = Vec.new()
-    for i in 0..items.len() as i32:
-        let item = items[i]
-        var inserted = false
-        var out: Vec[str] = Vec.new()
-        for j in 0..sorted.len() as i32:
-            let existing = sorted[j]
-            if not inserted and sdk_str_compare(item, existing) < 0:
-                out.push(sdk_owned_text(item))
-                inserted = true
-            out.push(sdk_owned_text(existing))
-        if not inserted:
-            out.push(sdk_owned_text(item))
-        sorted = out
-    sorted
-
 fn sdk_add_unique(items: Vec[str], item: &str) -> Vec[str]:
     var out = items
     for i in 0..out.len() as i32:
@@ -460,7 +443,7 @@ fn sdk_select_package_files(fs: &ToolFs, prefix: &str, platform: &str) -> Vec[st
         let libc = fs.list_files(sdk_join(prefix, "libc"))
         for i in 0..libc.len() as i32:
             candidates.push(sdk_owned_text(libc[i]))
-    let all = sdk_sort_strings(candidates)
+    let all = sdk_merge_sort_strings(candidates)
     for i in 0..all.len() as i32:
         let path = all[i]
         let rel = sdk_rel_path(prefix, path)
@@ -593,12 +576,12 @@ fn sdk_package_entries(ctx: &ActionCtx, prefix: &str, sdk_base: &str, platform: 
             let alias = aliases[i]
             if fs.exists(sdk_join(prefix, "bin/" ++ alias)):
                 dirs = sdk_add_parent_dirs(move dirs, sdk_base, "bin/" ++ alias)
-    dirs = sdk_sort_strings(dirs)
+    dirs = sdk_merge_sort_strings(dirs)
     // #1915: the darwin SDK carries the darwin sysroot, as its sysroot/.
     let sysroot_files = if platform == "darwin-aarch64": sdk_merge_sort_strings(fs.list_files(sdk_darwin_sysroot_dir())) else: Vec.new()
     for i in 0..sysroot_files.len() as i32:
         dirs = sdk_add_parent_dirs(move dirs, sdk_base, "sysroot/" ++ sdk_rel_path(sdk_darwin_sysroot_dir(), sysroot_files[i]))
-    dirs = sdk_sort_strings(dirs)
+    dirs = sdk_merge_sort_strings(dirs)
     let entries: Vec[ArchiveEntry] = Vec.new()
     for i in 0..dirs.len() as i32:
         entries.push(archive_dir_entry(sdk_owned_text(dirs[i]), 0o755))
@@ -631,11 +614,14 @@ fn sdk_write_text(ctx: &ActionCtx, path: &str, text: &str) -> i32:
     0
 
 fn sdk_archive_manifest(entries: &Vec[ArchiveEntry]) -> str:
-    var out = ""
+    // One buffer: `out = out ++ path` copies the manifest so far for every
+    // entry (a source-built SDK's 14,000 passed the evaluator's 1 GiB
+    // string budget).
+    var out = StringBuilder.with_capacity(1 << 20)
     for i in 0..entries.len() as i32:
-        let entry = entries[i]
-        out = out ++ entry.archive_path ++ "\n"
-    out
+        out.push_str(entries[i].archive_path)
+        out.push_str("\n")
+    out.to_str()
 
 pub fn run_package_llvm_sdk_action(ctx: ActionCtx) -> i32:
     let args = ctx.args()
@@ -1534,8 +1520,9 @@ const SDK_ZIG_TAR_GZ_SHA256: str = "966f170284ac8a1757dd55a092275b2d2a032ef40878
 const SDK_LIBCXX_ABILIST_NAME: str = "arm64-apple-darwin.libcxxabi.v1.stable.exceptions.nonew.abilist"
 const SDK_LIBCXX_ABILIST_SHA256: str = "15f185e6248890bfd4ddce53740b9437cbe5307b1916755d84e4dd96122c3638"
 
-// A merge sort: the sysroot sorts thousands of names (libc++'s symbols), and
-// sdk_sort_strings rebuilds its whole list for every insertion.
+// A merge sort: the sysroot sorts thousands of names (libc++'s symbols) and
+// a source-built SDK's archive 14,000 paths; an insertion sort that rebuilt
+// its list for every item passed the evaluator's step limit.
 fn sdk_merge_sort_strings(items: Vec[str]) -> Vec[str]:
     if items.len() <= 1:
         return items
