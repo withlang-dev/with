@@ -9006,6 +9006,14 @@ impl CCodegen:
         out = out ++ "    " ++ cc_rbrace()
         out
 
+    // The Unit constant MirLower gives a call that is all intrinsic
+    // (`unit_operand`): no function is named.
+    fn operand_is_unit_placeholder(body: &MirBody, operand_id: i32) -> bool:
+        if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32 or body.operand_kinds[operand_id] != OperandKind.OK_CONSTANT:
+            return false
+        let c: i32 = body.operand_d0[operand_id]
+        c >= 0 and c < body.const_kinds.len() as i32 and body.const_kinds[c] == ConstKind.CK_UNIT and body.const_types[c] == self.sema.ty_void as i32
+
     mut fn emit_term(body: &MirBody, bb: i32) -> str:
         let tk = body.term_kind(bb)
         let d0 = body.term_data0(bb)
@@ -9033,6 +9041,15 @@ impl CCodegen:
             let builtin_term = self.emit_builtin_call_term(body, bb, d0, d1, d2, d3)
             if builtin_term.len() > 0:
                 return builtin_term
+            // #2073: an intrinsic call's callee operand is the Unit
+            // placeholder; the intrinsic tag is the whole call. With no C
+            // lowering for the tag there is nothing to call — resolving the
+            // placeholder named an unrelated function (`StringBuilder.new`
+            // for the #1985 cancelled-return check).
+            if self.operand_is_unit_placeholder(body, d0):
+                let tag = body.call_intrinsic(d1) as i32
+                self.fail(f"C backend has no lowering for MIR intrinsic #{tag} called in `{self.sema.pool_resolve(body.fn_sym)}`")
+                return "    abort();"
             let callee = self.resolve_call_callee_text(body, bb, d0, d1, d2)
             let ret_tid = self.call_return_tid(body, bb, d0, d1, d2)
             if callee == "/*unresolved_call*/" or callee == "/*ambiguous_call*/" or callee == "/*ambiguous_method*/":
