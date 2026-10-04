@@ -2446,6 +2446,12 @@ impl Sema:
         let sig = self.get_sig(fn_sym)
         if sig < 0 or pi < 0 or pi >= self.sig_get_param_count(sig):
             return out
+        // A parameter a `buffer` clause pairs is that buffer (§16.2b.8), whatever
+        // resource wraps a pointer of its type: `char *dst` is not a `CHeapStr`.
+        let ci = self.facade_contract_for(fn_sym)
+        if ci >= 0:
+            for k in 0..self.foreign_contracts[ci].buffer_ptr.len() as i32:
+                if self.foreign_contracts[ci].buffer_ptr[k] == pi: return out
         let p = self.resolve_alias(self.sig_param_type(sig, pi) as TypeId)
         let pointee = if self.get_type_kind(p) == TypeKind.TY_PTR: self.get_type_d0(p) else: 0
         for i in 0..self.facade_resources.len() as i32:

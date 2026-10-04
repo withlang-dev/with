@@ -832,6 +832,10 @@ fn facade_render_lend_item(pool: AstPool, intern: InternPool, ci: &Vec[i32], ite
 fn facade_render_lend_hosted(pool: AstPool, intern: InternPool, li: &FacadeLendItem, resource: i32, repr: &str) -> bool:
     if not li.lends or li.decl == 0 or facade_render_param_count(pool, li.decl) == 0:
         return false
+    // A first parameter a `buffer` clause pairs is that buffer, never a
+    // receiver (Sema: facade_param_receives draws the same line).
+    if facade_render_buffer_of(pool, intern, li.decl, 0).0 == 0:
+        return false
     let meta = pool.find_fn_meta(li.decl as NodeId)
     let p0 = facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.fn_param_type(pool.fn_meta_param_start(meta), 0) as NodeId))
     let in_place = not repr.starts_with("*") and facade_render_has_clause(pool, resource, FACADE_CLAUSE_INIT)
