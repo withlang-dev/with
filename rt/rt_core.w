@@ -1072,6 +1072,7 @@ var dbg_scribble_state: i32 = 0    // 0=unread, 1=off, 2=on (cached, read once)
 var dbg_filter_state: i32 = 0      // 0=unread, 1=all, 2=non-root, 3=roots
 var dbg_base: i64 = 0              // mmap'd ledger table, 0 = uninitialised
 var dbg_full_warned: i32 = 0
+var dbg_alloc_total: i64 = 0       // allocations recorded this run (the exit report states it)
 
 // Logical allocation requests, including buffers freed before exit. This gate
 // is independent of the leak ledger and is read under the allocator lock.
@@ -1343,6 +1344,7 @@ fn dbg_entry_addr(slot: i64) -> i64:
 
 // Record (or reset, on address reuse) a live allocation.
 fn dbg_record_alloc(addr: i64, size: i64, origin: i64):
+    dbg_alloc_total = dbg_alloc_total + 1
     if dbg_base == 0:
         dbg_ledger_init()
     if dbg_base == 0:
@@ -1548,9 +1550,10 @@ fn dbg_scribble(ptr: i64, size: i64):
 pub fn with_debug_alloc_report_leaks() -> Unit:
     if dbg_on() == 0:
         return
-    if dbg_base == 0:
-        return
-    var slot: i64 = 0
+    // The report is unconditional: a program that never allocated has no
+    // ledger (dbg_base == 0) and still says so — silence was the same output
+    // as the allocator not running at all.
+    var slot: i64 = if dbg_base == 0: DBG_CAP else: 0
     var leaks: i64 = 0
     var suppressed: i64 = 0
     let filter = dbg_filter_mode()
@@ -1584,6 +1587,8 @@ pub fn with_debug_alloc_report_leaks() -> Unit:
         slot = slot + 1
     dbg_puts("debug-alloc: leak count=" as *const u8, 24)
     dbg_put_i64(leaks)
+    dbg_puts(" allocations=" as *const u8, 13)
+    dbg_put_i64(dbg_alloc_total)
     dbg_puts("\n" as *const u8, 1)
     if suppressed > 0:
         dbg_puts("debug-alloc: suppressed leak count=" as *const u8, 35)
