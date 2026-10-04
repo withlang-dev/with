@@ -7118,12 +7118,6 @@ impl MirBuilder:
         let flags = self.ast.get_data2(node)
         let mutable = flags % 2
         let is_discard_binding = if name_sym != 0 and self.pool.resolve_symbol(name_sym) == "_": 1 else: 0
-        // D5/P1 (#2043): Sema recorded that this wildcard names a place it
-        // leaves untouched; there is nothing to bind, move or drop.
-        if self.sema.discard_place_lets.contains(node):
-            self.body.note_let_binding(node, -1)
-            return
-
         let bind_ty = self.binding_type(node)
         if mutable == 0:
             // §2.4: a drop-body self-field let CONSUMES — never the alias

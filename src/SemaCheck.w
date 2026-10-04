@@ -14217,13 +14217,6 @@ impl Sema:
         var value_core = value
         while value_core != 0 and self.ast.kind(value_core) == NodeKind.NK_GROUPED:
             value_core = self.ast.get_data0(value_core)
-        // #2043 (D65): the place a wildcard names stays where it is — MIR
-        // reads this record and moves nothing (the move it made was the
-        // ownership validator's "move of _1, which a path already moved").
-        if self.pool_resolve(name) == "_" and value_core != 0:
-            let discard_kind = self.ast.kind(value_core)
-            if discard_kind == NodeKind.NK_IDENT or discard_kind == NodeKind.NK_FIELD_ACCESS:
-                self.discard_place_lets.insert(node, 1)
         if self.pool_resolve(name) != "_" and not self.view_projection_exprs.contains(value) and not self.view_projection_exprs.contains(value_core):
             // §2.4: a drop-body let of a self field CONSUMES (the 84ebff6d
             // observation rule contradicted the spec — spec_ss02_4 pins the
@@ -24529,10 +24522,7 @@ impl Sema:
         if self.is_intrinsic_fn_sym(fn_sym) != 0:
             let ret = self.check_intrinsic_call(fn_sym, node, arg_types, arg_count)
             self.typed_expr_types.insert(node, ret)
-            let intrinsic_kind = if self.math_builtin_calls.contains(node): CallCalleeKind.MathBuiltin
-                else if fn_sym == self.syms.src: CallCalleeKind.SourceLocation
-                else: CallCalleeKind.Intrinsic
-            self.note_call_callee(node, intrinsic_kind)
+            self.note_intrinsic_call_callee(node, fn_sym)
             return ret
 
         if self.ast.kind(callee) != NodeKind.NK_IDENT:
@@ -31500,7 +31490,17 @@ impl Sema:
             return 0
         let ret = self.check_intrinsic_call(fn_sym, node, &arg_types, arg_count)
         self.typed_expr_types.insert(node, ret)
+        self.note_intrinsic_call_callee(node, fn_sym)
         ret
+
+    // #2043 (D65): the callee kind of a call check_intrinsic_call typed. One
+    // derivation for the bare spelling (`sin(x)`) and the qualified one
+    // (`builtins.sin(x)`, §18.2), so MIR lowers both from the same record.
+    mut fn note_intrinsic_call_callee(node: i32, fn_sym: i32):
+        let kind = if self.math_builtin_calls.contains(node): CallCalleeKind.MathBuiltin
+            else if fn_sym == self.syms.src: CallCalleeKind.SourceLocation
+            else: CallCalleeKind.Intrinsic
+        self.note_call_callee(node, kind)
 
     mut fn check_intrinsic_call(fn_sym: i32, node: i32, arg_types: &Vec[i32], arg_count: i32) -> i32:
 
