@@ -29,17 +29,17 @@ pub fn Rc.new[T](value: T) -> Rc[T]:
 
 impl[T] Rc[T]:
     pub fn clone() -> Rc[T]:
-        let ptr = self.ptr as *mut RcControl
-        unsafe { (*ptr).strong = (*ptr).strong + 1 }
+        let control = self.ptr as *mut RcControl
+        unsafe { (*control).strong = (*control).strong + 1 }
         Rc { ptr: self.ptr }
 
     pub fn strong_count() -> i64:
-        let ptr = self.ptr as *mut RcControl
-        unsafe { (*ptr).strong }
+        let control = self.ptr as *mut RcControl
+        unsafe { (*control).strong }
 
     pub fn as_ref() -> &T:
-        let ptr = self.ptr as *mut RcControl
-        unsafe { (*ptr).value as *mut T as &T }
+        let control = self.ptr as *mut RcControl
+        unsafe { (*control).value as *mut T as &T }
 
 impl[T] Deref[T] for Rc[T]:
     fn deref() -> &T:
@@ -47,15 +47,15 @@ impl[T] Deref[T] for Rc[T]:
 
 impl[T] Drop for Rc[T]:
     move fn drop():
-        let ptr = self.ptr as *mut RcControl
-        let next = unsafe { (*ptr).strong } - 1
-        unsafe { (*ptr).strong = next }
+        let control = self.ptr as *mut RcControl
+        let next = unsafe { (*control).strong } - 1
+        unsafe { (*control).strong = next }
         if next == 0:
-            let value_ptr = unsafe { (*ptr).value } as *mut T
+            let value_ptr = unsafe { (*control).value } as *mut T
             let value = unsafe { *value_ptr }
             drop(value)
             with_free(value_ptr as *mut u8)
-            with_free(ptr as *mut u8)
+            with_free(control as *mut u8)
 
 /// `Arc[T]` is a thread-safe, explicitly cloned shared owner.
 pub type Arc[T] { ptr: *mut u8 }
@@ -71,20 +71,20 @@ pub fn Arc.new[T](value: T) -> Arc[T]:
 
 impl[T] Arc[T]:
     pub fn clone() -> Arc[T]:
-        let ptr = self.ptr as *mut RcControl
-        let strong = &raw mut (unsafe *ptr).strong as *mut Atomic[i64]
+        let control = self.ptr as *mut RcControl
+        let strong = &raw mut (unsafe *control).strong as *mut Atomic[i64]
         let _ = (unsafe *strong).fetch_add(1, .AcqRel)
         Arc { ptr: self.ptr }
 
     pub fn strong_count() -> i64:
-        let ptr = self.ptr as *mut RcControl
-        let strong = &raw const (unsafe *ptr).strong as *const Atomic[i64]
+        let control = self.ptr as *mut RcControl
+        let strong = &raw const (unsafe *control).strong as *const Atomic[i64]
         let n = (unsafe *strong).load(.Acquire)
         n
 
     pub fn as_ref() -> &T:
-        let ptr = self.ptr as *mut RcControl
-        unsafe { (*ptr).value as *mut T as &T }
+        let control = self.ptr as *mut RcControl
+        unsafe { (*control).value as *mut T as &T }
 
 impl[T] Deref[T] for Arc[T]:
     fn deref() -> &T:
@@ -92,12 +92,12 @@ impl[T] Deref[T] for Arc[T]:
 
 impl[T] Drop for Arc[T]:
     move fn drop():
-        let ptr = self.ptr as *mut RcControl
-        let strong = &raw mut (unsafe *ptr).strong as *mut Atomic[i64]
+        let control = self.ptr as *mut RcControl
+        let strong = &raw mut (unsafe *control).strong as *mut Atomic[i64]
         let old = (unsafe *strong).fetch_sub(1, .AcqRel)
         if old == 1:
-            let value_ptr = unsafe { (*ptr).value } as *mut T
+            let value_ptr = unsafe { (*control).value } as *mut T
             let value = unsafe { *value_ptr }
             drop(value)
             with_free(value_ptr as *mut u8)
-            with_free(ptr as *mut u8)
+            with_free(control as *mut u8)

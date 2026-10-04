@@ -13,8 +13,8 @@ type GenericBox[T] {
     label: str,
 }
 
-fn GenericBox.set_value(move self: GenericBox[T], value: T) -> GenericBox[T]:
-    { self with value: Some(value) }
+fn GenericBox.set_value(move self: GenericBox[T], new_value: T) -> GenericBox[T]:
+    { self with value: Some(new_value) }
 
 fn test_basic_update:
     let c = Config { width: 100, height: 200, depth: 50 }

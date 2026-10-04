@@ -104,10 +104,10 @@ impl[K: Hash + Eq, V] HashIndex[K, V]:
 
     /// The slot holding `key`, or null (the probe's key is a byte image).
     fn find(key: &K) -> *mut HashSlot[K, V]:
-        let probe = self.probe
-        unsafe { (*probe).head.compare = self.comparator() }
-        unsafe { with_memcpy(&raw mut (*probe).key as *mut u8, &raw const *key as *const u8, sizeof[K]() as i64) }
-        unsafe { tommy_hashdyn_search(self.map, hash_slot_compare, probe as *const c_void, self.hash_of(key)) } as *mut HashSlot[K, V]
+        let slot = self.probe
+        unsafe { (*slot).head.compare = self.comparator() }
+        unsafe { with_memcpy(&raw mut (*slot).key as *mut u8, &raw const *key as *const u8, sizeof[K]() as i64) }
+        unsafe { tommy_hashdyn_search(self.map, hash_slot_compare, slot as *const c_void, self.hash_of(key)) } as *mut HashSlot[K, V]
 
     /// Observes the value stored under `key`.
     pub fn get(key: &K) -> Option[&V]:
@@ -151,12 +151,12 @@ pub type HashIndexIter[K, V] ephemeral { map: i64, bucket: i64, node: i64 }
 
 impl[K, V] HashIndexIter[K, V]:
     pub mut fn next() -> Option[HashEntry[K, V]]:
-        let map = self.map as *mut tommy_hashdyn_struct
+        let table = self.map as *mut tommy_hashdyn_struct
         if self.node != 0:
             self.node = unsafe { (*(self.node as *mut tommy_node_struct)).next } as i64
-        let bucket_max = unsafe { (*map).bucket_max } as i64
+        let bucket_max = unsafe { (*table).bucket_max } as i64
         while self.node == 0:
             self.bucket = self.bucket + 1
             if self.bucket >= bucket_max: return None
-            self.node = unsafe { *((*map).bucket + self.bucket as u64) } as i64
+            self.node = unsafe { *((*table).bucket + self.bucket as u64) } as i64
         Some(HashEntry { slot: self.node })

@@ -744,6 +744,17 @@ type AstPoolState {
     // rewrote into the declaration's ident (Sema.rewrite_namespace_access),
     // mapped to the module's type when the member is a type (#1757), else 0.
     namespace_bound_set: HashMap[i32, i32],
+    // §9.5 (#1930): resolve_receiver_field_names' record. An instance method
+    // declared in its type's own module → the type's declaration; each
+    // NK_FIELD_ACCESS it made of a bare field name → that declaration; and
+    // (declaration, field name) keys of those types' fields.
+    receiver_field_methods: HashMap[i32, i32],
+    receiver_field_accesses: HashMap[i32, i32],
+    receiver_field_keys: HashMap[i64, i32],
+    // §18.1: (file, last segment of its `module` header) pairs, in parse
+    // order — a module's self-name when it has a header.
+    module_header_files: Vec[i32],
+    module_header_names: Vec[i32],
     frozen: i32,
 }
 
@@ -753,7 +764,7 @@ pub type AstPool {
 impl Copy for AstPool
 
 fn AstPool.new -> AstPool:
-    let ptr = with_alloc(2048) as *mut AstPoolState
+    let ptr = with_alloc(sizeof[AstPoolState]()) as *mut AstPoolState
     unsafe:
         *ptr = AstPoolState {
             kinds: Vec.new(),
@@ -838,6 +849,11 @@ fn AstPool.new -> AstPool:
             fn_target_arch: HashMap.new(),
             use_alias_map: HashMap.new(),
             namespace_bound_set: HashMap.new(),
+            receiver_field_methods: HashMap.new(),
+            receiver_field_accesses: HashMap.new(),
+            receiver_field_keys: HashMap.new(),
+            module_header_files: Vec.new(),
+            module_header_names: Vec.new(),
             unsafe_fn_type_nodes: HashMap.new(),
             variadic_fn_type_nodes: HashMap.new(),
             fn_effect_pin_starts: HashMap.new(),
@@ -1745,6 +1761,171 @@ impl AstPool:
                     self.state.fn_param_pattern_meta[(pattern_meta + 1)] = new_pattern_start
                     self.state.fn_param_pattern_meta[(pattern_meta + 2)] = old_pattern_count + 1
 
+    // §9.5 (#1930): in an instance method declared in its type's own module
+    // (§18.1: the file that declares the type), a field of the receiver is in
+    // scope by its bare name. Each such NK_IDENT in the method's body becomes
+    // `self.<field>` in place — `(self.<field>)` as a callee, so the call
+    // calls the field's value and never finds a method — before freeze,
+    // after every import and the comptime transform. A parameter of a
+    // field's name keeps its uses. Sema owns the verdict on every rewrite:
+    // a parameter or local binding of a field's name and a bare name that
+    // also names a global or a module-level function are its shadowing
+    // errors (receiver_field_owner, receiver_field_access_owner). A
+    // c_import's declarations and the types and methods a `c facade`
+    // renders (`generated_files`) are the compiler's text, not a module
+    // anyone wrote: their C parameter names stand.
+    mut fn resolve_receiver_field_names(intern: InternPool, decl_is_c_import: &Vec[i32], generated_files: &Vec[i32]):
+        if self.state.frozen != 0:
+            ast_pool_phase_bug("BUG: receiver field-name resolution ran after AstPool.freeze")
+        let self_sym = intern.intern("self")
+        let generated: HashMap[i32, i32] = HashMap.new()
+        for gi in 0..generated_files.len() as i32:
+            generated.insert(generated_files[gi], 1)
+        let struct_decls: HashMap[i64, i32] = HashMap.new()
+        let decl_nodes: HashMap[i32, i32] = HashMap.new()
+        for di in 0..self.decl_count():
+            let decl = self.get_decl(di)
+            decl_nodes.insert(decl as i32, 1)
+            let from_c = (di < decl_is_c_import.len() as i32 and decl_is_c_import[di] != 0) or generated.contains(self.file(decl) as i32)
+            if self.kind(decl) == NodeKind.NK_TYPE_DECL and not from_c:
+                let sub = type_decl_sub_kind(self.get_data2(decl))
+                if sub == TypeDeclKind.Struct or sub == TypeDeclKind.Union:
+                    struct_decls.insert(ast_pair_key(self.file(decl) as i32, self.get_data0(decl)), decl as i32)
+        for di in 0..self.decl_count():
+            let fn_node = self.get_decl(di)
+            if (di < decl_is_c_import.len() as i32 and decl_is_c_import[di] != 0) or generated.contains(self.file(fn_node) as i32):
+                continue
+            let owner = self.own_module_receiver_type(fn_node, self_sym, intern, &struct_decls)
+            if owner != 0:
+                self.resolve_method_receiver_field_names(fn_node, owner, self_sym, &decl_nodes)
+
+    // The struct or union `fn_node` is an instance method of when the file
+    // declaring the method declares the type, else 0. A derive the compiler
+    // generates carries its type's span: it is not a method anyone wrote.
+    fn own_module_receiver_type(fn_node: NodeId, self_sym: i32, intern: InternPool, struct_decls: &HashMap[i64, i32]) -> i32:
+        if self.kind(fn_node) != NodeKind.NK_FN_DECL or self.get_data1(fn_node) == 0 or self.fn_decl_body_is_interface(fn_node):
+            return 0
+        let meta = self.find_fn_meta(fn_node)
+        if meta < 0 or self.fn_meta_param_count(meta) == 0 or self.fn_param_name(self.fn_meta_param_start(meta), 0) != self_sym:
+            return 0
+        let name = intern.resolve(self.get_data0(fn_node)).clone()
+        var dot = -1
+        for ci in 0..name.len() as i32:
+            if name[ci] == '.':
+                dot = ci
+                break
+        if dot <= 0:
+            return 0
+        let owner_sym = intern.lookup_symbol(name.slice(0, dot as i64))
+        let decl = struct_decls.get(ast_pair_key(self.file(fn_node) as i32, owner_sym)) ?? 0
+        if decl == 0:
+            return 0
+        if self.get_start(fn_node) >= self.get_start(decl as NodeId) and self.get_end(fn_node) <= self.get_end(decl as NodeId):
+            return 0
+        decl
+
+    mut fn resolve_method_receiver_field_names(fn_node: NodeId, owner: i32, self_sym: i32, decl_nodes: &HashMap[i32, i32]):
+        self.state.receiver_field_methods.insert(fn_node as i32, owner)
+        let fields_ex = self.get_data1(owner as NodeId)
+        for fi in 0..self.get_extra(fields_ex):
+            self.state.receiver_field_keys.insert(ast_pair_key(owner, self.get_extra(fields_ex + 1 + fi * 3)), 1)
+        let file = self.file(fn_node) as i32
+        let body = self.get_data1(fn_node) as NodeId
+        let body_start = self.get_start(body)
+        let body_end = self.get_end(body)
+        let meta = self.find_fn_meta(fn_node)
+        let param_start = self.fn_meta_param_start(meta)
+        let param_count = self.fn_meta_param_count(meta)
+        // Nodes are appended children first: the method's subtree is the ids
+        // between the nearest declaration below it and its own (as Sema's
+        // prepare_body_order reads it); the body's span bounds it within.
+        var below = fn_node as i32 - 1
+        while below > 0 and not decl_nodes.contains(below): below = below - 1
+        // A nested fn is its own scope, with no receiver.
+        let nested_starts: Vec[i32] = Vec.new()
+        let nested_ends: Vec[i32] = Vec.new()
+        let callees: HashMap[i32, i32] = HashMap.new()
+        // Names a binding in the body takes. Sema refuses that binding
+        // (§29.8); its uses stay the binding's, so the refusal is the one
+        // diagnostic rather than the head of a cascade through `self.<name>`.
+        let bound: HashMap[i32, i32] = HashMap.new()
+        for n in below + 1..fn_node as i32:
+            let node = n as NodeId
+            let kind = self.kind(node)
+            if kind == NodeKind.NK_FN_DECL:
+                nested_starts.push(self.get_start(node))
+                nested_ends.push(self.get_end(node))
+            else if kind == NodeKind.NK_CALL:
+                callees.insert(self.get_data0(node), 1)
+            if self.file(node) as i32 != file or self.get_start(node) < body_start or self.get_end(node) > body_end:
+                continue
+            if kind == NodeKind.NK_LET_BINDING or kind == NodeKind.NK_PAT_IDENT or kind == NodeKind.NK_PAT_AT_BINDING or kind == NodeKind.NK_PAT_TYPED_BIND or kind == NodeKind.NK_PAT_REST:
+                bound.insert(self.get_data0(node), 1)
+            else if kind == NodeKind.NK_FOR and not self.for_binding_is_pattern(node):
+                bound.insert(self.get_data0(node), 1)
+            else if kind == NodeKind.NK_CLOSURE:
+                for pi in 0..self.get_data2(node):
+                    bound.insert(self.get_extra(self.get_data1(node) + pi * 2), 1)
+            else if kind == NodeKind.NK_TUPLE_DESTRUCTURE:
+                for ti in 0..self.get_data1(node):
+                    bound.insert(self.get_extra(self.get_data0(node) + ti), 1)
+            else if kind == NodeKind.NK_PAT_STRUCT:
+                for si in 0..self.get_data2(node):
+                    if self.get_extra(self.get_data1(node) + 1 + si * 2 + 1) == 0:
+                        bound.insert(self.get_extra(self.get_data1(node) + 1 + si * 2), 1)
+        for n in below + 1..fn_node as i32:
+            let node = n as NodeId
+            if self.kind(node) != NodeKind.NK_IDENT or self.file(node) as i32 != file:
+                continue
+            let sym = self.get_data0(node)
+            let start = self.get_start(node)
+            let end = self.get_end(node)
+            if start < body_start or end > body_end or not self.receiver_type_has_field(owner, sym) or bound.contains(sym):
+                continue
+            var is_param = false
+            for pi in 0..param_count:
+                if self.fn_param_name(param_start, pi) == sym: is_param = true
+            var nested = false
+            for ni in 0..nested_starts.len() as i32:
+                if start >= nested_starts[ni] and end <= nested_ends[ni]: nested = true
+            if is_param or nested:
+                continue
+            let receiver = self.add_node(NodeKind.NK_IDENT, start, end, self_sym, 0, 0)
+            self.state.files[(receiver as i32)] = file
+            if callees.contains(n):
+                let access = self.add_node(NodeKind.NK_FIELD_ACCESS, start, end, receiver as i32, sym, 0)
+                self.state.files[(access as i32)] = file
+                self.state.receiver_field_accesses.insert(access as i32, owner)
+                self.state.kinds[n] = NodeKind.NK_GROUPED
+                self.state.data0[n] = access as i32
+            else:
+                self.state.kinds[n] = NodeKind.NK_FIELD_ACCESS
+                self.state.data0[n] = receiver as i32
+                self.state.data1[n] = sym
+                self.state.receiver_field_accesses.insert(n, owner)
+
+    fn receiver_type_has_field(owner: i32, sym: i32) -> bool: self.state.receiver_field_keys.contains(ast_pair_key(owner, sym))
+
+    // §18.1: `module a.b.c` in file `file` names the module `c`.
+    fn record_module_header(file: i32, name_sym: i32):
+        self.state.module_header_files.push(file)
+        self.state.module_header_names.push(name_sym)
+
+    // The last segment of `file`'s `module` header, 0 when it has none.
+    fn module_header_name(file: i32) -> i32:
+        for i in 0..self.state.module_header_files.len() as i32:
+            if self.state.module_header_files[i] == file: return self.state.module_header_names[i]
+        0
+
+
+    // The type whose fields are in scope by bare name in `fn_node`'s body
+    // (§9.5), 0 when the method is not one of its own module's.
+    fn receiver_field_owner(fn_node: i32) -> i32: self.state.receiver_field_methods.get(fn_node) ?? 0
+
+    // The type a bare field name `node` was resolved through, 0 when `node`
+    // is no such access.
+    fn receiver_field_access_owner(node: i32) -> i32: self.state.receiver_field_accesses.get(node) ?? 0
+
     fn fn_param_name(param_start: i32, param_idx: i32) -> i32:
         self.get_extra(param_start + param_idx * FN_PARAM_STRIDE)
 
@@ -2160,6 +2341,8 @@ impl AstPool:
         self.state.block_meta[(meta + 1)]
 
 fn ast_pattern_binding_key(parent: i32, binding: i32): (parent as i64) * 4294967296 + (binding as i64)
+
+fn ast_pair_key(a: i32, b: i32): (a as i64) * 4294967296 + (b as i64)
 
 // The value of a `for` body that is exactly `yield E` — inline, or the only
 // line of its block — else 0. §13.6a: that body is the yield form.

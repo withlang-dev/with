@@ -19,9 +19,9 @@ pub type MapStage[G, T, U] { g: G, f: fn(T) -> U }
 impl[G: Gen[T], T, U] Gen[U] for MapStage[G, T, U]:
     move fn each(body: fn(U) -> bool):
         var me = self
-        let f = move me.f
-        let g = move me.g
-        g.each(x => body(f(x)))
+        let map_fn = move me.f
+        let source = move me.g
+        source.each(x => body(map_fn(x)))
 
 pub fn map[T, U, G: Gen[T]](g: G, f: fn(T) -> U) -> MapStage[G, T, U]: MapStage { g, f }
 
@@ -31,9 +31,9 @@ pub type FilterStage[G, T] { g: G, pred: fn(&T) -> bool }
 impl[G: Gen[T], T] Gen[T] for FilterStage[G, T]:
     move fn each(body: fn(T) -> bool):
         var me = self
-        let pred = move me.pred
-        let g = move me.g
-        g.each(x => if pred(&x): body(x) else: true)
+        let keep = move me.pred
+        let source = move me.g
+        source.each(x => if keep(&x): body(x) else: true)
 
 pub fn filter[T, G: Gen[T]](g: G, pred: fn(&T) -> bool) -> FilterStage[G, T]: FilterStage { g, pred }
 
@@ -44,8 +44,8 @@ pub type TakeStage[G, T] { g: G, n: i32 }
 impl[G: Gen[T], T] Gen[T] for TakeStage[G, T]:
     move fn each(body: fn(T) -> bool):
         var me = self
-        let g = move me.g
-        take_each(g, me.n, body)
+        let source = move me.g
+        take_each(source, me.n, body)
 
 pub fn take[T, G: Gen[T]](g: G, n: i32) -> TakeStage[G, T]: TakeStage { g, n }
 

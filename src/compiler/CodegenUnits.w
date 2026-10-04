@@ -224,9 +224,9 @@ impl CodegenUnitPipeline:
                 self.handles.push(handle)
 
     mut fn join_oldest():
-        let rc = with_thread_join(self.handles[self.next_join])
-        if rc != 0 and self.rc == 0:
-            self.rc = rc
+        let status = with_thread_join(self.handles[self.next_join])
+        if status != 0 and self.rc == 0:
+            self.rc = status
         self.next_join = self.next_join + 1
 
     // Joins every started unit; the first failing unit's code, or 0.

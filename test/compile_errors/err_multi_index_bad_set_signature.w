@@ -8,8 +8,8 @@ impl MultiIndex[i32] for Tensor:
         self.value
 
 impl Tensor:
-    fn multi_index_set(self: &Self, specs: &[IndexSpec], count: i32, value: i32) -> Unit:
-        let _ = value
+    fn multi_index_set(self: &Self, specs: &[IndexSpec], count: i32, v: i32):
+        let _ = v
 
 fn main:
     var t = Tensor { value: 1 }

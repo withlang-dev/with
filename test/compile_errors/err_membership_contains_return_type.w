@@ -2,7 +2,7 @@
 
 type Weird { value: i32 }
 
-fn Weird.contains(self: &Self, value: &i32) -> i32:
+fn Weird.contains(self: &Self, item: &i32) -> i32:
     1
 
 fn main:

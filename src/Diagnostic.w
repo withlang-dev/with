@@ -85,8 +85,8 @@ fn Diagnostic.warn(message: &str, span: Span) -> Diagnostic:
     diagnostic_warning(message, span)
 
 impl Diagnostic:
-    mut fn set_code(code: &str):
-        self.code = diagnostic_owned_text(code)
+    mut fn set_code(new_code: &str):
+        self.code = diagnostic_owned_text(new_code)
 
     mut fn set_origin(file: &str, fn_name: &str, line: i32, node: i32):
         self.origin_file = diagnostic_owned_text(file)
@@ -94,14 +94,11 @@ impl Diagnostic:
         self.origin_line = line
         self.origin_node = node
 
-    mut fn add_label(span: Span, message: &str) -> Unit:
-        self.labels.push(DiagnosticLabel { span, message: diagnostic_owned_text(message) })
+    mut fn add_label(span: Span, text: &str): self.labels.push(DiagnosticLabel { span, message: diagnostic_owned_text(text) })
 
-    mut fn add_note(message: &str) -> Unit:
-        self.notes.push(diagnostic_owned_text(message))
+    mut fn add_note(text: &str): self.notes.push(diagnostic_owned_text(text))
 
-    mut fn add_help(message: &str) -> Unit:
-        self.helps.push(diagnostic_owned_text(message))
+    mut fn add_help(text: &str): self.helps.push(diagnostic_owned_text(text))
 
     fn render(source: &Source):
         let no_paths: Vec[str] = Vec.new()
@@ -130,9 +127,9 @@ impl Diagnostic:
         var pend = self.primary.end - gen_start
         if pend <= pstart:
             pend = pstart + 1
-        let code: str = with_str_clone_ref(self.code)
-        let message: str = with_str_clone_ref(self.message)
-        with_eprint(render_diag_header(self.severity, code, message))
+        let diag_code: str = with_str_clone_ref(self.code)
+        let diag_message: str = with_str_clone_ref(self.message)
+        with_eprint(render_diag_header(self.severity, diag_code, diag_message))
 
         let loc = source.offset_to_location(pstart)
         let source_path: str = with_str_clone_ref(source.path)

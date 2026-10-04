@@ -10,8 +10,8 @@ impl Drop for R:
     move fn drop(): count = count + 1
 impl R:
     move fn take() -> i32:
-        let { repr, .. } = self
-        repr
+        let { repr: r, .. } = self
+        r
 
 fn main:
     let r = R { repr: 7, fd: 3 }

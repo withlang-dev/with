@@ -1899,6 +1899,19 @@ pub type Sema {
     // same-name declarations chained through body_typed_next.
     body_order_state: Vec[i32],
     body_order_lower: Vec[i32],
+    // §9.5 (#1930): the struct or union declaration whose fields are in scope
+    // by bare name in the body being checked (AstPool.receiver_field_owner),
+    // 0 outside its own module's instance methods; and the field names a
+    // binding in that body was refused for, whose bare uses then say nothing
+    // more.
+    receiver_field_owner: i32,
+    receiver_field_shadowed: HashMap[i32, i32],
+    // §18.1: module_self_name's last answer, for the module path it read.
+    self_name_cache_path: str,
+    self_name_cache: str,
+    // §18.2: callee nodes `builtins.name` bound to a compiler intrinsic —
+    // the intrinsic, whatever else the bare name names here.
+    builtins_intrinsic_nodes: HashMap[i32, i32],
     body_typed_decls: HashMap[i32, i32],
     body_typed_next: Vec[i32],
     // §13.6a: one for-comprehension's desugar (AstPool.build_comprehension_match)
@@ -2492,7 +2505,7 @@ impl Sema:
         self.ns_targets = sema_clone_i32_vec(&source.ns_targets)
         self.ns_offsets = sema_clone_i32_vec(&source.ns_offsets)
 
-    mut fn copy_module_graph_parts(module_paths: &Vec[str], module_import_starts: &Vec[i32], module_import_counts: &Vec[i32], module_import_targets: &Vec[i32], module_import_paths: &Vec[str], module_import_selected: &Vec[str], module_import_offsets: &Vec[i32], global_paths: &Vec[str]):
+    mut fn copy_module_graph_parts(src_module_paths: &Vec[str], src_module_import_starts: &Vec[i32], src_module_import_counts: &Vec[i32], src_module_import_targets: &Vec[i32], src_module_import_paths: &Vec[str], src_module_import_selected: &Vec[str], src_module_import_offsets: &Vec[i32], global_paths: &Vec[str]):
         self.module_paths = sema_new_vec_str()
         self.module_import_starts = sema_new_vec_i32()
         self.module_import_counts = sema_new_vec_i32()
@@ -2504,26 +2517,26 @@ impl Sema:
         self.global_visible_module_paths = sema_new_map_str_i32()
         self.module_visibility_cache = sema_new_map_str_i32()
 
-        for mi in 0..module_paths.len() as i32:
-            let source_path = module_paths[mi]
+        for mi in 0..src_module_paths.len() as i32:
+            let source_path = src_module_paths[mi]
             self.module_paths.push(sema_owned_text(source_path))
             self.module_index_by_path.insert(sema_owned_text(source_path), mi)
 
         for gi in 0..global_paths.len() as i32:
             self.global_visible_module_paths.insert(sema_owned_text(global_paths[gi]), 1)
 
-        for i in 0..module_import_starts.len() as i32:
-            self.module_import_starts.push(module_import_starts[i])
-        for i in 0..module_import_counts.len() as i32:
-            self.module_import_counts.push(module_import_counts[i])
-        for i in 0..module_import_targets.len() as i32:
-            self.module_import_targets.push(module_import_targets[i])
-        for i in 0..module_import_paths.len() as i32:
-            self.module_import_paths.push(sema_owned_text(module_import_paths[i]))
-        for i in 0..module_import_selected.len() as i32:
-            self.module_import_selected.push(sema_owned_text(module_import_selected[i]))
-        for i in 0..module_import_offsets.len() as i32:
-            self.module_import_offsets.push(module_import_offsets[i])
+        for i in 0..src_module_import_starts.len() as i32:
+            self.module_import_starts.push(src_module_import_starts[i])
+        for i in 0..src_module_import_counts.len() as i32:
+            self.module_import_counts.push(src_module_import_counts[i])
+        for i in 0..src_module_import_targets.len() as i32:
+            self.module_import_targets.push(src_module_import_targets[i])
+        for i in 0..src_module_import_paths.len() as i32:
+            self.module_import_paths.push(sema_owned_text(src_module_import_paths[i]))
+        for i in 0..src_module_import_selected.len() as i32:
+            self.module_import_selected.push(sema_owned_text(src_module_import_selected[i]))
+        for i in 0..src_module_import_offsets.len() as i32:
+            self.module_import_offsets.push(src_module_import_offsets[i])
         self.record_engine_corpora()
 
 fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
@@ -3430,6 +3443,11 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         discarded_stmt_node: 0,
         body_order_state: Vec.new(),
         body_order_lower: Vec.new(),
+        receiver_field_owner: 0,
+        receiver_field_shadowed: sema_new_map_i32_i32(),
+        self_name_cache_path: "",
+        self_name_cache: "",
+        builtins_intrinsic_nodes: sema_new_map_i32_i32(),
         body_typed_decls: sema_new_map_i32_i32(),
         body_typed_next: Vec.new(),
         comprehension_chain_roots: sema_new_map_i32_i32(),
@@ -5116,10 +5134,10 @@ impl Sema:
         &self.source_text
 
     fn extract_decl_name_after(node: i32, keyword: &str) -> str:
-        let source_text = self.source_text_for_decl_node(node)
-        if source_text.len() == 0:
+        let text = self.source_text_for_decl_node(node)
+        if text.len() == 0:
             return ""
-        let source_len = source_text.len() as i32
+        let source_len = text.len() as i32
         var start = self.ast.get_start(node)
         var end = self.ast.get_end(node)
         if start < 0:
@@ -5132,7 +5150,7 @@ impl Sema:
             end = source_len
         if end <= start:
             return ""
-        let snippet = source_text.slice(start as i64, end as i64)
+        let snippet = text.slice(start as i64, end as i64)
         extract_name_after_keyword_in_text(snippet, keyword)
 
     fn set_pretty_symbol(sym: i32, name: &str):
@@ -5151,10 +5169,10 @@ impl Sema:
         self.pretty_symbol_names.insert(sym, sema_owned_text(name))
 
     fn extract_fn_param_name(node: i32, param_index: i32) -> str:
-        let source_text = self.source_text_for_decl_node(node)
-        if source_text.len() == 0:
+        let text = self.source_text_for_decl_node(node)
+        if text.len() == 0:
             return ""
-        let source_len = source_text.len() as i32
+        let source_len = text.len() as i32
         var start = self.ast.get_start(node)
         var end = self.ast.get_end(node)
         if start < 0:
@@ -5163,7 +5181,7 @@ impl Sema:
             end = source_len
         if end <= start:
             return ""
-        extract_fn_param_name_in_text(source_text.slice(start as i64, end as i64), param_index)
+        extract_fn_param_name_in_text(text.slice(start as i64, end as i64), param_index)
 
     // ── Type management ──────────────────────────────────────────────
 
@@ -6469,9 +6487,25 @@ impl Sema:
         self.bind_provenance.push(binding_provenance_empty())
         self.scope_name_map.insert(sym, idx)
 
+    // §9.5 (#1930), §29.8: in its type's own module's instance method a
+    // receiver field is in scope by its bare name, so a parameter or local
+    // binding of that name would shadow it.
+    mut fn refuse_receiver_field_shadow(sym: i32, node: i32):
+        if self.receiver_field_owner == 0 or not self.ast.receiver_type_has_field(self.receiver_field_owner, sym):
+            return
+        let name: str = with_str_clone_ref(self.pool_resolve(sym))
+        let owner: str = with_str_clone_ref(self.pool_resolve(self.ast.get_data0(self.receiver_field_owner)))
+        self.receiver_field_shadowed.insert(sym, 1)
+        // A destructuring shorthand binds the field's own name: bind it under
+        // another (`{ repr: r }`).
+        let fix = if self.ast.kind(node) == NodeKind.NK_PAT_STRUCT: f"bind the field under another name, e.g. `{name}: {name.slice(0, 1)}`" else: f"rename the binding, e.g. `new_{name}`"
+        self.emit_error_with_help(f"shadowing is not allowed for '{name}': it names a field of the receiver `{owner}`, which this method reaches by its bare name (§9.5)", node, f"{fix}; the field is `{name}` or `self.{name}`")
+
+
     mut fn scope_put_at(sym: i32, tid: i32, is_mut: i32, node: i32):
         if self.is_discard_binding_symbol(sym) != 0:
             return
+        self.refuse_receiver_field_shadow(sym, node)
         let existing = self.scope_name_map.get(sym)
         if existing.is_some():
             let idx: i32 = existing.unwrap()
@@ -6536,6 +6570,7 @@ impl Sema:
     mut fn scope_put_consuming_rebind_at(sym: i32, tid: i32, is_mut: i32, node: i32) -> i32:
         if self.is_discard_binding_symbol(sym) != 0:
             return 1
+        self.refuse_receiver_field_shadow(sym, node)
         let existing = self.scope_name_map.get(sym)
         if not existing.is_some():
             self.scope_insert_at(sym, tid, is_mut)
@@ -7048,7 +7083,7 @@ impl Sema:
     // (a field moved on both paths re-added every merge), detonating memory
     // once the flip made Vec fields drop-tracked (#695 follow-up; the set must
     // stay bounded by the distinct field-paths in the function).
-    fn moved_field_entry_present(base: &Vec[i32], starts: &Vec[i32], counts: &Vec[i32], syms: &Vec[i32], base_sym: i32, src_start: i32, src_count: i32, src_syms: &Vec[i32]) -> bool:
+    fn moved_field_entry_present(base: &Vec[i32], starts: &Vec[i32], counts: &Vec[i32], path_syms: &Vec[i32], base_sym: i32, src_start: i32, src_count: i32, src_syms: &Vec[i32]) -> bool:
         for i in 0..base.len() as i32:
             if base[i] != base_sym:
                 continue
@@ -7057,7 +7092,7 @@ impl Sema:
             let dst_start = starts[i]
             var same = true
             for k in 0..src_count:
-                if syms[(dst_start + k)] != src_syms[(src_start + k)]:
+                if path_syms[(dst_start + k)] != src_syms[(src_start + k)]:
                     same = false
                     break
             if same:
@@ -7068,29 +7103,29 @@ impl Sema:
         var base: Vec[i32] = Vec.new()
         var starts: Vec[i32] = Vec.new()
         var counts: Vec[i32] = Vec.new()
-        var syms: Vec[i32] = Vec.new()
+        var path_syms: Vec[i32] = Vec.new()
         for i in 0..a.base.len() as i32:
-            starts.push(syms.len() as i32)
+            starts.push(path_syms.len() as i32)
             counts.push(a.counts[i])
             base.push(a.base[i])
             let s = a.starts[i]
             let c = a.counts[i]
             for k in 0..c:
-                syms.push(a.syms[(s + k)])
+                path_syms.push(a.syms[(s + k)])
         for i in 0..b.base.len() as i32:
             let bs = b.starts[i]
             let bc = b.counts[i]
-            if self.moved_field_entry_present(&base, &starts, &counts, &syms, b.base[i], bs, bc, &b.syms):
+            if self.moved_field_entry_present(&base, &starts, &counts, &path_syms, b.base[i], bs, bc, &b.syms):
                 continue
-            starts.push(syms.len() as i32)
+            starts.push(path_syms.len() as i32)
             counts.push(bc)
             base.push(b.base[i])
             for k in 0..bc:
-                syms.push(b.syms[(bs + k)])
+                path_syms.push(b.syms[(bs + k)])
         self.moved_field_base_syms = move base
         self.moved_field_path_starts = move starts
         self.moved_field_path_counts = move counts
-        self.moved_field_path_syms = move syms
+        self.moved_field_path_syms = move path_syms
         // Poisoned at the join iff poisoned at some non-divergent exit.
         var poison_syms: Vec[i32] = Vec.new()
         var poison_nodes: Vec[i32] = Vec.new()
@@ -7118,14 +7153,14 @@ impl Sema:
             out.push(self.bind_provenance[i].poisoned_origin_node)
         out
 
-    mut fn restore_poison(syms: &Vec[i32], nodes: &Vec[i32]):
-        for i in 0..syms.len() as i32:
+    mut fn restore_poison(path_syms: &Vec[i32], nodes: &Vec[i32]):
+        for i in 0..path_syms.len() as i32:
             if i >= self.bind_provenance.len() as i32:
                 break
             let slot_idx = i as i64
             with self.bind_provenance.slot(slot_idx) as mut slot:
                 var provenance = slot.get()
-                provenance.poisoned_origin_sym = syms[i]
+                provenance.poisoned_origin_sym = path_syms[i]
                 provenance.poisoned_origin_node = nodes[i]
                 slot.set(provenance)
 
@@ -9239,7 +9274,33 @@ impl Sema:
 
 // ── Utility functions ────────────────────────────────────────────
 
+// §18.2: the standard library's prelude module, std.builtins.
+pub fn sema_path_is_std_builtins(path: &str) -> bool:
+    path == "lib/std/builtins.w" or path == "<embedded-std>/std/builtins.w" or path.ends_with("/lib/std/builtins.w")
+
+// §18.1: a module without a `module` header names itself by its file's
+// stem, each character that cannot appear in an identifier replaced by `_`
+// and a leading digit prefixed with `_`.
+pub fn sema_module_stem_self_name(path: &str) -> str:
+    var start = 0
+    for i in 0..path.len() as i32:
+        if path[i] == '/': start = i + 1
+    var end = path.len() as i32
+    if path.ends_with(".wi"): end = end - 3
+    else if path.ends_with(".w"): end = end - 2
+    if end <= start:
+        return ""
+    var out = ""
+    for i in start..end:
+        let c = path[i]
+        let ident_char = (c >= 'a' and c <= 'z') or (c >= 'A' and c <= 'Z') or (c >= '0' and c <= '9') or c == '_'
+        out = out ++ (if ident_char: path.slice(i as i64, (i + 1) as i64) else: "_")
+    if path[start] >= '0' and path[start] <= '9':
+        out = "_" ++ out
+    out
+
 pub fn sema_str_has_data(text: &str) -> i32:
+
     if text.len() <= 0:
         return 0
     let data_ptr = unsafe *(text as *const str as *const *const u8)

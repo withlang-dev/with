@@ -684,16 +684,16 @@ impl CCodegen:
     fn string_literal_node_payload(node: i32) -> str:
         self.string_literal_node_payload_from_source(node, self.source_text)
 
-    fn string_literal_node_payload_from_source(node: i32, source_text: &str) -> str:
+    fn string_literal_node_payload_from_source(node: i32, src_text: &str) -> str:
         let start = self.ast.get_start(node)
         let end = self.ast.get_end(node)
-        if start >= 0 and end > start and end <= source_text.len() as i32:
-            let text = source_text.slice(start as i64, end as i64)
+        if start >= 0 and end > start and end <= src_text.len() as i32:
+            let text = src_text.slice(start as i64, end as i64)
             if cc_is_string_token_text(text) != 0:
                 return cc_string_token_payload(text)
         cc_string_literal_payload(cc_intern_resolve(self.intern, self.ast.get_data0(node)))
 
-    fn c_string_literal_node_payload_from_source(node: i32, source_text: &str) -> str:
+    fn c_string_literal_node_payload_from_source(node: i32, src_text: &str) -> str:
         var expr = node
         while expr != 0:
             let k = self.ast.kind(expr)
@@ -704,8 +704,8 @@ impl CCodegen:
             return ""
         let start = self.ast.get_start(expr)
         let end = self.ast.get_end(expr)
-        if start >= 0 and end > start and end <= source_text.len() as i32:
-            let text = source_text.slice(start as i64, end as i64)
+        if start >= 0 and end > start and end <= src_text.len() as i32:
+            let text = src_text.slice(start as i64, end as i64)
             if cc_is_c_string_token_text(text) != 0:
                 return cc_c_string_token_payload(text)
         cc_string_literal_payload(cc_intern_resolve(self.intern, self.ast.get_data0(expr)))
@@ -3536,7 +3536,7 @@ impl CCodegen:
     // A global's initializer as a C constant, or "" when it is not a literal
     // C can state — a shift, an array or variant literal, a call (#1484).
     // Those run at startup: prepare_global_init_bodies lowers them.
-    mut fn global_init_text(node: i32, tid: i32, source_text: &str) -> str:
+    mut fn global_init_text(node: i32, tid: i32, src_text: &str) -> str:
         var expr = node
         while expr != 0:
             let k = self.ast.kind(expr)
@@ -3556,7 +3556,7 @@ impl CCodegen:
                 return self.float_literal_c_text(self.ast.get_string(str_idx), tid)
             return ""
         if kind == NodeKind.NK_STRING_LIT:
-            let text = self.string_literal_node_payload_from_source(expr, source_text)
+            let text = self.string_literal_node_payload_from_source(expr, src_text)
             let resolved = self.sema.resolve_alias(tid)
             let tk = self.sema.get_type_kind(resolved)
             if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
@@ -3565,21 +3565,21 @@ impl CCodegen:
                     return "((" ++ self.c_type(tid, 0) ++ ")\"" ++ cc_escape_c_string(text) ++ "\")"
             return "WITH_STR_LIT(\"" ++ cc_escape_c_string(text) ++ "\")"
         if kind == NodeKind.NK_C_STRING_LIT:
-            let text = self.c_string_literal_node_payload_from_source(expr, source_text)
+            let text = self.c_string_literal_node_payload_from_source(expr, src_text)
             return self.cstr_literal_ref_expr(text, tid)
         if kind == NodeKind.NK_NULL_LIT:
             return "NULL"
         if kind == NodeKind.NK_ARRAY_LIT:
-            return self.global_array_init_text(expr, tid, source_text)
+            return self.global_array_init_text(expr, tid, src_text)
         if kind == NodeKind.NK_STRUCT_LIT:
-            return self.global_struct_init_text(expr, tid, source_text)
+            return self.global_struct_init_text(expr, tid, src_text)
         ""
 
     // An array literal whose every element is a C constant is one too, as
     // the LLVM backend folds it (try_eval_const_llvm). Lowered at startup
     // instead, pcre2's 1543-record `_pcre2_ucd_records_8` table became a
     // function of 1543 temporaries that clang -O1 spent 155 s in SROA on.
-    mut fn global_array_init_text(node: i32, tid: i32, source_text: &str) -> str:
+    mut fn global_array_init_text(node: i32, tid: i32, src_text: &str) -> str:
         let resolved = self.sema.resolve_alias(tid)
         if self.sema.get_type_kind(resolved) != TypeKind.TY_ARRAY:
             return ""
@@ -3590,7 +3590,7 @@ impl CCodegen:
             return ""
         var out = cc_lbrace()
         for i in 0..count:
-            let elem = self.global_init_text(self.ast.get_extra(extra_start + i), elem_tid, source_text)
+            let elem = self.global_init_text(self.ast.get_extra(extra_start + i), elem_tid, src_text)
             if elem.len() == 0:
                 return ""
             out = out ++ (if i > 0: ", " ++ elem else: elem)
@@ -3600,7 +3600,7 @@ impl CCodegen:
     // declaration order. An omitted field takes its declared default, whose
     // text lives with the type's declaration, not this global's: that
     // literal runs at startup instead.
-    mut fn global_struct_init_text(node: i32, tid: i32, source_text: &str) -> str:
+    mut fn global_struct_init_text(node: i32, tid: i32, src_text: &str) -> str:
         let resolved = self.sema.resolve_alias(tid)
         if self.sema.get_type_kind(resolved) != TypeKind.TY_STRUCT:
             return ""
@@ -3622,7 +3622,7 @@ impl CCodegen:
                     value = self.ast.get_extra(lit_start + li * 2 + 1)
             if value == 0:
                 return ""
-            let text = self.global_init_text(value, field_tid, source_text)
+            let text = self.global_init_text(value, field_tid, src_text)
             if text.len() == 0:
                 return ""
             out = out ++ (if fi > 0: ", ." else: ".") ++ field_name ++ " = " ++ text

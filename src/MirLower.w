@@ -4247,7 +4247,10 @@ impl MirBuilder:
             if hinted_tk == TypeKind.TY_PTR or hinted_tk == TypeKind.TY_REF or hinted_tk == TypeKind.TY_EXTERN_FN:
                 return self.const_operand(ConstKind.CK_INT, 0, self.sema.ty_i32)
 
-        let local = self.lookup_local(sym)
+        // §18.1/§18.2: a qualified name (Sema's namespace binding) names a
+        // declaration, never a local of its short name.
+        let qualified = node_id > 0 and self.ast.is_namespace_bound(node_id as NodeId)
+        let local = if qualified: -1 else: self.lookup_local(sym)
         if local >= 0:
             let place = self.body.new_place(local)
             // D52 (§9.1c): a global is never moved out — a `const` is a value
@@ -4262,7 +4265,7 @@ impl MirBuilder:
                     self.mark_string_base_fields_may_alias(local)
                 return self.body.new_operand(OperandKind.OK_COPY, place)
             return self.body.new_operand(OperandKind.OK_MOVE, place)
-        let alias_place = self.lookup_alias_place(sym)
+        let alias_place = if qualified: -1 else: self.lookup_alias_place(sym)
         if alias_place >= 0:
             // #747 (03h): a view binding rooted in storage THIS frame owns and
             // will drop (consumed param / owned local with a scheduled value
@@ -12389,6 +12392,10 @@ impl MirBuilder:
     fn ident_names_local_callable(fn_expr: i32) -> bool:
         if fn_expr == 0 or self.ast.kind(fn_expr) != NodeKind.NK_IDENT:
             return false
+        // §18.1/§18.2: a qualified callee names a declaration (Sema bound it).
+        if self.ast.is_namespace_bound(fn_expr as NodeId):
+            return false
+
         let sym = self.ast.get_data0(fn_expr)
         self.lookup_local(sym) >= 0 or self.lookup_alias_place(sym) >= 0
 
@@ -15635,7 +15642,7 @@ impl MirBuilder:
 
     mut fn lower_with_guarded_mode(node: i32, want_result: i32) -> i32:
         let source = self.ast.get_data0(node)
-        let body = self.ast.get_data1(node)
+        let with_body = self.ast.get_data1(node)
         let encoded = self.ast.get_data2(node)
         let name = decode_with_binding_sym(encoded)
         let is_mut = decode_with_binding_is_mut(encoded)
@@ -15686,10 +15693,10 @@ impl MirBuilder:
         // value-position nested with). Value-mode kept lower_if building a
         // void join and leaking expected_type=void into the arms.
         if want_result == 0:
-            let _ = self.lower_expr_discard(body)
+            let _ = self.lower_expr_discard(with_body)
             self.pop_scope_inline()
             return self.unit_operand()
-        let result = self.lower_expr(body)
+        let result = self.lower_expr(with_body)
         self.pop_scope_inline()
         result
 
@@ -15730,7 +15737,7 @@ impl MirBuilder:
 
     mut fn lower_with_tuple(node: i32) -> i32:
         let source = self.ast.get_data0(node)
-        let body = self.ast.get_data1(node)
+        let with_body = self.ast.get_data1(node)
         let extra_start = self.ast.get_data2(node)
         let name_count = self.ast.get_extra(extra_start)
         let is_mut = self.ast.get_extra(extra_start + 1)
@@ -15746,7 +15753,7 @@ impl MirBuilder:
                 let elem_ty = self.tuple_elem_type(rhs_ty, ni)
                 let field_place = self.body.new_tuple_index_place(rhs_place, ni, elem_ty)
                 self.bind_alias_place(n_sym, field_place, elem_ty)
-            let _ = self.lower_expr_discard(body)
+            let _ = self.lower_expr_discard(with_body)
             self.pop_scope_inline()
             return self.body.new_operand(OperandKind.OK_COPY, rhs_place)
         for ni in 0..name_count:
@@ -15763,7 +15770,7 @@ impl MirBuilder:
             let field_op = self.body.new_operand(if self.type_needs_value_drop(elem_ty) == 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, field_place)
             let dst_place = self.place_for_local(local_id)
             self.assign_operand_to_place(dst_place, field_op, self.ast.get_start(node))
-        let result = self.lower_expr(body)
+        let result = self.lower_expr(with_body)
         self.pop_scope_inline()
         result
 
@@ -17201,15 +17208,15 @@ impl MirBuilder:
 
         if kind == NodeKind.NK_WITH_EXPR:
             let source = self.ast.get_data0(node)
-            let body = self.ast.get_data1(node)
+            let with_body = self.ast.get_data1(node)
             let name = decode_with_binding_sym(self.ast.get_data2(node))
             if self.sema.with_form_kinds.contains(node):
                 let form: i32 = self.sema.with_form_kinds.get(node).unwrap()
                 if form == WithFormKind.Guarded or form == WithFormKind.GuardedMut:
                     return self.lower_with_guarded(node)
             if name != 0:
-                return self.lower_with_binding(name, source, body, self.ast.get_start(node))
-            return self.lower_with_form1(source, body)
+                return self.lower_with_binding(name, source, with_body, self.ast.get_start(node))
+            return self.lower_with_form1(source, with_body)
 
         if kind == NodeKind.NK_WITH_IMPLICIT:
             let wi_source = self.ast.get_data0(node)

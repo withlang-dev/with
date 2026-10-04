@@ -305,11 +305,11 @@ impl Parser:
             return self.parse_body()
         self.pool.add_node(NodeKind.NK_INTERFACE_BODY, self.prev_end(), self.prev_end(), 0, 0, 0)
 
-    fn token_text_at(pos: i32) -> str:
-        if pos < 0 or pos >= self.tokens.len():
+    fn token_text_at(at: i32) -> str:
+        if at < 0 or at >= self.tokens.len():
             return ""
-        let s = self.tokens.get_start(pos)
-        let e = self.tokens.get_end(pos)
+        let s = self.tokens.get_start(at)
+        let e = self.tokens.get_end(at)
         self.source.slice(s as i64, e as i64)
 
     fn has_top_level_main_decl() -> i32:
@@ -989,24 +989,34 @@ impl Parser:
         self.top_level_stmts = Vec.new()
         self.explicit_main_decl = 0
 
-        // Skip optional module declaration
+        // The optional module declaration: its last segment is the module's
+        // self-name (§18.1).
         if self.peek() == TokenKind.TK_KW_MODULE:
             self.advance()
+            var last_segment = ""
             if self.peek() == TokenKind.TK_IDENT or self.peek() == TokenKind.TK_DOT_IDENT:
+                last_segment = self.current_text()
                 self.advance()
             while true:
                 if self.peek() == TokenKind.TK_DOT:
                     self.advance()
                     if self.peek() == TokenKind.TK_IDENT:
+                        last_segment = self.current_text()
                         self.advance()
                     else:
                         break
                 else if self.peek() == TokenKind.TK_DOT_IDENT:
                     // .Uppercase segments are lexed as dot-identifiers.
+                    last_segment = self.current_text()
                     self.advance()
                 else:
                     break
+            if last_segment.starts_with("."):
+                last_segment = last_segment.slice(1, last_segment.len())
+            if last_segment.len() > 0:
+                self.pool.record_module_header(self.file_id, self.intern.intern(last_segment))
             self.skip_separators()
+
 
         while self.peek() != TokenKind.TK_EOF:
             self.skip_separators()
@@ -3091,15 +3101,15 @@ impl Parser:
         self.skip_newlines()
 
         let written = self.parse_enum_variant_list()
-        var pos = 0
+        var at = 0
         for wi in 0..written.count:
-            let vname = written.records[pos]
+            let vname = written.records[at]
             for gi in 0..wrapper_count:
                 if wrapper_names[gi] == vname:
                     let wrapped = self.intern.resolve(wrapped_types[gi])
                     let msg = f"variant '{self.intern.resolve(vname)}' of error '{self.intern.resolve(err_name)}' has the name of the wrapper variant generated for '{wrapped}' (`from {wrapped}`); give the written variant another name"
                     self.emit_error_span(msg, written.name_starts[wi], written.name_ends[wi])
-            pos += 2 + written.records[pos + 1]
+            at += 2 + written.records[at + 1]
         for ri in 0..written.records.len() as i32:
             records.push(written.records[ri])
         self.add_error_decl(start, err_name, is_pub, wrapper_count + written.count, &records)
@@ -5346,43 +5356,43 @@ impl Parser:
         var width = 0
         var precision = -1
         var mode = 0
-        var pos = 0
+        var at = 0
         // [fill]align: a fill byte counts only when an align follows it.
-        if pos + 1 < slen:
-            let next_align = fstring_spec_align(spec_text[pos + 1])
+        if at + 1 < slen:
+            let next_align = fstring_spec_align(spec_text[at + 1])
             if next_align != 0:
-                fill = spec_text[pos] as i32
+                fill = spec_text[at] as i32
                 align = next_align
-                pos = pos + 2
-        if align == 0 and pos < slen:
-            align = fstring_spec_align(spec_text[pos])
-            if align != 0: pos = pos + 1
-        if pos < slen and (spec_text[pos] == '+' or spec_text[pos] == '-'):
-            sign_plus = if spec_text[pos] == '+': 1 else: 0
-            pos = pos + 1
-        if pos < slen and spec_text[pos] == '#':
+                at = at + 2
+        if align == 0 and at < slen:
+            align = fstring_spec_align(spec_text[at])
+            if align != 0: at = at + 1
+        if at < slen and (spec_text[at] == '+' or spec_text[at] == '-'):
+            sign_plus = if spec_text[at] == '+': 1 else: 0
+            at = at + 1
+        if at < slen and spec_text[at] == '#':
             alternate = 1
-            pos = pos + 1
+            at = at + 1
         // `0` is the zero-pad flag when a width digit, a `.` or the end follows.
-        if pos < slen and spec_text[pos] == '0':
-            if pos + 1 >= slen or fstring_spec_digit(spec_text[pos + 1]) or spec_text[pos + 1] == '.':
+        if at < slen and spec_text[at] == '0':
+            if at + 1 >= slen or fstring_spec_digit(spec_text[at + 1]) or spec_text[at + 1] == '.':
                 zero_pad = 1
-                pos = pos + 1
-        while pos < slen and fstring_spec_digit(spec_text[pos]):
-            width = width * 10 + (spec_text[pos] - '0') as i32
-            pos = pos + 1
-        if pos < slen and spec_text[pos] == '.':
-            pos = pos + 1
+                at = at + 1
+        while at < slen and fstring_spec_digit(spec_text[at]):
+            width = width * 10 + (spec_text[at] - '0') as i32
+            at = at + 1
+        if at < slen and spec_text[at] == '.':
+            at = at + 1
             precision = 0
-            while pos < slen and fstring_spec_digit(spec_text[pos]):
-                precision = precision * 10 + (spec_text[pos] - '0') as i32
-                pos = pos + 1
-        if pos < slen and fstring_spec_mode(spec_text[pos]):
-            mode = spec_text[pos] as i32
-            pos = pos + 1
-        if pos < slen:
-            let rest = spec_text.slice(pos as i64, slen as i64)
-            self.emit_error_span(f"invalid format spec `{spec_text}`: `{rest}` is not part of [[fill]align][sign]['#']['0'][width]['.' precision][mode] (§15.4.1)", spec_start + pos, spec_start + slen)
+            while at < slen and fstring_spec_digit(spec_text[at]):
+                precision = precision * 10 + (spec_text[at] - '0') as i32
+                at = at + 1
+        if at < slen and fstring_spec_mode(spec_text[at]):
+            mode = spec_text[at] as i32
+            at = at + 1
+        if at < slen:
+            let rest = spec_text.slice(at as i64, slen as i64)
+            self.emit_error_span(f"invalid format spec `{spec_text}`: `{rest}` is not part of [[fill]align][sign]['#']['0'][width]['.' precision][mode] (§15.4.1)", spec_start + at, spec_start + slen)
         // Pack flags into d0: mode(-7), fill(8-15), align(16-17), sign_plus(18), alternate(19), zero_pad(20)
         let flags = mode | ((fill & 255) << 8) | ((align & 3) << 16) | ((sign_plus & 1) << 18) | ((alternate & 1) << 19) | ((zero_pad & 1) << 20)
         self.pool.add_node(NodeKind.NK_FSTRING_SPEC, start, end, flags, width, precision)
@@ -5424,10 +5434,10 @@ impl Parser:
         // first `{expr}` in an imported module to the root (AstPool.file),
         // and every such function's DWARF to the root's main.w.
         var lexer = Lexer.init(source_text, self.file_id)
-        let tokens = lexer.tokenize()
+        let sub_tokens = lexer.tokenize()
         let parse_diags = if use_shared_diags != 0: move self.diags else: DiagnosticList.init()
         let first_node = self.pool.node_count()
-        var sub_parser = Parser.init_with_pool(move tokens, source_text, self.file_id, self.intern, move parse_diags, self.pool)
+        var sub_parser = Parser.init_with_pool(move sub_tokens, source_text, self.file_id, self.intern, move parse_diags, self.pool)
         let result = sub_parser.parse_expr()
         sub_parser.skip_newlines()
         offset_interpolated_expr_spans(sub_parser.pool, first_node, base_start)
@@ -7938,11 +7948,11 @@ impl Parser:
             if self.peek() == TokenKind.TK_L_PAREN:
                 self.advance()
                 self.skip_newlines()
-                let source = self.parse_expr()
+                let source_node = self.parse_expr()
                 self.skip_newlines()
                 self.expect(TokenKind.TK_R_PAREN)
                 let body = self.parse_body()
-                return self.pool.add_node(NodeKind.NK_WITH_IMPLICIT, start, self.prev_end(), source, body, binding_name)
+                return self.pool.add_node(NodeKind.NK_WITH_IMPLICIT, start, self.prev_end(), source_node, body, binding_name)
             self.pos = save
         // Existing syntax: with expr as name: body
         // Multi-binding syntax is represented as nested single-binding nodes so
@@ -7954,7 +7964,7 @@ impl Parser:
         var keep_parsing_items = 1
         while keep_parsing_items != 0:
             self.suppress_as = 1
-            let source = self.parse_expr()
+            let source_node = self.parse_expr()
             self.suppress_as = 0
             if self.peek() != TokenKind.TK_KW_AS:
                 self.emit_error("expected 'as' in with expression")
@@ -7991,12 +8001,12 @@ impl Parser:
                 self.pool.add_extra(is_mut)
                 for ni in 0..names.len() as i32:
                     self.pool.add_extra(names[ni])
-                item_sources.push(source as i32)
+                item_sources.push(source_node as i32)
                 item_payloads.push(extra_start)
                 item_is_tuple.push(1)
             else:
                 let name = self.expect_ident()
-                item_sources.push(source as i32)
+                item_sources.push(source_node as i32)
                 item_payloads.push(encode_with_binding(name, is_mut))
                 item_is_tuple.push(0)
 
@@ -8076,7 +8086,7 @@ impl Parser:
         let k = self.pool.kind(node)
         k == NodeKind.NK_LET_BINDING or k == NodeKind.NK_LET_ELSE or k == NodeKind.NK_DEFER or k == NodeKind.NK_ERRDEFER
 
-    mut fn finish_record_update(start: i32, source: NodeId) -> NodeId:
+    mut fn finish_record_update(start: i32, source_node: NodeId) -> NodeId:
         self.advance()  // consume 'with'
         self.skip_newlines()
 
@@ -8102,7 +8112,7 @@ impl Parser:
         let extra_start = self.pool.extra_len()
         for fi in 0..fields.len() as i32:
             self.pool.add_extra(fields[fi])
-        self.pool.add_node(NodeKind.NK_RECORD_UPDATE, start, self.prev_end(), source, extra_start, field_count)
+        self.pool.add_node(NodeKind.NK_RECORD_UPDATE, start, self.prev_end(), source_node, extra_start, field_count)
 
     // ── Array literal / comprehension ────────────────────────────────
 

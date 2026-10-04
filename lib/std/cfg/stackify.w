@@ -214,12 +214,12 @@ impl StackifyGraph:
     pub mut fn add_branch_target(block: i32, args: &Vec[i32]) -> i32:
         self.add_target(block, args)
 
-    mut fn set_succs(block: i32, succs: &Vec[i32]):
+    mut fn set_succs(block: i32, block_succs: &Vec[i32]):
         self.blocks[block].succs_start = self.succs.len() as i32
-        self.blocks[block].succs_count = succs.len() as i32
+        self.blocks[block].succs_count = block_succs.len() as i32
         var i: i64 = 0
-        while i < succs.len():
-            self.succs.push(succs[i])
+        while i < block_succs.len():
+            self.succs.push(block_succs[i])
             i = i + 1
 
     pub mut fn set_br(block: i32, target_block: i32, args: &Vec[i32]):
@@ -229,9 +229,9 @@ impl StackifyGraph:
         self.blocks[block].term_kind = StackifyTermKind.Br
         self.blocks[block].targets_start = target
         self.blocks[block].targets_count = 1
-        let succs: Vec[i32] = Vec.new()
-        succs.push(target_block)
-        self.set_succs(block, succs)
+        let block_succs: Vec[i32] = Vec.new()
+        block_succs.push(target_block)
+        self.set_succs(block, block_succs)
 
     pub mut fn set_cond_br(block: i32, cond: i32, true_block: i32, true_args: &Vec[i32], false_block: i32, false_args: &Vec[i32]):
         if block < 0 or block >= self.blocks.len() as i32:
@@ -243,10 +243,10 @@ impl StackifyGraph:
         self.blocks[block].cond_value = cond
         self.blocks[block].targets_start = first_target
         self.blocks[block].targets_count = 2
-        let succs: Vec[i32] = Vec.new()
-        succs.push(true_block)
-        succs.push(false_block)
-        self.set_succs(block, succs)
+        let block_succs: Vec[i32] = Vec.new()
+        block_succs.push(true_block)
+        block_succs.push(false_block)
+        self.set_succs(block, block_succs)
 
     pub mut fn set_select(block: i32, selector: i32, target_blocks: &Vec[i32], default_block: i32):
         if block < 0 or block >= self.blocks.len() as i32:
@@ -264,13 +264,13 @@ impl StackifyGraph:
         self.blocks[block].targets_start = first_target
         self.blocks[block].targets_count = target_blocks.len() as i32
         self.blocks[block].default_target = default_target
-        let succs: Vec[i32] = Vec.new()
+        let block_succs: Vec[i32] = Vec.new()
         var si: i64 = 0
         while si < target_blocks.len():
-            succs.push(target_blocks[si])
+            block_succs.push(target_blocks[si])
             si = si + 1
-        succs.push(default_block)
-        self.set_succs(block, succs)
+        block_succs.push(default_block)
+        self.set_succs(block, block_succs)
 
     pub mut fn set_select_targets(block: i32, selector: i32, targets_start: i32, targets_count: i32, default_target: i32):
         if block < 0 or block >= self.blocks.len() as i32:
@@ -280,15 +280,15 @@ impl StackifyGraph:
         self.blocks[block].targets_start = targets_start
         self.blocks[block].targets_count = targets_count
         self.blocks[block].default_target = default_target
-        let succs: Vec[i32] = Vec.new()
+        let block_succs: Vec[i32] = Vec.new()
         var i = 0
         while i < targets_count:
             if targets_start + i >= 0 and targets_start + i < self.targets.len() as i32:
-                succs.push(self.targets[(targets_start + i)].block)
+                block_succs.push(self.targets[(targets_start + i)].block)
             i = i + 1
         if default_target >= 0 and default_target < self.targets.len() as i32:
-            succs.push(self.targets[default_target].block)
-        self.set_succs(block, succs)
+            block_succs.push(self.targets[default_target].block)
+        self.set_succs(block, block_succs)
 
     pub mut fn set_return(block: i32, values: &Vec[i32]):
         if block < 0 or block >= self.blocks.len() as i32:

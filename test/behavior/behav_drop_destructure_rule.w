@@ -12,7 +12,10 @@
 // visible at the type's own boundary. `let t = r` and a `_` arm keep the value
 // whole and run Drop exactly once; a borrowed subject binds views and never
 // moves; a total destructure inside the type's own `move fn` (`drop`
-// included) is the disarm and runs no Drop. Counting destructors: R adds 1,
+// included) is the disarm and runs no Drop. Inside the type's own methods
+// a field is in scope by its bare name (§9.5), so the disarm binds each
+// field under another name — `let { repr: r, other: _ } = self` — and the
+// shorthand `{ repr }` is a shadowing error. Counting destructors: R adds 1,
 // E adds 10, so each line's count pins exactly which destructors ran.
 
 var count: i32 = 0
@@ -25,8 +28,8 @@ impl Drop for E:
 
 impl R:
     move fn take() -> i32:
-        let { repr, other: _ } = self
-        repr
+        let { repr: r, other: _ } = self
+        r
 
 impl E:
     move fn pid() -> i32:
@@ -39,8 +42,8 @@ impl Drop for Wrapped:
     move fn drop():
         // A total destructure inside `drop` itself: the field is read and no
         // second Drop runs.
-        let { inner } = self
-        print(f"drop-self {inner} {count}")
+        let { inner: v } = self
+        print(f"drop-self {v} {count}")
 
 fn whole():
     let r = R { repr: 1, other: 0 }

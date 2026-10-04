@@ -22,9 +22,9 @@ type OutputFile { handle: *mut c_void }
 impl OutputFile:
     mut fn close():
         if self.handle == null: return 0
-        let handle: *mut c_void = self.handle
+        let file: *mut c_void = self.handle
         self.handle = null
-        fclose(handle)
+        fclose(file)
 
 impl Drop for OutputFile:
     move fn drop():
