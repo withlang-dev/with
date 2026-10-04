@@ -770,7 +770,24 @@ fn rt_net_write_port_to_c_buf(port: i32, out: *mut u8, cap: i64) -> i32:
 fn rt_net_empty_str() -> str:
     with_str_from_bytes("" as *const u8, 0)
 
-fn rt_net_connect_any(host: &str, port: i32, socktype: i32, protocol: i32) -> i32:
+// SO_RCVTIMEO and SO_SNDTIMEO: a send or receive that makes no progress for
+// `ms` fails (EAGAIN) instead of blocking; 0 clears both. #2062.
+fn rt_net_apply_timeout(fd: i32, ms: i32) -> i32:
+    if ms < 0:
+        return -22
+    // struct timeval: tv_sec, tv_usec.
+    var tv: [16]u8 = [0 as u8; 16]
+    unsafe *(&raw mut tv as *mut [16]u8 as *mut i64) = (ms / 1000) as i64
+    unsafe *((&raw mut tv as *mut [16]u8 as i64 + 8) as *mut i64) = ((ms % 1000) * 1000) as i64
+    if rt_libc_setsockopt(fd, 1, 20, &tv as *const [16]u8 as *const u8, 16 as u32) < 0:
+        return -get_errno()
+    if rt_libc_setsockopt(fd, 1, 21, &tv as *const [16]u8 as *const u8, 16 as u32) < 0:
+        return -get_errno()
+    0
+
+// `timeout_ms` > 0 bounds each address's connect: Linux's connect
+// honors SO_SNDTIMEO.
+fn rt_net_connect_any(host: &str, port: i32, socktype: i32, protocol: i32, timeout_ms: i32) -> i32:
     var host_buf: [256]u8 = [0 as u8; 256]
     var port_buf: [16]u8 = [0 as u8; 16]
     if rt_net_copy_str_to_c_buf(host, &raw mut host_buf as *mut [256]u8 as *mut u8, 256) != 0:
@@ -795,6 +812,8 @@ fn rt_net_connect_any(host: &str, port: i32, socktype: i32, protocol: i32) -> i3
     while p as i64 != 0:
         let fd = rt_libc_socket((unsafe *p).ai_family, (unsafe *p).ai_socktype, (unsafe *p).ai_protocol)
         if fd >= 0:
+            if timeout_ms > 0:
+                let _ = rt_net_apply_timeout(fd, timeout_ms)
             let rc = rt_libc_connect(fd, (unsafe *p).ai_addr as *const u8, (unsafe *p).ai_addrlen)
             if rc == 0:
                 rt_libc_freeaddrinfo(res)
@@ -805,10 +824,18 @@ fn rt_net_connect_any(host: &str, port: i32, socktype: i32, protocol: i32) -> i3
     -1
 
 pub fn with_net_tcp_connect(host: &str, port: i32) -> i32:
-    rt_net_connect_any(host, port, 1, 6)
+    rt_net_connect_any(host, port, 1, 6, 0)
+
+// A TCP connection that gives up after `timeout_ms` per address; the socket
+// keeps that as its send/receive timeout until with_net_set_timeout changes it.
+pub fn with_net_tcp_connect_timeout(host: &str, port: i32, timeout_ms: i32) -> i32:
+    rt_net_connect_any(host, port, 1, 6, timeout_ms)
+
+pub fn with_net_set_timeout(sock: i32, timeout_ms: i32) -> i32:
+    rt_net_apply_timeout(sock, timeout_ms)
 
 pub fn with_net_udp_connect(host: &str, port: i32) -> i32:
-    rt_net_connect_any(host, port, 2, 17)
+    rt_net_connect_any(host, port, 2, 17, 0)
 
 fn rt_net_bind_inaddr_any(fd: i32, port: i32) -> i32:
     // Linux sockaddr_in: sin_family (u16 LE), sin_port (BE), sin_addr, pad.

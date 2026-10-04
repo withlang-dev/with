@@ -166,12 +166,24 @@ fn http_resolve_redirect(current_url: &str, location: str) -> str:
 fn http_is_redirect(status: i32) -> bool:
     status == 301 or status == 302 or status == 303 or status == 307 or status == 308
 
-fn https_get_once(url: &str) -> HttpResponse:
+// The Content-Length a response declares, or -1.
+fn http_content_length(headers: &str) -> i64:
+    let text = http_header_value(headers, "Content-Length")
+    if text.len() == 0: return -1
+    var value: i64 = 0
+    for i in 0..text.len() as i32:
+        if text[i] < '0' or text[i] > '9': return -1
+        value = value * 10 + (text[i] - '0') as i64
+    value
+
+// `connect_ms` bounds the TCP connect and `idle_ms` every wait for the server
+// after it; 0 is no bound.
+fn https_get_once(url: &str, connect_ms: i32, idle_ms: i32) -> HttpResponse:
     let parsed = http_parse_url(url)
     if parsed.host.len() == 0:
         return http_empty_response(-1)
 
-    var conn = tls_connect(parsed.host, parsed.port)
+    var conn = tls_connect_timeout(parsed.host, parsed.port, connect_ms, idle_ms)
     if conn.fd < 0:
         return http_empty_response(-1)
 
@@ -215,14 +227,24 @@ fn https_get_once(url: &str) -> HttpResponse:
     var body = raw.slice(hdr_end as i64, raw.len())
     if http_is_chunked(headers):
         body = http_decode_chunked(body)
+    else:
+        // A connection that ended (closed, reset, or timed out) before the
+        // body the server declared is a failed response, never a short 200.
+        let declared = http_content_length(headers)
+        if declared >= 0 and body.len() < declared:
+            return http_empty_response(-1)
     let location = http_header_value(headers, "Location")
     HttpResponse { status, headers, body, location }
 
-pub fn https_get_response(url: str, max_redirects: i32) -> HttpResponse:
+pub fn https_get_response(url: str, max_redirects: i32) -> HttpResponse: https_get_response_timeout(url, max_redirects, 0, 0)
+
+/// https_get_response that gives up on a server that does not accept the
+/// connection within `connect_ms`, or says nothing for `idle_ms` (status -1).
+pub fn https_get_response_timeout(url: str, max_redirects: i32, connect_ms: i32, idle_ms: i32) -> HttpResponse:
     var current = url
     var redirects = 0
     while true:
-        var response = https_get_once(current)
+        var response = https_get_once(current, connect_ms, idle_ms)
         if not http_is_redirect(response.status):
             return response
         if redirects >= max_redirects:
@@ -240,8 +262,12 @@ pub fn https_get(url: str) -> str:
         return ""
     return move response.body
 
-pub fn https_download(url: str, dest_path: str) -> i32:
-    let response = https_get_response(url, 5)
+pub fn https_download(url: str, dest_path: str) -> i32: https_download_timeout(url, dest_path, 0, 0)
+
+/// https_download that gives up on a server that does not accept the
+/// connection within `connect_ms`, or says nothing for `idle_ms`.
+pub fn https_download_timeout(url: str, dest_path: str, connect_ms: i32, idle_ms: i32) -> i32:
+    let response = https_get_response_timeout(url, 5, connect_ms, idle_ms)
     if response.status != 200:
         return -1
     with_fs_write_file(dest_path, response.body)

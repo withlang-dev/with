@@ -820,10 +820,16 @@ unsafe fn tls_handshake(conn: *mut TlsConn, hostname: &str) -> i32:
 
 // Connect to a host via TLS, returning a TlsConn ready for data transfer.
 // Returns a TlsConn with fd >= 0 on success, fd = -1 on error.
-fn tls_connect(hostname: &str, port: i32) -> TlsConn:
-    let fd = tcp_connect(hostname, port)
+fn tls_connect(hostname: &str, port: i32) -> TlsConn: tls_connect_timeout(hostname, port, 0, 0)
+
+// tls_connect with a bound on the TCP connect (`connect_ms`) and on every
+// later wait for the peer, the handshake included (`idle_ms`); 0 is no bound.
+fn tls_connect_timeout(hostname: &str, port: i32, connect_ms: i32, idle_ms: i32) -> TlsConn:
+    let fd = if connect_ms > 0: tcp_connect_timeout(hostname, port, connect_ms) else: tcp_connect(hostname, port)
     if fd < 0:
         return TlsConn.new(-1)
+    if connect_ms > 0 or idle_ms > 0:
+        let _ = set_timeout(fd, idle_ms)
     var conn = TlsConn.new(fd)
     let r = unsafe { tls_handshake(&raw mut conn as *mut TlsConn, hostname) }
     if r < 0:

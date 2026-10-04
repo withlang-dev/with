@@ -1205,6 +1205,17 @@ pub fn with_net_tcp_connect(host: &str, port: i32) -> i32:
     let _ = port
     wasm_fail(WASI_ENOSYS)
 
+pub fn with_net_tcp_connect_timeout(host: &str, port: i32, timeout_ms: i32) -> i32:
+    let _ = host
+    let _ = port
+    let _ = timeout_ms
+    wasm_fail(WASI_ENOSYS)
+
+pub fn with_net_set_timeout(sock: i32, timeout_ms: i32) -> i32:
+    let _ = sock
+    let _ = timeout_ms
+    wasm_fail(WASI_ENOSYS)
+
 pub fn with_net_udp_connect(host: &str, port: i32) -> i32:
     let _ = host
     let _ = port
