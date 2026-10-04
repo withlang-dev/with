@@ -460,29 +460,3 @@ pub fn conan_recipe_requires(env: &CrEnv) -> ConanRequires:
         if guarded.verdict < 0: undecided.push(reference ++ "  (if " ++ guarded.why ++ ")")
         else: refs.push(reference)
     ConanRequires { refs, undecided }
-
-// The options a source build is made with, as a binary's conaninfo spells
-// them (`name=value`): what cr_option_value gives each declared option. The
-// link metadata of a built package is read against these, as a downloaded
-// binary's is read against its own.
-pub fn conan_recipe_built_options(recipe: &str, os: &str) -> Vec[str]:
-    let out: Vec[str] = Vec.new()
-    let start = recipe.find("default_options")
-    if start < 0: return out
-    let rest = recipe.slice(start, recipe.len())
-    let end = rest.find("}")
-    if end < 0: return out
-    var block = ""
-    for raw in rest.slice(0, end).split("\n"):
-        let hash = raw.find("#")
-        block = block ++ raw.slice(0, if hash >= 0: hash else: raw.len()) ++ "\n"
-    for entry in block.split(","):
-        let pair = entry.split(":")
-        if pair.len() < 2: continue
-        let name = cr_unquote(pair[0].split("{")[pair[0].split("{").len() - 1])
-        if name.len() == 0: continue
-        let value = cr_option_value(recipe, name, os)
-        if value.kind == CRV_BOOL: out.push(name ++ (if value.truth: "=True" else: "=False"))
-        else if value.kind == CRV_TEXT: out.push(name ++ "=" ++ value.text)
-        else if value.kind == CRV_NONE: out.push(name ++ "=None")
-    out

@@ -18,6 +18,7 @@ pub type ProjectConfig {
     link_rpaths: Vec[str],
     dep_link_libs: Vec[str],
     dep_link_args: Vec[str],
+    dep_loaded: Vec[str],
     dep_names: Vec[str],
     dep_constraints: Vec[str],
     c_dep_metadata_names: Vec[str],
@@ -53,6 +54,7 @@ pub fn project_config_default -> ProjectConfig:
         link_rpaths: Vec.new(),
         dep_link_libs: Vec.new(),
         dep_link_args: Vec.new(),
+        dep_loaded: Vec.new(),
         dep_names: Vec.new(),
         dep_constraints: Vec.new(),
         c_dep_metadata_names: Vec.new(),
@@ -99,6 +101,7 @@ pub fn project_config_clone(cfg: &ProjectConfig) -> ProjectConfig:
         link_rpaths: project_config_clone_str_vec(&cfg.link_rpaths),
         dep_link_libs: project_config_clone_str_vec(&cfg.dep_link_libs),
         dep_link_args: project_config_clone_str_vec(&cfg.dep_link_args),
+        dep_loaded: project_config_clone_str_vec(&cfg.dep_loaded),
         dep_names: project_config_clone_str_vec(&cfg.dep_names),
         dep_constraints: project_config_clone_str_vec(&cfg.dep_constraints),
         c_dep_metadata_names: project_config_clone_str_vec(&cfg.c_dep_metadata_names),
@@ -417,6 +420,15 @@ fn project_config_is_quoted_string_value(value: &str) -> bool:
     text.len() >= 2 and text[0] == 34 and text[text.len() as i64 - 1] == 34
 
 fn project_config_load_dep_metadata(cfg: ProjectConfig, name: &str, version: &str) -> ProjectConfig:
+    project_config_load_dep_component(cfg, name, version, "")
+
+// Links `component` of a fetched package ("" for the whole package) and what
+// it requires, each once. A package's metadata states its components and
+// what each requires — a sibling, or `name/version:component` of another
+// package — as the recipe's `package_info` does (`with get`,
+// compiler.ConanClient); a package without components is linked whole, with
+// every package it requires.
+fn project_config_load_dep_component(cfg: ProjectConfig, name: &str, version: &str, component: &str) -> ProjectConfig:
     var out = cfg
     // Read metadata.json from .with/deps/c/<name>/<version>/
     let dep_dir = out.root_dir ++ "/.with/deps/c/" ++ name ++ "/" ++ version
@@ -426,37 +438,54 @@ fn project_config_load_dep_metadata(cfg: ProjectConfig, name: &str, version: &st
         if out.manifest_error.len() == 0:
             out.manifest_error = "missing metadata for dependency c." ++ name ++ "@" ++ version ++ " at " ++ meta_path ++ "; run 'with get c." ++ name ++ "@" ++ version ++ "'"
         return out
-    // Extract include_paths, lib_paths, libs from JSON
-    let includes = project_config_json_str_array(meta, "include_paths")
-    for i in 0..includes.len() as i32:
-        let inc = includes[i]
-        out.c_import_include_paths.push(dep_dir ++ "/" ++ inc)
-    let defines = project_config_json_str_array(meta, "defines")
-    for i in 0..defines.len() as i32:
-        out.c_import_defines.push(with_str_clone_ref(defines[i]))
-    let lib_paths = project_config_json_str_array(meta, "lib_paths")
-    for i in 0..lib_paths.len() as i32:
-        let lp = lib_paths[i]
-        out.link_search_paths.push(dep_dir ++ "/" ++ lp)
-    let libs = project_config_json_str_array(meta, "libs")
-    for i in 0..libs.len() as i32:
-        out.dep_link_libs.push(with_str_clone_ref(libs[i]))
-    // #1915: the directories of the framework stubs `with get` wrote for
-    // this package (compiler.FrameworkStubs), relative to it.
-    let framework_paths = project_config_json_str_array(meta, "framework_paths")
-    for i in 0..framework_paths.len() as i32:
-        out.dep_link_args.push("-F" ++ dep_dir ++ "/" ++ framework_paths[i])
-    let link_args = project_config_json_str_array(meta, "link_args")
-    for i in 0..link_args.len() as i32:
-        out.dep_link_args.push(with_str_clone_ref(link_args[i]))
-    let requires = project_config_json_str_array(meta, "requires")
-    for i in 0..requires.len() as i32:
-        let req = requires[i]
-        let slash = project_config_find_char(req, 47)
-        if slash > 0:
+    let package_key = name ++ "/" ++ version
+    if not project_config_vec_contains(&out.dep_loaded, package_key):
+        out.dep_loaded.push(package_key.clone())
+        // What c_import reads, and the framework stubs `with get` wrote for
+        // this package (#1915, compiler.FrameworkStubs), relative to it.
+        let includes = project_config_json_str_array(meta, "include_paths")
+        for i in 0..includes.len() as i32:
+            out.c_import_include_paths.push(dep_dir ++ "/" ++ includes[i])
+        let defines = project_config_json_str_array(meta, "defines")
+        for i in 0..defines.len() as i32:
+            out.c_import_defines.push(with_str_clone_ref(defines[i]))
+        let framework_paths = project_config_json_str_array(meta, "framework_paths")
+        for i in 0..framework_paths.len() as i32:
+            out.dep_link_args.push("-F" ++ dep_dir ++ "/" ++ framework_paths[i])
+    let components = project_config_json_str_array(meta, "components")
+    var wanted: Vec[str] = Vec.new()
+    if components.len() == 0: wanted.push("")
+    else if component.len() > 0 and project_config_vec_contains(&components, component): wanted.push(component.to_owned())
+    else:
+        for i in 0..components.len() as i32: wanted.push(with_str_clone_ref(components[i]))
+    for wi in 0..wanted.len() as i32:
+        let key = package_key ++ ":" ++ wanted[wi]
+        if project_config_vec_contains(&out.dep_loaded, key): continue
+        out.dep_loaded.push(key)
+        let suffix = if wanted[wi].len() == 0: "" else: ":" ++ wanted[wi]
+        let lib_paths = project_config_json_str_array(meta, "lib_paths" ++ suffix)
+        for i in 0..lib_paths.len() as i32:
+            let path = dep_dir ++ "/" ++ lib_paths[i]
+            if not project_config_vec_contains(&out.link_search_paths, path): out.link_search_paths.push(path)
+        let libs = project_config_json_str_array(meta, "libs" ++ suffix)
+        for i in 0..libs.len() as i32:
+            if not project_config_vec_contains(&out.dep_link_libs, libs[i]): out.dep_link_libs.push(with_str_clone_ref(libs[i]))
+        let link_args = project_config_json_str_array(meta, "link_args" ++ suffix)
+        for i in 0..link_args.len() as i32:
+            out.dep_link_args.push(with_str_clone_ref(link_args[i]))
+        let requires = project_config_json_str_array(meta, "requires" ++ suffix)
+        for i in 0..requires.len() as i32:
+            let req = requires[i]
+            let slash = project_config_find_char(req, 47)
+            if slash <= 0:
+                // A sibling component.
+                out = project_config_load_dep_component(move out, name, version, req)
+                continue
+            let colon = project_config_find_char(req, 58)
             let req_name = req.slice(0, slash as i64)
-            let req_version = req.slice((slash + 1) as i64, req.len())
-            out = project_config_load_dep_metadata(move out, req_name, req_version)
+            let req_version = req.slice((slash + 1) as i64, if colon > slash: colon as i64 else: req.len())
+            let req_component = if colon > slash: req.slice((colon + 1) as i64, req.len()) else: ""
+            out = project_config_load_dep_component(move out, req_name, req_version, req_component)
     out
 
 pub fn project_config_json_str_array(json: &str, key: &str) -> Vec[str]:

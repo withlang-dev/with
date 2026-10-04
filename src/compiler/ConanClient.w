@@ -5,6 +5,7 @@
 use Archive
 use compiler.Runtime
 use compiler.ConanRecipe
+use compiler.RecipeInterp
 use compiler.ProjectConfig
 use compiler.ConanPatch
 use compiler.ClangDriver
@@ -623,6 +624,15 @@ fn conan_json_array(values: &Vec[str]) -> str:
     out ++ "]"
 
 fn conan_write_metadata(dest_dir: &str, name: &str, version: &str, recipe_rev: &str, package_id: &str, package_rev: &str, include_paths: &Vec[str], lib_paths: &Vec[str], libs: &Vec[str], defines: &Vec[str], link_args: &Vec[str], requires: &Vec[str]) -> i32:
+    let none: Vec[ConanComponentLink] = Vec.new()
+    conan_write_metadata_components(dest_dir, name, version, recipe_rev, package_id, package_rev, include_paths, lib_paths, libs, defines, link_args, requires, &none)
+
+// `components`, when the package has them, are written beside the package's
+// own lists as `libs:<name>`, `lib_paths:<name>`, `link_args:<name>` and
+// `requires:<name>`: the build links a package by its components and what
+// each requires (compiler.ProjectConfig), and the package-level lists stay
+// what c_import and the lock read.
+fn conan_write_metadata_components(dest_dir: &str, name: &str, version: &str, recipe_rev: &str, package_id: &str, package_rev: &str, include_paths: &Vec[str], lib_paths: &Vec[str], libs: &Vec[str], defines: &Vec[str], link_args: &Vec[str], requires: &Vec[str], components: &Vec[ConanComponentLink]) -> i32:
     let q = "\x22"
     let nl = "\n"
     var meta = "{" ++ nl
@@ -658,6 +668,17 @@ fn conan_write_metadata(dest_dir: &str, name: &str, version: &str, recipe_rev: &
             runtime_eprint("error: " ++ name ++ "/" ++ version ++ " links Apple frameworks, and their link stubs could not be written: " ++ problem)
             return 1
         meta = meta ++ "  " ++ q ++ "framework_paths" ++ q ++ ": [" ++ q ++ "Frameworks" ++ q ++ "]," ++ nl
+    if components.len() > 0:
+        var names: Vec[str] = Vec.new()
+        for c in components: names.push(c.name.clone())
+        meta = meta ++ "  " ++ q ++ "components" ++ q ++ ": " ++ conan_json_array(&names) ++ "," ++ nl
+        for c in components:
+            var paths = c.lib_paths.clone()
+            if conan_vec_contains(all_lib_paths, "windows-libs"): paths.push("windows-libs")
+            meta = meta ++ "  " ++ q ++ "libs:" ++ c.name ++ q ++ ": " ++ conan_json_array(&c.libs) ++ "," ++ nl
+            meta = meta ++ "  " ++ q ++ "lib_paths:" ++ c.name ++ q ++ ": " ++ conan_json_array(&paths) ++ "," ++ nl
+            meta = meta ++ "  " ++ q ++ "link_args:" ++ c.name ++ q ++ ": " ++ conan_json_array(&c.link_args) ++ "," ++ nl
+            meta = meta ++ "  " ++ q ++ "requires:" ++ c.name ++ q ++ ": " ++ conan_json_array(&c.requires) ++ "," ++ nl
     meta = meta ++ "  " ++ q ++ "requires" ++ q ++ ": " ++ conan_json_array(requires) ++ nl
     meta = meta ++ "}" ++ nl
     runtime_write_file(dest_dir ++ "/metadata.json", meta)
@@ -720,416 +741,205 @@ fn conan_scan_libraries(dep_dir: &str) -> ConanLibraryScan:
                 lib_paths = conan_sorted_insert_unique(move lib_paths, conan_relative_path(dep_dir, conan_path_dirname(path)))
     ConanLibraryScan { lib_paths, libs }
 
-// ── Recipe package_info extraction (#550) ────────────────────────────
+// ── What a consumer links ────────────────────────────────────────────
 //
-// Conan recipes declare system link requirements in package_info() as
-// cpp_info system_libs / frameworks assignments. The compiler cannot run
-// Python, but the common declarations are simple enough to read directly:
-// indentation-scoped if/elif/else on self.settings.os (or is_apple_os),
-// and = / append / extend with string-literal lists. Anything the reader
-// cannot resolve — option-dependent conditions, computed values,
-// multi-line lists — is skipped, never guessed: under-linking fails
-// loudly at link time, and conan_known_link_metadata remains the
-// override for packages whose recipes are too dynamic to read.
+// A package's link interface has one owner. For a binary Conan Center
+// built, it is the recipe's `package_info`, read against the settings and
+// options that binary was built with (its conaninfo) — Conan's own
+// consumers get nothing else, since the recipe deletes the build's
+// pkg-config and CMake files from the package. For a package built here,
+// it is what the build itself installed: its pkg-config files, which name
+// the libraries this build produced and what they need on this platform;
+// the recipe's `package_info` stands in when the build installs none.
+//
+// Either way the recipe is evaluated (compiler.RecipeInterp), never matched
+// line by line, and nothing here names a package: components, their
+// libraries, the directories they live in, the frameworks and system
+// libraries they need, and which components of which other packages they
+// require are all the recipe's or the build's to say. A library the recipe
+// names that the package does not hold is an error, and so is a recipe that
+// cannot be read: an incomplete link interface is never written.
 
-fn conan_recipe_line_indent(line: &str) -> i32:
-    var i = 0
-    while i < line.len() as i32 and line[i] == 32:
-        i = i + 1
-    i
-
-fn conan_recipe_extract_quoted(text: &str) -> Vec[str]:
-    var out: Vec[str] = Vec.new()
-    var i = 0
-    let n = text.len() as i32
-    while i < n:
-        let ch = text[i]
-        if ch == 34 or ch == 39:
-            var j = i + 1
-            while j < n and text[j] != ch:
-                j = j + 1
-            if j < n:
-                out.push(text.slice((i + 1) as i64, j as i64))
-                i = j
-        i = i + 1
-    out
-
-// The option values a package binary was built with: the `name=value` lines
-// of its conaninfo.txt `[options]` section (#2084).
-pub fn conan_parse_options_from_info(info: &str) -> Vec[str]:
-    let options: Vec[str] = Vec.new()
+// conaninfo's `key=value` lines under `[section]`.
+pub fn conan_info_section(info: &str, section: &str) -> Vec[str]:
+    let out: Vec[str] = Vec.new()
     let lines = conan_split_nonempty_lines(info)
-    var in_options = false
+    var inside = false
     for i in 0..lines.len() as i32:
         let line = lines[i]
         if line.starts_with("["):
-            in_options = line == "[options]"
+            inside = line == "[" ++ section ++ "]"
             continue
-        if in_options and conan_find_char(line, 61) > 0:
-            options.push(with_str_clone_ref(line))
-    options
+        if inside and conan_find_char(line, 61) > 0:
+            out.push(with_str_clone_ref(line))
+    out
 
-// The recipe's options as the reader knows them: the installed binary's
-// values, or nothing known (a source build, a recipe read on its own).
-pub type ConanRecipeOptions {
-    known: bool,
-    values: Vec[str],
-}
-
-pub fn conan_recipe_options_unknown() -> ConanRecipeOptions: ConanRecipeOptions { known: false, values: Vec.new() }
-
-pub fn conan_recipe_options_from_info(info: &str) -> ConanRecipeOptions: ConanRecipeOptions { known: true, values: conan_parse_options_from_info(info) }
-
-// An option's value, or "" when the binary has no such option.
-fn conan_recipe_option_value(options: &ConanRecipeOptions, name: &str) -> str:
-    let prefix = name ++ "="
-    for i in 0..options.values.len() as i32:
-        if options.values[i].starts_with(prefix):
-            return options.values[i].slice(prefix.len(), options.values[i].len())
+fn conan_info_setting(info: &str, key: &str) -> str:
+    let prefix = key ++ "="
+    for line in conan_info_section(info, "settings"):
+        if line.starts_with(prefix): return line.slice(prefix.len(), line.len()).to_owned()
     ""
 
-// Whether the parenthesis that opens `text` closes at its last character.
-fn conan_recipe_parens_wrap(text: &str) -> bool:
-    if text.len() < 2 or text[0] != 40 or text[text.len() - 1] != 41:
-        return false
-    var depth = 0
-    for i in 0..text.len() as i32:
-        if text[i] == 40: depth = depth + 1
-        if text[i] == 41:
-            depth = depth - 1
-            if depth == 0 and i < text.len() as i32 - 1:
-                return false
-    depth == 0
+// The option values a package binary was built with (#2084).
+pub fn conan_parse_options_from_info(info: &str) -> Vec[str]: conan_info_section(info, "options")
 
-// `text` split at each `sep` outside parentheses, brackets and quotes.
-fn conan_recipe_split_top_level(text: &str, sep: &str) -> Vec[str]:
-    let parts: Vec[str] = Vec.new()
-    var depth = 0
-    var quote = 0
-    var start = 0
-    var i = 0
-    let n = text.len() as i32
-    let m = sep.len() as i32
-    while i < n:
-        let ch = text[i] as i32
-        if quote != 0:
-            if ch == quote: quote = 0
-        else if ch == 34 or ch == 39:
-            quote = ch
-        else if ch == 40 or ch == 91:
-            depth = depth + 1
-        else if ch == 41 or ch == 93:
-            depth = depth - 1
-        else if depth == 0 and i + m <= n and text.slice(i as i64, (i + m) as i64) == sep:
-            parts.push(text.slice(start as i64, i as i64))
-            i = i + m
-            start = i
-            continue
-        i = i + 1
-    parts.push(text.slice(start as i64, n as i64))
-    parts
+// What a binary was built with, as its conaninfo states it.
+pub fn conan_binary_recipe_env(info: &str, version: &str, dep_dir: &str) -> RecipeEnv:
+    RecipeEnv { os: conan_info_setting(info, "os"), arch: conan_info_setting(info, "arch"), compiler: conan_info_setting(info, "compiler"), compiler_version: conan_info_setting(info, "compiler.version"), build_type: conan_info_setting(info, "build_type"), version: version.to_owned(), package_folder: dep_dir.to_owned(), options: conan_parse_options_from_info(info), options_known: true }
 
-// `self.options.get_safe("name")` or `self.options.name`, with an optional
-// `== value` / `!= value`: the name, and whether it is the get_safe form
-// (an absent option is None there, an error in the attribute form).
-fn conan_recipe_eval_option(cond: &str, options: &ConanRecipeOptions) -> i32:
-    if not options.known:
-        return -1
-    let at = conan_find_text(cond, "self.options.")
-    var rest = cond.slice((at + 13) as i64, cond.len())
-    let get_safe = rest.starts_with("get_safe(")
-    var name = ""
-    if get_safe:
-        let quoted = conan_recipe_extract_quoted(rest)
-        if quoted.len() == 0:
-            return -1
-        name = quoted[0].clone()
-        let close = conan_find_char(rest, 41)
-        if close < 0:
-            return -1
-        // A default (`get_safe("x", True)`) is another value to track.
-        if conan_find_char(rest.slice(0, close as i64), 44) >= 0:
-            return -1
-        rest = rest.slice((close + 1) as i64, rest.len())
-    else:
-        var end = 0
-        while end < rest.len() as i32 and (rest[end] == 95 or (rest[end] >= 48 and rest[end] <= 57) or (rest[end] >= 65 and rest[end] <= 90) or (rest[end] >= 97 and rest[end] <= 122)):
-            end = end + 1
-        if end == 0:
-            return -1
-        name = rest.slice(0, end as i64)
-        rest = rest.slice(end as i64, rest.len())
-    let value = conan_recipe_option_value(options, name)
-    let present = value.len() > 0
-    let tail = conan_trim(rest)
-    if tail.len() == 0:
-        if not present:
-            return if get_safe: 0 else: -1
-        return if value == "False" or value == "None": 0 else: 1
-    let negated = tail.starts_with("!=")
-    if not negated and not tail.starts_with("=="):
-        return -1
-    if not present:
-        return -1
-    var wanted = conan_trim(tail.slice(2, tail.len()))
-    let quoted = conan_recipe_extract_quoted(wanted)
-    if quoted.len() == 1:
-        wanted = quoted[0].clone()
-    else if wanted != "True" and wanted != "False":
-        return -1
-    let equal = value == wanted
-    if equal != negated: 1 else: 0
+// What a package built here is built with: this platform, the SDK's clang,
+// and the recipe's own default options.
+pub fn conan_built_recipe_env(version: &str, dep_dir: &str) -> RecipeEnv:
+    let os = conan_detect_os()
+    RecipeEnv { os: os.clone(), arch: conan_detect_arch(), compiler: if os == "Macos": "apple-clang" else: "clang", compiler_version: "", build_type: "Release", version: version.to_owned(), package_folder: dep_dir.to_owned(), options: Vec.new(), options_known: false }
 
-// Evaluate a package_info condition against the target OS and the options
-// of the binary. Returns 1 (true), 0 (false), or -1 (unresolvable): `or`
-// is true when any side is, `and` false when any side is, and either is
-// unresolvable only when what is known does not decide it.
-fn conan_recipe_eval_condition(cond_raw: &str, target_os: &str, options: &ConanRecipeOptions) -> i32:
-    var cond = conan_trim(cond_raw)
-    while conan_recipe_parens_wrap(cond):
-        cond = conan_trim(cond.slice(1, cond.len() - 1))
-    let any = conan_recipe_split_top_level(cond, " or ")
-    if any.len() > 1:
-        var unknown = false
-        for i in 0..any.len() as i32:
-            let r = conan_recipe_eval_condition(any[i], target_os, options)
-            if r == 1: return 1
-            if r == -1: unknown = true
-        return if unknown: -1 else: 0
-    let all = conan_recipe_split_top_level(cond, " and ")
-    if all.len() > 1:
-        var unknown = false
-        for i in 0..all.len() as i32:
-            let r = conan_recipe_eval_condition(all[i], target_os, options)
-            if r == 0: return 0
-            if r == -1: unknown = true
-        return if unknown: -1 else: 1
-    if cond.starts_with("not "):
-        let r = conan_recipe_eval_condition(cond.slice(4, cond.len()), target_os, options)
-        return if r == -1: -1 else: 1 - r
-    if cond == "is_apple_os(self)":
-        return if target_os == "Macos": 1 else: 0
-    // Every With toolchain is clang with the GNU driver (D81): no package is
-    // built by MSVC or clang-cl.
-    if cond == "is_msvc(self)" or cond == "self._is_clang_cl":
-        return 0
-    if conan_find_text(cond, "self.options.") >= 0:
-        return conan_recipe_eval_option(cond, options)
-    if conan_find_text(cond, "self.settings.os") < 0:
-        return -1
-    let quoted = conan_recipe_extract_quoted(cond)
-    if quoted.len() == 0:
-        return -1
-    if conan_find_text(cond, " not in ") >= 0:
-        return if conan_vec_contains(quoted, target_os): 0 else: 1
-    if conan_find_text(cond, " in ") >= 0 or conan_find_text(cond, " in[") >= 0:
-        return if conan_vec_contains(quoted, target_os): 1 else: 0
-    if conan_find_text(cond, "!=") >= 0:
-        if quoted.len() as i32 != 1:
-            return -1
-        return if quoted[0] == target_os: 0 else: 1
-    if conan_find_text(cond, "==") >= 0:
-        if quoted.len() as i32 != 1:
-            return -1
-        return if quoted[0] == target_os: 1 else: 0
-    -1
+// One component of a package, as the build links it: `requires` names a
+// sibling component, or `name/version:component` of another package.
+pub type ConanComponentLink { name: str, libs: Vec[str], lib_paths: Vec[str], link_args: Vec[str], defines: Vec[str], include_paths: Vec[str], requires: Vec[str] }
 
-// Pull the string values out of an attribute line:
-//   ... .system_libs = ["a", "b"]
-//   ... .frameworks.append("X")
-//   ... .system_libs.extend(["a", "b"])
-// Returns an empty Vec when the right-hand side cannot be read safely.
-fn conan_recipe_attr_values(line: &str, attr_pos: i32) -> Vec[str]:
-    let rhs = line.slice(attr_pos as i64, line.len())
-    // Python conditional expressions and multi-line lists are unresolvable.
-    if conan_find_text(rhs, " if ") >= 0:
-        return Vec.new()
-    var opens = 0
-    var closes = 0
-    for i in 0..rhs.len() as i32:
-        let ch = rhs[i]
-        if ch == 91: opens = opens + 1
-        if ch == 93: closes = closes + 1
-    if opens != closes:
-        return Vec.new()
-    conan_recipe_extract_quoted(rhs)
+pub type ConanPackageLink { problem: str, warnings: Vec[str], components: Vec[ConanComponentLink] }
 
-// Read system_libs and frameworks for target_os from a recipe's
-// package_info(). Frameworks are returned as ("-framework", name) link
-// argument pairs in lib_paths, matching conan_known_link_metadata.
-pub fn conan_extract_recipe_link_metadata(recipe: &str, target_os: &str) -> ConanLibraryScan:
-    conan_extract_recipe_link_metadata_for(recipe, target_os, &conan_recipe_options_unknown())
+// The component that stands for a package without components.
+pub fn CONAN_WHOLE_COMPONENT -> str: "*"
 
-// How far the brackets and parentheses of `text` are left open (quotes skipped).
-fn conan_recipe_open_depth(text: &str) -> i32:
-    var depth = 0
-    var quote = 0
-    for i in 0..text.len() as i32:
-        let ch = text[i] as i32
-        if quote != 0:
-            if ch == quote: quote = 0
-        else if ch == 34 or ch == 39:
-            quote = ch
-        else if ch == 35:
-            return depth
-        else if ch == 40 or ch == 91:
-            depth = depth + 1
-        else if ch == 41 or ch == 93:
-            depth = depth - 1
-    depth
+// Whether `lib` is a library file in one of the package's directories.
+fn conan_package_has_lib(dep_dir: &str, libdirs: &Vec[str], lib: &str) -> bool:
+    for d in libdirs:
+        let base = dep_dir ++ "/" ++ d ++ "/"
+        for candidate in ["lib" ++ lib ++ ".a", "lib" ++ lib ++ ".so", "lib" ++ lib ++ ".dylib", "lib" ++ lib ++ ".tbd", lib ++ ".lib", "lib" ++ lib ++ ".dll.a"]:
+            if runtime_file_exists(base ++ candidate) != 0: return true
+    false
 
-// As conan_extract_recipe_link_metadata, with the options of the binary
-// being installed: an option-guarded declaration (SDL's Apple frameworks,
-// `if self.options.get_safe("audio"):`) is read by the value the binary
-// was built with, and still skipped when no value is known (#2084).
-pub fn conan_extract_recipe_link_metadata_for(recipe: &str, target_os: &str, options: &ConanRecipeOptions) -> ConanLibraryScan:
-    var sys_libs: Vec[str] = Vec.new()
-    var fw_args: Vec[str] = Vec.new()
-    var fw_seen: Vec[str] = Vec.new()
+// A link flag as a recipe or a pkg-config file spells it, as the arguments
+// the build passes: a framework, linked or weakly linked. Empty when the
+// flag is something else.
+fn conan_framework_flag_args(flag: &str) -> Vec[str]:
+    let out: Vec[str] = Vec.new()
+    for prefix in ["-Wl,-weak_framework,", "-Wl,-framework,"]:
+        if flag.starts_with(prefix) and flag.len() > prefix.len():
+            out.push(if prefix.contains("weak"): "-weak_framework" else: "-framework")
+            out.push(flag.slice(prefix.len(), flag.len()).to_owned())
+    out
 
-    // Parallel frames for nested if/elif/else blocks. Indents are stored
-    // as i32; chain_* carry whether an earlier branch of the same chain
-    // was taken or unresolvable.
-    var frame_indent: Vec[i64] = Vec.new()
-    var frame_active: Vec[i64] = Vec.new()
-    var frame_unknown: Vec[i64] = Vec.new()
-    var frame_chain_taken: Vec[i64] = Vec.new()
-    var frame_chain_unknown: Vec[i64] = Vec.new()
+// `other::component` as `name/version:component`, by the versions this
+// package was resolved against; "" when it names no requirement of the package.
+fn conan_component_requirement(reference: &str, requirements: &Vec[str]) -> str:
+    let sep = reference.find("::")
+    if sep < 0: return reference.to_owned()
+    let package = reference.slice(0, sep)
+    for req in requirements:
+        if conan_ref_name(req) == package: return package ++ "/" ++ conan_ref_version(req) ++ ":" ++ reference.slice(sep + 2, reference.len())
+    ""
 
-    var in_body = false
-    var def_indent = 0
+fn conan_component_link(dep_dir: &str, requirements: &Vec[str], c: &RecipeComponent, name: &str, whole: bool, warnings0: Vec[str]) -> (ConanComponentLink, Vec[str], str):
+    var warnings = warnings0
+    var out = ConanComponentLink { name: name.to_owned(), libs: Vec.new(), lib_paths: Vec.new(), link_args: Vec.new(), defines: c.defines.clone(), include_paths: Vec.new(), requires: Vec.new() }
+    for d in c.libdirs:
+        if runtime_is_dir(dep_dir ++ "/" ++ d) != 0: out.lib_paths.push(d.clone())
+    for d in c.includedirs:
+        if runtime_is_dir(dep_dir ++ "/" ++ d) != 0: out.include_paths.push(d.clone())
+    for lib in c.libs:
+        if not conan_package_has_lib(dep_dir, &c.libdirs, lib):
+            return (out, warnings, "its recipe names the library '" ++ lib ++ "'" ++ (if whole: "" else: " (component '" ++ name ++ "')") ++ ", which the package does not hold in " ++ conan_json_array(&c.libdirs))
+        out.libs.push(lib.clone())
+    for lib in c.system_libs: out.libs.push(lib.clone())
+    for fw in c.frameworks:
+        out.link_args.push("-framework")
+        out.link_args.push(fw.clone())
+    for flag in c.exelinkflags:
+        let args = conan_framework_flag_args(flag)
+        if args.len() == 0: warnings.push("link flag '" ++ flag ++ "' is not passed on")
+        for a in args: out.link_args.push(a.clone())
+    for r in c.requires:
+        let resolved = conan_component_requirement(r, requirements)
+        if resolved.len() == 0: warnings.push("'" ++ r ++ "' names a package this one was not resolved against; it is not linked")
+        else: out.requires.push(resolved)
+    // A package that states no requirement of its own links all of them.
+    if whole and c.requires.len() == 0:
+        for req in requirements: out.requires.push(conan_ref_name(req) ++ "/" ++ conan_ref_version(req))
+    (out, warnings, "")
 
-    var pos = 0
-    let total = recipe.len() as i32
-    while pos < total:
-        var line_end = pos
-        while line_end < total and recipe[line_end] != 10:
-            line_end = line_end + 1
-        let raw_line = recipe.slice(pos as i64, line_end as i64)
-        pos = line_end + 1
+// The link interface `package_info` describes for the package in `dep_dir`.
+pub fn conan_package_link(dep_dir: &str, requirements: &Vec[str], info: &RecipePackageInfo) -> ConanPackageLink:
+    var out = ConanPackageLink { problem: "", warnings: Vec.new(), components: Vec.new() }
+    for n in info.notes: out.warnings.push("recipe " ++ n)
+    if info.components.len() == 0:
+        let (link, warnings, problem) = conan_component_link(dep_dir, requirements, &info.root, CONAN_WHOLE_COMPONENT(), true, move out.warnings)
+        out.warnings = warnings
+        out.problem = problem
+        out.components.push(link)
+        return out
+    for i in 0..info.components.len() as i32:
+        let (link, warnings, problem) = conan_component_link(dep_dir, requirements, &info.components[i], info.components[i].name, false, move out.warnings)
+        out.warnings = warnings
+        if problem.len() > 0:
+            out.problem = problem
+            return out
+        out.components.push(link)
+    out
 
-        var stripped = conan_trim(raw_line)
-        if stripped.len() == 0 or stripped[0] == 35:
-            continue
-        let indent = conan_recipe_line_indent(raw_line)
-        // A statement whose list runs over several lines (SDL's Windows
-        // `system_libs.extend([` … `])`) is one statement: its lines are
-        // joined until every bracket it opened is closed.
-        var open_depth = conan_recipe_open_depth(stripped)
-        while open_depth > 0 and pos < total:
-            var next_end = pos
-            while next_end < total and recipe[next_end] != 10:
-                next_end = next_end + 1
-            let next = conan_trim(recipe.slice(pos as i64, next_end as i64))
-            pos = next_end + 1
-            if next.len() == 0 or next[0] == 35:
-                continue
-            stripped = stripped ++ " " ++ next
-            open_depth = open_depth + conan_recipe_open_depth(next)
+// A pkg-config file's `field:` value with its variables substituted.
+pub fn conan_pc_field(text: &str, field: &str) -> str:
+    let names: Vec[str] = Vec.new()
+    let values: Vec[str] = Vec.new()
+    var found = ""
+    for raw in text.split("\n"):
+        let line = raw.trim()
+        if line.len() == 0 or line.starts_with("#"): continue
+        let colon = line.find(":")
+        let eq = line.find("=")
+        if eq > 0 and (colon < 0 or eq < colon):
+            names.push(line.slice(0, eq).trim().to_owned())
+            values.push(line.slice(eq + 1, line.len()).trim().to_owned())
+        else if colon > 0 and line.slice(0, colon) == field: found = line.slice(colon + 1, line.len()).trim().to_owned()
+    // Variables refer to earlier ones; a few rounds settle them.
+    for _round in 0..8:
+        if found.find("${") < 0: break
+        for i in 0..names.len() as i32: found = found.replace("${" ++ names[i] ++ "}", values[i])
+    found
 
-        if not in_body:
-            if stripped.starts_with("def package_info("):
-                in_body = true
-                def_indent = indent
-            continue
-        if indent <= def_indent:
-            break
+// What the pkg-config files a build installed say a static consumer links:
+// every file's `Libs` and `Libs.private`. `-L` is the package's own
+// directory, which `lib_paths` already names.
+pub fn conan_pc_link(dep_dir: &str, requirements: &Vec[str], pc_texts: &Vec[str]) -> ConanPackageLink:
+    var out = ConanPackageLink { problem: "", warnings: Vec.new(), components: Vec.new() }
+    var link = ConanComponentLink { name: CONAN_WHOLE_COMPONENT(), libs: Vec.new(), lib_paths: Vec.new(), link_args: Vec.new(), defines: Vec.new(), include_paths: Vec.new(), requires: Vec.new() }
+    if runtime_is_dir(dep_dir ++ "/lib") != 0: link.lib_paths.push("lib")
+    if runtime_is_dir(dep_dir ++ "/include") != 0: link.include_paths.push("include")
+    for text in pc_texts:
+        let flags = conan_pc_field(text, "Libs") ++ " " ++ conan_pc_field(text, "Libs.private")
+        var framework_next = false
+        for raw in flags.split(" "):
+            let token = raw.trim().replace("\"", "")
+            if token.len() == 0: continue
+            if framework_next:
+                framework_next = false
+                if not conan_vec_contains(link.link_args, token):
+                    link.link_args.push("-framework")
+                    link.link_args.push(token)
+            else if token == "-framework": framework_next = true
+            else if token.starts_with("-l") and token.len() > 2:
+                let lib = token.slice(2, token.len())
+                if not conan_vec_contains(link.libs, lib): link.libs.push(lib.to_owned())
+            else if token.starts_with("-L"): continue
+            else if token == "-pthread":
+                if conan_detect_os() != "Windows" and not conan_vec_contains(link.libs, "pthread"): link.libs.push("pthread")
+            else:
+                let args = conan_framework_flag_args(token)
+                if args.len() == 0: out.warnings.push("link flag '" ++ token ++ "' of its pkg-config file is not passed on")
+                else if not conan_vec_contains(link.link_args, args[1]):
+                    for a in args: link.link_args.push(a.clone())
+    for req in requirements: link.requires.push(conan_ref_name(req) ++ "/" ++ conan_ref_version(req))
+    out.components.push(link)
+    out
 
-        // Close blocks this line is no longer inside; remember the chain
-        // state of a same-indent frame for elif/else continuation.
-        var popped_same_indent = false
-        var prev_chain_taken = false
-        var prev_chain_unknown = false
-        while frame_indent.len() > 0:
-            let top = frame_indent.len() - 1
-            let top_indent = frame_indent[top]
-            if top_indent < indent as i64:
-                break
-            if top_indent == indent as i64:
-                popped_same_indent = true
-                prev_chain_taken = frame_chain_taken[top] != 0
-                prev_chain_unknown = frame_chain_unknown[top] != 0
-            let _a = frame_indent.pop()
-            let _b = frame_active.pop()
-            let _c = frame_unknown.pop()
-            let _d = frame_chain_taken.pop()
-            let _e = frame_chain_unknown.pop()
-
-        if stripped.starts_with("if ") and stripped.ends_with(":"):
-            let r = conan_recipe_eval_condition(stripped.slice(3, stripped.len() - 1), target_os, options)
-            frame_indent.push(indent as i64)
-            frame_active.push(if r == 1: 1 else: 0)
-            frame_unknown.push(if r == -1: 1 else: 0)
-            frame_chain_taken.push(if r == 1: 1 else: 0)
-            frame_chain_unknown.push(if r == -1: 1 else: 0)
-            continue
-        if stripped.starts_with("elif ") and stripped.ends_with(":"):
-            if not popped_same_indent:
-                // Malformed chain: treat the rest of it as unresolvable.
-                prev_chain_taken = false
-                prev_chain_unknown = true
-            let r = conan_recipe_eval_condition(stripped.slice(5, stripped.len() - 1), target_os, options)
-            let active = r == 1 and not prev_chain_taken and not prev_chain_unknown
-            let unknown = not prev_chain_taken and (prev_chain_unknown or r == -1)
-            frame_indent.push(indent as i64)
-            frame_active.push(if active: 1 else: 0)
-            frame_unknown.push(if unknown: 1 else: 0)
-            frame_chain_taken.push(if prev_chain_taken or r == 1: 1 else: 0)
-            frame_chain_unknown.push(if prev_chain_unknown or r == -1: 1 else: 0)
-            continue
-        if stripped == "else:":
-            if not popped_same_indent:
-                prev_chain_taken = false
-                prev_chain_unknown = true
-            let active = not prev_chain_taken and not prev_chain_unknown
-            let unknown = not prev_chain_taken and prev_chain_unknown
-            frame_indent.push(indent as i64)
-            frame_active.push(if active: 1 else: 0)
-            frame_unknown.push(if unknown: 1 else: 0)
-            frame_chain_taken.push(1)
-            frame_chain_unknown.push(if prev_chain_unknown: 1 else: 0)
-            continue
-
-        // Statement line: collect only when every enclosing branch is
-        // known-taken.
-        var collectible = true
-        for i in 0..frame_indent.len() as i32:
-            if frame_active[i] == 0 or frame_unknown[i] != 0:
-                collectible = false
-        if not collectible:
-            continue
-        if conan_find_text(stripped, "cpp_info") < 0:
-            continue
-        let sys_pos = conan_find_text(stripped, ".system_libs")
-        let fw_pos = conan_find_text(stripped, ".frameworks")
-        if sys_pos >= 0:
-            let values = conan_recipe_attr_values(stripped, sys_pos + 12)
-            for i in 0..values.len() as i32:
-                sys_libs = conan_sorted_insert_unique(move sys_libs, values[i])
-        else if fw_pos >= 0:
-            let values = conan_recipe_attr_values(stripped, fw_pos + 11)
-            for i in 0..values.len() as i32:
-                let fw = values[i]
-                if not conan_vec_contains(fw_seen, fw):
-                    fw_seen.push(with_str_clone_ref(fw))
-                    fw_args.push("-framework")
-                    fw_args.push(with_str_clone_ref(fw))
-        else:
-            // `exelinkflags.append("-Wl,-weak_framework,CoreHaptics")`: a
-            // framework the program links weakly (SDL's joystick haptics).
-            let flags_pos = conan_find_text(stripped, ".exelinkflags")
-            if flags_pos >= 0:
-                let values = conan_recipe_attr_values(stripped, flags_pos + 13)
-                for i in 0..values.len() as i32:
-                    let weak_prefix = "-Wl,-weak_framework,"
-                    if values[i].starts_with(weak_prefix):
-                        let fw = values[i].slice(weak_prefix.len(), values[i].len())
-                        if fw.len() > 0 and not conan_vec_contains(fw_seen, fw):
-                            fw_seen.push(with_str_clone_ref(fw))
-                            fw_args.push("-weak_framework")
-                            fw_args.push(fw)
-
-    ConanLibraryScan { lib_paths: fw_args, libs: sys_libs }
+// The pkg-config files the package in `dep_dir` holds.
+fn conan_package_pc_texts(dep_dir: &str) -> Vec[str]:
+    let out: Vec[str] = Vec.new()
+    let files = conan_split_nonempty_lines(runtime_list_files(dep_dir))
+    for i in 0..files.len() as i32:
+        if files[i].ends_with(".pc") and files[i].contains("/pkgconfig/"): out.push(runtime_read_file(files[i]))
+    out
 
 fn conan_fetch_recipe_text(name: &str, version: &str) -> str:
     let folder = conan_recipe_folder(name, version)
@@ -1137,41 +947,9 @@ fn conan_fetch_recipe_text(name: &str, version: &str) -> str:
         return ""
     conan_http_get(conan_recipe_file_url(name, folder, "conanfile.py"))
 
-// Packages whose link metadata is still hand-maintained. The table wins
-// over recipe extraction for these; the goal is to shrink this list as
-// extraction proves itself per package (#550).
-fn conan_package_has_table_link_metadata(name: &str, version: &str) -> bool:
-    if version == "system" and conan_system_package_lib(name).len() > 0:
-        return true
-    if name == "opengl" and version == "system":
-        return true
-    if name == "glfw":
-        return true
-    if name == "raylib":
-        return true
-    if name == "xorg" and version == "system":
-        return true
-    false
-
-fn conan_link_metadata_with_recipe(name: &str, version: &str, libs: Vec[str], link_args: Vec[str], recipe: &str, options: &ConanRecipeOptions) -> ConanLibraryScan:
-    if conan_package_has_table_link_metadata(name, version):
-        return conan_known_link_metadata(name, version, move libs, move link_args)
-    if recipe.len() == 0:
-        runtime_eprint("warning: no recipe metadata for " ++ name ++ "/" ++ version ++ "; system link requirements may be incomplete")
-        return conan_known_link_metadata(name, version, move libs, move link_args)
-    let extracted = conan_extract_recipe_link_metadata_for(recipe, conan_detect_os(), options)
-    var out_libs = libs
-    var out_args = link_args
-    for i in 0..extracted.libs.len() as i32:
-        out_libs = conan_sorted_insert_unique(move out_libs, extracted.libs[i])
-    for i in 0..extracted.lib_paths.len() as i32:
-        out_args.push(with_str_clone_ref(extracted.lib_paths[i]))
-    // #2084: SDL 3's device discovery calls the configuration manager
-    // (CM_Get_Device_Interface_List…), which the recipe's Windows list
-    // leaves out; a static SDL does not link without it.
-    if name == "sdl" and conan_detect_os() == "Windows":
-        out_libs = conan_sorted_insert_unique(move out_libs, "cfgmgr32")
-    ConanLibraryScan { lib_paths: out_args, libs: out_libs }
+// The recipe a binary was built from: its recipe revision's own conanfile.py.
+fn conan_fetch_recipe_revision_text(name: &str, version: &str, recipe_rev: &str) -> str:
+    conan_http_get(CONAN_CENTER_URL() ++ "/v2/conans/" ++ name ++ "/" ++ version ++ "/_/_/revisions/" ++ recipe_rev ++ "/files/conanfile.py")
 
 // A `<name>/system` recipe that stands for one library the host provides:
 // Conan Center has no binary and no source for it, only the name to link.
@@ -1243,36 +1021,6 @@ fn conan_known_link_metadata(name: &str, version: &str, libs: Vec[str], link_arg
             out_libs = conan_sorted_insert_unique(move out_libs, "GL")
         return ConanLibraryScan { lib_paths: out_args, libs: out_libs }
 
-    if name == "glfw":
-        if os == "Macos":
-            let frameworks: Vec[str] = Vec.new()
-            frameworks.push("AppKit")
-            frameworks.push("Cocoa")
-            frameworks.push("CoreFoundation")
-            frameworks.push("CoreGraphics")
-            frameworks.push("CoreServices")
-            frameworks.push("Foundation")
-            frameworks.push("IOKit")
-            for i in 0..frameworks.len() as i32:
-                out_args.push("-framework")
-                out_args.push(with_str_clone_ref(frameworks[i]))
-        else if os == "Linux":
-            out_libs = conan_sorted_insert_unique(move out_libs, "m")
-            out_libs = conan_sorted_insert_unique(move out_libs, "pthread")
-            out_libs = conan_sorted_insert_unique(move out_libs, "dl")
-            out_libs = conan_sorted_insert_unique(move out_libs, "rt")
-        else if os == "Windows":
-            out_libs = conan_sorted_insert_unique(move out_libs, "gdi32")
-        return ConanLibraryScan { lib_paths: out_args, libs: out_libs }
-
-    if name == "raylib":
-        if os == "Linux":
-            out_libs = conan_sorted_insert_unique(move out_libs, "m")
-            out_libs = conan_sorted_insert_unique(move out_libs, "pthread")
-        else if os == "Windows":
-            out_libs = conan_sorted_insert_unique(move out_libs, "winmm")
-        return ConanLibraryScan { lib_paths: out_args, libs: out_libs }
-
     if name == "xorg" and version == "system" and os == "Linux":
         let xlibs: Vec[str] = Vec.new()
         xlibs.push("X11")
@@ -1326,21 +1074,56 @@ fn conan_resolve_and_install_requirements(requirements: &Vec[str], project_root:
         resolved.push(req_name ++ "/" ++ actual)
     resolved
 
-fn conan_write_binary_metadata(name: &str, version: &str, recipe_rev: &str, package_id: &str, package_rev: &str, dep_dir: &str, requirements: &Vec[str], options: &ConanRecipeOptions) -> i32:
+// Writes the metadata of the package in `dep_dir` from its link interface
+// (above). `built` says the package was built here, so its own pkg-config
+// files speak first; a Conan Center binary is read through `recipe`, the
+// conanfile.py of its recipe revision.
+fn conan_write_binary_metadata(name: &str, version: &str, recipe_rev: &str, package_id: &str, package_rev: &str, dep_dir: &str, requirements: &Vec[str], env: &RecipeEnv, recipe: &str, built: bool) -> i32:
+    var link = ConanPackageLink { problem: "", warnings: Vec.new(), components: Vec.new() }
+    var pc: Vec[str] = Vec.new()
+    if built: pc = conan_package_pc_texts(dep_dir)
+    if pc.len() > 0: link = conan_pc_link(dep_dir, requirements, &pc)
+    else:
+        if recipe.len() == 0:
+            runtime_eprint("error: could not read the recipe of " ++ name ++ "/" ++ version ++ ", which says what the package links")
+            return 1
+        let info = recipe_package_info(recipe, env)
+        if not info.ok:
+            runtime_eprint("error: " ++ name ++ "/" ++ version ++ ": " ++ info.problem)
+            return 1
+        link = conan_package_link(dep_dir, requirements, &info)
+    if link.problem.len() > 0:
+        runtime_eprint("error: " ++ name ++ "/" ++ version ++ " cannot be linked: " ++ link.problem)
+        return 1
+    for w in link.warnings: runtime_eprint("warning: " ++ name ++ "/" ++ version ++ ": " ++ w)
+    // The package as a whole: every component's, in the recipe's order.
     var include_paths: Vec[str] = Vec.new()
-    if runtime_is_dir(dep_dir ++ "/include") != 0:
-        include_paths.push("include")
-    var scan = conan_scan_libraries(dep_dir)
-    var lib_paths = move scan.lib_paths
-    var libs = move scan.libs
-    if libs.len() == 0:
-        libs.push(with_str_clone_ref(name))
-        if runtime_is_dir(dep_dir ++ "/lib") != 0:
-            lib_paths.push("lib")
-    let defines: Vec[str] = Vec.new()
-    let link_args: Vec[str] = Vec.new()
-    let known = conan_link_metadata_with_recipe(name, version, move libs, move link_args, conan_fetch_recipe_text(name, version), options)
-    conan_write_metadata(dep_dir, name, version, recipe_rev, package_id, package_rev, include_paths, lib_paths, known.libs, defines, known.lib_paths, requirements)
+    var lib_paths: Vec[str] = Vec.new()
+    var libs: Vec[str] = Vec.new()
+    var defines: Vec[str] = Vec.new()
+    var link_args: Vec[str] = Vec.new()
+    for c in link.components:
+        for p in c.include_paths:
+            if not conan_vec_contains(include_paths, p): include_paths.push(p.clone())
+        for p in c.lib_paths:
+            if not conan_vec_contains(lib_paths, p): lib_paths.push(p.clone())
+        for l in c.libs:
+            if not conan_vec_contains(libs, l): libs.push(l.clone())
+        for d in c.defines:
+            if not conan_vec_contains(defines, d): defines.push(d.clone())
+        var i = 0
+        while i + 1 < c.link_args.len() as i32:
+            // Flag and name travel together: `-framework X`.
+            var seen = false
+            var j = 0
+            while j + 1 < link_args.len() as i32:
+                if link_args[j + 1] == c.link_args[i + 1]: seen = true
+                j = j + 2
+            if not seen:
+                link_args.push(c.link_args[i].clone())
+                link_args.push(c.link_args[i + 1].clone())
+            i = i + 2
+    conan_write_metadata_components(dep_dir, name, version, recipe_rev, package_id, package_rev, include_paths, lib_paths, libs, defines, link_args, requirements, &link.components)
 
 // On Windows every C package is built from source with the SDK's toolchain
 // (#1915; Eric, 2026-09-30: "with get builds packages from source in
@@ -1383,7 +1166,8 @@ pub fn conan_restore_locked_binary_package(name: &str, version: &str, recipe_rev
         let _remove = runtime_remove_tree(dep_dir)
         return false
     let requirements = conan_parse_requires_from_info(info)
-    if conan_write_binary_metadata(name, version, recipe_rev, package_id, package_rev, dep_dir, requirements, &conan_recipe_options_from_info(info)) != 0:
+    let restored_env = conan_binary_recipe_env(info, version, dep_dir)
+    if conan_write_binary_metadata(name, version, recipe_rev, package_id, package_rev, dep_dir, requirements, &restored_env, conan_fetch_recipe_revision_text(name, version, recipe_rev), false) != 0:
         runtime_eprint("error: failed to write metadata for " ++ name ++ "/" ++ version)
         let _remove = runtime_remove_tree(dep_dir)
         return false
@@ -1426,7 +1210,8 @@ fn conan_install_binary(name: &str, version: &str, recipe_rev: &str, project_roo
         runtime_eprint("error: failed to extract package for " ++ name ++ "/" ++ version)
         let _remove = runtime_remove_tree(dep_dir)
         return ""
-    if conan_write_binary_metadata(name, version, recipe_rev, pick.package_id, package_rev, dep_dir, resolved_requirements, &conan_recipe_options_from_info(info)) != 0:
+    let binary_env = conan_binary_recipe_env(info, version, dep_dir)
+    if conan_write_binary_metadata(name, version, recipe_rev, pick.package_id, package_rev, dep_dir, resolved_requirements, &binary_env, conan_fetch_recipe_revision_text(name, version, recipe_rev), false) != 0:
         runtime_eprint("error: failed to write metadata for " ++ name ++ "/" ++ version)
         let _remove = runtime_remove_tree(dep_dir)
         return ""
@@ -1931,9 +1716,8 @@ fn conan_install_from_source(name: &str, version: &str, project_root: &str, dept
     if conan_run_tool(install, 300000) != 0:
         return conan_source_fail(dep_dir, name ++ "/" ++ version ++ " did not build (the compiler's output is above" ++ (if build_rc != 0: "; the build step failed" else: "") ++ ")")
     let _work = runtime_remove_tree(work)
-    // The options this build was made with decide its link metadata.
-    let built_options = ConanRecipeOptions { known: true, values: conan_recipe_built_options(recipe, conan_detect_os()) }
-    if conan_write_binary_metadata(name, version, "built", "built", source.sha256, dep_dir, resolved, &built_options) != 0:
+    let package_env = conan_built_recipe_env(version, dep_dir)
+    if conan_write_binary_metadata(name, version, "built", "built", source.sha256, dep_dir, resolved, &package_env, recipe, true) != 0:
         return conan_source_fail(dep_dir, "could not write metadata for " ++ name ++ "/" ++ version)
     runtime_eprint("  built " ++ name ++ "/" ++ version ++ " into .with/deps/c/" ++ name ++ "/" ++ version ++ "/")
     version.to_owned()
