@@ -30401,7 +30401,17 @@ impl Sema:
                 self.emit_error("consuming method requires an owned receiver", node)
                 return 0
             if self.builtin_method_requires_mutable_receiver(type_name_sym, field) != 0:
-                if self.is_shared_ref_like_receiver(obj_type as i32) != 0:
+                // D27: `xs[i]` denotes the element place, so a mutating method on
+                // it mutates the element where it is. The element reads as a view
+                // (`&Vec[T]` for `rows[i]`), which is not a read-only receiver
+                // when the vector it indexes is a place the program may mutate.
+                var element_place = false
+                var indexed = expr
+                if self.ast.kind(indexed) == NodeKind.NK_GROUPED: indexed = self.ast.get_data0(indexed)
+                if self.ast.kind(indexed) == NodeKind.NK_INDEX:
+                    let packed = self.classify_place(indexed)
+                    element_place = unpack_place_kind(packed) != PlaceKind.PK_NotPlace and unpack_place_mut(packed) != PlaceMut.PM_ReadOnly and self.place_base_is_read_only_ref(indexed) == 0
+                if self.is_shared_ref_like_receiver(obj_type as i32) != 0 and not element_place:
                     self.emit_builtin_mutable_receiver_error(type_name_sym, field, node)
                     return 0
                 // D27 (§2.3): projections through a shared view type bare, so
