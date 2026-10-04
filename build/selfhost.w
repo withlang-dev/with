@@ -5383,7 +5383,7 @@ fn bs_check_migrate_runtime_cabi_aliases(ctx: &ActionCtx, compiler_path: &str, c
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "__with_cabi_with_i64_to_str((42 as c_longlong))", "runtime_cabi_call_alias")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "return __with_cabi_with_str_concat_n((self as *const with_str), count)", "runtime_cabi_member_wrapper_alias")
+    rc = bs_assert_contains(ctx, out_text, "return __with_cabi_with_str_concat_n((self as *const with_str), __param_count)", "runtime_cabi_member_wrapper_alias")
     if rc != 0: return rc
     var check_args: Vec[str] = Vec.new()
     check_args |> push("check")
