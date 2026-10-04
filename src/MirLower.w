@@ -420,12 +420,18 @@ impl MirBuilder:
             // #916 (§14.7): the callee may have left by a cancellation
             // unwind, its result never written. The caller unwinds in turn
             // before anything reads the result, like the await it sits under.
+            // #2019: a closure-invoking intrinsic stops at that invocation
+            // (codegen reads the mark) and its result holds what earlier
+            // invocations produced; the unwind edge releases it.
+            let releases_result = mir_intrinsic_invokes_closure(self.body.call_intrinsic(d1))
+            if releases_result:
+                self.body.set_call_may_cancel(d1)
             let check_bb = self.new_block()
             self.settle_payload_resets_at_terminator(kind, d2, check_bb)
             self.body.set_terminator(self.cur_bb, kind, d0, d1, d2, check_bb, span)
             self.mark_no_suspend_terminator()
             self.switch_to(check_bb)
-            self.emit_cancelled_return_check(d2, d3)
+            self.emit_cancelled_return_check(d2, d3, releases_result)
             return
         self.settle_payload_resets_at_terminator(kind, d2, d3)
         self.body.set_terminator(self.cur_bb, kind, d0, d1, d2, d3, span)
@@ -435,9 +441,22 @@ impl MirBuilder:
     // fn that may suspend (Sema's settled fact). The callee is the one Sema
     // resolved the call to (its contract's symbol: an overload's own, a
     // generic's specialization), else the function constant.
+    // #1985 (§14.3): a call through a callable value or a `dyn` method, or
+    // one that hands a callable over, may too: Sema's settled call-site fact
+    // for the call's AST node.
     fn call_may_cancel_return(callee_op: i32, call_id: i32) -> bool:
         let intrinsic = self.body.call_intrinsic(call_id)
-        if intrinsic != MirIntrinsic.NONE and intrinsic != MirIntrinsic.GENERIC_CALL:
+        // #2019: `xs.map(f)`, `xs.fold(init, f)`: the intrinsic invokes the
+        // closure on this fiber, so Sema's call-site fact decides.
+        if mir_intrinsic_invokes_closure(intrinsic):
+            let closure_call_node = self.body.call_ast_node(call_id)
+            return closure_call_node > 0 and self.sema.call_site_may_suspend(closure_call_node)
+        if intrinsic != MirIntrinsic.NONE and intrinsic != MirIntrinsic.GENERIC_CALL and intrinsic != MirIntrinsic.DYN_CALL:
+            return false
+        let ast_node = self.body.call_ast_node(call_id)
+        if ast_node > 0 and self.sema.call_site_may_suspend(ast_node):
+            return true
+        if intrinsic == MirIntrinsic.DYN_CALL:
             return false
         let constant = mir_body_extract_callee_sym(&self.body, callee_op)
         if constant == 0:
@@ -1432,7 +1451,14 @@ impl MirBuilder:
             self.emit_drop_entry(self.drop_local_ids[i], self.drop_kinds[i])
             i = i - 1
 
+    // Leave every scope down to `target`, innermost first: each scope's
+    // defers, then its drops. A scope's drops, once emitted on this path,
+    // leave the pending set until the path ends: a cancellation unwind in an
+    // outer scope's defer (§14.7, #1986) runs only the drops still pending,
+    // never one this exit already ran. Sibling paths keep every record.
     mut fn emit_cleanup_to_target(target: LoopInfo):
+        let ran_ids: Vec[i32] = Vec.new()
+        let ran_kinds: Vec[i32] = Vec.new()
         var scope_idx = self.drop_scope_starts.len() as i32 - 1
         var lowest_drop_start = self.drop_local_ids.len() as i32
         var lowest_defer_start = self.defer_nodes.len() as i32
@@ -1446,10 +1472,16 @@ impl MirBuilder:
             let drop_end = if scope_idx + 1 < self.drop_scope_starts.len(): self.drop_scope_starts[(scope_idx + 1)] else: self.drop_local_ids.len() as i32
             lowest_drop_start = drop_start
             self.emit_drops_for_range(drop_start, drop_end)
+            while self.drop_local_ids.len() as i32 > drop_start:
+                ran_ids.push(self.drop_local_ids.pop().unwrap())
+                ran_kinds.push(self.drop_kinds.pop().unwrap())
             scope_idx = scope_idx - 1
 
         self.emit_defers_for_range(target.break_defer_depth, lowest_defer_start)
         self.emit_drops_for_range(target.break_drop_depth, lowest_drop_start)
+        while ran_ids.len() > 0:
+            self.drop_local_ids.push(ran_ids.pop().unwrap())
+            self.drop_kinds.push(ran_kinds.pop().unwrap())
 
     mut fn emit_drops_for_return():
         // A return crosses all statement frames. Merge their temporaries into
@@ -4784,7 +4816,7 @@ impl MirBuilder:
         if aggregate_place < 0 or fields_id < 0 or fields_id >= self.body.agg_field_starts.len():
             return
         let start: i32 = self.body.agg_field_starts[fields_id]
-        let count = self.body.agg_field_counts[fields_id]
+        let count: i32 = self.body.agg_field_counts[fields_id]
         for i in 0..count:
             let field_sym: i32 = self.body.agg_field_name_syms[(start + i)]
             if field_sym == 0:
@@ -10445,6 +10477,14 @@ impl MirBuilder:
     // result_ty: sema type of the unwrapped result (T from Task[T])
     // task_ty: sema type of the Task value (Task[T])
     // node: AST node for the await expression (for span/ast_node)
+    // The same place `op` names, read without taking it (a `move` becomes a
+    // `copy`); any other operand as it is.
+    mut fn observing_operand(op: i32) -> i32:
+        if op < 0 or op >= self.body.operand_kinds.len() as i32 or self.body.operand_kinds[op] != OperandKind.OK_MOVE:
+            return op
+        let place: i32 = self.body.operand_d0[op]
+        self.body.new_operand(OperandKind.OK_COPY, place)
+
     mut fn lower_single_await(task_op: i32, result_ty: i32, task_ty: i32, node: i32, await_owns: i32) -> i32:
         let no_siblings: Vec[i32] = Vec.new()
         self.lower_group_await(task_op, result_ty, task_ty, node, await_owns, &no_siblings, 0)
@@ -10458,12 +10498,17 @@ impl MirBuilder:
     // no one.
     mut fn lower_group_await(task_op: i32, result_ty: i32, task_ty: i32, node: i32, await_owns: i32, sibling_ops: &Vec[i32], next_sibling: i32) -> i32:
         let span = self.ast.get_start(node)
+        // #1993: each path reads the handle and takes it once. The await
+        // parks on it and cancel observes it (copy); the normal path's
+        // result read and the unwind path's cleanup await take it (move). A
+        // `move` at the park left every later read a read of moved storage.
+        let observe_op = self.observing_operand(task_op)
 
         // 1. Emit FIBER_AWAIT intrinsic call. Arg 1 (await_owns) tells codegen whether
         // this value-await OWNS the result buffer and must free it (§14.7/G3): 1 for a
         // temporary/owned-local await, 0 for a borrowed param (the owner's drop frees).
         let await_args: Vec[i32] = Vec.new()
-        await_args.push(task_op)
+        await_args.push(observe_op)
         await_args.push(self.const_operand(ConstKind.CK_INT, await_owns, self.sema.ty_i32))
         let await_args_id = self.body.new_call_args(await_args)
         self.body.set_call_intrinsic(await_args_id, MirIntrinsic.FIBER_AWAIT)
@@ -10502,7 +10547,7 @@ impl MirBuilder:
         // 3. Self-cancel BB: cancel child, join it for cleanup, then unwind.
         self.switch_to(self_cancel_bb)
         let cancel_args: Vec[i32] = Vec.new()
-        cancel_args.push(task_op)
+        cancel_args.push(self.observing_operand(task_op))
         let cancel_call_id = self.body.new_call_args(cancel_args)
         self.body.set_call_intrinsic(cancel_call_id, MirIntrinsic.FIBER_CANCEL)
         self.body.set_call_ast_node(cancel_call_id, node)
@@ -10577,7 +10622,7 @@ impl MirBuilder:
     // return. (#1293: a select loser parked in recv() never unwound.)
     mut fn emit_wait_cancel_check():
         let continue_bb = self.new_block()
-        self.emit_cancelled_return_check(-1, continue_bb)
+        self.emit_cancelled_return_check(-1, continue_bb, false)
         self.switch_to(continue_bb)
 
     // The fiber's cancelled-return flag (set by every cancellation unwind,
@@ -10585,7 +10630,9 @@ impl MirBuilder:
     // place the just-returned call would have written (-1: none): on the
     // unwind edge it holds no value, so it must not be one this function
     // already owns and would drop.
-    mut fn emit_cancelled_return_check(dest: i32, continue_bb: i32):
+    // `release_dest` (#2019): the call left a valid partial result in `dest`
+    // (a closure-invoking intrinsic stopped early); the unwind edge drops it.
+    mut fn emit_cancelled_return_check(dest: i32, continue_bb: i32, release_dest: bool):
         if dest >= 0 and dest < self.body.place_locals.len():
             let dest_local: i32 = self.body.place_locals[dest]
             for di in 0..self.drop_local_ids.len():
@@ -10609,6 +10656,8 @@ impl MirBuilder:
         let ic_op = self.body.new_operand(OperandKind.OK_COPY, ic_place)
         self.terminate(TermKind.TK_SWITCH_INT, ic_op, sw, unwind_bb, 0)
         self.switch_to(unwind_bb)
+        if release_dest and dest >= 0 and dest < self.body.place_locals.len() and self.sema.type_needs_drop_frozen(self.local_type(self.body.place_locals[dest])) != 0:
+            self.emit_drop_stmt(dest, "cancel-unwind", 0)
         self.emit_cancelled_return()
 
     // Join a Task purely for cleanup: await completion and free its result buffer,
@@ -13931,12 +13980,16 @@ impl MirBuilder:
         let result_place = self.place_for_local(result_local)
         let next_bb = self.new_block()
 
+        // Tag the call with its intrinsic kind for codegen dispatch — the call
+        // this terminator makes (args_id), before the terminator is set. Read
+        // back as "the last call created" after it, the tag landed on the
+        // cancelled-return check terminate adds for a call reaching a
+        // may-suspend closure (#1985), and `xs.map(n => f(n).await)` lowered
+        // as a plain call to the map symbol (D65 #1639 validator, #2011).
+        let call_id = args_id
+        self.body.set_call_intrinsic(call_id, intrinsic)
         self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
         self.switch_to(next_bb)
-
-        // Tag call with intrinsic kind for codegen dispatch.
-        let call_id = self.body.call_arg_starts.len() as i32 - 1
-        self.body.set_call_intrinsic(call_id, intrinsic)
         if intrinsic == MirIntrinsic.MATH_FN:
             let math_method_name = self.pool.resolve_symbol(method_sym)
             let math_method_id = math_fn_lookup(math_method_name)
@@ -14165,7 +14218,8 @@ impl MirBuilder:
         var ci = start_idx
         while ci < task_ops.len():
             let task_op = task_ops[ci]
-            self.emit_handle_call(task_op, MirIntrinsic.FIBER_CANCEL, node)
+            let cancel_op = self.observing_operand(task_op)
+            self.emit_handle_call(cancel_op, MirIntrinsic.FIBER_CANCEL, node)
             self.lower_cleanup_await(task_op, node)
             ci = ci + 1
 
@@ -15944,9 +15998,10 @@ impl MirBuilder:
         let result_local = self.new_temp(ret_type)
         let result_place = self.place_for_local(result_local)
         let next_bb = self.new_block()
+        // Tagged before the terminator, which reads the intrinsic (#2019).
+        self.body.set_call_intrinsic(args_id, intrinsic)
         self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
         self.switch_to(next_bb)
-        self.body.set_call_intrinsic(args_id, intrinsic)
         if intrinsic == MirIntrinsic.MATH_FN:
             let math_method_name = self.pool.resolve_symbol(method_sym)
             let math_method_id = math_fn_lookup(math_method_name)
@@ -17699,10 +17754,13 @@ impl MirBuilder:
                 let task_op = self.lower_expr(task_node)
                 task_ops.push(task_op)
 
-            // 2. Emit select intrinsic call: passes all task operands, returns winner index
+            // 2. Emit select intrinsic call: passes all task operands, returns winner index.
+            // #2011: the select observes every task (copy); on each arm's
+            // path every task is taken once — the winner by its await, each
+            // loser by its cleanup await (its cancel observes).
             let select_args: Vec[i32] = Vec.new()
             for ai in 0..arm_count:
-                select_args.push(task_ops[ai])
+                select_args.push(self.observing_operand(task_ops[ai]))
             let select_call_id = self.body.new_call_args(select_args)
             let select_biased = self.ast.get_data2(node)
             let select_intrinsic = if select_biased != 0: MirIntrinsic.FIBER_SELECT_BIASED else: MirIntrinsic.FIBER_SELECT
@@ -17730,7 +17788,12 @@ impl MirBuilder:
             // 4. Switch on winner index
             let switch_op = self.body.new_operand(OperandKind.OK_COPY, select_result_place)
             let switch_table = self.body.new_switch_table(switch_vals, arm_bbs)
-            self.terminate(TermKind.TK_SWITCH_INT, switch_op, switch_table, join_bb, 0)
+            // #2011: the select returns one of the arm indices; no other value
+            // reaches the join. Its default edge went to the join and read the
+            // result no arm wrote on it (validate-all: "read of _4 reaches a
+            // path that never initialized it").
+            let no_winner_bb = self.new_unreachable_block()
+            self.terminate(TermKind.TK_SWITCH_INT, switch_op, switch_table, no_winner_bb, 0)
 
             // 5. Each arm: await winner, cancel losers, execute body
             for ai in 0..arm_count:
@@ -17770,7 +17833,7 @@ impl MirBuilder:
                     if li != ai:
                         let cancel_args: Vec[i32] = Vec.new()
                         let loser_task = task_ops[li]
-                        cancel_args.push(loser_task)
+                        cancel_args.push(self.observing_operand(loser_task))
                         let cancel_call_id = self.body.new_call_args(cancel_args)
                         self.body.set_call_intrinsic(cancel_call_id, MirIntrinsic.FIBER_CANCEL)
                         self.body.set_call_ast_node(cancel_call_id, node)
@@ -17782,11 +17845,18 @@ impl MirBuilder:
                         self.switch_to(after_cancel_bb)
                         self.lower_cleanup_await(loser_task, node)
 
-                // Execute arm body
+                // Execute arm body. #2011: its temporaries drop inside the arm,
+                // as an if branch's do (#729/#771) — left to the select's frame
+                // they dropped at the join on every arm's path, one that never
+                // wrote them among them. A temp moved into the result is
+                // cancelled by assign_operand_to_place before the frame closes.
+                let arm_temp_frame = self.push_stmt_temp_frame()
+                let arm_scoped = self.enter_body_scope(arm_body)
                 let body_op = self.lower_expr(arm_body)
-
-                // Store body result and branch to join
-                self.assign_operand_to_place(result_place, body_op, span)
+                if self.sema.body_can_fall_through(arm_body) != 0:
+                    self.assign_operand_to_place(result_place, body_op, span)
+                self.leave_body_scope(arm_scoped)
+                self.finish_stmt_temp_frame(arm_temp_frame)
                 self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
             self.switch_to(join_bb)

@@ -25,22 +25,22 @@ fn test_normal_task_observation:
     no_suspend:
         assert(not task.was_cancelled())
     assert(task.await == 41)
-    assert(not task.was_cancelled())
 
+// The handle is observed before the await that consumes it (§14.7's
+// example; §22 `t.await // OK: consumes the task`, #2011).
 fn test_cancelled_task_observation:
     let task = wait_until_cancelled()
     assert(not task.was_cancelled())
     task.cancel()
     drive_until_done(&task)
-    let _ = task.await
     assert(task.was_cancelled())
+    let _ = task.await
 
 fn test_scoped_task_observation:
     async scope s =>:
         let task = s.track(complete(42))
         assert(not task.was_cancelled())
         assert(task.await == 42)
-        assert(not task.was_cancelled())
         0
 
 fn main:

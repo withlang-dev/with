@@ -1709,7 +1709,10 @@ impl Sema:
             if prim != 0:
                 return prim as i32
             let named = self.lookup_named_type_visible(sym)
-            if named == 0 and self.private_symbol_path_from_current(sym).len() > 0:
+            // #2011: an unimported std type (§18.1) is the same error here as in
+            // an annotation; left silent, `Vec[Task[i32]].new()` without `use
+            // std.task.Task` passed Sema and failed MIR lowering.
+            if named == 0 and (self.private_symbol_path_from_current(sym).len() > 0 or self.std_gated_import_note(sym).len() > 0):
                 self.emit_private_symbol_error(sym, node)
             return named
         if kind == NodeKind.NK_TYPE_GENERIC:
@@ -1734,7 +1737,7 @@ impl Sema:
                     base_sym = canonical_base
                     base_tid = self.lookup_named_type_visible(base_sym)
             if base_tid == 0:
-                if self.private_symbol_path_from_current(base_sym).len() > 0:
+                if self.private_symbol_path_from_current(base_sym).len() > 0 or self.std_gated_import_note(base_sym).len() > 0:
                     self.emit_private_symbol_error(base_sym, base)
                 return 0
             let arg1_node = self.ast.get_data1(node)
@@ -6744,18 +6747,269 @@ impl Sema:
     // a body suspends when it awaits, or calls a declaration already known
     // to — so a recursive cycle cannot cut the answer short the way the
     // on-demand walk's visiting set does.
+    // #1985: a closure's body and a trait method's default body settle in
+    // the same fixpoint, keyed by the closure node and the body node, and
+    // each pass first re-reads which `dyn` methods may suspend. Then every
+    // call that reaches a may-suspend callable is recorded for lowering.
     mut fn settle_may_suspend_facts():
         self.suspend_facts_settling = 1
         var changed = true
         while changed:
             changed = false
+            self.settle_dyn_suspend_methods()
             for node in 1..self.ast.node_count():
-                if self.ast.kind(node) != NodeKind.NK_FN_DECL or self.suspend_fact_nodes.contains(node) or self.ast.fn_decl_body_is_interface(node):
+                let kind = self.ast.kind(node)
+                if self.suspend_fact_nodes.contains(node):
                     continue
-                if self.expr_may_suspend(self.ast.get_data1(node)) != 0:
+                let body = if kind == NodeKind.NK_FN_DECL and not self.ast.fn_decl_body_is_interface(node): self.ast.get_data1(node) else if kind == NodeKind.NK_CLOSURE: self.ast.get_data0(node) else: 0
+                if body != 0 and self.expr_may_suspend(body) != 0:
                     self.suspend_fact_nodes.insert(node, 1)
                     changed = true
+            for ti in 0..self.trait_method_default_bodies.len() as i32:
+                let default_body: i32 = self.trait_method_default_bodies[ti]
+                if default_body != 0 and not self.suspend_fact_nodes.contains(default_body) and self.expr_may_suspend(default_body) != 0:
+                    self.suspend_fact_nodes.insert(default_body, 1)
+                    changed = true
+        for node in 1..self.ast.node_count():
+            let kind = self.ast.kind(node)
+            if kind == NodeKind.NK_CALL and self.call_suspends_through_callable(node, true):
+                self.suspend_call_sites.insert(node, 1)
+            else if kind == NodeKind.NK_PIPELINE and self.pipeline_suspends_through_callable(node, true):
+                self.suspend_call_sites.insert(node, 1)
+                let stage = self.ast.get_data1(node)
+                if self.ast.kind(stage) == NodeKind.NK_CALL:
+                    self.suspend_call_sites.insert(stage, 1)
         self.suspend_facts_settling = 0
+
+    // #1985 (§14.3): a call `node` (or a pipeline stage) whose lowering
+    // reaches a callable that may suspend the calling fiber, beyond the
+    // direct callee #916 checks: Sema's settled answer, read by MIR.
+    fn call_site_may_suspend(node: i32) -> bool: self.suspend_call_sites.contains(node)
+
+    // The (trait, method) pairs a `dyn` call of which may suspend: some
+    // implementation's body may, or the trait's default body may, or an
+    // implementation has no body here (a bundle interface) to say otherwise.
+    mut fn settle_dyn_suspend_methods():
+        for di in 0..self.ast.decl_count():
+            if not self.method_decl_impl_nodes.contains(di):
+                continue
+            let md = self.ast.get_decl(di)
+            if self.ast.kind(md) != NodeKind.NK_FN_DECL:
+                continue
+            let trait_sym = self.ast.get_data2(self.method_decl_impl_nodes.get(di).unwrap())
+            if trait_sym == 0:
+                continue
+            let method = self.method_decl_name_symbol(self.ast.get_data0(md))
+            let flags = self.ast.get_data2(md)
+            let sync = (flags / FnFlags.ASYNC) % 2 == 0 and (flags / FnFlags.GEN) % 2 == 0
+            if sync and (self.ast.fn_decl_body_is_interface(md) or self.suspend_fact_nodes.contains(md)):
+                self.dyn_suspend_methods.insert(sema_pair_key(trait_sym, method), 1)
+        for tni in 0..self.trait_name_syms.len() as i32:
+            let trait_sym: i32 = self.trait_name_syms[tni]
+            let start: i32 = self.trait_method_starts[tni]
+            for mi in 0..self.trait_method_counts[tni]:
+                let default_body: i32 = self.trait_method_default_bodies[(start + mi)]
+                if default_body != 0 and self.suspend_fact_nodes.contains(default_body):
+                    self.dyn_suspend_methods.insert(sema_pair_key(trait_sym, self.trait_method_names[(start + mi)]), 1)
+
+    // #1985 (§14.3 INVARIANT 5): whether invoking the callable value `expr`
+    // may suspend the calling fiber. A closure and a fn declaration answer
+    // from their settled bodies; a callable `let` from every value it takes.
+    // A parameter's value is the caller's: at the call site (`site`) it is
+    // unknown, so it may; for the enclosing body's own fact the caller
+    // answers for it — handing a may-suspend callable over is a call that
+    // may suspend. Anything else (a field, an element, a call's result, a
+    // closure's parameter) is a value Sema cannot see through: it may.
+    mut fn callable_value_may_suspend(expr: i32, site: bool) -> bool:
+        if expr == 0:
+            return false
+        let kind = self.ast.kind(expr)
+        if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_MOVE_ARG:
+            return self.callable_value_may_suspend(self.ast.get_data0(expr), site)
+        if kind == NodeKind.NK_CLOSURE:
+            return self.suspend_fact_nodes.contains(expr)
+        // #2019: a lazy adapter Sema can see being built answers from its
+        // parts (`xs.iter()` holds no callable; `.map(f)` holds `f`).
+        if self.typed_expr_types.contains(expr) and self.is_iterator_type(self.typed_expr_types.get(expr).unwrap()):
+            if kind == NodeKind.NK_CALL and self.ast.kind(self.ast.get_data0(expr)) == NodeKind.NK_FIELD_ACCESS:
+                return self.adapter_parts_may_suspend(self.ast.get_data0(self.ast.get_data0(expr)), self.ast.get_data1(expr), self.ast.get_data2(expr), site)
+            if kind == NodeKind.NK_PIPELINE and self.ast.kind(self.ast.get_data1(expr)) == NodeKind.NK_CALL:
+                let stage = self.ast.get_data1(expr)
+                return self.adapter_parts_may_suspend(self.ast.get_data0(expr), self.ast.get_data1(stage), self.ast.get_data2(stage), site)
+        if kind != NodeKind.NK_IDENT:
+            return true
+        if self.callable_param_idents.contains(expr):
+            return site
+        if self.callable_opaque_idents.contains(expr):
+            return true
+        if self.callable_ident_decls.contains(expr):
+            let decl: i32 = self.callable_ident_decls.get(expr).unwrap()
+            if self.callable_value_visiting.contains(decl):
+                return false
+            self.callable_value_visiting.insert(decl, 1)
+            var may = false
+            var row = if self.callable_value_heads.contains(decl): self.callable_value_heads.get(decl).unwrap() else: -1
+            while row >= 0 and not may:
+                may = self.callable_value_may_suspend(self.callable_value_nodes[row], site)
+                row = self.callable_value_next[row]
+            self.callable_value_visiting.remove(decl)
+            return may
+        self.call_target_may_suspend(self.ast.get_data0(expr))
+
+    // Whether `expr` hands a callable value over (a closure, a fn's name, a
+    // callable binding, or any expression Sema typed as a With callable).
+    fn expr_is_callable_value(expr: i32) -> bool:
+        if expr == 0:
+            return false
+        let kind = self.ast.kind(expr)
+        if kind == NodeKind.NK_CLOSURE:
+            return true
+        if kind == NodeKind.NK_IDENT and (self.callable_ident_decls.contains(expr) or self.callable_param_idents.contains(expr) or self.callable_opaque_idents.contains(expr)):
+            return true
+        if not self.typed_expr_types.contains(expr):
+            return false
+        self.type_carries_callable(self.typed_expr_types.get(expr).unwrap())
+
+    fn type_is_with_callable(tid: i32) -> bool:
+        let callable = self.callable_any_fn_type(tid as TypeId)
+        callable != 0 and self.get_type_kind(callable) == TypeKind.TY_FN
+
+    // #2019 (§14.3 INVARIANT 5): a lazy iterator adapter that holds a closure
+    // (`xs.iter().map(f)`: MapIter, FilterIter, ...), directly or in the
+    // chain under it, is a callable value for the suspension summary: the
+    // closure runs inside whatever drives the adapter (`collect`, `fold`,
+    // `next`, ...), so the driving call reads the adapter's fact.
+    fn iterator_type_holds_callable(tid: i32) -> bool:
+        if tid <= 0 or not self.is_iterator_type(tid):
+            return false
+        var resolved = self.resolve_alias(tid as TypeId)
+        let tk = self.get_type_kind(resolved)
+        if tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR:
+            resolved = self.resolve_alias(self.get_type_d0(resolved) as TypeId)
+        let owner = self.get_generic_inst_base(resolved as i32)
+        if owner == self.syms.mapiter or owner == self.syms.filteriter or owner == self.syms.filtermapiter or owner == self.syms.takewhileiter or owner == self.syms.dropwhileiter or owner == self.syms.zipwithiter or owner == self.syms.flatmapiter:
+            return true
+        let arg_start = self.get_type_d1(resolved)
+        for ai in 0..self.get_type_d2(resolved):
+            if self.iterator_type_holds_callable(self.type_extra[(arg_start + ai)]):
+                return true
+        false
+
+    fn type_carries_callable(tid: i32) -> bool: self.type_is_with_callable(tid) or self.iterator_type_holds_callable(tid)
+
+    // Whether the adapter `expr` builds (`recv.map(f)`, `it |> map(f)`) holds
+    // a callable that may suspend: its receiver does, or an argument is one.
+    mut fn adapter_parts_may_suspend(recv: i32, arg_start: i32, arg_count: i32, site: bool) -> bool:
+        if self.expr_is_callable_value(recv) and self.callable_value_may_suspend(recv, site):
+            return true
+        for ai in 0..arg_count:
+            let arg = self.ast.get_extra(arg_start + ai)
+            if self.expr_is_callable_value(arg) and self.callable_value_may_suspend(arg, site):
+                return true
+        false
+
+    // #1985: the call `node` reaches a callable that may suspend — its callee
+    // is a callable value (not a declaration Sema resolved it to: #916
+    // answers those) or a `dyn` method that may, or one of its arguments is
+    // a callable that may, handed to a callee that runs on this fiber.
+    mut fn call_suspends_through_callable(node: i32, site: bool) -> bool:
+        let callee = self.ast.get_data0(node)
+        let callee_kind = self.ast.kind(callee)
+        if callee_kind == NodeKind.NK_FIELD_ACCESS:
+            let recv = self.ast.get_data0(callee)
+            if self.typed_expr_types.contains(recv):
+                let trait_sym = self.dyn_trait_symbol_for_type(self.typed_expr_types.get(recv).unwrap())
+                if trait_sym != 0 and self.dyn_suspend_methods.contains(sema_pair_key(trait_sym, self.ast.get_data1(callee))):
+                    return true
+            // A callable field called with method syntax (`h.f(x)`).
+            if self.typed_expr_types.contains(callee) and self.type_is_with_callable(self.typed_expr_types.get(callee).unwrap()):
+                return true
+            // #2019: a method driven on a lazy adapter that holds a
+            // may-suspend closure (`it.collect()`, `it.fold(..)`, `it.next()`).
+            if self.typed_expr_types.contains(recv) and self.iterator_type_holds_callable(self.typed_expr_types.get(recv).unwrap()) and self.callable_value_may_suspend(recv, site):
+                return true
+        else if callee_kind == NodeKind.NK_IDENT:
+            if self.expr_is_callable_value(callee) and not self.fn_decl_nodes.contains(self.ast.get_data0(callee)) and self.callable_value_may_suspend(callee, site):
+                return true
+        else if callee_kind == NodeKind.NK_GROUPED or callee_kind == NodeKind.NK_CLOSURE:
+            if self.callable_value_may_suspend(callee, site):
+                return true
+        self.args_hand_over_suspending_callable(node, self.ast.get_data1(node), self.ast.get_data2(node), site)
+
+    // An argument that is a may-suspend callable runs on this fiber when the
+    // callee invokes it — unless the callee is an async or gen fn, whose
+    // body runs in its own Task or in the generator's consumer.
+    mut fn args_hand_over_suspending_callable(node: i32, arg_start: i32, arg_count: i32, site: bool) -> bool:
+        if self.comp_resolved.contains(node):
+            let fn_node = self.fn_decl_node_for_suspend(self.comp_resolved.get(node).unwrap())
+            if fn_node != 0:
+                let flags = self.ast.get_data2(fn_node)
+                if (flags / FnFlags.ASYNC) % 2 != 0 or (flags / FnFlags.GEN) % 2 != 0:
+                    return false
+        for ai in 0..arg_count:
+            let arg = self.ast.get_extra(arg_start + ai)
+            if self.expr_is_callable_value(arg) and self.callable_value_may_suspend(arg, site):
+                return true
+        false
+
+    // `x |> stage`: the stage is a callable value, or a call whose callee or
+    // arguments reach one; the piped value is the stage's first argument.
+    mut fn pipeline_suspends_through_callable(node: i32, site: bool) -> bool:
+        let piped = self.ast.get_data0(node)
+        if self.expr_is_callable_value(piped) and self.callable_value_may_suspend(piped, site):
+            return true
+        let stage = self.ast.get_data1(node)
+        let stage_kind = self.ast.kind(stage)
+        if stage_kind == NodeKind.NK_CALL:
+            return self.call_suspends_through_callable(stage, site)
+        if stage_kind == NodeKind.NK_IDENT and self.expr_is_callable_value(stage) and not self.fn_decl_nodes.contains(self.ast.get_data0(stage)):
+            return self.callable_value_may_suspend(stage, site)
+        false
+
+    // #1985: what an identifier naming a callable binding holds (Sema's
+    // callable_ident_* records), read once checking is done.
+    mut fn note_callable_ident(node: i32):
+        let sym = self.ast.get_data0(node)
+        let local = self.scope_binding_is_local(sym)
+        if not local and self.fn_decl_nodes.contains(sym):
+            return
+        let ty = self.scope_lookup(sym)
+        if ty <= 0 or not self.type_carries_callable(ty):
+            return
+        let decl = if local and self.binding_decl_nodes.contains(sym): self.binding_decl_nodes.get(sym).unwrap() else: 0
+        if decl != 0 and self.callable_let_decls.contains(decl):
+            self.callable_ident_decls.insert(node, decl)
+        else if local and self.closure_body_depth == 0 and self.symbol_is_current_fn_param(sym):
+            self.callable_param_idents.insert(node, 1)
+        else:
+            self.callable_opaque_idents.insert(node, 1)
+
+    // #2011: an awaited owned Task or ScopedTask binding (a `let` or a
+    // parameter of that type, not a view of one) is consumed by the await;
+    // a ScopedTask awaits like a Task (§14.11.1) and lowers the same way.
+    mut fn mark_awaited_task_moved(expr: i32):
+        if self.ast.kind(expr) != NodeKind.NK_IDENT or not self.typed_expr_types.contains(expr):
+            return
+        let ty: i32 = self.typed_expr_types.get(expr).unwrap()
+        if self.type_is_task(ty) == 0 and self.type_is_scoped_task(ty) == 0:
+            return
+        self.mark_moved_if_consumed(expr)
+
+    fn symbol_is_current_fn_param(sym: i32) -> bool:
+        for pi in 0..self.current_fn_param_syms.len() as i32:
+            if self.current_fn_param_syms[pi] == sym:
+                return true
+        false
+
+    // A value a callable `let` binding `decl` takes (its initializer, or an
+    // assignment to it).
+    mut fn note_callable_binding_value(decl: i32, value: i32):
+        if value == 0:
+            return
+        let row = self.callable_value_nodes.len() as i32
+        self.callable_value_nodes.push(value)
+        self.callable_value_next.push(if self.callable_value_heads.contains(decl): self.callable_value_heads.get(decl).unwrap() else: -1)
+        self.callable_value_heads.insert(decl, row)
 
     // #916 (§14.7): a call to `callee` may return to its caller by a
     // cancellation unwind — the callee is a sync fn whose body may suspend,
@@ -6831,6 +7085,9 @@ impl Sema:
             if self.comp_resolved.contains(node):
                 if self.fn_symbol_may_suspend(self.comp_resolved.get(node).unwrap()) != 0:
                     return self.suspension_site(node)
+            // #1985: a callable value, a `dyn` method, or a callable argument.
+            if self.suspend_facts_settling != 0 and self.call_suspends_through_callable(node, false):
+                return self.suspension_site(node)
             let callee = self.ast.get_data0(node)
             if self.ast.kind(callee) == NodeKind.NK_IDENT:
                 let callee_sym = self.ast.get_data0(callee)
@@ -6873,6 +7130,8 @@ impl Sema:
             if self.comp_resolved.contains(node) and self.fn_symbol_may_suspend(self.comp_resolved.get(node).unwrap()) != 0:
                 return self.suspension_site(node)
             if self.pipeline_method_calls.contains(node) and self.fn_symbol_may_suspend(self.pipeline_method_calls.get(node).unwrap()) != 0:
+                return self.suspension_site(node)
+            if self.suspend_facts_settling != 0 and self.pipeline_suspends_through_callable(node, false):
                 return self.suspension_site(node)
             let stage = self.ast.get_data1(node)
             if self.ast.kind(stage) == NodeKind.NK_IDENT and self.fn_symbol_may_suspend(self.ast.get_data0(stage)) != 0:
@@ -9241,6 +9500,7 @@ impl Sema:
             return 0 as TypeId
 
         if kind == NodeKind.NK_IDENT:
+            self.note_callable_ident(node)
             return self.check_ident(self.ast.get_data0(node), node) as TypeId
 
         if kind == NodeKind.NK_MATCH_OP or kind == NodeKind.NK_NEG_MATCH_OP:
@@ -9748,6 +10008,7 @@ impl Sema:
                 let unwrapped_elems: Vec[i32] = Vec.new()
                 for ei in 0..elem_count:
                     let elem_node = self.ast.get_extra(extra_s + ei)
+                    self.mark_awaited_task_moved(elem_node)
                     var elem_ty = 0
                     if self.typed_expr_types.contains(elem_node):
                         elem_ty = self.typed_expr_types.get(elem_node).unwrap()
@@ -9760,12 +10021,11 @@ impl Sema:
                 return unwrapped_tuple as TypeId
             if self.expr_is_awaitable_task_value(inner) == 0:
                 self.emit_error("await requires a Task value", node)
-            // §14.7: `.await` does NOT consume the task — it drives it to completion
-            // and returns the result, but the task remains observable afterwards
-            // (`task.was_cancelled()`, `task.is_done()` are valid post-await). So
-            // await must not mark the awaited binding moved or record a consume
-            // effect; doing so both broke §14.7 observation and mis-classified an
-            // awaited task parameter as owned.
+            // #2011 (§22, concurrency.md: `t.await // OK: consumes the task`):
+            // `.await` takes the result and releases the task, so it consumes
+            // an owned Task binding and a later read is a use of a moved
+            // value. A view of a task (`&Task[T]`) is awaited in place.
+            self.mark_awaited_task_moved(inner)
             // Unwrap Task[T] → T for the .await expression type
             let await_result_ty = self.unwrap_task_type(inner_ty)
             self.typed_expr_types.insert(node, await_result_ty as i32)
@@ -13547,6 +13807,9 @@ impl Sema:
             return self.ty_void as i32
         self.binding_decl_nodes.insert(name, node)
         self.binding_value_nodes.insert(name, value)
+        if self.type_carries_callable(bind_type as i32):
+            self.callable_let_decls.insert(node, 1)
+            self.note_callable_binding_value(node, value)
         self.typed_binding_types.insert(node, bind_type as i32)
         self.typed_binding_names.insert(node, name)
         self.typed_binding_muts.insert(node, is_mut)
@@ -15584,6 +15847,8 @@ impl Sema:
             let target_sym = self.ast.get_data0(target)
             self.scope_set_state(target_sym, VarState.LIVE)
             self.binding_value_nodes.insert(target_sym, value)
+            if self.binding_decl_nodes.contains(target_sym) and self.callable_let_decls.contains(self.binding_decl_nodes.get(target_sym).unwrap()):
+                self.note_callable_binding_value(self.binding_decl_nodes.get(target_sym).unwrap(), value)
             self.scope_set_is_task(target_sym, self.expr_is_task_value(value))
             self.scope_set_is_scoped_task(target_sym, self.expr_is_scoped_task_value(value))
             self.scope_set_is_ephemeral_task(target_sym, self.expr_is_ephemeral_task(value))
@@ -22892,6 +23157,8 @@ impl Sema:
         let callee = self.ast.get_data0(node)
         let extra_start = self.ast.get_data1(node)
         let arg_count = self.ast.get_data2(node)
+        if self.ast.kind(callee) == NodeKind.NK_IDENT:
+            self.note_callable_ident(callee)
         // D70: `math.sqrt(x)` / `raylib.DrawText(...)` call the member the
         // import namespace names — resolved before the callee is read as a
         // method or a qualified extension call.
@@ -29328,6 +29595,12 @@ impl Sema:
             if mc_resolved_arg_count != 0:
                 self.emit_error("task method expects zero arguments", node)
                 return 0
+            // #1993: join_cleanup releases the task (cancel, cleanup await,
+            // result freed): it consumes an owned Task binding, so a later
+            // use is a use of a moved value — it could only read a released
+            // handle. Lowering moves the binding into the cleanup await.
+            if field == self.syms.join_cleanup and self.ast.kind(expr) == NodeKind.NK_IDENT and self.type_is_task(obj_type as i32) != 0:
+                self.mark_moved_if_consumed(expr)
             if field == self.syms.cancel or field == self.syms.join_cleanup:
                 return self.ty_void as i32
             return self.ty_bool as i32

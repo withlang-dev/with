@@ -1796,6 +1796,51 @@ fn invariance_variant_action(ctx: ActionCtx) -> i32:
 // Debug-allocator fixture lane: build tools/debug_drop.w, then run it in `check`
 // mode over test/debug_alloc/*.w. Gives the floor eyes for the over/under-drop
 // blind spot it is structurally unable to see. See docs/spec/toolchain/debug-allocator.md.
+// #2011: the async/cancel/defer corpus under every MIR validator. These
+// programs run green while their MIR can still drop a moved place or read a
+// released task handle; only `check --validate-all` sees that, and no lane
+// ran it over them. A fixture is in the corpus when its text names an
+// async, cancellation or defer construct.
+fn validate_all_async_selected(text: &str) -> bool:
+    text.contains("cancel") or text.contains("join_cleanup") or text.contains("await") or text.contains("defer:") or text.contains("defer {") or text.contains("async scope")
+
+fn run_validate_all_async_action(ctx: ActionCtx) -> i32:
+    let inputs = ctx.inputs()
+    if inputs.len() == 0:
+        ctx.diagnostics().error("validate-all-async: missing compiler input")
+    let fs = ctx.fs()
+    let out_dir = ctx.output()
+    if fs.mkdir_all(out_dir) != 0:
+        ctx.diagnostics().error("validate-all-async: could not create output dir: " ++ out_dir)
+    let root = ctx.project_info().project_root()
+    let compiler = build_project_abs(root, inputs[0])
+    var args: Vec[str] = Vec.new()
+    args.push(build_owned_text(compiler))
+    args.push("test")
+    args.push("--validate-all")
+    args.push("--quiet")
+    var dirs: Vec[str] = Vec.new()
+    dirs.push("test/behavior")
+    dirs.push("test/spec")
+    dirs.push("test/debug_alloc")
+    dirs.push("test/phase")
+    var count = 0
+    for di in 0..dirs.len() as i32:
+        let files = fs.list_files(dirs[di])
+        for fi in 0..files.len() as i32:
+            let p = files[fi]
+            if p.ends_with(".w") and not p.contains("/lib/") and validate_all_async_selected(fs.read_text(p)):
+                args.push(build_project_abs(root, p))
+                count = count + 1
+    let vout = build_project_abs(root, build_project_join(out_dir, "validate.stdout"))
+    let verr = build_project_abs(root, build_project_join(out_dir, "validate.stderr"))
+    let vr = ctx.process_runner().run_capture_cwd(args, vout, verr, 1800000, root)
+    if vr.rc != 0:
+        ctx.diagnostics().error(f"validate-all-async: {count} files, rc={vr.rc}\n" ++ fs.read_text(build_project_join(out_dir, "validate.stderr")))
+    print(f"validate-all-async: {count} files ok")
+    let _ = fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
+    0
+
 fn run_debug_alloc_tests_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()
     if inputs.len() == 0:
@@ -3798,6 +3843,16 @@ pub fn build(ctx: BuildCtx) -> Build:
     debug_alloc_tests = debug_alloc_tests.input(release_compiler_bin("with"))
     debug_alloc_tests = debug_alloc_tests.input("tools/debug_drop.w")
     debug_alloc_tests = debug_alloc_tests.input("test/debug_alloc")
+    var validate_all_async = target_new(.Action, "validate-all-async", "").output("out/validate-all-async")
+    validate_all_async.action = run_validate_all_async_action
+    validate_all_async = validate_all_async.input(release_compiler_bin("with"))
+    validate_all_async = validate_all_async.input("test/behavior")
+    validate_all_async = validate_all_async.input("test/spec")
+    validate_all_async = validate_all_async.input("test/debug_alloc")
+    validate_all_async = validate_all_async.input("test/phase")
+    validate_all_async = validate_all_async.dep("build")
+    validate_all_async = validate_all_async.write_scope("out/validate-all-async")
+    out = out.add_target(validate_all_async)
     var drop_audit = target_new(.Action, "drop-audit", "").output("out/drop-audit")
     drop_audit = drop_audit.allow_parallel()
     drop_audit.action = run_drop_audit_action
@@ -4253,6 +4308,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     // two-week-old fixture rot — a lane that exists but never runs is
     // silent debt. 14 s, input-keyed (skips when compiler+fixtures fresh).
     tests = tests.dep("debug-alloc-tests")
+    // #2011: the async/cancel/defer corpus under `check --validate-all`.
+    tests = tests.dep("validate-all-async")
     tests = tests.dep("internals-tests")
     tests = tests.dep("lexer-tests")
     tests = tests.dep("parser-tests")

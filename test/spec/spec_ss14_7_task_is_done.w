@@ -13,9 +13,8 @@ fn main:
         steps = steps + 1
     assert(t.is_done())              // true after driven to completion
 
-    // #637: is_done stays true after .await — the reaped handle names a
-    // finished task; a silent false was the one wrong answer.
+    // `.await` consumes the task (§22: `t.await // OK: consumes the task`),
+    // so the handle is not read after it (#2011; err_2011_task_read_after_await.w).
     let t2 = compute(1)
     assert(t2.await == 2)
-    assert(t2.is_done())
     print("ok")

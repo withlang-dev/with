@@ -4672,8 +4672,41 @@ fn run_test_file_with_build_settings_inner(target: &str, opt_level: i32, no_std:
             let _ = with_setenv_str(pair.slice(0, eq), saved[ei])
     env_rc
 
+// #2011: `with test --validate-all` first checks a test that is meant to
+// compile with every MIR validator (`check --validate-all`), so a battery
+// lane sees invalid ownership MIR that runs green: a drop of a moved place,
+// a read of a released handle. A test that expects a check or build failure,
+// or is skipped here, is not judged.
+fn test_flag_configures_compilation(token: &str) -> bool:
+    if token == "-h" or token == "--help" or token == "--debug-alloc" or token == "--trace-alloc":
+        return false
+    cli_one_liner_known_flag(token) or token.starts_with("--prelude=") or token.starts_with("--overflow=")
+
+fn run_test_validate_all(target: &str, directives: &TestDirectives) -> i32:
+    if directives.skip or directives.expect_check_fail.len() > 0 or directives.expect_build_fail.len() > 0:
+        return 0
+    var vd = parse_test_directives_for_target(target)
+    // Only the fixture's flags that configure how it compiles (prelude tier,
+    // std, runtime, overflow, optimization) apply; a dump or trace request
+    // would print in place of the verdict, and its value would be read as a
+    // file.
+    var kept = ""
+    for token in vd.extra_args.split(" "):
+        if test_flag_configures_compilation(token):
+            kept = kept ++ " " ++ token
+    vd.extra_args = kept ++ " --validate-all"
+    let result = run_test_compiler_command(target, "check", &vd)
+    if result.rc == 0 and result.stdout.contains("validate-all: ok"):
+        return 0
+    emit_test_stage_error("validate-all failed", target, "check", "")
+    emit_test_child_stderr(result.stdout ++ result.stderr)
+    1
+
 fn run_test_file_env_applied(target: &str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, keep_binary: bool, filter: &str, include_paths: &Vec[str], defines: &Vec[str], link_libs: &Vec[str], link_search_paths: &Vec[str], link_rpaths: &Vec[str]) -> i32:
     let directives = parse_test_directives_for_target(target)
+    if cli_has_flag(with_arg_count(), "--validate-all") and run_test_validate_all(target, &directives) != 0:
+        print_test_summary(target, 0, 1, quiet)
+        return 1
     let directive_rc = run_test_directive_command(target, directives, quiet)
     if directive_rc >= 0:
         if not directives.skip:
