@@ -5,6 +5,7 @@ use std.string.StringBuilder
 use std.sysinfo
 use build.compiler
 use build.par
+use build.source_fetch
 use std.io.print_str
 fn sdk_owned_text(s: &str): s ++ ""
 
@@ -703,20 +704,20 @@ fn sdk_compile_helper(ctx: &ActionCtx, workspace_name: &str, source_path: &str, 
         return sdk_fail(ctx, workspace_name ++ " did not produce " ++ output_path)
     0
 
-fn sdk_fetch(ctx: &ActionCtx, scratch: &str, label: &str, url: &str, output_path: &str, timeout_ms: i32) -> i32:
-    let root = ctx.project_info().project_root()
-    let helper = sdk_join(scratch, "https_fetch" ++ sdk_exe_suffix())
-    var rc = sdk_compile_helper(ctx, label ++ "-https-fetch-helper", "build/https_fetch.w", helper)
-    if rc != 0:
-        return rc
-    let argv: Vec[str] = Vec.new()
-    argv.push(sdk_abs(root, helper))
-    argv.push(sdk_owned_text(url))
-    argv.push(sdk_abs(root, output_path))
-    let result = ctx.process_runner().run_capture(argv, sdk_abs(root, sdk_join(scratch, label ++ ".fetch.stdout")), sdk_abs(root, sdk_join(scratch, label ++ ".fetch.stderr")), timeout_ms)
-    if result.rc != 0:
-        return sdk_fail(ctx, f"HTTPS fetch helper failed with exit code {result.rc}: " ++ result.stdout ++ result.stderr)
+// Fetch the archive pinned by `sha256` from the first of `sources` that
+// delivers it (build/source_fetch.w, #2062): a source that is down is
+// skipped in seconds, and when none delivers the failure names the pin and
+// what each source did.
+fn sdk_fetch(ctx: &ActionCtx, scratch: &str, label: &str, sources: &Vec[str], sha256: &str, output_path: &str, timeout_ms: i32) -> i32:
+    let fetched = source_fetch_pinned(ctx, scratch, label, sources, sha256, output_path, SOURCE_FETCH_CONNECT_MS, timeout_ms)
+    if fetched.rc != 0:
+        return sdk_fail(ctx, fetched.report)
     0
+
+fn sdk_one_source(url: &str) -> Vec[str]:
+    let sources: Vec[str] = Vec.new()
+    sources.push(sdk_owned_text(url))
+    sources
 
 fn sdk_gunzip(ctx: &ActionCtx, scratch: &str, archive_path: &str, tar_path: &str) -> i32:
     let root = ctx.project_info().project_root()
@@ -742,11 +743,11 @@ pub fn run_sdk_source_tar_gz_action(ctx: ActionCtx) -> i32:
     if ctx.fs().exists(marker):
         // A tree extracted before the backport existed still gets it.
         return sdk_patch_llvm_source(ctx, args[4])
-    sdk_materialize_source_tar_gz(ctx, sdk_join("out/command", ctx.target_name()), url, args[1], args[2], args[3], args[4], marker)
+    sdk_materialize_source_tar_gz(ctx, sdk_join("out/command", ctx.target_name()), &sdk_one_source(url), args[1], args[2], args[3], args[4], marker, 1800000)
 
 // Fetch the pinned archive (unless it is already there), check its sha256,
 // and extract it under `source_root`; `marker` says the tree is complete.
-fn sdk_materialize_source_tar_gz(ctx: &ActionCtx, scratch: &str, url: &str, expected_sha: &str, archive: &str, source_root: &str, source_dir: &str, marker: &str) -> i32:
+fn sdk_materialize_source_tar_gz(ctx: &ActionCtx, scratch: &str, sources: &Vec[str], expected_sha: &str, archive: &str, source_root: &str, source_dir: &str, marker: &str, download_ms: i32) -> i32:
     if expected_sha.len() == 0:
         return sdk_fail(ctx, "source download requires pinned SHA-256")
     let fs = ctx.fs()
@@ -755,7 +756,7 @@ fn sdk_materialize_source_tar_gz(ctx: &ActionCtx, scratch: &str, url: &str, expe
     if fs.mkdir_all(scratch) != 0:
         return sdk_fail(ctx, "could not create command directory: " ++ scratch)
     if not fs.exists(archive):
-        var rc = sdk_fetch(ctx, scratch, "source", url, archive, 1800000)
+        var rc = sdk_fetch(ctx, scratch, "source", sources, expected_sha, archive, download_ms)
         if rc != 0:
             return rc
     let actual = fs.sha256_file(archive)
@@ -1542,6 +1543,14 @@ fn sdk_merge_sort_strings(items: Vec[str]) -> Vec[str]:
     out
 
 pub fn sdk_zig_source_url() -> str: "https://codeberg.org/ziglang/zig/archive/" ++ SDK_ZIG_VERSION ++ ".tar.gz"
+
+// Where the pinned Zig archive is fetched from, in order; every entry must
+// deliver the bytes of SDK_ZIG_TAR_GZ_SHA256. One entry: no other public
+// host carries them (#2062, checked 2026-10-03). ziglang.org publishes
+// zig-<v>.tar.xz, another archive (sha256 43186959...) in a format the
+// build cannot read, and GitHub's ziglang/zig stops at 0.15.2. A copy we
+// publish ourselves is the entry to add here.
+pub fn sdk_zig_source_urls() -> Vec[str]: sdk_one_source(sdk_zig_source_url())
 pub fn sdk_zig_source_sha256() -> str: SDK_ZIG_TAR_GZ_SHA256
 
 // The sysroots are generated from the pinned Zig source, which each sysroot
@@ -1560,7 +1569,9 @@ fn sdk_materialize_zig_source(ctx: &ActionCtx, scratch: &str) -> i32:
     if fs.exists(zig_marker):
         return 0
     let _partial = fs.remove_tree(zig_root)
-    sdk_materialize_source_tar_gz(ctx, scratch, sdk_zig_source_url(), sdk_zig_source_sha256(), sdk_join(scratch, "zig-" ++ SDK_ZIG_VERSION ++ ".tar.gz"), zig_root, zig_dir, zig_marker)
+    // 35 MB: ten minutes is a 60 KB/s link, and a host that is down costs
+    // SOURCE_FETCH_CONNECT_MS, not this.
+    sdk_materialize_source_tar_gz(ctx, scratch, &sdk_zig_source_urls(), sdk_zig_source_sha256(), sdk_join(scratch, "zig-" ++ SDK_ZIG_VERSION ++ ".tar.gz"), zig_root, zig_dir, zig_marker, 600000)
 
 fn sdk_libcxx_abilist_url() -> str:
     "https://raw.githubusercontent.com/llvm/llvm-project/llvmorg-" ++ compiler_llvm_version() ++ "/libcxx/lib/abi/" ++ SDK_LIBCXX_ABILIST_NAME
@@ -1656,7 +1667,7 @@ pub fn run_darwin_sysroot_action(ctx: ActionCtx) -> i32:
     let abilist_path = sdk_join(scratch, "libcxx-" ++ compiler_llvm_version() ++ "-" ++ SDK_LIBCXX_ABILIST_NAME)
     if not fs.exists(abilist_path) or fs.sha256_file(abilist_path) != SDK_LIBCXX_ABILIST_SHA256:
         let _stale = fs.remove_file(abilist_path)
-        let rc = sdk_fetch(ctx, scratch, "libcxx-abilist", sdk_libcxx_abilist_url(), abilist_path, 300000)
+        let rc = sdk_fetch(ctx, scratch, "libcxx-abilist", &sdk_one_source(sdk_libcxx_abilist_url()), SDK_LIBCXX_ABILIST_SHA256, abilist_path, 300000)
         if rc != 0:
             return rc
     let abilist_sha = fs.sha256_file(abilist_path)
