@@ -785,13 +785,13 @@ pub fn conan_parse_options_from_info(info: &str) -> Vec[str]: conan_info_section
 
 // What a binary was built with, as its conaninfo states it.
 pub fn conan_binary_recipe_env(info: &str, version: &str, dep_dir: &str) -> RecipeEnv:
-    RecipeEnv { os: conan_info_setting(info, "os"), arch: conan_info_setting(info, "arch"), compiler: conan_info_setting(info, "compiler"), compiler_version: conan_info_setting(info, "compiler.version"), build_type: conan_info_setting(info, "build_type"), version: version.to_owned(), package_folder: dep_dir.to_owned(), options: conan_parse_options_from_info(info), options_known: true }
+    RecipeEnv { os: conan_info_setting(info, "os"), arch: conan_info_setting(info, "arch"), compiler: conan_info_setting(info, "compiler"), compiler_version: conan_info_setting(info, "compiler.version"), build_type: conan_info_setting(info, "build_type"), version: version.to_owned(), package_folder: dep_dir.to_owned(), source_folder: "", options: conan_parse_options_from_info(info), options_known: true }
 
 // What a package built here is built with: this platform, the SDK's clang,
 // and the recipe's own default options.
 pub fn conan_built_recipe_env(version: &str, dep_dir: &str) -> RecipeEnv:
     let os = conan_detect_os()
-    RecipeEnv { os: os.clone(), arch: conan_detect_arch(), compiler: if os == "Macos": "apple-clang" else: "clang", compiler_version: "", build_type: "Release", version: version.to_owned(), package_folder: dep_dir.to_owned(), options: Vec.new(), options_known: false }
+    RecipeEnv { os: os.clone(), arch: conan_detect_arch(), compiler: if os == "Macos": "apple-clang" else: "clang", compiler_version: "", build_type: "Release", version: version.to_owned(), package_folder: dep_dir.to_owned(), source_folder: "", options: Vec.new(), options_known: false }
 
 // One component of a package, as the build links it: `requires` names a
 // sibling component, or `name/version:component` of another package.
@@ -1074,24 +1074,89 @@ fn conan_resolve_and_install_requirements(requirements: &Vec[str], project_root:
         resolved.push(req_name ++ "/" ++ actual)
     resolved
 
+// Adds to `into` what `more` links that it does not: a library, or a
+// `-framework X` pair.
+fn conan_component_add_links(into0: ConanComponentLink, libs: &Vec[str], link_args: &Vec[str]) -> ConanComponentLink:
+    var into = into0
+    for lib in libs:
+        if not conan_vec_contains(into.libs, lib): into.libs.push(lib.clone())
+    var i = 0
+    while i + 1 < link_args.len() as i32:
+        var seen = false
+        var j = 0
+        while j + 1 < into.link_args.len() as i32:
+            if into.link_args[j + 1] == link_args[i + 1]: seen = true
+            j = j + 2
+        if not seen:
+            into.link_args.push(link_args[i].clone())
+            into.link_args.push(link_args[i + 1].clone())
+        i = i + 2
+    into
+
+// A package built here has two statements of what a consumer links beyond
+// its own libraries: the pkg-config files its build installed, written by
+// its authors for this build, and the recipe's `package_info`, written by
+// its packager for every platform. Each leaves things out (raylib's
+// pkg-config file names no winmm on Windows; SDL's recipe names no cfgmgr32
+// outside MSVC), and a library a static archive needs and nobody names is a
+// link error in the user's program. Both are honored: the system libraries
+// and frameworks either names are linked. The package's own libraries and
+// its components are the recipe's when the build produced the libraries it
+// names, and the build's otherwise.
+fn conan_built_package_link(dep_dir: &str, requirements: &Vec[str], pc_texts: &Vec[str], info: &RecipePackageInfo) -> ConanPackageLink:
+    let recipe_link = if info.ok: conan_package_link(dep_dir, requirements, info) else: ConanPackageLink { problem: info.problem.clone(), warnings: Vec.new(), components: Vec.new() }
+    if pc_texts.len() == 0: return recipe_link
+    let pc_link = conan_pc_link(dep_dir, requirements, pc_texts)
+    if recipe_link.problem.len() == 0:
+        // What the pkg-config files add, to every component that links a library.
+        var extra_libs: Vec[str] = Vec.new()
+        for lib in pc_link.components[0].libs:
+            if not conan_package_has_lib(dep_dir, &pc_link.components[0].lib_paths, lib): extra_libs.push(lib.clone())
+        var out = ConanPackageLink { problem: "", warnings: Vec.new(), components: Vec.new() }
+        for w in recipe_link.warnings: out.warnings.push(w.clone())
+        for w in pc_link.warnings: out.warnings.push(w.clone())
+        for c in recipe_link.components:
+            var merged = ConanComponentLink { name: c.name.clone(), libs: c.libs.clone(), lib_paths: c.lib_paths.clone(), link_args: c.link_args.clone(), defines: c.defines.clone(), include_paths: c.include_paths.clone(), requires: c.requires.clone() }
+            if c.libs.len() > 0: merged = conan_component_add_links(move merged, &extra_libs, &pc_link.components[0].link_args)
+            out.components.push(merged)
+        return out
+    // The build did not produce the libraries the recipe names: the build's
+    // own files say what it produced, and the recipe's system libraries and
+    // frameworks are added to them.
+    var out = ConanPackageLink { problem: "", warnings: Vec.new(), components: Vec.new() }
+    for w in pc_link.warnings: out.warnings.push(w.clone())
+    var whole = ConanComponentLink { name: pc_link.components[0].name.clone(), libs: pc_link.components[0].libs.clone(), lib_paths: pc_link.components[0].lib_paths.clone(), link_args: pc_link.components[0].link_args.clone(), defines: pc_link.components[0].defines.clone(), include_paths: pc_link.components[0].include_paths.clone(), requires: pc_link.components[0].requires.clone() }
+    if info.ok:
+        var frameworks: Vec[str] = Vec.new()
+        for fw in info.root.frameworks:
+            frameworks.push("-framework")
+            frameworks.push(fw.clone())
+        whole = conan_component_add_links(move whole, &info.root.system_libs, &frameworks)
+        for c in info.components:
+            var component_frameworks: Vec[str] = Vec.new()
+            for fw in c.frameworks:
+                component_frameworks.push("-framework")
+                component_frameworks.push(fw.clone())
+            whole = conan_component_add_links(move whole, &c.system_libs, &component_frameworks)
+        for n in info.notes: out.warnings.push("recipe " ++ n)
+    out.components.push(whole)
+    out
+
 // Writes the metadata of the package in `dep_dir` from its link interface
-// (above). `built` says the package was built here, so its own pkg-config
-// files speak first; a Conan Center binary is read through `recipe`, the
-// conanfile.py of its recipe revision.
+// (above). `built` says the package was built here, so the pkg-config files
+// its build installed speak beside its recipe; a Conan Center binary is read
+// through `recipe` alone, the conanfile.py of its recipe revision.
 fn conan_write_binary_metadata(name: &str, version: &str, recipe_rev: &str, package_id: &str, package_rev: &str, dep_dir: &str, requirements: &Vec[str], env: &RecipeEnv, recipe: &str, built: bool) -> i32:
-    var link = ConanPackageLink { problem: "", warnings: Vec.new(), components: Vec.new() }
+    if recipe.len() == 0:
+        runtime_eprint("error: could not read the recipe of " ++ name ++ "/" ++ version ++ ", which says what the package links")
+        return 1
+    let info = recipe_package_info(recipe, env)
     var pc: Vec[str] = Vec.new()
     if built: pc = conan_package_pc_texts(dep_dir)
-    if pc.len() > 0: link = conan_pc_link(dep_dir, requirements, &pc)
-    else:
-        if recipe.len() == 0:
-            runtime_eprint("error: could not read the recipe of " ++ name ++ "/" ++ version ++ ", which says what the package links")
-            return 1
-        let info = recipe_package_info(recipe, env)
-        if not info.ok:
-            runtime_eprint("error: " ++ name ++ "/" ++ version ++ ": " ++ info.problem)
-            return 1
-        link = conan_package_link(dep_dir, requirements, &info)
+    if not info.ok and pc.len() == 0:
+        runtime_eprint("error: " ++ name ++ "/" ++ version ++ ": " ++ info.problem)
+        return 1
+    let link = if built: conan_built_package_link(dep_dir, requirements, &pc, &info) else: conan_package_link(dep_dir, requirements, &info)
     if link.problem.len() > 0:
         runtime_eprint("error: " ++ name ++ "/" ++ version ++ " cannot be linked: " ++ link.problem)
         return 1
@@ -1605,12 +1670,13 @@ fn conan_install_from_source(name: &str, version: &str, project_root: &str, dept
     let self_exe = conan_self_exe()
     if self_exe.len() == 0: return conan_source_fail("", "could not locate this `with` executable to use as the C compiler")
 
-    let env = CrEnv { recipe: recipe.clone(), version: version.to_owned(), source_dir: "", os: conan_detect_os(), arch: conan_detect_arch() }
-    let requires = conan_recipe_requires(&env)
-    for undecided in requires.undecided:
-        runtime_eprint("  note: not requiring " ++ undecided ++ ": that condition needs the recipe to run")
+    var recipe_env = conan_built_recipe_env(version, "")
+    let requires = recipe_requirements(recipe, &recipe_env)
+    if not requires.ok: return conan_source_fail("", name ++ "/" ++ version ++ ": " ++ requires.problem)
+    for undecided in requires.notes:
+        runtime_eprint("  note: " ++ name ++ " recipe " ++ undecided ++ "; a requirement under it is not installed")
     let resolved: Vec[str] = Vec.new()
-    for reference in requires.refs:
+    for reference in requires.requires:
         let required = conan_ref_name(reference)
         let written = conan_ref_version(reference)
         // A version range asks for the newest release Conan Center has in it.
@@ -1648,8 +1714,10 @@ fn conan_install_from_source(name: &str, version: &str, project_root: &str, dept
     else if runtime_file_exists(source_dir ++ "/CMakeLists.txt") == 0:
         return conan_source_fail(dep_dir, name ++ "/" ++ version ++ " builds with " ++ conan_recipe_build_system(recipe) ++ "; `with get` builds CMake projects from source, so this package needs a platform Conan Center has a binary for")
 
-    let built_env = CrEnv { recipe: recipe.clone(), version: version.to_owned(), source_dir: source_dir.clone(), os: conan_detect_os(), arch: conan_detect_arch() }
-    let variables = conan_recipe_cmake_variables(&built_env)
+    recipe_env.source_folder = source_dir.clone()
+    let variables = recipe_cmake_variables(recipe, &recipe_env)
+    if not variables.ok: return conan_source_fail(dep_dir, name ++ "/" ++ version ++ ": " ++ variables.problem)
+    for undecided in variables.notes: runtime_eprint("  note: " ++ name ++ " recipe " ++ undecided ++ "; a CMake variable under it is not set")
     var prefix_path = ""
     for reference in resolved:
         if prefix_path.len() > 0: prefix_path = prefix_path ++ ";"
@@ -1690,7 +1758,7 @@ fn conan_install_from_source(name: &str, version: &str, project_root: &str, dept
         if written.problem.len() > 0:
             return conan_source_fail(dep_dir, "could not write the CMake package config of " ++ reference ++ " for " ++ name ++ "/" ++ version ++ ": " ++ written.problem)
         if written.define.len() > 0: configure = conan_argv_append(configure, written.define)
-    for define in variables.defines: configure = conan_argv_append(configure, define)
+    for i in 0..variables.names.len() as i32: configure = conan_argv_append(configure, "-D" ++ variables.names[i] ++ "=" ++ variables.values[i])
     for define in cmake_env.defines:
         runtime_eprint("  " ++ cmake_env_name ++ ": " ++ define)
         configure = conan_argv_append(configure, define)

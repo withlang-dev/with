@@ -902,7 +902,7 @@ type PyNames { items: Vec[str] }
 // package's version and directory, and its options as `name=value` when the
 // binary states them (`options_known`); otherwise the recipe's defaults are
 // taken and its `config_options` and `configure` run over them.
-pub type RecipeEnv { os: str, arch: str, compiler: str, compiler_version: str, build_type: str, version: str, package_folder: str, options: Vec[str], options_known: bool }
+pub type RecipeEnv { os: str, arch: str, compiler: str, compiler_version: str, build_type: str, version: str, package_folder: str, source_folder: str, options: Vec[str], options_known: bool }
 
 // One `cpp_info`: the package's own, or a component's.
 pub type RecipeComponent { name: str, libs: Vec[str], system_libs: Vec[str], frameworks: Vec[str], libdirs: Vec[str], includedirs: Vec[str], defines: Vec[str], exelinkflags: Vec[str], requires: Vec[str] }
@@ -920,7 +920,7 @@ let PY_CONTINUE = 3
 
 let PY_STEP_LIMIT = 400000
 
-type PyInterp { nodes: Vec[PyNode], lists: Vec[PyList], dkeys: Vec[PyList], dvals: Vec[PyList], objs: Vec[PyObj], recv: Vec[PyVal], frame_names: Vec[PyNames], frame_vals: Vec[PyList], method_names: Vec[str], method_nodes: Vec[i32], attr_names: Vec[str], attr_vals: Vec[PyVal], func_names: Vec[str], func_nodes: Vec[i32], self_obj: i32, env: RecipeEnv, notes: Vec[str], ret: PyVal, steps: i32, depth: i32, problem: str }
+type PyInterp { nodes: Vec[PyNode], lists: Vec[PyList], dkeys: Vec[PyList], dvals: Vec[PyList], objs: Vec[PyObj], recv: Vec[PyVal], frame_names: Vec[PyNames], frame_vals: Vec[PyList], method_names: Vec[str], method_nodes: Vec[i32], attr_names: Vec[str], attr_vals: Vec[PyVal], func_names: Vec[str], func_nodes: Vec[i32], self_obj: i32, env: RecipeEnv, notes: Vec[str], ret: PyVal, steps: i32, depth: i32, problem: str, reqs: Vec[str], tool_reqs: Vec[str], toolchains: Vec[i32] }
 
 // Numeric order of two versions, component by component; a missing
 // component is 0, and a component that is not a number orders as text.
@@ -1150,6 +1150,12 @@ impl PyInterp:
     mut fn self_attr(name: &str, line: i32) -> PyVal:
         let at = self.obj_find(self.self_obj, name)
         if at >= 0: return pv_copy(&self.objs[self.self_obj].vals[at])
+        if name == "requires" or name == "tool_requires" or name == "build_requires" or name == "test_requires":
+            // `self.requires("zlib/1.3")`, unless the class states `requires = …`.
+            var stated = false
+            for i in 0..self.attr_names.len() as i32:
+                if self.attr_names[i] == name: stated = true
+            if not stated: return self.bound(&pv(V_OBJ, self.self_obj as i64, ""), name)
         for i in 0..self.method_names.len() as i32:
             if self.method_names[i] != name: continue
             let node: i32 = self.method_nodes[i]
@@ -1187,6 +1193,7 @@ impl PyInterp:
             let at = self.obj_find(obj, name)
             if at >= 0: return pv_copy(&self.objs[obj].vals[at])
             return pv_none()
+        if cls == "toolchain" and self.obj_find(obj, name) < 0: return pv_sink()
         let at = self.obj_find(obj, name)
         if at >= 0: return pv_copy(&self.objs[obj].vals[at])
         pv_unknown()
@@ -1337,6 +1344,17 @@ impl PyInterp:
         let obj = receiver.n as i32
         let cls = self.objs[obj].cls.clone()
         if cls == "cppinfo": return if name == "set_property": pv_none() else: pv_unknown()
+        if cls == "self":
+            if name == "test_requires": return pv_none()
+            if name == "requires" or name == "tool_requires" or name == "build_requires":
+                let reference = self.to_text(&arg0)
+                if reference.k != V_STR:
+                    self.note(line, "a requirement could not be evaluated")
+                    return pv_none()
+                if name == "requires": self.reqs.push(reference.s.clone())
+                else: self.tool_reqs.push(reference.s.clone())
+                return pv_none()
+            return pv_unknown()
         if cls == "options":
             if name == "get_safe" and arg0.k == V_STR:
                 let at = self.obj_find(obj, arg0.s)
@@ -1406,6 +1424,15 @@ impl PyInterp:
         if name == "textwrap.dedent": return arg0
         if name == "print" or name == "check_min_cppstd" or name == "check_max_cppstd" or name == "check_min_cstd": return pv_none()
         // PkgConfig, self.dependencies, tools this model does not carry.
+        if name == "CMakeToolchain":
+            // What `generate` sets on it is what the build is configured with.
+            let tc = self.new_obj("toolchain")
+            let variables = self.new_dict()
+            let cache = self.new_dict()
+            self.obj_set(tc, "variables", variables)
+            self.obj_set(tc, "cache_variables", cache)
+            self.toolchains.push(tc)
+            return pv(V_OBJ, tc as i64, "")
         if name == "PkgConfig" or name == "VirtualBuildEnv" or name == "VirtualRunEnv" or name == "Environment": return pv_sink()
         pv_unknown()
 
@@ -1782,7 +1809,7 @@ fn recipe_class(tree: &PyModule) -> i32:
 
 fn recipe_interp(recipe: &str, env: &RecipeEnv) -> (PyInterp, str):
     var tree = py_parse(recipe)
-    var ip = PyInterp { nodes: Vec.new(), lists: Vec.new(), dkeys: Vec.new(), dvals: Vec.new(), objs: Vec.new(), recv: Vec.new(), frame_names: Vec.new(), frame_vals: Vec.new(), method_names: Vec.new(), method_nodes: Vec.new(), attr_names: Vec.new(), attr_vals: Vec.new(), func_names: Vec.new(), func_nodes: Vec.new(), self_obj: 0, env: RecipeEnv { os: env.os.clone(), arch: env.arch.clone(), compiler: env.compiler.clone(), compiler_version: env.compiler_version.clone(), build_type: env.build_type.clone(), version: env.version.clone(), package_folder: env.package_folder.clone(), options: Vec.new(), options_known: env.options_known }, notes: Vec.new(), ret: pv_none(), steps: 0, depth: 0, problem: "" }
+    var ip = PyInterp { nodes: Vec.new(), lists: Vec.new(), dkeys: Vec.new(), dvals: Vec.new(), objs: Vec.new(), recv: Vec.new(), frame_names: Vec.new(), frame_vals: Vec.new(), method_names: Vec.new(), method_nodes: Vec.new(), attr_names: Vec.new(), attr_vals: Vec.new(), func_names: Vec.new(), func_nodes: Vec.new(), self_obj: 0, env: RecipeEnv { os: env.os.clone(), arch: env.arch.clone(), compiler: env.compiler.clone(), compiler_version: env.compiler_version.clone(), build_type: env.build_type.clone(), version: env.version.clone(), package_folder: env.package_folder.clone(), source_folder: env.source_folder.clone(), options: Vec.new(), options_known: env.options_known }, notes: Vec.new(), ret: pv_none(), steps: 0, depth: 0, problem: "", reqs: Vec.new(), tool_reqs: Vec.new(), toolchains: Vec.new() }
     if tree.problem.len() > 0: return (ip, "the recipe could not be read: " ++ tree.problem)
     let cls_node = recipe_class(&tree)
     if cls_node < 0: return (ip, "the recipe defines no class")
@@ -1839,6 +1866,8 @@ fn recipe_interp(recipe: &str, env: &RecipeEnv) -> (PyInterp, str):
     ip.obj_set(self_obj, "settings_target", pv_none())
     ip.obj_set(self_obj, "version", pv_str(env.version))
     ip.obj_set(self_obj, "package_folder", pv_str(env.package_folder))
+    ip.obj_set(self_obj, "source_folder", pv_str(env.source_folder))
+    ip.obj_set(self_obj, "export_sources_folder", pv_str(env.source_folder))
     let options = ip.new_obj("options")
     ip.obj_set(self_obj, "options", pv(V_OBJ, options as i64, ""))
     let cpp_info = ip.new_obj("cppinfo")
@@ -1896,3 +1925,73 @@ pub fn recipe_package_info(recipe: &str, env: &RecipeEnv) -> RecipePackageInfo:
             ids.push(ip.objs[comps].vals[i].n as i32)
         for i in 0..names.len() as i32: components.push(ip.component(ids[i], names[i]))
     RecipePackageInfo { ok: true, problem: "", notes: move ip.notes, root, components }
+
+// What `requirements` and `build_requirements` ask for: the packages the
+// library needs, and the tools its build runs, as the recipe writes them
+// (`zlib/[>=1.2.11 <2]`).
+pub type RecipeRequirements { ok: bool, problem: str, notes: Vec[str], requires: Vec[str], tool_requires: Vec[str] }
+
+pub fn recipe_requirements(recipe: &str, env: &RecipeEnv) -> RecipeRequirements:
+    let (ip0, problem) = recipe_interp(recipe, env)
+    if problem.len() > 0: return RecipeRequirements { ok: false, problem, notes: Vec.new(), requires: Vec.new(), tool_requires: Vec.new() }
+    var ip = ip0
+    ip.notes = Vec.new()
+    // The class may state its requirements as an attribute instead.
+    let stated = ip.self_attr("requires", 0)
+    if stated.k == V_STR: ip.reqs.push(stated.s.clone())
+    if stated.k == V_LIST:
+        for i in 0..ip.lists[stated.n as i32].items.len() as i32:
+            let reference = pv_copy(&ip.lists[stated.n as i32].items[i])
+            if reference.k == V_STR: ip.reqs.push(reference.s.clone())
+    let _r = ip.run_method("requirements")
+    let _b = ip.run_method("build_requirements")
+    if ip.problem.len() > 0: return RecipeRequirements { ok: false, problem: move ip.problem, notes: Vec.new(), requires: Vec.new(), tool_requires: Vec.new() }
+    RecipeRequirements { ok: true, problem: "", notes: move ip.notes, requires: move ip.reqs, tool_requires: move ip.tool_reqs }
+
+// The variables `generate` sets on its CMakeToolchain, as CMake spells
+// their values; `unknown` names each one whose value could not be evaluated.
+pub type RecipeCMake { ok: bool, problem: str, notes: Vec[str], names: Vec[str], values: Vec[str], unknown: Vec[str] }
+
+pub fn recipe_cmake_variables(recipe: &str, env: &RecipeEnv) -> RecipeCMake:
+    var out = RecipeCMake { ok: false, problem: "", notes: Vec.new(), names: Vec.new(), values: Vec.new(), unknown: Vec.new() }
+    let (ip0, problem) = recipe_interp(recipe, env)
+    if problem.len() > 0:
+        out.problem = problem
+        return out
+    var ip = ip0
+    ip.notes = Vec.new()
+    let _g = ip.run_method("generate")
+    if ip.problem.len() > 0:
+        out.problem = move ip.problem
+        return out
+    for ti in 0..ip.toolchains.len() as i32:
+        let tc: i32 = ip.toolchains[ti]
+        for attr in ["variables", "cache_variables"]:
+            let at = ip.obj_find(tc, attr)
+            if at < 0: continue
+            let dict = pv_copy(&ip.objs[tc].vals[at])
+            if dict.k != V_DICT: continue
+            for i in 0..ip.dkeys[dict.n as i32].items.len() as i32:
+                let key = pv_copy(&ip.dkeys[dict.n as i32].items[i])
+                if key.k != V_STR: continue
+                let value = ip.plain(&ip.dvals[dict.n as i32].items[i])
+                // An unset variable (None) is not passed.
+                if value.k == V_OPT and value.s == "None": continue
+                if value.k == V_NONE: continue
+                var text = ""
+                if value.k == V_BOOL: text = if value.n != 0: "ON" else: "OFF"
+                else if value.k == V_OPT and (value.s == "True" or value.s == "False"): text = if value.s == "True": "ON" else: "OFF"
+                else if value.k == V_STR or value.k == V_OPT or value.k == V_VER or value.k == V_INT: text = py_option_text(&value)
+                else:
+                    out.unknown.push(key.s.clone())
+                    continue
+                var slot = -1
+                for k in 0..out.names.len() as i32:
+                    if out.names[k] == key.s: slot = k
+                if slot >= 0: out.values[slot] = text
+                else:
+                    out.names.push(key.s.clone())
+                    out.values.push(text)
+    out.ok = true
+    out.notes = move ip.notes
+    out

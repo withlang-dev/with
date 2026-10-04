@@ -87,7 +87,7 @@ fn demo_recipe() -> str:
     "            self.cpp_info.components[\"core\"].defines.append(\"ZLIB_DLL\")\n" ++
     ""
 
-fn env(os: &str, compiler: &str, version: &str, options: Vec[str], known: bool): RecipeEnv { os: os.to_owned(), arch: "x86_64", compiler: compiler.to_owned(), compiler_version: "13", build_type: "Release", version: version.to_owned(), package_folder: "", options, options_known: known }
+fn env(os: &str, compiler: &str, version: &str, options: Vec[str], known: bool): RecipeEnv { os: os.to_owned(), arch: "x86_64", compiler: compiler.to_owned(), compiler_version: "13", build_type: "Release", version: version.to_owned(), package_folder: "", source_folder: "", options, options_known: known }
 
 fn options(lines: &str) -> Vec[str]:
     var out: Vec[str] = Vec.new()

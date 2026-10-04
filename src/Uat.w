@@ -18,6 +18,7 @@ extern fn with_fs_mkdir_p(path: &str) -> i32
 extern fn with_fs_read_file(path: &str) -> str
 extern fn with_fs_file_exists(path: &str) -> i32
 extern fn with_fs_remove_tree(path: &str) -> i32
+extern fn with_fs_remove_file(path: &str) -> i32
 extern fn with_fs_list_files(path: &str) -> str
 extern fn with_fs_chmod(path: &str, mode: i32) -> i32
 use std.process
@@ -399,7 +400,25 @@ fn uat_toolchain(self_path: &str) -> str:
     let override = env("WITH_UAT_WITH")
     if override.len() > 0: override else: self_path.clone()
 
+// A scenario that writes a file before any `new directory` writes it into
+// the project itself. What it created there is removed when it ends (unless
+// `--keep`): a run leaves the project as it found it. A file that was there
+// before the run is the project's and stays.
 fn uat_run_scenario(sc: &UatScenario, root: &str, self_path: &str, keep: bool) -> UatOutcome:
+    var created: Vec[str] = Vec.new()
+    for si in 0..sc.steps.len() as i32:
+        let verb = sc.steps[si].verb
+        if verb == UAT_NEW_DIRECTORY: break
+        if verb != UAT_WRITE_FROM and verb != UAT_WRITE_INLINE: continue
+        let path = uat_join(root, sc.steps[si].a)
+        if with_fs_file_exists(path) == 0: created.push(path)
+    let outcome = uat_run_steps(sc, root, self_path, keep)
+    if not keep:
+        for path in created:
+            let _ = with_fs_remove_file(path)
+    outcome
+
+fn uat_run_steps(sc: &UatScenario, root: &str, self_path: &str, keep: bool) -> UatOutcome:
     var human: Vec[str] = Vec.new()
     let capture_dir = uat_join(root, "out/uat/" ++ sc.name)
     let _ = with_fs_mkdir_p(capture_dir)
