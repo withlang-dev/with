@@ -2034,16 +2034,9 @@ impl Parser:
             let field_name = self.expect_ident()
             if field_name == 0:
                 break
-            if self.expect(TokenKind.TK_COLON) == 0:
+            let (field_type, field_default) = self.parse_field_type_and_default()
+            if field_type == 0:
                 break
-            let field_type = self.parse_type_expr()
-
-            // Optional default value
-            var field_default: NodeId = 0 as NodeId
-            if self.peek() == TokenKind.TK_EQ:
-                self.advance()
-                self.skip_newlines()
-                field_default = self.parse_expr()
 
             fields.push(field_name)
             fields.push(field_type as i32)
@@ -2105,14 +2098,9 @@ impl Parser:
             if self.peek() != TokenKind.TK_IDENT:
                 break
             let field_name = self.expect_ident()
-            if self.expect(TokenKind.TK_COLON) == 0:
+            let (field_type, field_default) = self.parse_field_type_and_default()
+            if field_type == 0:
                 break
-            let field_type = self.parse_type_expr()
-            var field_default: NodeId = 0 as NodeId
-            if self.peek() == TokenKind.TK_EQ:
-                self.advance()
-                self.skip_newlines()
-                field_default = self.parse_expr()
 
             fields.push(field_name)
             fields.push(field_type as i32)
@@ -3018,6 +3006,97 @@ impl Parser:
             self.pool.mark_global_allocator_decl(decl)
             self.pending_global_allocator = 0
         decl
+
+    // D89 (§4.3): whether a field's default is an unsuffixed numeric
+    // constant expression, whose type the field's uses decide: 1 an integer,
+    // 2 a float, 0 neither.
+    fn untyped_numeric_default_kind(value: NodeId) -> i32:
+        if value == 0:
+            return 0
+        let kind = self.pool.kind(value)
+        if kind == NodeKind.NK_INT_LIT: return if self.pool.literal_suffix(value) == LiteralSuffix.None: 1 else: 0
+        if kind == NodeKind.NK_FLOAT_LIT: return if self.pool.literal_suffix(value) == LiteralSuffix.None: 2 else: 0
+        if kind == NodeKind.NK_GROUPED: return self.untyped_numeric_default_kind(self.pool.get_data0(value))
+        if kind == NodeKind.NK_UNARY and self.pool.get_data0(value) == UnaryOp.UOP_NEGATE: return self.untyped_numeric_default_kind(self.pool.get_data1(value))
+        if kind == NodeKind.NK_BINARY:
+            let op = self.pool.get_data0(value)
+            if op != BinaryOp.OP_ADD and op != BinaryOp.OP_SUB and op != BinaryOp.OP_MUL and op != BinaryOp.OP_DIV and op != BinaryOp.OP_MOD: return 0
+            let lhs = self.untyped_numeric_default_kind(self.pool.get_data1(value))
+            let rhs = self.untyped_numeric_default_kind(self.pool.get_data2(value))
+            if lhs == 0 or rhs == 0: return 0
+            return if lhs > rhs: lhs else: rhs
+        0
+
+    // D89 (§4.3): a field with a default may omit its type; the field then
+    // has the type of its default. The type is written here as the type node
+    // the default makes evident: a literal's, a struct literal's. An
+    // unsuffixed numeric default is marked (d2: 1 integer, 2 float): its
+    // type is `i32` or `f64` unless the field's uses in its module demand
+    // another (Sema). 0 when the default does not make its type evident.
+    mut fn field_type_from_default(value: NodeId) -> NodeId:
+        if value == 0:
+            return 0 as NodeId
+        var inner = value
+        while self.pool.kind(inner) == NodeKind.NK_GROUPED or (self.pool.kind(inner) == NodeKind.NK_UNARY and self.pool.get_data0(inner) == UnaryOp.UOP_NEGATE):
+            inner = if self.pool.kind(inner) == NodeKind.NK_GROUPED: self.pool.get_data0(inner) else: self.pool.get_data1(inner)
+        let start = self.pool.get_start(value)
+        let end = self.pool.get_end(value)
+        let numeric = self.untyped_numeric_default_kind(value)
+        if numeric == 2:
+            return self.pool.add_node(NodeKind.NK_TYPE_NAMED, start, end, self.intern.intern("f64"), 0, 2)
+        if numeric == 1:
+            var name = "i32"
+            if self.pool.kind(value) == NodeKind.NK_INT_LIT:
+                let fast = self.pool.int_literal_fast_i64(value)
+                if fast.ok == 0 or fast.value < -2147483648 or fast.value > 2147483647: name = "i64"
+            return self.pool.add_node(NodeKind.NK_TYPE_NAMED, start, end, self.intern.intern(name), 0, 1)
+        let kind = self.pool.kind(inner)
+        if kind == NodeKind.NK_BOOL_LIT:
+            return self.pool.add_node(NodeKind.NK_TYPE_NAMED, start, end, self.intern.intern("bool"), 0, 0)
+        if kind == NodeKind.NK_STRING_LIT or kind == NodeKind.NK_FSTRING:
+            return self.pool.add_node(NodeKind.NK_TYPE_NAMED, start, end, self.intern.intern("str"), 0, 0)
+        if kind == NodeKind.NK_STRUCT_LIT and self.pool.get_data0(inner) != 0:
+            return self.pool.add_node(NodeKind.NK_TYPE_NAMED, start, end, self.pool.get_data0(inner), 0, 0)
+        if kind == NodeKind.NK_INT_LIT or kind == NodeKind.NK_FLOAT_LIT:
+            let suffix = self.pool.literal_suffix(inner)
+            var name = ""
+            if suffix == LiteralSuffix.I8: name = "i8"
+            else if suffix == LiteralSuffix.I16: name = "i16"
+            else if suffix == LiteralSuffix.I32: name = "i32"
+            else if suffix == LiteralSuffix.I64: name = "i64"
+            else if suffix == LiteralSuffix.I128: name = "i128"
+            else if suffix == LiteralSuffix.Isize: name = "isize"
+            else if suffix == LiteralSuffix.U8: name = "u8"
+            else if suffix == LiteralSuffix.U16: name = "u16"
+            else if suffix == LiteralSuffix.U32: name = "u32"
+            else if suffix == LiteralSuffix.U64: name = "u64"
+            else if suffix == LiteralSuffix.U128: name = "u128"
+            else if suffix == LiteralSuffix.Usize: name = "usize"
+            else if suffix == LiteralSuffix.F32: name = "f32"
+            else if suffix == LiteralSuffix.F64: name = "f64"
+            if name.len() > 0: return self.pool.add_node(NodeKind.NK_TYPE_NAMED, start, end, self.intern.intern(name), 0, 0)
+        0 as NodeId
+
+    // A struct field after its name: `: Type`, `: Type = default`, or
+    // `= default` (D89). The type node and the default, or (0, 0) on error.
+    mut fn parse_field_type_and_default() -> (NodeId, NodeId):
+        if self.peek() == TokenKind.TK_EQ:
+            self.advance()
+            self.skip_newlines()
+            let value = self.parse_expr()
+            let inferred = self.field_type_from_default(value)
+            if inferred == 0 and value != 0:
+                self.emit_error("this field's default does not make its type evident here; write it (`name: Type = default`)")
+            return (inferred, value)
+        if self.expect(TokenKind.TK_COLON) == 0:
+            return (0 as NodeId, 0 as NodeId)
+        let field_type = self.parse_type_expr()
+        var field_default: NodeId = 0 as NodeId
+        if self.peek() == TokenKind.TK_EQ:
+            self.advance()
+            self.skip_newlines()
+            field_default = self.parse_expr()
+        (field_type, field_default)
 
     mut fn parse_const_decl(is_pub: i32, start: i32) -> NodeId:
         self.advance()  // consume 'const'
