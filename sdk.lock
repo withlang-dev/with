@@ -11,12 +11,14 @@
 # workflow pins those. A release asset replaced in place is a new SDK: pin
 # its digest only after verifying it builds this tree.
 
-# darwin-aarch64: 3ae5c9ec with the arm64e.x1 backport, so its ld64.lld reads
-# Xcode 27's .tbd stubs (#1826, #1880).
-with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz.version=nightly-sdk-20260928-3ae5c9ec0b31
-with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz=dd824534e89fe9570558036a69fcddfecb6075b0fcad1bfa7f502c67272de7a4
-with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz.sha256=66258ada1ca04f6bfa4ff1f55753fa890b75a2cc3b7fb978f6d9979ae24179f1
-with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz.manifest=9623c66f4f03265c64f2cda63ddc20be0eac9b690d0fab1155fb30f47c3b781e
+# darwin-aarch64: 8b059526, built from source with the arm64e.x1 backport, so
+# its ld64.lld reads Xcode 27's .tbd stubs (#1826, #1880). It carries its
+# sysroot (`sysroot/`) and the dsymutil driver archive: a build reads the
+# sysroot from it and fetches no Zig source (#2062, #1915).
+with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz.version=nightly-sdk-20261004-8b0595267bb0
+with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz=d3abcdfd6f6ccc8094929e4053a15c28c45d1672108d5755460cd51607bd9406
+with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz.sha256=f4dc074646a19a24167ef577ed2f6965211601563d9cd31acecff65169b41415
+with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz.manifest=889371bbfebf203482fa4c2d3dd072681dedec557ad58f21b3f269385dbc064f
 
 # linux-x86_64: built by build/sdk.w at 6f039463 against the With linux
 # sysroot (glibc 2.28), with its own compiler-rt and static libc++ and no
