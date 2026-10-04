@@ -88,6 +88,7 @@ PUB         := 'pub'
 STRUCT_DECL := [ PUB ] 'type' IDENT [ TYPE_PARAMS ] '{' FIELDS '}'
 FIELDS      := FIELD { ',' FIELD } [ ',' ]
 FIELD       := [ PUB ] IDENT ':' TYPE [ '=' EXPR ]
+             | [ PUB ] IDENT '=' EXPR
 ```
 
 **Enum declaration** (§4.4):

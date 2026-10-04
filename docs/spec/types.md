@@ -102,6 +102,22 @@ Suffixed literals are explicit and do not participate in contextual
 retyping. If a context expects `u32` and the literal is `42u8`, the
 program is ill-typed unless an explicit conversion is written.
 
+**Unsuffixed constants.** A `const` declared without a type, whose
+initializer is made only of unsuffixed numeric literals, operators on them,
+and other such constants, has no numeric type of its own. Each use of it is
+typed as its initializer would be if written at that use: by the context of
+the use, and by the defaults only where the use gives none. A `const` with a
+declared type, or whose initializer has a suffixed literal or any other typed
+operand, has that type at every use.
+
+```
+const STEP = 1.0 / 120.0
+const SPEED = 320.0
+fn advance(dt: f32) -> f32: SPEED * dt   // SPEED is f32 here
+let t: f64 = STEP                        // STEP is f64 here
+let n = SPEED                            // no context: f64
+```
+
 **Range checking:** a suffixed literal must fit in its declared type. For
 example, `256u8` is invalid.
 
@@ -638,6 +654,18 @@ type Request {
     created_at: Instant = Instant.now(),    // evaluated when constructed
     headers: Vec[Header] = Vec.new(),       // fresh Vec each time
 }
+```
+
+**A field's type from its default.** A field with a default may omit its
+type; the field then has the type of its default. When the default is an
+unsuffixed numeric constant expression, the field's numeric type is decided
+as a literal's is (§4.2.1): by what the field's uses in its module demand,
+and by the default (`i32`, `f64`) when no use demands anything. Uses that
+demand two different types are an error that asks for the type to be
+written. A field without a default states its type.
+
+```
+type Ship { pos = Vector2 { x: 480.0, y: 300.0 }, radius = 10.0, ticks = 0, alive = true }
 ```
 
 **Rules:**

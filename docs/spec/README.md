@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.19
+# The With Programming Language — Specification v7.20
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,13 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.20:** what a literal already says, 2026-10-04 (D88, D89).
+§4.2.1: a `const` without a type whose initializer is unsuffixed numeric
+literals has no numeric type of its own; each use is typed as the
+initializer would be there (#2096). §4.3: a field with a default may omit
+its type; an unsuffixed numeric default takes the type its uses in the
+module demand, the default type when none does, and two demands are an
+error (#2097). The implementation is NON-COMPLIANT until it catches up.
 **Changelog v7.19:** implicit fills, 2026-10-03 (D87). §7.3a: an implicit
 fill observes the binding and never consumes it; a non-Copy `implicit T`
 is passed explicitly; `std.context` APIs take `implicit &Context`. The
