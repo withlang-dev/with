@@ -13,6 +13,8 @@ const SDK_NINJA_VERSION: str = "1.13.1"
 const SDK_NINJA_SHA256: str = "f0055ad0369bf2e372955ba55128d000cfcc21777057806015b45e4accbebf23"
 const SDK_CMAKE_VERSION: str = "4.2.3"
 const SDK_CMAKE_SHA256: str = "7efaccde8c5a6b2968bad6ce0fe60e19b6e10701a12fce948c2bf79bac8a11e9"
+const SDK_ZLIB_VERSION: str = "1.3.1"
+const SDK_ZLIB_SHA256: str = "9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23"
 const SDK_LLVM_TAG_TAR_GZ_SHA256: str = "ba534c6835a5b9c2162c806e269799fe41fca952a3c25baff1afcff23841ec2b"
 
 fn sdk_fail(ctx: &ActionCtx, message: &str) -> i32:
@@ -174,6 +176,67 @@ pub fn sdk_llvm_source_dir() -> str:
 
 pub fn sdk_llvm_source_marker() -> str:
     sdk_llvm_source_dir() ++ "/.with-source-ready"
+
+// lld reads a zlib-compressed debug section (ELFCOMPRESS_ZLIB) only when
+// LLVM is built with zlib, and the static libraries Conan Center publishes
+// for Linux carry them (libffi under SDL: "is compressed with
+// ELFCOMPRESS_ZLIB, but lld is not built with zlib support"). The SDK builds
+// zlib's static library from source against the With sysroot, like
+// everything else in it, and LLVM takes that one: lib/libz.a, which the
+// compiler's link names beside the LLVM archives. Nothing of the host's.
+pub fn sdk_zlib_archive() -> str: sdk_source_root() ++ "/zlib-" ++ SDK_ZLIB_VERSION ++ ".tar.gz"
+
+pub fn sdk_zlib_source_dir() -> str: sdk_source_root() ++ "/zlib-" ++ SDK_ZLIB_VERSION
+
+pub fn sdk_zlib_source_marker() -> str: sdk_zlib_source_dir() ++ "/.with-source-ready"
+
+pub fn sdk_zlib_source_url() -> str:
+    "https://github.com/madler/zlib/releases/download/v" ++ SDK_ZLIB_VERSION ++ "/zlib-" ++ SDK_ZLIB_VERSION ++ ".tar.gz"
+
+pub fn sdk_zlib_source_sha256() -> str: SDK_ZLIB_SHA256
+
+pub fn sdk_zlib_library(prefix: &str) -> str: sdk_join(prefix, "lib/libz.a")
+
+fn sdk_build_linux_zlib(ctx: &ActionCtx, root: &str, cmake: &str, bootstrap_prefix: &str, tools_prefix: &str, output_prefix: &str, llvm_build_dir: &str, a: &str, jobs: &str) -> i32:
+    let fs = ctx.fs()
+    if not fs.exists(sdk_zlib_source_marker()):
+        return sdk_fail(ctx, "the zlib source is not unpacked: run :sdk-zlib-source")
+    let build_dir = sdk_join(sdk_dirname(llvm_build_dir), "zlib-" ++ a)
+    if fs.mkdir_all(build_dir) != 0:
+        return sdk_fail(ctx, "could not create zlib build directory: " ++ build_dir)
+    let configure: Vec[str] = Vec.new()
+    configure.push(sdk_owned_text(cmake))
+    configure.push("-G")
+    configure.push("Ninja")
+    configure.push("-S")
+    configure.push(sdk_abs(root, sdk_zlib_source_dir()))
+    configure.push("-B")
+    configure.push(sdk_abs(root, build_dir))
+    configure.push("-DCMAKE_BUILD_TYPE=Release")
+    configure.push("-DCMAKE_MAKE_PROGRAM=" ++ sdk_abs(root, sdk_tool(tools_prefix, "ninja")))
+    configure.push("-DCMAKE_C_COMPILER=" ++ sdk_abs(root, sdk_tool(bootstrap_prefix, "clang")))
+    configure.push("-DZLIB_BUILD_EXAMPLES=OFF")
+    let linux_flags = sdk_linux_toolchain_flags(root, output_prefix, build_dir, a)
+    for i in 0..linux_flags.len() as i32: configure.push(sdk_owned_text(linux_flags[i]))
+    var rc = sdk_run_capture(ctx, "zlib-configure", configure, 600000)
+    if rc != 0: return rc
+    // The static library only: the SDK ships no shared zlib.
+    var build: Vec[str] = Vec.new()
+    build.push(sdk_owned_text(cmake))
+    build.push("--build")
+    build.push(sdk_abs(root, build_dir))
+    build.push("--target")
+    build.push("zlibstatic")
+    build = sdk_append_jobs(move build, jobs)
+    rc = sdk_run_capture(ctx, "zlib-build", build, 600000)
+    if rc != 0: return rc
+    if fs.mkdir_all(sdk_join(output_prefix, "lib")) != 0 or fs.mkdir_all(sdk_join(output_prefix, "include")) != 0:
+        return sdk_fail(ctx, "could not create the SDK's lib and include directories under " ++ output_prefix)
+    if fs.copy_file(sdk_join(build_dir, "libz.a"), sdk_zlib_library(output_prefix)) != 0:
+        return sdk_fail(ctx, "zlib's static library was not built: " ++ sdk_join(build_dir, "libz.a"))
+    if fs.copy_file(sdk_join(sdk_zlib_source_dir(), "zlib.h"), sdk_join(output_prefix, "include/zlib.h")) != 0 or fs.copy_file(sdk_join(build_dir, "zconf.h"), sdk_join(output_prefix, "include/zconf.h")) != 0:
+        return sdk_fail(ctx, "could not install zlib.h and zconf.h into " ++ sdk_join(output_prefix, "include"))
+    0
 
 pub fn sdk_ninja_source_url() -> str:
     "https://github.com/ninja-build/ninja/archive/refs/tags/v" ++ SDK_NINJA_VERSION ++ ".tar.gz"
@@ -1234,7 +1297,7 @@ pub fn run_sdk_llvm_action(ctx: ActionCtx) -> i32:
     configure.push("-DLLVM_INCLUDE_EXAMPLES=OFF")
     configure.push("-DCLANG_INCLUDE_TESTS=OFF")
     configure.push("-DCLANG_BUILD_EXAMPLES=OFF")
-    configure.push("-DLLVM_ENABLE_ZLIB=OFF")
+
     configure.push("-DLLVM_ENABLE_ZSTD=OFF")
     if os() == "Windows":
         // #1915: LLVM, clang and lld are windows-gnu code against the output
@@ -1283,6 +1346,15 @@ pub fn run_sdk_llvm_action(ctx: ActionCtx) -> i32:
             return sdk_fail(ctx, "the SDK's runtimes are not built: run :sdk-runtimes")
         let linux_flags = sdk_linux_llvm_flags(root, output_prefix, build_dir, llvm_arch, native_tools)
         for i in 0..linux_flags.len() as i32: configure.push(sdk_owned_text(linux_flags[i]))
+        // zlib, built here from source, so lld reads the compressed debug
+        // sections of the libraries `with get` installs (sdk_build_linux_zlib).
+        rc = sdk_build_linux_zlib(&ctx, root, cmake, bootstrap_prefix, tools_prefix, output_prefix, build_dir, llvm_arch, jobs)
+        if rc != 0: return rc
+        configure.push("-DLLVM_ENABLE_ZLIB=FORCE_ON")
+        configure.push("-DZLIB_LIBRARY=" ++ sdk_abs(root, sdk_zlib_library(output_prefix)))
+        configure.push("-DZLIB_INCLUDE_DIR=" ++ sdk_abs(root, sdk_join(output_prefix, "include")))
+    else:
+        configure.push("-DLLVM_ENABLE_ZLIB=OFF")
     rc = sdk_run_capture(ctx, "llvm-configure", configure, 1800000)
     if rc != 0: return rc
     var build: Vec[str] = Vec.new()

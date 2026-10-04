@@ -2959,6 +2959,13 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
         rsp = rsp ++ "-lpthread\n-ldl\n-lm\n"
         ld_rsp = ld_rsp ++ comp_rsp_path(libcxx) ++ "\n"
         ld_rsp = ld_rsp ++ "-lpthread\n-ldl\n-lm\n"
+        // An SDK whose LLVM reads zlib-compressed sections carries the zlib
+        // it was built with (build/sdk.w sdk_build_linux_zlib); one built
+        // before that has neither.
+        let zlib = llvm_lib_dir ++ "/libz.a"
+        if fs.host_exists(zlib):
+            rsp = rsp ++ comp_rsp_path(zlib) ++ "\n"
+            ld_rsp = ld_rsp ++ comp_rsp_path(zlib) ++ "\n"
     else if os() == "Linux":
         rsp = rsp ++ "-lpthread\n"
         rsp = rsp ++ "-ldl\n"

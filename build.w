@@ -1348,6 +1348,7 @@ fn add_sdk_cross_aarch64_targets(out0: Build, ctx: &BuildCtx) -> Build:
     llvm = llvm.write_scope(build_owned_text(prefix)).write_scope(build_owned_text(root)).write_scope("out/command/sdk-cross-aarch64-llvm")
     // The host SDK build (sdk-llvm) supplies the tablegens the cross build runs.
     llvm = llvm.dep("sdk-llvm-source").dep("sdk-cross-aarch64-cmake").dep("sdk-cross-aarch64-runtimes").dep("sdk-llvm")
+    llvm = llvm.dep("sdk-zlib-source").input(sdk_zlib_source_marker())
     out = out.add_target(llvm.timeout(21600000))
     let package = package_llvm_sdk_platform_target("sdk-cross-aarch64-package", "out/sdk-release", platform, prefix, llvm_build ++ "/CMakeCache.txt")
     out = out.add_target(package.dep("sdk-cross-aarch64-llvm"))
@@ -1448,6 +1449,8 @@ fn sdk_llvm_target(ctx: &BuildCtx) -> Target:
     if os() == "Linux" and arch() == "x86_64":
         target = target.dep("linux-sysroot")
         target = target.input(sdk_linux_sysroot_pack())
+        // Its LLVM is built with the zlib the SDK builds (build/sdk.w).
+        target = target.dep("sdk-zlib-source").input(sdk_zlib_source_marker())
     target.timeout(21600000)
 
 // The Windows C runtime of the SDK (#1915; build/sdk.w): mingw-w64's headers,
@@ -2845,6 +2848,7 @@ pub fn build(ctx: BuildCtx) -> Build:
 
     out = out.add_target(sdk_source_target("sdk-ninja-source", sdk_ninja_source_url(), sdk_ninja_source_sha256(), sdk_ninja_archive(), sdk_source_root(), sdk_ninja_source_dir(), sdk_ninja_source_marker()))
     out = out.add_target(sdk_source_target("sdk-cmake-source", sdk_cmake_source_url(), sdk_cmake_source_sha256(), sdk_cmake_archive(), sdk_source_root(), sdk_cmake_source_dir(), sdk_cmake_source_marker()))
+    out = out.add_target(sdk_source_target("sdk-zlib-source", sdk_zlib_source_url(), sdk_zlib_source_sha256(), sdk_zlib_archive(), sdk_source_root(), sdk_zlib_source_dir(), sdk_zlib_source_marker()))
     out = out.add_target(sdk_source_target("sdk-llvm-source", sdk_llvm_source_url(), sdk_llvm_source_sha256(), sdk_llvm_archive(), sdk_source_root(), sdk_llvm_source_dir(), sdk_llvm_source_marker()))
     out = out.add_target(sdk_source_target("sdk-mingw-source", sdk_mingw_source_url(), sdk_mingw_source_sha256(), sdk_mingw_archive(), sdk_source_root(), sdk_mingw_source_dir(), sdk_mingw_source_marker()))
     out = out.add_target(sdk_windows_libc_target(ctx))
