@@ -887,9 +887,13 @@ fn run_cli(full_argc: i32) -> i32:
         if argc < 5:
             with_eprint("usage: with __ar <qc|rc|rcs> <archive> <object>...")
             return 2
-        let members: Vec[str] = Vec.new()
-        for i in 4..argc: members.push(with_arg_at(i))
-        return create_static_archive(with_arg_at(3), members)
+        let named: Vec[str] = Vec.new()
+        for i in 4..argc: named.push(with_arg_at(i))
+        // `@objects.rsp`: the members a build system wrote to a file because
+        // the command line would be too long.
+        let members = ar_expand_response_args(&named, with_sysinfo_os() == "Windows", 0)
+        if not members.ok: return 1
+        return create_static_archive(with_arg_at(3), members.args)
     let opt_level = cli_opt_level(argc)
     let no_std = cli_has_flag(argc, "--no-std") or cli_has_flag(argc, "--freestanding")
     let alloc_mode = cli_has_flag(argc, "--alloc")

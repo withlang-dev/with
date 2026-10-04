@@ -345,6 +345,75 @@ fn create_gnu_indexed_archive(output_path: &str, member_names: &Vec[str], member
         return 1
     0
 
+// The arguments a response file holds. A build system writes one when a
+// command line would be too long (CMake's `ar qc lib.a @objects.rsp` for
+// SDL's 268 objects on Windows). Quoting is the host's, as llvm-ar reads it:
+// on Windows a backslash is a path character and escapes only a double
+// quote; elsewhere (GNU) it escapes the next character and single quotes
+// quote too.
+pub fn ar_tokenize_response(text: &str, windows_quoting: bool) -> Vec[str]:
+    let out: Vec[str] = Vec.new()
+    var token = ""
+    var started = false
+    var quote = 0
+    var i = 0
+    let n = text.len() as i32
+    while i < n:
+        let ch = text[i] as i32
+        if quote != 0:
+            if ch == quote:
+                quote = 0
+            else if ch == 92 and quote == 34 and i + 1 < n and (text[i + 1] == 34 or not windows_quoting):
+                i = i + 1
+                token = token ++ text.slice(i as i64, (i + 1) as i64)
+            else:
+                token = token ++ text.slice(i as i64, (i + 1) as i64)
+        else if ch == 32 or ch == 9 or ch == 10 or ch == 13:
+            if started:
+                out.push(token)
+                token = ""
+                started = false
+        else if ch == 34 or (ch == 39 and not windows_quoting):
+            quote = ch
+            started = true
+        else if ch == 92 and i + 1 < n and (text[i + 1] == 34 or not windows_quoting):
+            i = i + 1
+            token = token ++ text.slice(i as i64, (i + 1) as i64)
+            started = true
+        else:
+            token = token ++ text.slice(i as i64, (i + 1) as i64)
+            started = true
+        i = i + 1
+    if started:
+        out.push(token)
+    out
+
+// `args` with every `@file` replaced by the arguments that file holds
+// (a response file may name another). `ok` is false when one cannot be read.
+pub type ArResponseArgs {
+    ok: bool,
+    args: Vec[str],
+}
+
+pub fn ar_expand_response_args(args: &Vec[str], windows_quoting: bool, depth: i32) -> ArResponseArgs:
+    let out: Vec[str] = Vec.new()
+    for i in 0..args.len() as i32:
+        let arg = args[i]
+        if arg.len() < 2 or arg[0] != 64:
+            out.push(with_str_clone_ref(arg))
+            continue
+        let path = arg.slice(1, arg.len())
+        let text = with_fs_read_file(path)
+        if text.len() == 0 or depth >= 8:
+            with_eprint("error: archive: cannot read response file: " ++ path)
+            return ArResponseArgs { ok: false, args: out }
+        let inner = ar_expand_response_args(&ar_tokenize_response(text, windows_quoting), windows_quoting, depth + 1)
+        if not inner.ok:
+            return ArResponseArgs { ok: false, args: out }
+        for j in 0..inner.args.len() as i32:
+            out.push(with_str_clone_ref(inner.args[j]))
+    ArResponseArgs { ok: true, args: out }
+
 pub fn create_static_archive(output_path: &str, member_paths: &Vec[str]) -> i32:
     let member_count = member_paths.len() as i32
     let member_names: Vec[str] = Vec.new()
