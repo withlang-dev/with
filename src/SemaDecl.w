@@ -181,6 +181,54 @@ impl Sema:
             diag.add_label(self.diagnostic_node_span(first), "first declared here")
             diag.add_label(self.diagnostic_node_span(decl), "declared again here")
             self.diags.emit(move diag)
+        self.report_function_named_like_global()
+
+    // #2066: a free function and a module `const`/`var` of one name are two
+    // values under one name. The bare name meant the function and the global
+    // was unreachable (`fn K` + `const K`: `K()` ran, `K` printed nothing).
+    // A method is not a free function: a declaration inside an `impl`,
+    // `extend` or `trait` block, or one spelled `T.m`, is skipped.
+    mut fn report_function_named_like_global():
+        let globals: HashMap[i64, i32] = HashMap.new()
+        let block_files: Vec[i32] = Vec.new()
+        let block_starts: Vec[i32] = Vec.new()
+        let block_ends: Vec[i32] = Vec.new()
+        for di in 0..self.ast.decl_count():
+            let decl = self.ast.get_decl(di)
+            let kind = self.ast.kind(decl)
+            let file = self.pool_intern(self.decl_source_path_for_index(di))
+            if kind == NodeKind.NK_LET_DECL:
+                let name = self.ast.get_data0(decl)
+                if name != 0 and not globals.contains(sema_pair_key(name, file)):
+                    globals.insert(sema_pair_key(name, file), decl)
+            else if kind == NodeKind.NK_IMPL_DECL or kind == NodeKind.NK_TRAIT_DECL or kind == NodeKind.NK_TYPE_DECL:
+                block_files.push(file)
+                block_starts.push(self.ast.get_start(decl))
+                block_ends.push(self.ast.get_end(decl))
+        if globals.len() == 0:
+            return
+        for di in 0..self.ast.decl_count():
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) != NodeKind.NK_FN_DECL:
+                continue
+            let name = self.ast.get_data0(decl)
+            if name == 0 or self.method_decl_name_symbol(name) != name:
+                continue
+            let file = self.pool_intern(self.decl_source_path_for_index(di))
+            let global_decl: i32 = globals.get(sema_pair_key(name, file)) ?? 0
+            if global_decl == 0:
+                continue
+            let at = self.ast.get_start(decl)
+            var in_block = false
+            for bi in 0..block_files.len() as i32:
+                if block_files[bi] == file and at >= block_starts[bi] and at < block_ends[bi]:
+                    in_block = true
+            if in_block:
+                continue
+            var diag = Diagnostic.err(f"`{self.pool_resolve(name)}` is declared as a function and as a global in this module", self.diagnostic_node_span(decl))
+            diag.add_label(self.diagnostic_node_span(global_decl), "the global")
+            diag.add_label(self.diagnostic_node_span(decl), "the function")
+            self.diags.emit(move diag)
 
     mut fn compute_method_origins():
         self.compute_colliding_type_names()
