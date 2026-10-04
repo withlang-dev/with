@@ -315,12 +315,9 @@ impl CrParser:
         CrValue.unknown()
 
 // The value a source build gives an option: its declared default, except
-// that `shared` is a static library, and that on Windows the TLS backend is
-// the system's own (Schannel) where the recipe offers it: OpenSSL is built
-// by a Perl script, and the SDK carries no Perl (D81).
+// that `shared` is a static library.
 fn cr_option_value(recipe: &str, name: &str, os: &str) -> CrValue:
     if name == "shared": return CrValue.of_bool(false)
-    if name == "with_ssl" and os == "Windows" and recipe.contains("\"schannel\""): return CrValue.of_text("schannel")
     let literal = cr_default_option(recipe, name)
     if literal.len() == 0: return CrValue.unknown()
     var parser = CrParser { tokens: cr_tokens(literal), at: 0 }
