@@ -829,6 +829,19 @@ pub type Sema {
     // initializer it stands for at that use. Its type there is the node's in
     // typed_expr_types; MIR lowers the initializer at that type.
     untyped_const_uses: HashMap[i32, i32],
+    // D89 (§4.3): a field whose numeric type its uses decide. The frontend
+    // checks such a program twice: once to hear what the uses demand
+    // (collect_field_demands; each such field is a distinct alias of its
+    // default type, so a demand names its field), and once with every
+    // field at the type decided (field_decisions: per field, its type node,
+    // the type, whether two were demanded, and the two with their uses).
+    collect_field_demands: i32,
+    inferred_field_nodes: Vec[i32],
+    inferred_field_aliases: Vec[i32],
+    field_demand_fields: Vec[i32],
+    field_demand_types: Vec[i32],
+    field_demand_uses: Vec[i32],
+    field_decisions: Vec[i32],
     // move-sites: last use per (root, first-field) path — the liveness key for
     // FIELD-shaped transfer args, so `eat(move self.r)` followed by `self.tag`
     // reads verdicts on the `.r` path, not the whole receiver. Key packs
@@ -2979,6 +2992,13 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         untyped_const_decls: HashMap.new(),
         untyped_const_alt_decls: Vec.new(),
         untyped_const_uses: HashMap.new(),
+        collect_field_demands: 0,
+        inferred_field_nodes: Vec.new(),
+        inferred_field_aliases: Vec.new(),
+        field_demand_fields: Vec.new(),
+        field_demand_types: Vec.new(),
+        field_demand_uses: Vec.new(),
+        field_decisions: Vec.new(),
         field_last_use: HashMap.new(),
         effect_prov: HashMap.new(),
         effect_note_origin_node: 0,

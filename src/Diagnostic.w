@@ -206,6 +206,12 @@ impl DiagnosticList:
                     best = i
             self.items.push(rest.remove(best))
 
+    // Forgets the diagnostics from `count` on: a check whose only purpose
+    // was to hear something reports nothing.
+    mut fn truncate(count: i32):
+        while self.items.len() as i32 > count:
+            let _ = self.items.remove(count)
+
     fn count() -> i32:
         self.items.len() as i32
 

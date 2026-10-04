@@ -1829,6 +1829,33 @@ impl Zcu:
     mut fn compile_source_frontend(text: &str, name: &str, file_id: i32) -> AstPool:
         self.compile_source_frontend_mode(text, name, file_id, 0)
 
+    // The Sema that checks the final pool, configured from this frontend.
+    mut fn new_module_sema(text: &str, pool: AstPool) -> Sema:
+        var sema = self.configure_tracked_input_sema(Sema.init(self.pool, move self.diagnostics, pool))
+        sema.source_text = with_str_clone_ref(text)
+        sema.decl_source_paths = sema_clone_str_vec(&self.decl_source_paths)
+        sema.decl_source_file_ids = sema_clone_i32_vec(&self.decl_source_file_ids)
+        sema.decl_is_c_import = sema_clone_i32_vec(&self.decl_is_c_import)
+        sema.source_text_file_ids = sema_clone_i32_vec(&self.source_text_file_ids)
+        sema.source_text_names = sema_clone_str_vec(&self.source_text_names)
+        sema.source_texts = sema_clone_str_vec(&self.source_texts)
+        sema.ci_omitted_symbols = sema_clone_str_str_hashmap(&self.c_import_omitted_symbols)
+        sema.tool_mode_entry_path = frontend_owned_text(self.tool_mode_entry_path)
+        sema.runtime_available = if self.project_config.runtime_available: 1 else: 0
+        sema.runtime_fiber_stack_size = self.project_config.runtime_fiber_stack_size
+        sema.runtime_fiber_pool_size = self.project_config.runtime_fiber_pool_size
+        sema.runtime_fiber_worker_count = self.project_config.runtime_fiber_worker_count
+        sema.copy_warn_threshold = self.project_config.copy_warn_threshold
+        sema.lint_partial_statement_match = if self.project_config.lint_partial_statement_match: 1 else: 0
+        sema.emit_config_warnings = 1
+        sema.overflow_mode = self.project_config.overflow_mode
+        if self.project_config.no_std:
+            sema.no_std = 1
+        if self.project_config.alloc_mode:
+            sema.alloc = 1
+        sema.init_module_graph(&self.last_resolved)
+        sema
+
     mut fn compile_source_frontend_mode(text: &str, name: &str, file_id: i32, implicit_main_mode: i32) -> AstPool:
         let do_profile = runtime_getenv("WITH_PROFILE").len() > 0
         if zcu_debug_init_enabled() != 0:
@@ -2085,29 +2112,21 @@ impl Zcu:
         if zcu_debug_init_enabled() != 0:
             runtime_eprint("[frontend] compile_source:sema")
         let t_sema = runtime_clock_nanos()
-        var sema = self.configure_tracked_input_sema(Sema.init(self.pool, move self.diagnostics, pool))
-        sema.source_text = with_str_clone_ref(text)
-        sema.decl_source_paths = sema_clone_str_vec(&self.decl_source_paths)
-        sema.decl_source_file_ids = sema_clone_i32_vec(&self.decl_source_file_ids)
-        sema.decl_is_c_import = sema_clone_i32_vec(&self.decl_is_c_import)
-        sema.source_text_file_ids = sema_clone_i32_vec(&self.source_text_file_ids)
-        sema.source_text_names = sema_clone_str_vec(&self.source_text_names)
-        sema.source_texts = sema_clone_str_vec(&self.source_texts)
-        sema.ci_omitted_symbols = sema_clone_str_str_hashmap(&self.c_import_omitted_symbols)
-        sema.tool_mode_entry_path = frontend_owned_text(self.tool_mode_entry_path)
-        sema.runtime_available = if self.project_config.runtime_available: 1 else: 0
-        sema.runtime_fiber_stack_size = self.project_config.runtime_fiber_stack_size
-        sema.runtime_fiber_pool_size = self.project_config.runtime_fiber_pool_size
-        sema.runtime_fiber_worker_count = self.project_config.runtime_fiber_worker_count
-        sema.copy_warn_threshold = self.project_config.copy_warn_threshold
-        sema.lint_partial_statement_match = if self.project_config.lint_partial_statement_match: 1 else: 0
-        sema.emit_config_warnings = 1
-        sema.overflow_mode = self.project_config.overflow_mode
-        if self.project_config.no_std:
-            sema.no_std = 1
-        if self.project_config.alloc_mode:
-            sema.alloc = 1
-        sema.init_module_graph(&self.last_resolved)
+        // D89 (§4.3): a field whose numeric type its uses decide makes the
+        // program one that is checked twice: first to hear what the uses
+        // demand, with nothing reported, then with every such field at the
+        // type decided. A program without one is checked once, as before.
+        var field_decisions: Vec[i32] = Vec.new()
+        if frontend_has_inferred_numeric_fields(pool):
+            let reported = self.diagnostics.count()
+            var probe = self.new_module_sema(text, pool)
+            probe.collect_field_demands = 1
+            probe.check_module()
+            field_decisions = probe.inferred_field_decisions()
+            self.diagnostics = move probe.diags
+            self.diagnostics.truncate(reported)
+        var sema = self.new_module_sema(text, pool)
+        sema.field_decisions = field_decisions
         sema.check_module()
         if do_profile:
             let sema_ns = runtime_clock_nanos() - t_sema
@@ -3300,3 +3319,10 @@ pub fn frontend_dirname(path: &str) -> str:
     if last_slash < 0:
         return "."
     path.slice(0, last_slash as i64)
+
+// D89: whether any field of the program takes its numeric type from its
+// uses (the parser marks such a field's type node).
+fn frontend_has_inferred_numeric_fields(pool: AstPool) -> bool:
+    for i in 1..pool.node_count():
+        if pool.kind(i as NodeId) == NodeKind.NK_TYPE_NAMED and pool.get_data2(i as NodeId) != 0: return true
+    false

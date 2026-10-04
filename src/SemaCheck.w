@@ -1484,6 +1484,82 @@ impl Sema:
         else:
             self.emit_error_with_help(f"{what} cannot take an array by value: C adjusts an array parameter to a pointer (C11 6.7.6.3p7), so `{shown}` has no C ABI", at, "take a pointer to the first element (`*const T`), or wrap the array in a struct and pass that")
 
+    // D89 (§4.3): the type of a field written without one, whose default is
+    // an unsuffixed numeric constant expression (the parser marks its type
+    // node). Decided, it is the decision; while demands are collected, a
+    // distinct alias of the default type; otherwise the default type.
+    mut fn resolve_inferred_field_type(node: i32) -> TypeId:
+        var i = 0
+        while i + 6 < self.field_decisions.len() as i32:
+            if self.field_decisions[i] == node:
+                if self.field_decisions[i + 2] != 0:
+                    let a = self.type_name(self.field_decisions[i + 3])
+                    let b = self.type_name(self.field_decisions[i + 5])
+                    self.emit_error(f"the uses of this field demand both `{a}` and `{b}`; write its type (§4.3)", node)
+                return self.field_decisions[i + 1] as TypeId
+            i = i + 7
+        let default_ty = self.lookup_named_type_visible(self.ast.get_data0(node))
+        if self.collect_field_demands == 0 or default_ty == 0:
+            return default_ty as TypeId
+        for k in 0..self.inferred_field_nodes.len() as i32:
+            if self.inferred_field_nodes[k] == node: return self.inferred_field_aliases[k] as TypeId
+        let alias = self.add_type(TypeKind.TY_ALIAS, default_ty as i32, 0, 0)
+        self.inferred_field_nodes.push(node)
+        self.inferred_field_aliases.push(alias as i32)
+        alias as TypeId
+
+    // A use that demands the numeric type `demanded` of a value whose type
+    // is an inferred field's (`actual`): heard while demands are collected.
+    mut fn note_inferred_field_demand(actual: i32, demanded: i32, node: i32):
+        if self.collect_field_demands == 0 or actual == 0 or demanded == 0:
+            return
+        var field = -1
+        for k in 0..self.inferred_field_aliases.len() as i32:
+            if self.inferred_field_aliases[k] == actual: field = k
+            // Another such field demands nothing of this one.
+            if self.inferred_field_aliases[k] == demanded: return
+        if field < 0:
+            return
+        let want = self.resolve_alias(self.numeric_operand_type(demanded) as TypeId)
+        let want_kind = self.get_type_kind(want)
+        if want_kind != TypeKind.TY_INT and want_kind != TypeKind.TY_FLOAT:
+            return
+        // A float default is no integer (§4.2.1): that use is an error, not a demand.
+        if self.ast.get_data2(self.inferred_field_nodes[field]) == 2 and want_kind == TypeKind.TY_INT:
+            return
+        self.field_demand_fields.push(field)
+        self.field_demand_types.push(want as i32)
+        self.field_demand_uses.push(node)
+
+    // What the collected demands decide, for the second check: per inferred
+    // field, [type node, type, conflict, first type, its use, second type,
+    // its use]. No demand leaves the default; two different ones conflict.
+    pub fn inferred_field_decisions() -> Vec[i32]:
+        var out: Vec[i32] = Vec.new()
+        for k in 0..self.inferred_field_nodes.len() as i32:
+            let default_ty = self.resolve_alias(self.inferred_field_aliases[k] as TypeId) as i32
+            var first = 0
+            var first_use = 0
+            var second = 0
+            var second_use = 0
+            for d in 0..self.field_demand_fields.len() as i32:
+                if self.field_demand_fields[d] != k: continue
+                let ty: i32 = self.field_demand_types[d]
+                if first == 0:
+                    first = ty
+                    first_use = self.field_demand_uses[d]
+                else if ty != first and second == 0:
+                    second = ty
+                    second_use = self.field_demand_uses[d]
+            out.push(self.inferred_field_nodes[k])
+            out.push(if first != 0 and second == 0: first else: default_ty)
+            out.push(if second != 0: 1 else: 0)
+            out.push(first)
+            out.push(first_use)
+            out.push(second)
+            out.push(second_use)
+        out
+
     mut fn resolve_type_expr(node: i32) -> TypeId:
         if node == 0:
             return 0 as TypeId
@@ -1494,6 +1570,8 @@ impl Sema:
             return self.resolve_type_level_arg_expr(node) as TypeId
 
         if kind == NodeKind.NK_TYPE_NAMED:
+            if self.ast.get_data2(node) != 0:
+                return self.resolve_inferred_field_type(node)
             let sym = self.ast.get_data0(node)
             let subst = self.lookup_generic_subst(sym)
             if subst != 0:
@@ -12857,6 +12935,9 @@ impl Sema:
             self.emit_error(f"constant arithmetic overflows `{self.type_name(result as i32)}`: its literals have that type (§4.2.1) and arithmetic is checked (§4.2.3)", node)
 
     mut fn emit_mixed_arithmetic_error(node: i32, lhs: TypeId, rhs: TypeId):
+        // D89: a peer operand of another numeric type demands it of an inferred field.
+        self.note_inferred_field_demand(lhs as i32, rhs as i32, node)
+        self.note_inferred_field_demand(rhs as i32, lhs as i32, node)
         let l = self.type_name(lhs as i32)
         let r = self.type_name(rhs as i32)
         let lk = self.get_type_kind(self.resolve_alias(self.numeric_operand_type(lhs as i32) as TypeId))
@@ -12969,6 +13050,19 @@ impl Sema:
         int_eval_binary_arithmetic(op, lhs.value, rhs.value, bits, signed == 0, self.overflow_mode)
 
     mut fn check_binary(node: i32) -> i32:
+        let result = self.check_binary_operator(node)
+        // D89: a peer operand of a numeric type demands it of an inferred
+        // field, whether or not the two already agree.
+        if self.collect_field_demands != 0 and self.inferred_field_aliases.len() > 0:
+            let lhs_ty = self.typed_expr_types.get(self.ast.get_data1(node)) ?? 0
+            let rhs_ty = self.typed_expr_types.get(self.ast.get_data2(node)) ?? 0
+            let op = self.ast.get_data0(node)
+            if op != BinaryOp.OP_SHL and op != BinaryOp.OP_SHR and op != BinaryOp.OP_DEFAULT:
+                self.note_inferred_field_demand(lhs_ty, rhs_ty, node)
+                self.note_inferred_field_demand(rhs_ty, lhs_ty, node)
+        result
+
+    mut fn check_binary_operator(node: i32) -> i32:
         let op = self.ast.get_data0(node)
         let lhs_node = self.ast.get_data1(node)
         // A generic body is rechecked per instantiation; an operator that
@@ -25017,6 +25111,7 @@ impl Sema:
             return false
         let pointee = self.shared_copy_pointee(actual)
         let value = if pointee != 0: pointee else: actual
+        self.note_inferred_field_demand(value, expected, node)
         let vr = self.resolve_alias(value as TypeId)
         let vk = self.get_type_kind(vr)
         let want = self.type_name(expected)
