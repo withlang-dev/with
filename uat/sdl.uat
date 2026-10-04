@@ -1,0 +1,13 @@
+scenario: SDL opens a window and draws from a fresh project
+requires: network, display
+
+new directory
+run: with init .
+run: with get c.sdl
+write src/main.w from sdl_main.w
+copy lib/facades/sdl.w to src/facades/sdl.w
+run: with check src/main.w
+expect stdout: ok
+run: with run
+expect exit: 0
+expect stdout contains: sdl UAT passed:
