@@ -2255,7 +2255,12 @@ fn ci_emit_member_fn_wrapper(session: i64, idx: i32, struct_name: &str, method_n
         let ptype = ci_pointer_type_explicit_mut(with_cimport_fn_param_type_translated(session, idx, pi))
         if ci_cimport_param_type_requires_raw_abi(ptype):
             raw_wrapper = true
-        let actual_name = if pname.len() > 0: ci_escape_param_name(pname) else: f"p{pi}"
+        // The wrapper is a method of the struct in the struct's own module,
+        // where a field is in scope by its bare name (§9.5): a C parameter
+        // named like a field (`holder_init(h, cmp)` over `holder.cmp`) would
+        // shadow it. It takes the signature spelling every other emitted
+        // function gives its parameters (`__param_cmp`), which no C field has.
+        let actual_name = ci_param_signature_name(ci_escape_reserved(pname), pi)
         if params.len() > 0:
             params = params ++ ", "
         params = params ++ actual_name ++ ": " ++ ptype
