@@ -122,6 +122,15 @@ pub type Codegen {
     mode_site_decisions: Vec[i32],
     mode_site_disagree: Vec[i32],
     mode_site_first: Vec[str],
+    // #2043 (D65 phase 5): codegen's own derivations of a fact Sema owns —
+    // an AST type node resolved, a constant expression evaluated — counted
+    // per kind where they decide, with the first one. A derivation run as
+    // verification (verify_ast_type) decides nothing and is not counted;
+    // nested calls belong to the outermost (ast_derivation_depth).
+    ast_derivation_counts: Vec[i32],
+    ast_derivation_first: Vec[str],
+    ast_derivation_depth: i32,
+    ast_verifying: i32,
 
     // Current function state
     current_ret_type: i64,
@@ -211,7 +220,6 @@ pub type Codegen {
     local_allocas: HashMap[i32, i64],
     local_types: HashMap[i32, i64],
     local_muts: HashMap[i32, i32],
-    local_fn_sigs: HashMap[i32, i64],
     local_pointee_structs: HashMap[i32, i32],
 
     // Sema type annotations: sym → sema TypeId (for generic type dispatch)
@@ -874,6 +882,60 @@ impl Codegen:
                 self.analysis_fail(f"mode-provenance: {name}: {mode_site_owner(site)} and {mode_site_derivation(site)} disagree in {self.mode_site_disagree[site]} of {self.mode_site_decisions[site]} decisions; first: {self.mode_site_first[site]}")
             self.analysis_report.note(f"mode-provenance: {name} decisions={self.mode_site_decisions[site]} disagree={self.mode_site_disagree[site]}")
 
+    // #2043 (D65 phase 5): a derivation codegen ran from the AST for a fact
+    // Sema owns. Every one is a decision the owner's record should have
+    // made; nested calls belong to the outermost, and a derivation under
+    // verify_ast_type is verification.
+    mut fn note_ast_derivation(kind: i32, node: i32):
+        if self.analysis_enabled == 0 or self.ast_derivation_depth != 0 or self.ast_verifying != 0:
+            return
+        while self.ast_derivation_counts.len() as i32 < AST_DERIVATION_COUNT:
+            self.ast_derivation_counts.push(0)
+            self.ast_derivation_first.push("")
+        if self.ast_derivation_counts[kind] == 0:
+            let in_fn = if self.current_function_name_sym != 0: self.sema_symbol_text(self.current_function_name_sym) else: "<declarations>"
+            self.ast_derivation_first[kind] = f"{in_fn}: node {node} at {self.current_decl_source_file}:{self.pool.get_start(node)}"
+        self.ast_derivation_counts[kind] = self.ast_derivation_counts[kind] + 1
+
+    // The owner's type for `type_node` is the decision; under analysis the
+    // node's AST resolution is the verification audit:codegen compares.
+    mut fn verify_ast_type(site: i32, fact: i64, type_node: i32, fn_sym: i32, subject: i32) -> i64:
+        if self.analysis_enabled == 0 or type_node == 0:
+            return fact
+        self.ast_verifying = self.ast_verifying + 1
+        let derived = self.resolve_type(type_node)
+        self.ast_verifying = self.ast_verifying - 1
+        self.mode_record(site, fact == derived, fn_sym, subject, f"owner={self.llvm_type_label(fact)} derived={self.llvm_type_label(derived)} node {type_node}")
+        fact
+
+    // An LLVM type for a finding: its kind and, for a named struct, its name.
+    fn llvm_type_label(ty: i64) -> str:
+        if ty == 0: return "none"
+        let kind = wl_get_type_kind(ty)
+        if kind == wl_struct_type_kind(): return f"struct `{wl_get_struct_name(ty)}`"
+        if kind == wl_pointer_type_kind(): return "ptr"
+        if kind == wl_void_type_kind(): return "void"
+        f"llvm-kind-{kind}"
+
+    // The same for a declaration's return type, whose AST resolution treats
+    // an explicit `-> Unit` as void (resolve_return_type).
+    mut fn verify_ast_return_type(fact: i64, ret_node: i32, fn_sym: i32) -> i64:
+        if self.analysis_enabled == 0:
+            return fact
+        self.ast_verifying = self.ast_verifying + 1
+        let derived = self.resolve_return_type(ret_node)
+        self.ast_verifying = self.ast_verifying - 1
+        self.fact_decide(MODE_SITE_DECL_TYPE_NODE, fact, derived, fn_sym, -1)
+
+    mut fn audit_ast_derivations():
+        if self.analysis_enabled == 0:
+            return
+        for kind in 0..AST_DERIVATION_COUNT:
+            let count = if kind < self.ast_derivation_counts.len() as i32: self.ast_derivation_counts[kind] else: 0
+            if count > 0:
+                self.analysis_fail(f"ast-derivation: {ast_derivation_name(kind)}: {count} decisions codegen derived from the AST instead of reading {ast_derivation_owner(kind)}; first: {self.ast_derivation_first[kind]}")
+            self.analysis_report.note(f"ast-derivation: {ast_derivation_name(kind)} decisions={count}")
+
     mut fn audit_codegen_call_coverage():
         if self.analysis_enabled == 0 or self.analysis_query != "audit":
             return
@@ -1025,6 +1087,10 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         mode_site_decisions: Vec.new(),
         mode_site_disagree: Vec.new(),
         mode_site_first: Vec.new(),
+        ast_derivation_counts: Vec.new(),
+        ast_derivation_first: Vec.new(),
+        ast_derivation_depth: 0,
+        ast_verifying: 0,
         current_ret_type: 0,
         mir_emit_mutual_tail_call: 0,
         async_trampolines: HashMap.new(),
@@ -1055,7 +1121,6 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         local_allocas: HashMap.new(),
         local_types: HashMap.new(),
         local_muts: HashMap.new(),
-        local_fn_sigs: HashMap.new(),
         local_pointee_structs: HashMap.new(),
         local_sema_types: HashMap.new(),
         fn_values: HashMap.new(),
@@ -2233,12 +2298,6 @@ impl Codegen:
         if canon != 0 and canon != sym:
             self.local_sema_types.insert(canon, sema_ty)
 
-    fn record_local_fn_sig(sym: i32, fn_sig: i64):
-        self.local_fn_sigs.insert(sym, fn_sig)
-        let canon = self.canonical_local_sym(sym)
-        if canon != 0 and canon != sym:
-            self.local_fn_sigs.insert(canon, fn_sig)
-
     fn record_local_pointee_struct(sym: i32, pointee_sym: i32):
         self.local_pointee_structs.insert(sym, pointee_sym)
         let canon = self.canonical_local_sym(sym)
@@ -3003,6 +3062,9 @@ impl Codegen:
         with_str_clone_ref(self.sema.pool_resolve(sym))
 
     // ── Resolve type expression → LLVM type ───────────────────────────
+    // Verification only (#2043, D65): every type codegen emits is Sema's.
+    // verify_ast_type runs this resolution under analysis to check the
+    // owner's answer; any other call is a decision audit:codegen refuses.
 
     // The LLVM type of a RETURN position. An explicit `-> Unit` and an absent
     // return type are the same Sema type (ty_void) and must lower to the same
@@ -3016,6 +3078,13 @@ impl Codegen:
         self.resolve_type(ret_type_node)
 
     mut fn resolve_type(type_node: i32) -> i64:
+        self.note_ast_derivation(AST_DERIVATION_TYPE, type_node)
+        self.ast_derivation_depth = self.ast_derivation_depth + 1
+        let ty = self.derive_type_from_ast(type_node)
+        self.ast_derivation_depth = self.ast_derivation_depth - 1
+        ty
+
+    mut fn derive_type_from_ast(type_node: i32) -> i64:
         if type_node == 0: return wl_void_type(self.context)
         if type_node < 0 or type_node >= self.pool.node_count():
             with_eprint(f"error: invalid type node {type_node} during code generation")
@@ -3588,6 +3657,13 @@ impl Codegen:
                 self.had_error = 1
 
     mut fn type_expr_to_sema_type(type_node: i32) -> i32:
+        self.note_ast_derivation(AST_DERIVATION_TYPE, type_node)
+        self.ast_derivation_depth = self.ast_derivation_depth + 1
+        let ty = self.derive_sema_type_from_ast(type_node)
+        self.ast_derivation_depth = self.ast_derivation_depth - 1
+        ty
+
+    mut fn derive_sema_type_from_ast(type_node: i32) -> i32:
         if type_node == 0:
             return self.sema.ty_void as i32
         let kind = self.pool.kind(type_node)
@@ -4356,6 +4432,23 @@ impl Codegen:
             return 0
         self.method_owner_cg_sym(self.sema.pool_resolve(key))
 
+    // #2043: a function is a method when Sema recorded an owner for it; the
+    // spelling of a `self: T` parameter decides nothing. Under analysis a
+    // `self` parameter naming a struct in a function Sema recorded no owner
+    // for is a violation: Sema's record is incomplete.
+    mut fn check_self_owner_recorded(owner_sym: i32, p_name: i32, p_sym: i32):
+        if self.analysis_enabled == 0 or owner_sym != 0 or p_name != self.sym_self or p_sym == self.sym_str or not self.struct_type_map.contains(p_sym):
+            return
+        self.analysis_fail(f"method-owner: {self.sema_symbol_text(self.current_function_name_sym)} has a `self: {self.intern.resolve(p_sym)}` parameter but Sema recorded no owner for it")
+
+    // The codegen symbol of a method function's own name in its owner's
+    // table (`push` for `Vec__i32.push`), from Sema's record (#2043).
+    fn fn_method_name_cg_sym(fn_sym: i32) -> i32:
+        let text = self.intern.resolve(fn_sym)
+        let sema_sym = if text.len() > 0: self.sema.pool_lookup_symbol(text) else: 0
+        let name: i32 = self.sema.method_name_syms.get(sema_sym) ?? 0
+        if name == 0: 0 else: self.intern.intern(self.sema.pool_resolve(name))
+
     fn method_owner_cg_sym(owner_text: &str) -> i32:
         let sema_sym = self.sema.pool_lookup_symbol(owner_text)
         if sema_sym != 0 and self.sema.type_identity_tids.contains(sema_sym):
@@ -4671,7 +4764,7 @@ impl Codegen:
             let f_name = self.pool.get_extra(offset)
             let f_type_node = self.pool.get_extra(offset + 1)
             let f_sema_ty = if struct_tid > 0: self.sema.type_reflection_field_type_frozen(struct_tid, fi) else: 0
-            let f_ty = self.field_llvm_type(f_sema_ty, f_type_node, name_sym, fi, false)
+            let f_ty = self.field_llvm_type(f_sema_ty, f_type_node, name_sym, fi)
             self.debug_type_layout_field(name_str, fi, f_name, f_type_node, f_ty)
 
             if f_ty == 0:
@@ -4853,7 +4946,7 @@ impl Codegen:
             let f_name = self.pool.get_extra(offset)
             let f_type_node = self.pool.get_extra(offset + 1)
             let f_tid = if union_tid > 0: self.sema.type_reflection_field_type_frozen(union_tid, fi) else: 0
-            let f_ty = self.field_llvm_type(f_tid, f_type_node, name_sym, fi, false)
+            let f_ty = self.field_llvm_type(f_tid, f_type_node, name_sym, fi)
             if f_ty == 0:
                 with_eprint("error: unresolved type for field '" ++ self.intern.resolve(f_name) ++ "' in union '" ++ name_str ++ "'")
                 invalid_layout = 1
@@ -5103,14 +5196,15 @@ impl Codegen:
     // A generic declaration's own body (`enum Slot[T]: Full(T)`) is not a
     // type: a payload naming its parameter has no concrete Sema type, and
     // its instances are Sema's generic-instance types with their own facts.
-    // The template keeps the node's codegen resolution, unjudged.
-    mut fn field_llvm_type(sema_ty: i32, type_node: i32, owner_sym: i32, subject: i32, template: bool) -> i64:
+    // Such a payload has no LLVM type (0, #2043): codegen resolving the
+    // parameter itself named nothing Sema checked.
+    mut fn field_llvm_type(sema_ty: i32, type_node: i32, owner_sym: i32, subject: i32) -> i64:
         let fact = if sema_ty > 0: self.sema_type_to_llvm(sema_ty) else: 0
         if fact == 0:
-            return if template: self.resolve_type(type_node) else: 0
-        let generic_inst = self.sema.get_type_kind(self.sema.resolve_alias(sema_ty as TypeId)) == TypeKind.TY_GENERIC_INST
-        let derived = if self.analysis_enabled != 0 and not generic_inst: self.resolve_type(type_node) else: fact
-        self.fact_decide(MODE_SITE_STRUCT_FIELD_TYPE, fact, derived, owner_sym, subject)
+            return 0
+        if self.sema.get_type_kind(self.sema.resolve_alias(sema_ty as TypeId)) == TypeKind.TY_GENERIC_INST:
+            return self.fact_decide(MODE_SITE_STRUCT_FIELD_TYPE, fact, fact, owner_sym, subject)
+        self.verify_ast_type(MODE_SITE_STRUCT_FIELD_TYPE, fact, type_node, owner_sym, subject)
 
     // Sema's type of payload `pi` of variant `vi` of an enum declaration
     // (its TY_ENUM record: name, count, payload types per variant).
@@ -5152,7 +5246,7 @@ impl Codegen:
                 let payload_fields: Vec[i64] = Vec.new()
                 for pi in 0..v_payload_count:
                     let payload_type_node = self.pool.get_extra(offset + pi)
-                    let field_ty = self.field_llvm_type(self.sema_enum_payload_type(sema_tid, vi, pi), payload_type_node, name_sym, vi * 1000 + pi, self.type_decl_tp_count(type_node) > 0)
+                    let field_ty = self.field_llvm_type(self.sema_enum_payload_type(sema_tid, vi, pi), payload_type_node, name_sym, vi * 1000 + pi)
                     if field_ty == 0:
                         with_eprint("error: unresolved payload type for enum variant '" ++ self.intern.resolve(v_name) ++ "' in '" ++ enum_name ++ "'")
                         self.had_error = 1
@@ -5192,8 +5286,14 @@ impl Codegen:
         let extra_start = self.pool.get_data1(type_node)
         let repr_type_node = self.pool.get_extra(extra_start)
         let variant_count = self.pool.get_extra(extra_start + 1)
-        let repr_ty = self.resolve_type(repr_type_node)
+        // #2043: the repr is Sema's record for the declaration.
+        let sema_tid = self.type_decl_sema_tid(type_node)
+        let repr_sema_ty = self.sema.disc_repr_types.get(sema_tid) ?? 0
+        let repr_fact = self.sema_type_to_llvm(repr_sema_ty)
+        let repr_ty = self.verify_ast_type(MODE_SITE_DECL_TYPE_NODE, repr_fact, repr_type_node, name_sym, 0)
         if repr_ty == 0:
+            with_eprint(f"error: discriminant enum '{self.intern.resolve(name_sym)}' has no checked repr type")
+            self.had_error = 1
             return
 
         // Whether any variant carries a payload decides the representation a
@@ -5211,8 +5311,7 @@ impl Codegen:
         let idx = self.disc_enum_repr_types.len() as i32
         self.disc_enum_name_syms.push(name_sym)
         self.disc_enum_repr_types.push(repr_ty)
-        let repr_sema_ty = self.sema.resolve_type_expr_frozen(repr_type_node)
-        self.disc_enum_repr_unsigned.push(if repr_sema_ty > 0 and self.sema.is_unsigned_int_type(repr_sema_ty): 1 else: 0)
+        self.disc_enum_repr_unsigned.push(if self.sema.is_unsigned_int_type(repr_sema_ty): 1 else: 0)
         let v_start = self.disc_enum_variant_names.len() as i32
         self.disc_enum_variant_starts.push(v_start)
         self.disc_enum_variant_counts.push(variant_count)
@@ -5226,11 +5325,6 @@ impl Codegen:
         // First pass: collect variant info and compute max payload size. A
         // variant's discriminant is Sema's (the AST holds only an explicit
         // `= N` node; Sema computes the auto-incremented ones, #1451).
-        let sema_tid = self.type_decl_sema_tid(type_node)
-        if sema_tid == 0:
-            with_eprint(f"error: discriminant enum '{self.intern.resolve(name_sym)}' has no checked type")
-            self.had_error = 1
-            return
         var offset = extra_start + 2
         for vi in 0..variant_count:
             let v_name = self.pool.get_extra(offset)
@@ -5243,7 +5337,7 @@ impl Codegen:
                 var payload_ok = true
                 for pi in 0..payload_count:
                     let payload_type_node = self.pool.get_extra(offset + 3 + pi)
-                    let field_ty = self.field_llvm_type(self.sema_enum_payload_type(sema_tid, vi, pi), payload_type_node, name_sym, vi * 1000 + pi, template)
+                    let field_ty = self.field_llvm_type(self.sema_enum_payload_type(sema_tid, vi, pi), payload_type_node, name_sym, vi * 1000 + pi)
                     // A generic declaration's payload naming its own parameter has
                     // no layout: the template declares no payload struct (its
                     // instances are Sema's generic-instance types).
@@ -5348,7 +5442,12 @@ pub const MODE_SITE_CAPTURE_BY_PLACE: i32 = 13
 pub const MODE_SITE_CLOSURE_OWNED_ENV: i32 = 14
 // #1647: a named field projection carries Sema's declaration index in MIR.
 pub const MODE_SITE_FIELD_DECL_CARRIED: i32 = 15
-pub const MODE_SITE_COUNT: i32 = 16
+// #2043: a type node's LLVM type — a declaration's (an extern's parameter,
+// return or variable, an alias's target, a discriminant repr, a dyn trait
+// method's parameter) or a body's (a transmute target, an asm output).
+pub const MODE_SITE_DECL_TYPE_NODE: i32 = 16
+pub const MODE_SITE_BODY_TYPE_NODE: i32 = 17
+pub const MODE_SITE_COUNT: i32 = 18
 
 pub fn mode_site_name(site: i32) -> str:
     if site == MODE_SITE_FIELD_TYPE_THROUGH_ADDRESS: return "projected-type field through an address"
@@ -5367,6 +5466,8 @@ pub fn mode_site_name(site: i32) -> str:
     if site == MODE_SITE_CAPTURE_BY_PLACE: return "closure capture by place"
     if site == MODE_SITE_CLOSURE_OWNED_ENV: return "closure owns its environment"
     if site == MODE_SITE_FIELD_DECL_CARRIED: return "field projection declaration index carried by MIR"
+    if site == MODE_SITE_DECL_TYPE_NODE: return "declaration type node LLVM type"
+    if site == MODE_SITE_BODY_TYPE_NODE: return "body type node LLVM type"
     "unknown"
 
 pub fn mode_site_owner(site: i32) -> str:
@@ -5377,15 +5478,31 @@ pub fn mode_site_owner(site: i32) -> str:
     if site == MODE_SITE_FIELD_INDEX: return "Sema's field declaration"
     if site == MODE_SITE_CAPTURE_BY_PLACE or site == MODE_SITE_CLOSURE_OWNED_ENV: return "Sema's capture facts"
     if site == MODE_SITE_FIELD_DECL_CARRIED: return "MIR's projection"
+    if site == MODE_SITE_DECL_TYPE_NODE or site == MODE_SITE_BODY_TYPE_NODE: return "Sema's type for the node"
     "Sema's place category"
 
 // What a site re-derived its fact from before it read the owner.
 pub fn mode_site_derivation(site: i32) -> str:
-    if site == MODE_SITE_SIZEOF_TYPE_ARG or site == MODE_SITE_STRUCT_FIELD_TYPE: return "the AST type node"
+    if site == MODE_SITE_SIZEOF_TYPE_ARG or site == MODE_SITE_STRUCT_FIELD_TYPE or site == MODE_SITE_DECL_TYPE_NODE or site == MODE_SITE_BODY_TYPE_NODE: return "the AST type node"
     if site == MODE_SITE_FIELD_INDEX: return "the LLVM struct registry"
     if site == MODE_SITE_CAPTURE_BY_PLACE or site == MODE_SITE_CLOSURE_OWNED_ENV: return "the closure's AST spelling"
     if site == MODE_SITE_FIELD_DECL_CARRIED: return "a lookup of the field's name in Sema's record"
     "the LLVM type"
+
+// #2043 (D65 phase 5): the kinds of fact codegen once derived from the AST
+// itself. note_ast_derivation counts them; audit:codegen wants zero.
+pub const AST_DERIVATION_TYPE: i32 = 0
+pub const AST_DERIVATION_CONST: i32 = 1
+pub const AST_DERIVATION_COUNT: i32 = 2
+
+pub fn ast_derivation_name(kind: i32) -> str:
+    if kind == AST_DERIVATION_TYPE: return "AST type node resolved by codegen"
+    if kind == AST_DERIVATION_CONST: return "constant expression evaluated by codegen"
+    "unknown"
+
+pub fn ast_derivation_owner(kind: i32) -> str:
+    if kind == AST_DERIVATION_TYPE: return "the type Sema recorded for the node"
+    "the value Sema evaluated"
 
 // Symbol-naming rules live in src/FnAbi.w (docs/spec/abi/with-abi.md §5); this is
 // the adapter that feeds them the codegen mode.
@@ -5596,20 +5713,11 @@ impl Codegen:
         if self.fn_node_is_declared_only(fn_node) and (self.fn_values.contains(name_sym) or (alias_sym != 0 and self.fn_values.contains(alias_sym))):
             return
 
-        // Check if method (has dot in name); for missing symbol text, infer owner
-        // from `self: Type` in param 0.
-        // The owner is Sema's record for the function (#2043); the text after
-        // the `.` is only the method's short name for its key.
+        // A method's owner and its name in the owner's table are Sema's
+        // records for the function (#2043), never a split of its symbol.
         let method_owner_sym = self.fn_method_owner_cg_sym(name_sym)
-        var method_key_sym: i32 = 0
-        for di in 0..name_str.len() as i32:
-            if name_str[di] == 46 and method_owner_sym != 0:
-                let short_method_name = name_str.slice((di + 1) as i64, name_str.len() as i64)
-                if short_method_name.len() > 0:
-                    let short_method_sym = self.intern.intern(short_method_name)
-                    let mk_str = f"$m${method_owner_sym}|{short_method_sym}"
-                    method_key_sym = self.intern.intern(mk_str)
-                break
+        let short_method_sym = if method_owner_sym != 0: self.fn_method_name_cg_sym(name_sym) else: 0
+        let method_key_sym = if short_method_sym != 0: self.intern.intern(f"$m${method_owner_sym}|{short_method_sym}") else: 0
 
         // Methods owned by generic types are always compiled lazily against a
         // concrete owner instantiation. Even "static" methods like Foo.wrap(x: T)
@@ -5639,13 +5747,9 @@ impl Codegen:
         if method_owner_sym != 0:
             self.current_method_owner_sym = method_owner_sym
 
-        // #1647 (D65): the return type is Sema's signature's; the AST type
-        // node is read only for a function Sema holds no signature for.
-        var ret_ty_raw: i64 = 0
-        if sema_sig_idx >= 0:
-            ret_ty_raw = self.sema_type_to_llvm(self.sema.sig_return_type(sema_sig_idx))
-        else if ret_type_node != 0:
-            ret_ty_raw = self.resolve_return_type(ret_type_node)
+        // #1647 (D65): the return type is Sema's signature's; a function
+        // Sema holds no signature for is refused below (#2043).
+        let ret_ty_raw = if sema_sig_idx >= 0: self.sema_type_to_llvm(self.sema.sig_return_type(sema_sig_idx)) else: 0
         let ret_ty = if ret_ty_raw != 0: ret_ty_raw else: self.type_fallback()
 
         // Check if this returns Result
@@ -6764,25 +6868,28 @@ impl Codegen:
         // The public name may now select a curated With wrapper with a
         // different arity. FnAbi must read this raw declaration's signature.
         let sema_sig_idx = self.sema.extern_decl_sigs.get(ext_node) ?? -1
-
-        let ret_ty = self.resolve_return_type(ret_type_node)
         let name_str = self.intern.resolve(name_sym).clone()
+        // #2043 (D65): the return and parameter types are Sema's signature's.
+        if sema_sig_idx < 0 or self.sema.sig_get_param_count(sema_sig_idx) != param_count:
+            with_eprint(f"error: extern declaration {name_str} has no finalized FnAbi signature")
+            self.had_error = 1
+            return
+        let ret_fact = self.sema_type_to_llvm(self.sema.sig_return_type(sema_sig_idx))
+        let ret_ty = self.verify_ast_return_type(ret_fact, ret_type_node, name_sym)
         let cc_name = self.fn_callconv_name(meta)
         let uses_internal_abi = codegen_extern_uses_internal_abi(name_str, cc_name)
 
-        // Resolve original param types
         let orig_param_types: Vec[i64] = Vec.new()
         for pi in 0..param_count:
-            let p_type_node = self.pool.fn_param_type(param_start, pi)
-            orig_param_types.push(self.resolve_type(p_type_node))
+            let param_fact = self.abi_param_source_type(sema_sig_idx, pi)
+            orig_param_types.push(self.verify_ast_type(MODE_SITE_DECL_TYPE_NODE, param_fact, self.pool.fn_param_type(param_start, pi), name_sym, pi))
 
         // ABI transformation for C interop on aarch64:
         // - Struct params > 16 bytes → ptr (caller passes pointer to copy)
         // - Struct returns > 16 bytes → void return + hidden sret ptr first param
         let places: Vec[i32] = Vec.new()
         for pi in 0..param_count:
-            places.push(if sema_sig_idx >= 0: self.sig_abi_param_flags(sema_sig_idx, pi) else:
-                if self.pool.kind(self.pool.fn_param_type(param_start, pi)) == NodeKind.NK_TYPE_REF: 2 else: 0)
+            places.push(self.sig_abi_param_flags(sema_sig_idx, pi))
         let abi_index = self.compute_fn_abi(ret_ty, orig_param_types, places, if uses_internal_abi: FN_ABI_WITH else: FN_ABI_C, is_variadic)
         let abi = self.fn_abis[abi_index]
         let has_sret = if abi.ret.pass == PM_INDIRECT: 1 else: 0
@@ -6880,8 +6987,12 @@ impl Codegen:
         let flags = self.pool.get_data2(node)
         let is_mut = flags % 2
 
-        let var_ty = self.resolve_type(type_node)
+        // #2043: the variable's type is Sema's record for the declaration.
+        let var_fact = self.sema_type_to_llvm(self.sema.extern_var_type_ids.get(node) ?? 0)
+        let var_ty = self.verify_ast_type(MODE_SITE_DECL_TYPE_NODE, var_fact, type_node, name_sym, 0)
         if var_ty == 0:
+            with_eprint(f"error: extern variable '{self.intern.resolve(name_sym)}' has no checked type")
+            self.had_error = 1
             return
         let name_str = self.intern.resolve(name_sym)
         let link_name = self.canonical_extern_name(name_str)
@@ -7606,21 +7717,6 @@ impl Codegen:
             i = i - 1
         self.scope_local_count = watermark
 
-    mut fn build_fn_type_from_ast(fn_type_node: i32) -> i64:
-        // NodeKind.NK_TYPE_FN: d0=extra_start, d1=param_count, d2=return_type(node)
-        let extra_start = self.pool.get_data0(fn_type_node)
-        let param_count = self.pool.get_data1(fn_type_node)
-        let ret_node = self.pool.get_data2(fn_type_node)
-
-        let ptr_ty = wl_ptr_type(self.context)
-        let param_types: Vec[i64] = Vec.new()
-        param_types.push(ptr_ty)  // context pointer (closure convention)
-        for i in 0..param_count:
-            let p_node = self.pool.get_extra(extra_start + i)
-            param_types.push(self.resolve_type(p_node))
-        let ret_ty = self.resolve_return_type(ret_node)
-        wl_function_type(ret_ty, vec_data_i64(&param_types), param_count + 1, 0)
-
     // ── gen_module: multi-pass entry point ────────────────────────────
 
     mut fn gen_module(ast_pool: AstPool) -> i32:
@@ -7712,9 +7808,10 @@ impl Codegen:
                 // Type safety enforced by sema, not by LLVM types.
                 continue
             if sub_kind == TypeDeclKind.Alias:
-                let extra_start = self.pool.get_data1(decl)
-                let aliased_node = self.pool.get_extra(extra_start)
-                let resolved = self.resolve_type(aliased_node)
+                // #2043: the target is Sema's alias record.
+                let aliased_node = self.pool.get_extra(self.pool.get_data1(decl))
+                let target_fact = self.sema_type_to_llvm(self.type_decl_sema_tid(decl))
+                let resolved = self.verify_ast_type(MODE_SITE_DECL_TYPE_NODE, target_fact, aliased_node, name_sym, 0)
                 self.type_aliases.insert(name_sym, resolved)
         self.verify_type_bodies_defined()
 

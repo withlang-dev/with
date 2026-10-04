@@ -1727,6 +1727,7 @@ impl Sema:
         self.method_lookup.sig_lookup.insert(key, each_sig_idx)
         self.method_lookup.fn_lookup.insert(key, each_sym)
         self.method_owner_keys.insert(each_sym, state_sym)
+        self.method_name_syms.insert(each_sym, self.pool_intern("each"))
 
         self.generator_fn_run_syms.insert(fn_sym, run_sym)
         self.generator_fn_each_syms.insert(fn_sym, each_sym)
@@ -2211,6 +2212,7 @@ impl Sema:
         self.extern_var_texts.insert(sema_owned_text(self.pool_resolve(name)), 1)
         let type_node = self.ast.get_data1(node)
         let tid = self.resolve_type_expr(type_node)
+        self.extern_var_type_ids.insert(node, tid as i32)
         if self.is_opaque_value_type(tid) != 0:
             self.emit_error("opaque types cannot be declared as extern values; use a pointer or reference", type_node)
         // Register the extern var for scope lookup
@@ -2345,6 +2347,7 @@ impl Sema:
         // function's symbol; codegen reads it instead of splitting the
         // symbol's text at its first `.`.
         self.method_owner_keys.insert(fn_sym, owner_sym)
+        self.method_name_syms.insert(fn_sym, method_sym)
         if self.method_decl_is_extension(node) != 0:
             // Registration runs once per check pass; without the identity
             // guard the same extension appears N times and a SINGLE
@@ -2459,6 +2462,7 @@ impl Sema:
             let arg_tid = self.resolve_type_expr(arg_node)
             if arg_tid != 0:
                 self.put_generic_subst(tp_sym, arg_tid as i32, arg_node)
+                self.impl_trait_arg_type_ids.insert(arg_node, arg_tid as i32)
             ti = ti + 1
 
     mut fn resolve_trait_default_method_type(type_node: i32, impl_type_sym: i32, impl_type_tid: i32, trait_sym: i32, impl_node: i32) -> i32:
@@ -2532,6 +2536,7 @@ impl Sema:
                 self.method_lookup.sig_lookup.insert(key, sig_idx)
                 self.method_lookup.fn_lookup.insert(key, fn_sym)
                 self.method_owner_keys.insert(fn_sym, impl_key)
+                self.method_name_syms.insert(fn_sym, method_sym)
                 self.method_symbol_flags.insert(fn_sym, 1)
 
     fn top_level_let_type_ann_extra(flags: i32) -> i32:
