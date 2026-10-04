@@ -15,19 +15,18 @@ with-darwin-aarch64=ccc155d5651caf33bcae42c27717f9ed00f2984f7cec4260278faaad2078
 # tree no longer folds comments to dodge the old cross-file scan. Verified:
 # it builds main from a fresh checkout to a stage2 == stage3 fixpoint over
 # all 16 units. The previous seed (c95ae12d) is #1898's.
-# linux-x86_64 is main 2e8defaa, published from a local bootstrap: v0.15.2.1
-# cannot build this tree, so it was laddered through 8c859a7d, 37f3a99f,
-# 8e55d67b, fb6753b4 + the 4f004956 field-move fix, 8db10d1a, and the
-# 607a52f5 hop (a stage1 of a5c6f430 embedding 607a52f5's lib/). The published
-# binary builds main from a fresh checkout to a stage2 == stage3 fixpoint.
+# linux-x86_64 is main 074a38b8, cut on eric-5090: the seed before it
+# (2e8defaa) cannot compile main since 4cc11b86 (#2068). A fresh clone of main
+# 8cc883a7 with it as the seed runs :deps, builds to a stage2 == stage3
+# fixpoint over all 16 units and passes :no-host-toolchain.
 # linux-aarch64 is wave-arm64 b78ceca2 (#1915, D81), bootstrapped natively in
 # tools/docker/linux-aarch64 by a compiler cross-built on eric-5090 (v0.15.2.0
 # cannot build this tree). It embeds its runtime, the glibc 2.28 sysroot,
 # libc++ and lld: a fresh clone in a bare ubuntu:24.04 (git, curl, bubblewrap)
 # runs :deps and build with no LLVM_PREFIX to a stage2 == stage3 fixpoint over
 # all 16 units, and its release compiler is this binary byte for byte.
-with-linux-x86_64.version=nightly-20260926-local-1-2e8defaa18ef
-with-linux-x86_64=ce5c3c4729650b215fb166ac8078fe7c7982b094bc4a1e31401e04eb7e7460d0
+with-linux-x86_64.version=nightly-20261003-local-1-074a38b8fd81
+with-linux-x86_64=3f899db6d4ac28febc2efa8173c3e8dbcfab26607a08e51dd00bf5ec41ffc48e
 with-linux-aarch64.version=nightly-20261003-local-2-b78ceca2d3c5
 with-linux-aarch64=c5b434ce739a0ef2a8beddf09abd30f1f501aa2b9227b07a0b16bdf65f8f2898
 # windows-x86_64 is win-self-contained bd6e00d1 (#1915, D81): the first seed
