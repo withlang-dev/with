@@ -890,6 +890,15 @@ pub fn mir_test_resolution_callees() -> Unit:
     assert(resolution_verdict(false, MirIntrinsic.GENERIC_CALL, 1, resolution_answer(CalleeResolutionKind.Intrinsic, -1, -1, -1)) == "")
     // Any other intrinsic mark is recognized by its kind.
     assert(resolution_verdict(false, MirIntrinsic.STR_LEN, 1, resolution_answer(CalleeResolutionKind.Unknown, -1, -1, -1)) == "")
+    // D65 phase 5 (#2043): a facade call MIR lowered by its spelling — the
+    // raw C declaration (5) where Sema resolved the bridge (9) — or to a
+    // third function, and a converted value MIR never converted.
+    assert(mir_resolved_callee_verdict(5, 9, 5).contains("the call spells"))
+    assert(mir_resolved_callee_verdict(6, 9, 5).contains("did not resolve"))
+    assert(mir_resolved_callee_verdict(9, 9, 5) == "")
+    assert(mir_resolved_callee_verdict(5, 0, 5) == "")
+    assert(mir_value_conversion_verdict(false).contains("raw result"))
+    assert(mir_value_conversion_verdict(true) == "")
 
 // D65 phase 3 (#1647): a field place against Sema's facts for its node —
 // the projection, its type, and its base after Sema's autoderef (the module

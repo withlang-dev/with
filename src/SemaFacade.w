@@ -2228,10 +2228,7 @@ impl Sema:
         // The receiver is C's param 0: the selector is argument p - 1.
         if arg_count < p or self.ast.has_call_named_args(node) != 0:
             return field
-        let target = self.facade_variadic_pick(ci, self.pool_resolve(field), self.ast.get_extra(extra_start + p - 1), node)
-        if target != 0:
-            self.facade_variadic_calls.insert(node, target)
-        target
+        self.facade_variadic_pick(ci, self.pool_resolve(field), self.ast.get_extra(extra_start + p - 1), node)
 
     // A free call's retarget (SemaCheck.w check_call, beside
     // facade_bridge_redirect): the case function of a variadic free
@@ -2259,8 +2256,6 @@ impl Sema:
         // The case function must be visible here, as a bridge must be.
         if target == self.current_fn_symbol or self.symbol_visible_from_current(target) == 0 or self.get_visible_sig(target) < 0:
             return fn_sym
-        self.facade_bridge_syms.insert(target, 1)
-        self.facade_variadic_calls.insert(node, target)
         target
 
 pub fn facade_clause_name(kind: i32) -> str:
@@ -2821,7 +2816,6 @@ impl Sema:
         // The bridge's own body calls the C name: the raw operation.
         if bsym == 0 or bsym == self.current_fn_symbol or self.symbol_visible_from_current(bsym) == 0 or (self.get_visible_sig(bsym) < 0 and self.generic_fn_node_for_symbol(bsym) == 0):
             return fn_sym
-        self.facade_bridge_syms.insert(bsym, 1)
         bsym
 
     fn facade_type_is_byte(tid: i32) -> bool:
@@ -4700,7 +4694,21 @@ impl Sema:
         if sig < 0 or self.facade_pair_op_by_sig.contains(sig):
             return
         self.facade_pair_op_by_sig.insert(sig, self.facade_pair_ops.len() as i32)
-        self.facade_pair_ops.push(FacadePairOp { contract: ci, resource: ri, action, slot, userdata_tid, guard_ok, invokes })
+        // Every pair operation is a method of its resource: the receiver is
+        // the resource it acts on. A userdata setter retains the referent
+        // of its last parameter, the `&U` (facade_note_pair_op_sig).
+        let retained_param = if action == FOREIGN_PAIR_USERDATA: self.sig_get_param_count(sig) - 1 else: -1
+        self.facade_pair_ops.push(FacadePairOp { contract: ci, resource: ri, action, slot, userdata_tid, guard_ok, invokes, subject_param: 0, retained_param })
+
+    // The presented operation a pair op is, for a diagnostic: 'Host.method'.
+    fn facade_pair_op_display(op: i32) -> str:
+        let ci = self.facade_pair_ops[op].contract
+        let ri = self.facade_pair_ops[op].resource
+        let fname: str = self.pool_resolve(self.foreign_contracts[ci].fn_sym)
+        "'" ++ self.pool_resolve(self.facade_resources[ri].name) ++ "." ++ self.facade_presented(ri, fname) ++ "'"
+
+    // A pair resource, for a diagnostic: 'Name'.
+    fn facade_pair_resource_display(ri: i32) -> str: "'" ++ self.pool_resolve(self.facade_resources[ri].name) ++ "'"
 
     // A pair setter's concrete signature, at the call that specializes it
     // (SemaCheck.w check_selected_generic_call_args / the generic method
