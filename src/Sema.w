@@ -819,6 +819,16 @@ pub type Sema {
     global_value_ident_nodes: HashMap[i32, i32],
     // `const` globals: comptime values, exempt from the move-out check.
     const_global_syms: HashMap[i32, i32],
+    // D88 (§4.2.1): a `const` declared without a type, by name: its
+    // declaration, and the others of that name in other modules. Whether one
+    // is an untyped numeric constant is its initializer's to say
+    // (untyped_const_init).
+    untyped_const_decls: HashMap[i32, i32],
+    untyped_const_alt_decls: Vec[i32],
+    // An identifier that names an untyped numeric constant -> the
+    // initializer it stands for at that use. Its type there is the node's in
+    // typed_expr_types; MIR lowers the initializer at that type.
+    untyped_const_uses: HashMap[i32, i32],
     // move-sites: last use per (root, first-field) path — the liveness key for
     // FIELD-shaped transfer args, so `eat(move self.r)` followed by `self.tag`
     // reads verdicts on the `.r` path, not the whole receiver. Key packs
@@ -2966,6 +2976,9 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         binding_last_use: HashMap.new(),
         global_value_ident_nodes: HashMap.new(),
         const_global_syms: HashMap.new(),
+        untyped_const_decls: HashMap.new(),
+        untyped_const_alt_decls: Vec.new(),
+        untyped_const_uses: HashMap.new(),
         field_last_use: HashMap.new(),
         effect_prov: HashMap.new(),
         effect_note_origin_node: 0,

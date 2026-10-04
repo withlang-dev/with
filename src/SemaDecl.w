@@ -2678,6 +2678,9 @@ impl Sema:
         self.register_top_level_global_decl(name, bind_ty as i32, is_mut, node, decl_kind)
         if self.ast.is_const_decl_node(node) != 0:
             self.const_global_syms.insert(name, 1)
+            if flags / 16 == 0:
+                if self.untyped_const_decls.contains(name): self.untyped_const_alt_decls.push(node)
+                else: self.untyped_const_decls.insert(name, node)
         self.typed_binding_types.insert(node, bind_ty as i32)
         self.typed_binding_names.insert(node, name)
         self.typed_binding_muts.insert(node, is_mut)

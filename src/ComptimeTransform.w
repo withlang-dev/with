@@ -600,6 +600,19 @@ impl Sema:
             return self.ct_transform_expr(source_ast, pool, intern, else_body)
         pool.ct_empty_block(wrapper)
 
+// An initializer that may be an untyped numeric constant's (D88): unsuffixed
+// numeric literals, grouping, unary and binary operators, and names. Whether
+// the names are such constants too is Sema's to decide.
+fn ct_untyped_numeric_candidate(pool: AstPool, node: i32) -> bool:
+    if node == 0: return false
+    let kind = pool.kind(node)
+    if kind == NodeKind.NK_INT_LIT or kind == NodeKind.NK_FLOAT_LIT: return pool.literal_suffix(node) == LiteralSuffix.None
+    if kind == NodeKind.NK_IDENT: return true
+    if kind == NodeKind.NK_GROUPED: return ct_untyped_numeric_candidate(pool, pool.get_data0(node))
+    if kind == NodeKind.NK_UNARY: return ct_untyped_numeric_candidate(pool, pool.get_data1(node))
+    if kind == NodeKind.NK_BINARY: return ct_untyped_numeric_candidate(pool, pool.get_data1(node)) and ct_untyped_numeric_candidate(pool, pool.get_data2(node))
+    false
+
 fn ct_iter_count(value: &ComptimeValue) -> i32:
     if value.kind == ComptimeValueKind.CV_ARRAY or value.kind == ComptimeValueKind.CV_TUPLE or value.kind == ComptimeValueKind.CV_VEC:
         return value.extra_count
@@ -1203,6 +1216,8 @@ impl Sema:
                             let inner = pool.get_data0(value)
                             if inner != 0:
                                 self.typed_expr_types.insert(inner, ann_type as i32)
+                if pool.kind(value) == NodeKind.NK_COMPTIME and pool.is_const_decl_node(node) != 0 and self.local_let_type_ann_extra(pool.get_data2(node)) < 0 and ct_untyped_numeric_candidate(pool, pool.get_data0(value)):
+                    pool.set_untyped_const_init(node, pool.get_data0(value))
                 let was_comptime = pool.kind(value) == NodeKind.NK_COMPTIME
                 let folded = self.ct_transform_expr(source_ast, pool, intern, value)
                 if was_comptime:
@@ -3225,6 +3240,11 @@ impl Sema:
                             let inner = pool.get_data0(value)
                             if inner != 0:
                                 self.typed_expr_types.insert(inner, ann_type as i32)
+                // D88: an unannotated `const` whose initializer is numeric
+                // literals and names keeps that initializer beside its folded
+                // value: each use is typed from it (Sema: untyped_const_init).
+                if pool.kind(value) == NodeKind.NK_COMPTIME and pool.is_const_decl_node(node) != 0 and self.top_level_let_type_ann_extra(pool.get_data2(node)) < 0 and ct_untyped_numeric_candidate(pool, pool.get_data0(value)):
+                    pool.set_untyped_const_init(node, pool.get_data0(value))
                 let was_comptime = pool.kind(value) == NodeKind.NK_COMPTIME
                 let folded = self.ct_transform_expr(source_ast, pool, intern, value)
                 if was_comptime:

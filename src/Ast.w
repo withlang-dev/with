@@ -702,6 +702,9 @@ type AstPoolState {
     extend_impl_set: HashMap[i32, i32],
     comptime_decl_set: HashMap[i32, i32],
     const_decl_set: HashMap[i32, i32],
+    // D88: an unannotated `const` -> the initializer it was written with,
+    // kept when the comptime transform folds the declaration to its value.
+    untyped_const_inits: HashMap[i32, i32],
     move_closure_set: HashMap[i32, i32],
     non_escaping_closure_set: HashMap[i32, i32],
     by_place_closure_set: HashMap[i32, i32],
@@ -836,6 +839,7 @@ fn AstPool.new -> AstPool:
             extend_impl_set: HashMap.new(),
             comptime_decl_set: HashMap.new(),
             const_decl_set: HashMap.new(),
+            untyped_const_inits: HashMap.new(),
             move_closure_set: HashMap.new(),
             non_escaping_closure_set: HashMap.new(),
             by_place_closure_set: HashMap.new(),
@@ -2078,6 +2082,13 @@ impl AstPool:
     fn mark_const_decl(node: NodeId):
         self.state.const_decl_nodes.push(node as i32)
         self.state.const_decl_set.insert(node as i32, 1)
+
+    fn set_untyped_const_init(decl: NodeId, init: NodeId):
+        self.state.untyped_const_inits.insert(decl as i32, init as i32)
+
+    fn untyped_const_init_of(decl: NodeId) -> i32:
+        if self.state.untyped_const_inits.contains(decl as i32): return self.state.untyped_const_inits.get(decl as i32).unwrap()
+        0
 
     fn is_const_decl_node(node: NodeId) -> i32:
         if self.state.const_decl_set.contains(node as i32): return 1

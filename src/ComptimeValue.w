@@ -134,7 +134,10 @@ pub fn comptime_float_text(value: &ComptimeValue) -> str:
     if value.text.len() > 0:
         return with_str_clone_ref(value.text)
     let v = value.real
-    f"{v:.17}"
+    // Scientific notation: 17 significant digits whatever the magnitude.
+    // `{v:.17}` is 17 digits after the point, which for 1.0 / 120.0 is 15
+    // significant ones, and the folded constant was not the quotient.
+    f"{v:.16e}"
 
 pub fn comptime_value_str(value: &str) -> ComptimeValue:
     ComptimeValue {

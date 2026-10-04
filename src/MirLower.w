@@ -225,6 +225,12 @@ pub type MirBuilder = ephemeral {
     next_temp: i32,
     cur_node: i32,
     expected_type: i32,
+    // D88: while an untyped constant's initializer is lowered for one use,
+    // the nodes on its value path have the type of that use (Sema:
+    // untyped_const_value_path).
+    untyped_override_nodes: Vec[i32],
+    untyped_override_type: i32,
+    untyped_override_depth: i32,
     // D22 Stage 5: lower_expr consumes Sema's contextual-Copy adjustment at
     // the adjusted expression. While materializing that adjustment, lower the
     // same node once at its exact reference type without re-entering it.
@@ -352,6 +358,9 @@ fn MirBuilder.init(sema: &Sema, ast: AstPool, pool: InternPool, fn_sym: i32) -> 
         next_temp: 0,
         cur_node: 0,
         expected_type: 0,
+        untyped_override_nodes: Vec.new(),
+        untyped_override_type: 0,
+        untyped_override_depth: 0,
         contextual_copy_raw_node: 0,
         vector_raw_node: 0,
         contextual_fact_sig_idx: -1,
@@ -1846,6 +1855,10 @@ impl MirBuilder:
         self.sema.substitute_type(type_id, self.sema.generic_subst_param_syms, self.sema.generic_subst_type_ids, subst_count)
 
     mut fn expr_type(node: i32) -> i32:
+        if self.untyped_override_depth > 0:
+            // One use, one type: every node on the path has it.
+            for n in self.untyped_override_nodes:
+                if n == node: return self.untyped_override_type
         if node == 0:
             return self.sema.ty_void as i32
         if self.sema.typed_expr_types.contains(node):
@@ -4236,7 +4249,25 @@ impl MirBuilder:
             return local_id
         -1
 
+    // D88 (§4.2.1): a use of a constant with no numeric type of its own is
+    // its initializer, lowered at the type Sema gave this use.
+    mut fn lower_untyped_const_use(init: i32, use_ty: i32) -> i32:
+        let path = self.sema.untyped_const_value_path(init, Vec.new())
+        for n in path: self.untyped_override_nodes.push(n)
+        self.untyped_override_type = use_ty
+        self.untyped_override_depth = self.untyped_override_depth + 1
+        let op = self.lower_expr(init)
+        self.untyped_override_depth = self.untyped_override_depth - 1
+        if self.untyped_override_depth == 0: self.untyped_override_nodes = Vec.new()
+        op
+
     mut fn lower_var(sym: i32, type_id: i32, node_id: i32) -> i32:
+        if node_id != 0 and self.sema.untyped_const_uses.contains(node_id):
+            let untyped_init: i32 = self.sema.untyped_const_uses.get(node_id).unwrap()
+            let use_ty = self.expr_type(node_id)
+            // At the declaration's own type the constant's storage is the same value.
+            if self.untyped_override_depth > 0 or use_ty != self.expr_type(untyped_init):
+                return self.lower_untyped_const_use(untyped_init, use_ty)
         let hinted_ty = if self.expected_type != 0: self.expected_type else: type_id
         if self.pool.resolve(sym) == "None" and hinted_ty != 0:
             let hinted_resolved = self.sema.resolve_alias(hinted_ty)

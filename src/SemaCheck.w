@@ -9841,7 +9841,11 @@ impl Sema:
 
         if kind == NodeKind.NK_IDENT:
             self.note_callable_ident(node)
-            return self.check_ident(self.ast.get_data0(node), node) as TypeId
+            let ident_ty = self.check_ident(self.ast.get_data0(node), node)
+            // D88: an untyped numeric constant takes its type from this use.
+            let untyped_init = if ident_ty != 0: self.untyped_const_init(self.ast.get_data0(node)) else: 0
+            if untyped_init != 0: return self.check_untyped_const_use(node, untyped_init, ident_ty as i32) as TypeId
+            return ident_ty as TypeId
 
         if kind == NodeKind.NK_MATCH_OP or kind == NodeKind.NK_NEG_MATCH_OP:
             if self.no_std != 0 and self.current_module_is_std_implementation() == 0:
@@ -12686,27 +12690,129 @@ impl Sema:
             return pointee as TypeId
         peer
 
+    // D88 (§4.2.1): the initializer of the untyped numeric constant `sym`
+    // names in the module being checked, or 0: a `const` declared without a
+    // type whose initializer is made only of unsuffixed numeric literals,
+    // operators on them, and other such constants. It has no numeric type of
+    // its own; each use is typed as this initializer would be there.
+    fn untyped_const_init_depth(sym: i32, depth: i32) -> i32:
+        if depth > 16:
+            return 0
+        var decl = 0
+        if self.scope_binding_is_local(sym):
+            // A `const` inside a function.
+            if self.binding_decl_nodes.contains(sym): decl = self.binding_decl_nodes.get(sym).unwrap()
+        else if self.untyped_const_decls.contains(sym):
+            decl = self.untyped_const_decls.get(sym).unwrap()
+            if self.decl_source_path_for_node(decl) != self.current_module_path:
+                decl = 0
+                for i in 0..self.untyped_const_alt_decls.len() as i32:
+                    let alt: i32 = self.untyped_const_alt_decls[i]
+                    if self.ast.get_data0(alt) == sym and self.decl_source_path_for_node(alt) == self.current_module_path: decl = alt
+        if decl == 0:
+            return 0
+        // The initializer as written: the comptime transform folded the
+        // declaration itself to its value at the default type.
+        let value = self.ast.untyped_const_init_of(decl)
+        if value == 0 or not self.expr_is_literal_arith_depth(value, false, depth + 1):
+            return 0
+        value
+
+    fn untyped_const_init(sym: i32): self.untyped_const_init_depth(sym, 0)
+
+    // Whether an untyped literal expression is a float: one of its literals
+    // is, or one of the constants it names.
+    fn untyped_expr_is_float(node: i32) -> bool:
+        if node == 0:
+            return false
+        let kind = self.ast.kind(node)
+        if kind == NodeKind.NK_FLOAT_LIT: return true
+        if kind == NodeKind.NK_GROUPED: return self.untyped_expr_is_float(self.ast.get_data0(node))
+        if kind == NodeKind.NK_UNARY: return self.untyped_expr_is_float(self.ast.get_data1(node))
+        if kind == NodeKind.NK_BINARY: return self.untyped_expr_is_float(self.ast.get_data1(node)) or self.untyped_expr_is_float(self.ast.get_data2(node))
+        if kind == NodeKind.NK_IDENT and self.untyped_const_uses.contains(node): return self.untyped_expr_is_float(self.untyped_const_uses.get(node).unwrap())
+        false
+
+    // The nodes of an untyped constant's initializer that take the type of
+    // the use: its literals and the operators over them, through the
+    // constants it names. A shift's amount keeps its own type (§4.2.4).
+    pub fn untyped_const_value_path(node: i32, out0: Vec[i32]) -> Vec[i32]:
+        var out = out0
+        if node == 0:
+            return out
+        let kind = self.ast.kind(node)
+        if kind == NodeKind.NK_INT_LIT or kind == NodeKind.NK_FLOAT_LIT:
+            out.push(node)
+        else if kind == NodeKind.NK_GROUPED:
+            out.push(node)
+            out = self.untyped_const_value_path(self.ast.get_data0(node), move out)
+        else if kind == NodeKind.NK_UNARY:
+            out.push(node)
+            out = self.untyped_const_value_path(self.ast.get_data1(node), move out)
+        else if kind == NodeKind.NK_BINARY:
+            out.push(node)
+            out = self.untyped_const_value_path(self.ast.get_data1(node), move out)
+            let op = self.ast.get_data0(node)
+            if op != BinaryOp.OP_SHL and op != BinaryOp.OP_SHR: out = self.untyped_const_value_path(self.ast.get_data2(node), move out)
+        else if kind == NodeKind.NK_IDENT and self.untyped_const_uses.contains(node):
+            out.push(node)
+            out = self.untyped_const_value_path(self.untyped_const_uses.get(node).unwrap(), move out)
+        out
+
+    // A use of an untyped numeric constant (D88): typed as its initializer
+    // would be if written here — by the context of the use, and by the
+    // default (`declared`, what the declaration's own check gave it) where
+    // the use gives none. An integer constant that does not fit the type its
+    // use demands is an error here, as the literal would be.
+    mut fn check_untyped_const_use(node: i32, init: i32, declared: i32) -> i32:
+        // The initializer is checked once at its defaults: its shift amounts
+        // and the constants it names take their own types there.
+        if not self.typed_expr_types.contains(init):
+            let _ = self.check_expr_with_expected(init, 0 as TypeId)
+        self.untyped_const_uses.insert(node, init)
+        var ty = declared
+        if self.untyped_expr_is_float(init):
+            let expected = self.float_literal_expected_type()
+            if expected != 0: ty = expected
+        else if self.has_expected_type != 0 and self.expected_expr_type != 0:
+            let expected = self.numeric_operand_type(self.expected_expr_type as i32)
+            if self.is_numeric_type(expected): ty = expected
+        if ty != declared:
+            let resolved = self.resolve_alias(self.numeric_operand_type(ty) as TypeId)
+            if self.get_type_kind(resolved) == TypeKind.TY_INT:
+                let folded = self.fold_literal_int_arith_at(init, ty)
+                if folded.ok == 0 or folded.overflow != 0:
+                    let name: str = with_str_clone_ref(self.pool_resolve(self.ast.get_data0(node)))
+                    self.emit_error(f"constant `{name}` does not fit `{self.type_name(ty)}`: an untyped constant is typed as its initializer would be at each use (§4.2.1)", node)
+        self.typed_expr_types.insert(node, ty)
+        ty
+
     // Numeric literals combined by arithmetic, bitwise operators, shifts,
     // negation, `~` and grouping. `constant` admits suffixed literals and
     // asks for a value known here: a shift's amount must be one too. Without
     // it, the question is whether a context decides the type, and a shift's
     // type is its left operand's alone.
-    fn expr_is_literal_arith_of(node: i32, constant: bool) -> bool:
+    fn expr_is_literal_arith_of(node: i32, constant: bool): self.expr_is_literal_arith_depth(node, constant, 0)
+
+    fn expr_is_literal_arith_depth(node: i32, constant: bool, depth: i32) -> bool:
         if node == 0:
             return false
         let kind = self.ast.kind(node)
         if kind == NodeKind.NK_INT_LIT or kind == NodeKind.NK_FLOAT_LIT:
             return constant or self.literal_suffix_type(self.ast.literal_suffix(node)) == 0
         if kind == NodeKind.NK_GROUPED:
-            return self.expr_is_literal_arith_of(self.ast.get_data0(node), constant)
+            return self.expr_is_literal_arith_depth(self.ast.get_data0(node), constant, depth)
         if kind == NodeKind.NK_UNARY and (self.ast.get_data0(node) == UnaryOp.UOP_NEGATE or self.ast.get_data0(node) == UnaryOp.UOP_BIT_NOT):
-            return self.expr_is_literal_arith_of(self.ast.get_data1(node), constant)
+            return self.expr_is_literal_arith_depth(self.ast.get_data1(node), constant, depth)
         if kind == NodeKind.NK_BINARY:
             let op = self.ast.get_data0(node)
             if sema_binary_op_is_arithmetic(op) or op == BinaryOp.OP_BIT_AND or op == BinaryOp.OP_BIT_OR or op == BinaryOp.OP_BIT_XOR:
-                return self.expr_is_literal_arith_of(self.ast.get_data1(node), constant) and self.expr_is_literal_arith_of(self.ast.get_data2(node), constant)
+                return self.expr_is_literal_arith_depth(self.ast.get_data1(node), constant, depth) and self.expr_is_literal_arith_depth(self.ast.get_data2(node), constant, depth)
             if op == BinaryOp.OP_SHL or op == BinaryOp.OP_SHR:
-                return self.expr_is_literal_arith_of(self.ast.get_data1(node), constant) and (not constant or self.expr_is_literal_arith_of(self.ast.get_data2(node), true))
+                return self.expr_is_literal_arith_depth(self.ast.get_data1(node), constant, depth) and (not constant or self.expr_is_literal_arith_depth(self.ast.get_data2(node), true, depth))
+        // D88: a constant with no numeric type of its own is its initializer.
+        if kind == NodeKind.NK_IDENT:
+            return self.untyped_const_init_depth(self.ast.get_data0(node), depth) != 0
         false
 
     // An expression whose type no operand decides: unsuffixed numeric
@@ -12786,14 +12892,23 @@ impl Sema:
     // recorded for its nodes. `ok == 0` when an operand cannot be folded or
     // itself overflowed (already reported); `overflow != 0` when this node's
     // own operation overflows.
-    fn fold_literal_int_arith(node: i32) -> IntArithmeticResult:
+    fn fold_literal_int_arith(node: i32): self.fold_literal_int_arith_at(node, 0)
+
+    // As fold_literal_int_arith, with every node on the value path at
+    // `force` when it is not 0: an untyped constant's initializer at the
+    // type of one use (D88).
+    fn fold_literal_int_arith_at(node: i32, force: i32) -> IntArithmeticResult:
         let failed = IntArithmeticResult { ok: 0, overflow: 0, value: 0 }
         if node == 0:
             return failed
         let kind = self.ast.kind(node)
         if kind == NodeKind.NK_GROUPED:
-            return self.fold_literal_int_arith(self.ast.get_data0(node))
-        let ty = if self.typed_expr_types.contains(node): self.typed_expr_types.get(node).unwrap() else: 0
+            return self.fold_literal_int_arith_at(self.ast.get_data0(node), force)
+        let recorded = if self.typed_expr_types.contains(node): self.typed_expr_types.get(node).unwrap() else: 0
+        let ty = if force != 0: force else: recorded
+        if kind == NodeKind.NK_IDENT:
+            if not self.untyped_const_uses.contains(node): return failed
+            return self.fold_literal_int_arith_at(self.untyped_const_uses.get(node).unwrap(), ty)
         let resolved = self.resolve_alias(self.numeric_operand_type(ty) as TypeId)
         if ty == 0 or self.get_type_kind(resolved) != TypeKind.TY_INT:
             return failed
@@ -12807,7 +12922,7 @@ impl Sema:
                 return failed
             return IntArithmeticResult { ok: 1, overflow: 0, value: int_truncate_to_width(words.lo, bits, signed == 0) }
         if kind == NodeKind.NK_UNARY:
-            let inner = self.fold_literal_int_arith(self.ast.get_data1(node))
+            let inner = self.fold_literal_int_arith_at(self.ast.get_data1(node), force)
             if inner.ok == 0 or inner.overflow != 0:
                 return failed
             if self.ast.get_data0(node) == UnaryOp.UOP_BIT_NOT:
@@ -12817,8 +12932,10 @@ impl Sema:
             return int_eval_unary_neg(inner.value, bits, self.overflow_mode)
         if kind != NodeKind.NK_BINARY:
             return failed
-        let lhs = self.fold_literal_int_arith(self.ast.get_data1(node))
-        let rhs = self.fold_literal_int_arith(self.ast.get_data2(node))
+        let lhs = self.fold_literal_int_arith_at(self.ast.get_data1(node), force)
+        let op_kind = self.ast.get_data0(node)
+        let amount_force = if op_kind == BinaryOp.OP_SHL or op_kind == BinaryOp.OP_SHR: 0 else: force
+        let rhs = self.fold_literal_int_arith_at(self.ast.get_data2(node), amount_force)
         if lhs.ok == 0 or lhs.overflow != 0 or rhs.ok == 0 or rhs.overflow != 0:
             return failed
         let op = self.ast.get_data0(node)
