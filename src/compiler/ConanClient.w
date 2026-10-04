@@ -391,8 +391,79 @@ fn conan_result_version_for_name(result: &str, name: &str) -> str:
         return ""
     result.slice((slash + 1) as i64, at as i64)
 
+// Numeric order of two versions, component by component; a missing
+// component is 0, so `3` and `3.0.0` are the same version.
+fn conan_version_order(a: &str, b: &str) -> i32:
+    let pa = a.split(".")
+    let pb = b.split(".")
+    let n = if pa.len() > pb.len(): pa.len() as i32 else: pb.len() as i32
+    for i in 0..n:
+        let x: &str = if i < pa.len() as i32: &pa[i] else: "0"
+        let y: &str = if i < pb.len() as i32: &pb[i] else: "0"
+        let c = conan_version_compare(x, y)
+        if c != 0: return c
+    0
+
+// The first version past what `base` admits: its minor bumped for a tilde
+// (`1.2` and `1.2.3` -> `1.3`, `1` -> `2`), its major for a caret (`1.2` -> `2`).
+fn conan_version_bump(base: &str, caret: bool) -> str:
+    let parts = base.split(".")
+    let keep = if caret or parts.len() < 2: 0 else: 1
+    var out = ""
+    for i in 0..keep: out = out ++ parts[i] ++ "."
+    let (_, n) = conan_parse_leading_int(parts[keep])
+    out ++ f"{n + 1}"
+
+fn conan_parse_leading_int(text: &str) -> (bool, i32):
+    var n = 0
+    var any = false
+    for i in 0..text.len() as i32:
+        if text[i] < '0' or text[i] > '9': break
+        n = n * 10 + (text[i] - '0') as i32
+        any = true
+    (any, n)
+
+// One term of a Conan version range: `>=3`, `>3`, `<4`, `<=4`, `=1.0`,
+// `~1.2` (>=1.2 <1.3), `^1.2` (>=1.2 <2), or a bare version (that version).
+fn conan_range_term_holds(version: &str, term: &str) -> bool:
+    if term.starts_with(">="): return conan_version_order(version, term.slice(2, term.len())) >= 0
+    if term.starts_with("<="): return conan_version_order(version, term.slice(2, term.len())) <= 0
+    if term.starts_with(">"): return conan_version_order(version, term.slice(1, term.len())) > 0
+    if term.starts_with("<"): return conan_version_order(version, term.slice(1, term.len())) < 0
+    if term.starts_with("~") or term.starts_with("^"):
+        let base = term.slice(1, term.len())
+        return conan_version_order(version, base) >= 0 and conan_version_order(version, conan_version_bump(base, term.starts_with("^"))) < 0
+    if term.starts_with("="): return conan_version_order(version, term.slice(1, term.len())) == 0
+    conan_version_order(version, term) == 0
+
+// Whether `version` is in the range a recipe writes as `[>=3 <4]`: terms
+// separated by spaces all hold, `||` separates alternatives, and what follows
+// a `,` is an option (`include_prerelease`), without which a pre-release
+// (`3.0.0-beta`) is in no range.
+pub fn conan_version_in_range(version: &str, range: &str) -> bool:
+    var body = range.trim()
+    if body.starts_with("["): body = body.slice(1, body.len())
+    if body.ends_with("]"): body = body.slice(0, body.len() - 1)
+    let comma = body.find(",")
+    let prerelease = comma >= 0 and body.slice(comma + 1, body.len()).contains("include_prerelease")
+    if comma >= 0: body = body.slice(0, comma)
+    if version.contains("-") and not prerelease: return false
+    for alternative in body.split("||"):
+        var holds = true
+        var any = false
+        for term in alternative.split(" "):
+            if term.len() == 0: continue
+            any = true
+            if not conan_range_term_holds(version, term): holds = false
+        if holds and any: return true
+    // `[*]` and an empty range accept every release.
+    body.trim().len() == 0 or body.trim() == "*"
+
+// `version_hint` is an exact version, a `1.2.Z` prefix, a range as a recipe
+// writes one (`[>=3 <4]`) or empty; a range or a prefix asks for the newest
+// release Conan Center has that satisfies it.
 fn conan_resolve_version(name: &str, version_hint: &str) -> str:
-    if version_hint.len() > 0 and not version_hint.ends_with(".Z"):
+    if version_hint.len() > 0 and not version_hint.ends_with(".Z") and not version_hint.starts_with("["):
         return with_str_clone_ref(version_hint)
     let url = CONAN_CENTER_URL() ++ "/v2/conans/search?q=" ++ name
     let response = conan_http_get(url)
@@ -404,7 +475,7 @@ fn conan_resolve_version(name: &str, version_hint: &str) -> str:
         let version = conan_result_version_for_name(results[i], name)
         if version.len() == 0:
             continue
-        if not conan_version_matches_hint(version, version_hint):
+        if not (if version_hint.starts_with("["): conan_version_in_range(version, version_hint) else: conan_version_matches_hint(version, version_hint)):
             continue
         if best.len() == 0 or conan_version_compare(version, best) > 0:
             best = version
@@ -1757,9 +1828,8 @@ fn conan_install_from_source(name: &str, version: &str, project_root: &str, dept
     for reference in requires.refs:
         let required = conan_ref_name(reference)
         let written = conan_ref_version(reference)
-        // A version range asks for the newest release Conan Center has.
-        let hint = if written.starts_with("["): "" else: written.clone()
-        let installed = conan_install_internal(required, hint, project_root, depth + 1, false)
+        // A version range asks for the newest release Conan Center has in it.
+        let installed = conan_install_internal(required, written, project_root, depth + 1, false)
         if installed.len() == 0:
             return conan_source_fail("", name ++ "/" ++ version ++ " requires " ++ reference ++ ", which could not be installed (above)")
         resolved.push(required ++ "/" ++ installed)

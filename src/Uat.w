@@ -393,6 +393,8 @@ fn uat_fail(steps: i32, step: &UatStep, what: &str, stderr_path: &str, human: Ve
 
 // The toolchain a `run:` line's leading `with` names: WITH_UAT_WITH, else
 // the running binary.
+fn uat_exe_suffix_for(executable: bool, path: &str): if executable and uat_host_platform() == "windows" and not path.ends_with(".exe"): ".exe" else: ""
+
 fn uat_toolchain(self_path: &str) -> str:
     let override = env("WITH_UAT_WITH")
     if override.len() > 0: override else: self_path.clone()
@@ -421,6 +423,9 @@ fn uat_run_scenario(sc: &UatScenario, root: &str, self_path: &str, keep: bool) -
             var argv = uat_split_command(step.a)
             if argv.len() == 0: return uat_fail(steps, step, "empty command", "", move human)
             if argv[0] == "with": argv[0] = uat_toolchain(self_path)
+            // `./bin/with` names a file of the scenario directory. Windows resolves
+            // a relative program against the runner, and wants the `.exe`.
+            else if uat_host_platform() == "windows" and argv[0].starts_with("./"): argv[0] = uat_join(cwd, argv[0].slice(2, argv[0].len())) ++ uat_exe_suffix_for(true, argv[0])
             let label = f"step-{steps}"
             let stdout_path = uat_join(capture_dir, label ++ ".stdout")
             let stderr_path = uat_join(capture_dir, label ++ ".stderr")
@@ -453,7 +458,8 @@ fn uat_run_scenario(sc: &UatScenario, root: &str, self_path: &str, keep: bool) -
             // an install layout's `bin/with`.
             let src = if step.a == "with": uat_toolchain(self_path) else if step.a.starts_with("$"): uat_join(root, env(step.a.slice(1, step.a.len()))) else: uat_join(root, step.a)
             if with_fs_file_exists(src) == 0: return uat_fail(steps, step, "nothing to copy at " ++ step.a, "", move human)
-            let dst = uat_join(cwd, step.b)
+            // On Windows an executable is named `.exe`: `bin/with` is `bin/with.exe`.
+            let dst = uat_join(cwd, step.b) ++ uat_exe_suffix_for(step.a == "with", step.b)
             if uat_write_text(dst, uat_read_text(src)) != 0: return uat_fail(steps, step, "could not write " ++ step.b, "", move human)
             if step.a == "with" and with_fs_chmod(dst, 493) != 0: return uat_fail(steps, step, "could not make " ++ step.b ++ " executable", "", move human)
         else if verb == UAT_ENV:
