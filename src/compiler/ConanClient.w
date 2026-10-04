@@ -683,16 +683,167 @@ fn conan_recipe_extract_quoted(text: &str) -> Vec[str]:
         i = i + 1
     out
 
-// Evaluate a package_info condition against the target OS.
-// Returns 1 (true), 0 (false), or -1 (unresolvable).
-fn conan_recipe_eval_condition(cond_raw: &str, target_os: &str) -> i32:
-    var cond = conan_trim(cond_raw)
-    while cond.len() >= 2 and cond[0] == 40 and cond[cond.len() - 1] == 41:
-        cond = conan_trim(cond.slice(1, cond.len() - 1))
-    if conan_find_text(cond, " and ") >= 0 or conan_find_text(cond, " or ") >= 0:
+// The option values a package binary was built with: the `name=value` lines
+// of its conaninfo.txt `[options]` section (#2084).
+pub fn conan_parse_options_from_info(info: &str) -> Vec[str]:
+    let options: Vec[str] = Vec.new()
+    let lines = conan_split_nonempty_lines(info)
+    var in_options = false
+    for i in 0..lines.len() as i32:
+        let line = lines[i]
+        if line.starts_with("["):
+            in_options = line == "[options]"
+            continue
+        if in_options and conan_find_char(line, 61) > 0:
+            options.push(with_str_clone_ref(line))
+    options
+
+// The recipe's options as the reader knows them: the installed binary's
+// values, or nothing known (a source build, a recipe read on its own).
+pub type ConanRecipeOptions {
+    known: bool,
+    values: Vec[str],
+}
+
+pub fn conan_recipe_options_unknown() -> ConanRecipeOptions: ConanRecipeOptions { known: false, values: Vec.new() }
+
+pub fn conan_recipe_options_from_info(info: &str) -> ConanRecipeOptions: ConanRecipeOptions { known: true, values: conan_parse_options_from_info(info) }
+
+// An option's value, or "" when the binary has no such option.
+fn conan_recipe_option_value(options: &ConanRecipeOptions, name: &str) -> str:
+    let prefix = name ++ "="
+    for i in 0..options.values.len() as i32:
+        if options.values[i].starts_with(prefix):
+            return options.values[i].slice(prefix.len(), options.values[i].len())
+    ""
+
+// Whether the parenthesis that opens `text` closes at its last character.
+fn conan_recipe_parens_wrap(text: &str) -> bool:
+    if text.len() < 2 or text[0] != 40 or text[text.len() - 1] != 41:
+        return false
+    var depth = 0
+    for i in 0..text.len() as i32:
+        if text[i] == 40: depth = depth + 1
+        if text[i] == 41:
+            depth = depth - 1
+            if depth == 0 and i < text.len() as i32 - 1:
+                return false
+    depth == 0
+
+// `text` split at each `sep` outside parentheses, brackets and quotes.
+fn conan_recipe_split_top_level(text: &str, sep: &str) -> Vec[str]:
+    let parts: Vec[str] = Vec.new()
+    var depth = 0
+    var quote = 0
+    var start = 0
+    var i = 0
+    let n = text.len() as i32
+    let m = sep.len() as i32
+    while i < n:
+        let ch = text[i] as i32
+        if quote != 0:
+            if ch == quote: quote = 0
+        else if ch == 34 or ch == 39:
+            quote = ch
+        else if ch == 40 or ch == 91:
+            depth = depth + 1
+        else if ch == 41 or ch == 93:
+            depth = depth - 1
+        else if depth == 0 and i + m <= n and text.slice(i as i64, (i + m) as i64) == sep:
+            parts.push(text.slice(start as i64, i as i64))
+            i = i + m
+            start = i
+            continue
+        i = i + 1
+    parts.push(text.slice(start as i64, n as i64))
+    parts
+
+// `self.options.get_safe("name")` or `self.options.name`, with an optional
+// `== value` / `!= value`: the name, and whether it is the get_safe form
+// (an absent option is None there, an error in the attribute form).
+fn conan_recipe_eval_option(cond: &str, options: &ConanRecipeOptions) -> i32:
+    if not options.known:
         return -1
+    let at = conan_find_text(cond, "self.options.")
+    var rest = cond.slice((at + 13) as i64, cond.len())
+    let get_safe = rest.starts_with("get_safe(")
+    var name = ""
+    if get_safe:
+        let quoted = conan_recipe_extract_quoted(rest)
+        if quoted.len() == 0:
+            return -1
+        name = quoted[0].clone()
+        let close = conan_find_char(rest, 41)
+        if close < 0:
+            return -1
+        // A default (`get_safe("x", True)`) is another value to track.
+        if conan_find_char(rest.slice(0, close as i64), 44) >= 0:
+            return -1
+        rest = rest.slice((close + 1) as i64, rest.len())
+    else:
+        var end = 0
+        while end < rest.len() as i32 and (rest[end] == 95 or (rest[end] >= 48 and rest[end] <= 57) or (rest[end] >= 65 and rest[end] <= 90) or (rest[end] >= 97 and rest[end] <= 122)):
+            end = end + 1
+        if end == 0:
+            return -1
+        name = rest.slice(0, end as i64)
+        rest = rest.slice(end as i64, rest.len())
+    let value = conan_recipe_option_value(options, name)
+    let present = value.len() > 0
+    let tail = conan_trim(rest)
+    if tail.len() == 0:
+        if not present:
+            return if get_safe: 0 else: -1
+        return if value == "False" or value == "None": 0 else: 1
+    let negated = tail.starts_with("!=")
+    if not negated and not tail.starts_with("=="):
+        return -1
+    if not present:
+        return -1
+    var wanted = conan_trim(tail.slice(2, tail.len()))
+    let quoted = conan_recipe_extract_quoted(wanted)
+    if quoted.len() == 1:
+        wanted = quoted[0].clone()
+    else if wanted != "True" and wanted != "False":
+        return -1
+    let equal = value == wanted
+    if equal != negated: 1 else: 0
+
+// Evaluate a package_info condition against the target OS and the options
+// of the binary. Returns 1 (true), 0 (false), or -1 (unresolvable): `or`
+// is true when any side is, `and` false when any side is, and either is
+// unresolvable only when what is known does not decide it.
+fn conan_recipe_eval_condition(cond_raw: &str, target_os: &str, options: &ConanRecipeOptions) -> i32:
+    var cond = conan_trim(cond_raw)
+    while conan_recipe_parens_wrap(cond):
+        cond = conan_trim(cond.slice(1, cond.len() - 1))
+    let any = conan_recipe_split_top_level(cond, " or ")
+    if any.len() > 1:
+        var unknown = false
+        for i in 0..any.len() as i32:
+            let r = conan_recipe_eval_condition(any[i], target_os, options)
+            if r == 1: return 1
+            if r == -1: unknown = true
+        return if unknown: -1 else: 0
+    let all = conan_recipe_split_top_level(cond, " and ")
+    if all.len() > 1:
+        var unknown = false
+        for i in 0..all.len() as i32:
+            let r = conan_recipe_eval_condition(all[i], target_os, options)
+            if r == 0: return 0
+            if r == -1: unknown = true
+        return if unknown: -1 else: 1
+    if cond.starts_with("not "):
+        let r = conan_recipe_eval_condition(cond.slice(4, cond.len()), target_os, options)
+        return if r == -1: -1 else: 1 - r
     if cond == "is_apple_os(self)":
         return if target_os == "Macos": 1 else: 0
+    // Every With toolchain is clang with the GNU driver (D81): no package is
+    // built by MSVC or clang-cl.
+    if cond == "is_msvc(self)" or cond == "self._is_clang_cl":
+        return 0
+    if conan_find_text(cond, "self.options.") >= 0:
+        return conan_recipe_eval_option(cond, options)
     if conan_find_text(cond, "self.settings.os") < 0:
         return -1
     let quoted = conan_recipe_extract_quoted(cond)
@@ -736,6 +887,31 @@ fn conan_recipe_attr_values(line: &str, attr_pos: i32) -> Vec[str]:
 // package_info(). Frameworks are returned as ("-framework", name) link
 // argument pairs in lib_paths, matching conan_known_link_metadata.
 pub fn conan_extract_recipe_link_metadata(recipe: &str, target_os: &str) -> ConanLibraryScan:
+    conan_extract_recipe_link_metadata_for(recipe, target_os, &conan_recipe_options_unknown())
+
+// How far the brackets and parentheses of `text` are left open (quotes skipped).
+fn conan_recipe_open_depth(text: &str) -> i32:
+    var depth = 0
+    var quote = 0
+    for i in 0..text.len() as i32:
+        let ch = text[i] as i32
+        if quote != 0:
+            if ch == quote: quote = 0
+        else if ch == 34 or ch == 39:
+            quote = ch
+        else if ch == 35:
+            return depth
+        else if ch == 40 or ch == 91:
+            depth = depth + 1
+        else if ch == 41 or ch == 93:
+            depth = depth - 1
+    depth
+
+// As conan_extract_recipe_link_metadata, with the options of the binary
+// being installed: an option-guarded declaration (SDL's Apple frameworks,
+// `if self.options.get_safe("audio"):`) is read by the value the binary
+// was built with, and still skipped when no value is known (#2084).
+pub fn conan_extract_recipe_link_metadata_for(recipe: &str, target_os: &str, options: &ConanRecipeOptions) -> ConanLibraryScan:
     var sys_libs: Vec[str] = Vec.new()
     var fw_args: Vec[str] = Vec.new()
     var fw_seen: Vec[str] = Vec.new()
@@ -761,10 +937,24 @@ pub fn conan_extract_recipe_link_metadata(recipe: &str, target_os: &str) -> Cona
         let raw_line = recipe.slice(pos as i64, line_end as i64)
         pos = line_end + 1
 
-        let stripped = conan_trim(raw_line)
+        var stripped = conan_trim(raw_line)
         if stripped.len() == 0 or stripped[0] == 35:
             continue
         let indent = conan_recipe_line_indent(raw_line)
+        // A statement whose list runs over several lines (SDL's Windows
+        // `system_libs.extend([` … `])`) is one statement: its lines are
+        // joined until every bracket it opened is closed.
+        var open_depth = conan_recipe_open_depth(stripped)
+        while open_depth > 0 and pos < total:
+            var next_end = pos
+            while next_end < total and recipe[next_end] != 10:
+                next_end = next_end + 1
+            let next = conan_trim(recipe.slice(pos as i64, next_end as i64))
+            pos = next_end + 1
+            if next.len() == 0 or next[0] == 35:
+                continue
+            stripped = stripped ++ " " ++ next
+            open_depth = open_depth + conan_recipe_open_depth(next)
 
         if not in_body:
             if stripped.starts_with("def package_info("):
@@ -795,7 +985,7 @@ pub fn conan_extract_recipe_link_metadata(recipe: &str, target_os: &str) -> Cona
             let _e = frame_chain_unknown.pop()
 
         if stripped.starts_with("if ") and stripped.ends_with(":"):
-            let r = conan_recipe_eval_condition(stripped.slice(3, stripped.len() - 1), target_os)
+            let r = conan_recipe_eval_condition(stripped.slice(3, stripped.len() - 1), target_os, options)
             frame_indent.push(indent as i64)
             frame_active.push(if r == 1: 1 else: 0)
             frame_unknown.push(if r == -1: 1 else: 0)
@@ -807,7 +997,7 @@ pub fn conan_extract_recipe_link_metadata(recipe: &str, target_os: &str) -> Cona
                 // Malformed chain: treat the rest of it as unresolvable.
                 prev_chain_taken = false
                 prev_chain_unknown = true
-            let r = conan_recipe_eval_condition(stripped.slice(5, stripped.len() - 1), target_os)
+            let r = conan_recipe_eval_condition(stripped.slice(5, stripped.len() - 1), target_os, options)
             let active = r == 1 and not prev_chain_taken and not prev_chain_unknown
             let unknown = not prev_chain_taken and (prev_chain_unknown or r == -1)
             frame_indent.push(indent as i64)
@@ -853,6 +1043,20 @@ pub fn conan_extract_recipe_link_metadata(recipe: &str, target_os: &str) -> Cona
                     fw_seen.push(with_str_clone_ref(fw))
                     fw_args.push("-framework")
                     fw_args.push(with_str_clone_ref(fw))
+        else:
+            // `exelinkflags.append("-Wl,-weak_framework,CoreHaptics")`: a
+            // framework the program links weakly (SDL's joystick haptics).
+            let flags_pos = conan_find_text(stripped, ".exelinkflags")
+            if flags_pos >= 0:
+                let values = conan_recipe_attr_values(stripped, flags_pos + 13)
+                for i in 0..values.len() as i32:
+                    let weak_prefix = "-Wl,-weak_framework,"
+                    if values[i].starts_with(weak_prefix):
+                        let fw = values[i].slice(weak_prefix.len(), values[i].len())
+                        if fw.len() > 0 and not conan_vec_contains(fw_seen, fw):
+                            fw_seen.push(with_str_clone_ref(fw))
+                            fw_args.push("-weak_framework")
+                            fw_args.push(fw)
 
     ConanLibraryScan { lib_paths: fw_args, libs: sys_libs }
 
@@ -878,19 +1082,24 @@ fn conan_package_has_table_link_metadata(name: &str, version: &str) -> bool:
         return true
     false
 
-fn conan_link_metadata_with_recipe(name: &str, version: &str, libs: Vec[str], link_args: Vec[str], recipe: &str) -> ConanLibraryScan:
+fn conan_link_metadata_with_recipe(name: &str, version: &str, libs: Vec[str], link_args: Vec[str], recipe: &str, options: &ConanRecipeOptions) -> ConanLibraryScan:
     if conan_package_has_table_link_metadata(name, version):
         return conan_known_link_metadata(name, version, move libs, move link_args)
     if recipe.len() == 0:
         runtime_eprint("warning: no recipe metadata for " ++ name ++ "/" ++ version ++ "; system link requirements may be incomplete")
         return conan_known_link_metadata(name, version, move libs, move link_args)
-    let extracted = conan_extract_recipe_link_metadata(recipe, conan_detect_os())
+    let extracted = conan_extract_recipe_link_metadata_for(recipe, conan_detect_os(), options)
     var out_libs = libs
     var out_args = link_args
     for i in 0..extracted.libs.len() as i32:
         out_libs = conan_sorted_insert_unique(move out_libs, extracted.libs[i])
     for i in 0..extracted.lib_paths.len() as i32:
         out_args.push(with_str_clone_ref(extracted.lib_paths[i]))
+    // #2084: SDL 3's device discovery calls the configuration manager
+    // (CM_Get_Device_Interface_List…), which the recipe's Windows list
+    // leaves out; a static SDL does not link without it.
+    if name == "sdl" and conan_detect_os() == "Windows":
+        out_libs = conan_sorted_insert_unique(move out_libs, "cfgmgr32")
     ConanLibraryScan { lib_paths: out_args, libs: out_libs }
 
 // A `<name>/system` recipe that stands for one library the host provides:
@@ -1046,7 +1255,7 @@ fn conan_resolve_and_install_requirements(requirements: &Vec[str], project_root:
         resolved.push(req_name ++ "/" ++ actual)
     resolved
 
-fn conan_write_binary_metadata(name: &str, version: &str, recipe_rev: &str, package_id: &str, package_rev: &str, dep_dir: &str, requirements: &Vec[str]) -> i32:
+fn conan_write_binary_metadata(name: &str, version: &str, recipe_rev: &str, package_id: &str, package_rev: &str, dep_dir: &str, requirements: &Vec[str], options: &ConanRecipeOptions) -> i32:
     var include_paths: Vec[str] = Vec.new()
     if runtime_is_dir(dep_dir ++ "/include") != 0:
         include_paths.push("include")
@@ -1059,7 +1268,7 @@ fn conan_write_binary_metadata(name: &str, version: &str, recipe_rev: &str, pack
             lib_paths.push("lib")
     let defines: Vec[str] = Vec.new()
     let link_args: Vec[str] = Vec.new()
-    let known = conan_link_metadata_with_recipe(name, version, move libs, move link_args, conan_fetch_recipe_text(name, version))
+    let known = conan_link_metadata_with_recipe(name, version, move libs, move link_args, conan_fetch_recipe_text(name, version), options)
     conan_write_metadata(dep_dir, name, version, recipe_rev, package_id, package_rev, include_paths, lib_paths, known.libs, defines, known.lib_paths, requirements)
 
 // On Windows every C package is built from source with the SDK's toolchain
@@ -1103,7 +1312,7 @@ pub fn conan_restore_locked_binary_package(name: &str, version: &str, recipe_rev
         let _remove = runtime_remove_tree(dep_dir)
         return false
     let requirements = conan_parse_requires_from_info(info)
-    if conan_write_binary_metadata(name, version, recipe_rev, package_id, package_rev, dep_dir, requirements) != 0:
+    if conan_write_binary_metadata(name, version, recipe_rev, package_id, package_rev, dep_dir, requirements, &conan_recipe_options_from_info(info)) != 0:
         runtime_eprint("error: failed to write metadata for " ++ name ++ "/" ++ version)
         let _remove = runtime_remove_tree(dep_dir)
         return false
@@ -1146,7 +1355,7 @@ fn conan_install_binary(name: &str, version: &str, recipe_rev: &str, project_roo
         runtime_eprint("error: failed to extract package for " ++ name ++ "/" ++ version)
         let _remove = runtime_remove_tree(dep_dir)
         return ""
-    if conan_write_binary_metadata(name, version, recipe_rev, pick.package_id, package_rev, dep_dir, resolved_requirements) != 0:
+    if conan_write_binary_metadata(name, version, recipe_rev, pick.package_id, package_rev, dep_dir, resolved_requirements, &conan_recipe_options_from_info(info)) != 0:
         runtime_eprint("error: failed to write metadata for " ++ name ++ "/" ++ version)
         let _remove = runtime_remove_tree(dep_dir)
         return ""
@@ -1652,7 +1861,7 @@ fn conan_install_from_source(name: &str, version: &str, project_root: &str, dept
     if conan_run_tool(install, 300000) != 0:
         return conan_source_fail(dep_dir, name ++ "/" ++ version ++ " did not build (the compiler's output is above" ++ (if build_rc != 0: "; the build step failed" else: "") ++ ")")
     let _work = runtime_remove_tree(work)
-    if conan_write_binary_metadata(name, version, "built", "built", source.sha256, dep_dir, resolved) != 0:
+    if conan_write_binary_metadata(name, version, "built", "built", source.sha256, dep_dir, resolved, &conan_recipe_options_unknown()) != 0:
         return conan_source_fail(dep_dir, "could not write metadata for " ++ name ++ "/" ++ version)
     runtime_eprint("  built " ++ name ++ "/" ++ version ++ " into .with/deps/c/" ++ name ++ "/" ++ version ++ "/")
     version.to_owned()

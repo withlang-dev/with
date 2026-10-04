@@ -418,12 +418,13 @@ pub fn framework_stubs_write(dir: &str, names: &Vec[str]) -> str:
     fs_close_cache(&cache)
     ""
 
-// The framework names of `-framework <Name>` pairs in a package's link
-// arguments.
+// The framework names of `-framework <Name>` and `-weak_framework <Name>`
+// pairs in a package's link arguments: a weakly linked framework needs its
+// stub at link time as any other does.
 pub fn framework_names_in_link_args(link_args: &Vec[str]) -> Vec[str]:
     let out: Vec[str] = Vec.new()
     for i in 0..link_args.len() as i32:
-        if link_args[i] == "-framework" and i + 1 < link_args.len() as i32:
+        if (link_args[i] == "-framework" or link_args[i] == "-weak_framework") and i + 1 < link_args.len() as i32:
             out.push(link_args[i + 1].clone())
     out
 
