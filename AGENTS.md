@@ -801,7 +801,9 @@ with run tools/battery.w
 ```
 It refuses a dirty tree, holds one of two machine-wide battery slots, runs
 `src/main build :gate` under the pinned seed (a red gate stops it there:
-`RED (gate): <targets>`), then `src/main build :battery-checks` (fixpoint,
+`RED (gate): <targets>`), then `with uat` with the release compiler the gate
+built (the acceptance scenarios, `uat/*.uat`; a red scenario stops it there:
+`RED (uat): <scenarios>`), then `src/main build :battery-checks` (fixpoint,
 the drop and move audits, every test target, user-programs-safe, green
 evidence) as ONE survey, so a red reports every failing target at once — and
 writes `RED: <target>` to `out/battery/status.txt` the moment each target

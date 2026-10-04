@@ -11,12 +11,17 @@
 //      gate (build.w's gate_fixed_targets and every test lane the last
 //      battery measured under 60 s); a red gate stops here, since the
 //      25-minute checks would only repeat it;
-//   4. runs `src/main build :battery-checks` — fixpoint, the drop and move
+//   4. runs `with uat` with the release compiler the gate built: the
+//      acceptance scenarios (uat/*.uat) — a fresh project, `with get` of each
+//      C library, the program a user writes over it. A red scenario stops
+//      here: `RED (uat): <scenarios>`. A scenario whose requirement the host
+//      lacks (network, display) is skipped and says so in out/battery/uat.log;
+//   5. runs `src/main build :battery-checks` — fixpoint, the drop and move
 //      audits, every test target, user-programs-safe, and the green evidence —
 //      as ONE survey invocation, so a red reports every failing target at
 //      once instead of one per battery. `--fail-fast` stops it at the first
 //      red target instead (the repair loop).
-// Both steps report live: while the child runs, its log is polled once a
+// The build steps report live: while the child runs, its log is polled once a
 // second and every newly failed target lands in status.txt as `RED: <target>`
 // the moment it appears, so a red known at minute 1 is read at minute 1.
 // Afterwards the wall times of every target both steps ran are merged into
@@ -136,6 +141,13 @@ fn red_report(log: &str) -> str:
 // wait): the worker runs the command and writes its exit code to live_done,
 // and the main thread polls the log meanwhile.
 // (an implicit-main script has no `global`; the two are process env vars.)
+// The scenarios `with uat` reported as failed: `uat: <name> .... FAIL  step …`.
+fn uat_failed(log: &str) -> str:
+    var out = ""
+    for line in (read_file(log) ?? "").split("\n"):
+        if line.starts_with("uat: ") and line.contains(" FAIL "): out = out ++ (if out.len() > 0: " " else: "") ++ line.split(" ")[1]
+    if out.len() > 0: out else: "with uat failed; read out/battery/uat.log"
+
 fn live_cmd -> str: env("WITH_BATTERY_LIVE_CMD")
 fn live_done -> str: env("WITH_BATTERY_LIVE_DONE")
 
@@ -211,7 +223,7 @@ for arg in args():
     if arg == "--fail-fast": fail_fast = true
     else if arg == "--help" or arg == "-h":
         print("usage: with run tools/battery.w [--fail-fast]")
-        print("  runs `src/main build :gate`, then `src/main build :battery-checks`, reporting")
+        print("  runs `src/main build :gate`, `with uat`, then `src/main build :battery-checks`, reporting")
         print("  each failed target live in out/battery/status.txt as `RED: <target>`;")
         print("  --fail-fast stops the checks at the first red target (the repair loop).")
         exit_code(0)
@@ -238,6 +250,16 @@ let ledger = "out/.build-state/battery-times.tsv"
 let flags = if fail_fast: " --fail-fast" else: ""
 var rc = step_live("gate", "WITH=$PWD/src/main src/main build :gate" ++ flags ++ " > out/battery/gate.log 2>&1", "out/battery/gate.log", status)
 merge_times(ledger, "out/.build-state/build-times.tsv")
+if rc != 0:
+    let failed = red_report("out/battery/gate.log")
+    print("RED (gate): " ++ failed)
+    append(status, "RED (gate): " ++ failed)
+if rc == 0:
+    rc = step_live("uat", "WITH_UAT_WITH=$PWD/out/release/bin/with out/release/bin/with uat > out/battery/uat.log 2>&1", "out/battery/uat.log", status)
+    if rc != 0:
+        let failed = uat_failed("out/battery/uat.log")
+        print("RED (uat): " ++ failed)
+        append(status, "RED (uat): " ++ failed)
 if rc == 0:
     rc = step_live("battery-checks", "WITH=$PWD/src/main src/main build :battery-checks" ++ flags ++ " > out/battery/checks.log 2>&1", "out/battery/checks.log", status)
     merge_times(ledger, "out/.build-state/build-times.tsv")
@@ -245,10 +267,6 @@ if rc == 0:
         let failed = red_report("out/battery/checks.log")
         print("failed: " ++ failed)
         append(status, "failed: " ++ failed)
-else:
-    let failed = red_report("out/battery/gate.log")
-    print("RED (gate): " ++ failed)
-    append(status, "RED (gate): " ++ failed)
 let verdict = if rc == 0: "GREEN" else: "RED"
 append(status, verdict ++ "\nBATTERY_DONE")
 let _ = remove_file(slot)
