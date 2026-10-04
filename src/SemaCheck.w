@@ -1506,7 +1506,20 @@ impl Sema:
         let alias = self.add_type(TypeKind.TY_ALIAS, default_ty as i32, 0, 0)
         self.inferred_field_nodes.push(node)
         self.inferred_field_aliases.push(alias as i32)
+        self.inferred_field_paths.push(self.inferred_field_module_path(node))
         alias as TypeId
+
+    // The module that declares the field whose type node is `node`.
+    fn inferred_field_module_path(node: i32) -> str:
+        for di in 0..self.ast.decl_count():
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) != NodeKind.NK_TYPE_DECL: continue
+            let extra_start = self.ast.get_data1(decl)
+            let sub_kind = type_decl_sub_kind(self.ast.get_data2(decl))
+            if sub_kind != TypeDeclKind.Struct and sub_kind != TypeDeclKind.Union: continue
+            for fi in 0..self.ast.get_extra(extra_start):
+                if self.ast.get_extra(extra_start + 1 + fi * 3 + 1) == node: return self.decl_source_path_for_node(decl)
+        self.current_module_path.clone()
 
     // A use that demands the numeric type `demanded` of a value whose type
     // is an inferred field's (`actual`): heard while demands are collected.
@@ -1518,6 +1531,10 @@ impl Sema:
             if self.inferred_field_aliases[k] == actual: field = k
             // Another such field demands nothing of this one.
             if self.inferred_field_aliases[k] == demanded: return
+        // The uses that count are those in the module that declares the field:
+        // a type does not change with its importers.
+        if field >= 0 and self.inferred_field_paths[field] != self.current_module_path:
+            return
         if field < 0:
             return
         let want = self.resolve_alias(self.numeric_operand_type(demanded) as TypeId)
