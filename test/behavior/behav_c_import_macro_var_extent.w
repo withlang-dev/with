@@ -12,7 +12,7 @@
 // and initializers holding comparisons, keep their values.
 
 use pre_d_build_runner
-use std.time
+use std.libc.cpu_time_ns
 use std.string.StringBuilder
 
 fn header(filler: i32) -> str:
@@ -34,10 +34,10 @@ fn check_seconds(case_dir: &str, filler: i32) -> f64:
     p7_write(case_dir, f"src/guid{filler}.h", header(filler))
     // G0 is referenced only to prove it imported with its declared type.
     p7_write(case_dir, f"src/use{filler}.w", f"use c_import(\"guid{filler}.h\")\nfn main: print(f\"{{G0.d2}}\")\n")
-    let start = now_ns()
+    let start = cpu_time_ns()
     let run = p7_run(case_dir, f"c_import guid var after {filler} lines", f"check\0src/use{filler}.w\0")
     p7_assert_success(run, f"c_import guid var after {filler} lines")
-    (now_ns() - start) as f64 / 1000000000.0
+    (cpu_time_ns() - start) as f64 / 1000000000.0
 
 fn main:
     let case_dir = p7_prepare_case("c_import_macro_var_extent", "macrovarextent")

@@ -3,8 +3,8 @@
 
 use pre_d_build_runner
 use std.fs
+use std.libc.cpu_time_ns
 use std.string.StringBuilder
-use std.time
 
 extern fn with_exec_argv_capture(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32) -> i32
 
@@ -20,10 +20,13 @@ fn dump(dir: &str, name: &str) -> str:
     assert(rc == 0)
     read_file(p7_join(dir, name ++ ".out")).unwrap()
 
+// CPU time, this process and the dump it reaps (#1998): a growth bound on
+// the wall clock failed in a battery whose other tests were running beside
+// it (160000 elements: 875 ms of wall for 230 ms of CPU).
 fn elapsed_ns(dir: &str, name: &str) -> i64:
-    let start = now_ns()
+    let start = cpu_time_ns()
     let _ = dump(dir, name)
-    now_ns() - start
+    cpu_time_ns() - start
 
 fn median_ns(dir: &str, name: &str) -> i64:
     let a = elapsed_ns(dir, name)

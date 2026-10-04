@@ -7,7 +7,7 @@
 // as long, not sixteen. A ratio, so the machine's speed cancels out.
 
 use pre_d_build_runner
-use std.time
+use std.libc.cpu_time_ns
 use std.string.StringBuilder
 
 fn check_seconds(case_dir: &str, decls: i32) -> f64:
@@ -16,10 +16,10 @@ fn check_seconds(case_dir: &str, decls: i32) -> f64:
         header.push_str(f"typedef struct S{i} {{ struct S{i} *next; struct Op{i} *p; int v; }} S{i};\nS{i} *make{i}(struct Op{i} *o, int k);\n#define K{i} ({i} + 1)\n")
     p7_write(case_dir, f"src/big{decls}.h", header.to_str())
     p7_write(case_dir, f"src/use{decls}.w", f"use c_import(\"big{decls}.h\")\nfn main: print(f\"{{K7 + K9}}\")\n")
-    let start = now_ns()
+    let start = cpu_time_ns()
     let run = p7_run(case_dir, f"c_import of {decls} declarations", f"check\0src/use{decls}.w\0")
     p7_assert_success(run, f"c_import of {decls} declarations")
-    (now_ns() - start) as f64 / 1000000000.0
+    (cpu_time_ns() - start) as f64 / 1000000000.0
 
 fn main:
     let case_dir = p7_prepare_case("c_import_scales_linearly", "cimportscale")
