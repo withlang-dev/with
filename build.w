@@ -1215,6 +1215,12 @@ fn package_llvm_sdk_platform_target(name: &str, dir: &str, platform: &str, prefi
     if platform == "darwin-aarch64":
         target = target.dep("darwin-sysroot")
         target = target.input(sdk_darwin_sysroot_pack())
+    // #2062: a linux SDK carries its sysroot too. Packaged on a Linux host
+    // only (the packager refuses any other), where the sysroot targets are.
+    if os() == "Linux" and (platform == "linux-x86_64" or platform == "linux-aarch64"):
+        let sysroot_arch = if platform == "linux-aarch64": "aarch64" else: "x86_64"
+        target = target.dep(linux_sysroot_target_name(sysroot_arch))
+        target = target.input(sdk_linux_sysroot_pack_for(sysroot_arch))
     target = target.extra_output(dir ++ "/" ++ asset)
     target = target.extra_output(dir ++ "/" ++ asset ++ ".sha256")
     target = target.extra_output(dir ++ "/" ++ asset ++ ".manifest")

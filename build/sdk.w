@@ -577,10 +577,13 @@ fn sdk_package_entries(ctx: &ActionCtx, prefix: &str, sdk_base: &str, platform: 
             if fs.exists(sdk_join(prefix, "bin/" ++ alias)):
                 dirs = sdk_add_parent_dirs(move dirs, sdk_base, "bin/" ++ alias)
     dirs = sdk_merge_sort_strings(dirs)
-    // #1915: the darwin SDK carries the darwin sysroot, as its sysroot/.
-    let sysroot_files = if platform == "darwin-aarch64": sdk_merge_sort_strings(fs.list_files(sdk_darwin_sysroot_dir())) else: Vec.new()
+    // #1915, #2062: a darwin or linux SDK carries its sysroot, as its
+    // sysroot/; a build that pins it reads the sysroot there and fetches no
+    // Zig source.
+    let sysroot_tree = sdk_packaged_sysroot_dir(platform)
+    let sysroot_files = if sysroot_tree.len() > 0: sdk_merge_sort_strings(fs.list_files(sysroot_tree)) else: Vec.new()
     for i in 0..sysroot_files.len() as i32:
-        dirs = sdk_add_parent_dirs(move dirs, sdk_base, "sysroot/" ++ sdk_rel_path(sdk_darwin_sysroot_dir(), sysroot_files[i]))
+        dirs = sdk_add_parent_dirs(move dirs, sdk_base, "sysroot/" ++ sdk_rel_path(sysroot_tree, sysroot_files[i]))
     dirs = sdk_merge_sort_strings(dirs)
     let entries: Vec[ArchiveEntry] = Vec.new()
     for i in 0..dirs.len() as i32:
@@ -590,7 +593,7 @@ fn sdk_package_entries(ctx: &ActionCtx, prefix: &str, sdk_base: &str, platform: 
         let rel = sdk_rel_path(prefix, path)
         entries.push(archive_file_entry(sdk_owned_text(path), sdk_base ++ "/" ++ rel, sdk_file_mode(rel)))
     for i in 0..sysroot_files.len() as i32:
-        let rel = "sysroot/" ++ sdk_rel_path(sdk_darwin_sysroot_dir(), sysroot_files[i])
+        let rel = "sysroot/" ++ sdk_rel_path(sysroot_tree, sysroot_files[i])
         entries.push(archive_file_entry(sdk_owned_text(sysroot_files[i]), sdk_base ++ "/" ++ rel, 0o644))
     if not sdk_platform_is_windows(platform):
         let aliases: Vec[str] = Vec.new()
@@ -661,6 +664,9 @@ pub fn run_package_llvm_sdk_action(ctx: ActionCtx) -> i32:
     if platform == "darwin-aarch64":
         if not selected.contains(sdk_base ++ "/sysroot/usr/lib/libSystem.tbd\n") or not selected.contains(sdk_base ++ "/sysroot/usr/lib/libc++.tbd\n") or not selected.contains(sdk_base ++ "/sysroot/usr/include/stdio.h\n"):
             return sdk_fail(ctx, "the darwin SDK archive omitted its sysroot (#1915): run `with build :darwin-sysroot`")
+    if platform == "linux-x86_64" or platform == "linux-aarch64":
+        if not selected.contains(sdk_base ++ "/sysroot/usr/lib/libc.so\n") or not selected.contains(sdk_base ++ "/sysroot/usr/lib/crt1.o\n"):
+            return sdk_fail(ctx, "the linux SDK archive omitted its sysroot (#2062): run `with build :" ++ (if platform == "linux-aarch64": "linux-sysroot-aarch64" else: "linux-sysroot") ++ "`")
     // The archive is the next build's bootstrap; a package that cannot
     // bootstrap is not an SDK, whatever else it contains.
     let bootstrap = sdk_bootstrap_set(platform)
@@ -1810,6 +1816,14 @@ pub fn sdk_linux_sysroot_pack_for(a: &str) -> str: sdk_linux_sysroot_dir_for(a) 
 pub fn sdk_linux_sysroot_dir() -> str: sdk_linux_sysroot_dir_for(arch())
 pub fn sdk_linux_sysroot_pack() -> str: sdk_linux_sysroot_pack_for(arch())
 
+// The sysroot tree an SDK archive of `platform` carries as its `sysroot/`, or
+// "" for a platform whose SDK carries none.
+pub fn sdk_packaged_sysroot_dir(platform: &str) -> str:
+    if platform == "darwin-aarch64": return sdk_darwin_sysroot_dir()
+    if platform == "linux-x86_64": return sdk_linux_sysroot_dir_for("x86_64")
+    if platform == "linux-aarch64": return sdk_linux_sysroot_dir_for("aarch64")
+    ""
+
 // Zig's glibc library order, which the abilists' library indices name.
 const SDK_GLIBC_LIB_NAMES: [8]str = ["m", "c", "ld", "resolv", "pthread", "dl", "rt", "util"]
 const SDK_GLIBC_LIB_SOVERS: [8]i32 = [6, 6, 2, 2, 0, 2, 1, 1]
@@ -2081,6 +2095,18 @@ pub fn run_linux_sysroot_action(ctx: ActionCtx) -> i32:
         return sdk_write_text(ctx, pack_path, "")
     let root = ctx.project_info().project_root()
     let prefix = compiler_default_llvm_prefix()
+    // The SDK is the bootstrap's product (#2062): a Linux host's SDK that
+    // carries its sysroot is where the build reads it, and nothing is
+    // fetched or compiled. The generation below runs only for an SDK that
+    // has none (while one is being built) and for another architecture's
+    // sysroot, which the host's SDK does not carry.
+    let sdk_sysroot = sdk_join(prefix, "sysroot")
+    if os() == "Linux" and a == arch() and fs.exists(sdk_join(sdk_sysroot, "usr/lib/libc.so")):
+        let from_sdk_tree = sdk_linux_sysroot_dir_for(a)
+        let _stale = fs.remove_tree(from_sdk_tree)
+        if fs.copy_tree(sdk_sysroot, from_sdk_tree) != 0:
+            return sdk_fail(ctx, "could not copy the SDK's sysroot " ++ sdk_sysroot ++ " to " ++ from_sdk_tree)
+        return sdk_write_linux_sysroot_pack(ctx, from_sdk_tree, pack_path)
     let clang = sdk_abs(root, sdk_tool(prefix, "clang"))
     let lld = sdk_abs(root, sdk_tool(prefix, "ld.lld"))
     if not fs.exists(clang) or not fs.exists(lld):
@@ -2249,7 +2275,13 @@ pub fn run_linux_sysroot_action(ctx: ActionCtx) -> i32:
             if rc != 0: return rc
     rc = sdk_write_text(ctx, sdk_join(tree, "PROVENANCE"), sdk_linux_sysroot_provenance(a))
     if rc != 0: return rc
-    // "F <path> <size>\n<bytes>" per file, as the darwin pack.
+    sdk_write_linux_sysroot_pack(ctx, tree, pack_path)
+
+// The pack of a linux sysroot tree: "F <path> <size>\n<bytes>" per file in
+// sorted order, as the darwin pack. One writer for a tree just generated and
+// for one copied out of the SDK, so the two are the same bytes.
+fn sdk_write_linux_sysroot_pack(ctx: &ActionCtx, tree: &str, pack_path: &str) -> i32:
+    let fs = ctx.fs()
     let files = sdk_merge_sort_strings(fs.list_files(tree))
     var pack = StringBuilder.with_capacity(24000000)
     pack.push_str("WITH-SYSROOT 1\n")
