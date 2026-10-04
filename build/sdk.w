@@ -1870,10 +1870,12 @@ fn sdk_write_darwin_sysroot(ctx: &ActionCtx, pack_path: &str, rel_paths: &Vec[st
 // never the host's:
 // - usr/lib/lib{c,m,pthread,dl,rt,util,resolv}.so.* and the dynamic linker:
 //   link stubs for glibc SDK_LINUX_GLIBC_MINOR, from Zig's glibc abilists
-//   (every symbol at every version up to the pin, the newest the default);
+//   (every symbol at every version; an unversioned reference binds the
+//   newest at or below the pin, sdk_glibc_stub_sources);
 // - usr/lib/crt1.o, Scrt1.o: glibc's csu start code; usr/lib/libc_nonshared.o;
 // - usr/include: Zig's glibc headers, pinned to the same minor version.
-// A program built against it runs on any glibc at or after the pin. The
+// A program built against it runs on any glibc at or after the pin, unless a
+// library it links was built against a newer one and names its symbols. The
 // generating host need not be the target: the SDK's clang and lld cross.
 const SDK_LINUX_GLIBC_MAJOR: i32 = 2
 const SDK_LINUX_GLIBC_MINOR: i32 = 28
@@ -1954,7 +1956,13 @@ fn sdk_glibc_version_suffix(v: &SdkGlibcVersion) -> str:
 
 // The link stubs' sources from Zig's abilists (src/libs/glibc.zig
 // buildSharedObjects): element 0 is the version script naming every version
-// up to the pin, element 1 + i the assembly of SDK_GLIBC_LIB_NAMES[i]. An
+// the abilists know, element 1 + i the assembly of SDK_GLIBC_LIB_NAMES[i].
+// Every symbol is there at every version, and the pin decides only which one
+// an unversioned reference binds: a With program, compiled against the
+// pinned headers, needs the pinned glibc and no more, while a library built
+// elsewhere against a newer glibc (a Conan Center binary asking for
+// fstat@GLIBC_2.33) finds what it names, and the program that links it then
+// needs that glibc. The floor is what the program uses, not a wall. An
 // empty vector is a malformed abilists or a target or version it lacks.
 pub fn sdk_glibc_stub_sources(abilists: &str, target: &str, major: i32, minor: i32) -> Vec[str]:
     var out: Vec[str] = Vec.new()
@@ -1979,7 +1987,7 @@ pub fn sdk_glibc_stub_sources(abilists: &str, target: &str, major: i32, minor: i
     if not r.ok or pin < 0 or target_index < 0: return out
     let inclusions_at: i32 = r.at
     var map = StringBuilder.new()
-    for i in 0..pin + 1:
+    for i in 0..versions.len() as i32:
         map.push_str(sdk_glibc_version_name(&versions[i]) ++ " { };\n")
     out.push(map.to_str())
     let target_bit = (1 as u64) << (target_index as u64)
@@ -1997,32 +2005,45 @@ pub fn sdk_glibc_stub_sources(abilists: &str, target: &str, major: i32, minor: i
             // indexed: the build's comptime evaluator assigns only locals and
             // fields).
             var chosen_sizes: Vec[i32] = Vec.new()
+            // Whether any library gives this symbol a version at or below the
+            // pin: the floor a program keeps unless a library it links needs more.
+            var floor_any = false
             var have_name = false
             for _s in 0..count:
                 if not have_name:
                     sym = r.cstr()
                     chosen = Vec.new()
                     chosen_sizes = Vec.new()
+                    floor_any = false
                     have_name = true
                 let targets = r.leb()
                 let size = if pass == 1: r.leb() as i32 else: 0
                 var lib_index = r.byte()
                 let terminal = (lib_index & 128) != 0
                 lib_index = lib_index & 127
-                let applies = lib_index == lib and (targets & target_bit) != 0
+                let on_target = (targets & target_bit) != 0
+                let applies = lib_index == lib and on_target
                 while true:
                     let b = r.byte()
                     let ver = b & 127
-                    if applies and ver <= pin:
+                    if on_target and ver <= pin: floor_any = true
+                    if applies:
                         chosen.push(ver)
                         chosen_sizes.push(size)
                     if (b & 128) != 0 or not r.ok: break
                 if not terminal: continue
                 have_name = false
                 if chosen.len() == 0: continue
+                // The version an unversioned reference binds: the newest at or
+                // below the pin. A symbol newer than the pin everywhere is bound
+                // at its newest version; one another library holds at the floor
+                // is here only for references that name its version.
                 var newest = -1
+                var default_ver = -1
                 for c in chosen:
                     if c > newest: newest = c
+                    if c <= pin and c > default_ver: default_ver = c
+                if default_ver < 0 and not floor_any: default_ver = newest
                 var written: Vec[i32] = Vec.new()
                 for c in chosen:
                     var seen = false
@@ -2035,7 +2056,7 @@ pub fn sdk_glibc_stub_sources(abilists: &str, target: &str, major: i32, minor: i
                         if chosen[k] == c: object_size = chosen_sizes[k]
                     let v = &versions[c]
                     let label = sym ++ "_" ++ sdk_glibc_version_suffix(v)
-                    let at = if c == newest: "@@" else: "@"
+                    let at = if c == default_ver: "@@" else: "@"
                     stub.push_str(".balign 8\n.globl " ++ label ++ "\n")
                     if pass == 0:
                         stub.push_str(".type " ++ label ++ ", %function\n")
@@ -2122,7 +2143,7 @@ fn sdk_glibc_internal_includes(zig_libc: &str, a: &str) -> Vec[str]:
 fn sdk_linux_sysroot_provenance(a: &str) -> str:
     var out = "The With linux-" ++ a ++ " sysroot (#1915, D81): what linking a With program and\n"
     out = out ++ "c_import of libc read on Linux. Generated by `with build :linux-sysroot`.\n\n"
-    out = out ++ f"Target glibc {SDK_LINUX_GLIBC_MAJOR}.{SDK_LINUX_GLIBC_MINOR}: a program built against it runs on that glibc or any later one.\n\n"
+    out = out ++ f"Target glibc {SDK_LINUX_GLIBC_MAJOR}.{SDK_LINUX_GLIBC_MINOR}: a program built against it runs on that glibc or any later one; a library built against a newer glibc links too, and raises that floor to what it names.\n\n"
     out = out ++ "usr/lib/*.so.*: link stubs generated from Zig's lib/libc/glibc/abilists;\n"
     out = out ++ "usr/lib/{crt1.o,Scrt1.o,libc_nonshared.o}: built from Zig's copy of glibc's csu,\n"
     out = out ++ "stdlib, io, debug and pthread sources; usr/lib/libc.so: glibc's linker script;\n"
