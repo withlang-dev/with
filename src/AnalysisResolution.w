@@ -586,6 +586,8 @@ fn resolution_audit_callee_kinds(report: &AnalysisReport, sema: &Sema, mir_mod: 
     var builtins = 0
     var method_builtins = 0
     var method_intrinsics = 0
+    var method_calls = 0
+    var method_calls_unrecorded = 0
     for bi in 0..mir_mod.bodies.len() as i32:
         let body = &mir_mod.bodies[bi]
         if body.lowering_failed != 0: continue
@@ -608,6 +610,14 @@ fn resolution_audit_callee_kinds(report: &AnalysisReport, sema: &Sema, mir_mod: 
                 let mir_intrinsic = body.call_intrinsic(call_id)
                 if mir_intrinsic != MirIntrinsic.NONE and mir_intrinsic != MirIntrinsic.GENERIC_CALL and mir_intrinsic != sema_intrinsic:
                     report.fail(f"resolution: {pool.resolve(body.fn_sym)} at {resolution_where(sema, &site, node)}: MIR call intrinsic {mir_intrinsic as i32} disagrees with Sema's {sema_intrinsic as i32}")
+            // Every method call MIR lowered was checked as one by Sema in this
+            // instance, so its lowering kind is Sema's record (MethodLowering).
+            if sema.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS and not sema.call_callable_types.contains(node):
+                method_calls = method_calls + 1
+                if not sema.method_call_recorded_in_body(body.instance_sym, node):
+                    method_calls_unrecorded = method_calls_unrecorded + 1
+                    if method_calls_unrecorded <= 3:
+                        report.note(f"resolution-audit: method call without a Sema lowering record: {pool.resolve(body.fn_sym)} at {resolution_where(sema, &site, node)}")
             if (sema.call_builtins.get(node) ?? 0) >= CallBuiltin.BoxNew as i32:
                 method_builtins = method_builtins + 1
             if any_kind == CallCalleeKind.TypeLevelBuiltin or any_kind == CallCalleeKind.Intrinsic or any_kind == CallCalleeKind.SourceLocation:
@@ -625,7 +635,7 @@ fn resolution_audit_callee_kinds(report: &AnalysisReport, sema: &Sema, mir_mod: 
                 let source_argc = if sema.has_resolved_call_args(node) != 0: sema.get_resolved_call_arg_count(node) else: sema.ast.get_data2(node)
                 if body.call_arg_counts[call_id] != source_argc:
                     report.fail(f"resolution: {pool.resolve(body.fn_sym)} at {resolution_where(sema, &site, node)}: builtin `{pool.resolve(sema.ast.get_data0(callee))}` lowered with {body.call_arg_counts[call_id]} MIR operands for {source_argc} arguments")
-    report.note(f"resolution-audit: name-callee-kinds judged={checked} builtin-calls={builtins} method-builtin-calls={method_builtins} method-intrinsic-calls={method_intrinsics}")
+    report.note(f"resolution-audit: name-callee-kinds judged={checked} builtin-calls={builtins} method-builtin-calls={method_builtins} method-intrinsic-calls={method_intrinsics} method-calls={method_calls} without-lowering-record={method_calls_unrecorded}")
     checked
 
 // The source call a MIR call lowers: the call node itself, or a pipeline

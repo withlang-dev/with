@@ -414,6 +414,8 @@ pub enum CallBuiltin: i32:
     ScopeTrack = 18
     ScopeSpawn = 19
     ScopedJoin = 20
+    // §4.4a `Enum.from_int(n)` on a discriminant enum.
+    EnumFromInt = 21
 
 impl Copy for CallBuiltin
 
@@ -1571,6 +1573,8 @@ pub type Sema {
     call_builtins: HashMap[i32, i32],
     // #2043: each builtin method call's MirIntrinsic, keyed (instance, node).
     method_intrinsics: HashMap[i64, i32],
+    // ... and its MethodLowering kind (present for every checked method call).
+    method_lowerings: HashMap[i64, i32],
     // #2043: each method function's own name in its owner's table (`push`
     // for `Vec__i32.push`), recorded with its owner key.
     method_name_syms: HashMap[i32, i32],
@@ -3357,6 +3361,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         method_owner_keys: sema_new_map_i32_i32(),
         call_builtins: sema_new_map_i32_i32(),
         method_intrinsics: sema_new_map_i64_i32(),
+        method_lowerings: sema_new_map_i64_i32(),
         method_name_syms: sema_new_map_i32_i32(),
         extern_var_type_ids: sema_new_map_i32_i32(),
         impl_trait_arg_type_ids: sema_new_map_i32_i32(),

@@ -29469,13 +29469,215 @@ impl Sema:
             let builtin = self.method_call_builtin(expr, field, ret)
             if builtin != CallBuiltin.None:
                 self.call_builtins.insert(node, builtin as i32)
-        // Which intrinsic a builtin method call is, for this body's instance.
-        if ret != 0:
-            let recv = self.typed_expr_types.get(expr) ?? known_recv_ty
-            let intrinsic = self.builtin_method_intrinsic(recv, self.pool_resolve(field))
-            if intrinsic != MirIntrinsic.NONE:
-                self.method_intrinsics.insert(sema_pair_key(self.current_specialization_sym, node), intrinsic as i32)
+        // How the call lowers, for this body's instance (#2043): the
+        // intrinsic a builtin method is, and the MethodLowering kind.
+        let raw_recv = self.method_lowering_raw_recv_type(expr, ret, known_recv_ty)
+        let recv = if raw_recv != 0 and raw_recv != self.ty_void as i32: self.auto_deref_method_type_frozen(raw_recv as TypeId, field) as i32 else: raw_recv
+        var intrinsic = self.builtin_method_intrinsic(recv, self.pool_resolve(field))
+        let lowering = self.method_lowering_kind(raw_recv, recv, expr, field, arg_count, intrinsic)
+        if lowering == MethodLowering.IsEmptyViaLen:
+            intrinsic = self.builtin_method_intrinsic(recv, "len")
+        let lowering_key = sema_pair_key(self.current_specialization_sym, node)
+        self.method_lowerings.insert(lowering_key, lowering as i32)
+        if intrinsic != MirIntrinsic.NONE:
+            self.method_intrinsics.insert(lowering_key, intrinsic as i32)
+        else:
+            self.method_intrinsics.remove(lowering_key)
         ret
+
+    // D65 phase 5 (#2043): the receiver type a method call's lowering is
+    // decided on: the receiver expression's type, a static receiver's named
+    // type (`Vec.new()`), or the call's own result when the receiver names
+    // it, through the references and user derefs the method resolves over.
+    // `raw` is the same before that auto-deref.
+    fn method_lowering_raw_recv_type(expr: i32, ret: i32, known_recv_ty: i32) -> i32:
+        var recv = self.typed_expr_types.get(expr) ?? known_recv_ty
+        if recv == 0 or recv == self.ty_void as i32:
+            recv = self.static_type_receiver_type(expr)
+        if recv == 0 or recv == self.ty_void as i32:
+            if self.ast.kind(expr) == NodeKind.NK_IDENT and ret > 0 and self.get_type_name(ret as TypeId) == self.ast.get_data0(expr):
+                recv = ret
+        recv
+
+    fn static_type_receiver_type(node: i32) -> i32:
+        let kind = self.ast.kind(node)
+        if kind == NodeKind.NK_TYPE_NAMED or kind == NodeKind.NK_TYPE_GENERIC or kind == NodeKind.NK_TYPE_PTR or kind == NodeKind.NK_TYPE_REF or kind == NodeKind.NK_TYPE_ARRAY or kind == NodeKind.NK_TYPE_SLICE or kind == NodeKind.NK_TYPE_TUPLE or kind == NodeKind.NK_TYPE_FN or kind == NodeKind.NK_TYPE_EXTERN_FN or kind == NodeKind.NK_TYPE_TRAIT_OBJ:
+            return self.resolve_type_expr_frozen(node) as i32
+        if kind == NodeKind.NK_IDENT:
+            let sym = self.ast.get_data0(node)
+            if self.named_types.contains(sym):
+                return self.named_types.get(sym).unwrap()
+        if kind == NodeKind.NK_INDEX:
+            let indexed_ty = self.resolve_type_level_arg_expr_frozen(node)
+            if indexed_ty != 0:
+                return indexed_ty
+            let base = self.ast.get_data0(node)
+            if self.ast.kind(base) == NodeKind.NK_IDENT:
+                let sym = self.ast.get_data0(base)
+                if self.named_types.contains(sym):
+                    return self.named_types.get(sym).unwrap()
+        0
+
+    // A receiver that names a type, not a value (a local of that name wins).
+    fn receiver_names_type(expr: i32) -> bool:
+        if expr == 0:
+            return false
+        let kind = self.ast.kind(expr)
+        if kind == NodeKind.NK_IDENT:
+            let sym = self.ast.get_data0(expr)
+            return self.scope_lookup(sym) < 0 and self.named_types.contains(sym)
+        if kind == NodeKind.NK_TYPE_NAMED or kind == NodeKind.NK_TYPE_GENERIC or kind == NodeKind.NK_TYPE_PTR or kind == NodeKind.NK_TYPE_REF or kind == NodeKind.NK_TYPE_ARRAY or kind == NodeKind.NK_TYPE_SLICE or kind == NodeKind.NK_TYPE_TUPLE or kind == NodeKind.NK_TYPE_FN or kind == NodeKind.NK_TYPE_EXTERN_FN or kind == NodeKind.NK_TYPE_TRAIT_OBJ:
+            return true
+        if kind == NodeKind.NK_INDEX:
+            return self.receiver_names_type(self.ast.get_data0(expr))
+        false
+
+    fn generic_inst_base_of(tid: i32) -> i32:
+        if tid <= 0:
+            return 0
+        let resolved = self.resolve_alias(tid as TypeId)
+        if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST: 0 else: self.get_generic_inst_base(resolved as i32)
+
+    fn base_sym_is_btree(sym: i32) -> bool:
+        if sym == 0:
+            return false
+        if sym == self.syms.btreeset or sym == self.syms.btreemap:
+            return true
+        let name = self.pool_resolve(sym)
+        name.starts_with("BTreeSet") or name.starts_with("BTreeMap")
+
+    // The lowering of a builtin method call (MethodLowering): the one table
+    // MirLower's method dispatch reads. `raw` and `recv` are the receiver
+    // type before and after auto-deref.
+    fn method_lowering_kind(raw: i32, recv: i32, expr: i32, field: i32, arg_count: i32, intrinsic: MirIntrinsic) -> MethodLowering:
+        let name = self.pool_resolve(field)
+        if name == "as_option" and raw > 0 and self.get_type_kind(self.resolve_alias(raw as TypeId)) == TypeKind.TY_PTR:
+            return MethodLowering.PtrAsOption
+        if name == "drop" and arg_count == 0 and not self.receiver_names_type(expr) and recv != 0 and self.type_has_drop_impl(recv) != 0:
+            return MethodLowering.ExplicitDrop
+        let base = self.generic_inst_base_of(recv)
+        let is_option = base != 0 and base == self.syms.option
+        let is_result = base != 0 and base == self.syms.result
+        if is_option:
+            if name == "map": return MethodLowering.OptMap
+            if name == "and_then": return MethodLowering.OptAndThen
+            if name == "or_else": return MethodLowering.OptOrElse
+            if name == "filter": return MethodLowering.OptFilter
+            if name == "inspect": return MethodLowering.OptInspect
+            if name == "copied": return MethodLowering.OptCopied
+            if name == "cloned": return MethodLowering.OptCloned
+            if name == "zip": return MethodLowering.OptZip
+            if name == "unzip": return MethodLowering.OptUnzip
+            if name == "flatten": return MethodLowering.OptFlatten
+        if is_result:
+            if name == "map": return MethodLowering.ResMap
+            if name == "map_err": return MethodLowering.ResMapErr
+            if name == "context": return MethodLowering.ResContext
+            if name == "with_context": return MethodLowering.ResWithContext
+            if name == "and_then": return MethodLowering.ResAndThen
+            if name == "or_else": return MethodLowering.ResOrElse
+            if name == "inspect": return MethodLowering.ResInspect
+            if name == "inspect_err": return MethodLowering.ResInspectErr
+            if name == "ok": return MethodLowering.ResOk
+            if name == "err": return MethodLowering.ResErr
+        if name == "join_cleanup" and self.type_is_task(recv) != 0:
+            return MethodLowering.TaskJoinCleanup
+        if name == "transpose":
+            if is_option: return MethodLowering.OptTranspose
+            if is_result: return MethodLowering.ResTranspose
+        if base != 0 and base == self.syms.vec:
+            if name == "sequence": return MethodLowering.VecSequence
+            if name == "traverse": return MethodLowering.VecTraverse
+        if name == "new" and (self.base_sym_is_btree(self.static_receiver_sema_base(expr)) or self.base_sym_is_btree(base)):
+            return MethodLowering.BTreeNew
+        if is_option or is_result:
+            if name == "unwrap_or": return MethodLowering.UnwrapOr
+            if name == "unwrap_or_else": return MethodLowering.UnwrapOrElse
+        if intrinsic == MirIntrinsic.NONE and name == "is_empty" and arg_count == 0 and self.builtin_method_intrinsic(recv, "len") != MirIntrinsic.NONE:
+            return MethodLowering.IsEmptyViaLen
+        MethodLowering.None
+
+    // The type a static receiver expression names (a local of the same
+    // name is a value, not a type), or 0.
+    fn static_receiver_sema_base(expr: i32) -> i32:
+        if expr == 0:
+            return 0
+        let kind = self.ast.kind(expr)
+        if kind == NodeKind.NK_IDENT:
+            let sym = self.ast.get_data0(expr)
+            if self.scope_lookup(sym) < 0 and self.named_types.contains(sym): return sym
+            return 0
+        if kind == NodeKind.NK_INDEX:
+            return self.static_receiver_sema_base(self.ast.get_data0(expr))
+        if kind == NodeKind.NK_TYPE_NAMED or kind == NodeKind.NK_TYPE_GENERIC:
+            return self.ast.get_data0(expr)
+        0
+
+    // D65 phase 5 (#2043): the std generic a base symbol names. The
+    // compiler-known containers are their interned symbols; a channel
+    // endpoint and Atomic are std declarations (a user's own type of that
+    // name is not one: `tid`'s template decides when it is known).
+    fn std_generic_of_base(base: i32, tid: i32) -> StdGeneric:
+        if base == 0:
+            return StdGeneric.None
+        if base == self.syms.vec: return StdGeneric.Vec
+        if base == self.syms.hashmap: return StdGeneric.HashMap
+        if base == self.syms.hashset: return StdGeneric.HashSet
+        if base == self.syms.option: return StdGeneric.Option
+        if base == self.syms.result: return StdGeneric.Result
+        if base == self.syms.slotmap: return StdGeneric.SlotMap
+        if base == self.syms.btreemap: return StdGeneric.BTreeMap
+        if base == self.syms.btreeset: return StdGeneric.BTreeSet
+        let name = self.pool_resolve(base)
+        if name.starts_with("BTreeMap"): return StdGeneric.BTreeMap
+        if name.starts_with("BTreeSet"): return StdGeneric.BTreeSet
+        if name == "Sender" or name == "Receiver" or name == "Atomic":
+            if tid > 0:
+                let template = self.generic_inst_template_tid(tid)
+                let template_tid = if template != 0: self.resolve_alias(template as TypeId) as i32 else: 0
+                if template_tid != 0 and self.type_decl_nodes_by_tid.contains(template_tid) and self.type_tid_std_tier(template_tid) == 0:
+                    return StdGeneric.None
+            if name == "Sender": return StdGeneric.Sender
+            if name == "Receiver": return StdGeneric.Receiver
+            return StdGeneric.Atomic
+        StdGeneric.None
+
+    // The std generic a type is (through aliases, not through references).
+    fn std_generic_of(tid: i32) -> StdGeneric:
+        if tid <= 0:
+            return StdGeneric.None
+        let resolved = self.resolve_alias(tid as TypeId) as i32
+        if self.get_type_kind(resolved as TypeId) != TypeKind.TY_GENERIC_INST:
+            return StdGeneric.None
+        self.std_generic_of_base(self.get_generic_inst_base(resolved), resolved)
+
+    // Symbol identities MIR needs (it holds symbols, never spellings).
+    fn sym_is_discard(sym: i32): sym == 0 or sym == self.discard_sym
+    fn sym_is_self_value(sym: i32): sym != 0 and sym == self.pool_lookup_symbol("self")
+    fn sym_is_none_variant(sym: i32): sym != 0 and sym == self.syms.none
+    fn sym_is_len(sym: i32): sym != 0 and sym == self.syms.len
+    // The math builtin a method symbol names (MathBuiltins' row), or -1.
+    fn math_method_id(sym: i32): math_fn_lookup(self.pool_resolve(sym))
+    fn builtin_method_intrinsic_of_sym(recv: i32, sym: i32): self.builtin_method_intrinsic(recv, self.pool_resolve(sym))
+    // The type a method function belongs to, from the owner key Sema
+    // registered it under (0 for a function that is no method).
+    fn fn_method_owner_type(fn_sym: i32) -> i32:
+        let key: i32 = self.method_owner_keys.get(fn_sym) ?? 0
+        if key == 0:
+            return 0
+        if self.type_identity_tids.contains(key):
+            return self.type_identity_tids.get(key).unwrap()
+        self.named_types.get(key) ?? 0
+    // The comprehension markers the parser desugars `yield`/empty to.
+    fn sym_is_payload_marker(sym: i32): sym != 0 and sym == self.pool_lookup_symbol("_Payload")
+    fn sym_is_empty_marker(sym: i32): sym != 0 and sym == self.pool_lookup_symbol("_Empty")
+
+    fn method_lowering_in_body(instance_sym: i32, node: i32) -> MethodLowering:
+        let raw = self.method_lowerings.get(sema_pair_key(instance_sym, node)) ?? 0
+        raw as MethodLowering
+
+    // Whether Sema checked `node` as a method call in this instance at all.
+    fn method_call_recorded_in_body(instance_sym: i32, node: i32): self.method_lowerings.contains(sema_pair_key(instance_sym, node))
 
     fn method_intrinsic_in_body(instance_sym: i32, node: i32) -> MirIntrinsic:
         let raw = self.method_intrinsics.get(sema_pair_key(instance_sym, node)) ?? 0
@@ -30085,6 +30287,7 @@ impl Sema:
                 opt_args.push(enum_resolved as i32)
                 let opt_ty = self.ensure_generic_inst_type(self.syms.option, opt_args, 1) as i32
                 self.typed_expr_types.insert(node, opt_ty)
+                self.call_builtins.insert(node, CallBuiltin.EnumFromInt as i32)
                 return opt_ty
 
         let is_static_receiver = if static_type_sym != 0 and self.static_receiver_type_is_known(expr) != 0: 1 else: 0
