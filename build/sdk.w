@@ -1651,6 +1651,13 @@ pub fn run_darwin_sysroot_action(ctx: ActionCtx) -> i32:
     // compiler carries a zero-length blob (and fetches nothing).
     if os() != "Macos":
         return sdk_write_text(ctx, pack_path, "")
+    // The SDK is the bootstrap's product: one that carries its sysroot is
+    // where the build reads it, and nothing is fetched (Eric, 2026-10-04).
+    // The Zig source below is read only to make the sysroot an SDK will
+    // carry, by whoever builds that SDK.
+    let sdk_sysroot = sdk_join(comp_llvm_prefix_for_root(ctx.project_info().project_root()), "sysroot")
+    if fs.exists(sdk_join(sdk_sysroot, "usr/lib/libSystem.tbd")):
+        return sdk_darwin_sysroot_from_sdk(ctx, sdk_sysroot, pack_path)
     let scratch = sdk_join("out/command", ctx.target_name())
     if fs.mkdir_all(scratch) != 0:
         return sdk_fail(ctx, "could not create " ++ scratch)
@@ -1685,10 +1692,6 @@ pub fn run_darwin_sysroot_action(ctx: ActionCtx) -> i32:
     let headers = sdk_merge_sort_strings(fs.list_files(include_root))
     if headers.len() == 0:
         return sdk_fail(ctx, "no macOS libc headers under " ++ include_root)
-    // The tree is rebuilt whole: a header dropped by a newer pin must not
-    // linger in it.
-    let tree = sdk_darwin_sysroot_dir()
-    let _old = fs.remove_tree(tree)
     let rel_paths: Vec[str] = Vec.new()
     let contents: Vec[str] = Vec.new()
     rel_paths.push("PROVENANCE")
@@ -1713,6 +1716,51 @@ pub fn run_darwin_sysroot_action(ctx: ActionCtx) -> i32:
             return sdk_fail(ctx, "a header path the sysroot pack cannot carry: " ++ headers[i])
         rel_paths.push("usr/include/" ++ rel)
         contents.push(fs.read_text(headers[i]))
+    sdk_write_darwin_sysroot(ctx, pack_path, &rel_paths, &contents, libsystem)
+
+// The sysroot an SDK already carries (its `sysroot/`), read back in the order
+// the generation writes it: PROVENANCE, SDKSettings.json, the two stubs, the
+// headers in sorted order. The four libc aliases are copies of libSystem.tbd
+// in the tree and alias records in the pack, as generated.
+fn sdk_darwin_sysroot_from_sdk(ctx: &ActionCtx, sdk_sysroot: &str, pack_path: &str) -> i32:
+    let fs = ctx.fs()
+    let rel_paths: Vec[str] = Vec.new()
+    let contents: Vec[str] = Vec.new()
+    let fixed: Vec[str] = Vec.new()
+    fixed.push("PROVENANCE")
+    fixed.push("SDKSettings.json")
+    fixed.push("usr/lib/libSystem.tbd")
+    fixed.push("usr/lib/libc++.tbd")
+    for i in 0..fixed.len() as i32:
+        let text = fs.read_text(sdk_join(sdk_sysroot, fixed[i]))
+        if text.len() == 0:
+            return sdk_fail(ctx, "the SDK's sysroot has no " ++ fixed[i] ++ ": " ++ sdk_sysroot)
+        rel_paths.push(fixed[i].clone())
+        contents.push(text)
+    let include_root = sdk_join(sdk_sysroot, "usr/include")
+    let headers = sdk_merge_sort_strings(fs.list_files(include_root))
+    if headers.len() == 0:
+        return sdk_fail(ctx, "the SDK's sysroot has no headers under " ++ include_root)
+    // ToolFs lists a directory inside the project by its root-relative path.
+    let listed_root = sdk_rel_path(ctx.project_info().project_root(), include_root)
+    for i in 0..headers.len() as i32:
+        let header = sdk_normalize(headers[i])
+        let direct = sdk_rel_path(include_root, header)
+        let rel = if direct.len() > 0 or listed_root.len() == 0: direct else: sdk_rel_path(listed_root, header)
+        if not sdk_sysroot_path_ok(rel):
+            return sdk_fail(ctx, "a header path the sysroot pack cannot carry: " ++ headers[i])
+        rel_paths.push("usr/include/" ++ rel)
+        contents.push(fs.read_text(headers[i]))
+    let libsystem = contents[2].clone()
+    sdk_write_darwin_sysroot(ctx, pack_path, &rel_paths, &contents, libsystem)
+
+// The tree under out/gen and the pack the compiler embeds, from the sysroot's
+// files in order. The tree is rebuilt whole: a header dropped by a newer pin
+// must not linger in it.
+fn sdk_write_darwin_sysroot(ctx: &ActionCtx, pack_path: &str, rel_paths: &Vec[str], contents: &Vec[str], libsystem: &str) -> i32:
+    let fs = ctx.fs()
+    let tree = sdk_darwin_sysroot_dir()
+    let _old = fs.remove_tree(tree)
     let aliases: Vec[str] = Vec.new()
     aliases.push("usr/lib/libc.tbd")
     aliases.push("usr/lib/libm.tbd")
