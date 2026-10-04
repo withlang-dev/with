@@ -536,6 +536,14 @@ fn link_stage_make_linux_own_sysroot_command(linker: &str, sysroot: &str, obj_pa
     for a in ["--eh-frame-hdr", "--hash-style=gnu", "--build-id", "--gc-sections", "--as-needed", "-dynamic-linker"]:
         args.push(a.clone())
     args.push(link_stage_linux_own_dynamic_linker())
+    // The sysroot's libc is link stubs: they define what a program may name,
+    // not glibc's private interfaces (GLIBC_PRIVATE). A shared library from
+    // a package or the host that reaches those (the host's libmvec:
+    // _rtld_global_ro) is complete on the machine it runs on and cannot be
+    // checked against stubs, so its own undefined references are not this
+    // link's to refuse. (Zig's linker does the same whenever it is not
+    // linking the native system's libraries.)
+    args.push("--allow-shlib-undefined")
     // The compiler folds identical code, as its link always has.
     if compiler_link: args.push("--icf=all")
     args.push("-o")
@@ -651,14 +659,6 @@ fn link_stage_make_linux_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_pa
         // Keep every implicit library search inside the sysroot; the
         // embedded dynamic-linker path below stays the target's own.
         args.push("--sysroot=" ++ sysroot)
-        // The sysroot's libc is link stubs: they define what a program may
-        // name, not glibc's private interfaces (GLIBC_PRIVATE). A shared
-        // library from a package or the host that reaches those (the host's
-        // libmvec: _rtld_global_ro) is complete on the machine it runs on
-        // and cannot be checked against stubs, so its own undefined
-        // references are not this link's to refuse. (Zig's linker does the
-        // same whenever it is not linking the native system's libraries.)
-        args.push("--allow-shlib-undefined")
     args.push("-dynamic-linker")
     args.push(dynamic_linker)
     args.push("-o")
