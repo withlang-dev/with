@@ -255,7 +255,10 @@ if rc != 0:
     print("RED (gate): " ++ failed)
     append(status, "RED (gate): " ++ failed)
 if rc == 0:
-    rc = step_live("uat", "WITH_UAT_WITH=$PWD/out/release/bin/with out/release/bin/with uat > out/battery/uat.log 2>&1", "out/battery/uat.log", status)
+    // A scenario that opens a window needs a lit display: on macOS the uat
+    // step holds it awake (and wakes it) for as long as it runs.
+    let awake = if file_exists("/usr/bin/caffeinate"): "/usr/bin/caffeinate -d -u " else: ""
+    rc = step_live("uat", "WITH_UAT_WITH=$PWD/out/release/bin/with " ++ awake ++ "out/release/bin/with uat > out/battery/uat.log 2>&1", "out/battery/uat.log", status)
     if rc != 0:
         let failed = uat_failed("out/battery/uat.log")
         print("RED (uat): " ++ failed)
