@@ -168,6 +168,11 @@ impl Sema:
             let name = self.ast.get_data0(decl)
             if name == 0 or self.pool_resolve(name).len() == 0:
                 continue
+            // A type a `c facade` renders: the facade's own check reports a
+            // clash with a written declaration, naming what generated it
+            // (D51 stage 5, §16.2b.4/§16.2b.8).
+            if self.facade_decl_file_name(di).starts_with("<facade "):
+                continue
             let key = sema_pair_key(name, self.pool_intern(self.decl_source_path_for_index(di)))
             let first: i32 = if kind == NodeKind.NK_TYPE_DECL: first_types.get(key) ?? 0 else: first_traits.get(key) ?? 0
             if first == 0:

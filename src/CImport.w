@@ -2916,8 +2916,10 @@ pub fn ci_translate_typedef(session: i64, idx: i32, count: i32) -> str:
         if second == 95 or (second >= 65 and second <= 90):
             return ""
 
-    // Skip already-emitted names
-    if with_cimport_is_name_emitted(name) != 0:
+    // Skip already-emitted names: a value of this name, or the type itself
+    // (`typedef enum Color { … } Color;` — the enum already emitted
+    // `type Color`, and a second one is a duplicate declaration, #2066).
+    if with_cimport_is_name_emitted(name) != 0 or ci_type_name_is_emitted(name):
         return ""
 
     // Check builtin typedef map first (short-circuits common types)
