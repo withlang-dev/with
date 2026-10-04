@@ -299,6 +299,14 @@ fn sdk_validate_cache(ctx: &ActionCtx, platform: &str, cache_path: &str) -> i32:
         return sdk_fail(ctx, "refusing to package SDK not built with clang++; CMAKE_CXX_COMPILER=" ++ cxx)
     0
 
+// Whether `prefix` is the SDK sdk.lock pins for `platform`: its stamp, written
+// when `:deps` extracted the pinned archive, names that release and digest.
+fn sdk_prefix_is_pinned_sdk(ctx: &ActionCtx, platform: &str, prefix: &str) -> bool:
+    let fs = ctx.fs()
+    let pin = llvm_sdk_pin(sdk_lock_read(fs), sdk_asset_for_platform(platform))
+    let stamp = llvm_sdk_pin_stamp_path(prefix)
+    pin.len() > 0 and fs.exists(stamp) and fs.read_text(stamp) == pin ++ "\n"
+
 fn sdk_validate_package_prefix(ctx: &ActionCtx, platform: &str, prefix: &str, build_cache: &str) -> i32:
     if sdk_is_abs(prefix) or sdk_is_abs(build_cache):
         return sdk_fail(ctx, "SDK package inputs must be project-relative graph paths, got prefix=" ++ prefix ++ " cache=" ++ build_cache)
@@ -309,7 +317,15 @@ fn sdk_validate_package_prefix(ctx: &ActionCtx, platform: &str, prefix: &str, bu
     let cross_linux = current == "linux-x86_64" and platform == "linux-aarch64"
     if current != platform and not cross_linux:
         return sdk_fail(ctx, "SDK packages must be built on their native host; requested " ++ platform ++ " on " ++ current)
-    var rc = sdk_validate_cache(ctx, platform, build_cache)
+    // What is validated is the SDK being packaged. One `:deps` extracted
+    // carries the stamp of the release and digest sdk.lock pins: it is that
+    // published archive, whose build was validated when it was packaged, and
+    // the backend it must carry is checked in the SDK itself. A build
+    // directory beside it is another build (here, a May LLVM with no
+    // WebAssembly backend refused the pinned SDK that has one), and a host
+    // that only fetched the SDK has none. A source-built SDK has no stamp:
+    // its own build cache answers for it.
+    var rc = if sdk_prefix_is_pinned_sdk(ctx, platform, prefix): sdk_check_file(ctx, sdk_join(prefix, "lib/libLLVMWebAssemblyCodeGen.a"), "WebAssembly backend") else: sdk_validate_cache(ctx, platform, build_cache)
     if rc != 0:
         return rc
     if sdk_platform_is_windows(platform):
