@@ -16,6 +16,7 @@
 // it is reported (`notes`), never guessed. Nothing here names a package.
 
 use std.string.StringBuilder
+use compiler.Runtime
 
 extern fn str_from_byte(b: i32) -> str
 
@@ -1424,6 +1425,30 @@ impl PyInterp:
         if name == "textwrap.dedent": return arg0
         if name == "print" or name == "check_min_cppstd" or name == "check_max_cppstd" or name == "check_min_cstd": return pv_none()
         // PkgConfig, self.dependencies, tools this model does not carry.
+        if name == "collect_libs":
+            // Conan's helper: the libraries the package holds in its library
+            // directories, by the names a linker is given.
+            let folder = self.env.package_folder.clone()
+            if folder.len() == 0: return pv_unknown()
+            var names: Vec[str] = Vec.new()
+            for dir in ["lib"]:
+                let base = folder ++ "/" ++ dir ++ "/"
+                for path in runtime_list_files(folder ++ "/" ++ dir).split("\n"):
+                    if not path.starts_with(base): continue
+                    let file = path.slice(base.len(), path.len())
+                    if file.contains("/"): continue
+                    var stem = ""
+                    if file.ends_with(".lib"): stem = file.slice(0, file.len() - 4).to_owned()
+                    else if file.starts_with("lib"):
+                        for ext in [".a", ".so", ".dylib"]:
+                            let at = file.find(ext)
+                            if at > 3 and stem.len() == 0: stem = file.slice(3, at).to_owned()
+                    if stem.len() == 0: continue
+                    var seen = false
+                    for n in names:
+                        if n == stem: seen = true
+                    if not seen: names.push(stem)
+            return self.new_str_list(&names)
         if name == "CMakeToolchain":
             // What `generate` sets on it is what the build is configured with.
             let tc = self.new_obj("toolchain")
