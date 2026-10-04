@@ -236,11 +236,11 @@ jobs:
             seed_version: nightly-20261003-local-1-074a38b8fd81
             seed_asset: with-linux-x86_64
             seed_sha256: 3f899db6d4ac28febc2efa8173c3e8dbcfab26607a08e51dd00bf5ec41ffc48e
-            sdk_version: nightly-sdk-20260930-6f0394637064
+            sdk_version: nightly-sdk-20261004-c4ddb7ddbef2
             sdk_asset: with-llvm-sdk-22.1.6-linux-x86_64.tar.gz
-            sdk_sha256: 5d3f1a34f677185880d87bb3b9031e6c4f2967bf4fd0b5077fb3c9e702b6a47f
-            sdk_sidecar_sha256: bd9719f205d97faa5739a407fcef3fb4950f81c1dcd71ae074513c859a318a25
-            sdk_manifest_sha256: 4252f86279af1c7d1d345e649447ec6877726fc176ef58d5584224b457662850
+            sdk_sha256: 89751749724afcd2cd26f4022201797d310dc77c74f4b49689a0d2768db74785
+            sdk_sidecar_sha256: 76e475395de94e958a44e254c0783b65bca2ad517503f6f947e3e64378ef4650
+            sdk_manifest_sha256: 93c0d15b1bb4b67f53c84d7343929757a84e5ad512298f8bb010555f361886e8
             release_asset: with-linux-x86_64
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 360

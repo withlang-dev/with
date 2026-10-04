@@ -37,7 +37,7 @@ jobs:
       WITH_SDK_REPO: withlang-dev/with
       # Built from build/sdk.w at 6f039463: the With linux sysroot, its own
       # compiler-rt and static libc++, no libxml2 (#1915, D81).
-      WITH_SDK_VERSION: nightly-sdk-20260930-6f0394637064
+      WITH_SDK_VERSION: nightly-sdk-20261004-c4ddb7ddbef2
       WITH_SDK_ASSET: with-llvm-sdk-22.1.6-linux-x86_64.tar.gz
     steps:
       - name: Checkout

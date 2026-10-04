@@ -20,14 +20,18 @@ with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz=d3abcdfd6f6ccc8094929e4053a15c28c45d1
 with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz.sha256=f4dc074646a19a24167ef577ed2f6965211601563d9cd31acecff65169b41415
 with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz.manifest=889371bbfebf203482fa4c2d3dd072681dedec557ad58f21b3f269385dbc064f
 
-# linux-x86_64: built by build/sdk.w at 6f039463 against the With linux
+# linux-x86_64: built by build/sdk.w at c4ddb7dd against the With linux
 # sysroot (glibc 2.28), with its own compiler-rt and static libc++ and no
 # libxml2 (#1915, D81); every executable in it, cmake and ninja included,
-# needs glibc 2.28+ and nothing else of the host.
-with-llvm-sdk-22.1.6-linux-x86_64.tar.gz.version=nightly-sdk-20260930-6f0394637064
-with-llvm-sdk-22.1.6-linux-x86_64.tar.gz=5d3f1a34f677185880d87bb3b9031e6c4f2967bf4fd0b5077fb3c9e702b6a47f
-with-llvm-sdk-22.1.6-linux-x86_64.tar.gz.sha256=bd9719f205d97faa5739a407fcef3fb4950f81c1dcd71ae074513c859a318a25
-with-llvm-sdk-22.1.6-linux-x86_64.tar.gz.manifest=4252f86279af1c7d1d345e649447ec6877726fc176ef58d5584224b457662850
+# needs glibc 2.28+ and nothing else of the host. It carries its sysroot
+# (`sysroot/`), so a build fetches no Zig source (#2062); its lld reads
+# zlib-compressed sections, with the zlib the SDK builds (lib/libz.a); and
+# the sysroot's glibc stubs define every symbol at every version, 2.28 the
+# default binding, so a library built against a newer glibc links.
+with-llvm-sdk-22.1.6-linux-x86_64.tar.gz.version=nightly-sdk-20261004-c4ddb7ddbef2
+with-llvm-sdk-22.1.6-linux-x86_64.tar.gz=89751749724afcd2cd26f4022201797d310dc77c74f4b49689a0d2768db74785
+with-llvm-sdk-22.1.6-linux-x86_64.tar.gz.sha256=76e475395de94e958a44e254c0783b65bca2ad517503f6f947e3e64378ef4650
+with-llvm-sdk-22.1.6-linux-x86_64.tar.gz.manifest=93c0d15b1bb4b67f53c84d7343929757a84e5ad512298f8bb010555f361886e8
 
 # linux-aarch64: cross-built from e997223d with the same glibc 2.28 floor,
 # static libc++, compiler-rt, CMake and Ninja as linux-x86_64. Verified by
