@@ -363,7 +363,38 @@ pub unsafe fn Regex.__literal_code(slot: *mut *const i8, pattern: &str, options:
     if compiled as i64 == 0:
         with_panic("invalid regex literal: " ++ regex_error_message(err_code), "", 0)
     *slot = compiled
+    // Remember the slot for Regex.__literal_free_all: a 16-byte link, the
+    // slot's address and the link registered before it.
+    let link = regex_alloc_link()
+    *link = slot as i64
+    *((link as i64 + 8) as *mut i64) = regex_literal_slots
+    regex_literal_slots = link as i64
     compiled
+
+// The slots regex literals compiled into, newest first (0: none). A plain
+// word: a program without a regex literal neither initializes nor frees
+// anything, and links none of this (#2049: an owning module global here was
+// initialized and dropped in every program, which pulled std.regex and the
+// pcre2 bundle into programs that use no regex).
+var regex_literal_slots: i64 = 0
+
+fn regex_alloc_link() -> *mut i64: with_alloc(16) as *mut i64
+
+// #1036/#2049: a literal's code lives for the program, and the program's
+// exit frees it. The exit wrapper calls this in a program Sema validated a
+// regex literal for (Codegen.wrap_main_for_exit); nothing did, and every
+// literal site that ran leaked its pattern and tables.
+pub unsafe fn Regex.__literal_free_all():
+    var link = regex_literal_slots
+    regex_literal_slots = 0
+    while link != 0:
+        let slot = *(link as *mut i64) as *mut *const i8
+        let next = *((link + 8) as *mut i64)
+        if *slot as i64 != 0:
+            pcre2_code_free_8(*slot as *mut pcre2_real_code_8)
+            *slot = null
+        with_free(link as *mut u8)
+        link = next
 
 pub fn Regex.__capture_count(code: *const i8) -> i32:
     if code as i64 == 0:

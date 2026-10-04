@@ -1,6 +1,6 @@
 //! expect-stdout: ok
 
-type Ctx { multiplier: i32 }
+type Ctx: Copy { multiplier: i32 }
 
 fn by_value(x: i32, ctx: implicit Ctx) -> i32:
     x * ctx.multiplier

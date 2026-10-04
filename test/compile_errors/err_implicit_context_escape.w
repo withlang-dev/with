@@ -2,7 +2,7 @@
 
 use std.context
 
-fn traced(ctx: implicit Context) -> i64:
+fn traced(ctx: implicit &Context) -> i64:
     ctx.trace_id.value
 
 fn make_reader() -> fn() -> i64:

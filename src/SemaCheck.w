@@ -23176,6 +23176,9 @@ impl Sema:
                                 if resolved_map.contains(pi): continue
                                 let pflags = self.ast.fn_param_flags(ps, pi)
                                 if fn_param_is_implicit(pflags) == 0: continue
+                                if not self.implicit_param_fillable(sig_idx, pi):
+                                    self.emit_implicit_param_unfilled(sig_idx, ps, pi, node)
+                                    continue
                                 let expected_ty = self.sig_param_type(sig_idx, pi)
                                 var si = self.implicit_binding_types.len() as i32 - 1
                                 while si >= 0:
@@ -23906,7 +23909,7 @@ impl Sema:
                 let ps_check = self.ast.fn_meta_param_start(meta_check)
                 for pi in actual..expected:
                     if fn_param_is_implicit(self.ast.fn_param_flags(ps_check, pi)) != 0:
-                        self.emit_error("implicit parameter not provided; add a 'with' binding of the matching type", node)
+                        self.emit_implicit_param_unfilled(self.get_sig(fn_sym), ps_check, pi, node)
                         return false
         if receiver != 0 and expected == 0:
             // A function of the type (`fn Item.tag()` at top level: no
@@ -28866,6 +28869,29 @@ impl Sema:
             return self.check_method_call_parts(expr, target, extra_start, arg_count, node, recv_ty)
         self.check_method_call_parts(expr, field, extra_start, arg_count, node, 0)
 
+    // D87 (§7.3a): an implicit fill observes the binding and never consumes
+    // it. An `implicit &T` parameter borrows the binding; an `implicit T`
+    // parameter is filled only when T is Copy. #2049: a non-Copy `implicit T`
+    // was filled with a copy of the binding — the consuming callee and the
+    // binding's scope both freed the one value (DOUBLE FREE).
+    mut fn implicit_param_fillable(sig_idx: i32, pi: i32) -> bool:
+        if sig_idx < 0:
+            return true
+        let param_ty = self.sig_param_type(sig_idx, pi)
+        let param_kind = self.get_type_kind(self.resolve_alias(param_ty as TypeId))
+        param_kind == TypeKind.TY_REF or self.is_copy(param_ty as TypeId) != 0
+
+    // The error for implicit parameter `pi` (declared at `ps`) of a call
+    // that leaves it unfilled: a non-Copy `implicit T` names both
+    // spellings that work (D87); otherwise a `with` binding is missing.
+    mut fn emit_implicit_param_unfilled(sig_idx: i32, ps: i32, pi: i32, call_node: i32):
+        if self.implicit_param_fillable(sig_idx, pi):
+            self.emit_error("implicit parameter not provided; add a 'with' binding of the matching type", call_node)
+            return
+        let pname = self.pool_resolve(self.ast.fn_param_name(ps, pi)).clone()
+        let ty_name = self.type_name(self.sig_param_type(sig_idx, pi) as i32)
+        self.emit_error_with_help(f"implicit parameter `{pname}` takes a non-Copy `{ty_name}`, which is never filled implicitly (§7.3a)", call_node, f"an implicit fill never consumes the `with` binding: pass the argument explicitly (`{pname}: value`, which moves it), or declare the parameter `{pname}: implicit &{ty_name}` to borrow the context")
+
     // One named-argument binding rule for free functions, static methods and
     // instance methods. Bind names before filling omitted parameters; the
     // number of supplied arguments says nothing about which ones are absent.
@@ -28921,6 +28947,7 @@ impl Sema:
         for pi in param_offset..param_count:
             if resolved_map.contains(pi): continue
             if fn_param_is_implicit(self.ast.fn_param_flags(ps, pi)) == 0: continue
+            if not self.implicit_param_fillable(sig_idx, pi): continue
             let expected_ty = self.sig_param_type(sig_idx, pi)
             var si = self.implicit_binding_types.len() as i32 - 1
             while si >= 0:
@@ -28939,7 +28966,7 @@ impl Sema:
         for pi in param_offset..param_count:
             if not resolved_map.contains(pi):
                 if fn_param_is_implicit(self.ast.fn_param_flags(ps, pi)) != 0:
-                    self.emit_error("implicit parameter not provided; add a 'with' binding of the matching type", call_node)
+                    self.emit_implicit_param_unfilled(sig_idx, ps, pi, call_node)
                 else:
                     let pname = self.pool_resolve(self.ast.fn_param_name(ps, pi)).clone()
                     self.emit_error(f"missing argument for parameter '{pname}'", call_node)
@@ -28982,14 +29009,14 @@ impl Sema:
         for ai in 0..arg_count:
             resolved_map.insert(ai + param_offset, self.ast.get_extra(extra_start + ai))
         var filled = 0
-        var missing_implicit = 0
+        var missing_implicit = -1
         for pi in actual..param_count:
             let pflags = self.ast.fn_param_flags(param_start, pi)
             if fn_param_is_implicit(pflags) == 0:
                 continue
             // A generic method's implicit parameter has no resolved type to
             // match a binding against here; it stays missing and is reported.
-            let expected_ty = if sig_idx >= 0: self.sig_param_type(sig_idx, pi) else: 0
+            let expected_ty = if sig_idx >= 0 and self.implicit_param_fillable(sig_idx, pi): self.sig_param_type(sig_idx, pi) else: 0
             var si = if expected_ty != 0: self.implicit_binding_types.len() as i32 - 1 else: -1
             var found = 0
             while si >= 0:
@@ -29001,8 +29028,8 @@ impl Sema:
                     found = 1
                     break
                 si = si - 1
-            if found == 0:
-                missing_implicit = 1
+            if found == 0 and missing_implicit < 0:
+                missing_implicit = pi
         var missing_required = false
         for pi2 in actual..param_count:
             if resolved_map.contains(pi2):
@@ -29014,13 +29041,13 @@ impl Sema:
                 filled = 1
             else if fn_param_is_implicit(self.ast.fn_param_flags(param_start, pi2)) == 0:
                 missing_required = true
-        if missing_implicit != 0:
-            self.emit_error("implicit parameter not provided; add a 'with' binding of the matching type", call_node)
+        if missing_implicit >= 0:
+            self.emit_implicit_param_unfilled(sig_idx, param_start, missing_implicit, call_node)
         // #1973: a required parameter with no argument and no default is
         // not filled — storing the partial list (a 0 for the missing slot)
         // settled the call's arity and MIR passed Unit. The supplied
         // arguments stand, and check_call_arity reports the count.
-        if filled == 0 or (missing_required and missing_implicit == 0):
+        if filled == 0 or (missing_required and missing_implicit < 0):
             return arg_count
         let final_args: Vec[i32] = Vec.new()
         for pi3 in param_offset..param_count:

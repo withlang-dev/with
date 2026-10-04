@@ -7969,6 +7969,16 @@ impl Codegen:
                 let gd_global = gd_opt.unwrap() as i64
                 self.mir_emit_drop_ptr_for_sema_type(gd_global, wl_global_get_value_type(gd_global), self.module_drop_global_tids[gd])
 
+        // #1036/#2049: a regex literal's compiled code lives in its
+        // per-site slot for the program, and the exit frees it. Only a
+        // program Sema validated a regex literal for (regex_capture_counts
+        // has every literal and pattern) makes the call: one without a
+        // literal links nothing of std.regex.
+        if self.sema.regex_capture_counts.len() > 0:
+            let free_literals_fn = self.regex_facade_fn("Regex.__literal_free_all")
+            if free_literals_fn != 0:
+                wl_build_call(self.builder, wl_global_get_value_type(free_literals_fn), free_literals_fn, 0, 0)
+
         var runtime_shutdown_fn = wl_get_named_function(self.llmod, "with_runtime_shutdown")
         if runtime_shutdown_fn == 0:
             let runtime_shutdown_ft_new = wl_function_type(wl_void_type(self.context), 0, 0, 0)

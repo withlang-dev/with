@@ -2582,6 +2582,45 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
     // Init for the caller to drop; the ownership validator called it a leak.
     if deep_debug_analyze_expect(ctx, root, compiler, build_project_abs(root, "test/behavior/behav_1822_mut_receiver_replaced_whole.w"), out_dir, "analyze-audit-receiver-replaced", "audit:all", "violations=0 ok") != 0:
         return 1
+    // #2049: `text =~ re` observes a compiled Regex; it moved `re` on every match.
+    if deep_debug_tool_expect(ctx, root, compiler, build_project_abs(root, "test/debug_alloc/da_2049_regex_captures_dropped.w"), out_dir, "validate-ownership-regex-observed", "--validate-ownership", "", "validate-ownership: ok") != 0:
+        return 1
+    // #2049: a module global's runtime initializer emitted after a facade
+    // method inherited that function's by-address local map; audit:all
+    // names the disagreement (mode-provenance).
+    if deep_debug_analyze_expect(ctx, root, compiler, build_project_abs(root, "test/behavior/behav_2049_runtime_init_global_after_facade.w"), out_dir, "analyze-audit-runtime-init-global", "audit:all", "violations=0 ok") != 0:
+        return 1
+    // #2049: the ownership validator's verdicts over passing behavior
+    // programs — each was a MIR ownership defect (a copy into a consuming
+    // parameter, a leak at return, a drop after a move, a reset of an
+    // unmoved local) or a false verdict, until it validates in every build
+    // (#2043).
+    let ownership_programs: Vec[str] = Vec.new()
+    ownership_programs.push("async_tuple_await")
+    ownership_programs.push("behav_1974_eliminator_owned_at_ref_param")
+    ownership_programs.push("behav_async_tuple_await")
+    ownership_programs.push("behav_const_consumed_twice_materializes")
+    ownership_programs.push("behav_cstr_from_ptr_to_owned")
+    ownership_programs.push("behav_implicit_autoref")
+    ownership_programs.push("behav_implicit_method_call")
+    ownership_programs.push("behav_implicit_params")
+    ownership_programs.push("behav_let_else_break_exits_loop")
+    ownership_programs.push("behav_record_copy")
+    ownership_programs.push("behav_record_update_large_struct")
+    ownership_programs.push("behav_record_update")
+    ownership_programs.push("behav_regex_capture_fstring")
+    ownership_programs.push("behav_regex_language_semantics")
+    ownership_programs.push("behav_result")
+    ownership_programs.push("behav_std_context")
+    ownership_programs.push("behav_task_join_cleanup_consumes_handle")
+    ownership_programs.push("behav_unwrap_or_large_str_payload")
+    ownership_programs.push("errdefer_basic")
+    ownership_programs.push("errdefer_ordering")
+    ownership_programs.push("errdefer_question_mark")
+    ownership_programs.push("issue51_semantic_compare_dispatch")
+    for program in ownership_programs:
+        if deep_debug_tool_expect(ctx, root, compiler, build_project_abs(root, "test/behavior/" ++ program ++ ".w"), out_dir, "validate-ownership-" ++ program, "--validate-ownership", "", "validate-ownership: ok") != 0:
+            return 1
     // #1323: `InternPool.resolve` hands out a view into `symbol_texts`; a
     // binding read after anything that interns is a use-after-free (the
     // release compiler segfaulted in ct_generate_debug_derive). The pool sits

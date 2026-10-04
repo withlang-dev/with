@@ -2,7 +2,7 @@
 
 use std.context
 
-fn traced(stdctx: implicit Context) -> i64:
+fn traced(stdctx: implicit &Context) -> i64:
     stdctx.trace_id.value
 
 fn main:
