@@ -1682,16 +1682,11 @@ pub fn run_darwin_sysroot_action(ctx: ActionCtx) -> i32:
     let contents: Vec[str] = Vec.new()
     rel_paths.push("PROVENANCE")
     contents.push(sdk_darwin_sysroot_provenance())
-    // clang's driver reads the SDK version from SDKSettings.json and needs
-    // Version and MaximumDeploymentTarget; Zig's names the version only.
-    let version_key = "\"MinimalDisplayName\":\""
-    let version_at = settings.find(version_key)
-    if version_at < 0:
+    let sdk_settings = sdk_darwin_sdk_settings(settings)
+    if sdk_settings.len() == 0:
         return sdk_fail(ctx, "no MinimalDisplayName in Zig's darwin SDKSettings.json: " ++ settings)
-    let version_rest = settings.slice(version_at + version_key.len(), settings.len())
-    let sdk_version = version_rest.slice(0, version_rest.find("\""))
     rel_paths.push("SDKSettings.json")
-    contents.push("{\"CanonicalName\":\"macosx" ++ sdk_version ++ "\",\"Version\":\"" ++ sdk_version ++ "\",\"MaximumDeploymentTarget\":\"" ++ sdk_version ++ ".99\"}\n")
+    contents.push(sdk_settings)
     rel_paths.push("usr/lib/libSystem.tbd")
     contents.push(libsystem.clone())
     rel_paths.push("usr/lib/libc++.tbd")
@@ -1722,6 +1717,58 @@ pub fn run_darwin_sysroot_action(ctx: ActionCtx) -> i32:
             return rc
         pack.push_str("A " ++ aliases[i] ++ " usr/lib/libSystem.tbd\n")
     sdk_write_text(ctx, pack_path, pack.to_str())
+
+// The clang SDK settings of the darwin headers: its driver reads the SDK
+// version from SDKSettings.json and needs Version and
+// MaximumDeploymentTarget; Zig's names the version only. "" when Zig's
+// settings name none.
+fn sdk_darwin_sdk_settings(zig_settings: &str) -> str:
+    let version_key = "\"MinimalDisplayName\":\""
+    let version_at = zig_settings.find(version_key)
+    if version_at < 0:
+        return ""
+    let version_rest = zig_settings.slice(version_at + version_key.len(), zig_settings.len())
+    let sdk_version = version_rest.slice(0, version_rest.find("\""))
+    "{\"CanonicalName\":\"macosx" ++ sdk_version ++ "\",\"Version\":\"" ++ sdk_version ++ "\",\"MaximumDeploymentTarget\":\"" ++ sdk_version ++ ".99\"}\n"
+
+// ── The corpus C model off macOS (#2060) ─────────────────────────────
+//
+// A corpus is migrated against one C model on every host (build/corpus.w):
+// macOS on arm64 and the darwin libc headers. A macOS compiler embeds them
+// (the darwin sysroot above); on every other host this action writes the
+// same headers and SDK settings, from the same pinned Zig source, for the
+// corpus migrations alone: no compiler embeds this tree and no link reads it.
+pub fn sdk_corpus_c_model_dir() -> str: "out/gen/corpus-c-model"
+
+pub fn run_corpus_c_model_action(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    let scratch = sdk_join("out/command", ctx.target_name())
+    if fs.mkdir_all(scratch) != 0:
+        return sdk_fail(ctx, "could not create " ++ scratch)
+    let zig_rc = sdk_materialize_zig_source(ctx, scratch)
+    if zig_rc != 0:
+        return zig_rc
+    let zig_libc = sdk_join(sdk_scratch_zig_dir(scratch), "lib/libc")
+    let settings = sdk_darwin_sdk_settings(fs.read_text(sdk_join(zig_libc, "darwin/SDKSettings.json")))
+    if settings.len() == 0:
+        return sdk_fail(ctx, "no MinimalDisplayName in the Zig " ++ SDK_ZIG_VERSION ++ " source's lib/libc/darwin/SDKSettings.json")
+    let include_root = sdk_join(zig_libc, "include/any-darwin-any")
+    let headers = sdk_merge_sort_strings(fs.list_files(include_root))
+    if headers.len() == 0:
+        return sdk_fail(ctx, "no macOS libc headers under " ++ include_root)
+    let tree = sdk_corpus_c_model_dir()
+    let _old = fs.remove_tree(tree)
+    var rc = sdk_write_text(ctx, sdk_join(tree, "SDKSettings.json"), settings)
+    if rc != 0:
+        return rc
+    for i in 0..headers.len() as i32:
+        let rel = sdk_rel_path(include_root, sdk_normalize(headers[i]))
+        if not sdk_sysroot_path_ok(rel):
+            return sdk_fail(ctx, "a header path the C model cannot carry: " ++ headers[i])
+        rc = sdk_write_text(ctx, sdk_join(tree, "usr/include/" ++ rel), fs.read_text(headers[i]))
+        if rc != 0:
+            return rc
+    sdk_write_text(ctx, ctx.output(), "ok\n")
 
 // ── The Linux sysroot (#1915, D81) ───────────────────────────────────
 //

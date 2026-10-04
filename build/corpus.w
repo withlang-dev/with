@@ -1,6 +1,7 @@
 module build.corpus
 
 use std.build
+use std.sysinfo
 
 // A migrated C corpus (docs/proposals/stdlib_sourcing_plan.md, docs/spec/toolchain/wo_bundles.md):
 // the facts about one upstream library and the few hooks its pipeline
@@ -193,11 +194,39 @@ pub fn corpus_migrate_options(corpus: &Corpus, source: &str, output: &str) -> Mi
         migrate_one: "", shared_fragment: "", ir_roundtrip: false,
     }
 
-/// Runs one migration workspace. A migration runs in the build driver's own
-/// compiler (a migrate workspace is driver comptime evaluation), so
-/// re-migrating needs a tree compiler as the driver:
-/// `WITH=out/release/bin/with out/release/bin/with build :<stem>-promote`.
-/// The battery never migrates; it compiles the checked-in output.
+// ── the C model (#2060) ─────────────────────────────────────────
+//
+// A corpus is one set of modules for every target: std.libc carries its
+// libc calls everywhere, and the bundle is built from the same bytes on
+// each host. So its migration is a function of the upstream source, the
+// migrator and one C model — a target and that target's libc headers —
+// never of the host that runs it: migrated for the host, a Linux run takes
+// glibc's `#if` branches and macro values (zlib's ioapi.c calls fopen64)
+// and a Windows run mingw-w64's, and no two hosts agree. The model is the
+// one the corpora were promoted under: macOS on arm64, against the darwin
+// headers of the pinned Zig source (build/sdk.w), which every host can
+// generate. On macOS that tree is the darwin sysroot the compiler embeds;
+// elsewhere `corpus-c-model` writes the same headers.
+// The triple names its macOS version: left to clang it is the migrating
+// Mac's own OS version, and off macOS none at all (the darwin headers then
+// leave _FORTIFY_SOURCE off and <string.h> declares another memset).
+pub fn corpus_c_model_target() -> str: "arm64-apple-macosx11.0"
+pub fn corpus_c_model_dir() -> str: if os() == "Macos": "out/gen/darwin-sysroot" else: "out/gen/corpus-c-model"
+pub fn corpus_c_model_stamp() -> str: if os() == "Macos": "out/gen/darwin-sysroot.pack" else: "out/gen/corpus-c-model.ready"
+pub fn corpus_c_model_dep() -> str: if os() == "Macos": "darwin-sysroot" else: "corpus-c-model"
+
+/// A target that migrates a corpus: the migrator is this tree's release
+/// compiler, run as a process against the C model.
+pub fn corpus_migrating_target(target: Target, release_compiler: &str) -> Target:
+    var out = target.arg("migrator=" ++ release_compiler)
+    out = out.input(corpus_owned_text(release_compiler)).input(corpus_c_model_stamp())
+    out.dep("build").dep(corpus_c_model_dep())
+
+/// Runs one migration. A target that names its `migrator=` (every corpus
+/// migration: corpus_migrating_target) runs that compiler as a process
+/// against the C model. One that names none (pcre2-migrate-smoke, a test of
+/// the driver's migrator) runs a migrate workspace in the build driver's own
+/// compiler, for the host.
 pub fn corpus_run_migration(ctx: &ActionCtx, label: &str, options: MigrateOptions) -> i32:
     let migrator = corpus_migrator_arg(ctx)
     if migrator.len() > 0: return corpus_run_migration_process(ctx, label, migrator, &options)
@@ -211,8 +240,8 @@ pub fn corpus_run_migration(ctx: &ActionCtx, label: &str, options: MigrateOption
     0
 
 /// The compiler an action's `migrator=<path>` arg names ("" = none: the
-/// migration runs in the driver, as above). The drift check (#1905) names
-/// this tree's release compiler, the migrator a re-promotion would use.
+/// migration runs in the driver, as above). A corpus's migrate target and its
+/// drift check (#1905) name the same one, this tree's release compiler.
 pub fn corpus_migrator_arg(ctx: &ActionCtx) -> str:
     for arg in ctx.args():
         if arg.starts_with("migrator="): return arg.slice("migrator=".len(), arg.len())
@@ -229,6 +258,10 @@ pub fn corpus_migrate_argv(ctx: &ActionCtx, compiler: &str, options: &MigrateOpt
     argv.push(corpus_abs(ctx, options.source_path))
     argv.push("-o")
     argv.push(corpus_abs(ctx, options.output_path))
+    argv.push("--c-target")
+    argv.push(corpus_c_model_target())
+    argv.push("--c-sysroot")
+    argv.push(corpus_abs(ctx, corpus_c_model_dir()))
     for path in options.include_paths:
         argv.push("-I")
         argv.push(corpus_abs(ctx, path))

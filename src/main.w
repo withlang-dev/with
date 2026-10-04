@@ -4957,7 +4957,7 @@ fn migrate_apply_std_use_fixits(output_path: &str) -> i32:
 
 fn run_migrate_command(argc: i32) -> i32:
     if argc < 3:
-        eprint("usage: with migrate <file.c|dir/> [-o output] [-I include_dir] [-include header] [--exclude basename]")
+        eprint("usage: with migrate <file.c|dir/> [-o output] [-I include_dir] [-include header] [--exclude basename] [--c-target triple --c-sysroot dir]")
         return 1
     // #1915: the migrator parses C as c_import does (compiler.Frontend): on
     // Windows x86_64 for the windows-gnu target against the C runtime the
@@ -4974,9 +4974,21 @@ fn run_migrate_command(argc: i32) -> i32:
     var source_path = ""
     var output_path = ""
     var exclude_basenames = ""
+    // #2060: the C model — the target and the sysroot whose headers the
+    // parse reads instead of the host's. Named together or not at all.
+    var c_target = ""
+    var c_sysroot = ""
     var ai = 2
     while ai < argc:
         let arg = with_arg_at(ai)
+        if arg == "--c-target" and ai + 1 < argc:
+            c_target = with_arg_at(ai + 1)
+            ai = ai + 2
+            continue
+        if arg == "--c-sysroot" and ai + 1 < argc:
+            c_sysroot = with_arg_at(ai + 1)
+            ai = ai + 2
+            continue
         if arg == "-o" and ai + 1 < argc:
             output_path = with_arg_at(ai + 1)
             ai = ai + 2
@@ -5054,6 +5066,14 @@ fn run_migrate_command(argc: i32) -> i32:
     if source_path.len() == 0:
         eprint("error: no source file specified")
         return 1
+    if (c_target.len() == 0) != (c_sysroot.len() == 0):
+        eprint("error: migrate: --c-target and --c-sysroot name the C model together; give both or neither")
+        return 1
+    if c_target.len() > 0:
+        if with_fs_is_dir(c_sysroot) == 0:
+            eprint("error: migrate: --c-sysroot " ++ c_sysroot ++ " is not a directory")
+            return 1
+        ci_set_c_model(c_target, c_sysroot)
 
     // Detect if source is a directory (ends with / or doesn't end with .c/.h)
     let is_dir = (source_path.len() > 0 and source_path[source_path.len() - 1] == 47) or (source_path.len() > 2 and source_path.slice(source_path.len() - 2, source_path.len()) != ".c" and source_path.slice(source_path.len() - 2, source_path.len()) != ".h")

@@ -2102,6 +2102,9 @@ fn with_cimport_add_windows_incdir(var_name: &str) -> i32:
 // means the SDK carries no libc: the parse then finds no system header, and
 // with_cimport_windows_libc_missing names the cause.
 pub fn with_cimport_set_windows_target(triple: &str, sysroot: &str):
+    // A named C model (#2060) is the parse's target for the whole process:
+    // the frontend's per-compile Windows selection never replaces it.
+    if cimport_has_c_model(): return
     unsafe:
         g_cimport_target_buf[0] = 0
         g_cimport_sysroot_arg_buf[0] = 0
@@ -2124,7 +2127,30 @@ pub fn with_cimport_windows_libc_missing() -> i32:
             return 1
     0
 
-// Appends the Windows target and sysroot (when set) to a parse's argv.
+// #2060: the C model a migration names (`with migrate --c-target <triple>
+// --c-sysroot <dir>`): the parse is for that target against that sysroot's
+// headers and reads nothing of the host — not its triple, not its sysroot,
+// not /usr/include. A corpus that must be the same bytes whichever host
+// migrates it (the std bundles, which std.libc carries to every target)
+// names its model; a migration that names none parses for the host.
+var g_cimport_model_isysroot_buf: [1100]u8 = [0 as u8; 1100]
+
+pub fn with_cimport_set_c_model(triple: &str, sysroot: &str):
+    unsafe { g_cimport_model_isysroot_buf[0] = 0 }
+    with_cimport_set_windows_target(triple, sysroot)
+    unsafe:
+        if g_cimport_target_buf[0] == 0 or sysroot.len() == 0 or sysroot.len() >= 1099:
+            return
+        with_memcpy(&raw mut g_cimport_model_isysroot_buf as *mut [1100]u8 as *mut u8, *(sysroot as *const str as *const *const u8), sysroot.len())
+        g_cimport_model_isysroot_buf[sysroot.len()] = 0
+
+// 1 when this parse names its C model.
+fn cimport_has_c_model() -> bool:
+    unsafe { g_cimport_model_isysroot_buf[0] != 0 }
+
+// Appends the target and sysroot (when set) to a parse's argv: the Windows
+// libc as --sysroot=, a named C model as -isysroot (where a Darwin target
+// also reads its SDK version) and --sysroot= (every other target's search).
 unsafe fn cimport_push_target_args(args: *mut *const u8, nargs: i32) -> i32:
     var n = nargs
     if g_cimport_target_buf[0] != 0:
@@ -2132,6 +2158,11 @@ unsafe fn cimport_push_target_args(args: *mut *const u8, nargs: i32) -> i32:
         n = n + 1
         *((args as i64 + n as i64 * 8) as *mut *const u8) = &g_cimport_target_buf as *const [128]u8 as *const u8
         n = n + 1
+        if g_cimport_model_isysroot_buf[0] != 0:
+            *((args as i64 + n as i64 * 8) as *mut *const u8) = "-isysroot\0" as *const u8
+            n = n + 1
+            *((args as i64 + n as i64 * 8) as *mut *const u8) = &g_cimport_model_isysroot_buf as *const [1100]u8 as *const u8
+            n = n + 1
         if g_cimport_sysroot_arg_buf[0] != 0:
             *((args as i64 + n as i64 * 8) as *mut *const u8) = &g_cimport_sysroot_arg_buf as *const [1100]u8 as *const u8
             n = n + 1
@@ -2168,7 +2199,8 @@ pub fn with_cimport_set_resource_dir(path: &str) -> Unit:
 // Every declaration parse and macro probe uses the same language and target.
 unsafe fn cimport_build_args(args: *mut *const u8, cxx: bool):
     var n = 0
-    let sysroot = get_sdk_path()
+    // A named C model replaces the host's sysroot and library directories.
+    let sysroot = if cimport_has_c_model(): 0 as *const u8 else: get_sdk_path()
     if sysroot as i64 != 0:
         args[n] = sysroot_flag()
         args[n + 1] = sysroot
@@ -2198,7 +2230,8 @@ unsafe fn cimport_build_args(args: *mut *const u8, cxx: bool):
 unsafe fn cimport_parse_translation_unit(index: *mut u8, path: *const u8, cxx: bool, options: u32) -> *mut u8:
     if g_cimport_include_error: return 0 as *mut u8
     // At most fourteen fixed arguments: sysroot(2), host library dirs(4),
-    // target(3), resource(2), mode(3).
+    // target(3), resource(2), mode(3) — or, with a C model, target(5) in
+    // place of the first nine.
     let capacity = 14 + g_cimport_include_count as i64 * 2
     let args = with_alloc(capacity * 8) as *mut *const u8
     if args as i64 == 0: return 0 as *mut u8

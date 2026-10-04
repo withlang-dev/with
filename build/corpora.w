@@ -82,6 +82,9 @@ pub fn run_corpus_prepare_reference_action(ctx: ActionCtx) -> i32:
 fn corpus_generate(ctx: &ActionCtx, corpus: &Corpus, generated: &str) -> i32:
     let reference = corpus.upstream.reference.clone()
     let source = corpus_scratch(ctx) ++ "/source"
+    // #2060: a corpus is migrated against the C model, which only the
+    // process path names; a driver migration would be the host's.
+    if corpus_migrator_arg(ctx).len() == 0: return corpus_fail(ctx, "a corpus migration names its migrator (corpus_migrating_target)")
     if corpus_reset_dir(ctx, source) != 0 or corpus_reset_dir(ctx, generated) != 0: return 1
     if corpus.stage(ctx, corpus, &reference, &source) != 0: return 1
     if corpus.migrate(ctx, corpus, &source, generated) != 0: return 1
@@ -170,7 +173,8 @@ fn corpus_w_names(ctx: &ActionCtx, dir: &str) -> Vec[str]:
 /// release compiler — `<stem>-migrate`'s steps, its `migrator=` arg naming
 /// the compiler — into a scratch tree and fails naming every module that
 /// differs, is missing or is extra. A migrator change that alters a corpus
-/// is red here until the corpus is re-promoted.
+/// is red here until the corpus is re-promoted. The migration is against the
+/// C model (build/corpus.w, #2060), so the check means the same on every host.
 pub fn run_corpus_drift_check_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let owned = action_corpus(ctx)
@@ -232,6 +236,7 @@ pub fn corpus_pipeline(out: Build, ctx: &BuildCtx, corpus: &Corpus, release_comp
     var migrate = corpus_target(.Action, corpus, "migrate", corpus_migrated_dir(corpus))
     migrate.action = run_corpus_migrate_action
     migrate = migrate.input(up.reference.clone()).dep(corpus.stem ++ "-prepare-reference")
+    migrate = corpus_migrating_target(move migrate, release_compiler)
     graph = graph.add_target(migrate)
 
     var check = corpus_target(.Action, corpus, "check-generated", "out/gen/." ++ corpus.stem ++ "-check-generated-stamp")
@@ -264,10 +269,10 @@ pub fn corpus_pipeline(out: Build, ctx: &BuildCtx, corpus: &Corpus, release_comp
 
     var drift = corpus_target(.Action, corpus, "drift-check", "out/corpus-drift/" ++ corpus.stem ++ ".ok")
     drift.action = run_corpus_drift_check_action
-    drift = drift.arg("migrator=" ++ release_compiler)
-    drift = drift.input(up.reference.clone()).input(release_compiler.clone()).input(corpus.corpus_dir ++ "/bundle.w")
+    drift = corpus_migrating_target(move drift, release_compiler)
+    drift = drift.input(up.reference.clone()).input(corpus.corpus_dir ++ "/bundle.w")
     drift = target_with_corpus_module_inputs(move drift, ctx, corpus)
-    drift = drift.dep(corpus.stem ++ "-prepare-reference").dep("build")
+    drift = drift.dep(corpus.stem ++ "-prepare-reference")
     drift = drift.write_scope("out/corpus-drift").allow_parallel()
     graph = graph.add_target(drift)
 
