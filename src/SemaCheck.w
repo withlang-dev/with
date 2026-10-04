@@ -6934,6 +6934,10 @@ impl Sema:
         else if callee_kind == NodeKind.NK_GROUPED or callee_kind == NodeKind.NK_CLOSURE:
             if self.callable_value_may_suspend(callee, site):
                 return true
+        // A type-level builtin (`transmute[T](f)`, `sizeof[T]()`, …) never
+        // invokes its operand: handing it a callable is not a suspend site.
+        if self.is_sizeof_or_alignof(callee) != 0 or self.is_nameof_call(callee) != 0 or self.is_transmute_call(callee) != 0 or self.is_chan_call(callee) != 0:
+            return false
         self.args_hand_over_suspending_callable(node, self.ast.get_data1(node), self.ast.get_data2(node), site)
 
     // An argument that is a may-suspend callable runs on this fiber when the

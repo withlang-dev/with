@@ -182,6 +182,10 @@ enum CcBuiltin: i32:
     VA_START
     VA_ARG
     VA_END
+    FIBER_IS_CANCELLED
+    FIBER_WAIT_CANCELLED
+    FIBER_SET_CANCELLED_RETURN
+    FIBER_WAS_CANCELLED_RETURN
 
 impl Copy for CcBuiltin
 
@@ -5863,6 +5867,10 @@ impl CCodegen:
             return self.sema.ty_void as i32
         if kind == CcBuiltin.ATOMIC_FENCE:
             return self.sema.ty_void as i32
+        if kind == CcBuiltin.FIBER_SET_CANCELLED_RETURN:
+            return self.sema.ty_void as i32
+        if kind == CcBuiltin.FIBER_IS_CANCELLED or kind == CcBuiltin.FIBER_WAIT_CANCELLED or kind == CcBuiltin.FIBER_WAS_CANCELLED_RETURN:
+            return self.sema.ty_i32 as i32
         if kind == CcBuiltin.STR_LEN:
             return self.sema.ty_usize as i32
         if kind == CcBuiltin.STR_LEN32:
@@ -6700,6 +6708,12 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: MirIntrinsic) -> CcBuiltin:
     if intrinsic == MirIntrinsic.MAX: return CcBuiltin.MAX
     if intrinsic == MirIntrinsic.ABS: return CcBuiltin.ABS
     if intrinsic == MirIntrinsic.FMA: return CcBuiltin.FMA
+    // §14.7: the cancellation checks MIR places after a call that may
+    // suspend (#1985) are calls of the fiber runtime's own functions.
+    if intrinsic == MirIntrinsic.FIBER_IS_CANCELLED: return CcBuiltin.FIBER_IS_CANCELLED
+    if intrinsic == MirIntrinsic.FIBER_WAIT_CANCELLED: return CcBuiltin.FIBER_WAIT_CANCELLED
+    if intrinsic == MirIntrinsic.FIBER_SET_CANCELLED_RETURN: return CcBuiltin.FIBER_SET_CANCELLED_RETURN
+    if intrinsic == MirIntrinsic.FIBER_WAS_CANCELLED_RETURN: return CcBuiltin.FIBER_WAS_CANCELLED_RETURN
     CcBuiltin.NONE
 
 impl CCodegen:
@@ -7269,6 +7283,20 @@ impl CCodegen:
                 return "    abort();"
             let order = self.atomic_order_text(self.operand_text(body, self.call_arg_operand(body, args_id, 0)))
             var out = "    __atomic_thread_fence(" ++ order ++ ");\n"
+            out = out ++ f"    goto bb{next_bb};"
+            return out
+
+        if kind == CcBuiltin.FIBER_IS_CANCELLED or kind == CcBuiltin.FIBER_WAIT_CANCELLED or kind == CcBuiltin.FIBER_SET_CANCELLED_RETURN or kind == CcBuiltin.FIBER_WAS_CANCELLED_RETURN:
+            var call = if kind == CcBuiltin.FIBER_IS_CANCELLED: "with_fiber_is_cancelled()"
+                else if kind == CcBuiltin.FIBER_WAIT_CANCELLED: "with_fiber_wait_cancelled()"
+                else if kind == CcBuiltin.FIBER_SET_CANCELLED_RETURN: "with_fiber_set_cancelled_return()"
+                else: ""
+            if kind == CcBuiltin.FIBER_WAS_CANCELLED_RETURN:
+                if argc < 1:
+                    self.fail("was_cancelled expects the task's fiber id")
+                    return "    abort();"
+                call = "with_fiber_was_cancelled_return(" ++ self.operand_text(body, self.call_arg_operand(body, args_id, 0)) ++ ")"
+            var out = if has_ret != 0 and kind != CcBuiltin.FIBER_SET_CANCELLED_RETURN: "    " ++ self.place_text(body, dest_place) ++ " = " ++ call ++ ";\n" else: "    " ++ call ++ ";\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 

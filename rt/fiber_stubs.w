@@ -76,6 +76,15 @@ pub fn with_runtime_current_set_cancelled_return():
 pub fn with_runtime_current_cancelled_return() -> i32:
     0
 
+// §14.7 (#1985): a call through a callable value is followed by the
+// cancelled-return check, in rt_core's own thread entry too. With no fiber
+// runtime linked nothing is ever cancelled.
+pub fn with_fiber_wait_cancelled() -> i32:
+    0
+
+pub fn with_fiber_set_cancelled_return():
+    let _ = 0
+
 pub fn with_runtime_completed_cancelled_return(fiber_id: i32) -> i32:
     let _ = fiber_id
     0
