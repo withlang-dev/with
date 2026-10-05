@@ -3377,6 +3377,32 @@ fn cli_fast_install_blessed(root: &str, target_name: &str) -> i32:
     if build_graph_install_path(f"[{target_name}]", compiler_path, data, dest, 0o755, "version") != 0:
         return 1
     with_write("[" ++ target_name ++ "] " ++ dest ++ " <- out/release/bin/with (" ++ verified_by ++ ")\n")
+    cli_install_compiler_dsym(root, target_name, dest)
+
+// The installed compiler's debug info: lldb on ~/.local/bin/with gets source
+// lines, arguments and dotted breakpoints only from a dSYM beside it. The
+// release link writes `with.unstamped.dSYM`; stamping patches bytes and
+// keeps the Mach-O UUID, so that dSYM is the stamped binary's. It installs
+// as `with.dSYM` with its DWARF file named after the binary, through a temp
+// sibling and a rename. An old one is removed first either way: a dSYM
+// left from an earlier install describes a different binary.
+fn cli_install_compiler_dsym(root: &str, target_name: &str, dest: &str) -> i32:
+    let dsym = dest ++ ".dSYM"
+    build_graph_rt_remove_tree(dsym)
+    let source = resolve_join(root, "out/release/bin/with.unstamped.dSYM/Contents")
+    let dwarf = with_fs_read_file(source ++ "/Resources/DWARF/with.unstamped")
+    if dwarf.len() == 0:
+        with_write(f"[{target_name}] no dSYM in out/release/bin (this SDK links no dsymutil): lldb on {dest} has symbols only, no source lines\n")
+        return 0
+    let tmp = dsym ++ f".install-tmp.{build_graph_rt_pid()}"
+    build_graph_rt_remove_tree(tmp)
+    let plist = with_fs_read_file(source ++ "/Info.plist")
+    let wrote = build_graph_rt_mkdir_p(tmp ++ "/Contents/Resources/DWARF") == 0 and build_graph_rt_write_file(tmp ++ "/Contents/Info.plist", plist) == 0 and build_graph_rt_write_file(tmp ++ "/Contents/Resources/DWARF/with", dwarf) == 0
+    if not wrote or build_graph_rt_rename_file(tmp, dsym) != 0:
+        build_graph_rt_remove_tree(tmp)
+        with_eprint(f"[{target_name}] error: could not install {dsym}")
+        return 1
+    with_write(f"[{target_name}] {dsym} <- out/release/bin/with.unstamped.dSYM\n")
     0
 
 fn run_build_command(options: BuildCommandOptions, graph_options: &BuildGraphCommandOptions) -> i32:

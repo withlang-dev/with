@@ -20,14 +20,18 @@ of them refuses a flag it does not know on `check`, `ir` and `run`
 exit 2, #2198): a misspelled or removed flag never reads as a clean run.
 
 - **`with` on PATH** (`~/.local/bin/with`, installed from main): every
-  dump, trace, `analyze`, `reduce` and allocator recipe. It carries no
-  debug info: lldb finds its functions only by regex
+  dump, trace, `analyze`, `reduce` and allocator recipe, and lldb on the
+  compiler when the bug is on main: `:install-user` installs
+  `~/.local/bin/with.dSYM` beside it (the release link's dSYM; stamping
+  keeps the Mach-O UUID), so dotted names resolve and frames show source
+  lines and parameters. An install from an SDK without dsymutil says so and
+  leaves no dSYM; then lldb finds functions only by regex
   (`breakpoint set -r 'Codegen\.marshal_mir_call_arg$'`; the symbol is
-  `__wcu$N$Codegen.marshal_mir_call_arg`), with no source lines and no
-  arguments.
+  `__wcu$N$Codegen.marshal_mir_call_arg`). `ls ~/.local/bin/with.dSYM`
+  answers which.
 - **`out/bootstrap/bin/with-stage1`** (after `with build :dev`; has a
   `.dSYM`): the compiler built from your tree. Use it for anything about
-  source you have changed, and for lldb on the compiler: dotted names
+  source you have changed, and for lldb on that compiler: dotted names
   resolve (`breakpoint set --name Codegen.marshal_mir_call_arg`) and frames
   show source lines and parameters.
 - **`out/stage/bin/with-stage2`** (after a full `with build`) and

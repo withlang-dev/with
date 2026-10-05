@@ -40,11 +40,11 @@ cause and fix that, not the symptom.
 you. If `grep`, `nm`, `otool`, `lldb`, or reading code can answer it, do that.
 
 **Use the debugger.** One `lldb` breakpoint answers in seconds what
-print-and-rebuild takes minutes to. Debug the compiler with
-`out/bootstrap/bin/with-stage1` (after `with build :dev`; it has a `.dSYM`:
-dotted breakpoints, source lines, parameters). The installed `with` has no
-debug info: lldb finds its functions only by regex, with no source or
-arguments. A program any compiler builds carries debug info for its own
+print-and-rebuild takes minutes to. The installed `with` has
+`~/.local/bin/with.dSYM` beside it (`:install-user` installs it): dotted
+breakpoints, source lines, parameters. For source you changed, debug
+`out/bootstrap/bin/with-stage1` (after `with build :dev`; it has a
+`.dSYM` too). A program any compiler builds carries debug info for its own
 code and the runtime.
 
 **"Root cause" means the exact line** — the exact function, branch, and
@@ -884,7 +884,7 @@ fails silently when `old_string` doesn't match due to stale context.
 `with` below is the installed compiler; it runs every dump, trace,
 `analyze`, `reduce` and allocator recipe. For source you changed, use the
 compiler built from it, `out/bootstrap/bin/with-stage1` (`with build :dev`);
-for lldb on the compiler, always stage1 (debug info). `out/stage/bin/
+lldb works on either (both have a dSYM). `out/stage/bin/
 with-stage2` exists only after a full build. The full catalog, with what
 each tool proves, is `docs/spec/toolchain/deep-debugging-tools.md`.
 
