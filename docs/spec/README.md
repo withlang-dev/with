@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.22
+# The With Programming Language — Specification v7.23
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,13 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.23:** a collection literal's binding, 2026-10-05 (D93).
+§4.3c rule 1: an annotation may name the collection without its arguments
+(`let w: Vec = [1, 2, 3]`); a binding with no annotation takes its type
+from its uses (a parameter, a typed place, a return, a method exactly one
+collection has), element type included; a slice demand is met by the fixed
+array; two demanded types are an error; an empty literal with no demand is
+an error (#2144). The implementation is NON-COMPLIANT until it catches up.
 **Changelog v7.22:** modeled-C Amendment 3, 2026-10-04 (D92). §16.2b.4: an
 fn item whose C function returns a status may state `ok`, with one
 constant or several, and is then presented as a `Result`; a resource may

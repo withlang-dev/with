@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D93 — A collection literal's binding takes its type from its uses](2026-10-05-D93-a-collection-literals-binding-takes-its-type-from-its-uses.md)
 - [D92 — Modeled-C Amendment 3: `ok` on a status-returning operation, the failure's text, two presentations of one function](2026-10-04-D92-modeled-c-amendment-3-status-on-operations-the-failure-s-text-two-presentations.md)
 - [D91 — `Target.os` and `Target.arch` are compile-time constants; a per-target value is an exhaustive `comptime match`](2026-10-04-D91-target-os-and-target-arch-are-compile-time-constants.md)
 - [D90 — A migrated corpus names its libc constants; a constant and the function that consumes it come from one `std.libc` table](2026-10-04-D90-a-migrated-corpus-names-libc-constants.md)

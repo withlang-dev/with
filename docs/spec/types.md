@@ -874,6 +874,8 @@ let v: Vec[i32] = [1, 2, 3]            // Vec via expected type
 let w: Vec = [1, 2, 3]                 // Vec[i32]: the elements decide T
 let xs = [1, 2, 3]                     // Vec[i32]: `total` below takes one
 print(total(xs))                       // fn total(xs: &Vec[i32])
+var ys = []                            // Vec[i64]: `push` demands a Vec,
+ys.push(big)                           // and `big: i64` its element type
 let s: HashSet[str] = ["a", "b"]       // HashSet via expected type
 let o: BTreeSet[i32] = [3, 1, 2]       // BTreeSet via expected type
 
@@ -889,18 +891,21 @@ let none: Vec[i32] = []                // empty sequence (type from context)
 **Rules:**
 
 1. The element form `[a, b, c]` builds the collection its expected type
-   names: `Vec[T]`, `HashSet[T]`, `BTreeSet[T]`, a slice, or a fixed array
-   `[T; N]` (§4.3a). An annotation may name the collection without its
-   arguments, and the elements decide them: `let w: Vec = [1, 2, 3]` is a
-   `Vec[i32]`.
+   names: `Vec[T]`, `HashSet[T]`, `BTreeSet[T]`, or a fixed array `[T; N]`
+   (§4.3a). An annotation may name the collection without its arguments,
+   and the elements decide them: `let w: Vec = [1, 2, 3]` is a `Vec[i32]`.
 
-   A binding with no annotation takes the collection its uses demand, as
-   an unsuffixed numeric literal takes its type (§4.2.1): where the
-   binding is passed to a parameter, assigned to a typed place, or
-   returned as one of those collections (or a view of one), the literal
-   builds that collection. With no such use it is a fixed array. Uses that
-   demand two different collections are an error at the second, which
-   names both.
+   A binding with no annotation takes its type from its uses, as an
+   unsuffixed numeric literal does (§4.2.1). A use demands a type when the
+   binding is passed to a parameter, assigned to or from a typed place, or
+   returned, as one of those collections or a view of one; or when a
+   method is called that exactly one of those collections has (`push`
+   demands a `Vec`). The literal builds the demanded collection with the
+   demanded element type. A slice demand is met by a fixed array and
+   demands nothing. Uses that demand two different types are an error at
+   the second, naming both. With no demand, a non-empty literal is a fixed
+   array, and an empty literal is an error asking for its element type.
+   Demands are taken from the binding's own function only.
 2. The map form `[k: v, ...]` defaults to `HashMap[K, V]`. When the
    expected type is `BTreeMap[K, V]`, it builds that instead. `[:]`
    is the empty map and requires an expected map type.
