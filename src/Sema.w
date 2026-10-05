@@ -835,6 +835,9 @@ pub type Sema {
     // default type, so a demand names its field), and once with every
     // field at the type decided (field_decisions: per field, its type node,
     // the type, whether two were demanded, and the two with their uses).
+    // An assignment's store: its operands were all evaluated before it
+    // (#2099), so a view used only in them is not live across it.
+    store_follows_operands: i32,
     collect_field_demands: i32,
     inferred_field_nodes: Vec[i32],
     inferred_field_aliases: Vec[i32],
@@ -2993,6 +2996,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         untyped_const_decls: HashMap.new(),
         untyped_const_alt_decls: Vec.new(),
         untyped_const_uses: HashMap.new(),
+        store_follows_operands: 0,
         collect_field_demands: 0,
         inferred_field_nodes: Vec.new(),
         inferred_field_aliases: Vec.new(),

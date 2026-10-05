@@ -16409,7 +16409,7 @@ impl Sema:
             self.reject_mutation_through_view_binding(self.place_root_sym(base_expr), node)
 
             if lhs_kind != PlaceKind.PK_NotPlace and lhs_mut_state != PlaceMut.PM_ReadOnly:
-                self.check_mutation_against_views(base_expr, node)
+                self.check_store_against_views(base_expr, node)
 
             if expected_value_type != 0 and value_type != 0:
                 if self.value_aggregate_repr_differs(expected_value_type, value_type):
@@ -16507,7 +16507,7 @@ impl Sema:
 
         let mutation_packed = self.classify_place(target)
         if unpack_place_kind(mutation_packed) != PlaceKind.PK_NotPlace and unpack_place_mut(mutation_packed) != PlaceMut.PM_ReadOnly:
-            self.check_mutation_against_views(target, node)
+            self.check_store_against_views(target, node)
 
         // Check type compatibility
         if target_type != 0 and value_type != 0:
@@ -33001,12 +33001,24 @@ impl Sema:
         let loop_view = loop_body_depth != 0
         let gen_loop_view = loop_view and self.for_view_binding_is_gen_loop(ref_sym)
         var state = BORROW_LIVE
-        if last_use == 0 and not self.view_used_in(err_node, ref_sym):
+        if last_use == 0 and (self.store_follows_operands != 0 or not self.view_used_in(err_node, ref_sym)):
             if not loop_view:
                 state = BORROW_DEAD
             else if not gen_loop_view and self.loop_ends_after_current_stmt(loop_body_depth) != 0:
                 state = BORROW_DEAD_HERE
         SemaBorrowLiveness { state, last_use, loop_view, gen_loop_view }
+
+    // An assignment's store against the views of its place (#2099). The
+    // right-hand side and the target's own operands are evaluated before the
+    // store, and an owned demand materializes a Copy value where it is read
+    // (D22), so a view whose last use is inside the assignment is dead when
+    // the place is written: `let last = rocks[n]` then `rocks[0] = last` is
+    // `rocks[0] = rocks[n]` with a name.
+    mut fn check_store_against_views(place_node: i32, err_node: i32):
+        let saved: i32 = self.store_follows_operands
+        self.store_follows_operands = 1
+        self.check_mutation_against_views(place_node, err_node)
+        self.store_follows_operands = saved
 
     mut fn check_mutation_against_views(place_node: i32, err_node: i32):
         let place = self.borrow_root_place(place_node)
