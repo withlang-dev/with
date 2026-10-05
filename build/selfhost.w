@@ -4673,7 +4673,7 @@ fn bs_check_migrate_c_model(ctx: &ActionCtx, compiler_path: &str, case_dir: &str
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(sysroot, "usr/include/stdio.h"), "struct model_box { struct model_hidden *inner; int n; };\n", "the model's stdio.h")
     if rc != 0: return rc
-    rc = bs_write_fixture(ctx, src, "int model_mark(void) { return MODEL_MARK; }\n", "a unit that reads the model's macro")
+    rc = bs_write_fixture(ctx, src, "#include <string.h>\n#include <stdio.h>\nint model_mark(void) { return MODEL_MARK; }\n", "a unit that reads the model's macro")
     if rc != 0: return rc
     var args: Vec[str] = Vec.new()
     args |> push("migrate")
