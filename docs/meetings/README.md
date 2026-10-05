@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D90 — A migrated corpus names its libc constants; a constant and the function that consumes it come from one `std.libc` table](2026-10-04-D90-a-migrated-corpus-names-libc-constants.md)
 - [D89 — A field with a default may omit its type; an unsuffixed numeric default takes the type its uses in the module demand](2026-10-04-D89-a-field-s-type-from-its-default.md)
 - [D88 — A `const` of unsuffixed numeric literals has no numeric type of its own; each use types it](2026-10-04-D88-an-unsuffixed-const-has-no-numeric-type-of-its-own.md)
 - [D87 — An implicit fill observes the binding and never consumes it; `std.context` APIs take `implicit &Context`](2026-10-03-D87-an-implicit-fill-observes-and-never-consumes.md)
