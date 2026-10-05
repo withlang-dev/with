@@ -14397,6 +14397,19 @@ impl Sema:
                     return 1
         0
 
+    // The generic type a bare name in an annotation names (`Vec`, `Option`,
+    // a user `Pair`), or 0: a name with arguments, a non-generic type, or
+    // anything that is not a plain name.
+    fn bare_generic_annotation(type_node: i32) -> i32:
+        if type_node == 0 or self.ast.kind(type_node) != NodeKind.NK_TYPE_NAMED:
+            return 0
+        let base = self.canonical_symbol_by_text(self.ast.get_data0(type_node))
+        if base == self.syms.vec or base == self.syms.hashset or base == self.syms.btreeset or base == self.syms.hashmap or base == self.syms.btreemap:
+            return base
+        if self.type_decl_nodes.contains(base) and self.type_decl_tp_count(self.type_decl_nodes.get(base).unwrap()) > 0:
+            return base
+        0
+
     mut fn check_let_binding(node: i32) -> i32:
         let name = self.ast.get_data0(node)
         var bind_name = self.extract_decl_name_after(node, "let")
@@ -14417,9 +14430,20 @@ impl Sema:
         let ann_extra = self.local_let_type_ann_extra(flags)
         var ann_type: TypeId = 0 as TypeId
         var ann_type_node = 0
+        // #2144: an annotation naming a generic type without its arguments
+        // (`let xs: Vec = [1, 2, 3]`) names the type; the initializer decides
+        // the arguments. A collection literal builds that collection (§4.3c).
+        var bare_generic = 0
         if ann_extra >= 0:
             ann_type_node = self.ast.get_extra(ann_extra)
-            ann_type = self.resolve_type_expr(ann_type_node)
+            bare_generic = if value != 0: self.bare_generic_annotation(ann_type_node) else: 0
+            if bare_generic != 0:
+                let value_kind = self.ast.kind(value)
+                let sequence = bare_generic == self.syms.vec or bare_generic == self.syms.hashset or bare_generic == self.syms.btreeset
+                let keyed = bare_generic == self.syms.hashmap or bare_generic == self.syms.btreemap
+                if (value_kind == NodeKind.NK_ARRAY_LIT and sequence) or (value_kind == NodeKind.NK_MAP_LIT and keyed): self.collection_literal_hints.insert(value, bare_generic)
+            else:
+                ann_type = self.resolve_type_expr(ann_type_node)
 
         // var x: T (no initializer) — zero-initialized
         if value == 0:
@@ -14458,6 +14482,11 @@ impl Sema:
             self.reject_owned_demand_from_view_projection(value, ann_type as i32, "typed let binding")
         else if is_mut != 0:
             self.reject_owned_demand_from_view_projection(value, val_type as i32, "mutable binding")
+        if bare_generic != 0 and val_type != 0:
+            let value_ty = self.resolve_alias(val_type) as i32
+            let value_base = if self.get_type_kind(value_ty as TypeId) == TypeKind.TY_GENERIC_INST: self.canonical_symbol_by_text(self.get_generic_inst_base(value_ty)) else: 0
+            if value_base != bare_generic:
+                self.emit_error(f"type mismatch in binding: the annotation names `{self.pool_resolve(bare_generic)}` and the value is `{self.type_name(val_type as i32)}`", node)
         var bind_type: TypeId = val_type
         // #725 (§5.2/§2.4): an ephemeral binding whose initializer borrows a
         // statement TEMPORARY outlives its origin — the temp collection dies
