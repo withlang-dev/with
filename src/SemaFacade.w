@@ -990,7 +990,7 @@ impl Sema:
         if self.foreign_contract_index.contains(fn_sym):
             let prev: i32 = self.foreign_contract_index.get(fn_sym).unwrap()
             if self.foreign_contracts[prev].decl == decl:
-                self.emit_error(f"fn '{fname}' is described twice in this facade (§16.2b)", item)
+                self.emit_error_with_help(f"fn '{fname}' is described twice in this facade (§16.2b)", item, "to present one C function as two operations, give each item its own 'rename' (§16.2b.11)")
                 return
             // Another block describes it too. The same clauses restated are
             // the same facts — the runtime's files each carry a block naming

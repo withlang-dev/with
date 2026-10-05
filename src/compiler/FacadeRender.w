@@ -125,6 +125,20 @@ pub fn facade_render_block(pool: AstPool, intern: InternPool, facade: i32, ci: &
 // renames is left as written, and Sema refuses it.
 pub fn facade_render_presentation_prefix() -> str: "__with_presented_"
 
+// A diagnostic names such a declaration by the C function it declares:
+// `text` with every presentation's declaration name replaced by that
+// function's.
+pub fn facade_render_shown_names(text: &str) -> str:
+    let prefix = facade_render_presentation_prefix()
+    if not text.contains(prefix):
+        return text.clone()
+    let parts = text.split(prefix)
+    var out = parts[0].clone()
+    for i in 1..parts.len() as i32:
+        let at = parts[i].find("__of__")
+        out = out ++ (if at >= 0: parts[i].slice(at + 6, parts[i].len()) else: prefix ++ parts[i])
+    out
+
 pub fn facade_render_presentation_aliases(pool: AstPool, intern: InternPool, facade: i32, ci: &Vec[i32]) -> (str, Vec[i32]):
     var out = ""
     // Per declaration emitted, the index of the import's declaration it
@@ -993,8 +1007,18 @@ pub fn facade_render_all_items(pool: AstPool, kind: NodeKind) -> Vec[i32]:
         let extra_start = pool.get_data1(decl)
         for i in 0..pool.get_data2(decl):
             let item = pool.get_extra(extra_start + i)
-            if pool.kind(item as NodeId) == kind:
-                out.push(item)
+            if pool.kind(item as NodeId) != kind:
+                continue
+            // An fn item repeating an earlier one of its block is refused by
+            // Sema ("described twice"); it renders nothing, so the refusal
+            // is the only error. (A second presentation is not a repeat: it
+            // names its own declaration, facade_render_presentation_aliases.)
+            var repeat = false
+            if kind == NodeKind.NK_FACADE_FN:
+                for k in 0..i:
+                    let earlier = pool.get_extra(extra_start + k)
+                    if pool.kind(earlier as NodeId) == kind and pool.get_data0(earlier as NodeId) == pool.get_data0(item as NodeId): repeat = true
+            if not repeat: out.push(item)
     out
 
 fn facade_render_resource(pool: AstPool, intern: InternPool, ci: &Vec[i32], item: i32, methods: &str, plain_methods: &str, failed_methods: &str) -> str:

@@ -9,6 +9,7 @@ use render
 use std.string.StringBuilder
 use SemaTypes
 use SemaVector
+use compiler.FacadeRender
 
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_eprint(s: &str) -> Unit
@@ -211,14 +212,14 @@ impl Sema:
     mut fn emit_error(msg: &str, node: i32, origin_file: &str = __FILE__, origin_line: u32 = __LINE__, origin_fn: &str = __FN__):
         if self.suppress_errors != 0:
             return
-        var diag = Diagnostic.err(msg, self.diagnostic_node_span(node))
+        var diag = Diagnostic.err(facade_render_shown_names(msg), self.diagnostic_node_span(node))
         diag.set_origin(origin_file, origin_fn, origin_line as i32, node)
         self.diags.emit(move diag)
 
     mut fn emit_error_code(msg: &str, node: i32, code: &str, origin_file: &str = __FILE__, origin_line: u32 = __LINE__, origin_fn: &str = __FN__):
         if self.suppress_errors != 0:
             return
-        var diag = Diagnostic.err(msg, self.diagnostic_node_span(node))
+        var diag = Diagnostic.err(facade_render_shown_names(msg), self.diagnostic_node_span(node))
         diag.set_code(code)
         diag.set_origin(origin_file, origin_fn, origin_line as i32, node)
         self.diags.emit(move diag)
@@ -226,19 +227,19 @@ impl Sema:
     mut fn emit_error_with_help(msg: &str, node: i32, help: &str, origin_file: &str = __FILE__, origin_line: u32 = __LINE__, origin_fn: &str = __FN__):
         if self.suppress_errors != 0:
             return
-        var diag = Diagnostic.err(msg, self.diagnostic_node_span(node))
+        var diag = Diagnostic.err(facade_render_shown_names(msg), self.diagnostic_node_span(node))
         diag.set_origin(origin_file, origin_fn, origin_line as i32, node)
         if help.len() > 0:
             diag.add_help(help)
         self.diags.emit(move diag)
 
     mut fn emit_warning(msg: &str, node: i32, origin_file: &str = __FILE__, origin_line: u32 = __LINE__, origin_fn: &str = __FN__):
-        var diag = Diagnostic.warn(msg, self.diagnostic_node_span(node))
+        var diag = Diagnostic.warn(facade_render_shown_names(msg), self.diagnostic_node_span(node))
         diag.set_origin(origin_file, origin_fn, origin_line as i32, node)
         self.diags.emit(move diag)
 
     mut fn emit_warning_code(msg: &str, node: i32, code: &str, origin_file: &str = __FILE__, origin_line: u32 = __LINE__, origin_fn: &str = __FN__):
-        var diag = Diagnostic.warn(msg, self.diagnostic_node_span(node))
+        var diag = Diagnostic.warn(facade_render_shown_names(msg), self.diagnostic_node_span(node))
         diag.set_code(code)
         diag.set_origin(origin_file, origin_fn, origin_line as i32, node)
         self.diags.emit(move diag)
