@@ -1,3 +1,4 @@
+//! expect-debug-alloc: leak count=0
 //! expect-stdout: ABC
 // #2190: collect[String]() copies the bytes out of a staging Vec[u8] and
 // frees it.
