@@ -3010,6 +3010,13 @@ pub fn build(ctx: BuildCtx) -> Build:
     compiler_no_c_export = target_with_compiler_c_export_audit_inputs(move compiler_no_c_export, ctx)
     out = out.add_target(compiler_no_c_export)
 
+    // #2043 (D65): MirLower holds no name-text decision.
+    var mirlower_names = target_new(.Action, "mirlower-no-name-dispatch", "").output("out/.build-state/mirlower-no-name-dispatch.txt")
+    mirlower_names.action = run_check_mirlower_no_name_dispatch_action
+    mirlower_names = mirlower_names.write_scope("out/.build-state")
+    mirlower_names = mirlower_names.input("src/MirLower.w")
+    out = out.add_target(mirlower_names)
+
     // #1826: the SDK link probe on its own, for the canary lane. SDKROOT is
     // its env_input, so a new SDK re-runs it.
     var sdk_host_link_check = target_new(.Action, "sdk-host-link-check", "").output("out/.build-state/sdk-host-link-check.txt")
@@ -3279,6 +3286,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage1 = stage1.dep("compat-runtime-source")
     stage1 = stage1.dep("embedded-clang-resource-source")
     stage1 = stage1.dep("compiler-no-c-export")
+    stage1 = stage1.dep("mirlower-no-name-dispatch")
     stage1 = stage1.dep("prepare-bootstrap-link-root")
     stage1 = stage1.dep("with-sha256")
     // #1815: the seed links stage1 against the runtime it compiled and

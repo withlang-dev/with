@@ -1414,6 +1414,31 @@ pub fn run_check_compiler_no_new_c_export_action(ctx: ActionCtx) -> i32:
             return rc
     comp_write_ok_output(ctx)
 
+// D65 phase 5 (#2043): MirLower decides nothing from a name's spelling — a
+// callee, a lowering or a type's identity is Sema's record. A comparison
+// against a string literal in src/MirLower.w is such a decision; the count
+// was 178 before the conversion and is held at 0.
+fn comp_mirlower_name_compare_lines(text: &str) -> Vec[i32]:
+    let hits: Vec[i32] = Vec.new()
+    var line_no = 1
+    for line in text.split("\n"):
+        let t = line.trim()
+        if not t.starts_with("//"):
+            if t.contains("== \"") or t.contains("!= \"") or t.contains(".starts_with(\"") or t.contains(".ends_with(\"") or t.contains(".contains(\""):
+                hits.push(line_no)
+        line_no = line_no + 1
+    hits
+
+pub fn run_check_mirlower_no_name_dispatch_action(ctx: ActionCtx) -> i32:
+    let path = "src/MirLower.w"
+    let hits = comp_mirlower_name_compare_lines(ctx.fs().read_text(path))
+    for i in 0..hits.len() as i32:
+        ctx.diagnostics().error(f"{path}:{hits[i]}: MirLower compares a name against a string literal; read Sema's record instead (#2043, D65)")
+    if hits.len() > 0:
+        return 1
+    print(f"mirlower-no-name-dispatch: 0 name-text comparisons in {path}")
+    comp_write_ok_output(ctx)
+
 // ── std.libc surface (Eric, 2026-09-15) ─────────────────────────────────────
 // std.libc exports C-standard functions (the same name and meaning in
 // libSystem, glibc and the UCRT) and With functions over with_libc_* runtime

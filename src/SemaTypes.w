@@ -404,3 +404,64 @@ pub fn mir_len_method_intrinsic(base: MirIntrinsic, method_name: &str) -> MirInt
         if method_name == "len64": return MirIntrinsic.SLOTMAP_LEN64
         if method_name == "ulen32": return MirIntrinsic.SLOTMAP_ULEN32
     MirIntrinsic.NONE
+
+// D65 phase 5 (#2043): how a method call that is neither an ordinary call
+// nor a plain intrinsic lowers. Sema decides it from the receiver type and
+// the method it resolved (check_method_call_parts) and records it per call
+// and instance; MirLower switches on the record and never compares a method
+// or type name.
+pub enum MethodLowering: i32:
+    None = 0
+    PtrAsOption
+    ExplicitDrop
+    OptMap
+    OptAndThen
+    OptOrElse
+    OptFilter
+    OptInspect
+    OptCopied
+    OptCloned
+    OptZip
+    OptUnzip
+    OptFlatten
+    OptTranspose
+    ResMap
+    ResMapErr
+    ResContext
+    ResWithContext
+    ResAndThen
+    ResOrElse
+    ResInspect
+    ResInspectErr
+    ResOk
+    ResErr
+    ResTranspose
+    TaskJoinCleanup
+    VecSequence
+    VecTraverse
+    BTreeNew
+    UnwrapOr
+    UnwrapOrElse
+    // `is_empty()` on a receiver with a `len` intrinsic and no `is_empty`
+    // one (#1010); the call's intrinsic record is that `len`.
+    IsEmptyViaLen
+
+impl Copy for MethodLowering
+
+// D65 phase 5 (#2043): which std generic a type is, by Sema's identity for
+// the instance's declaration — never by a later stage reading its name.
+pub enum StdGeneric: i32:
+    None = 0
+    Vec
+    HashMap
+    HashSet
+    BTreeMap
+    BTreeSet
+    Option
+    Result
+    Sender
+    Receiver
+    Atomic
+    SlotMap
+
+impl Copy for StdGeneric
