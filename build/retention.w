@@ -529,17 +529,17 @@ pub fn ret_green_store_path() -> str:
     let dir = if explicit.len() > 0: explicit else: comp_home_dir_env() ++ "/.local/with-green"
     dir ++ "/green.tsv"
 
-/// An untracked path that is not a build input: a user's own program under
-/// examples/, or a document — `docs/` and top-level `*.md` are outside the
-/// identity, so an untracked one cannot dirty it. Mirrors
-/// GreenEvidence.green_untracked_is_not_input; the two must agree.
-fn ret_untracked_is_not_input(status_line: &str) -> bool:
-    if not status_line.starts_with("?? "): return false
+/// A `git status --porcelain` line that names no build input: a document
+/// (`docs/`, a top-level `*.md`) in any state, or a user's own untracked
+/// program under examples/. Mirrors
+/// GreenEvidence.green_status_is_not_input; the two must agree.
+fn ret_status_is_not_input(status_line: &str) -> bool:
+    if status_line.len() < 4 or status_line.contains(" -> "): return false
     let path = status_line.slice(3, status_line.len())
-    path.starts_with("examples/") or path.starts_with("docs/") or (path.ends_with(".md") and not path.contains("/"))
+    if path.starts_with("docs/") or (path.ends_with(".md") and not path.contains("/")): return true
+    status_line.starts_with("?? ") and path.starts_with("examples/")
 
-/// The tracked tree is as committed, and nothing untracked could be a build
-/// input.
+/// Every build input is as committed, and nothing untracked could be one.
 fn ret_worktree_is_clean(ctx: &ActionCtx) -> bool:
     let args: Vec[str] = Vec.new()
     args.push("git")
@@ -549,7 +549,7 @@ fn ret_worktree_is_clean(ctx: &ActionCtx) -> bool:
     for i in 0..lines.len() as i32:
         let line = lines[i]
         if line.len() == 0: continue
-        if ret_untracked_is_not_input(line): continue
+        if ret_status_is_not_input(line): continue
         return false
     true
 

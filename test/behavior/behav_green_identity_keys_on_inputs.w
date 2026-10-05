@@ -26,11 +26,13 @@ fn main:
     assert(green_identity_inputs(top_after_docs_edit) == inputs)
     // A change to a source tree does.
     assert(green_identity_inputs(top.replace("040000 tree 3333\tsrc", "040000 tree 7777\tsrc")) != inputs)
-    // The clean check applies the same rule to untracked paths: a document or
-    // a user's program cannot dirty a tree whose identity does not see it
-    // (an untracked docs/feature_plans/ draft refused main's reseed 2026-09-22).
-    for harmless in ["?? docs/feature_plans/with-ui.md", "?? examples/spiral/", "?? NOTES.md"]:
-        assert(green_untracked_is_not_input(harmless))
-    for input in ["?? src/New.w", "?? build/x.w", "?? lib/std/notes.md", " M src/Sema.w", "?? test/behavior/t.w"]:
-        assert(not green_untracked_is_not_input(input))
+    // The clean check applies the same rule to the worktree: a document in
+    // any state, or a user's untracked program, cannot dirty a tree whose
+    // identity does not see it (an untracked docs/feature_plans/ draft
+    // refused main's reseed 2026-09-22; a modified docs/handoff.md refused
+    // its install 2026-10-04).
+    for harmless in ["?? docs/feature_plans/with-ui.md", "?? examples/spiral/", "?? NOTES.md", " M docs/handoff.md", "M  README.md", " D docs/old.md"]:
+        assert(green_status_is_not_input(harmless))
+    for input in ["?? src/New.w", "?? build/x.w", "?? lib/std/notes.md", " M src/Sema.w", "?? test/behavior/t.w", " M examples/hello/main.w", "R  docs/a.md -> src/a.md"]:
+        assert(not green_status_is_not_input(input))
     print("ok")

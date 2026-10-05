@@ -60,16 +60,19 @@ fn green_inputs_identity(root: &str) -> str:
     hash_args.push(listing)
     green_first_line(green_git_output(root, &hash_args, "hash-object"))
 
-/// An untracked path that is not a build input: a user's own program under
-/// examples/, or a document — `docs/` and top-level `*.md` are outside the
-/// identity (green_identity_inputs), so an untracked one cannot dirty it.
-pub fn green_untracked_is_not_input(status_line: &str) -> bool:
-    if not status_line.starts_with("?? "): return false
+/// A `git status --porcelain` line that names no build input: a document —
+/// `docs/` and top-level `*.md` are outside the identity
+/// (green_identity_inputs), so one that is untracked, modified or deleted
+/// cannot dirty it (a modified docs/handoff.md refused main's install
+/// 2026-10-04) — or a user's own untracked program under examples/. A
+/// rename is judged an input: its line names two paths.
+pub fn green_status_is_not_input(status_line: &str) -> bool:
+    if status_line.len() < 4 or status_line.contains(" -> "): return false
     let path = status_line.slice(3, status_line.len())
-    path.starts_with("examples/") or path.starts_with("docs/") or (path.ends_with(".md") and not path.contains("/"))
+    if path.starts_with("docs/") or (path.ends_with(".md") and not path.contains("/")): return true
+    status_line.starts_with("?? ") and path.starts_with("examples/")
 
-// The tracked tree is as committed and nothing untracked could be a build
-// input.
+// Every build input is as committed, and nothing untracked could be one.
 fn green_worktree_is_clean(root: &str) -> bool:
     let args: Vec[str] = Vec.new()
     args.push("status")
@@ -77,7 +80,7 @@ fn green_worktree_is_clean(root: &str) -> bool:
     let status_lines = green_git_output(root, &args, "status").split("\n")
     for i in 0..status_lines.len() as i32:
         let line = status_lines[i]
-        if line.len() > 0 and not green_untracked_is_not_input(line): return false
+        if line.len() > 0 and not green_status_is_not_input(line): return false
     true
 
 /// The commit at which the sources under `root` were recorded green, or "":
