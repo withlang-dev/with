@@ -204,6 +204,15 @@ impl Sema:
         let suggestion = self.suggest_type_name(target_name, node)
         self.emit_error_with_suggestion(self.unknown_type_message(sym), node, suggestion)
 
+    // The 1-based line a node starts on, in its own source.
+    fn node_line(node: i32) -> i32:
+        let text = self.source_text_view_for_file_id(self.ast.file(node as NodeId) as i32)
+        let start = self.ast.get_start(node)
+        var line = 1
+        for i in 0..start:
+            if i < text.len() as i32 and text[i] == '\n': line += 1
+        line
+
     fn diagnostic_node_span(node: i32) -> Span:
         // A deferred judgment can run after another module's body. Each
         // parser node owns its source identity, independent of that context.

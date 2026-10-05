@@ -11087,11 +11087,16 @@ impl Sema:
             let state = self.scope_lookup_state(sym)
             if state == VarState.MOVED and sym != self.assign_target_revive_sym:
                 if sema_debug_move_enabled() != 0:
-                    let name = self.pool_resolve(sym)
+                    let name = self.pool_resolve(sym).clone()
                     with_eprint(
                         f"[moved-use] sym={name} tid={tid} node_kind={self.ast.kind(node)}"
                     )
-                self.emit_error_with_help("use of moved value", node, "a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move")
+                if self.discard_lets.contains(sym):
+                    let name = self.pool_resolve(sym).clone()
+                    let line = self.node_line(self.discard_lets.get(sym) ?? 0)
+                    self.emit_error_with_help("use of moved value", node, f"`let _ = {name}` dropped `{name}` at line {line}; remove it to keep `{name}`")
+                else:
+                    self.emit_error_with_help("use of moved value", node, "a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move")
             if sym != self.assign_target_revive_sym:
                 self.note_param_effect(sym, EFF_READ)
                 if is_local:
@@ -14725,16 +14730,17 @@ impl Sema:
             bind_type = ann_type
             self.check_binding_annotation(node, value, ann_type, val_type)
 
-        // Move semantics. #D5/P1: a wildcard `let _ = x` does NOT bind or move `x`
-        // (as in Rust) — `x` is untouched, so it must not be marked consumed. This
-        // keeps `let _ = param` a non-consuming acknowledgement: the param stays
-        // share-place (borrowed) instead of being forced to owned.
+        // Move semantics. §29.6 (D95): `_` binds nothing, so the value bound to
+        // it is dropped there: `let _ = x` moves a non-Copy `x` as any binding
+        // of it does, and MIR drops it at the statement.
         var field_view_let = 0
         // D73: `let t = (s = e)` binds the view the grouped assignment yields.
         var value_core = value
         while value_core != 0 and self.ast.kind(value_core) == NodeKind.NK_GROUPED:
             value_core = self.ast.get_data0(value_core)
-        if self.pool_resolve(name) != "_" and not self.view_projection_exprs.contains(value) and not self.view_projection_exprs.contains(value_core):
+        if self.pool_resolve(name) == "_" and self.ast.kind(value_core) == NodeKind.NK_IDENT:
+            self.discard_lets.insert(self.ast.get_data0(value_core), node)
+        if not self.view_projection_exprs.contains(value) and not self.view_projection_exprs.contains(value_core):
             // §2.4: a drop-body let of a self field CONSUMES (the 84ebff6d
             // observation rule contradicted the spec — spec_ss02_4 pins the
             // WFN order: consumed local drops before the remaining-field

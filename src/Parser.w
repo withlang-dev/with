@@ -3108,8 +3108,6 @@ impl Parser:
         if self.peek() == TokenKind.TK_COLON:
             self.advance()
             type_ann = self.parse_type_expr()
-        else if is_pub == Visibility.Public:
-            self.emit_error("public const declarations require an explicit type annotation")
 
         if self.expect(TokenKind.TK_EQ) == 0:
             return self.poisoned_expr()
@@ -3803,6 +3801,14 @@ impl Parser:
             self.pool.set_data1(rhs, pipeline as i32)
             self.pool.set_start(rhs, self.pool.get_start(lhs))
             return rhs
+        // §9.9 (D95): a stage is every operator above `|>`, so `xs |> sum() * 2`
+        // is `xs |> (sum() * 2)`. An arithmetic or bitwise result is never a
+        // stage; say where the parentheses go instead of an undefined `sum`.
+        if self.pool.kind(rhs) == NodeKind.NK_BINARY:
+            let span = Span { file: self.file_id, start: self.pool.get_start(rhs), end: self.pool.get_end(rhs) }
+            var diag = Diagnostic.err("a pipeline stage is one call, and this stage is an operator expression: `|>` binds looser than the operator after the stage (§9.9)", span)
+            diag.add_help("parenthesize the pipeline to apply the operator to its result: `(xs |> sum()) * 2`")
+            self.diags.emit(move diag)
         self.pool.add_node(NodeKind.NK_PIPELINE, self.pool.get_start(lhs), self.pool.get_end(rhs), lhs, rhs, 0)
 
     mut fn parse_precedence(min_prec: i32) -> NodeId:
@@ -3963,33 +3969,37 @@ impl Parser:
         if t == TokenKind.TK_GT: return 4 * 1000 + BinaryOp.OP_GT
         if t == TokenKind.TK_LT_EQ: return 4 * 1000 + BinaryOp.OP_LTE
         if t == TokenKind.TK_GT_EQ: return 4 * 1000 + BinaryOp.OP_GTE
+        // §9.9: `??` (6) binds below every operator that computes a value and
+        // above the comparisons and ranges (an index expression, level 6 and up,
+        // takes a default and no range); `|` < `^` < `&`
+        // as in C.
+        if t == TokenKind.TK_QUESTION_QUESTION: return 6 * 1000 + BinaryOp.OP_DEFAULT
         if t == TokenKind.TK_DOT_DOT: return 5 * 1000 + 502
         if t == TokenKind.TK_DOT_DOT_EQ: return 5 * 1000 + 503
-        if t == TokenKind.TK_PIPE_GT: return 6 * 1000 + 500
-        if t == TokenKind.TK_LT_PIPE: return 6 * 1000 + 501
-        if t == TokenKind.TK_LT_LT: return 10 * 1000 + BinaryOp.OP_SHL
-        if t == TokenKind.TK_GT_GT: return 10 * 1000 + BinaryOp.OP_SHR
-        if t == TokenKind.TK_AMPERSAND: return 7 * 1000 + BinaryOp.OP_BIT_AND
-        if t == TokenKind.TK_CARET: return 8 * 1000 + BinaryOp.OP_BIT_XOR
-        if t == TokenKind.TK_PIPE: return 9 * 1000 + BinaryOp.OP_BIT_OR
-        if t == TokenKind.TK_QUESTION_QUESTION: return 10 * 1000 + BinaryOp.OP_DEFAULT
-        if t == TokenKind.TK_PLUS: return 11 * 1000 + BinaryOp.OP_ADD
-        if t == TokenKind.TK_PLUS_PLUS: return 11 * 1000 + BinaryOp.OP_CONCAT
-        if t == TokenKind.TK_MINUS: return 11 * 1000 + BinaryOp.OP_SUB
-        if t == TokenKind.TK_PLUS_WRAP: return 11 * 1000 + BinaryOp.OP_ADD_WRAP
-        if t == TokenKind.TK_MINUS_WRAP: return 11 * 1000 + BinaryOp.OP_SUB_WRAP
-        if t == TokenKind.TK_PLUS_SAT: return 11 * 1000 + BinaryOp.OP_ADD_SAT
-        if t == TokenKind.TK_MINUS_SAT: return 11 * 1000 + BinaryOp.OP_SUB_SAT
-        if t == TokenKind.TK_STAR: return 12 * 1000 + BinaryOp.OP_MUL
-        if t == TokenKind.TK_SLASH: return 12 * 1000 + BinaryOp.OP_DIV
-        if t == TokenKind.TK_PERCENT: return 12 * 1000 + BinaryOp.OP_MOD
-        if t == TokenKind.TK_STAR_WRAP: return 12 * 1000 + BinaryOp.OP_MUL_WRAP
-        if t == TokenKind.TK_STAR_SAT: return 12 * 1000 + BinaryOp.OP_MUL_SAT
+        if t == TokenKind.TK_PIPE_GT: return 7 * 1000 + 500
+        if t == TokenKind.TK_LT_PIPE: return 7 * 1000 + 501
+        if t == TokenKind.TK_PIPE: return 8 * 1000 + BinaryOp.OP_BIT_OR
+        if t == TokenKind.TK_CARET: return 9 * 1000 + BinaryOp.OP_BIT_XOR
+        if t == TokenKind.TK_AMPERSAND: return 10 * 1000 + BinaryOp.OP_BIT_AND
+        if t == TokenKind.TK_LT_LT: return 11 * 1000 + BinaryOp.OP_SHL
+        if t == TokenKind.TK_GT_GT: return 11 * 1000 + BinaryOp.OP_SHR
+        if t == TokenKind.TK_PLUS: return 12 * 1000 + BinaryOp.OP_ADD
+        if t == TokenKind.TK_PLUS_PLUS: return 12 * 1000 + BinaryOp.OP_CONCAT
+        if t == TokenKind.TK_MINUS: return 12 * 1000 + BinaryOp.OP_SUB
+        if t == TokenKind.TK_PLUS_WRAP: return 12 * 1000 + BinaryOp.OP_ADD_WRAP
+        if t == TokenKind.TK_MINUS_WRAP: return 12 * 1000 + BinaryOp.OP_SUB_WRAP
+        if t == TokenKind.TK_PLUS_SAT: return 12 * 1000 + BinaryOp.OP_ADD_SAT
+        if t == TokenKind.TK_MINUS_SAT: return 12 * 1000 + BinaryOp.OP_SUB_SAT
+        if t == TokenKind.TK_STAR: return 13 * 1000 + BinaryOp.OP_MUL
+        if t == TokenKind.TK_SLASH: return 13 * 1000 + BinaryOp.OP_DIV
+        if t == TokenKind.TK_PERCENT: return 13 * 1000 + BinaryOp.OP_MOD
+        if t == TokenKind.TK_STAR_WRAP: return 13 * 1000 + BinaryOp.OP_MUL_WRAP
+        if t == TokenKind.TK_STAR_SAT: return 13 * 1000 + BinaryOp.OP_MUL_SAT
         // @ operator for matmul — distinguish from @[annotation] by checking next token
         if t == TokenKind.TK_AT:
             if self.pos + 1 < self.tokens.len():
                 if self.tokens.get_tag(self.pos + 1) != TokenKind.TK_L_BRACKET:
-                    return 12 * 1000 + BinaryOp.OP_MATMUL
+                    return 13 * 1000 + BinaryOp.OP_MATMUL
         0
 
     // ── Primary expression ──────────────────────────────────────────
@@ -6651,7 +6661,7 @@ impl Parser:
             // Prefix unsafe authorizes one unary/postfix raw-memory access chain.
             // Binary operators bind outside the unsafe marker, so
             // `unsafe *p + 1` parses as `(unsafe *p) + 1`.
-            body = self.parse_precedence(13)
+            body = self.parse_precedence(14)
         self.pool.add_node(NodeKind.NK_UNSAFE_BLOCK, start, self.prev_end(), body, unsafe_kind, UNSAFE_ORIGIN_EXPR)
 
     // Operand index for an asm {name} placeholder: position of `name_sym` in the

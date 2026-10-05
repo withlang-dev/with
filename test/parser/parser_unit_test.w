@@ -250,14 +250,35 @@ fn test_chained_sugar_precedence_and_associativity:
     assert(shl_pool.kind(shl_pool.get_data1(shl_body)) == NodeKind.NK_BINARY)
     assert(shl_pool.get_data0(shl_pool.get_data1(shl_body)) == BinaryOp.OP_SHL)
 
-    // ?? has higher precedence than pipeline.
+    // §9.9 (D95): ?? binds below the pipeline, so a default applies to the
+    // pipeline's result: `a ?? b |> c` is `a ?? (b |> c)`.
     let mixed_src = "fn p:\n    a ?? b |> c\n"
     let mixed_pool = parse_module(mixed_src)
-    let mixed_decl = mixed_pool.get_decl(0)
-    let mixed_body = mixed_pool.get_data1(mixed_decl)
-    assert(mixed_pool.kind(mixed_body) == NodeKind.NK_PIPELINE)
-    assert(mixed_pool.kind(mixed_pool.get_data0(mixed_body)) == NodeKind.NK_BINARY)
-    assert(mixed_pool.get_data0(mixed_pool.get_data0(mixed_body)) == BinaryOp.OP_DEFAULT)
+    let mixed_body = mixed_pool.get_data1(mixed_pool.get_decl(0))
+    assert(mixed_pool.kind(mixed_body) == NodeKind.NK_BINARY)
+    assert(mixed_pool.get_data0(mixed_body) == BinaryOp.OP_DEFAULT)
+    assert(mixed_pool.kind(mixed_pool.get_data2(mixed_body)) == NodeKind.NK_PIPELINE)
+
+    // ?? is right-associative: `a ?? b ?? c` is `a ?? (b ?? c)`.
+    let chain_pool = parse_module("fn p:\n    a ?? b ?? c\n")
+    let chain_body = chain_pool.get_data1(chain_pool.get_decl(0))
+    assert(chain_pool.get_data0(chain_body) == BinaryOp.OP_DEFAULT)
+    assert(chain_pool.kind(chain_pool.get_data1(chain_body)) == NodeKind.NK_IDENT)
+    assert(chain_pool.get_data0(chain_pool.get_data2(chain_body)) == BinaryOp.OP_DEFAULT)
+
+    // ?? binds above the comparisons: `a ?? 0 > 3` is `(a ?? 0) > 3`.
+    let cmp_pool = parse_module("fn p:\n    a ?? 0 > 3\n")
+    let cmp_body = cmp_pool.get_data1(cmp_pool.get_decl(0))
+    assert(cmp_pool.get_data0(cmp_body) == BinaryOp.OP_GT)
+    assert(cmp_pool.get_data0(cmp_pool.get_data1(cmp_body)) == BinaryOp.OP_DEFAULT)
+
+    // §9.9: `|` < `^` < `&`, as in C: `a | b & c` is `a | (b & c)`.
+    let bits_pool = parse_module("fn p:\n    a | b ^ c & d\n")
+    let bits_body = bits_pool.get_data1(bits_pool.get_decl(0))
+    assert(bits_pool.get_data0(bits_body) == BinaryOp.OP_BIT_OR)
+    let xor_node = bits_pool.get_data2(bits_body)
+    assert(bits_pool.get_data0(xor_node) == BinaryOp.OP_BIT_XOR)
+    assert(bits_pool.get_data0(bits_pool.get_data2(xor_node)) == BinaryOp.OP_BIT_AND)
 
 fn test_goto_and_statement_labels:
     let goto_pool = parse_module("fn f:\n    goto 'done\n")

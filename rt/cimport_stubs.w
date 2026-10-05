@@ -397,9 +397,6 @@ pub fn with_llvm_wasm_backend_missing() -> Unit:
     let _ = names
     empty_str()
 
-    let _ = h
-    empty_str()
-
 @[weak] pub fn with_cimport_macro_count(s: i64) -> i32:
     let _ = s
     0

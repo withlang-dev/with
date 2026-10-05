@@ -1328,6 +1328,9 @@ pub type Sema {
     bind_provenance: Vec[BindingProvenance],
     binding_decl_nodes: HashMap[i32, i32],
     binding_value_nodes: HashMap[i32, i32],
+    // §29.6 (D95): a binding a `let _ = x` dropped, and that `let`, for the
+    // help on a later use.
+    discard_lets: HashMap[i32, i32],
     scope_starts: Vec[i32],
     scope_name_map: HashMap[i32, i32],
     pending_generic_binding_base: HashMap[i32, i32],
@@ -3274,6 +3277,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         bind_provenance: Vec.new(),
         binding_decl_nodes: sema_new_map_i32_i32(),
         binding_value_nodes: sema_new_map_i32_i32(),
+        discard_lets: sema_new_map_i32_i32(),
         scope_starts: Vec.new(),
         scope_name_map: HashMap.new(),
         pending_generic_binding_base: sema_new_map_i32_i32(),

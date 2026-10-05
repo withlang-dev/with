@@ -184,17 +184,21 @@ let config: ServerConfig = parse(args)
 let MAX_RETRIES = 3
 
 // ✓ compile-time constant, inlined at every use
-const MAX_RETRIES: i32 = 3
+const MAX_RETRIES = 3
 ```
 
-`const` requires a type annotation and a compile-time evaluable
-expression. Use it for configuration values, sizes, sentinel values,
+`const` takes a compile-time evaluable expression, and its type from it, a
+`pub const` as much as a private one (§9.1b). A constant of unsuffixed
+numeric literals has no numeric type of its own: each use types it, so
+`BUFFER_SIZE` below is an `i32` where an `i32` is wanted and a `usize` where a
+`usize` is. Use `const` for configuration values, sizes, sentinel values,
 and any named value that never changes.
 
 ```
-const BUFFER_SIZE: i32 = 4096
-const DEFAULT_TIMEOUT: i64 = 30000
-const VERSION: str = "1.0.0"
+pub const BUFFER_SIZE = 64 * 1024
+const DEFAULT_TIMEOUT = 30000
+const VERSION = "1.0.0"
+pub const VENDOR = 0x28DEu16      // a suffix states a type the default would not
 ```
 
 ---
