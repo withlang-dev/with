@@ -2466,28 +2466,212 @@ fn build_timeout_or(timeout: i32, fallback: i32) -> i32:
         return timeout
     fallback
 
-// The twin of build/https_fetch.w's download: a fetch retries with a growing
-// pause, so one dropped connection does not fail a lane. Keep the two
-// downloads identical (that program also has a --probe mode, #2062).
+// The fetch program an action compiles and runs. With a connect timeout it
+// first opens and closes a TCP connection to the host and exits 3 when that
+// fails (a host that is down is not worth five download attempts); every
+// download attempt then gives up when the server says nothing for `idle_ms`.
+// A fetch retries with a growing pause, so one dropped connection does not
+// fail a lane. build/https_fetch.w is the build layer's own copy for drivers
+// whose std.http has no timeouts (#2062).
 fn build_https_fetch_source() -> str:
     "use std.http\n" ++
+    "use std.net\n" ++
     "use std.process\n" ++
     "use std.time\n\n" ++
     "let ATTEMPTS = 5\n\n" ++
+    "fn number(text: &str) -> i32:\n" ++
+    "    var value = 0\n" ++
+    "    for i in 0..text.len() as i32:\n" ++
+    "        if text[i] < '0' or text[i] > '9': return -1\n" ++
+    "        value = value * 10 + (text[i] - '0') as i32\n" ++
+    "    if text.len() == 0: -1 else: value\n\n" ++
+    "fn authority(url: &str) -> str:\n" ++
+    "    if not url.starts_with(\"https://\"): return \"\"\n" ++
+    "    let rest = url.slice(8, url.len())\n" ++
+    "    var end = rest.len() as i32\n" ++
+    "    for i in 0..rest.len() as i32:\n" ++
+    "        if rest[i] == '/' or rest[i] == '?' or rest[i] == '#':\n" ++
+    "            end = i\n" ++
+    "            break\n" ++
+    "    rest.slice(0, end)\n\n" ++
     "fn main -> i32:\n" ++
     "    let argv = args()\n" ++
     "    if argv.len() < 3:\n" ++
-    "        print(\"usage: https_fetch <url> <output>\")\n" ++
+    "        print(\"usage: https_fetch <url> <output> [<connect-ms> <idle-ms>]\")\n" ++
     "        return 2\n" ++
     "    let url = argv[1] ++ \"\"\n" ++
     "    let output = argv[2] ++ \"\"\n" ++
+    "    let connect_ms = if argv.len() >= 5: number(argv[3]) else: 0\n" ++
+    "    let idle_ms = if argv.len() >= 5: number(argv[4]) else: 0\n" ++
+    "    if connect_ms < 0 or idle_ms < 0:\n" ++
+    "        print(\"https_fetch: the timeouts are milliseconds\")\n" ++
+    "        return 2\n" ++
+    "    if connect_ms > 0:\n" ++
+    "        let host_port = authority(url)\n" ++
+    "        let colon = host_port.index_of(\":\")\n" ++
+    "        let host = if colon > 0: host_port.slice(0, colon) else: host_port ++ \"\"\n" ++
+    "        let port = if colon > 0: number(host_port.slice(colon + 1, host_port.len())) else: 443\n" ++
+    "        if host.len() == 0 or port <= 0:\n" ++
+    "            print(\"not an https URL: \" ++ url)\n" ++
+    "            return 2\n" ++
+    "        let fd = tcp_connect_timeout(host, port, connect_ms)\n" ++
+    "        if fd < 0:\n" ++
+    "            print(f\"no connection to {host}:{port} (waited at most {connect_ms / 1000} s)\")\n" ++
+    "            return 3\n" ++
+    "        let _ = socket_close(fd)\n" ++
     "    for attempt in 1..ATTEMPTS + 1:\n" ++
-    "        if https_download(url.clone(), output.clone()) == 0: return 0\n" ++
+    "        if https_download_timeout(url.clone(), output.clone(), connect_ms, idle_ms) == 0: return 0\n" ++
     "        if attempt < ATTEMPTS:\n" ++
     "            print(f\"HTTPS download failed (attempt {attempt} of {ATTEMPTS}), retrying: \" ++ url)\n" ++
     "            sleep_secs(2 * attempt)\n" ++
-    "    print(f\"HTTPS download failed after {ATTEMPTS} attempts: \" ++ url)\n" ++
+    "    if idle_ms > 0:\n" ++
+    "        print(f\"connected, but no complete response in {ATTEMPTS} attempts (each gives up after {idle_ms / 1000} s of silence)\")\n" ++
+    "    else:\n" ++
+    "        print(f\"HTTPS download failed after {ATTEMPTS} attempts: \" ++ url)\n" ++
     "    1\n"
+
+// ── Pinned source fetch and the machine-wide source cache (#2062) ──────
+// A source archive is named by its sha256, so where its bytes come from does
+// not matter: an ordered list of sources (https URLs, or a file in the
+// project), the first that delivers the pin wins, and the bytes are kept
+// machine-wide under <build cache>/sources/<sha256>. A worktree that needs
+// an archive this machine has fetched reads it from there, re-verified
+// against the pin, and touches no network.
+//
+// The cache is the runner's, not the action's: an action writes only its
+// declared outputs, and a host path it reads would become an input of its
+// cache record. This read is keyed by the digest alone (the `source` effect),
+// which the bytes are checked against on every use.
+
+/// How long a source's host has to accept a connection.
+pub const BUILD_FETCH_CONNECT_MS: i32 = 20000
+/// How long a connected source may say nothing.
+pub const BUILD_FETCH_IDLE_MS: i32 = 30000
+
+pub type FetchedSource {
+    /// 0 when `output` holds the pinned bytes.
+    rc: i32,
+    /// What each source did; on failure, the whole error.
+    report: str,
+    /// The bytes came from the machine's source cache: nothing was fetched.
+    from_cache: bool,
+}
+
+// $WITH_BUILD_CACHE_DIR/sources, as the build store resolves its directory
+// (src/BuildGraphCache.w build_cache_store_dir); "" when there is none.
+fn build_source_cache_dir() -> str:
+    let explicit = with_getenv_str("WITH_BUILD_CACHE_DIR")
+    if explicit == "none": return ""
+    if explicit.len() > 0: return explicit ++ "/sources"
+    let home = with_getenv_str("HOME")
+    if home.len() == 0: return ""
+    home ++ "/.local/with-build-cache/sources"
+
+fn build_fetch_is_sha256(text: &str) -> bool:
+    if text.len() != 64: return false
+    for i in 0..text.len() as i32:
+        let c = text[i]
+        if not ((c >= '0' and c <= '9') or (c >= 'a' and c <= 'f')): return false
+    true
+
+fn build_fetch_last_line(text: &str) -> str:
+    var last = ""
+    for line in text.split("\n"):
+        if line.len() > 0 and line != "\r": last = line ++ ""
+    last
+
+// Runs the fetch program on one https URL into `part`. "" when it wrote the
+// file, else why it did not.
+fn ActionCtx.fetch_url(self: &Self, cmd_dir: &str, url: &str, part: &str, download_ms: i32) -> str:
+    let fs = self.fs()
+    let helper = cmd_dir ++ "/https_fetch" ++ build_host_exe_suffix()
+    if not fs.exists(helper):
+        let ws = self.create_workspace(self.target_name() ++ "-https_fetch")
+        ws.add_string(cmd_dir ++ "/https_fetch.w", build_https_fetch_source())
+        var opts = ws.options()
+        opts.output_path = with_str_clone_ref(helper)
+        opts.debug_info = false
+        ws.set_options(opts)
+        let compiled = ws.compile()
+        if compiled.status != BuildStatus.ok or compiled.rc != 0:
+            return "could not compile the https_fetch helper"
+    let argv: Vec[str] = Vec.new()
+    argv.push(with_str_clone_ref(helper))
+    argv.push(with_str_clone_ref(url))
+    argv.push(with_str_clone_ref(part))
+    argv.push(f"{BUILD_FETCH_CONNECT_MS}")
+    argv.push(f"{BUILD_FETCH_IDLE_MS}")
+    let result = self.process_runner().run_capture(argv, cmd_dir ++ "/https_fetch.stdout", cmd_dir ++ "/https_fetch.stderr", download_ms)
+    if result.timed_out:
+        return f"no complete response within {download_ms / 1000} s"
+    if result.rc != 0:
+        let said = build_fetch_last_line(result.stdout ++ result.stderr)
+        return if said.len() > 0: said else: f"the download failed (exit {result.rc})"
+    ""
+
+/// Puts the archive whose sha256 is `sha256` at `output` (a declared output
+/// of this action). The machine's source cache is read first; otherwise each
+/// of `sources` (an https URL, or a file in the project) is tried in order
+/// under `download_ms`, and the first that delivers the pinned bytes is kept
+/// in the cache for every other worktree. An https source needs
+/// `target.allow_network()`; a cache hit does not.
+pub fn ActionCtx.fetch_source(self: &Self, sources: &Vec[str], sha256: &str, output: &str, download_ms: i32) -> FetchedSource:
+    let fs = self.fs()
+    let name = tool_process_basename(output)
+    if not build_fetch_is_sha256(sha256):
+        return FetchedSource { rc: 1, report: "a source archive is fetched by its pinned sha256 (64 lowercase hex digits); " ++ name ++ " has '" ++ sha256 ++ "'", from_cache: false }
+    fs.require_write_file_allowed(output)
+    let resolved = fs.resolve_path(output)
+    let out_dir = build_path_dirname(output)
+    if out_dir != "." and fs.mkdir_all(out_dir) != 0:
+        return FetchedSource { rc: 1, report: "could not create " ++ out_dir, from_cache: false }
+    tool_effect_record("source\tsha256=" ++ sha256)
+    let cache_dir = build_source_cache_dir()
+    let cached = if cache_dir.len() > 0: cache_dir ++ "/" ++ sha256 else: ""
+    if cached.len() > 0 and with_fs_file_exists(cached) != 0:
+        let bytes = with_fs_read_file(cached)
+        if tool_sha256_text(bytes) == sha256:
+            if with_fs_write_file(resolved, bytes) != 0:
+                return FetchedSource { rc: 1, report: "could not write " ++ output, from_cache: false }
+            return FetchedSource { rc: 0, report: "  " ++ cached ++ ": the machine's source cache\n", from_cache: true }
+        // Not the pinned bytes (a torn write, a disk fault): never served.
+        let _bad = with_fs_remove_file(cached)
+    if sources.len() == 0:
+        return FetchedSource { rc: 1, report: name ++ " (pinned sha256 " ++ sha256 ++ ") has no source to fetch it from", from_cache: false }
+    let cmd_dir = "out/command/" ++ self.target_name()
+    if fs.mkdir_all(cmd_dir) != 0:
+        return FetchedSource { rc: 1, report: "could not create " ++ cmd_dir, from_cache: false }
+    let part = output ++ ".part"
+    var tried = ""
+    for i in 0..sources.len() as i32:
+        let source = sources[i]
+        let _stale = fs.remove_file(part)
+        var why = ""
+        if source.starts_with("https://"):
+            why = self.fetch_url(cmd_dir, source, part, download_ms)
+        else if not fs.exists(source):
+            why = "no such file"
+        else if fs.copy_file(source, part) != 0:
+            why = "could not copy it"
+        if why.len() == 0:
+            let bytes = with_fs_read_file(fs.resolve_path(part))
+            let actual = tool_sha256_text(bytes)
+            if actual == sha256:
+                if fs.rename(part, output) != 0:
+                    return FetchedSource { rc: 1, report: "could not move " ++ part ++ " to " ++ output, from_cache: false }
+                // Kept for every other worktree; a cache that cannot be
+                // written costs the next one a fetch, nothing else.
+                if cached.len() > 0 and with_fs_mkdir_p(cache_dir) == 0:
+                    let tmp = cached ++ ".tmp"
+                    if with_fs_write_file(tmp, bytes) != 0 or with_fs_rename_file(tmp, cached) != 0:
+                        let _rm = with_fs_remove_file(tmp)
+                return FetchedSource { rc: 0, report: tried ++ "  " ++ source ++ ": fetched\n", from_cache: false }
+            why = "its sha256 is " ++ actual ++ ", not the pin"
+        let _bad = fs.remove_file(part)
+        tried = tried ++ "  " ++ source ++ ": " ++ why ++ "\n"
+    let count = sources.len() as i32
+    let plural = if count == 1: "its source" else: f"any of its {count} sources"
+    FetchedSource { rc: 1, report: "could not fetch " ++ name ++ " (pinned sha256 " ++ sha256 ++ ") from " ++ plural ++ ":\n" ++ tried, from_cache: false }
 
 fn build_zlib_gunzip_source() -> str:
     "use std.fs\n" ++
@@ -2535,7 +2719,6 @@ fn build_zlib_gunzip_source() -> str:
 
 fn build_download_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
-    let proc = ctx.process_runner()
     let args = ctx.args()
     let output_path = ctx.output()
     if args.len() < 2 or output_path.len() == 0:
@@ -2545,41 +2728,24 @@ fn build_download_action(ctx: ActionCtx) -> i32:
     let output_dir = build_path_dirname(output_path)
     if fs.mkdir_all(output_dir) != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": could not create directory: " ++ output_dir)
+    let download_ms = build_timeout_or(ctx.timeout(), 300000)
+    if sha256.len() > 0:
+        // Pinned: the machine's source cache first, then the URL (#2062).
+        let sources: Vec[str] = Vec.new()
+        sources.push(with_str_clone_ref(url))
+        let fetched = ctx.fetch_source(&sources, sha256, output_path, download_ms)
+        if fetched.rc != 0:
+            ctx.diagnostics().error(ctx.target_name() ++ ": " ++ fetched.report)
+        return 0
+    ctx.diagnostics().warn(ctx.target_name() ++ ": no sha256 checksum specified for download")
     let cmd_dir = "out/command/" ++ ctx.target_name()
     if fs.mkdir_all(cmd_dir) != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": could not create command directory: " ++ cmd_dir)
     let tmp_path = output_path ++ ".download.tmp"
-    let helper = cmd_dir ++ "/https_fetch" ++ build_host_exe_suffix()
-    let ws = ctx.create_workspace(ctx.target_name() ++ "-https_fetch")
-    ws.add_string(cmd_dir ++ "/https_fetch.w", build_https_fetch_source())
-    var opts = ws.options()
-    opts.output_path = with_str_clone_ref(helper)
-    opts.debug_info = false
-    ws.set_options(opts)
-    let compile_result = ws.compile()
-    if compile_result.status != BuildStatus.ok or compile_result.rc != 0:
-        ctx.diagnostics().error(ctx.target_name() ++ ": failed to compile https_fetch helper")
-    let fetch_args: Vec[str] = Vec.new()
-    fetch_args.push(helper)
-    fetch_args.push(with_str_clone_ref(url))
-    fetch_args.push(with_str_clone_ref(tmp_path))
-    let result = proc.run_capture(fetch_args, cmd_dir ++ "/https_fetch.stdout", cmd_dir ++ "/https_fetch.stderr", build_timeout_or(ctx.timeout(), 300000))
-    if result.rc != 0:
-        var detail = ""
-        if result.stderr.len() > 0:
-            detail = ": " ++ result.stderr
-        else if result.stdout.len() > 0:
-            detail = ": " ++ result.stdout
-        ctx.diagnostics().error(ctx.target_name() ++ ": HTTPS download failed for " ++ url ++ " (rc=" ++ f"{result.rc}" ++ ")" ++ detail)
-    if sha256.len() > 0:
-        let actual = fs.sha256_file(tmp_path)
-        if actual.len() == 0:
-            ctx.diagnostics().error(ctx.target_name() ++ ": could not hash downloaded file")
-        if actual != sha256:
-            let _ = fs.remove_file(tmp_path)
-            ctx.diagnostics().error(ctx.target_name() ++ ": sha256 mismatch: expected " ++ sha256 ++ " got " ++ actual)
-    else:
-        ctx.diagnostics().warn(ctx.target_name() ++ ": no sha256 checksum specified for download")
+    let why = ctx.fetch_url(cmd_dir, url, tmp_path, download_ms)
+    if why.len() > 0:
+        let _ = fs.remove_file(tmp_path)
+        ctx.diagnostics().error(ctx.target_name() ++ ": could not fetch " ++ url ++ ": " ++ why)
     if fs.rename(tmp_path, output_path) != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": could not publish: " ++ output_path)
     0

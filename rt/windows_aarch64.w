@@ -1503,6 +1503,7 @@ extern fn rt_libc_send(s: i64, buf: *const u8, len: i32, flags: i32) -> i32
 @[link_name("recv")]
 extern fn rt_libc_recv(s: i64, buf: *mut u8, len: i32, flags: i32) -> i32
 extern fn closesocket(s: i64) -> i32
+extern fn setsockopt(s: i64, level: i32, optname: i32, optval: *const u8, optlen: i32) -> i32
 extern fn getaddrinfo(node: *const u8, service: *const u8, hints: *const WindowsAddrInfo, res: *mut *mut WindowsAddrInfo) -> i32
 extern fn freeaddrinfo(res: *mut WindowsAddrInfo) -> Unit
 extern fn with_str_from_bytes(s: *const u8, len: i64) -> str
@@ -1609,7 +1610,23 @@ fn rt_net_fill_sockaddr_ipv4(host: &str, port: i32, sa: *mut u8) -> i32:
         j = j + 1
     0
 
-fn rt_net_connect_any(host: &str, port: i32, socktype: i32, protocol: i32) -> i32:
+// SO_RCVTIMEO and SO_SNDTIMEO (a DWORD of milliseconds): a send or receive
+// that makes no progress for `ms` fails instead of blocking; 0 clears both.
+// #2062.
+fn rt_net_apply_timeout(fd: i64, ms: i32) -> i32:
+    if ms < 0:
+        return -22
+    var value: i32 = ms
+    if setsockopt(fd, 65535, 4102, &value as *const i32 as *const u8, 4) != 0:
+        return -1
+    if setsockopt(fd, 65535, 4101, &value as *const i32 as *const u8, 4) != 0:
+        return -1
+    0
+
+// `timeout_ms` > 0 sets the socket's send/receive timeout before connecting.
+// Winsock's connect is not bounded by it: an unanswered connect ends at the
+// system's own limit (about 21 s).
+fn rt_net_connect_any(host: &str, port: i32, socktype: i32, protocol: i32, timeout_ms: i32) -> i32:
     if rt_net_wsa_ensure() != 0:
         return -1
     var sa: [16]u8 = [0 as u8; 16]
@@ -1617,6 +1634,8 @@ fn rt_net_connect_any(host: &str, port: i32, socktype: i32, protocol: i32) -> i3
         let fd = socket(2, socktype, protocol)
         if fd < 0:
             return -1
+        if timeout_ms > 0:
+            let _ = rt_net_apply_timeout(fd, timeout_ms)
         if connect(fd, &sa as *const [16]u8 as *const u8, 16) != 0:
             let _ = closesocket(fd)
             return -1
@@ -1646,6 +1665,8 @@ fn rt_net_connect_any(host: &str, port: i32, socktype: i32, protocol: i32) -> i3
     while p as i64 != 0:
         let fd = socket((unsafe *p).ai_family, (unsafe *p).ai_socktype, (unsafe *p).ai_protocol)
         if fd >= 0:
+            if timeout_ms > 0:
+                let _ = rt_net_apply_timeout(fd, timeout_ms)
             let rc = connect(fd, (unsafe *p).ai_addr as *const u8, (unsafe *p).ai_addrlen as i32)
             if rc == 0:
                 freeaddrinfo(res)
@@ -1656,10 +1677,16 @@ fn rt_net_connect_any(host: &str, port: i32, socktype: i32, protocol: i32) -> i3
     -1
 
 pub fn with_net_tcp_connect(host: &str, port: i32) -> i32:
-    rt_net_connect_any(host, port, 1, 6)
+    rt_net_connect_any(host, port, 1, 6, 0)
+
+pub fn with_net_tcp_connect_timeout(host: &str, port: i32, timeout_ms: i32) -> i32:
+    rt_net_connect_any(host, port, 1, 6, timeout_ms)
+
+pub fn with_net_set_timeout(sock: i32, timeout_ms: i32) -> i32:
+    rt_net_apply_timeout(sock as i64, timeout_ms)
 
 pub fn with_net_udp_connect(host: &str, port: i32) -> i32:
-    rt_net_connect_any(host, port, 2, 17)
+    rt_net_connect_any(host, port, 2, 17, 0)
 
 fn rt_net_bind_inaddr_any(fd: i64, port: i32) -> i32:
     var sa: [16]u8 = [0 as u8; 16]
@@ -1848,5 +1875,6 @@ c facade win32:
         preserves domain environ
         preserves domain locale
     fn closesocket
+    fn setsockopt
     fn getaddrinfo
     fn freeaddrinfo

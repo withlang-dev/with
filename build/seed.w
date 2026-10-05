@@ -3,6 +3,7 @@ module build.seed
 use std.build
 use std.process
 use build.compiler
+use build.source_fetch
 use std.io.print_str
 fn seed_owned_text(s: &str): s ++ ""
 
@@ -99,22 +100,13 @@ fn seed_compile_binary(ctx: &ActionCtx, workspace_name: &str, source_path: &str,
         return seed_fail(ctx, workspace_name ++ " did not produce " ++ output_path)
     0
 
+// One https fetch through build/source_fetch.w (#2062): a host that is down
+// is reported within SOURCE_FETCH_CONNECT_MS, and one that connects and says
+// nothing at `timeout_ms`, each naming the URL.
 fn seed_fetch_to_file(ctx: &ActionCtx, scratch_dir: &str, label: &str, url: &str, output_path: &str, timeout_ms: i32) -> i32:
-    let fs = ctx.fs()
-    let root = ctx.project_info().project_root()
-    let fetch_bin = seed_join(scratch_dir, "https_fetch")
-    if fs.mkdir_all(seed_dirname(fetch_bin)) != 0:
-        return seed_fail(ctx, "could not create HTTPS fetch helper directory")
-    var rc = seed_compile_binary(ctx, label ++ "-https-fetch-helper", "build/https_fetch.w", fetch_bin)
-    if rc != 0:
-        return rc
-    var fetch_args: Vec[str] = Vec.new()
-    fetch_args.push(seed_abs(root, fetch_bin))
-    fetch_args.push(seed_owned_text(url))
-    fetch_args.push(seed_abs(root, output_path))
-    let result = ctx.process_runner().run_capture(fetch_args, seed_abs(root, seed_join(scratch_dir, label ++ ".fetch.stdout")), seed_abs(root, seed_join(scratch_dir, label ++ ".fetch.stderr")), timeout_ms)
-    if result.rc != 0:
-        return seed_fail(ctx, f"HTTPS fetch helper failed with exit code {result.rc}: " ++ result.stdout ++ result.stderr)
+    let fetched = source_fetch_url(ctx, scratch_dir, label, url, output_path, SOURCE_FETCH_CONNECT_MS, timeout_ms)
+    if fetched.rc != 0:
+        return seed_fail(ctx, fetched.report)
     0
 
 fn seed_gunzip_to_tar(ctx: &ActionCtx, scratch_dir: &str, archive_path: &str, tar_path: &str) -> i32:

@@ -900,7 +900,7 @@ fn gate_fixed_targets() -> Vec[str]:
     // Built by push: the pinned seed evaluating build.w cannot take .len() of a
     // collection literal (the #1122 class).
     var fixed: Vec[str] = Vec.new()
-    for name in "build selfcheck reseed-check-build-w abi-hash-check unit-return-review spec-inventory-check sema-order-check examples-tests benchmarks-check c-migrator-basic-tests deep-debug-tool-tests user-programs-safe no-host-toolchain source-fetch-tests corpus-drift-check".split(" "): fixed.push(name.clone())
+    for name in "build selfcheck reseed-check-build-w abi-hash-check unit-return-review spec-inventory-check sema-order-check examples-tests benchmarks-check c-migrator-basic-tests deep-debug-tool-tests user-programs-safe no-host-toolchain source-fetch-tests source-cache-tests corpus-drift-check".split(" "): fixed.push(name.clone())
     fixed
 
 fn gate_times_ledger_path() -> str: "out/.build-state/battery-times.tsv"
@@ -3073,6 +3073,19 @@ pub fn build(ctx: BuildCtx) -> Build:
     source_fetch_tests = source_fetch_tests.allow_network()
     out = out.add_target(source_fetch_tests.timeout(300000))
 
+    // #2062: std.build's ActionCtx.fetch_source and the machine-wide source
+    // cache, driven by the fresh release compiler: a second worktree whose
+    // source is down is served from the cache and fetches nothing.
+    var source_cache_tests = target_new(.Action, "source-cache-tests", "").output("out/.build-state/source-cache-tests.txt")
+    source_cache_tests.action = run_source_cache_tests_action
+    source_cache_tests = source_cache_tests.input(release_compiler_bin("with"))
+    source_cache_tests = source_cache_tests.input("build/source_fetch.w")
+    source_cache_tests = source_cache_tests.dep("build")
+    source_cache_tests = source_cache_tests.write_scope("out/.build-state")
+    source_cache_tests = source_cache_tests.write_scope("out/command/source-cache-tests")
+    source_cache_tests = source_cache_tests.allow_network()
+    out = out.add_target(source_cache_tests.timeout(1500000))
+
     var libc_surface = target_new(.Action, "libc-surface-check", "").output("out/.build-state/libc-surface-check.txt")
     libc_surface.action = run_check_libc_surface_action
     libc_surface = libc_surface.write_scope("out/.build-state")
@@ -4439,6 +4452,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     battery_checks = battery_checks.dep("user-programs-safe")
     battery_checks = battery_checks.dep("no-host-toolchain")
     battery_checks = battery_checks.dep("source-fetch-tests")
+    battery_checks = battery_checks.dep("source-cache-tests")
     battery_checks = battery_checks.dep("last-green")
     out = out.add_target(battery_checks)
 
