@@ -67,8 +67,9 @@ the routes.
    function — `WITH_DUMP_LLIR_ON_INVALID=1` prints the module as it stands
    then, with every callee's and thunk's declaration; a
    multi-unit build keeps each `<obj>.u<k>.gen.bc` under
-   `WITH_KEEP_BITCODE=1` for `llvm-dis`. Or
-   `otool -tV bin | awk '/^_fn:/,/^_next:/'`. (There is no `--emit-llvm`.) Two
+   `WITH_KEEP_BITCODE=1` for `llvm-dis`. Or disassemble the one function:
+   `lldb --batch -o "disassemble -n Type.fn" -- bin`. (There is no
+   `--emit-llvm`.) Two
    unconditional drop calls after a `switch` merge, with no drop-flag test,
    is the whole diagnosis for the #729 class.
 7. **Confirm with the drop-state view** (`--dump-drop-plan`,
@@ -83,6 +84,12 @@ down to the seed that first set the bit. Then `matrix:name~<fn>` to see the
 first layer (AST, Sema, ABI, MIR, codegen) where the facts diverge. Never
 bisect by neutralizing code: the #691 escalation cascade was one misattributed
 seed, a one-query answer with provenance.
+
+For a wrong view-origin verdict (a use-after-free accepted, a valid view
+refused), `WITH_DEBUG_BORROWS=1 with check repro.w` prints every view
+binding with its dependency count and the borrow table at each read and
+mutation check: a binding whose dependency is itself, or a local where a
+parameter was expected, names the lost origin in one run (#2187).
 
 ### A `with build :fixpoint` failure
 
@@ -118,9 +125,11 @@ An internal `BUG:` line, a SIGTRAP (exit 133), or exit 134 is a compiler
 defect regardless of what the input did. Reduce it (`with reduce --exit-code
 nonzero -- with check {file}`), then lldb on the compiler: LLVM frames in the
 backtrace mean invalid IR construction, pure With frames mean a With-side
-abort (#653's `switch undef` class). File it with the reduced input; `map[k]`
-on a HashMap aborting in `validate_generic_call_contracts` (#1012) is the
-current example.
+abort (#653's `switch undef` class). File it with the reduced input. A
+`BUG:` about a generic instance (`generic-inst payload miss`, a field cache
+miss after freeze) is a type created or reflected in the wrong phase:
+`WITH_TRACE_INST=1` prints every instance as it is added and as the eager
+pass preregisters it, so the missing step shows (#2188).
 
 ## Integrated Compiler Analysis
 
@@ -364,6 +373,13 @@ recursively until a direct seed is reached.
 ./out/stage/bin/with-stage2 analyze src/main.w 'explain:effect:Zcu.clear_stage_outputs:self'
 ```
 
+An `escape_view` line reads `origins=[…] through=[…]`, parameter indices
+both: `origins` are the parameters the returned view may come from, and
+`through` the subset whose result views only what that parameter views,
+never the parameter's own storage. A parameter in `origins` and not in
+`through` is one the result points into, so the caller's argument must
+outlive the result.
+
 Provenance is recorded at first-set during body checking and the effect
 fixpoint; the chain names each hop's source location. Use this instead of
 neutralize-bisection when a receiver demands a stronger mode than expected —
@@ -432,10 +448,12 @@ stack garbage, the #729 class).
 - `--dump-drop-state` prints every block's in/out state.
 - `--dump-drop-plan` prints each MIR drop site with the state before it and
   an `action` (`drop`, `drop-conditional`, `skip`). **Read `action` as the
-  analysis's verdict, not as what codegen does**: drop flags are retired and
-  codegen emits every `drop` statement, so a `skip` on an `Uninit` place is
-  a drop of garbage at runtime. Making that a hard `check` error rather than
-  an opt-in validator is the intended end state.
+  analysis's verdict, not as what codegen does**: there are no runtime drop
+  flags (a conditional move resets its place to the empty value, §2.5.2, or
+  clears its hidden liveness byte, D72), and codegen emits every `drop`
+  statement, so a `skip` on an `Uninit` place is a drop of garbage at
+  runtime. Making that a hard `check` error rather than an opt-in validator
+  is the intended end state.
 - `--trace-ownership <fn:place>` prints the before/after state at every
   statement or terminator that touches the place (empty place: all places).
 - `--trace-cleanup-edge <fn:from->to>` prints the state across one CFG edge.
@@ -444,8 +462,11 @@ stack garbage, the #729 class).
   reports the first error; `--validate-all` runs every MIR validator.
 - `--dump-place-map` lists each MIR place with base local, type id, and
   projection list, for when `_N.fK` does not mean what the source seemed
-  to say. `--dump-drop-flags` reports runtime drop flags; today it prints
-  `<no drop flags>` for every module.
+  to say.
+- `--dump-drop-flags` is gone: it dumped the runtime drop flags, and those
+  were removed with the rest of the M7 drop-flag machinery (63e351af6,
+  2026-06-30) once the niche reset handled every conditional move. The
+  drop-state and drop-plan views above are what it pointed at.
 
 These show what MIR believes. They now believe the right thing about joins,
 but still use `lldb` on the lowering or codegen branch to prove *why* a
@@ -502,11 +523,12 @@ Hard-won specifics for `lldb --batch` against `-O1 -g` With binaries:
   (line-table skew); LLVM C API symbols (`LLVMAddFunction`,
   `LLVMTargetMachineEmitToFile`, `LLVMBuildAlloca`) are reliable anchors with
   ABI-stable argument registers.
-- Our DWARF has no variable info (`frame variable` fails with "no variable
-  information"); read entry-register args at non-inlined symbol entries, and
-  treat `[inlined]` frame line attributions as unreliable. Fixing variable
-  info would strengthen every recipe on this page more than a new query
-  verb would.
+- Parameters have variable info: at a breakpoint `frame variable` prints
+  them (`(int) node = 494`). `self` and locals the optimizer kept in
+  registers read `<unavailable>`; read those from the entry registers at a
+  non-inlined symbol entry, and treat `[inlined]` frame line attributions as
+  unreliable. A regex breakpoint (`breakpoint set -r record_pattern_view`)
+  finds a method without spelling its owner.
 - `register read` transcribes inside breakpoint command lists;
   `memory read` with a `$reg` address does not — do memory dumps at the
   final stop from the `-o` command stream instead.
@@ -657,15 +679,109 @@ Runtime code can mark an allocation as an intentional root with
 fixtures can set `//! debug-alloc-filter: non-root` to assert the non-root leak
 view instead of raw process-lifetime noise.
 
-`tools/debug_drop_sites.lldb` (breakpoints on every alloc/free with a
-backtrace) is retired in favor of the reporter breakpoint and the
-watchpoint: it did not finish within five minutes on a four-test fixture.
+The tools around the allocator:
+
+- `tools/debug_drop.w` drives it: `debug_drop run <with> <repro.w>` prints
+  the verdict lines; `debug_drop check <with> <fixture.w>…` asserts each
+  fixture's `//! expect-debug-alloc:` and `//! expect-stdout:` lines (the
+  `:debug-alloc-tests` lane). Build it with
+  `out/release/bin/with build tools/debug_drop.w -o out/debug-alloc-tests/debug_drop`.
+- `tools/debug_drop_sites.lldb` resolves the sites: breakpoints on the trap
+  checks (`dbg_trap_free_check`, `dbg_trap_alloc_check`) and on the
+  double-free reporter, each with a backtrace, used with
+  `WITH_DEBUG_ALLOC_TRAP_FREE=<addr>`. It finishes in seconds. (Its first
+  version broke on every alloc and free and never finished; that version is
+  gone, the file is not.)
+- `tools/debug_drop_fields.lldb` breaks on the struct field-drop recursion
+  and both drop paths with hit counts while the compiler *builds* a leaky
+  repro (#606, an inline-drop field skipped).
+
+The allocator's own switches, all read by the runtime of the program under
+test (details in `debug-allocator.md`):
+
+| Switch | What it does |
+|---|---|
+| `WITH_DEBUG_ALLOC=1` | the ledger: double free, invalid free, leaks at exit |
+| `WITH_DEBUG_ALLOC_FILTER=all\|non-root\|roots` | which leaks the report lists |
+| `WITH_DEBUG_ALLOC_SCRIBBLE=1` | poison freed payloads: a use-after-free crashes at the read (off by default: it turns a double drop into a crash before the ledger reports it) |
+| `WITH_DEBUG_ALLOC_TRACE=1` | every allocation request, freed or not (`with run --trace-alloc` sets it for the child) |
+| `WITH_ALLOC_NO_REUSE=1` | never hand out a freed address again |
+| `WITH_ALLOC_ZERO_CLASS=1` | zero a recycled block's whole size class: a failure that vanishes here but not under no-reuse read a block's stale tail |
+| `WITH_ALLOC_SYSTEM=1` | allocate through the system malloc, so tools that walk malloc zones (`leaks`, `MallocScribble`) see the heap; the payload-start check stands down |
+| `WITH_DEBUG_ALLOC_TRAP_FREE=<addr>` | print every alloc and free of one payload address, with drop origins |
+| `WITH_DEBUG_ALLOC_TRAP_FREE_HIT=<n>` / `WITH_DEBUG_ALLOC_TRAP_ALLOC_HIT=<n>` | panic on the n-th free / alloc of that address |
+| `WITH_MEMORY_LIMIT_BYTES=<n>` | a committed-memory ceiling: a runaway allocation fails loudly |
+
+## Trace and Dump Switches
+
+The compiler's own traces, by layer. Each prints to stderr and changes
+nothing it observes. A trace is a characterization, not proof (AGENTS.md):
+use one to pick the breakpoint, then confirm in lldb or with a validator.
+
+CLI dumps (`with check <file> <flag>`):
+
+| Flag | Prints |
+|---|---|
+| `--dump-tokens`, `--dump-ast`, `--dump-resolved`, `--dump-typed` | the lexer's tokens, the AST, resolution, and Sema's types per node |
+| `--dump-mir`, `--dump-async-mir` | the lowered MIR bodies (synchronous, and after the async transform) |
+| `--dump-place-map`, `--dump-drop-state`, `--dump-drop-plan`, `--dump-abi` | see the drop-state view and `--dump-abi` above |
+| `--trace-place`, `--explain-mir-origin`, `--trace-ownership`, `--trace-cleanup-edge` | one place's history, where a MIR local came from, its ownership states, one CFG edge |
+| `--validate-ownership`, `--validate-all` | the MIR validators |
+| `--dump-project-info` | the project the compilation resolved for the file |
+| `--sema-body-order-reverse` | check bodies last to first (see Declaration-Order Independence) |
+
+`with build --explain <target>` prints a build target as the graph holds
+it: its kind, entry, output, dependencies and inputs. `with uat --keep` keeps an acceptance scenario's work directory.
+
+Environment switches (set on the compiler's run unless noted):
+
+| Switch | Layer | Prints |
+|---|---|---|
+| `WITH_PROFILE=1` | frontend, Sema | one `[profile]` line per phase with its time |
+| `WITH_DEBUG_STAGE1_TRACE=1` | Sema | each unknown type name with what lookup saw |
+| `WITH_TRACE_INST=1` | Sema | every generic instance added, and the eager pass's preregistration |
+| `WITH_DEBUG_BORROWS=1` | Sema | each view binding's dependencies and the borrow table at every read and mutation check |
+| `WITH_DEBUG_MOVE=1` | Sema | move state per binding (`[state]`) and non-Copy classifications |
+| `WITH_D32_DEBUG=1` | Sema | the D32 implicit-field-move arm and the field type it saw |
+| `WITH_DEBUG_DEREF=1` | Sema | the auto-deref steps recorded for an expression |
+| `WITH_DEBUG_SUBST=1` | Sema | value-ref ABI decisions per parameter of a specialization |
+| `WITH_DEBUG_BOXSYM=1` | Sema | whether a type symbol is `std.box`'s `Box`, and why |
+| `WITH_SEMA_BODY_ORDER=reverse` | Sema | same as `--sema-body-order-reverse` |
+| `WITH_TRACE_COMPTIME=1`, `WITH_TRACE_TLL=1` | comptime | method calls the evaluator carries back to a receiver; top-level lets it evaluates |
+| `WITH_DUMP_FACADE=1` | frontend | each rendered `c facade` text, as the parser sees it (`<facade NAME>:line:col` points into it) |
+| `WITH_TRACE_SCOPES=1`, `WITH_TRACE_RESETS=1` | MIR | drop-scope pushes and pops; every move operand created |
+| `WITH_DEBUG_BOXWALK=1` | MIR | the auto-deref walk through boxes to a field |
+| `WITH_DUMP_PAIR_FLOW=1` | MIR | the foreign callback-pair analysis and its findings |
+| `WITH_MIR_AUDIT=1` | MIR, codegen | `[mir-lower-fail] kind=<node kind> fn=… span=…`: which node a failed lowering could not lower |
+| `WITH_DEBUG_MIR_CODEGEN=1` | codegen | which body codegen takes from MIR, and each function symbol it resolves |
+| `WITH_DUMP_INIT_MIR=1` | codegen | codegen-synthesized bodies (module initializers), which `--dump-mir` never sees |
+| `WITH_DUMP_MIR_CLEANUP_FN=<fn>\|*` | codegen | one body's MIR after cleanup, before LLVM |
+| `WITH_DUMP_LLIR_PRE=1`, `WITH_DUMP_LLIR_POST=1`, `WITH_DUMP_LLIR_ON_INVALID=1`, `WITH_KEEP_BITCODE=1` | codegen | the LLVM module (see the drop route above) |
+| `WITH_DEBUG_CALL_COERCE=1` | codegen | a call argument whose value did not match the parameter type |
+| `WITH_DEBUG_LOCAL_FLOW=1` | codegen | each local bound to its stack slot |
+| `WITH_DEBUG_METHOD_DISPATCH=1` | codegen | the receiver of a method call that failed to dispatch |
+| `WITH_DEBUG_DTM=1` | codegen | each trait-method thunk as it is built |
+| `WITH_DEBUG_TYPE_LAYOUT=1` | codegen | each struct field's resolved type as the layout is built |
+| `WITH_DEBUG_POOL_FLOW=1` | codegen | the AST and symbol pool sizes handed to the backend |
+| `WITH_TRACE_CMP=1` | codegen | each integer `==`/`!=` with its operand types and signedness |
+| `WITH_TRACE_VECDROP=1` | codegen | each Vec drop and whether its elements need dropping |
+| `WITH_TRACE_CARGS=1` | C backend | each extern call's signature and argument count |
+| `WITH_ANALYZE_TRACE=pool-views` | analyze | `audit:pool-views`'s per-body walk |
+| `WITH_TRACE_GRAPH=1` | build | the build graph as it materializes |
+| `WITH_MIGRATE_TRACE_PORT=1`, `WITH_MIGRATE_RAW_STATS=1`, `WITH_MIGRATE_TRACE_LIBC_CONSTANTS=1` | migrator | each ported declaration; raw-pointer statistics; each libc constant candidate and its value |
+
+`WITH_DEBUG_FALLBACK=1` prints a warning where codegen hits an invalid MIR
+id and emits `undef`. That a switch decides whether this is reported at all
+is a defect (#2199): the failure must always be loud.
 
 ## Verification Targets
 
 ```sh
 with build :deep-debug-tool-tests
 with build :debug-alloc-tests
+with build :drop-audit
+with build :move-audit
+with build :sema-order-check
 with build :fixpoint-diff
 ```
 

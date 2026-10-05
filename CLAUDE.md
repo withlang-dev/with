@@ -882,7 +882,7 @@ bugs:
 ./out/stage/bin/with-stage2 check repro.w --dump-place-map
 ./out/stage/bin/with-stage2 check repro.w --dump-abi
 ./out/stage/bin/with-stage2 check repro.w --trace-cleanup-edge 'main:bb0->bb1'
-./out/stage/bin/with-stage2 check repro.w --dump-drop-flags
+./out/stage/bin/with-stage2 check repro.w --dump-drop-state
 ./out/stage/bin/with-stage2 check repro.w --validate-all
 ./out/stage/bin/with-stage2 check repro.w --validate-ownership
 with build :fixpoint-diff
