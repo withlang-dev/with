@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.23
+# The With Programming Language — Specification v7.24
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,15 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.24:** five rulings, 2026-10-05 (D95). §29.6: `_` binds
+nothing, so `let _ = x` moves a non-`Copy` `x` and drops it there (#2074).
+§9.1b: a `pub const` may omit its type as a private one may; §4.2.1: a use
+the value does not fit is an error at that use (#2101). §9.9: `??` has its
+own level between the comparisons and `|>`, right-associative (#2142).
+§11.8: a tuple, a fixed array, `Option` and `Result` implement `Clone`, `Eq`,
+`Ord`, `Hash` and `Debug` when every element type does; a clone that panics
+partway drops what it cloned (#2161). The implementation is NON-COMPLIANT
+until it catches up.
 **Changelog v7.23:** a collection literal's binding, 2026-10-05 (D93).
 §4.3c rule 1: an annotation may name the collection without its arguments
 (`let w: Vec = [1, 2, 3]`); a binding with no annotation takes its type

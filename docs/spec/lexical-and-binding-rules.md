@@ -104,6 +104,8 @@ and never starts a label or character literal.
 
 `_` is an explicit discard binding. It is legal in binding positions (for example `let _ = expr`, parameter bindings, pattern bindings) and does not introduce a usable name.
 
+`_` binds nothing, so a value bound to it is dropped where it is bound. A `let _ = x` that names a non-`Copy` value moves it, as naming one does everywhere, and drops it at that statement: a later use of `x` is a use of a moved value. `let _ = x` is the visible way to say "drop this now".
+
 ### 29.7 String escape parity
 
 String processing supports:

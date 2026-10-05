@@ -593,6 +593,12 @@ For explicit control, list traits individually. `@[derive(Eq, Hash)]`
 will produce a compile error if a field doesn't implement `Eq` or
 `Hash`.
 
+**Structural types.** A tuple, a fixed array `[T; N]`, `Option[T]` and
+`Result[T, E]` implement `Clone`, `Eq`, `Ord`, `Hash` and `Debug` when every
+element type does, with the behavior `@[derive]` gives a declared type of the
+same shape: element by element, in order. A clone that panics partway
+through drops the elements already cloned.
+
 `@[derive(...)]` is implemented via comptime (§17.3). User-defined
 derive targets (e.g., `@[derive(Serialize)]`) are supported through
 comptime functions.

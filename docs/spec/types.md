@@ -108,7 +108,9 @@ and other such constants, has no numeric type of its own. Each use of it is
 typed as its initializer would be if written at that use: by the context of
 the use, and by the defaults only where the use gives none. A `const` with a
 declared type, or whose initializer has a suffixed literal or any other typed
-operand, has that type at every use.
+operand, has that type at every use. A use whose type cannot hold the value is
+an error at that use, never at the declaration: `const BIG = 5_000_000_000`
+used as an `i32` is refused where it is so used.
 
 ```
 const STEP = 1.0 / 120.0

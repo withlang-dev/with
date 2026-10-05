@@ -166,15 +166,16 @@ ERRDEFER_STMT := 'errdefer' BODY
 | 2 | `and` | Left |
 | 3 | `==`, `!=`, `in`, `not in`, `=~`, `!~` | Non-associative |
 | 4 | `<`, `>`, `<=`, `>=` | Chained |
-| 5 | `\|>` (pipeline) | Left |
-| 6 | `\|` | Left |
-| 7 | `^` | Left |
-| 8 | `&` | Left |
-| 9 | `<<`, `>>` | Left |
-| 10 | `+`, `-`, `++`, `??` | Left |
-| 11 | `*`, `/`, `%`, `@` | Left |
-| 12 | Unary prefix (`not`, `-`, `~`, `&`, `&raw mut`) | — |
-| 13 | Postfix (`.await`, `?`, `.field`, `[i]`, `()`) | Left |
+| 5 | `??` (default) | Right |
+| 6 | `\|>` (pipeline) | Left |
+| 7 | `\|` | Left |
+| 8 | `^` | Left |
+| 9 | `&` | Left |
+| 10 | `<<`, `>>` | Left |
+| 11 | `+`, `-`, `++` | Left |
+| 12 | `*`, `/`, `%`, `@` | Left |
+| 13 | Unary prefix (`not`, `-`, `~`, `&`, `&raw mut`) | — |
+| 14 | Postfix (`.await`, `?`, `.field`, `[i]`, `()`) | Left |
 
 **Comprehensions** (§13.6):
 

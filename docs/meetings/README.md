@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D95 — Five rulings: `let _` drops, `pub const` takes its value's type, `??` binds below `|>`, structural types derive, the SQLite fixture](2026-10-05-D95-five-rulings-discard-pub-const-default-precedence-structural-traits.md)
 - [D94 — A corpus is migrated against every target's C, and the results are merged per declaration](2026-10-05-D94-a-corpus-is-migrated-against-every-target-and-merged.md)
 - [D93 — A collection literal's binding takes its type from its uses](2026-10-05-D93-a-collection-literals-binding-takes-its-type-from-its-uses.md)
 - [D92 — Modeled-C Amendment 3: `ok` on a status-returning operation, the failure's text, two presentations of one function](2026-10-04-D92-modeled-c-amendment-3-status-on-operations-the-failure-s-text-two-presentations.md)
