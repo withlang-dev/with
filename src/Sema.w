@@ -848,6 +848,19 @@ pub type Sema {
     field_demand_types: Vec[i32],
     field_demand_uses: Vec[i32],
     field_decisions: Vec[i32],
+    // D93 (§4.3c rule 1): a binding with no annotation whose initializer is
+    // an element-form literal takes its type from its uses. The check hears
+    // them (literal_demands: per demand, the `let`, the demanded type, the
+    // use); a program with a demand is checked again with every such
+    // binding at the type decided (literal_decisions: per binding, the
+    // `let`, its type, a second demanded type or 0, the two uses).
+    literal_demands: Vec[i32],
+    // Every literal binding checked so far, as (function signature, name,
+    // `let`) triples: a return is judged after the body's scopes have
+    // closed, and a generic callee's body is checked in the middle of its
+    // caller's.
+    fn_literal_lets: Vec[i32],
+    literal_decisions: Vec[i32],
     // move-sites: last use per (root, first-field) path — the liveness key for
     // FIELD-shaped transfer args, so `eat(move self.r)` followed by `self.tag`
     // reads verdicts on the `.r` path, not the whole receiver. Key packs
@@ -3015,6 +3028,9 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         field_demand_types: Vec.new(),
         field_demand_uses: Vec.new(),
         field_decisions: Vec.new(),
+        literal_demands: Vec.new(),
+        fn_literal_lets: Vec.new(),
+        literal_decisions: Vec.new(),
         field_last_use: HashMap.new(),
         effect_prov: HashMap.new(),
         effect_note_origin_node: 0,

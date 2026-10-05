@@ -4515,7 +4515,7 @@ impl Sema:
                             if self.types_compatible(ok_type, body_ty) != 0 or self.arithmetic_result_type(ok_type, body_ty) != 0:
                                 ok_wrapped = true
                     if not ok_wrapped:
-                        self.emit_return_mismatch("return type mismatch", body)
+                        self.emit_return_mismatch("return type mismatch", body, body_expected_ret as i32)
 
         // @[tailrec] enforcement: verify all recursive calls are in tail position
         if (flags / FnFlags.TAILREC) % 2 == 1:
@@ -8965,6 +8965,8 @@ impl Sema:
                 if self.expr_mutates_any_current_binding(node) != 0:
                     return 1
                 if self.return_value_type_compatible(expected, actual) == 0 and self.record_contextual_copy_adjustment(node, expected, actual) == 0:
+                    // D93: a return demands its collection of a literal's binding.
+                    self.note_literal_demand(node, expected, node)
                     self.emit_error(msg, node)
                     return 0
         1
@@ -9285,7 +9287,7 @@ impl Sema:
     // A tail whose type does not match the declared return is an error even
     // when it is an assignment (§4.10): report it at the assignment and name
     // the read it yields.
-    mut fn emit_return_mismatch(msg: &str, body: i32):
+    mut fn emit_return_mismatch(msg: &str, body: i32, expected: i32):
         var n = body
         while n != 0:
             let k = self.ast.kind(n)
@@ -9295,6 +9297,8 @@ impl Sema:
                 n = self.ast.get_data2(n)
             else:
                 break
+        // D93: a return demands its collection of a literal's binding.
+        self.note_literal_demand(n, expected, n)
         if not self.tail_reads_place(n):
             self.emit_error(msg, body)
             return
@@ -14348,6 +14352,8 @@ impl Sema:
         if val_type == 0 or self.int_narrowing_requires_cast(ann_type, val_type) != 0:
             return
         if self.types_compatible(ann_type as i32, val_type as i32) == 0 and self.has_contextual_copy_adjustment(value) == 0:
+            // D93: a typed place demands its collection of a literal's binding.
+            self.note_literal_demand(value, ann_type as i32, node)
             let vector_help = self.vector_scalar_binding_help(ann_type as i32, val_type as i32)
             if vector_help.len() > 0:
                 self.emit_error("type mismatch in binding: " ++ vector_help, node)
@@ -14397,6 +14403,104 @@ impl Sema:
                     return 1
         0
 
+    // D93 (§4.3c rule 1): the `let` of the binding `expr` names, when that
+    // binding has no annotation and an element-form literal for its
+    // initializer; 0 otherwise.
+    fn literal_binding_let(expr: i32) -> i32:
+        if expr <= 0 or self.ast.kind(expr) != NodeKind.NK_IDENT:
+            return 0
+        let sym = self.ast.get_data0(expr)
+        // The latest such `let` of that name in this function.
+        var k = self.fn_literal_lets.len() as i32 - 3
+        while k >= 0:
+            if self.fn_literal_lets[k] == self.current_fn_sig_idx and self.fn_literal_lets[k + 1] == sym: return self.fn_literal_lets[k + 2]
+            k = k - 3
+        0
+
+    // A use of `expr` that needs the type `demanded`: a parameter, a typed
+    // place, a return. Only `Vec`, `HashSet` and `BTreeSet` are demanded: a
+    // slice is met by the fixed array and demands nothing.
+    mut fn note_literal_demand(expr: i32, demanded: i32, use_node: i32):
+        let let_node = self.literal_binding_let(expr)
+        if let_node == 0 or demanded == 0:
+            return
+        let want = self.auto_deref_ref_ptr_type(self.resolve_alias(demanded as TypeId)) as i32
+        if self.get_type_kind(want as TypeId) != TypeKind.TY_GENERIC_INST:
+            return
+        let base = self.canonical_symbol_by_text(self.get_generic_inst_base(want))
+        if base != self.syms.vec and base != self.syms.hashset and base != self.syms.btreeset:
+            return
+        self.literal_demands.push(let_node)
+        self.literal_demands.push(want)
+        self.literal_demands.push(use_node)
+
+    // A method called on `recv_expr` that exactly one of the collections a
+    // literal builds has (`push` demands a `Vec`). The element type is the
+    // literal's, or the argument's when the literal is empty.
+    mut fn note_literal_method_demand(recv_expr: i32, recv_ty: i32, field: i32, first_arg_ty: i32, use_node: i32):
+        let let_node = self.literal_binding_let(recv_expr)
+        if let_node == 0:
+            return
+        let have = if recv_ty != 0: self.resolve_alias(recv_ty as TypeId) as i32 else: 0
+        var elem = if have != 0 and self.get_type_kind(have as TypeId) == TypeKind.TY_ARRAY: self.get_type_d0(have as TypeId) else: 0
+        if elem == 0 and first_arg_ty != 0: elem = self.auto_deref_ref_ptr_type(self.resolve_alias(first_arg_ty as TypeId)) as i32
+        if elem == 0:
+            return
+        let method_name: str = with_str_clone_ref(self.pool_resolve(field))
+        var found = 0
+        var count = 0
+        for base in [self.syms.vec, self.syms.hashset, self.syms.btreeset]:
+            let args: Vec[i32] = Vec.new()
+            args.push(elem)
+            let candidate = self.ensure_generic_inst_type(base, args, 1) as i32
+            if self.builtin_method_intrinsic(candidate, method_name) != MirIntrinsic.NONE:
+                found = candidate
+                count = count + 1
+        if count != 1:
+            return
+        self.literal_demands.push(let_node)
+        self.literal_demands.push(found)
+        self.literal_demands.push(use_node)
+
+    // What the demands decide, for the second check.
+    pub fn literal_decisions_from_demands() -> Vec[i32]:
+        var out: Vec[i32] = Vec.new()
+        var i = 0
+        while i + 2 < self.literal_demands.len() as i32:
+            let let_node: i32 = self.literal_demands[i]
+            let want: i32 = self.literal_demands[i + 1]
+            let use_node: i32 = self.literal_demands[i + 2]
+            i = i + 3
+            var at = -1
+            var k = 0
+            while k + 4 < out.len() as i32:
+                if out[k] == let_node: at = k
+                k = k + 5
+            if at < 0:
+                out.push(let_node)
+                out.push(want)
+                out.push(0)
+                out.push(use_node)
+                out.push(0)
+            else if out[at + 1] != want and out[at + 2] == 0:
+                out[at + 2] = want
+                out[at + 4] = use_node
+        out
+
+    // The type the uses of the binding declared at `let_node` decided, or 0.
+    // Two demanded types are an error at the second use (§4.3c).
+    mut fn literal_decision(let_node: i32) -> i32:
+        var k = 0
+        while k + 4 < self.literal_decisions.len() as i32:
+            if self.literal_decisions[k] == let_node:
+                if self.literal_decisions[k + 2] != 0:
+                    let first = self.type_name(self.literal_decisions[k + 1])
+                    let second = self.type_name(self.literal_decisions[k + 2])
+                    self.emit_error_with_help(f"this use demands `{second}` of a binding another use demands `{first}` of (§4.3c)", self.literal_decisions[k + 4], "write the binding's type")
+                return self.literal_decisions[k + 1]
+            k = k + 5
+        0
+
     // The generic type a bare name in an annotation names (`Vec`, `Option`,
     // a user `Pair`), or 0: a name with arguments, a non-generic type, or
     // anything that is not a plain name.
@@ -14444,6 +14548,12 @@ impl Sema:
                 if (value_kind == NodeKind.NK_ARRAY_LIT and sequence) or (value_kind == NodeKind.NK_MAP_LIT and keyed): self.collection_literal_hints.insert(value, bare_generic)
             else:
                 ann_type = self.resolve_type_expr(ann_type_node)
+
+        // D93: no annotation, an element-form literal, and uses that
+        // demanded a collection: the binding has that type.
+        if ann_extra < 0 and value != 0 and self.ast.kind(value) == NodeKind.NK_ARRAY_LIT and self.literal_decisions.len() > 0:
+            let decided = self.literal_decision(node)
+            if decided != 0: ann_type = decided as TypeId
 
         // var x: T (no initializer) — zero-initialized
         if value == 0:
@@ -14550,6 +14660,10 @@ impl Sema:
             return self.ty_void as i32
         self.binding_decl_nodes.insert(name, node)
         self.binding_value_nodes.insert(name, value)
+        // D93: a literal's binding, or a later `let` of the name that is not one.
+        self.fn_literal_lets.push(self.current_fn_sig_idx)
+        self.fn_literal_lets.push(name)
+        self.fn_literal_lets.push(if ann_extra < 0 and self.ast.kind(value) == NodeKind.NK_ARRAY_LIT and self.ast.kind(node) == NodeKind.NK_LET_BINDING: node else: 0)
         if self.type_carries_callable(bind_type as i32):
             self.callable_let_decls.insert(node, 1)
             self.note_callable_binding_value(node, value)
@@ -16383,6 +16497,7 @@ impl Sema:
                 let arith = if compat == 0: self.arithmetic_result_type(self.current_return_type, val_type) else: 1 as TypeId
                 if compat == 0:
                     if arith == 0:
+                        self.note_literal_demand(value, self.current_return_type as i32, node)
                         self.emit_error("return type mismatch", node)
         self.ty_never as i32
 
@@ -22228,7 +22343,7 @@ impl Sema:
                 // also mutates a capture; its value is never discarded for
                 // the implicit default.
                 if not closure_ok_wrapped:
-                    self.emit_return_mismatch("closure return type mismatch", body)
+                    self.emit_return_mismatch("closure return type mismatch", body, 0)
         self.pop_label_frame()
         self.emit_unused_label_warnings()
         self.restore_label_registry(saved_label_registry)
@@ -30445,6 +30560,15 @@ impl Sema:
     // dispatch switches on the record.
     mut fn check_method_call_parts(expr: i32, field: i32, extra_start: i32, arg_count: i32, node: i32, known_recv_ty: i32) -> i32:
         let ret = self.check_method_call_parts_inner(expr, field, extra_start, arg_count, node, known_recv_ty)
+        // D93: a method called on the binding of an empty literal, which has
+        // no type until a use gives it one (`var xs = []`, `xs.push(1)`).
+        if ret == 0 and arg_count >= 1 and extra_start >= 0 and self.literal_binding_let(expr) != 0:
+            let literal_value: i32 = self.ast.get_data1(self.literal_binding_let(expr))
+            if self.ast.get_data1(literal_value) == 0:
+                let first_arg = self.ast.get_extra(extra_start)
+                var first_arg_ty: i32 = self.typed_expr_types.get(first_arg) ?? 0
+                if first_arg_ty == 0: first_arg_ty = self.check_expr(first_arg) as i32
+                self.note_literal_method_demand(expr, 0, field, first_arg_ty, node)
         if ret != 0 and not self.call_builtins.contains(node):
             let builtin = self.method_call_builtin(expr, field, ret)
             if builtin != CallBuiltin.None:
@@ -32207,6 +32331,14 @@ impl Sema:
             let marked = if self.facade_resource_has_failed_state_items(failed_of): "the operations its facade marks 'valid on failed'" else: "the operations its facade marks 'valid on failed', and this facade marks none"
             self.emit_error_with_help("unknown method '" ++ method_name ++ "' for type '" ++ receiver_name ++ "': a failed '" ++ rname ++ "' — the resource a failed producer still produced — admits only " ++ marked ++ "; its Drop destroys it (§16.2b.4)", node, "state 'valid on failed' on the fn item describing an operation the C library documents on the failed handle; its representation is the field `repr`, under the raw C rules (`unsafe`)")
             return 0
+        // D93: a method only one collection has demands that collection.
+        if self.literal_binding_let(expr) != 0:
+            var first_arg_ty = 0
+            if arg_count >= 1 and extra_start >= 0:
+                let first_arg = self.ast.get_extra(extra_start)
+                first_arg_ty = self.typed_expr_types.get(first_arg) ?? 0
+                if first_arg_ty == 0: first_arg_ty = self.check_expr(first_arg) as i32
+            self.note_literal_method_demand(expr, obj_type as i32, field, first_arg_ty, node)
         self.emit_error("unknown method '" ++ method_name ++ "' for type '" ++ receiver_name ++ "'", node)
         0
 

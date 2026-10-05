@@ -119,6 +119,8 @@ impl Sema:
         0
 
     mut fn emit_argument_type_mismatch(call_name: &str, fn_sym: i32, arg_index: i32, param_i: i32, expected_ty: i32, actual_ty: i32, arg_node: i32):
+        // D93: a parameter demands its collection of a literal's binding.
+        self.note_literal_demand(arg_node, expected_ty, arg_node)
         if self.suppress_errors != 0:
             return
         let start = self.ast.get_start(arg_node)

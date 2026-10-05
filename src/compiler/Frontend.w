@@ -2127,9 +2127,23 @@ impl Zcu:
             field_decisions = probe.inferred_field_decisions()
             self.diagnostics = move probe.diags
             self.diagnostics.truncate(reported)
+        let reported_before_check = self.diagnostics.count()
         var sema = self.new_module_sema(text, pool)
-        sema.field_decisions = field_decisions
+        sema.field_decisions = sema_clone_i32_vec(&field_decisions)
         sema.check_module()
+        // D93 (§4.3c rule 1): a binding whose literal takes its type from
+        // its uses makes the program one that is checked twice, as D89's
+        // fields do: the check above heard the demands, and this one has
+        // every such binding at the type decided. A program with no demand
+        // is checked once.
+        if sema.literal_demands.len() > 0:
+            let literal_decisions = sema.literal_decisions_from_demands()
+            self.diagnostics = move sema.diags
+            self.diagnostics.truncate(reported_before_check)
+            sema = self.new_module_sema(text, pool)
+            sema.field_decisions = field_decisions
+            sema.literal_decisions = literal_decisions
+            sema.check_module()
         if do_profile:
             let sema_ns = runtime_clock_nanos() - t_sema
             runtime_eprint(f"[profile] frontend.sema  {sema_ns / 1000000}.{(sema_ns % 1000000) / 1000} ms  decls={pool.decl_count()}")
