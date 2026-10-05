@@ -189,15 +189,15 @@ const HEADER: str = "X-Custom"
 
 **Syntax:** `const NAME [: TYPE] = EXPR`
 
-The type annotation may be omitted when the initializer determines an
-unambiguous type. If omitted, ordinary expression inference and default
-literal rules choose the type. The annotation is required when the
-initializer cannot determine a concrete type, and public exported constants
-must include an explicit type so the API surface is stable.
+The type annotation may be omitted when the initializer determines the
+type: ordinary expression inference and the default literal rules choose
+it, and a constant of unsuffixed numeric literals has no numeric type of
+its own (§4.2.1). This holds for a `pub const` as for a private one. The
+annotation is required only when the initializer cannot determine a
+concrete type.
 
-`const NAME: TYPE = EXPR` remains the spelling for API clarity and
-disambiguation. Use it whenever the default literal type would be
-surprising.
+A literal suffix states a type the default would not (`0x28DEu16`);
+`const NAME: TYPE = EXPR` states it for any other initializer.
 
 The expression must be evaluable at compile time — integer literals,
 arithmetic (`+`, `-`, `*`, `/`, `%`), unary negate, logical `not`, and
@@ -208,7 +208,7 @@ const WIDTH = 80
 const HEIGHT = 24
 const AREA = WIDTH * HEIGHT    // computed at compile time
 
-pub const PROTOCOL_VERSION: u16 = 3
+pub const PROTOCOL_VERSION = 3u16
 ```
 
 `const` values are inlined at every use site. They have no runtime address and
