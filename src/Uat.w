@@ -317,6 +317,17 @@ fn uat_probe_capture(argv: &Vec[str], scratch: &str) -> i32:
     let _ = with_fs_mkdir_p(scratch)
     with_exec_argv_capture_cwd(uat_argv_blob(argv), scratch ++ "/probe.stdout", scratch ++ "/probe.stderr", 20000, ".")
 
+// Whether the console session's screen is locked: `ioreg` (in the base
+// system) prints the session dictionary with `"CGSSessionScreenIsLocked"=Yes`.
+fn uat_darwin_screen_locked(scratch: &str) -> bool:
+    var argv: Vec[str] = Vec.new()
+    argv.push("/usr/sbin/ioreg")
+    argv.push("-n")
+    argv.push("Root")
+    argv.push("-d1")
+    if uat_probe_capture(&argv, scratch) != 0: return false
+    uat_read_text(scratch ++ "/probe.stdout").contains("\"CGSSessionScreenIsLocked\"=Yes")
+
 // "" when the requirement is met, else the reason the scenario skips.
 fn uat_unmet(req: &str, scratch: &str) -> str:
     if req == "network":
@@ -327,6 +338,11 @@ fn uat_unmet(req: &str, scratch: &str) -> str:
         let host = uat_host_platform()
         if host == "linux" and env("DISPLAY").len() == 0 and env("WAYLAND_DISPLAY").len() == 0: return "requires " ++ req ++ ": none"
         if host == "darwin" and env("SSH_CONNECTION").len() > 0: return "requires " ++ req ++ ": none (ssh session)"
+        // A locked session has a display online and no window can open on
+        // it: GLFW finds no monitor and the scenario failed red, with the
+        // compiler blameless (2026-10-05 battery). The session's own record
+        // says so.
+        if host == "darwin" and uat_darwin_screen_locked(scratch): return "requires " ++ req ++ ": the screen is locked"
         return ""
     if req.starts_with("lib "):
         let name = req.slice(4, req.len()).trim()
