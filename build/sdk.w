@@ -1625,13 +1625,19 @@ fn sdk_merge_sort_strings(items: Vec[str]) -> Vec[str]:
 
 pub fn sdk_zig_source_url() -> str: "https://codeberg.org/ziglang/zig/archive/" ++ SDK_ZIG_VERSION ++ ".tar.gz"
 
+// Our own copy of the pinned archive, an asset of the `sdk-sources` release.
+pub fn sdk_zig_source_mirror_url() -> str: "https://github.com/withlang-dev/with/releases/download/sdk-sources/zig-" ++ SDK_ZIG_VERSION ++ ".tar.gz"
+
 // Where the pinned Zig archive is fetched from, in order; every entry must
-// deliver the bytes of SDK_ZIG_TAR_GZ_SHA256. One entry: no other public
-// host carries them (#2062, checked 2026-10-03). ziglang.org publishes
-// zig-<v>.tar.xz, another archive (sha256 43186959...) in a format the
-// build cannot read, and GitHub's ziglang/zig stops at 0.15.2. A copy we
-// publish ourselves is the entry to add here.
-pub fn sdk_zig_source_urls() -> Vec[str]: sdk_one_source(sdk_zig_source_url())
+// deliver the bytes of SDK_ZIG_TAR_GZ_SHA256. No other public host carries
+// them (#2062, checked 2026-10-03): ziglang.org publishes zig-<v>.tar.xz,
+// another archive (sha256 43186959...) in a format the build cannot read,
+// and GitHub's ziglang/zig stops at 0.15.2. So the second entry is the copy
+// we publish; a bump of SDK_ZIG_VERSION uploads the new archive there.
+pub fn sdk_zig_source_urls() -> Vec[str]:
+    let sources = sdk_one_source(sdk_zig_source_url())
+    sources.push(sdk_zig_source_mirror_url())
+    sources
 pub fn sdk_zig_source_sha256() -> str: SDK_ZIG_TAR_GZ_SHA256
 
 // The sysroots are generated from the pinned Zig source, which each sysroot
