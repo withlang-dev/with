@@ -7,6 +7,33 @@ the kind of bug you are holding, not by tool: each route says which tool
 proves what, and what it cannot prove. The catalog of every command follows
 the routes.
 
+Every recipe here was run as written on 2026-10-05 against main efb765c8b
+(macOS arm64), except the native Windows section, last run on #1081. A
+recipe that does not work as written is a defect in this page or in the
+tool; fix it or file it.
+
+## Which binary
+
+`with` in the recipes is a compiler; pick the one the question needs.
+
+- **`with` on PATH** (`~/.local/bin/with`, installed from main): every
+  dump, trace, `analyze`, `reduce` and allocator recipe. It carries no
+  debug info: lldb finds its functions only by regex
+  (`breakpoint set -r 'Codegen\.marshal_mir_call_arg$'`; the symbol is
+  `__wcu$N$Codegen.marshal_mir_call_arg`), with no source lines and no
+  arguments.
+- **`out/bootstrap/bin/with-stage1`** (after `with build :dev`; has a
+  `.dSYM`): the compiler built from your tree. Use it for anything about
+  source you have changed, and for lldb on the compiler: dotted names
+  resolve (`breakpoint set --name Codegen.marshal_mir_call_arg`) and frames
+  show source lines and parameters.
+- **`out/stage/bin/with-stage2`** (after a full `with build`) and
+  **`out/release/bin/with`**: the same, one stage on.
+
+A program you build with any of them carries debug info for its own code
+and the runtime, so lldb on the *program* resolves `rt_core.w` lines
+(`dbg_report_double_free`, `with_panic_core`) whichever compiler built it.
+
 ## Routes by bug class
 
 ### A drop, double free, invalid free, use-after-free, or leak
@@ -14,8 +41,9 @@ the routes.
 1. **Native debug allocator first.** `with run --debug-alloc repro.w` (or
    `WITH_DEBUG_ALLOC=1` on any binary). It names the block, its size, and
    the drop-origin tag of the first free (`first_drop=drop#struct
-   __drop_struct_16` is the str drop glue; `<untagged>` is a raw `rt_free`
-   caller such as a collection's own free). The tag is the first real clue:
+   __drop_struct_551` names a type's drop glue, the number varies by
+   program; `<untagged>` is a raw `rt_free` caller such as a collection's own
+   free). The tag is the first real clue:
    a str drop freeing a block another owner also frees means a str aliases
    that owner's buffer, or a str value is garbage.
 2. **`WITH_ALLOC_NO_REUSE=1`** on the same run. A plain double free still
@@ -46,16 +74,25 @@ the routes.
    `rt_alloc`/`rt_free` with backtraces — that is thousands of stops and
    times out on a four-test fixture.
 5. **Resolve the first free and every touch of the block** with the
-   allocator's own trap, no debugger needed:
-   `WITH_DEBUG_ALLOC_TRAP_FREE=<decimal addr> ./bin` prints every alloc and
-   free of that payload address with its drop origin (it works without
-   `WITH_DEBUG_ALLOC`, so the heap layout is unchanged), and
-   `WITH_DEBUG_ALLOC_TRAP_FREE_HIT=<n>` panics on the n-th free so lldb
-   stops on that call chain. `tools/debug_drop_sites.lldb` puts backtrace
-   breakpoints on those trap checks and on the double-free reporter. A
-   hardware watchpoint on the payload (`watchpoint set expression -w write
-   -s 8 -- <addr>`) is the other fast tool; lldb runs with ASLR off, so an
-   address from one run is stable in the next. #1014 asks for the first
+   allocator's own trap. **Run it under lldb**: outside lldb macOS
+   randomizes the heap, so the address changes every run and a trap set
+   from an earlier run never hits. Under lldb (ASLR off) the address is the
+   same run to run, with or without `WITH_DEBUG_ALLOC`:
+   ```
+   lldb --batch -o "settings set target.env-vars WITH_DEBUG_ALLOC=1" -o run -- ./bin
+       # read addr= from the DOUBLE FREE line
+   lldb --batch -s tools/debug_drop_sites.lldb \
+       -o "settings set target.env-vars WITH_DEBUG_ALLOC=1 WITH_DEBUG_ALLOC_TRAP_FREE=<addr>" \
+       -o run -o "bt 24" -o quit -- ./bin
+   ```
+   The trap prints `trap-alloc hit=` / `trap-free hit=` for every alloc and
+   free of that payload; `tools/debug_drop_sites.lldb` adds a backtrace at
+   each hit and stops at the double-free reporter. To stop on the n-th free
+   instead, `WITH_DEBUG_ALLOC_TRAP_FREE_HIT=<n>` panics there, and a panic
+   is an ordinary exit: add `-o "breakpoint set --name with_panic_core"`
+   before `run`, or lldb only reports `exited with status = 1`. A hardware
+   watchpoint on the payload (`watchpoint set expression -w write -s 8 --
+   <addr>`) is the other fast tool. #1014 asks for the first
    free's site to be recorded by default so the plain report names both.
 6. **Read the function's IR or disassembly at the join block.** `with ir
    fixture.w` prints the module as codegen built it (stdout, before the
@@ -139,15 +176,15 @@ and effects, concrete specializations, `MirBody` tables, diagnostic provenance,
 and the actual LLVM marshalling/prologue branches used for production codegen.
 
 ```sh
-./out/stage/bin/with-stage2 analyze repro.w audit:all
-./out/stage/bin/with-stage2 analyze repro.w audit:storage
-./out/stage/bin/with-stage2 analyze repro.w 'matrix:name~target_fn'
-./out/stage/bin/with-stage2 analyze repro.w 'path:call:main:target_fn'
-./out/stage/bin/with-stage2 analyze repro.w 'closure:call:main'
-./out/stage/bin/with-stage2 analyze repro.w 'lldb:kind=call,name~target_fn'
-./out/stage/bin/with-stage2 analyze repro.w contract
-./out/stage/bin/with-stage2 analyze repro.w audit:contract
-./out/stage/bin/with-stage2 analyze repro.w 'select:stage=sema,kind=global-effect'
+with analyze repro.w audit:all
+with analyze repro.w audit:storage
+with analyze repro.w 'matrix:name~target_fn'
+with analyze repro.w 'path:call:main:target_fn'
+with analyze repro.w 'closure:call:main'
+with analyze repro.w 'lldb:kind=call,name~target_fn'
+with analyze repro.w contract
+with analyze repro.w audit:contract
+with analyze repro.w 'select:stage=sema,kind=global-effect'
 ```
 
 The global-effect view reads recorded writes, calls and their expanded targets,
@@ -262,6 +299,18 @@ methods the analyzer accounts for the implicit receiver argument. AST node IDs a
 snapshot-local: rerun the query after any source change before using
 `explain:node:<id>`.
 
+`lldb:<query>` emits breakpoints on the **compiler's** branches that
+handled the matching facts (`Codegen.marshal_mir_call_arg`,
+`MirBuilder.lower_call_arg`), not on the program: save them and run lldb on
+stage1 compiling the repro:
+
+```sh
+with analyze repro.w 'lldb:kind=call,name~take' > take.lldb
+lldb --batch -s take.lldb -o run -o "bt 6" -- out/bootstrap/bin/with-stage1 build repro.w -o /tmp/repro
+```
+
+On the installed `with` the dotted names stay `pending` (see Which binary).
+
 The live MIR graph backs `path:call:<from>:<to>` and
 `closure:call:<root>`. Prefer these over parsing source text. There are no legacy
 semantic scanner fallbacks. If compilation stops before the needed snapshot, use
@@ -271,8 +320,8 @@ compiler branch that stopped it.
 Use an analysis audit directly as a reduction predicate:
 
 ```sh
-./out/stage/bin/with-stage2 reduce repro.w --exit-code nonzero -- \
-  ./out/stage/bin/with-stage2 analyze {file} audit:all
+with reduce repro.w --exit-code nonzero -- \
+  with analyze {file} audit:all
 ```
 
 ## Ownership Transfer Classification
@@ -285,7 +334,7 @@ use (partitioning an error worklist, e.g. the #691 flip's, before deciding
 which sites get a `move` keyword and which need design work).
 
 ```sh
-./out/stage/bin/with-stage2 analyze src/main.w move-sites
+with analyze src/main.w move-sites
 ```
 
 One TSV row per site:
@@ -320,7 +369,7 @@ gates (the gate and the query share the predicate; the gate is this report
 flipped to a diagnostic once the inventory is clean).
 
 ```sh
-./out/stage/bin/with-stage2 analyze src/main.w seam-sites
+with analyze src/main.w seam-sites
 ```
 
 Every row carries a **tier**, and the summary counts both:
@@ -370,8 +419,14 @@ call argument) or an effect-flow edge into a callee parameter, followed
 recursively until a direct seed is reached.
 
 ```sh
-./out/stage/bin/with-stage2 analyze src/main.w 'explain:effect:Zcu.clear_stage_outputs:self'
+with analyze src/main.w 'explain:effect:Zcu.clear_stage_outputs:self'
 ```
+
+A method is `Type.method`; a free function its name. A generic function's
+body is checked per specialization, under a mangled name
+(`iter_collect__sema__411:3428:163=17:364=320`): `explain:effect:` on the
+plain name says `no signature matched`, and
+`select:stage=sema,kind=signature,name~iter_collect` lists the real one.
 
 An `escape_view` line reads `origins=[…] through=[…]`, parameter indices
 both: `origins` are the parameters the returned view may come from, and
@@ -394,9 +449,9 @@ on erroring inputs.
 predicate still holds.
 
 ```sh
-./out/stage/bin/with-stage2 reduce repro.w \
+with reduce repro.w \
     --contains "undefined variable" \
-    -- ./out/stage/bin/with-stage2 check {file}
+    -- with check {file}
 ```
 
 Options:
@@ -413,11 +468,16 @@ Options:
   `with test` on the reduced file to get one.
 
 ```sh
-./out/stage/bin/with-stage2 reduce fixture.w --test test_needs_two_lines
+with reduce fixture.w --test test_needs_two_lines
 ```
 
 The source path must immediately follow `reduce`. Use `{file}` in the predicate
 argv for the candidate path; without it, the candidate path is appended.
+
+The reducer keeps the smallest file the predicate still accepts, whatever
+else is wrong with it: `--contains "mismatch"` on a type error reduced a
+seven-line program to one orphaned indented line. Make `--contains` the
+exact diagnostic you are chasing.
 
 What it cannot reduce: a layout-dependent bug. A drop of uninitialized stack
 garbage (the #729 class) changes with every deleted line, so the predicate
@@ -437,13 +497,19 @@ sweep silently skipped. States: `Uninit`, `Init`, `Moved`, `Maybe`, and
 stack garbage, the #729 class).
 
 ```sh
-./out/stage/bin/with-stage2 check repro.w --dump-drop-state
-./out/stage/bin/with-stage2 check repro.w --dump-drop-plan
-./out/stage/bin/with-stage2 check repro.w --trace-ownership main:_1
-./out/stage/bin/with-stage2 check repro.w --trace-cleanup-edge 'main:bb0->bb1'
-./out/stage/bin/with-stage2 check repro.w --validate-ownership
-./out/stage/bin/with-stage2 check repro.w --validate-all
+with check repro.w --dump-drop-state
+with check repro.w --dump-drop-plan
+with check repro.w --trace-ownership main:_1
+with check repro.w --trace-cleanup-edge 'main:bb0->bb1'
+with check repro.w --validate-ownership
+with check repro.w --validate-all
 ```
+
+Each dump covers every body in the module, the standard library's
+included (189 functions for a ten-line program): find your function by
+`(name)` in its header line, `fn sym366(f) {`. A place argument such as
+`f:_1` names a MIR local, and `_1` is the first local, often a parameter:
+read the local's number from `--dump-mir` first.
 
 - `--dump-drop-state` prints every block's in/out state.
 - `--dump-drop-plan` prints each MIR drop site with the state before it and
@@ -517,8 +583,20 @@ the exact function, instruction, operands, and invalid capacity assumption.
 Hard-won specifics for `lldb --batch` against `-O1 -g` With binaries:
 
 - Symbol names are dotted: `breakpoint set -n Codegen.gen_module`, not
-  `gen_module`. A bare-name breakpoint reports `no locations (pending)` and
-  the run proceeds uninstrumented.
+  `gen_module`, on a binary with debug info (stage1, stage2, release). A
+  bare-name breakpoint, or any dotted name on the installed `with`, reports
+  `no locations (pending)` and the run proceeds uninstrumented: check the
+  `Breakpoint 1: where = …` line before reading the result. A regex
+  (`breakpoint set -r record_pattern_view`) matches either.
+- A breakpoint command list is a `DONE` block:
+  ```
+  breakpoint command add
+  thread backtrace -c 12
+  continue
+  DONE
+  ```
+  Repeating `--one-liner` keeps only the last command, so the backtrace
+  never prints (the debug_drop scripts had exactly this until 2026-10-05).
 - Function-body breakpoints on our `-O1` binaries can resolve yet never fire
   (line-table skew); LLVM C API symbols (`LLVMAddFunction`,
   `LLVMTargetMachineEmitToFile`, `LLVMBuildAlloca`) are reliable anchors with
@@ -606,7 +684,7 @@ cat out/fixpoint-diff/report.txt
 Or run it directly:
 
 ```sh
-./out/stage/bin/with-stage2 fixpoint-diff \
+with fixpoint-diff \
     out/stage/bin/with-stage2-fixpoint.o \
     out/stage/bin/with-stage3-fixpoint.o
 ```
@@ -640,21 +718,29 @@ The native debug allocator remains the first tool for drop, lifetime,
 double-free, use-after-free, and leak bugs:
 
 ```sh
-./out/stage/bin/with-stage2 run --debug-alloc repro.w
-./out/stage/bin/with-stage2 run --debug-alloc --debug-alloc-filter=non-root repro.w
-WITH_DEBUG_ALLOC=1 ./bin                 # any binary
-WITH_ALLOC_NO_REUSE=1 ./bin              # never reuse a freed address
+with run --debug-alloc repro.w
+with run --debug-alloc --debug-alloc-filter=non-root repro.w
+WITH_DEBUG_ALLOC=1 ./bin                          # any binary
+WITH_DEBUG_ALLOC=1 WITH_ALLOC_NO_REUSE=1 ./bin    # never reuse a freed address
 ```
 
 The report names the block (address, size), the drop-origin tag of the
 first free, and whether the second was tagged. `WITH_ALLOC_NO_REUSE=1`
 distinguishes a genuine double free (still reported) from a stale pointer
 into reused memory or an uninitialized value that happened to hold a live
-address (report disappears). Then trap the address:
+address (report disappears). Without `WITH_DEBUG_ALLOC` the production
+allocator still refuses a double free, as `panic: invalid free: pointer is
+not an allocated payload start` with slab forensics, but names no origin.
+
+Then trap the address, under lldb so it is the same from run to run (see
+route step 5):
 
 ```sh
-WITH_DEBUG_ALLOC_TRAP_FREE=<decimal payload addr> ./bin        # print every alloc/free of it, with drop origins
-WITH_DEBUG_ALLOC_TRAP_FREE_HIT=<n> WITH_DEBUG_ALLOC_TRAP_FREE=<addr> ./bin   # panic on the n-th free
+lldb --batch -o "settings set target.env-vars WITH_DEBUG_ALLOC_TRAP_FREE=<addr>" -o run -- ./bin
+    # every alloc/free of it, with drop origins
+lldb --batch -o "settings set target.env-vars WITH_DEBUG_ALLOC_TRAP_FREE=<addr> WITH_DEBUG_ALLOC_TRAP_FREE_HIT=<n>" \
+    -o "breakpoint set --name with_panic_core" -o run -o "bt 12" -- ./bin
+    # stop on the n-th free
 ```
 
 The trap works without `WITH_DEBUG_ALLOC` (the allocation pattern under
@@ -754,8 +840,8 @@ Environment switches (set on the compiler's run unless noted):
 | `WITH_DUMP_PAIR_FLOW=1` | MIR | the foreign callback-pair analysis and its findings |
 | `WITH_MIR_AUDIT=1` | MIR, codegen | `[mir-lower-fail] kind=<node kind> fn=… span=…`: which node a failed lowering could not lower |
 | `WITH_DEBUG_MIR_CODEGEN=1` | codegen | which body codegen takes from MIR, and each function symbol it resolves |
-| `WITH_DUMP_INIT_MIR=1` | codegen | codegen-synthesized bodies (module initializers), which `--dump-mir` never sees |
-| `WITH_DUMP_MIR_CLEANUP_FN=<fn>\|*` | codegen | one body's MIR after cleanup, before LLVM |
+| `WITH_DUMP_INIT_MIR=1` | codegen | codegen-synthesized MIR bodies (a module with a global initializer: `__with_init_const_<name>`), which `--dump-mir` never sees; nothing for a module without one |
+| `WITH_DUMP_MIR_CLEANUP_FN=<fn>\|*` | codegen | one function's LLVM IR before and after codegen's per-function cleanup (`===== PRE MIR CLEANUP f =====`, `POST`) |
 | `WITH_DUMP_LLIR_PRE=1`, `WITH_DUMP_LLIR_POST=1`, `WITH_DUMP_LLIR_ON_INVALID=1`, `WITH_KEEP_BITCODE=1` | codegen | the LLVM module (see the drop route above) |
 | `WITH_DEBUG_CALL_COERCE=1` | codegen | a call argument whose value did not match the parameter type |
 | `WITH_DEBUG_LOCAL_FLOW=1` | codegen | each local bound to its stack slot |

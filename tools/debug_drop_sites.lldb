@@ -39,9 +39,15 @@
 # -s 8 -- <addr>`) is the other fast tool when the trap env is not enough.
 
 breakpoint set --name dbg_trap_free_check
-breakpoint command add --one-liner "bt 12" --one-liner "continue"
+breakpoint command add
+thread backtrace -c 12
+continue
+DONE
 
 breakpoint set --name dbg_trap_alloc_check
-breakpoint command add --one-liner "bt 12" --one-liner "continue"
+breakpoint command add
+thread backtrace -c 12
+continue
+DONE
 
 breakpoint set --name dbg_report_double_free

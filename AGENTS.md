@@ -1005,7 +1005,7 @@ use-after-free, and leak bugs:
 with build :debug-alloc-tests
 ./out/release/bin/with build tools/debug_drop.w -o out/debug-alloc-tests/debug_drop
 out/debug-alloc-tests/debug_drop run ./out/release/bin/with repro.w
-WITH_DEBUG_ALLOC_TRAP_FREE=<decimal payload addr> ./bin        # every alloc/free of that block, with drop origins
+lldb --batch -o "settings set target.env-vars WITH_DEBUG_ALLOC=1" -o run -- ./bin   # learn the addr (stable only under lldb)
 lldb --batch -s tools/debug_drop_sites.lldb \
   -o "settings set target.env-vars WITH_DEBUG_ALLOC=1 WITH_DEBUG_ALLOC_TRAP_FREE=<addr>" \
   -o run -o "bt 24" -o quit -- ./bin                            # backtraces at each trap hit and at the double-free reporter

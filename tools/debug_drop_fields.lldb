@@ -26,4 +26,7 @@ breakpoint set --name Codegen.mir_emit_drop_fields_ptr --auto-continue true
 breakpoint set --name Codegen.mir_emit_drop_ptr_for_sema_type --auto-continue true
 
 breakpoint set --name Codegen.mir_emit_drop_ptr
-breakpoint command add --one-liner "bt 4" --one-liner "continue"
+breakpoint command add
+thread backtrace -c 4
+continue
+DONE
