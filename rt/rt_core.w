@@ -4041,44 +4041,19 @@ pub fn with_hashmap_clear(map: *mut u8):
     hm_set_field(m, HM_OFF_NENT, 0)
     hm_set_field(m, HM_OFF_LEN, 0)
 
-pub fn with_hashmap_keys_out(out: *mut u8, map: *mut u8, key_size: i64):
+// D44: a consuming traversal moves entry `index` out: its key's and value's
+// bytes go to `key_out` and `val_out`, which become their sole owners, and
+// the entry dies without a drop. 0 when the entry is not live.
+pub fn with_hashmap_take_at(map: *mut u8, index: i64, key_out: *mut u8, val_out: *mut u8) -> i32:
+    if with_hashmap_slot_occupied(map, index) == 0: return 0
     let m = map as i64
-    if m == 0:
-        with_vec_new_out(out, key_size)
-        return
-    let ksz = hm_key_size(m)
-    with_vec_new_out(out, if ksz > 0: ksz else: key_size)
-    for e in 0..hm_nent(m):
-        if hm_entry_live(m, e): with_vec_push(out, hm_key_at(m, e) as *const u8)
-
-pub fn with_hashmap_values_out(out: *mut u8, map: *mut u8, val_size: i64) -> Unit:
-    let m = map as i64
-    if m == 0:
-        with_vec_new_out(out, val_size)
-        return
-    let vsz = hm_val_size(m)
-    with_vec_new_out(out, if vsz > 0: vsz else: val_size)
-    for e in 0..hm_nent(m):
-        if hm_entry_live(m, e): with_vec_push(out, hm_val_at(m, e) as *const u8)
-
-pub fn with_hashmap_items_out(out: *mut u8, map: *mut u8, key_size: i64, val_size: i64, pair_size: i64, val_offset: i64) -> Unit:
-    let m = map as i64
-    let effective_pair_size = if pair_size > 0: pair_size else: key_size + val_size
-    with_vec_new_out(out, effective_pair_size)
-    if m == 0:
-        return
-    let ksz = hm_key_size(m)
-    let vsz = hm_val_size(m)
-    let effective_ksz = if ksz > 0: ksz else: key_size
-    let effective_vsz = if vsz > 0: vsz else: val_size
-    let tmp = rt_alloc(effective_pair_size)
-    for e in 0..hm_nent(m):
-        if hm_entry_live(m, e):
-            rt_memset(tmp, 0, effective_pair_size)
-            rt_memcpy(tmp, hm_key_at(m, e) as *const u8, effective_ksz)
-            rt_memcpy((tmp as i64 + val_offset) as *mut u8, hm_val_at(m, e) as *const u8, effective_vsz)
-            with_vec_push(out, tmp as *const u8)
-    rt_free_sized(tmp, effective_pair_size)
+    let slot = hm_find_slot(m, hm_key_at(m, index) as *const u8)
+    rt_memcpy(key_out, hm_key_at(m, index) as *const u8, hm_key_size(m))
+    rt_memcpy(val_out, hm_val_at(m, index) as *const u8, hm_val_size(m))
+    if slot >= 0: hm_set_slot(m, slot, -2)
+    unsafe *((hm_live(m) as i64 + index) as *mut u8) = 0
+    hm_set_field(m, HM_OFF_LEN, hm_len(m) - 1)
+    1
 
 pub fn with_hashmap_free(map: *mut u8):
     if map as i64 == 0: return

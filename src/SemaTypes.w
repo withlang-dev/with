@@ -337,6 +337,7 @@ pub enum MirIntrinsic: i32:
     MAP_SLOT_OCCUPIED
     MAP_KEY_AT
     MAP_VALUE_AT
+    MAP_TAKE_AT
     // D63: `f.clone()` on a callable value — copies the pair; an owned
     // environment (a `move ||` closure's heap cell) is cloned by the cell's
     // clone fn.
@@ -379,6 +380,7 @@ pub fn mir_map_slot_intrinsic(name: &str) -> MirIntrinsic:
     if name == "slot_live": return MirIntrinsic.MAP_SLOT_OCCUPIED
     if name == "slot_key": return MirIntrinsic.MAP_KEY_AT
     if name == "slot_value": return MirIntrinsic.MAP_VALUE_AT
+    if name == "slot_take": return MirIntrinsic.MAP_TAKE_AT
     MirIntrinsic.NONE
 
 pub fn mir_len_method_intrinsic(base: MirIntrinsic, method_name: &str) -> MirIntrinsic:

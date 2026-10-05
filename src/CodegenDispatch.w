@@ -9746,6 +9746,22 @@ impl Codegen:
                 let dest_is_view = dest_sema > 0 and self.mir_type_kind_at(self.mir_resolve_alias_at(dest_sema)) == TypeKind.TY_REF
                 result = if dest_is_view: self.mir_ref_from_slot_ptr(slot_ptr, dest_sema) else: wl_build_load(self.builder, self.mir_dest_llvm_type(body, dest_place), slot_ptr)
 
+        else if intrinsic == MirIntrinsic.MAP_TAKE_AT:
+            // D44: a consuming traversal moves entry `slot` into its (K, V)
+            // result; the runtime marks the entry dead without a drop.
+            let map_ptr = self.mir_intrinsic_map_handle(body, args_id)
+            let slot = self.coerce_int(self.mir_intrinsic_arg(body, args_id, 1), i64_ty)
+            let entry_ty = self.mir_dest_llvm_type(body, dest_place)
+            let entry = self.create_entry_alloca(entry_ty)
+            var take_fn = wl_get_named_function(self.llmod, "with_hashmap_take_at")
+            let take_params: Vec[i64] = [ptr_ty, i64_ty, ptr_ty, ptr_ty]
+            let take_ty = wl_function_type(i32_ty, vec_data_i64(&take_params), 4, 0)
+            if take_fn == 0:
+                take_fn = wl_add_function(self.llmod, "with_hashmap_take_at", take_ty)
+            let take_args: Vec[i64] = [map_ptr, slot, wl_build_struct_gep(self.builder, entry_ty, entry, 0), wl_build_struct_gep(self.builder, entry_ty, entry, 1)]
+            let _ = wl_build_call(self.builder, take_ty, take_fn, vec_data_i64(&take_args), 4)
+            result = wl_build_load(self.builder, entry_ty, entry)
+
         else if intrinsic == MirIntrinsic.MAP_LEN32 or intrinsic == MirIntrinsic.MAP_LEN64 or intrinsic == MirIntrinsic.MAP_ULEN32:
             let map_ptr = self.mir_intrinsic_map_handle(body, args_id)
             let fn_val = self.ensure_hm_fn("with_hashmap_len", i64_ty)

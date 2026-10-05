@@ -521,6 +521,82 @@ impl[K, V] HashMap[K, V]:
     @[iter_of_self]
     pub fn values() -> MapValues[K, V]: MapValues { source: .Hash(self), at: 0 }
 
+// The consuming traversals (D44): each entry moves out of the map once.
+// The entries move out together, last first, so each step pops the next in
+// the map's order (insertion order for a HashMap, key order for a BTreeMap);
+// the ones never yielded drop with the iterator.
+
+/// `map.into_iter()`: each entry, moved out; the map is consumed.
+pub type MapIntoIter[K, V] { entries: Vec[(K, V)] }
+
+/// `map.into_keys()`: each key, moved out; the values are dropped.
+pub type MapIntoKeys[K, V] { entries: MapIntoIter[K, V] }
+
+/// `map.into_values()`: each value, moved out; the keys are dropped.
+pub type MapIntoValues[K, V] { entries: MapIntoIter[K, V] }
+
+/// `map.drain()`: each entry, moved out; the map remains, empty.
+pub type MapDrain[K, V] { entries: MapIntoIter[K, V] }
+
+impl[K, V] Iter[(K, V)] for MapIntoIter[K, V]:
+    mut fn next() -> Option[(K, V)]: self.entries.pop()
+
+impl[K, V] Iter[K] for MapIntoKeys[K, V]:
+    mut fn next() -> Option[K]:
+        match self.entries.next():
+            Some((key, _)) => Some(key)
+            None => None
+
+impl[K, V] Iter[V] for MapIntoValues[K, V]:
+    mut fn next() -> Option[V]:
+        match self.entries.next():
+            Some((_, value)) => Some(value)
+            None => None
+
+impl[K, V] Iter[(K, V)] for MapDrain[K, V]:
+    mut fn next() -> Option[(K, V)]: self.entries.next()
+
+impl[K, V] HashMap[K, V]:
+    // Every entry, moved out, last first; the table is left empty.
+    mut fn take_reversed() -> MapIntoIter[K, V]:
+        var reversed: Vec[(K, V)] = Vec.with_capacity(self.len())
+        var slot = self.slot_count() - 1
+        while slot >= 0:
+            if self.slot_live(slot): reversed.push(self.slot_take(slot))
+            slot = slot - 1
+        self.clear()
+        MapIntoIter { entries: reversed }
+
+    pub move fn into_iter() -> MapIntoIter[K, V]:
+        var map = self
+        map.take_reversed()
+
+    pub move fn into_keys() -> MapIntoKeys[K, V]: MapIntoKeys { entries: self.into_iter() }
+
+    pub move fn into_values() -> MapIntoValues[K, V]: MapIntoValues { entries: self.into_iter() }
+
+    pub mut fn drain() -> MapDrain[K, V]: MapDrain { entries: self.take_reversed() }
+
+impl[K, V] BTreeMap[K, V]:
+    // Every entry, moved out, last first; the map is left empty.
+    mut fn take_reversed() -> MapIntoIter[K, V]:
+        var reversed: Vec[(K, V)] = Vec.with_capacity(self.entries.len())
+        while true:
+            match self.entries.pop():
+                Some(entry) => reversed.push(entry)
+                None => break
+        MapIntoIter { entries: reversed }
+
+    pub move fn into_iter() -> MapIntoIter[K, V]:
+        var map = self
+        map.take_reversed()
+
+    pub move fn into_keys() -> MapIntoKeys[K, V]: MapIntoKeys { entries: self.into_iter() }
+
+    pub move fn into_values() -> MapIntoValues[K, V]: MapIntoValues { entries: self.into_iter() }
+
+    pub mut fn drain() -> MapDrain[K, V]: MapDrain { entries: self.take_reversed() }
+
 /// `set.iter()`, and what `for x in set` walks: each element as a view.
 pub type SetIter[T] ephemeral { set: &HashSet[T], at: i64 }
 
