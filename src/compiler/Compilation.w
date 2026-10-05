@@ -1361,7 +1361,9 @@ impl Compilation:
         if not compilation_ensure_output_dir(output_dir):
             return ""
 
-        let pool = self.compile_file(source_path)
+        // The file is an entry source: its top-level statements are its
+        // implicit main (§18.5b), as `build` and `check` compile it (#2118).
+        let pool = self.compile_entry_file(source_path)
         if pool.decl_count() == 0:
             return ""
         let prepared_pool = self.prepare_pool_after_typecheck_hooks(pool, source_path)
@@ -1600,7 +1602,9 @@ impl Compilation:
             runtime_eprint("error: --emit-c needs source bodies; '" ++ source_path ++ "' is an interface (D39)")
             return ""
         self.emit_c_in_unit = true
-        let pool = self.compile_file(source_path)
+        // The file is an entry source: its top-level statements are its
+        // implicit main (§18.5b), as `build` and `check` compile it (#2118).
+        let pool = self.compile_entry_file(source_path)
         if pool.decl_count() == 0:
             return ""
         let prepared_pool = self.prepare_pool_after_typecheck_hooks(pool, source_path)
