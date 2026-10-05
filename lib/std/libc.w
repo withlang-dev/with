@@ -11,6 +11,7 @@
 // `libc-surface-check` lane refuses any other `pub extern` in this file.
 
 use std.builtins.eprint
+use std.os.Target
 
 extern fn with_str_from_cstr(s: *const u8) -> str
 
@@ -180,3 +181,88 @@ extern fn with_libc_getrlimit(resource: i32, lim: *mut u8) -> i32
 extern fn with_libc_setrlimit(resource: i32, lim: *const u8) -> i32
 pub fn getrlimit(resource: i32, rlp: *mut rlimit) -> i32: with_libc_getrlimit(resource, rlp as *mut u8)
 pub fn setrlimit(resource: i32, rlp: *const rlimit) -> i32: with_libc_setrlimit(resource, rlp as *const u8)
+
+// ── Constants (D90) ─────────────────────────────────────────────
+// A migrated corpus names a libc constant; it never carries the number its
+// migration's headers gave it. The value here is what the function that
+// consumes it accepts on the target being compiled for: the runtime's own
+// numbering where a seam translates (`open`, `fcntl`), the target's own
+// value where the call goes straight to the OS's C runtime (`errno`,
+// `clock`, `setlocale`). A constant and the function that consumes it come
+// from this one table. A value that differs by target is a
+// `comptime match Target.os` (D91): a target added to `OsKind` is a compile
+// error here until its value is stated.
+
+// limits.h, stdint.h, stdlib.h: the same on every supported target.
+pub const INT_MAX: i32 = 2147483647
+pub const UINT_MAX: u32 = 4294967295
+pub const UINT8_MAX: i32 = 255
+pub const UINT16_MAX: i32 = 65535
+pub const UINT32_MAX: u32 = 4294967295
+pub const SIZE_MAX: u64 = 18446744073709551615
+pub const UINTPTR_MAX: u64 = 18446744073709551615
+pub const EXIT_SUCCESS: i32 = 0
+pub const EXIT_FAILURE: i32 = 1
+// C's `unsigned long` is 32 bits on Windows and 64 elsewhere.
+pub const ULONG_MAX: u64 = comptime match Target.os:
+    .Windows => 4294967295u64
+    .Macos => 18446744073709551615u64
+    .Linux => 18446744073709551615u64
+    .Wasi => 4294967295u64
+
+// stdio.h: `fseek` and `lseek` origins.
+pub const SEEK_SET: i32 = 0
+pub const SEEK_CUR: i32 = 1
+pub const SEEK_END: i32 = 2
+
+// fcntl.h: `open` flags and `fcntl` commands, in the numbering the `open`
+// and `fcntl` seams take (rt_open, rt_fcntl translate per target).
+pub const O_RDONLY: i32 = 0
+pub const O_WRONLY: i32 = 1
+pub const O_RDWR: i32 = 2
+pub const O_CREAT: i32 = 0x200
+pub const O_TRUNC: i32 = 0x400
+pub const O_APPEND: i32 = 0x800
+pub const O_EXCL: i32 = 0x1000
+pub const O_NONBLOCK: i32 = 0x2000
+pub const O_CLOEXEC: i32 = 0x4000
+pub const F_GETFD: i32 = 1
+pub const F_SETFD: i32 = 2
+pub const F_GETFL: i32 = 3
+pub const F_SETFL: i32 = 4
+pub const FD_CLOEXEC: i32 = 1
+
+// errno.h: what `*errno_ptr()` holds on the target.
+pub const EAGAIN: i32 = comptime match Target.os:
+    .Macos => 35
+    .Linux => 11
+    .Windows => 11
+    .Wasi => 6
+pub const EWOULDBLOCK: i32 = comptime match Target.os:
+    .Macos => 35
+    .Linux => 11
+    .Windows => 140
+    .Wasi => 6
+
+// time.h: the unit of `clock()`.
+pub const CLOCKS_PER_SEC: i32 = comptime match Target.os:
+    .Windows => 1000
+    .Macos => 1000000
+    .Linux => 1000000
+    .Wasi => 1000000000
+
+// sys/resource.h: `getrlimit` and `setrlimit`.
+pub const RLIMIT_STACK: i32 = 3
+// The Windows seam reports Darwin's value (rt: win_getrlimit).
+pub const RLIM_INFINITY: u64 = comptime match Target.os:
+    .Linux => 18446744073709551615u64
+    .Macos => 9223372036854775807u64
+    .Windows => 9223372036854775807u64
+    .Wasi => 18446744073709551615u64
+
+// locale.h: `setlocale` categories.
+pub const LC_CTYPE: i32 = comptime match Target.os:
+    .Linux => 0
+    .Macos => 2
+    .Windows => 2
+    .Wasi => 0

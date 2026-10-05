@@ -6,6 +6,7 @@
 
 use std.os.Target
 use std.os.OsKind
+use std.libc
 
 const NEWLINE: str = comptime match Target.os:
     .Windows => "\r\n"
@@ -22,6 +23,10 @@ fn family() -> i32:
     else:
         only_on_posix()
 
+// std.libc's per-target constants (D90) have a value on every target.
+fn libc_values() -> i64:
+    (libc.EAGAIN + libc.EWOULDBLOCK + libc.CLOCKS_PER_SEC + libc.LC_CTYPE) as i64 + (libc.RLIM_INFINITY % 7) as i64 + (libc.ULONG_MAX % 7) as i64
+
 fn main:
     let os: OsKind = Target.os
-    print(f"{NEWLINE.len()} {family()} {os == .Wasi}")
+    print(f"{NEWLINE.len()} {family()} {os == .Wasi} {libc_values()}")

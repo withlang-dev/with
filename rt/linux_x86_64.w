@@ -209,13 +209,17 @@ pub fn rt_read(fd: i32, buf: *mut u8, len: i64) -> i64:
     r
 
 pub fn rt_open(path: *const u8, flags: i32, mode: i32) -> i32:
-    // Canonical: O_RDONLY=0, O_WRONLY=1, O_RDWR=2, O_CREAT=0x200,
-    // O_TRUNC=0x400, O_APPEND=0x800.
-    // Linux: O_CREAT=0x40, O_EXCL=0x80, O_TRUNC=0x200, O_APPEND=0x400.
+    // Canonical (std.libc's O_* constants, D90): O_RDONLY=0, O_WRONLY=1,
+    // O_RDWR=2, O_CREAT=0x200, O_TRUNC=0x400, O_APPEND=0x800, O_EXCL=0x1000,
+    // O_NONBLOCK=0x2000, O_CLOEXEC=0x4000.
+    // Linux: O_CREAT=0x40, O_EXCL=0x80, O_TRUNC=0x200, O_APPEND=0x400,
+    // O_NONBLOCK=0x800, O_CLOEXEC=0x80000.
     var native = flags & 3
     if (flags & 0x200) != 0: native = native | 0x40
     if (flags & 0x400) != 0: native = native | 0x200
-    if (flags & 0x800) != 0: native = native | 0x400
+    if (flags & 0x1000) != 0: native = native | 0x80
+    if (flags & 0x4000) != 0: native = native | 0x80000
+    native = native | rt_status_flags_to_native(flags)
     var r: i32 = 0
     loop:
         r = rt_libc_open(path, native, mode)
@@ -235,11 +239,28 @@ pub fn rt_close(fd: i32) -> i32:
         return -get_errno()
     0
 
+// The file status flags F_GETFL and F_SETFL carry, between std.libc's
+// numbering and Linux's (O_APPEND 0x400, O_NONBLOCK 0x800).
+fn rt_status_flags_to_native(flags: i32) -> i32:
+    var native = 0
+    if (flags & 0x800) != 0: native = native | 0x400
+    if (flags & 0x2000) != 0: native = native | 0x800
+    native
+
+fn rt_status_flags_from_native(native: i32) -> i32:
+    var flags = native & 3
+    if (native & 0x400) != 0: flags = flags | 0x800
+    if (native & 0x800) != 0: flags = flags | 0x2000
+    flags
+
+// std.libc's fcntl (D90): F_GETFD=1, F_SETFD=2, F_GETFL=3, F_SETFL=4, the
+// status flags in std.libc's O_* numbering, FD_CLOEXEC=1.
 pub fn rt_fcntl(fd: i32, cmd: i32, arg: i32) -> i32:
-    let r = rt_libc_fcntl(fd, cmd, arg)
+    let native_arg = if cmd == 4: rt_status_flags_to_native(arg) else if cmd == 2: arg & 1 else: arg
+    let r = rt_libc_fcntl(fd, cmd, native_arg)
     if r < 0:
         return -get_errno()
-    r
+    if cmd == 3: rt_status_flags_from_native(r) else: r
 
 pub fn rt_seek(fd: i32, offset: i64, whence: i32) -> i64:
     let r = rt_libc_lseek(fd, offset, whence)
