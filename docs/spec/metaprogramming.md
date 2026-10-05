@@ -118,6 +118,11 @@ compiler-recognized APIs that declare their inputs to the build graph
 before reading them. Ordinary pure comptime does not get ambient file I/O
 by promising to be deterministic.
 
+The target a compilation is for is a declared input: `--target` names it,
+or it is the host, before anything is read. Reading `Target.os` or
+`Target.arch` (§17.5) is therefore pure, tracked comptime and needs no
+capability.
+
 ### 17.1b Capability-Bearing Comptime
 
 Capability-bearing comptime is a separate mode for build orchestration,
@@ -360,6 +365,33 @@ fn serialize_value[T](val: &T, out: Writer) -> Writer:
 `comptime_error` produces a compile error with a custom message.
 This is the mechanism for "concept checking" — enforcing constraints
 that can't be expressed as trait bounds.
+
+**The target.** `Target.os` and `Target.arch` are compile-time constants
+of `std.os`'s enums `OsKind` and `ArchKind`: the operating system and the
+architecture the program is being compiled for, never the host's. Each
+enum has one variant per supported target and no other. A `comptime if`
+or a `comptime match` on them selects code and values per target:
+
+```
+pub const EAGAIN: i32 = comptime match Target.os:
+    .Macos => 35
+    .Linux => 11
+    .Windows => 11
+    .Wasi => 6
+
+fn page_size() -> i64:
+    comptime if Target.os == .Windows:
+        windows_page_size()
+    else:
+        sysconf_page_size()
+```
+
+A `comptime match` is exhaustive as every `match` is, so a target added to
+`OsKind` is a compile error at each per-target value that does not name
+it. As with a `comptime if` on a type parameter, a branch not taken is
+parsed and not compiled: its names are not resolved and its types are not
+checked, so it may name what exists only on its own target.
+`with check --target <t>` checks a program as target `t` compiles it.
 
 **`comptime_error` semantics:**
 

@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.20
+# The With Programming Language — Specification v7.21
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,12 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.21:** the target at compile time, 2026-10-04 (D91). §17.1a:
+`Target` is a declared build input. §17.5: `Target.os` and `Target.arch`
+are compile-time constants of `OsKind` and `ArchKind`; a per-target value
+is an exhaustive `comptime match`; a branch not taken is parsed and not
+compiled; `with check --target <t>` checks a program as target `t`
+compiles it. The implementation is NON-COMPLIANT until it catches up.
 **Changelog v7.20:** what a literal already says, 2026-10-04 (D88, D89).
 §4.2.1: a `const` without a type whose initializer is unsuffixed numeric
 literals has no numeric type of its own; each use is typed as the
