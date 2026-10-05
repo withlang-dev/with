@@ -10,7 +10,7 @@ error AppError = DbError(str) | ProcessError | Cancelled
 type DbConnection { id: i32 }
 type ConnectionPool { url: str }
 
-fn with_connection(pool: ConnectionPool) -> DbConnection:
+fn with_connection(pool: ConnectionPool):
     print(f"Acquiring connection to {pool.url}...")
     defer: print("Releasing connection...")
     DbConnection { id: 42 }
