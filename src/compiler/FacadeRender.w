@@ -122,10 +122,17 @@ fn facade_render_hosted_fn_errors(pool: AstPool, intern: InternPool, ci: &Vec[i3
         if not li.bridged or li.text_view or li.borrow_res != 0 or not facade_render_lend_hosted(pool, intern, &li, resource, repr):
             continue
         let bridge = facade_render_bridge(pool, intern, li.decl, 1, -1, "")
-        if not bridge.ok or bridge.cap_var.len() == 0 or facade_render_fn_ok(pool, intern, li.decl) == 0:
+        if not bridge.ok or facade_render_fn_oks(pool, intern, li.decl).len() == 0:
             continue
         let fname: str = intern.resolve(pool.get_data0(li.decl as NodeId))
         out = out ++ facade_render_fn_error_type(pool, intern, li.decl, facade_render_present(pool, intern, ci, resource, fname))
+    // A callback operation hosted here (`db.exec(sql, callback, userdata)`).
+    for i in 0..items.len() as i32:
+        let cbi = facade_render_callback_item(pool, intern, ci, items[i])
+        if cbi.decl == 0 or not facade_render_callback_hosted(pool, intern, &cbi, resource, repr) or facade_render_fn_oks(pool, intern, cbi.decl).len() == 0:
+            continue
+        let fname: str = intern.resolve(pool.get_data0(cbi.decl as NodeId))
+        out = out ++ facade_render_fn_error_type(pool, intern, cbi.decl, facade_render_present(pool, intern, ci, resource, fname))
     out
 
 // Everything a facade renders is its module's public surface (spec
@@ -1855,7 +1862,24 @@ fn facade_render_indent(text: &str, indent: &str) -> str:
 // a runtime failure naming the operation and the length, never a trust.
 fn facade_render_bridge_body(pool: AstPool, intern: InternPool, decl: i32, b: &FacadeBridge, call: &str, presented: &str, indent: &str) -> (str, str):
     if b.cap_var.len() == 0:
-        return (facade_render_return(pool, intern, decl), indent ++ call ++ "\n")
+        // A status-returning operation under `ok` (ruling Amendment 3,
+        // §16.2b.4): `Result[T, <Fn>Error]`. One constant: the status is the
+        // whole return, so `T` is `Unit`. Several: `T` is the status that
+        // matched.
+        let oks = facade_render_fn_oks(pool, intern, decl)
+        if oks.len() == 0:
+            return (facade_render_return(pool, intern, decl), indent ++ call ++ "\n")
+        let op_err = facade_render_fn_error_name(presented)
+        let op_status = facade_render_fresh("status", facade_render_param_names(pool, intern, decl))
+        var failed = ""
+        for k in 0..oks.len() as i32:
+            if k > 0: failed = failed ++ " and "
+            failed = failed ++ op_status ++ " != " ++ intern.resolve(oks[k])
+        let checked = indent ++ "let " ++ op_status ++ " = " ++ call ++ "\n" ++ indent ++ "if " ++ failed ++ ": return Err(" ++ op_err ++ ".Failed(" ++ op_status ++ "))\n"
+        if oks.len() == 1:
+            return (" -> Result[Unit, " ++ op_err ++ "]", checked ++ indent ++ "()\n")
+        let status_type = facade_render_return(pool, intern, decl)
+        return (" -> Result[" ++ status_type.slice(4, status_type.len()) ++ ", " ++ op_err ++ "]", checked ++ indent ++ op_status ++ "\n")
     let ok_sym = facade_render_fn_ok(pool, intern, decl)
     let check = indent ++ "if " ++ b.cap_var ++ " < 0 or " ++ b.cap_var ++ " as u64 > " ++ b.cap_of ++ ".len() as u64: panic(f\"" ++ presented ++ ": C reported {" ++ b.cap_var ++ "} " ++ b.cap_unit ++ " written into a buffer of {" ++ b.cap_of ++ ".len()} " ++ b.cap_unit ++ " (§16.2b.8)\")\n"
     let result = indent ++ b.cap_var ++ " as usize\n"
@@ -1866,6 +1890,23 @@ fn facade_render_bridge_body(pool: AstPool, intern: InternPool, decl: i32, b: &F
     var body = indent ++ "let " ++ status ++ " = " ++ call ++ "\n"
     body = body ++ indent ++ "if " ++ status ++ " != " ++ intern.resolve(ok_sym) ++ ": return Err(" ++ err ++ ".Failed(" ++ status ++ "))\n"
     (" -> Result[usize, " ++ err ++ "]", body ++ check ++ result)
+
+// Every constant of the `ok` an fn item states for the declaration; none
+// for a variadic contract, whose `ok` is its setter's success edge and
+// leaves the presentation as it is (§16.2b.5).
+fn facade_render_fn_oks(pool: AstPool, intern: InternPool, decl: i32) -> Vec[i32]:
+    let oks: Vec[i32] = Vec.new()
+    let item = facade_render_fn_item(pool, intern, decl)
+    if item == 0:
+        return oks
+    let cstart = pool.get_data1(item as NodeId)
+    for k in 0..pool.get_data2(item as NodeId):
+        if pool.get_data0(pool.get_extra(cstart + k) as NodeId) == FACADE_CLAUSE_VARIADIC: return oks
+    for k in 0..pool.get_data2(item as NodeId):
+        let clause = pool.get_extra(cstart + k)
+        if pool.get_data0(clause as NodeId) == FACADE_CLAUSE_OK:
+            for ci in 0..pool.get_data2(clause as NodeId): oks.push(pool.get_extra(pool.get_data1(clause as NodeId) + ci))
+    oks
 
 // The `ok CONST` an fn item states for the declaration, or 0.
 fn facade_render_fn_ok(pool: AstPool, intern: InternPool, decl: i32) -> i32:
@@ -1955,7 +1996,7 @@ fn facade_render_free_ops(pool: AstPool, intern: InternPool, ci: &Vec[i32], faca
             let handle = facade_render_fresh("repr", facade_render_param_names(pool, intern, decl))
             out = out ++ "fn " ++ base ++ "(" ++ bridge.params ++ ") -> Option[" ++ view ++ "]:\n" ++ facade_render_indent(bridge.prologue, "    ") ++ "    let " ++ handle ++ " = " ++ facade_render_call(pool, intern, decl, bridge.args) ++ "\n    if " ++ handle ++ " == null: None else: Some(unsafe { " ++ handle ++ " as " ++ view ++ " })\n"
             continue
-        if bridge.cap_var.len() > 0 and facade_render_fn_ok(pool, intern, decl) != 0:
+        if facade_render_fn_oks(pool, intern, decl).len() > 0:
             out = out ++ facade_render_fn_error_type(pool, intern, decl, presented)
         let rendered = if li.rename != 0: presented.clone() else: facade_render_bridge_name(cname)
         let (result, body) = facade_render_bridge_body(pool, intern, decl, &bridge, facade_render_call(pool, intern, decl, bridge.args), presented, "    ")
@@ -2809,7 +2850,9 @@ fn facade_render_callback_ops(pool: AstPool, intern: InternPool, ci: &Vec[i32], 
                 body = body ++ indent ++ "let " ++ facade_render_fresh(f"facade_c{pi}", taken) ++ ": " ++ wrapped_raw[wi] ++ " = if " ++ facade_render_fresh(f"facade_p{pi}", taken) ++ " == null: null else: " ++ w ++ "\n"
         if wrapped_failed:
             continue
-        if bridge.cap_var.len() > 0 and facade_render_fn_ok(pool, intern, decl) != 0:
+        // A hosted operation's error type is declared beside its resource
+        // (facade_render_hosted_fn_errors).
+        if not hosted and facade_render_fn_oks(pool, intern, decl).len() > 0:
             out = out ++ facade_render_fn_error_type(pool, intern, decl, mname)
         out = out ++ head ++ body ++ call_body ++ "\n"
     out

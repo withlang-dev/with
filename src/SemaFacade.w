@@ -987,7 +987,7 @@ impl Sema:
                 return
             self.emit_error(f"fn '{fname}' is described by two facade blocks with different clauses; one function has one contract — restate it word for word or describe it once (§16.2b)", item)
             return
-        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: Vec.new(), consumes_destroyed_by: Vec.new(), retains: Vec.new(), retains_by: Vec.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_domain: 0, returns_borrow_parent: 0, returns_static_tid: 0, preserves_params: Vec.new(), preserves_domains: Vec.new(), of_resource: 0, rename: 0, callback_thread_any: 0, callbacks_none: 0, callback_consumes: Vec.new(), callback_userdata_cb: Vec.new(), callback_userdata_of: Vec.new(), valid_on_failed: 0, nullable_params: Vec.new(), buffer_ptr: Vec.new(), buffer_len: Vec.new(), buffer_inout: Vec.new(), buffer_elements: Vec.new(), fixed_params: Vec.new(), fixed_literals: Vec.new(), ok_const: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: Vec.new(), variadic_case_values: Vec.new(), variadic_case_tids: Vec.new(), variadic_case_kinds: Vec.new(), variadic_slots: Vec.new(), returns_borrow_record: 0, argv_cb: Vec.new(), argv_index: Vec.new(), argc_index: Vec.new(), argv_handle: Vec.new(), argv_nodes: Vec.new(), user_data_fn: 0, user_data_handle: -1, user_data_node: 0 }
+        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: Vec.new(), consumes_destroyed_by: Vec.new(), retains: Vec.new(), retains_by: Vec.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_domain: 0, returns_borrow_parent: 0, returns_static_tid: 0, preserves_params: Vec.new(), preserves_domains: Vec.new(), of_resource: 0, rename: 0, callback_thread_any: 0, callbacks_none: 0, callback_consumes: Vec.new(), callback_userdata_cb: Vec.new(), callback_userdata_of: Vec.new(), valid_on_failed: 0, nullable_params: Vec.new(), buffer_ptr: Vec.new(), buffer_len: Vec.new(), buffer_inout: Vec.new(), buffer_elements: Vec.new(), fixed_params: Vec.new(), fixed_literals: Vec.new(), ok_const: 0, ok_count: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: Vec.new(), variadic_case_values: Vec.new(), variadic_case_tids: Vec.new(), variadic_case_kinds: Vec.new(), variadic_slots: Vec.new(), returns_borrow_record: 0, argv_cb: Vec.new(), argv_index: Vec.new(), argc_index: Vec.new(), argv_handle: Vec.new(), argv_nodes: Vec.new(), user_data_fn: 0, user_data_handle: -1, user_data_node: 0 }
         let extra_start = self.ast.get_data1(item)
         let clause_count = self.ast.get_data2(item)
         for ci in 0..clause_count:
@@ -1673,22 +1673,20 @@ impl Sema:
                     return c
             return c
         if kind == FACADE_CLAUSE_OK:
-            // `ok CONST` on an fn item (D64, §16.2b.8): the status contract
-            // under which a copied-back length is presented — on success
-            // only. A resource's producer states `ok` on the resource
-            // (§16.2b.4); an fn item's `ok` needs a length to present, which
-            // verify_facade_buffers checks once every clause is collected.
+            // `ok` on an fn item (§16.2b.4; ruling Amendment 3): the status
+            // contract of an operation whose C function returns a status.
+            // One constant or several; what the presented operation returns
+            // on success, and the shapes a list does not fit (a copied-back
+            // length, a variadic setter), verify_facade_buffers decides once
+            // every clause is collected.
             let const_sym = self.ast.get_extra(ops)
             let cn: str = self.pool_resolve(const_sym)
-            // Several success statuses are a producer's (§16.2b.4, ruling
-            // Amendment 1: "A producer's `ok` may list several"); the
-            // status contract of an fn item names one.
-            if self.ast.get_data2(clause) > 1:
-                self.emit_error(f"fn '{fname}': 'ok' lists several success statuses, which a producer's 'ok' on its resource may; an fn item's 'ok' — the status contract of a copied-back length or a variadic setter — names one (§16.2b.4)", clause)
-                return c
-            if not self.facade_status_constant_ok(const_sym):
-                self.emit_error(f"fn '{fname}': 'ok {cn}' names no imported integer constant; a status is compared with a compile-time constant the header declares (§16.2b.4)", clause)
-                return c
+            for oi in 0..self.ast.get_data2(clause):
+                let listed = self.ast.get_extra(ops + oi)
+                if not self.facade_status_constant_ok(listed):
+                    let ln: str = self.pool_resolve(listed)
+                    self.emit_error(f"fn '{fname}': 'ok {ln}' names no imported integer constant; a status is compared with a compile-time constant the header declares (§16.2b.4)", clause)
+                    return c
             let ret = self.sig_return_type(sig)
             if ret == 0 or self.get_type_kind(self.numeric_operand_type(ret)) != TypeKind.TY_INT:
                 let rt: str = if ret == 0: "nothing" else: self.type_name(ret)
@@ -1698,6 +1696,7 @@ impl Sema:
                 self.emit_error(f"fn '{fname}': 'ok' is stated twice (§16.2b.4)", clause)
                 return c
             c.ok_const = const_sym
+            c.ok_count = self.ast.get_data2(clause)
             return c
         let cname = facade_clause_name(kind)
         self.emit_error(f"fn '{fname}': clause '{cname}' applies to a resource, not an fn item (§16.2b)", clause)
@@ -2867,9 +2866,12 @@ impl Sema:
         // `ok CONST` on a variadic operation is its status contract for the
         // listed cases (§16.2b.5): the success edge of a setter, read by
         // MIR; the presentation is unchanged.
-        if ok_const != 0 and inout < 0 and self.foreign_contracts[ci].variadic_node == 0:
-            let cn: str = self.pool_resolve(ok_const)
-            self.emit_error(f"fn '{fname}': 'ok {cn}' states the status contract a copied-back length is presented under, and '{fname}' pairs no 'capacity … inout' buffer, so there is no value to present on success; a producer's status is stated on its resource (§16.2b.4, §16.2b.8)", node)
+        // Several success statuses belong to a status-returning operation
+        // (ruling Amendment 3): a copied-back length is presented under one
+        // status, and a variadic setter's success edge is one status.
+        if self.foreign_contracts[ci].ok_count > 1 and (inout >= 0 or self.foreign_contracts[ci].variadic_node != 0):
+            let shape = if inout >= 0: "a copied-back length is presented under one success status" else: "a variadic setter has one success status"
+            self.emit_error(f"fn '{fname}': 'ok' lists several success statuses, and {shape} (§16.2b.4)", node)
             return
         // A resource's own operation renders as its constructor or destroyer,
         // a callback contract as its callback method (stage 9): their
