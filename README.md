@@ -258,7 +258,7 @@ fn largest[T: Area](items: &Vec[T]):
     biggest ?? 0.0                       // an empty list has no largest
 
 fn main:
-    let shapes: Vec[Shape] = [.Circle(1.0), .Rect(2.0, 3.0), .Unit]
+    let shapes = [.Circle(1.0), .Rect(2.0, 3.0), .Unit]
     print(largest(shapes))                                                   // 6
     let big = shapes.iter() |> filter(it.area() > 1.0) |> map(it.area()) |> collect[Vec]()
     let squares = [x * x for x in 1..6 if x % 2 == 1]                        // 1, 9, 25
