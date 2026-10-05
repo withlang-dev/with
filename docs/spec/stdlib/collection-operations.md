@@ -121,6 +121,16 @@ signatures is a separate ruling, provisionally identified as a D23 candidate.
 `SlotMap.get` already has the uniform `Option[&T]` contract specified by §6.2
 and therefore participates in D22 without an API change.
 
+**Insertion order and a seeded hash (D96).** A `HashMap` or `HashSet`
+iterates in insertion order: an entry keeps the position of its first
+insertion, an insert of a key already present replaces its value in place,
+and a removal leaves the rest in order. The order is the same run to run
+and host to host, because it depends on the order of insertions, not on
+hash values. The hash is seeded once per process from the runtime's
+randomness capability: it protects a map whose keys an adversary chooses
+from degrading to quadratic time, and is otherwise unobservable; a
+deterministic replay records the seed as it records any random value.
+
 **Traversal observes; consuming iteration transfers (D44).**
 
 Every owning keyed map in the standard library, including `HashMap[K, V]`

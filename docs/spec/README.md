@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.24
+# The With Programming Language — Specification v7.25
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,14 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.25:** keys and maps, 2026-10-05 (D96). §11.7: a key is any
+type whose `==` is structural and that holds no float; every key implements
+`Key`; a type whose equality is about one part of its value states that
+part as its key projection (`fn key()`), from which `==` and the hash both
+follow; the hash is the compiler's, seeded per process; `Hash` is no longer
+written or derived (§11.8). Collection operations: `HashMap` and `HashSet`
+iterate in insertion order. The implementation is NON-COMPLIANT until it
+catches up.
 **Changelog v7.24:** five rulings, 2026-10-05 (D95). §29.6: `_` binds
 nothing, so `let _ = x` moves a non-`Copy` `x` and drops it there (#2074).
 §9.1b: a `pub const` may omit its type as a private one may; §4.2.1: a use

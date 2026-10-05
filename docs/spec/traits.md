@@ -35,8 +35,8 @@ no errors are reported — even if the body contains invalid operations.
 Explicit bounds remain available as optional contracts:
 
 ```
-fn debug[T: Show + Hash](x: &T):
-    print(f"{x.show()} (hash: {x.hash()})")
+fn debug[T: Show + Clone](x: &T):
+    print(f"{x.show()} and {x.clone().show()}")
 ```
 
 Use bounds when they improve the public API contract or produce
@@ -52,8 +52,8 @@ function signature, type definition, or impl header:
 fn display[T](x: T) where T: Printable:
     print(x.to_string())
 
-fn multi[T](x: T) where T: Show, T: Hash:
-    print(f"{x.show()} (hash: {x.hash()})")
+fn multi[T](x: T) where T: Show, T: Clone:
+    print(f"{x.show()} and {x.clone().show()}")
 ```
 
 `where` clauses are equivalent to inline bounds (`T: Trait` in the generic
@@ -419,6 +419,34 @@ trait Ord:
     fn cmp(self: &Self, other: &Self) -> i32
 ```
 
+**Keys (D96).** A type is a *key*, a `HashMap` key or a `HashSet` element,
+when its `==` is structural and no part of it is a float: the integers,
+`bool`, `str`, raw pointers, and tuples, fixed arrays, `Vec`, `Option`,
+`Result`, `Box` and declared types whose parts are keys. Every key
+implements `Key`, which is the bound a generic container states
+(`K: Key`). A float part is refused as a key; the error names `std`'s
+`TotalF64`, a float with a total order. The map owns its keys and nothing
+else can mutate one while it is inside, so a `Vec` is as good a key as an
+integer.
+
+A key is hashed by the compiler, structurally and consistently with `==`,
+with a hash seeded once per process from the runtime's randomness
+capability. No program writes a hash. A type whose equality is about one
+part of its value states that part once, as its key projection:
+
+```
+impl Key for Tag:
+    fn key(): self.name.to_lower()
+```
+
+`key` observes its receiver and returns a key, of the type its body gives.
+For a type with a projection, `a == b` is `a.key() == b.key()` and its hash
+is its key's, so the two cannot disagree; such a type does not also declare
+`eq`. A type that declares its own `eq` and no projection is not a key:
+using it as one is an error that suggests `key()`. A container a library
+writes over a generic key hashes it with `std.hash.hash_of(key: &K) -> u64`,
+the hash the standard maps use.
+
 The prelude also defines optional traits with matching names and
 signatures for the arithmetic operators, for explicit bounds and
 documentation:
@@ -464,8 +492,8 @@ Standard library implementations:
 | `[T; N]` (array) | `T` where `T: Eq` | Linear scan |
 | `[]T` (slice) | `T` where `T: Eq` | Linear scan |
 | `Vec[T]` | `T` where `T: Eq` | Linear scan |
-| `HashSet[T]` | `T` where `T: Hash + Eq` | O(1) lookup |
-| `HashMap[K, V]` | `K` where `K: Hash + Eq` | Key existence |
+| `HashSet[T]` | `T` where `T: Key` | O(1) lookup |
+| `HashMap[K, V]` | `K` where `K: Key` | Key existence |
 | `BTreeSet[T]` | `T` where `T: Ord` | O(log n) lookup |
 | `BTreeMap[K, V]` | `K` where `K: Ord` | Key existence |
 | `Range[T]` (`a..b`) | `T` where `T: Ord` | `a <= x and x < b` |
@@ -547,13 +575,12 @@ structure. The following traits may be derived:
 | `Clone` | All fields are `Clone` | Field-by-field clone |
 | `Default` | All fields are `Default` | Field-by-field default |
 | `Eq` | All fields are `Eq` | Field-by-field equality |
-| `Hash` | All fields are `Hash` | Hash all fields in order |
 | `Ord` | All fields are `Ord` | Lexicographic comparison |
 | `Debug` | Always | "{TypeName} { field: value, ... }" |
 | `Display` | Always (enums) | Variant name as string |
 
 ```
-@[derive(Eq, Hash, Debug, Clone)]
+@[derive(Eq, Debug, Clone)]
 type Point { x: f64, y: f64 }
 
 @[derive(Eq, Debug)]
@@ -566,12 +593,12 @@ qualifies for:
 ```
 @[derive(all)]
 type Color { r: u8, g: u8, b: u8, a: u8 }
-// Derives: Clone, Default, Eq, Hash, Ord, Debug
+// Derives: Clone, Default, Eq, Ord, Debug
 // (NOT Copy — aggregate types require explicit Copy opt-in)
 
 @[derive(all)]
 type User { name: str, email: str, age: i32 }
-// Derives: Clone, Default, Eq, Hash, Debug
+// Derives: Clone, Default, Eq, Debug
 // (NOT Copy — aggregate types require explicit Copy opt-in)
 // (NOT Ord — not all fields implement Ord by default)
 ```
@@ -589,14 +616,15 @@ implement `Eq`, the type silently loses its derived `Eq`. This is by
 design — no compile error, because `@[derive(all)]` means "whatever
 you can."
 
-For explicit control, list traits individually. `@[derive(Eq, Hash)]`
+For explicit control, list traits individually. `@[derive(Eq, Ord)]`
 will produce a compile error if a field doesn't implement `Eq` or
-`Hash`.
+`Ord`. `Hash` is not derived: a key is hashed by the compiler (§11.7).
 
 **Structural types.** A tuple, a fixed array `[T; N]`, `Option[T]` and
-`Result[T, E]` implement `Clone`, `Eq`, `Ord`, `Hash` and `Debug` when every
-element type does, with the behavior `@[derive]` gives a declared type of the
-same shape: element by element, in order. A clone that panics partway
+`Result[T, E]` implement `Clone`, `Eq`, `Ord` and `Debug` when every element
+type does, with the behavior `@[derive]` gives a declared type of the same
+shape: element by element, in order; they are keys when every element type
+is. A clone that panics partway
 through drops the elements already cloned.
 
 `@[derive(...)]` is implemented via comptime (§17.3). User-defined

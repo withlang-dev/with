@@ -916,7 +916,7 @@ let none: Vec[i32] = []                // empty sequence (type from context)
    matching repeated `insert`).
 4. Element and map forms cannot be mixed in one literal.
 5. The map form requires the target's key type to satisfy the
-   container's bound (`Hash + Eq` for `HashMap`, `Ord` for
+   container's bound (`Key` for `HashMap`, `Ord` for
    `BTreeMap`), checked as for any construction.
 
 There are no brace-delimited collection literals; `{ }` remains
