@@ -1,6 +1,6 @@
 # Unified `from` Query Expressions
 
-This feature is dependent on `jq` and `sqlite` being migrated per docs/feature_plans/stdlib_migration.md.  It can't be implemented until that's complete.
+The in-memory backend comes first; the jq and SQLite backends depend on those migrations (docs/feature_plans/stdlib_migration.md).
 
 ## Overview
 
