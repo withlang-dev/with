@@ -4457,6 +4457,8 @@ impl Sema:
                 if body_root != 0:
                     self.note_param_view_origin(body_root, self.compute_expr_view_origin_mask(body), self.compute_expr_storage_origin_mask(body), body)
                 self.check_returned_view_origins(body, body)
+            else if has_ret_annotation and body_materializes_copy == 0 and self.type_is_ephemeral_value(body_ty as i32) == 0 and self.expr_is_ephemeral_value(body) == 0:
+                self.check_returned_owned_as_view(body, body_ty as i32, ret_type, body)
             else if body_materializes_copy == 0 and (self.type_is_ephemeral_value(body_ty as i32) != 0 or self.expr_is_ephemeral_value(body) != 0):
                 self.note_returned_transparent_view_effects(body)
                 self.check_returned_ephemeral_value_origins(body, body)
@@ -15581,6 +15583,33 @@ impl Sema:
     mut fn check_returned_view_origins(expr_node: i32, report_node: i32):
         self.check_view_escape_origins(expr_node, report_node, -1)
 
+    // #2116 (§21.1): a function declared to return a view whose result is an
+    // owned value returns a view of that value. A local's or a consumed
+    // parameter's dies with the frame, and a temporary's has no place at
+    // all: `fn f() -> &str: let s = make(); s` compiled, and leaked `s`.
+    mut fn check_returned_owned_as_view(expr_node: i32, value_ty: i32, declared_ret: i32, report_node: i32):
+        if expr_node == 0 or value_ty <= 0 or declared_ret <= 0:
+            return
+        if self.get_type_kind(self.resolve_alias(declared_ret as TypeId)) != TypeKind.TY_REF:
+            return
+        let value_kind = self.get_type_kind(self.resolve_alias(value_ty as TypeId))
+        if value_kind == TypeKind.TY_REF or value_kind == TypeKind.TY_PTR or value_kind == TypeKind.TY_NEVER or self.type_is_ephemeral_value(value_ty as TypeId) != 0:
+            return
+        // The value a block yields is its tail's.
+        var result = expr_node
+        while self.ast.kind(result) == NodeKind.NK_BLOCK and self.ast.get_data2(result) != 0:
+            result = self.ast.get_data2(result)
+        let owner = self.place_root_sym(result)
+        if owner == 0:
+            self.emit_error_with_help("cannot return a view of a temporary value: it is dropped when the function returns", report_node, "return the value itself: declare the return type without `&`")
+            return
+        // A parameter answers by its declared mode, a global outlives the
+        // call; anything else is a local of this body, in scope or already
+        // out of it.
+        let dies_with_frame = if self.param_index_for_sym(owner) >= 0: self.view_origin_is_stack_local(owner) != 0 else: self.global_value_decl_kind(owner) == 0
+        if dies_with_frame:
+            self.report_view_escape(owner, report_node, -1)
+
     // #1406 (§21.1): the origin dies before the view's destination when it is
     // a stack local of the function (a return, `block_scope_start < 0`), or a
     // binding declared inside the block whose tail yields the view (an inner
@@ -16310,6 +16339,8 @@ impl Sema:
                 if root != 0:
                     self.note_param_view_origin(root, self.compute_expr_view_origin_mask(value), self.compute_expr_storage_origin_mask(value), value)
                 self.check_returned_view_origins(value, node)
+            else if self.has_contextual_copy_adjustment(value) == 0 and self.type_is_ephemeral_value(val_type as i32) == 0 and self.expr_is_ephemeral_value(value) == 0:
+                self.check_returned_owned_as_view(value, val_type as i32, self.current_return_type as i32, node)
             else if self.has_contextual_copy_adjustment(value) == 0 and (self.type_is_ephemeral_value(val_type as i32) != 0 or self.expr_is_ephemeral_value(value) != 0):
                 self.note_returned_transparent_view_effects(value)
                 self.check_returned_ephemeral_value_origins(value, node)
