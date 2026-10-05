@@ -134,7 +134,7 @@ fn total(xs: &Vec[i32]): xs.iter() |> sum()                      // &T borrows
 fn archive(xs: Vec[i32]): print(f"archived {xs.len()} values")   // T takes ownership
 
 fn main:
-    let xs: Vec = [1, 2, 3]
+    let xs = [1, 2, 3]
     print(total(xs))                   // no & at the call
     archive(xs)                        // no move at the call
     print(total(xs))                   // error: use of moved value
@@ -161,7 +161,7 @@ and it refuses a view that would outlive what it points into:
 
 ```
 fn first_of_local() -> &i32:
-    let xs: Vec = [1, 2, 3]
+    let xs = [1, 2, 3]
     xs[0]        // error: returned view may outlive its origin 'xs'
 ```
 
