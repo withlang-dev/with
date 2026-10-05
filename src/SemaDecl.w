@@ -470,6 +470,15 @@ impl Sema:
         self.prepare_interface_demand()
         self.register_c_import_modules()
         self.collecting_types = 1
+        // Pass 0: the names of the module-level constants. A field's type
+        // may be sized by one (`[T; N]`, §4.3a), and types are collected
+        // before the bindings are (#2121).
+        for di in 0..self.ast.decl_count():
+            if self.decl_is_lazy_skipped(di):
+                continue
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) == NodeKind.NK_LET_DECL and self.ast.is_const_decl_node(decl) != 0:
+                self.const_global_syms.insert(self.ast.get_data0(decl), 1)
         // Pass 1: collect named types and traits first so functions can refer
         // to imported or forward-declared types regardless of declaration order.
         for di in 0..self.ast.decl_count():

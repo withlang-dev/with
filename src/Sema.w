@@ -852,8 +852,8 @@ pub type Sema {
     // an element-form literal takes its type from its uses. The check hears
     // them (literal_demands: per demand, the `let`, the demanded type, the
     // use); a program with a demand is checked again with every such
-    // binding at the type decided (literal_decisions: per binding, the
-    // `let`, its type, a second demanded type or 0, the two uses).
+    // binding at the type decided (literal_decisions; its layout is
+    // literal_decisions_from_demands's).
     literal_demands: Vec[i32],
     // Every literal binding checked so far, as (function signature, name,
     // `let`) triples: a return is judged after the body's scopes have
@@ -861,6 +861,10 @@ pub type Sema {
     // caller's.
     fn_literal_lets: Vec[i32],
     literal_decisions: Vec[i32],
+    // The number of types when the first such binding was reached: the two
+    // checks are the same check up to there, so a type below this mark has
+    // one id in both, and a type above it is rebuilt from its structure.
+    literal_watermark: i32,
     // move-sites: last use per (root, first-field) path — the liveness key for
     // FIELD-shaped transfer args, so `eat(move self.r)` followed by `self.tag`
     // reads verdicts on the `.r` path, not the whole receiver. Key packs
@@ -3034,6 +3038,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         field_decisions: Vec.new(),
         literal_demands: Vec.new(),
         fn_literal_lets: Vec.new(),
+        literal_watermark: 0,
         literal_decisions: Vec.new(),
         field_last_use: HashMap.new(),
         effect_prov: HashMap.new(),

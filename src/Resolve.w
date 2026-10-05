@@ -11,6 +11,8 @@ use Diagnostic
 use Span
 use compiler.EmbeddedStdlib
 use compiler.EmbeddedRuntime
+use compiler.EmbeddedBundles
+use compiler.BundleInterfaces
 use compiler.ModuleSource
 use compiler.Runtime
 use std.collections.HashMap
@@ -603,6 +605,7 @@ impl ResolveState:
 
         if kind == NodeKind.NK_TYPE_ARRAY:
             self.walk_type_expr(ast_pool, module_id, current_scope, ast_pool.get_data0(node))
+            if ast_pool.get_data2(node) != 0: self.walk_expr(ast_pool, module_id, 0, current_scope, ast_pool.get_data2(node))
             return
 
         if kind == NodeKind.NK_TYPE_TUPLE:
@@ -1382,7 +1385,21 @@ fn resolve_header_namespace(header: &str) -> str:
             return ""
     name.clone()
 
+// The embedded bundle whose interface names module `dotted`, or "".
+fn embedded_bundle_providing(dotted: &str) -> str:
+    for bi in 0..embedded_bundle_count():
+        if not embedded_bundle_present(bi): continue
+        for path in bundle_interface_section_paths(embedded_bundle_interface_text(bi)):
+            if bundle_module_dotted_name(path) == dotted: return embedded_bundle_name(bi)
+    ""
+
 pub fn import_not_found_message(dotted: &str) -> str:
+    // A bundled corpus is in the compiler as an object and an interface,
+    // never as source (D38). A compilation that needs its bodies (--emit-c
+    // compiles every module in-unit) has them only in a source checkout (#2118).
+    let bundle = embedded_bundle_providing(dotted)
+    if bundle.len() > 0:
+        return "module '" ++ dotted ++ "' is in this compiler as the '" ++ bundle ++ "' bundle, an object without source; this compilation needs its source (--emit-c compiles every module in-unit), so run it from a With source checkout"
     var msg = "import module not found: '" ++ dotted ++ "'"
     if with_fs_is_dir("out/gen") == 0:
         msg = msg ++ " (build-generated modules live under out/gen; run `with build` once in a fresh checkout)"

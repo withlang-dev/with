@@ -8864,9 +8864,14 @@ impl Parser:
             if self.peek() == TokenKind.TK_SEMICOLON:
                 self.advance()  // consume ;
                 self.skip_newlines()
+                // §4.3a: N is an integer literal or a constant expression
+                // (a `const`). A non-literal length is the node's d2; Sema
+                // evaluates it (#2121).
                 if self.peek() != TokenKind.TK_INT_LIT:
-                    self.emit_error("expected array size after ';'")
-                    return self.poisoned_expr()
+                    let len_expr = self.parse_expr()
+                    self.skip_newlines()
+                    self.expect(TokenKind.TK_R_BRACKET)
+                    return self.pool.add_node(NodeKind.NK_TYPE_ARRAY, start, self.prev_end(), elem, 0, len_expr)
                 let ss = self.current_start()
                 let se = self.current_end()
                 let size_text = self.source.slice(ss as i64, se as i64)

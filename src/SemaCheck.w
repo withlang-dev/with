@@ -1717,7 +1717,7 @@ impl Sema:
 
         if kind == NodeKind.NK_TYPE_ARRAY:
             let elem = self.resolve_type_expr(self.ast.get_data0(node))
-            let size = self.ast.get_data1(node)
+            let size = self.array_type_len(node)
             return self.ensure_exact_type(TypeKind.TY_ARRAY, elem as i32, size, 0)
 
         if kind == NodeKind.NK_TYPE_SLICE:
@@ -1975,6 +1975,8 @@ impl Sema:
             let fn_kind = if kind == NodeKind.NK_TYPE_EXTERN_FN: TypeKind.TY_EXTERN_FN else: TypeKind.TY_FN
             return self.find_fn_type_of_kind_u(fn_kind, &param_types, param_count, ret, self.fn_type_node_flags(node))
         if kind == NodeKind.NK_TYPE_ARRAY:
+            // A length Sema never evaluated has no type (array_type_len).
+            if self.ast.get_data2(node) != 0: return 0
             let elem = self.resolve_type_expr_frozen(self.ast.get_data0(node))
             return self.find_exact_type(TypeKind.TY_ARRAY, elem as i32, self.ast.get_data1(node), 0)
         if kind == NodeKind.NK_TYPE_SLICE:
@@ -12613,13 +12615,15 @@ impl Sema:
     // For comparison, a `&str` behaves like the `str` it points at (string value
     // compare), so it is not treated as a bare pointer. Derefs only str references;
     // `&i32` etc. keep pointer semantics. (#293)
+    // A view of a str compares as the str it observes, through every level
+    // of view (`kept[i]` of a `Vec[&str]` is a view of a view, #2142).
     fn cmp_normalize_str_ref(ty: i32) -> i32:
-        let r = self.resolve_alias(ty as TypeId)
-        if self.get_type_kind(r) == TypeKind.TY_REF:
-            let inner = self.get_type_d0(r)
-            if self.get_type_kind(self.resolve_alias(inner as TypeId)) == TypeKind.TY_STR:
-                return inner
-        ty
+        var inner = ty
+        var r = self.resolve_alias(inner as TypeId)
+        while self.get_type_kind(r) == TypeKind.TY_REF:
+            inner = self.get_type_d0(r) as i32
+            r = self.resolve_alias(inner as TypeId)
+        if inner != ty and self.get_type_kind(r) == TypeKind.TY_STR: inner else: ty
 
     fn membership_rhs_uses_special_lowering(rhs_node: i32, rhs_ty: i32) -> i32:
         let rhs_kind = self.ast.kind(rhs_node)
@@ -12793,6 +12797,17 @@ impl Sema:
             return 0
         self.typed_expr_types.insert(node, self.ty_bool as i32)
         self.ty_bool as i32
+
+    // A tuple type with an element that is a generic declaration itself:
+    // a bare `None` typed with nothing to decide its `Option` (#2142).
+    fn tuple_has_open_generic(tuple: i32) -> bool:
+        let start = self.get_type_d0(tuple as TypeId)
+        for ei in 0..self.get_type_d1(tuple as TypeId):
+            let elem = self.resolve_alias(self.type_extra[start + ei] as TypeId) as i32
+            let kind = self.get_type_kind(elem as TypeId)
+            if kind == TypeKind.TY_TUPLE and self.tuple_has_open_generic(elem): return true
+            if (kind == TypeKind.TY_STRUCT or kind == TypeKind.TY_ENUM) and self.type_decl_type_param_count(self.get_type_d0(elem as TypeId)) > 0: return true
+        false
 
     fn comparison_operand_is_aggregate_literal(node: i32) -> bool:
         let kind = self.ast.kind(node)
@@ -13386,8 +13401,27 @@ impl Sema:
             // short of an implicit conversion, which §4.2.6 never makes
             // between two typed values. Accepting it left MIR to refuse it.
             if lhs_cmp_kind == TypeKind.TY_TUPLE and rhs_cmp_kind == TypeKind.TY_TUPLE:
-                let lhs_tuple = self.resolve_alias(self.cmp_normalize_str_ref(lhs) as TypeId) as i32
-                let rhs_tuple = self.resolve_alias(self.cmp_normalize_str_ref(rhs) as TypeId) as i32
+                var lhs_tuple = self.resolve_alias(self.cmp_normalize_str_ref(lhs) as TypeId) as i32
+                var rhs_tuple = self.resolve_alias(self.cmp_normalize_str_ref(rhs) as TypeId) as i32
+                // Two tuple literals are each typed on their own. One whose
+                // element a bare variant left open (`(None, 1)`) takes the
+                // other's type, as a bare `None` beside a typed operand
+                // does (#2142). A literal that does not fit keeps the type
+                // it had, and the mismatch below names both.
+                if self.ast.kind(lhs_node) == NodeKind.NK_TUPLE and self.ast.kind(rhs_node) == NodeKind.NK_TUPLE:
+                    let lhs_open = self.tuple_has_open_generic(lhs_tuple)
+                    let rhs_open = self.tuple_has_open_generic(rhs_tuple)
+                    if lhs_open and rhs_open:
+                        self.emit_error_with_help("neither tuple decides the type of its bare variant", node, "bind one side with its type")
+                        return 0
+                    if rhs_open:
+                        rhs = self.check_expr_with_expected(rhs_node, lhs_tuple as TypeId)
+                        if rhs == 0: return 0
+                        rhs_tuple = self.resolve_alias(rhs) as i32
+                    else if lhs_open:
+                        lhs = self.check_expr_with_expected(lhs_node, rhs_tuple as TypeId)
+                        if lhs == 0: return 0
+                        lhs_tuple = self.resolve_alias(lhs) as i32
                 if not self.types_identical(lhs_tuple, rhs_tuple):
                     self.emit_error(f"comparison operands must have the same tuple type: `{self.type_name(lhs_tuple)}` and `{self.type_name(rhs_tuple)}`", node)
                     return 0
@@ -14462,9 +14496,73 @@ impl Sema:
         self.literal_demands.push(found)
         self.literal_demands.push(use_node)
 
-    // What the demands decide, for the second check.
-    pub fn literal_decisions_from_demands() -> Vec[i32]:
+    // A type in a form the second check can read. The two checks are two
+    // Semas, and a type first made after `literal_watermark` (the `Vec[f64]`
+    // a use demanded) has no id in the second: it is written as its
+    // structure over types below the mark, and rebuilt there. Empty when the
+    // type has a part this form does not carry.
+    fn literal_type_encode(tid: i32) -> Vec[i32]:
         var out: Vec[i32] = Vec.new()
+        if tid < self.literal_watermark:
+            out.push(0)
+            out.push(tid)
+            return out
+        let kind = self.get_type_kind(tid as TypeId)
+        var parts: Vec[i32] = Vec.new()
+        if kind == TypeKind.TY_GENERIC_INST:
+            out.push(1)
+            out.push(self.get_generic_inst_base(tid))
+            for ai in 0..self.get_generic_inst_arg_count(tid): parts.push(self.get_generic_inst_arg(tid, ai))
+        else if kind == TypeKind.TY_TUPLE:
+            out.push(2)
+            let start = self.get_type_d0(tid as TypeId)
+            for ei in 0..self.get_type_d1(tid as TypeId): parts.push(self.type_extra[start + ei])
+        else if kind == TypeKind.TY_ARRAY or kind == TypeKind.TY_REF or kind == TypeKind.TY_SLICE or kind == TypeKind.TY_PTR:
+            out.push(if kind == TypeKind.TY_ARRAY: 3 else if kind == TypeKind.TY_REF: 4 else if kind == TypeKind.TY_SLICE: 5 else: 6)
+            out.push(self.get_type_d1(tid as TypeId))
+            out.push(self.get_type_d2(tid as TypeId))
+            let inner = self.literal_type_encode(self.get_type_d0(tid as TypeId))
+            if inner.len() == 0: return Vec.new()
+            for code in inner: out.push(code)
+            return out
+        else:
+            return Vec.new()
+        out.push(parts.len() as i32)
+        for part in parts:
+            let inner = self.literal_type_encode(part)
+            if inner.len() == 0: return Vec.new()
+            for code in inner: out.push(code)
+        out
+
+    // The type written at `codes[at]`, and the index after it, as a pair
+    // packed `type * 2^32 + next`.
+    mut fn literal_type_decode(codes: &Vec[i32], at: i32) -> i64:
+        let tag: i32 = codes[at]
+        if tag == 0:
+            return (codes[at + 1] as i64) * 4294967296 + (at + 2) as i64
+        if tag == 1 or tag == 2:
+            let count: i32 = if tag == 1: codes[at + 2] else: codes[at + 1]
+            var next = if tag == 1: at + 3 else: at + 2
+            let parts: Vec[i32] = Vec.new()
+            for _ in 0..count:
+                let part = self.literal_type_decode(codes, next)
+                parts.push((part / 4294967296) as i32)
+                next = (part % 4294967296) as i32
+            let made = if tag == 1: self.ensure_generic_inst_type(codes[at + 1], parts, count) as i32 else: self.ensure_tuple_type(parts, count) as i32
+            return (made as i64) * 4294967296 + next as i64
+        let inner = self.literal_type_decode(codes, at + 3)
+        let kind = if tag == 3: TypeKind.TY_ARRAY else if tag == 4: TypeKind.TY_REF else if tag == 5: TypeKind.TY_SLICE else: TypeKind.TY_PTR
+        let made = self.ensure_exact_type(kind, (inner / 4294967296) as i32, codes[at + 1], codes[at + 2]) as i32
+        (made as i64) * 4294967296 + inner % 4294967296
+
+    // What the demands decide, for the second check: per binding, the `let`,
+    // the use that demanded its type, the use that demanded another (or 0),
+    // then each of the two types as a length and its encoding (the second
+    // has length 0 when there is none). A binding whose demanded type cannot
+    // be carried is left out, and stays the array it is without its uses.
+    pub fn literal_decisions_from_demands() -> Vec[i32]:
+        // (let, type, second type or 0, use, second use), in this check's ids.
+        var found: Vec[i32] = Vec.new()
         var i = 0
         while i + 2 < self.literal_demands.len() as i32:
             let let_node: i32 = self.literal_demands[i]
@@ -14473,18 +14571,33 @@ impl Sema:
             i = i + 3
             var at = -1
             var k = 0
-            while k + 4 < out.len() as i32:
-                if out[k] == let_node: at = k
+            while k + 4 < found.len() as i32:
+                if found[k] == let_node: at = k
                 k = k + 5
             if at < 0:
-                out.push(let_node)
-                out.push(want)
-                out.push(0)
-                out.push(use_node)
-                out.push(0)
-            else if out[at + 1] != want and out[at + 2] == 0:
-                out[at + 2] = want
-                out[at + 4] = use_node
+                found.push(let_node)
+                found.push(want)
+                found.push(0)
+                found.push(use_node)
+                found.push(0)
+            else if found[at + 1] != want and found[at + 2] == 0:
+                found[at + 2] = want
+                found[at + 4] = use_node
+        var out: Vec[i32] = Vec.new()
+        var f = 0
+        while f + 4 < found.len() as i32:
+            let first = self.literal_type_encode(found[f + 1])
+            let second = if found[f + 2] != 0: self.literal_type_encode(found[f + 2]) else: Vec.new()
+            if first.len() > 0 and (found[f + 2] == 0 or second.len() > 0):
+                out.push(found[f])
+                out.push(found[f + 3])
+                out.push(found[f + 4])
+                out.push(first.len() as i32)
+                for code in first: out.push(code)
+                out.push(if found[f + 2] == 0: 0 else: second.len() as i32)
+                if found[f + 2] != 0:
+                    for code in second: out.push(code)
+            f = f + 5
         out
 
     // The type the uses of the binding declared at `let_node` decided, or 0.
@@ -14492,13 +14605,16 @@ impl Sema:
     mut fn literal_decision(let_node: i32) -> i32:
         var k = 0
         while k + 4 < self.literal_decisions.len() as i32:
+            let first_len: i32 = self.literal_decisions[k + 3]
+            let second_len: i32 = self.literal_decisions[k + 4 + first_len]
             if self.literal_decisions[k] == let_node:
-                if self.literal_decisions[k + 2] != 0:
-                    let first = self.type_name(self.literal_decisions[k + 1])
-                    let second = self.type_name(self.literal_decisions[k + 2])
-                    self.emit_error_with_help(f"this use demands `{second}` of a binding another use demands `{first}` of (§4.3c)", self.literal_decisions[k + 4], "write the binding's type")
-                return self.literal_decisions[k + 1]
-            k = k + 5
+                let codes = sema_clone_i32_vec(&self.literal_decisions)
+                let decided = (self.literal_type_decode(&codes, k + 4) / 4294967296) as i32
+                if second_len != 0:
+                    let other = (self.literal_type_decode(&codes, k + 5 + first_len) / 4294967296) as i32
+                    self.emit_error_with_help(f"this use demands `{self.type_name(other)}` of a binding another use demands `{self.type_name(decided)}` of (§4.3c)", self.literal_decisions[k + 2], "write the binding's type")
+                return decided
+            k = k + 5 + first_len + second_len
         0
 
     // The generic type a bare name in an annotation names (`Vec`, `Option`,
@@ -14551,6 +14667,8 @@ impl Sema:
 
         // D93: no annotation, an element-form literal, and uses that
         // demanded a collection: the binding has that type.
+        if ann_extra < 0 and value != 0 and self.ast.kind(value) == NodeKind.NK_ARRAY_LIT and self.literal_watermark == 0:
+            self.literal_watermark = self.type_kinds.len() as i32
         if ann_extra < 0 and value != 0 and self.ast.kind(value) == NodeKind.NK_ARRAY_LIT and self.literal_decisions.len() > 0:
             let decided = self.literal_decision(node)
             if decided != 0: ann_type = decided as TypeId
@@ -18778,6 +18896,29 @@ impl Sema:
                 return self.ast.is_const_decl_node(self.binding_decl_nodes.get(sym).unwrap() as NodeId) != 0
             return self.const_global_syms.contains(sym)
         false
+
+    // §4.3a (#2121): the length of `[T; N]`. A literal N is the node's d1. A
+    // constant expression N (a `const`, arithmetic over consts) is evaluated
+    // once, here, and written into d1, so every later reader of the node
+    // (the frozen resolver, codegen, the renderer) sees a plain length.
+    mut fn array_type_len(node: i32) -> i32:
+        let len_node = self.ast.get_data2(node)
+        if len_node == 0:
+            return self.ast.get_data1(node)
+        var len = 0
+        if not self.expr_is_const_expr(len_node):
+            self.emit_error("`[T; N]`: the length is not a compile-time constant; N is an integer literal or a `const` (§4.3a) — a `let` is a runtime value (§9.1b)", len_node)
+        else:
+            let value = unsafe { comptime_try_eval_expr(self as *mut Sema, self.ast, self.pool, len_node) }
+            if value.kind != ComptimeValueKind.CV_INT:
+                self.emit_error("`[T; N]`: the length is not an integer constant (§4.3a)", len_node)
+            else if value.data0 < 0 or value.data0 > 2147483647:
+                self.emit_error(f"`[T; N]`: the length {value.data0} is out of range (§4.3a)", len_node)
+            else:
+                len = value.data0 as i32
+        self.ast.set_data1(node as NodeId, len)
+        self.ast.set_data2(node as NodeId, 0)
+        len
 
     mut fn array_fill_count(node: i32, count_node: i32) -> i32:
         let count_ty = self.check_expr(count_node)
@@ -26562,7 +26703,7 @@ impl Sema:
 
         if kind == NodeKind.NK_TYPE_ARRAY:
             let elem = self.resolve_generic_return_type_node(self.ast.get_data0(ret_node), tp_start, tp_count)
-            let size = self.ast.get_data1(ret_node)
+            let size = self.array_type_len(ret_node)
             return self.ensure_exact_type(TypeKind.TY_ARRAY, elem, size, 0) as i32
 
         if kind == NodeKind.NK_TYPE_SLICE:
@@ -27266,7 +27407,7 @@ impl Sema:
             return self.ensure_exact_type(TypeKind.TY_PTR, inner, self.ast.get_data1(type_node), self.ast.get_data2(type_node)) as i32
         if kind == NodeKind.NK_TYPE_ARRAY:
             let elem = self.resolve_type_node_with_current_subst(self.ast.get_data0(type_node), self_ty)
-            return self.ensure_exact_type(TypeKind.TY_ARRAY, elem, self.ast.get_data1(type_node), 0) as i32
+            return self.ensure_exact_type(TypeKind.TY_ARRAY, elem, self.array_type_len(type_node), 0) as i32
         if kind == NodeKind.NK_TYPE_SLICE:
             let elem = self.resolve_type_node_with_current_subst(self.ast.get_data0(type_node), self_ty)
             return self.ensure_exact_type(TypeKind.TY_SLICE, elem, self.ast.get_data1(type_node), 0) as i32
@@ -29032,6 +29173,12 @@ impl Sema:
         if method_name == "byte_at" or method_name == "repeat": return 1
         0
 
+    // What `sum` and `product` yield over elements of `elem`: the number,
+    // also when the elements are views of it (#2142).
+    fn summed_type(elem: i32) -> i32:
+        let resolved = self.resolve_alias(elem as TypeId)
+        if self.get_type_kind(resolved) == TypeKind.TY_REF: self.get_type_d0(resolved) as i32 else: elem
+
     fn builtin_intrinsic_method_return_type(recv_type: i32, owner_sym: i32, field: i32) -> i32:
         if recv_type == 0:
             return 0
@@ -29048,7 +29195,9 @@ impl Sema:
                 return recv_type
             if field == self.syms.filter or field == self.syms.filter_map or field == self.syms.take or field == self.syms.drop_items or field == self.syms.take_while or field == self.syms.drop_while or field == self.syms.zip or field == self.syms.enumerate or field == self.syms.chain or field == self.syms.zip_with or field == self.syms.step_by or field == self.syms.flat_map:
                 return recv_type
-            if field == self.syms.fold or field == self.syms.sum or field == self.syms.product:
+            if field == self.syms.sum or field == self.syms.product:
+                return self.summed_type(iter_elem_ty)
+            if field == self.syms.fold:
                 return iter_elem_ty
             if field == self.syms.min or field == self.syms.max or field == self.syms.min_by or field == self.syms.max_by or field == self.syms.find:
                 return self.ensure_option_type_for(iter_elem_ty)
@@ -29327,7 +29476,7 @@ impl Sema:
                 let params: Vec[i32] = Vec.new()
                 params.push(iter_elem)
                 return self.ensure_fn_type(params, 1, 0 as TypeId) as i32
-            if (field == self.syms.filter or field == self.syms.take_while or field == self.syms.drop_while or field == self.syms.partition or field == self.syms.find or field == self.syms.any or field == self.syms.all or field == self.syms.none_pred) and arg_index == 0:
+            if (field == self.syms.filter or field == self.syms.take_while or field == self.syms.drop_while or field == self.syms.partition or field == self.syms.find or field == self.syms.position or field == self.syms.any or field == self.syms.all or field == self.syms.none_pred) and arg_index == 0:
                 let params2: Vec[i32] = Vec.new()
                 params2.push(iter_elem)
                 return self.ensure_fn_type(params2, 1, self.ty_bool) as i32
@@ -32058,10 +32207,8 @@ impl Sema:
                         return iter_elem_ty
                     if field == self.syms.reduce:
                         return self.ensure_option_type_for(iter_elem_ty)
-                    if field == self.syms.sum:
-                        return iter_elem_ty
-                    if field == self.syms.product:
-                        return iter_elem_ty
+                    if field == self.syms.sum or field == self.syms.product:
+                        return self.summed_type(iter_elem_ty)
                     if field == self.syms.min or field == self.syms.max or field == self.syms.min_by or field == self.syms.max_by or field == self.syms.find:
                         return self.ensure_option_type_for(iter_elem_ty)
                     if field == self.syms.position:

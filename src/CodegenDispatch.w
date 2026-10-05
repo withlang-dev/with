@@ -13760,7 +13760,10 @@ impl Codegen:
             insert_args.push(key_alloca)
             insert_args.push(val_alloca)
             insert_args.push(is_str_key)
-            let _ins = wl_build_call(self.builder, insert_ty, insert_fn, vec_data_i64(&insert_args), 4)
+            // An element whose key is already present is the insert of a
+            // duplicate: the key it carried and the value it replaces are
+            // dropped, as `insert` drops them (#2165).
+            self.mir_emit_owned_map_insert(insert_fn, insert_ty, insert_args, key_tid, val_tid, key_ty, val_ty)
             wl_build_br(self.builder, loop_bb2)
             wl_position_at_end(self.builder, end_bb2)
             return wl_build_load(self.builder, map_ty, out_ptr)
@@ -13847,6 +13850,11 @@ impl Codegen:
             wl_build_br(self.builder, scan_bb_b)
 
             wl_position_at_end(self.builder, replace_bb_b)
+            // The entry this element replaces is dropped (#2165).
+            if elem_tid > 0 and self.sema.type_needs_drop_frozen(elem_tid) != 0:
+                self.member_drop_depth = self.member_drop_depth + 1
+                self.mir_emit_drop_ptr_for_sema_type(entry_ptr_b, elem_ty, elem_tid)
+                self.member_drop_depth = self.member_drop_depth - 1
             wl_build_store(self.builder, elem_b, entry_ptr_b)
             wl_build_br(self.builder, loop_bb_b)
 
@@ -13952,7 +13960,12 @@ impl Codegen:
         let recv_op = body.call_arg_operands[arg_start]
         let recv_sema = self.mir_operand_sema_type(body, recv_op)
         let elem_tid = self.mir_iter_elem_tid(recv_sema)
-        let elem_ty0 = self.mir_sema_type_to_llvm(elem_tid)
+        // Over views of a number the result is the number (#2142): each
+        // view is read.
+        let elem_resolved = self.mir_resolve_alias_at(elem_tid)
+        let over_views = self.mir_type_kind_at(elem_resolved) == TypeKind.TY_REF
+        let view_ty = self.mir_sema_type_to_llvm(elem_tid)
+        let elem_ty0 = if over_views: self.mir_sema_type_to_llvm(self.mir_type_d0_at(elem_resolved)) else: view_ty
         let elem_ty = if elem_ty0 != 0: elem_ty0 else: self.type_fallback()
         let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
         let acc_ptr = self.create_entry_alloca(elem_ty)
@@ -13965,9 +13978,9 @@ impl Codegen:
         let next = self.mir_emit_iter_next_from_ptr(recv_ptr, recv_sema, elem_tid)
         wl_build_cond_br(self.builder, self.mir_option_is_some_value(next), add_bb, end_bb)
         wl_position_at_end(self.builder, add_bb)
-        let elem = self.option_payload_value(next, elem_ty)
+        let elem = if over_views: wl_build_load(self.builder, elem_ty, self.option_payload_value(next, view_ty)) else: self.option_payload_value(next, elem_ty)
         let cur = wl_build_load(self.builder, elem_ty, acc_ptr)
-        let next_acc = if wl_get_type_kind(elem_ty) == wl_float_type_kind():
+        let next_acc = if wl_get_type_kind(elem_ty) == wl_float_type_kind() or wl_get_type_kind(elem_ty) == wl_double_type_kind():
             wl_build_fadd(self.builder, cur, elem)
         else:
             wl_build_add(self.builder, cur, elem)
@@ -13981,7 +13994,12 @@ impl Codegen:
         let recv_op = body.call_arg_operands[arg_start]
         let recv_sema = self.mir_operand_sema_type(body, recv_op)
         let elem_tid = self.mir_iter_elem_tid(recv_sema)
-        let elem_ty0 = self.mir_sema_type_to_llvm(elem_tid)
+        // Over views of a number the result is the number (#2142): each
+        // view is read.
+        let elem_resolved = self.mir_resolve_alias_at(elem_tid)
+        let over_views = self.mir_type_kind_at(elem_resolved) == TypeKind.TY_REF
+        let view_ty = self.mir_sema_type_to_llvm(elem_tid)
+        let elem_ty0 = if over_views: self.mir_sema_type_to_llvm(self.mir_type_d0_at(elem_resolved)) else: view_ty
         let elem_ty = if elem_ty0 != 0: elem_ty0 else: self.type_fallback()
         let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
         let acc_ptr = self.create_entry_alloca(elem_ty)
@@ -13998,7 +14016,7 @@ impl Codegen:
         let next = self.mir_emit_iter_next_from_ptr(recv_ptr, recv_sema, elem_tid)
         wl_build_cond_br(self.builder, self.mir_option_is_some_value(next), mul_bb, end_bb)
         wl_position_at_end(self.builder, mul_bb)
-        let elem = self.option_payload_value(next, elem_ty)
+        let elem = if over_views: wl_build_load(self.builder, elem_ty, self.option_payload_value(next, view_ty)) else: self.option_payload_value(next, elem_ty)
         let cur = wl_build_load(self.builder, elem_ty, acc_ptr)
         let next_acc = self.mir_build_bin_op(BinaryOp.OP_MUL, cur, elem, self.mir_sema_type_is_unsigned(elem_tid), elem_tid, elem_tid)
         wl_build_store(self.builder, self.coerce_value_to_type(next_acc, elem_ty), acc_ptr)
