@@ -119,7 +119,7 @@ The signature says whether a function borrows or takes ownership. The call
 site says nothing:
 
 ```
-fn total(xs: &Vec[i32]) -> i32:        // &T borrows
+fn total(xs: &Vec[i32]):               // &T borrows
     var sum = 0
     for x in xs: sum += x
     sum
@@ -240,13 +240,13 @@ trait Area:
     fn area(self: &Self) -> f64
 
 impl Area for Shape:
-    fn area(self: &Self) -> f64:
+    fn area(self: &Self):
         match self:
             .Circle(r) => 3.14159 * r * r
             .Rect(w, h) => w * h
             .Unit => 0.0
 
-fn largest[T: Area](items: &Vec[T]) -> f64:
+fn largest[T: Area](items: &Vec[T]):
     var best = 0.0
     for item in items:
         if item.area() > best: best = item.area()
