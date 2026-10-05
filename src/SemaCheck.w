@@ -27489,7 +27489,10 @@ impl Sema:
             seen.insert(t, 1)
             let tk = self.get_type_kind(t as TypeId)
             let declared = tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ENUM or tk == TypeKind.TY_GENERIC_INST
-            if declared and self.type_has_operator_method(t, eq_sym) != 0:
+            // A generic type's `eq` is its impl's template, which has no
+            // signature until it is specialized (ensure_eq_contract).
+            let generic_eq = tk == TypeKind.TY_GENERIC_INST and self.lookup_generic_method_fn(self.get_generic_inst_base(t), eq_sym) != 0
+            if generic_eq or (declared and self.type_has_operator_method(t, eq_sym) != 0):
                 self.ensure_eq_contract(t, eq_sym, node)
                 continue
             if tk == TypeKind.TY_TUPLE:

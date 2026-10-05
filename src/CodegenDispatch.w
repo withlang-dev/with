@@ -2370,10 +2370,10 @@ impl Codegen:
     mut fn mir_emit_eq_ptrs(lp: i64, rp: i64, ty: i64, sema_ty: i32) -> i64:
         let resolved = self.mir_eq_live_type(sema_ty)
         let tk = self.sema.get_type_kind(resolved as TypeId)
-        let sig_opt = self.sema.concrete_eq_sigs.get(resolved)
-        let sym_opt = self.sema.concrete_eq_mono_syms.get(resolved)
-        if sig_opt.is_some() and sym_opt.is_some():
-            let concrete = self.ensure_concrete_mir_function(0, sig_opt.unwrap(), sym_opt.unwrap(), 0, "Eq.eq")
+        let eq_sig: i32 = self.sema.concrete_eq_sigs.get(resolved) ?? -1
+        let eq_sym: i32 = self.sema.concrete_eq_mono_syms.get(resolved) ?? 0
+        if eq_sig >= 0 and eq_sym != 0:
+            let concrete = self.ensure_concrete_mir_function(0, eq_sig, eq_sym, 0, "Eq.eq")
             if concrete.sym == 0:
                 return wl_get_undef(wl_i1_type(self.context))
             let args: Vec[i64] = Vec.new()
@@ -2513,7 +2513,8 @@ impl Codegen:
                 let elem_sema = self.mir_project_field_sema_type(resolved, i)
                 let elem_ty = self.mir_sema_type_to_llvm(elem_sema)
                 if elem_sema > 0 and elem_ty != 0:
-                    self.mir_eq_require(self.mir_emit_eq_ptrs(self.tuple_elem_ptr(ty, lp, i), self.tuple_elem_ptr(ty, rp, i), elem_ty, elem_sema), differ)
+                    let part_equal = self.mir_emit_eq_ptrs(self.tuple_elem_ptr(ty, lp, i), self.tuple_elem_ptr(ty, rp, i), elem_ty, elem_sema)
+                    self.mir_eq_require(part_equal, differ)
             return
         if tk == TypeKind.TY_ARRAY:
             let elem_sema = self.sema.get_type_d0(resolved as TypeId)
@@ -2535,9 +2536,11 @@ impl Codegen:
             if pointee_ty == 0 or pointee_kind == TypeKind.TY_TRAIT_OBJ or wl_get_type_kind(ty) != wl_pointer_type_kind():
                 // A `Box[dyn Trait]` holds a value of a type this walk cannot
                 // name: two boxes are equal when they are the same box.
-                self.mir_eq_require(self.compare_value_eq(wl_build_load(self.builder, ty, lp), wl_build_load(self.builder, ty, rp), ty, BinaryOp.OP_EQ), differ)
+                let part_equal = self.compare_value_eq(wl_build_load(self.builder, ty, lp), wl_build_load(self.builder, ty, rp), ty, BinaryOp.OP_EQ)
+                self.mir_eq_require(part_equal, differ)
                 return
-            self.mir_eq_require(self.mir_emit_eq_ptrs(wl_build_load(self.builder, ty, lp), wl_build_load(self.builder, ty, rp), pointee_ty, pointee), differ)
+            let part_equal = self.mir_emit_eq_ptrs(wl_build_load(self.builder, ty, lp), wl_build_load(self.builder, ty, rp), pointee_ty, pointee)
+            self.mir_eq_require(part_equal, differ)
             return
         let variant_count = self.mir_enum_variant_count(resolved)
         if variant_count > 0:
@@ -2546,7 +2549,8 @@ impl Codegen:
         if tk == TypeKind.TY_STRUCT and self.sema.distinct_type_names.contains(self.sema.get_type_d0(resolved as TypeId)):
             // §4.5: a distinct type has its underlying type's representation,
             // and its equality.
-            self.mir_eq_require(self.mir_emit_eq_ptrs(lp, rp, ty, self.sema.type_extra[(self.sema.get_type_d1(resolved as TypeId) + 1)]), differ)
+            let part_equal = self.mir_emit_eq_ptrs(lp, rp, ty, self.sema.type_extra[(self.sema.get_type_d1(resolved as TypeId) + 1)])
+            self.mir_eq_require(part_equal, differ)
             return
         let struct_idx = self.find_struct_index_by_type(ty)
         let field_start: i32 = self.struct_field_starts[struct_idx]
@@ -2559,9 +2563,11 @@ impl Codegen:
             let rf = wl_build_struct_gep(self.builder, ty, rp, llvm_fi)
             let field_sema = self.mir_project_field_sema_type(resolved, field_sym)
             if field_sema > 0:
-                self.mir_eq_require(self.mir_emit_eq_ptrs(lf, rf, field_ty, field_sema), differ)
+                let part_equal = self.mir_emit_eq_ptrs(lf, rf, field_ty, field_sema)
+                self.mir_eq_require(part_equal, differ)
             else:
-                self.mir_eq_require(self.compare_value_eq(wl_build_load(self.builder, field_ty, lf), wl_build_load(self.builder, field_ty, rf), field_ty, BinaryOp.OP_EQ), differ)
+                let part_equal = self.compare_value_eq(wl_build_load(self.builder, field_ty, lf), wl_build_load(self.builder, field_ty, rf), field_ty, BinaryOp.OP_EQ)
+                self.mir_eq_require(part_equal, differ)
 
     // An enum is equal to another when both are the same variant and that
     // variant's payloads are equal. Three representations (see
@@ -2587,12 +2593,14 @@ impl Codegen:
             if some_idx >= 0:
                 let payload_sema = self.mir_enum_payload_sema_type(resolved, some_idx, 0)
                 if payload_sema > 0:
-                    self.mir_eq_require(self.mir_emit_eq_ptrs(lp, rp, ty, payload_sema), differ)
+                    let part_equal = self.mir_emit_eq_ptrs(lp, rp, ty, payload_sema)
+                    self.mir_eq_require(part_equal, differ)
             wl_build_br(self.builder, done_bb)
             wl_position_at_end(self.builder, done_bb)
             return
         if wl_get_type_kind(ty) != wl_struct_type_kind() or wl_count_struct_elem_types(ty) < 2:
-            self.mir_eq_require(self.compare_value_eq(wl_build_load(self.builder, ty, lp), wl_build_load(self.builder, ty, rp), ty, BinaryOp.OP_EQ), differ)
+            let part_equal = self.compare_value_eq(wl_build_load(self.builder, ty, lp), wl_build_load(self.builder, ty, rp), ty, BinaryOp.OP_EQ)
+            self.mir_eq_require(part_equal, differ)
             return
         let tag_ty = wl_struct_get_type_at(ty, 0)
         let l_tag = wl_build_load(self.builder, tag_ty, wl_build_struct_gep(self.builder, ty, lp, 0))
@@ -2614,12 +2622,14 @@ impl Codegen:
             if payload_count == 1:
                 let payload_sema = self.mir_enum_payload_sema_type(resolved, vi, 0)
                 if payload_sema > 0 and payload_ty != 0:
-                    self.mir_eq_require(self.mir_emit_eq_ptrs(l_data, r_data, payload_ty, payload_sema), differ)
+                    let part_equal = self.mir_emit_eq_ptrs(l_data, r_data, payload_ty, payload_sema)
+                    self.mir_eq_require(part_equal, differ)
             else if payload_ty != 0 and wl_get_type_kind(payload_ty) == wl_struct_type_kind():
                 for pf in 0..payload_count:
                     let payload_sema = self.mir_enum_payload_sema_type(resolved, vi, pf)
                     if payload_sema > 0:
-                        self.mir_eq_require(self.mir_emit_eq_ptrs(self.tuple_elem_ptr(payload_ty, l_data, pf), self.tuple_elem_ptr(payload_ty, r_data, pf), self.tuple_elem_type(payload_ty, pf), payload_sema), differ)
+                        let part_equal = self.mir_emit_eq_ptrs(self.tuple_elem_ptr(payload_ty, l_data, pf), self.tuple_elem_ptr(payload_ty, r_data, pf), self.tuple_elem_type(payload_ty, pf), payload_sema)
+                        self.mir_eq_require(part_equal, differ)
             wl_build_br(self.builder, done_bb)
             wl_position_at_end(self.builder, next_bb)
         wl_build_br(self.builder, done_bb)
