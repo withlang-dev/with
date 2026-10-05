@@ -337,6 +337,9 @@ pub type MirModule {
     // Copy. A fill evaluates its operand once and copies it N times, so a
     // non-Copy element is N owners of one value: invalid MIR.
     sema_non_copy_fill_types: HashMap[i32, i32],
+    // #2108: the local types that are a generic struct or enum declaration
+    // with no type arguments (`Option`, not `Option[i32]`).
+    sema_uninstantiated_generic_types: HashMap[i32, i32],
     // D65 (#1647, #1639): every symbol Sema accepts as a direct call target,
     // keyed by this module's pool: MirCallableClass.Signature for a declared
     // signature, Generic for a generic template, Intrinsic for a builtin
@@ -388,6 +391,7 @@ fn MirModule.init -> MirModule:
         sema_moved_drop_types: HashMap.new(),
         sema_dropped_types: HashMap.new(),
         sema_non_copy_fill_types: HashMap.new(),
+        sema_uninstantiated_generic_types: HashMap.new(),
         sema_callable_syms: HashMap.new(),
         sema_sig_param_starts: HashMap.new(),
         sema_sig_param_data: Vec.new(),
@@ -4399,6 +4403,12 @@ pub fn validate_typed_mir_body(mir_mod: &MirModule, body: &MirBody) -> MirValida
     let params = mir_validate_body_params(mir_mod, body)
     if params.len() > 0:
         return mir_validation_fail(body.fn_sym, 0, params)
+    // #2108: after Sema every local has a concrete type. A generic
+    // declaration with its type parameters unbound has no layout; codegen
+    // failed on one (`var best = None`) while this validator said ok.
+    for li in 0..body.local_type_ids.len() as i32:
+        if mir_mod.sema_uninstantiated_generic_types.contains(mir_mod.mir_resolve_alias(body.local_type_ids[li])):
+            return mir_validation_fail(body.fn_sym, 0, f"local _{li} has ty={body.local_type_ids[li]}, a generic declaration with no type arguments")
     let stmt_count = body.stmt_count()
     for si in 0..stmt_count:
         let stmt_kind = body.stmt_kinds[si]

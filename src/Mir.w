@@ -141,6 +141,15 @@ impl MirModule:
             let ty = filled[i]
             if ty > 0 and not self.sema_non_copy_fill_types.contains(ty) and sema.is_copy_frozen(ty) == 0:
                 self.sema_non_copy_fill_types.insert(ty, 1)
+        // #2108: every local typed as a generic declaration itself.
+        for bi in 0..self.bodies.len():
+            let body = &self.bodies[bi]
+            for li in 0..body.local_type_ids.len():
+                let ty = sema.resolve_alias(body.local_type_ids[li] as TypeId) as i32
+                if ty <= 0 or self.sema_uninstantiated_generic_types.contains(ty): continue
+                let kind = sema.get_type_kind(ty as TypeId)
+                if (kind == TypeKind.TY_STRUCT or kind == TypeKind.TY_ENUM) and sema.type_decl_type_param_count(sema.get_type_d0(ty as TypeId)) > 0:
+                    self.sema_uninstantiated_generic_types.insert(ty, 1)
 
 
 fn MirBody.init(fn_sym: i32, sema: &Sema) -> MirBody:

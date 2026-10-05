@@ -1459,6 +1459,28 @@ pub fn mir_test_non_copy_array_fill:
     assert(array_fill_verdict(false).contains("array_fill of a non-Copy element (ty=2)"))
     assert(array_fill_verdict(true) == "")
 
+// #2108: a local typed as a generic declaration with no type arguments
+// (`var best = None` before #2103 gave a local of bare `Option`; codegen
+// failed and this verifier said ok). ty 1 is the enum, recorded as
+// uninstantiated the way snapshot_moved_drop_types records it from Sema.
+fn uninstantiated_generic_local_verdict(bare: bool) -> str:
+    var mir_mod = MirModule.init()
+    for kind in [0, TypeKind.TY_ENUM]:
+        mir_mod.sema_type_kinds.push(kind)
+        mir_mod.sema_type_d0.push(0)
+        mir_mod.sema_type_d1.push(0)
+        mir_mod.sema_type_d2.push(0)
+    if bare: mir_mod.sema_uninstantiated_generic_types.insert(1, 1)
+    var body = MirBody.init_for_fn(1)
+    body.new_temp(1)
+    let entry = body.new_block()
+    body.set_terminator(entry, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    with_str_clone_ref(validate_typed_mir_body(mir_mod, body).message)
+
+pub fn mir_test_uninstantiated_generic_local:
+    assert(uninstantiated_generic_local_verdict(true).contains("local _1 has ty=1, a generic declaration with no type arguments"))
+    assert(uninstantiated_generic_local_verdict(false) == "")
+
 // #1991: `drop(_1); _2 = copy _1.f0` — a read through a projection of a
 // local every path reaching it dropped. The pre-#1968 lowering emitted
 // exactly this for `let t = table(); t[id].arity` (the seed-built
