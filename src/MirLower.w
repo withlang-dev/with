@@ -4923,6 +4923,14 @@ impl MirBuilder:
     // drop (a local's scope exit, a temporary's statement end) ran after a
     // path that "moved" it.
     mut fn lower_comparison_operand(is_cmp: bool, expr: i32) -> i32:
+        // A comparison observes its operands. One that owns something is
+        // lowered as a place, so a temporary (`Token.Name(a()) == t`,
+        // `(a(), 1) == pair`) is dropped at the end of its statement like
+        // any other; read as a value it was copied out of a temp nothing
+        // dropped, and its payload leaked (#2137).
+        let expr_ty = self.expr_type(expr)
+        if is_cmp and expr_ty != 0 and self.sema.get_type_kind(self.sema.resolve_alias(expr_ty as TypeId)) != TypeKind.TY_REF and self.sema.type_needs_drop_frozen(expr_ty) != 0:
+            return self.body.new_operand(OperandKind.OK_COPY, self.lower_expr_place(expr))
         let op = self.lower_expr(expr)
         if not is_cmp or op < 0 or self.body.operand_kinds[op] != OperandKind.OK_MOVE:
             return op

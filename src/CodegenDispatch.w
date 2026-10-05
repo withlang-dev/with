@@ -14784,8 +14784,15 @@ impl Codegen:
         ga.push(sa)
         ga.push(wl_build_load(self.builder, i64_ty, ctr))
         let ep = wl_build_call(self.builder, gt, gf, vec_data_i64(&ga), 2)
-        let cur = wl_build_load(self.builder, elem_ty, ep)
-        let eq = self.compare_value_eq(cur, needle, elem_ty, BinaryOp.OP_EQ)
+        // #2137: an element equals the needle as its With type says.
+        let elem_sema = self.mir_vec_elem_sema_type_from_sema_type(self.mir_operand_sema_type(body, recv_op))
+        var eq: i64 = 0
+        if elem_sema > 0 and wl_type_of(needle) == elem_ty:
+            let needle_slot = self.create_entry_alloca(elem_ty)
+            wl_build_store(self.builder, needle, needle_slot)
+            eq = self.mir_emit_eq_ptrs(ep, needle_slot, elem_ty, elem_sema)
+        else:
+            eq = self.compare_value_eq(wl_build_load(self.builder, elem_ty, ep), needle, elem_ty, BinaryOp.OP_EQ)
         wl_build_cond_br(self.builder, eq, fb, ib)
         wl_position_at_end(self.builder, fb)
         wl_build_store(self.builder, wl_const_int(i1_ty, 1, 0), found)

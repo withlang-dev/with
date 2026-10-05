@@ -30425,6 +30425,11 @@ impl Sema:
         let recv = if raw_recv != 0 and raw_recv != self.ty_void as i32: self.auto_deref_method_type_frozen(raw_recv as TypeId, field) as i32 else: raw_recv
         var intrinsic = self.builtin_method_intrinsic(recv, self.pool_resolve(field))
         let lowering = self.method_lowering_kind(raw_recv, recv, expr, field, arg_count, intrinsic)
+        // `v.contains(x)` and `x in v` compare each element with `x` (#2137).
+        if intrinsic == MirIntrinsic.VEC_CONTAINS and recv > 0:
+            let vec_ty = self.auto_deref_ref_ptr_type(self.resolve_alias(recv as TypeId)) as i32
+            if self.get_type_kind(vec_ty as TypeId) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_arg_count(vec_ty) == 1:
+                self.note_structural_equality(self.get_generic_inst_arg(vec_ty, 0), node)
         if lowering == MethodLowering.IsEmptyViaLen:
             intrinsic = self.builtin_method_intrinsic(recv, "len")
         // A builtin constructor on a written type (`Vec[str].new()`, the
