@@ -2636,6 +2636,10 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
         return 1
     if deep_debug_analyze_expect(ctx, root, compiler, build_project_abs(root, "test/behavior/behav_2182_total_f64.w"), out_dir, "analyze-operator-route", "select:kind=operator,detail~lhs:TotalF64", "route:key-projection") != 0:
         return 1
+    // explain:origin: the view origins Sema recorded, per parameter and per
+    // binding (#2187 took two hours of trace prints without it).
+    if deep_debug_analyze_expect(ctx, root, compiler, build_project_abs(root, "test/behavior/behav_2187_view_through_match_binding.w"), out_dir, "analyze-explain-origin", "explain:origin:at_match", "only through what it views") != 0:
+        return 1
     // D65 phase 2 (#1647): the codegen mode-provenance lane runs and every
     // site's owner fact agrees with the LLVM representation. The &fn
     // marshalling fixture passes a function item, a callable binding and a

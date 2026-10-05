@@ -2297,6 +2297,66 @@ fn analysis_explain_effect(sema: &Sema, target: &str, source_path: &str) -> str:
         out = out ++ "  (no signature matched; use the exact finalized name, e.g. Type.method)\n"
     out
 
+// `fn` names the function or any of its specializations (`f__sema__…`).
+fn analysis_origin_fn_matches(sema: &Sema, sym: i32, fn_name: &str) -> bool:
+    let name = sema.pool_resolve(sym)
+    name == fn_name or name.starts_with(fn_name ++ "__sema__")
+
+fn analysis_origin_where(sema: &Sema, file: i32, node: i32, source_path: &str) -> str:
+    if node <= 0 or node >= sema.ast.node_count(): return "(no node)"
+    let text = sema.source_text_for_file_id(file)
+    f"{analysis_move_site_file_name(sema, file, source_path)}:{analysis_line_for_offset(text, sema.ast.get_start(node))}"
+
+// explain:origin:<fn>[:<binding>] — the view origins Sema recorded: per
+// parameter of <fn>, whether a returned view may come from it and whether
+// from its own storage, with the node that first made each so; per view
+// binding, each time its origins were set or merged (bind, store, loop)
+// with its parameter origins, storage origins and local dependencies.
+fn analysis_explain_origin(sema: &Sema, target: &str, source_path: &str) -> str:
+    var fn_name = with_str_clone_ref(target)
+    var want = ""
+    let colon = analysis_find_from(target, ":", 0)
+    if colon >= 0:
+        fn_name = analysis_slice(target, 0, colon)
+        want = analysis_slice(target, colon + 1, target.len() as i32)
+    var out = f"explain:origin {target}\n"
+    var found = 0
+    // A body Sema checks more than once records each fact again: print one.
+    var seen: Vec[str] = Vec.new()
+    for si in 0..sema.sig_names.len() as i32:
+        if not analysis_origin_fn_matches(sema, sema.sig_names[si], fn_name): continue
+        let pc = sema.sig_get_param_count(si)
+        for pi in 0..pc:
+            if (sema.sig_param_effect(si, pi) & EFF_ESCAPE_VIEW) == 0: continue
+            found = found + 1
+            let storage = (sema.sig_param_view_through(si, pi) & sema_param_origin_bit(pi)) == 0
+            out = out ++ f"  {sema.pool_resolve(sema.sig_names[si])} param[{pi}]: a returned view may come from it, " ++ (if storage: "from its own storage" else: "only through what it views") ++ " (origins=[" ++ analysis_param_mask_text(sema.sig_param_view_origin(si, pi), pc) ++ "] through=[" ++ analysis_param_mask_text(sema.sig_param_view_through(si, pi), pc) ++ "])\n"
+            for fi in 0..sema.param_view_fact_sigs.len() as i32:
+                if sema.param_view_fact_sigs[fi] != si or sema.param_view_fact_params[fi] != pi: continue
+                let what = if sema.param_view_fact_storage[fi] != 0: "first storage" else: "first view"
+                let line = f"    {what} at {analysis_origin_where(sema, sema.param_view_fact_files[fi], sema.param_view_fact_nodes[fi], source_path)} (node {sema.param_view_fact_nodes[fi]})\n"
+                if not seen.contains(line):
+                    out = out ++ line
+                    seen.push(line)
+    for vi in 0..sema.view_fact_syms.len() as i32:
+        if not analysis_origin_fn_matches(sema, sema.view_fact_fns[vi], fn_name): continue
+        let name = sema.pool_resolve(sema.view_fact_syms[vi])
+        if want.len() > 0 and name != want: continue
+        found = found + 1
+        let event = sema.view_fact_events[vi]
+        let what = if event == 2: "store" else if event == 3: "loop" else: "bind"
+        var deps = ""
+        for di in 0..sema.view_fact_dep_counts[vi]:
+            let dep = sema.view_fact_deps[(sema.view_fact_dep_starts[vi] + di)]
+            deps = deps ++ (if deps.len() > 0: ", " else: "") ++ sema.pool_resolve(dep)
+        let line = f"  binding `{name}` {what} at {analysis_origin_where(sema, sema.view_fact_files[vi], sema.view_fact_nodes[vi], source_path)}: origins=[" ++ analysis_param_mask_text(sema.view_fact_masks[vi], 32) ++ "] storage=[" ++ analysis_param_mask_text(sema.view_fact_storage[vi], 32) ++ f"] deps=[{deps}]\n"
+        if not seen.contains(line):
+            out = out ++ line
+            seen.push(line)
+    if found == 0:
+        out = out ++ "  (no view origins recorded: no parameter escapes a view and no view binding matched; a generic body is named by its plain name)\n"
+    out
+
 fn analysis_fact_explain_query(kind: &str, wanted: &str) -> str:
     if kind == "call": return "kind=call,name~" ++ wanted
     if kind == "value": return "kind=place,detail~" ++ wanted
@@ -2444,6 +2504,7 @@ fn analysis_help() -> str:
         "  audit:calls|effects|storage|methods|mir|returns|receivers|receiver-surface|phase|pool-views|contract|resolution|codegen|trait-tables|all\n" ++
         "  audit:resolution                        D65: every MIR callee and argument count agrees with Sema's resolution of the call it lowers, and every expression's operand has Sema's type\n" ++
         "  select:kind=operator,detail~fn:<fn>     how codegen lowered each binary operator (route, operand types)\n" ++
+        "  explain:origin:<fn>[:<binding>]         the view origins Sema recorded: per parameter and per view binding\n" ++
         "  contract                                the modeled foreign contract (§16.2b): every fact with its provenance, then audit:contract\n" ++
         "  move-sites | seam-sites                 ownership worklists (owned-param call sites; aliasing/blanking seams)\n" ++
         "  path:call:<from>:<to>                   shortest live MIR call path\n" ++
@@ -2505,6 +2566,9 @@ pub fn compiler_analysis_run(sema: &Sema, mir_mod: &MirModule, pool: &InternPool
         return CompilerAnalysisResult { text: analysis_move_sites(sema, source_path), status: 0, needs_codegen: false, codegen_query: "", report }
     if request == "seam-sites":
         return CompilerAnalysisResult { text: analysis_seam_sites(sema, mir_mod, source_path, source_text), status: 0, needs_codegen: false, codegen_query: "", report }
+    if request.starts_with("explain:origin:"):
+        let eo_target = analysis_slice(request, 15, request.len() as i32)
+        return CompilerAnalysisResult { text: analysis_explain_origin(sema, eo_target, source_path), status: 0, needs_codegen: false, codegen_query: "", report }
     if request.starts_with("explain:effect:"):
         let ee_target = analysis_slice(request, 15, request.len() as i32)
         return CompilerAnalysisResult { text: analysis_explain_effect(sema, ee_target, source_path), status: 0, needs_codegen: false, codegen_query: "", report }

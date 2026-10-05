@@ -1857,6 +1857,25 @@ pub type Sema {
     concrete_cmp_sigs: HashMap[i32, i32],
     concrete_cmp_mono_syms: HashMap[i32, i32],
     concrete_key_sigs: HashMap[i32, i32],
+    // explain:origin (analyze): each view binding's origins as Sema set them,
+    // in order, per function (the binding table itself is popped with its
+    // scope), and the first node that put a parameter in a returned view's
+    // origins and in its storage set. Event: 1 bind, 2 store, 3 loop.
+    view_fact_fns: Vec[i32],
+    view_fact_syms: Vec[i32],
+    view_fact_nodes: Vec[i32],
+    view_fact_files: Vec[i32],
+    view_fact_events: Vec[i32],
+    view_fact_masks: Vec[i32],
+    view_fact_storage: Vec[i32],
+    view_fact_dep_starts: Vec[i32],
+    view_fact_dep_counts: Vec[i32],
+    view_fact_deps: Vec[i32],
+    param_view_fact_sigs: Vec[i32],
+    param_view_fact_params: Vec[i32],
+    param_view_fact_storage: Vec[i32],
+    param_view_fact_nodes: Vec[i32],
+    param_view_fact_files: Vec[i32],
     concrete_key_mono_syms: HashMap[i32, i32],
     generic_inst_cache: HashMap[i64, i32],
     // D7: eager tables filled in preregister_mir_types (before freeze) so the frozen
@@ -3539,6 +3558,21 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         concrete_cmp_sigs: sema_new_map_i32_i32(),
         concrete_cmp_mono_syms: sema_new_map_i32_i32(),
         concrete_key_sigs: sema_new_map_i32_i32(),
+        view_fact_fns: Vec.new(),
+        view_fact_syms: Vec.new(),
+        view_fact_nodes: Vec.new(),
+        view_fact_files: Vec.new(),
+        view_fact_events: Vec.new(),
+        view_fact_masks: Vec.new(),
+        view_fact_storage: Vec.new(),
+        view_fact_dep_starts: Vec.new(),
+        view_fact_dep_counts: Vec.new(),
+        view_fact_deps: Vec.new(),
+        param_view_fact_sigs: Vec.new(),
+        param_view_fact_params: Vec.new(),
+        param_view_fact_storage: Vec.new(),
+        param_view_fact_nodes: Vec.new(),
+        param_view_fact_files: Vec.new(),
         concrete_key_mono_syms: sema_new_map_i32_i32(),
         generic_inst_cache,
         layout_size_cache,
@@ -7577,6 +7611,21 @@ impl Sema:
     // already exists — used when a store (Vec.push / HashMap.insert) adds the
     // pushed element's borrow origins to the container binding, so a later escape
     // of the container is caught by the ephemeral-escape checks.
+    // One row of `sym`'s view facts as they stand now (explain:origin).
+    fn note_view_fact(sym: i32, node: i32, event: i32):
+        if sym == 0: return
+        self.view_fact_fns.push(self.current_fn_symbol)
+        self.view_fact_syms.push(sym)
+        self.view_fact_nodes.push(node)
+        self.view_fact_files.push(self.local_file_id)
+        self.view_fact_events.push(event)
+        self.view_fact_masks.push(self.binding_view_origin_mask(sym))
+        self.view_fact_storage.push(self.binding_view_storage_mask(sym))
+        self.view_fact_dep_starts.push(self.view_fact_deps.len() as i32)
+        let count = self.binding_view_dep_count(sym)
+        for di in 0..count: self.view_fact_deps.push(self.binding_view_dep_at(sym, di))
+        self.view_fact_dep_counts.push(count)
+
     fn add_binding_view_deps(sym: i32, param_mask: i32, deps: &Vec[i32]):
         if sym == 0:
             return
@@ -7590,6 +7639,7 @@ impl Sema:
             merged = self.push_unique_i32(move merged, deps[i])
         let merged_mask = self.binding_view_origin_mask(sym) | param_mask
         self.set_binding_view_deps(sym, merged_mask, merged)
+        self.note_view_fact(sym, 0, 2)
 
     fn binding_view_origin_mask(sym: i32) -> i32:
         let opt = self.scope_name_map.get(sym)
@@ -8667,6 +8717,13 @@ impl Sema:
 
     // `mask`: the parameters the returned view may originate from;
     // `storage_mask`: the subset whose own storage it may point into.
+    fn note_param_view_fact(pi: i32, storage: bool, node: i32):
+        self.param_view_fact_sigs.push(self.current_fn_sig_idx)
+        self.param_view_fact_params.push(pi)
+        self.param_view_fact_storage.push(if storage: 1 else: 0)
+        self.param_view_fact_nodes.push(node)
+        self.param_view_fact_files.push(self.local_file_id)
+
     mut fn note_param_view_origin(sym: i32, mask: i32, storage_mask: i32, origin_node: i32):
         if self.current_fn_sig_idx < 0 or sym == 0 or mask == 0:
             return
@@ -8678,6 +8735,12 @@ impl Sema:
             self.current_fn_param_storage_origins[pi] = cur_storage | storage_mask
             if origin_node != 0 and self.current_fn_param_view_nodes[pi] == 0:
                 self.current_fn_param_view_nodes[pi] = origin_node
+            // explain:origin: the first node to put this parameter in the
+            // returned view's origins, and the first to put it in its storage.
+            if origin_node != 0 and (cur & mask) != mask:
+                self.note_param_view_fact(pi, false, origin_node)
+            if origin_node != 0 and storage_mask != 0 and (cur_storage & storage_mask) != storage_mask:
+                self.note_param_view_fact(pi, true, origin_node)
             return
 
     mut fn note_place_effect(expr_node: i32, eff: i32):

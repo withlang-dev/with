@@ -15778,6 +15778,7 @@ impl Sema:
         self.set_binding_view_deps(sym, param_mask, deps)
         self.set_binding_view_storage_mask(sym, self.compute_expr_storage_origin_mask(expr_node))
         self.register_view_binding_borrows(sym, expr_node)
+        self.note_view_fact(sym, expr_node, 1)
 
     // #1302 (§2.2, §9.7, D22/D27/D32): a pattern is structural projection, so a
     // match observes its subject unless an arm takes an owned value out of it —
@@ -17561,6 +17562,7 @@ impl Sema:
         if deps.len() == 0 and param_mask == 0:
             deps = self.push_unique_i32(move deps, self.place_root_sym(iterable))
         self.set_binding_view_deps(sym, param_mask, deps)
+        self.note_view_fact(sym, iterable, 3)
 
     // #1317 / §21.1 rule 1, §15.8, D44: the loop binding is a live view into
     // the iterated place for the whole loop (the compiler-inserted iterator

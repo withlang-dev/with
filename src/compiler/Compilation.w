@@ -1806,7 +1806,7 @@ fn analysis_request_is_semantic_snapshot(request: &str) -> bool:
     if request.starts_with("select:kind=receiver") or request.starts_with("select:kind=effect-edge") or request.starts_with("select:kind=specialization"): return true
     if request.starts_with("select:kind=type") or request.starts_with("select:kind=field") or request.starts_with("select:kind=expression") or request.starts_with("select:kind=diagnostic"): return true
     if request.starts_with("select:kind=method-registration") or request.starts_with("select:kind=method-resolution"): return true
-    if request.starts_with("explain:effect:") or request.starts_with("explain:specialization:") or request.starts_with("explain:diagnostic:"): return true
+    if request.starts_with("explain:effect:") or request.starts_with("explain:origin:") or request.starts_with("explain:specialization:") or request.starts_with("explain:diagnostic:"): return true
     if request.starts_with("explain:type:") or request.starts_with("explain:field:") or request.starts_with("explain:expression:"): return true
     if request.starts_with("explain:method:") or request.starts_with("explain:resolution:"): return true
     request.starts_with("explain:node:")

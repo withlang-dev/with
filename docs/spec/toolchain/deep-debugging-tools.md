@@ -126,7 +126,12 @@ bisect by neutralizing code: the #691 escalation cascade was one misattributed
 seed, a one-query answer with provenance.
 
 For a wrong view-origin verdict (a use-after-free accepted, a valid view
-refused), `WITH_DEBUG_BORROWS=1 with check repro.w` prints every view
+refused), start with `with analyze repro.w 'explain:origin:<fn>[:<binding>]'`
+(below): per parameter, whether a returned view comes from its own storage
+or only through what it views, and the node that first made it so; per
+view binding, its origins, storage origins and dependencies each time
+they were set. It runs on a program that fails to compile. Then
+`WITH_DEBUG_BORROWS=1 with check repro.w` prints every view
 binding with its dependency count and the borrow table at each read and
 mutation check: a binding whose dependency is itself, or a local where a
 parameter was expected, names the lost origin in one run (#2187).
@@ -489,6 +494,33 @@ the 57-method escalation cascade in #691 was exactly one misattributed seed
 plus transitive root edges, a one-query answer with provenance and an
 afternoon of bisection without it. Also a semantic-snapshot request: works
 on erroring inputs.
+
+## View Origins
+
+`analyze <file> 'explain:origin:<fn>[:<binding>]'` prints what Sema recorded
+about the views of `<fn>` (a generic function by its plain name: every
+specialization matches), even when the check fails:
+
+```
+explain:origin at_match
+  at_match param[0]: a returned view may come from it, only through what it views (origins=[0] through=[0])
+    first view at repro.w:12 (node 579952)
+  binding `v` bind at repro.w:12: origins=[0] storage=[0] deps=[s]
+```
+
+Per parameter that a returned view may come from: whether from the
+parameter's own storage (the caller's argument must outlive the result) or
+only through what it views, and the node that first put it in the
+origins and in the storage set. Per view binding (`:<binding>` narrows to
+one name), a row each time its origins were set or merged: `bind` (a
+`let`, a pattern, a parameter alias), `store` (a view pushed into it),
+`loop` (a `for` binding); `origins` and `storage` are parameter indices,
+`deps` the locals it depends on. A binding whose `deps` names itself, a
+local where a parameter was expected, or a `first storage` row on a value
+that should only be viewed through, is where the origin went wrong. Sema
+records these as it checks (`Sema.view_fact_*`, `param_view_fact_*`); the
+binding table itself is gone once a body is checked, which is why this
+existed only as trace prints before (#2187's two-hour hunt).
 
 ## Repro Reduction
 
