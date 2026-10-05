@@ -1,6 +1,7 @@
-//! expect-check-fail: HashMap literal key type must implement Hash
+//! expect-check-fail: `Reading` cannot be a map key: it holds a `f64`
 
-type Key { value: i32 }
+// D96 (§11.7): a map literal's key is a key: structural `==` and no float.
+type Reading { celsius: f64 }
 
 fn main:
-    let values = [Key { value: 1 }: 10]
+    let values = [Reading { celsius: 1.5 }: 10]
