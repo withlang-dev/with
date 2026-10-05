@@ -28,3 +28,10 @@ impl[E: Error] Error for ContextError[E]:
         self.message.clone()
     fn source() -> Option[&dyn Error]:
         Some(&self.source)
+
+/// A Result is Clone when both of its payloads are.
+impl[T: Clone, E: Clone] Clone for Result[T, E]:
+    fn clone() -> Self:
+        match self:
+            Ok(value) => Ok(value.clone())
+            Err(failure) => Err(failure.clone())

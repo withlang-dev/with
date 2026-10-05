@@ -22,3 +22,10 @@ pub enum Option[T] { Some(T) | None }
 // An Option carries no ownership beyond its payload. Copy payloads therefore
 // make the whole wrapper Copy; non-Copy payloads remain single-owner values.
 impl[T: Copy] Copy for Option[T]
+
+/// An Option is Clone when its payload is: `Some` holds a clone of it.
+impl[T: Clone] Clone for Option[T]:
+    fn clone() -> Self:
+        match self:
+            Some(value) => Some(value.clone())
+            None => None
