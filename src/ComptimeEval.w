@@ -114,6 +114,13 @@ enum ComptimeControlKind: i32:
     CTL_CONTINUE = 3
     CTL_ERROR = 4
 
+// A comprehension in progress: its elements so far, and the signal that
+// stopped it when that is not a value.
+type ComptimeComprehension {
+    signal: ComptimeControl,
+    elems: Vec[ComptimeValue],
+}
+
 type ComptimeControl {
     kind: i32,
     value: ComptimeValue,
@@ -7463,6 +7470,72 @@ impl ComptimeEvaluator:
         self.loop_labels.pop()
         comptime_control_value(comptime_value_void(self.sema.ty_void as i32))
 
+    // `[expr for pat in iter … if cond]` (§13.6, #2142): the element
+    // expression once per binding of its clauses that passes the filter, in
+    // clause order. The result is the collection Sema typed the node as.
+    mut fn eval_array_comprehension(node: i32) -> ComptimeControl:
+        let start_state = ComptimeComprehension { signal: comptime_control_value(comptime_value_void(self.sema.ty_void as i32)), elems: Vec.new() }
+        var done = self.eval_comprehension_clause(node, 0, move start_state)
+        if done.signal.kind != ComptimeControlKind.CTL_VALUE:
+            return move done.signal
+        let count = done.elems.len() as i32
+        let start = self.extra_values.len() as i32
+        let elems = move done.elems
+        for elem in elems.into_iter():
+            self.push_extra_value(elem)
+        let type_id = self.node_type_or(node, 0)
+        if type_id != 0 and self.sema.std_generic_of(type_id) == StdGeneric.Vec:
+            return comptime_control_value(comptime_value_vec(type_id, start, count))
+        comptime_control_value(comptime_value_array(type_id, start, count))
+
+    mut fn eval_comprehension_clause(node: i32, clause: i32, state0: ComptimeComprehension) -> ComptimeComprehension:
+        var state = state0
+        if clause == self.ast.get_data2(node):
+            var elem_signal = self.eval_expr(self.ast.get_data0(node))
+            if elem_signal.kind != ComptimeControlKind.CTL_VALUE:
+                state.signal = move elem_signal
+                return state
+            state.elems.push(move elem_signal.value)
+            return state
+        let extra = self.ast.get_data1(node) + clause * 3
+        let pattern = self.ast.get_extra(extra)
+        let filter = self.ast.get_extra(extra + 2)
+        var iterable_signal = self.eval_expr(self.ast.get_extra(extra + 1))
+        if iterable_signal.kind != ComptimeControlKind.CTL_VALUE:
+            state.signal = move iterable_signal
+            return state
+        let source = move iterable_signal.value
+        var count = 0
+        if source.kind == ComptimeValueKind.CV_ARRAY or source.kind == ComptimeValueKind.CV_TUPLE or source.kind == ComptimeValueKind.CV_VEC:
+            count = source.extra_count
+        else if source.kind == ComptimeValueKind.CV_RANGE:
+            count = if source.extra_start != 0: (source.data1 - source.data0 + 1) as i32 else: (source.data1 - source.data0) as i32
+            if count < 0: count = 0
+        else:
+            state.signal = self.fail(node, "a comptime comprehension iterates an array, tuple, vec, or range")
+            return state
+        for i in 0..count:
+            self.push_scope()
+            let item = if source.kind == ComptimeValueKind.CV_RANGE: comptime_value_int(self.sema.ty_i64 as i32, source.data0 + i as i64) else: self.extra_value_at((source.extra_start + i) as i64)
+            var keep = self.match_pattern(pattern, item, node) > 0
+            if keep and filter != 0:
+                var filter_signal = self.eval_expr(filter)
+                if filter_signal.kind != ComptimeControlKind.CTL_VALUE:
+                    self.pop_scope()
+                    state.signal = move filter_signal
+                    return state
+                let truthy = comptime_value_truthy(filter_signal.value)
+                if truthy < 0:
+                    self.pop_scope()
+                    state.signal = self.fail(filter, "a comprehension's filter is a bool")
+                    return state
+                keep = truthy != 0
+            if keep: state = self.eval_comprehension_clause(node, clause + 1, move state)
+            self.pop_scope()
+            if state.signal.kind != ComptimeControlKind.CTL_VALUE:
+                return state
+        state
+
     fn generic_callee_symbol(callee: i32) -> i32:
         let kind = self.ast.kind(callee)
         if kind == NodeKind.NK_TYPE_GENERIC:
@@ -8338,6 +8411,8 @@ impl ComptimeEvaluator:
             return self.eval_match(node)
         if kind == NodeKind.NK_FOR:
             return self.eval_for(node)
+        if kind == NodeKind.NK_ARRAY_COMPREHENSION:
+            return self.eval_array_comprehension(node)
         if kind == NodeKind.NK_WHILE:
             return self.eval_while(node)
         if kind == NodeKind.NK_DO_WHILE:

@@ -344,12 +344,9 @@ generates implementations from a type's structure:
 ```
 use std.json
 
-comptime fn squares(n: i32) -> Vec[i32]:
-    var table = Vec[i32].new()
-    for i in 0..n: table.push(i * i)
-    table
+comptime fn squares(n: i32): [i * i for i in 0..n]
 
-const SQUARES: Vec[i32] = comptime squares(8)       // built by the compiler
+const SQUARES = comptime squares(8)                 // built by the compiler
 
 @[derive(Serialize, Deserialize)]
 type User { name: str, age: i32 }
