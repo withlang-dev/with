@@ -479,6 +479,10 @@ impl Sema:
 
     fn ct_build_value_tree(pool: AstPool, intern: InternPool, value: &ComptimeValue, node: i32, extras: &Vec[ComptimeValue]) -> i32:
         if value.kind == ComptimeValueKind.CV_INT:
+            // A unit variant of an enum is written back as the variant.
+            let variant = self.enum_variant_sym_for_discriminant(value.type_id, value.data0)
+            if variant != 0:
+                return pool.add_node(NodeKind.NK_VARIANT_SHORTHAND, pool.get_start(node), pool.get_end(node), intern.intern(self.pool_resolve(variant)), 0, 0) as i32
             let int_lit = pool.add_node(
                 NodeKind.NK_INT_LIT,
                 pool.get_start(node),

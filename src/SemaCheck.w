@@ -14854,6 +14854,11 @@ impl Sema:
         if self.in_comptime_fn == 0 or fn_sym == 0:
             return 0
         if self.extern_fn_names.contains(fn_sym):
+            // D91 (§17.1a): the target is a declared build input, and the
+            // evaluator answers these two with it (ComptimeEval).
+            let extern_name = self.pool_resolve(fn_sym)
+            if extern_name == "with_sysinfo_os" or extern_name == "with_sysinfo_arch":
+                return 0
             self.emit_error("comptime call of extern function", node)
             return 1
         if self.is_intrinsic_fn_sym(fn_sym) != 0:
@@ -20948,6 +20953,20 @@ impl Sema:
     // held every repr enum's variants, so a lookup by name answered for
     // whichever enum last declared it (an unrelated `None = 0` inverted
     // Option.is_none; two repr enums with an `X` shared one value).
+    // The variant of the payload-free enum `tid` whose discriminant is
+    // `disc`, or 0: `tid` is no such enum, or no variant has that value.
+    fn enum_variant_sym_for_discriminant(tid: i32, disc: i64) -> i32:
+        if tid <= 0: return 0
+        let resolved = self.resolve_alias(tid as TypeId) as i32
+        if self.get_type_kind(resolved as TypeId) != TypeKind.TY_ENUM or self.disc_has_payload.contains(resolved): return 0
+        let enum_decl = self.enum_variant_decl_type(resolved)
+        if enum_decl == 0: return 0
+        var pos = self.get_type_d1(enum_decl)
+        for vi in 0..self.get_type_d2(enum_decl):
+            if self.enum_variant_discriminant_at(enum_decl, vi) == disc: return self.type_extra[pos]
+            pos = pos + 2 + self.type_extra[(pos + 1)]
+        0
+
     fn enum_variant_discriminant_at(enum_decl: i32, index: i32) -> i64:
         let start = self.disc_value_starts.get(enum_decl)
         if start.is_some() and index >= 0 and index < self.get_type_d2(enum_decl):
