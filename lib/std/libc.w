@@ -11,6 +11,7 @@
 // `libc-surface-check` lane refuses any other `pub extern` in this file.
 
 use std.builtins.eprint
+use std.os.Target
 
 extern fn with_str_from_cstr(s: *const u8) -> str
 
@@ -188,11 +189,9 @@ pub fn setrlimit(resource: i32, rlp: *const rlimit) -> i32: with_libc_setrlimit(
 // numbering where a seam translates (`open`, `fcntl`), the target's own
 // value where the call goes straight to the OS's C runtime (`errno`,
 // `clock`, `setlocale`). A constant and the function that consumes it come
-// from this one table. A value that differs by target and goes straight to
-// the OS (`EAGAIN`, `CLOCKS_PER_SEC`, `LC_CTYPE`, `RLIM_INFINITY`,
-// `ULONG_MAX`) needs a compile-time view of the target, which the language
-// does not have yet: those are absent, and a corpus that uses one does not
-// migrate (the migrator names it).
+// from this one table. A value that differs by target is a
+// `comptime match Target.os` (D91): a target added to `OsKind` is a compile
+// error here until its value is stated.
 
 // limits.h, stdint.h, stdlib.h: the same on every supported target.
 pub const INT_MAX: i32 = 2147483647
@@ -204,6 +203,12 @@ pub const SIZE_MAX: u64 = 18446744073709551615
 pub const UINTPTR_MAX: u64 = 18446744073709551615
 pub const EXIT_SUCCESS: i32 = 0
 pub const EXIT_FAILURE: i32 = 1
+// C's `unsigned long` is 32 bits on Windows and 64 elsewhere.
+pub const ULONG_MAX: u64 = comptime match Target.os:
+    .Windows => 4294967295u64
+    .Macos => 18446744073709551615u64
+    .Linux => 18446744073709551615u64
+    .Wasi => 4294967295u64
 
 // stdio.h: `fseek` and `lseek` origins.
 pub const SEEK_SET: i32 = 0
@@ -227,5 +232,37 @@ pub const F_GETFL: i32 = 3
 pub const F_SETFL: i32 = 4
 pub const FD_CLOEXEC: i32 = 1
 
+// errno.h: what `*errno_ptr()` holds on the target.
+pub const EAGAIN: i32 = comptime match Target.os:
+    .Macos => 35
+    .Linux => 11
+    .Windows => 11
+    .Wasi => 6
+pub const EWOULDBLOCK: i32 = comptime match Target.os:
+    .Macos => 35
+    .Linux => 11
+    .Windows => 140
+    .Wasi => 6
+
+// time.h: the unit of `clock()`.
+pub const CLOCKS_PER_SEC: i32 = comptime match Target.os:
+    .Windows => 1000
+    .Macos => 1000000
+    .Linux => 1000000
+    .Wasi => 1000000000
+
 // sys/resource.h: `getrlimit` and `setrlimit`.
 pub const RLIMIT_STACK: i32 = 3
+// The Windows seam reports Darwin's value (rt: win_getrlimit).
+pub const RLIM_INFINITY: u64 = comptime match Target.os:
+    .Linux => 18446744073709551615u64
+    .Macos => 9223372036854775807u64
+    .Windows => 9223372036854775807u64
+    .Wasi => 18446744073709551615u64
+
+// locale.h: `setlocale` categories.
+pub const LC_CTYPE: i32 = comptime match Target.os:
+    .Linux => 0
+    .Macos => 2
+    .Windows => 2
+    .Wasi => 0

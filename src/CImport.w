@@ -17956,14 +17956,15 @@ pub let CI_LIBC_KIND_CONST: i32 = 8
 // that consumes it come from this one table: the value is what the With
 // seam accepts, never a header's.
 fn ci_libc_constant_known(name: &str) -> bool:
-    if name == "INT_MAX" or name == "UINT_MAX" or name == "SIZE_MAX" or name == "UINTPTR_MAX": return true
+    if name == "INT_MAX" or name == "UINT_MAX" or name == "ULONG_MAX" or name == "SIZE_MAX" or name == "UINTPTR_MAX": return true
     if name == "UINT8_MAX" or name == "UINT16_MAX" or name == "UINT32_MAX": return true
     if name == "EXIT_SUCCESS" or name == "EXIT_FAILURE": return true
     if name == "SEEK_SET" or name == "SEEK_CUR" or name == "SEEK_END": return true
     if name == "O_RDONLY" or name == "O_WRONLY" or name == "O_RDWR" or name == "O_CREAT" or name == "O_TRUNC": return true
     if name == "O_APPEND" or name == "O_EXCL" or name == "O_NONBLOCK" or name == "O_CLOEXEC": return true
     if name == "F_GETFD" or name == "F_SETFD" or name == "F_GETFL" or name == "F_SETFL" or name == "FD_CLOEXEC": return true
-    if name == "RLIMIT_STACK": return true
+    if name == "EAGAIN" or name == "EWOULDBLOCK" or name == "CLOCKS_PER_SEC": return true
+    if name == "RLIMIT_STACK" or name == "RLIM_INFINITY" or name == "LC_CTYPE": return true
     false
 
 // D90 (#2060, #2070): a use of an integer constant that a system header
@@ -18018,6 +18019,8 @@ fn ci_libc_constant_use(session: i64, cursor: i32, kind: i32) -> str:
             g_ci_bail_location = with_ci_cursor_location(session, cursor)
             g_ci_bail_kind = at_kind
         return ""
+    // The module names std.libc, so it imports it.
+    ci_migrate_note_libc_symbol(name)
     name
 
 pub fn ci_libc_symbol_allowed_as(name: &str, kind: i32) -> bool:
