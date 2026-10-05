@@ -3715,7 +3715,11 @@ fn ec_run_cases(ctx: &ActionCtx, compiler_path: &str, platform_obj: &str, cases:
             continue
         cc_case.push(i)
         let fibers = bs_emit_c_needs_fiber_runtime(c_text)
-        cc_jobs.push(par_job(bs_emit_c_cc_args(root, c_path, ec_bin(c), platform_obj, c.libm, fibers), bs_capture_path(root, c.dir, "compile", "stdout"), bs_capture_path(root, c.dir, "compile", "stderr"), 120000))
+        // The limit catches a hung compile, not a slow one. The prelude
+        // case is 19 MB of C and takes 112 s on the release host with this
+        // target running alone; at 120 s it timed out (exit 124) in every
+        // battery that ran the other test targets beside it.
+        cc_jobs.push(par_job(bs_emit_c_cc_args(root, c_path, ec_bin(c), platform_obj, c.libm, fibers), bs_capture_path(root, c.dir, "compile", "stdout"), bs_capture_path(root, c.dir, "compile", "stderr"), 600000))
     let cc_rcs = par_run(ctx, &cc_jobs, par_width(&cc_jobs))
 
     for k in 0..cc_case.len() as i32:
