@@ -26,8 +26,8 @@ extern fn with_free(ptr: *mut u8) -> Unit
 /// An intrusive TommyDS item: the node first, then the key.
 type Item { node: tommy_node_struct, key: i32 }
 
-fn item_key_compare(arg: *const c_void, obj: *const c_void) -> c_int:
-    if unsafe { *(arg as *const i32) } == unsafe { (*(obj as *const Item)).key }: 0 else: 1
+unsafe fn item_key_compare(arg: *const c_void, obj: *const c_void) -> c_int:
+    if *(arg as *const i32) == (*(obj as *const Item)).key: 0 else: 1
 
 fn key_hash(key: i32) -> c_ulonglong: tommy_inthash_u32(key as c_uint) as c_ulonglong
 

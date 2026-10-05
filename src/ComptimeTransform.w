@@ -2005,7 +2005,6 @@ fn ct_supported_derive_target(intern: InternPool, derive_sym: i32) -> i32:
     if name == "Clone": return 1
     if name == "Default": return 1
     if name == "Eq": return 1
-    if name == "Hash": return 1
     if name == "Ord": return 1
     if name == "Debug": return 1
     if name == "Display": return 1
@@ -2083,6 +2082,10 @@ impl Sema:
         let derive_count = out.type_meta_derive_count(meta)
         for i in 0..derive_count:
             let derive_sym = out.get_extra(derive_start + i)
+            if intern.resolve(derive_sym) == "Hash":
+                // §11.8 (D96): nothing to derive; a key is hashed by the compiler.
+                self.ct_emit_error_help(out, decl, "`Hash` is not derived: every key is hashed by the compiler, consistently with its `==` (§11.7, §11.8)", "remove `Hash` from the derive list")
+                continue
             if ct_supported_derive_target(intern, derive_sym) != 0:
                 continue
             let generated_source = self.ct_eval_user_derive_source(out, intern, decl, derive_sym)
@@ -2388,8 +2391,11 @@ impl Sema:
         let bool_sym = intern.intern("bool")
         let tp_count = ct_type_decl_tp_count(out, decl)
         let tp_start = ct_type_decl_tp_start(out, decl)
-        let self_type = out.add_node(NodeKind.NK_TYPE_NAMED, start, end, intern.intern("Self"), 0, 0)
-        let other_type = out.add_node(NodeKind.NK_TYPE_NAMED, start, end, intern.intern("Self"), 0, 0)
+        // §11.7: `Eq.eq` and `Ord.cmp` observe both operands.
+        let self_named = out.add_node(NodeKind.NK_TYPE_NAMED, start, end, intern.intern("Self"), 0, 0)
+        let self_type = out.add_node(NodeKind.NK_TYPE_REF, start, end, self_named as i32, 0, 0)
+        let other_named = out.add_node(NodeKind.NK_TYPE_NAMED, start, end, intern.intern("Self"), 0, 0)
+        let other_type = out.add_node(NodeKind.NK_TYPE_REF, start, end, other_named as i32, 0, 0)
         let ret_type = out.add_node(NodeKind.NK_TYPE_NAMED, start, end, bool_sym, 0, 0)
 
         let te_start = self.get_type_d1(resolved)
@@ -2411,7 +2417,7 @@ impl Sema:
                 body = out.ct_build_binary(decl, BinaryOp.OP_AND, body, eq_call)
 
         let param_start = out.extra_len()
-        out.ct_add_fn_param(self_sym, self_type as i32, FN_PARAM_FLAG_MOVE_SELF)
+        out.ct_add_fn_param(self_sym, self_type as i32, FN_PARAM_FLAG_REF_SELF | FN_PARAM_FLAG_SYNTH_RECEIVER)
         out.ct_add_fn_param(other_sym, other_type as i32, 0)
         let fn_sym = intern.intern(type_name ++ ".eq")
         let fn_node = out.add_node(NodeKind.NK_FN_DECL, start, end, fn_sym, body as i32, 0)
@@ -2422,66 +2428,6 @@ impl Sema:
         out.add_extra(1)
         let impl_node = out.add_node(NodeKind.NK_IMPL_DECL, start, end, type_name_sym, impl_extra, eq_trait_sym)
         ct_add_generated_impl_target(out, decl, impl_node as i32, type_name_sym, tp_start, tp_count, eq_trait_sym)
-
-        generated.push(fn_node as i32)
-        generated.push(impl_node as i32)
-        generated
-
-    mut fn ct_generate_hash_derive(out: AstPool, intern: InternPool, decl: i32) -> Vec[i32]:
-        let generated: Vec[i32] = Vec.new()
-        if type_decl_sub_kind(out.get_data2(decl)) != TypeDeclKind.Struct:
-            return generated
-
-        let hash_trait_sym = intern.intern("Hash")
-        let all_sym = intern.intern("all")
-        if self.ct_validate_explicit_struct_derive_fields(out, intern, decl, hash_trait_sym, all_sym) == 0:
-            return generated
-        let hash_method_sym = intern.intern("hash_value")
-        let type_name_sym = out.get_data0(decl)
-        if self.lookup_method_sig(type_name_sym, hash_method_sym) >= 0:
-            return generated
-        if self.select_trait_impl(type_name_sym, hash_trait_sym) != 0:
-            return generated
-
-        let tid = self.lookup_named_type_visible(type_name_sym)
-        if tid == 0:
-            return generated
-        let resolved = self.resolve_alias(tid)
-        if self.get_type_kind(resolved) != TypeKind.TY_STRUCT:
-            return generated
-
-        let type_name = intern.resolve(type_name_sym).clone()
-        let start = out.get_start(decl)
-        let end = out.get_end(decl)
-        let self_sym = intern.intern("self")
-        let i64_sym = intern.intern("i64")
-        let tp_count = ct_type_decl_tp_count(out, decl)
-        let tp_start = ct_type_decl_tp_start(out, decl)
-        let self_type = out.add_node(NodeKind.NK_TYPE_NAMED, start, end, intern.intern("Self"), 0, 0)
-        let ret_type = out.add_node(NodeKind.NK_TYPE_NAMED, start, end, i64_sym, 0, 0)
-
-        let te_start = self.get_type_d1(resolved)
-        let field_count = self.get_type_d2(resolved)
-        var body = out.ct_build_int_lit(decl, 1469598103934665603)
-        for fi in 0..field_count:
-            let field_sym = self.type_extra[(te_start + fi * 3)]
-            let field_expr = ct_build_self_field(out, decl, self_sym, field_sym)
-            let no_args: Vec[i32] = Vec.new()
-            let field_hash = ct_build_method_call(out, decl, field_expr, hash_method_sym, no_args)
-            let mixed = out.ct_build_binary(decl, BinaryOp.OP_MUL_WRAP, body, out.ct_build_int_lit(decl, 1099511628211))
-            body = out.ct_build_binary(decl, BinaryOp.OP_BIT_XOR, mixed, field_hash)
-
-        let param_start = out.extra_len()
-        out.ct_add_fn_param(self_sym, self_type as i32, FN_PARAM_FLAG_MOVE_SELF)
-        let fn_sym = intern.intern(type_name ++ ".hash_value")
-        let fn_node = out.add_node(NodeKind.NK_FN_DECL, start, end, fn_sym, body as i32, 0)
-        out.add_fn_meta(fn_node, FN_META_REQUIRED_UNIT, ret_type as i32, param_start, 1, 0, 0)
-
-        let impl_extra = out.extra_len()
-        out.add_extra(0)
-        out.add_extra(1)
-        let impl_node = out.add_node(NodeKind.NK_IMPL_DECL, start, end, type_name_sym, impl_extra, hash_trait_sym)
-        ct_add_generated_impl_target(out, decl, impl_node as i32, type_name_sym, tp_start, tp_count, hash_trait_sym)
 
         generated.push(fn_node as i32)
         generated.push(impl_node as i32)
@@ -2518,8 +2464,11 @@ impl Sema:
         let i32_sym = intern.intern("i32")
         let tp_count = ct_type_decl_tp_count(out, decl)
         let tp_start = ct_type_decl_tp_start(out, decl)
-        let self_type = out.add_node(NodeKind.NK_TYPE_NAMED, start, end, intern.intern("Self"), 0, 0)
-        let other_type = out.add_node(NodeKind.NK_TYPE_NAMED, start, end, intern.intern("Self"), 0, 0)
+        // §11.7: `Eq.eq` and `Ord.cmp` observe both operands.
+        let self_named = out.add_node(NodeKind.NK_TYPE_NAMED, start, end, intern.intern("Self"), 0, 0)
+        let self_type = out.add_node(NodeKind.NK_TYPE_REF, start, end, self_named as i32, 0, 0)
+        let other_named = out.add_node(NodeKind.NK_TYPE_NAMED, start, end, intern.intern("Self"), 0, 0)
+        let other_type = out.add_node(NodeKind.NK_TYPE_REF, start, end, other_named as i32, 0, 0)
         let ret_type = out.add_node(NodeKind.NK_TYPE_NAMED, start, end, i32_sym, 0, 0)
 
         let te_start = self.get_type_d1(resolved)
@@ -2542,7 +2491,7 @@ impl Sema:
         let body = out.ct_build_block(decl, stmts, out.ct_build_int_lit(decl, 0))
 
         let param_start = out.extra_len()
-        out.ct_add_fn_param(self_sym, self_type as i32, FN_PARAM_FLAG_MOVE_SELF)
+        out.ct_add_fn_param(self_sym, self_type as i32, FN_PARAM_FLAG_REF_SELF | FN_PARAM_FLAG_SYNTH_RECEIVER)
         out.ct_add_fn_param(other_sym, other_type as i32, 0)
         let fn_sym = intern.intern(type_name ++ ".cmp")
         let fn_node = out.add_node(NodeKind.NK_FN_DECL, start, end, fn_sym, body as i32, 0)
@@ -3316,7 +3265,6 @@ impl Sema:
         let clone_trait_sym = intern.intern("Clone")
         let default_trait_sym = intern.intern("Default")
         let eq_trait_sym = intern.intern("Eq")
-        let hash_trait_sym = intern.intern("Hash")
         let ord_trait_sym = intern.intern("Ord")
         let debug_trait_sym = intern.intern("Debug")
         let display_trait_sym = intern.intern("Display")
@@ -3383,15 +3331,6 @@ impl Sema:
                     ordered_ci.push(decl_ci)
                 if ct_source_decl_is_local(source_ast, di) != 0:
                     generated_local_count = generated_local_count + generated_eq.len() as i32
-            if self.ct_type_decl_should_generate_derive(out, intern, decl as i32, hash_trait_sym, all_sym) != 0:
-                let generated_hash = self.ct_generate_hash_derive(out, intern, decl as i32)
-                for gi in 0..generated_hash.len() as i32:
-                    ordered.push(generated_hash[gi])
-                    ordered_paths.push(sema_owned_text(decl_path))
-                    ordered_file_ids.push(decl_file_id)
-                    ordered_ci.push(decl_ci)
-                if ct_source_decl_is_local(source_ast, di) != 0:
-                    generated_local_count = generated_local_count + generated_hash.len() as i32
             if self.ct_type_decl_should_generate_derive(out, intern, decl as i32, ord_trait_sym, all_sym) != 0:
                 let generated_ord = self.ct_generate_ord_derive(out, intern, decl as i32)
                 for gi in 0..generated_ord.len() as i32:

@@ -370,14 +370,6 @@ pub type Handle[T] {
 
 impl[T] Copy for Handle[T]
 
-impl[T] Eq for Handle[T]:
-    fn eq(other: &Handle[T]) -> bool:
-        self.index == other.index and self.generation == other.generation
-
-impl[T] Hash for Handle[T]:
-    fn hash_value() -> i64:
-        ((self.index as i64) << 32) ^ (self.generation as i64)
-
 /// Generational dense-ish storage for long-lived relationships.
 /// Runtime storage is compiler-backed like Vec and HashMap.
 pub type SlotMap[T] {

@@ -3068,6 +3068,16 @@ pub fn with_str_from_vec_u8(v: *const u8) -> str:
         return make_str("" as *const u8, 0)
     alloc_str(vec_get_ptr_field(vp), len)
 
+// FNV-1a, unkeyed: the same on every run, for names derived from text
+// (the compiler's symbol names). A map key is hashed with the keyed hasher.
+fn fnv_hash(data: *const u8, len: i64) -> u64:
+    var h: u64 = 14695981039346656037
+    var i: i64 = 0
+    while i < len:
+        h = (h ^ ((unsafe data[i]) as u64)) *% 1099511628211
+        i = i + 1
+    h
+
 pub fn with_str_hash(s: &str) -> u64:
     fnv_hash(str_data(s), str_length(s))
 
@@ -3631,82 +3641,189 @@ pub fn with_slotmap_set(map: *mut u8, index: u32, generation: u32, val: *const u
     rt_memcpy(sm_value_ptr_at(m, index), val, sm_elem_size(m))
     1
 
-// ── HashMap operations ─────────────────────────────────────────────
+// ── Hashing (D96) ──────────────────────────────────────────────────
 //
-// FNV-1a hash. Open-addressing with linear probing.
+// SipHash-1-3 (Rust's and Python's map hash), keyed once per process from
+// the OS's randomness: a key an adversary chooses cannot be steered into
+// collisions, and nothing observes the key but timing. A hasher is 56 bytes
+// the caller owns: v0..v3, the pending tail bytes, their count, the total.
+
+let SIP_SIZE: i64 = 56
+
+var hash_seed_k0: u64 = 0
+var hash_seed_k1: u64 = 0
+var hash_seed_ready: Atomic[i32]
+var hash_seed_lock: Atomic[i32]
+
+fn hash_seed_init():
+    if hash_seed_ready.load(.Acquire) != 0:
+        return
+    while hash_seed_lock.swap(1, .Acquire) != 0:
+        let _ = rt_nanosleep(1000)
+    if hash_seed_ready.load(.Acquire) == 0:
+        var keys: [2]u64 = [0 as u64; 2]
+        rt_fill_random((&raw mut keys) as *mut [2]u64 as *mut u8, 16)
+        hash_seed_k0 = keys[0]
+        hash_seed_k1 = keys[1]
+        hash_seed_ready.store(1, .Release)
+    hash_seed_lock.store(0, .Release)
+
+fn sip_get(s: *mut u8, at: i64) -> u64: unsafe *((s as i64 + at * 8) as *const u64)
+fn sip_set(s: *mut u8, at: i64, v: u64): unsafe *((s as i64 + at * 8) as *mut u64) = v
+fn sip_rotl(x: u64, r: u64) -> u64: (x << r) | (x >> (64 - r))
+
+fn sip_round(s: *mut u8):
+    var v0 = sip_get(s, 0)
+    var v1 = sip_get(s, 1)
+    var v2 = sip_get(s, 2)
+    var v3 = sip_get(s, 3)
+    v0 = v0 +% v1
+    v1 = sip_rotl(v1, 13) ^ v0
+    v0 = sip_rotl(v0, 32)
+    v2 = v2 +% v3
+    v3 = sip_rotl(v3, 16) ^ v2
+    v0 = v0 +% v3
+    v3 = sip_rotl(v3, 21) ^ v0
+    v2 = v2 +% v1
+    v1 = sip_rotl(v1, 17) ^ v2
+    v2 = sip_rotl(v2, 32)
+    sip_set(s, 0, v0)
+    sip_set(s, 1, v1)
+    sip_set(s, 2, v2)
+    sip_set(s, 3, v3)
+
+fn sip_compress(s: *mut u8, m: u64):
+    sip_set(s, 3, sip_get(s, 3) ^ m)
+    sip_round(s)
+    sip_set(s, 0, sip_get(s, 0) ^ m)
+
+/// Starts a hasher at `state` (SIP_SIZE bytes), keyed with the process seed.
+pub fn with_hasher_init(state: *mut u8):
+    hash_seed_init()
+    sip_set(state, 0, hash_seed_k0 ^ 0x736f6d6570736575)
+    sip_set(state, 1, hash_seed_k1 ^ 0x646f72616e646f6d)
+    sip_set(state, 2, hash_seed_k0 ^ 0x6c7967656e657261)
+    sip_set(state, 3, hash_seed_k1 ^ 0x7465646279746573)
+    sip_set(state, 4, 0)
+    sip_set(state, 5, 0)
+    sip_set(state, 6, 0)
+
+/// Feeds `len` bytes at `data` into the hasher.
+pub fn with_hasher_write(state: *mut u8, data: *const u8, len: i64):
+    var tail = sip_get(state, 4)
+    var ntail = sip_get(state, 5) as i64
+    var i: i64 = 0
+    while i < len:
+        let byte = (unsafe data[i]) as u64
+        tail = tail | (byte << ((ntail * 8) as u64))
+        ntail = ntail + 1
+        if ntail == 8:
+            sip_compress(state, tail)
+            tail = 0
+            ntail = 0
+        i = i + 1
+    sip_set(state, 4, tail)
+    sip_set(state, 5, ntail as u64)
+    sip_set(state, 6, sip_get(state, 6) +% len as u64)
+
+/// Feeds a str: its length, then its bytes, so ("ab", "c") and ("a", "bc")
+/// differ.
+pub fn with_hasher_write_str(state: *mut u8, s: &str):
+    var len = s.len() as i64
+    with_hasher_write(state, (&raw mut len) as *mut i64 as *const u8, 8)
+    with_hasher_write(state, unsafe *(s as *const str as *const *const u8), len)
+
+/// The hash of everything written.
+pub fn with_hasher_finish(state: *mut u8) -> i64:
+    let b = (sip_get(state, 6) << 56) | sip_get(state, 4)
+    sip_compress(state, b)
+    sip_set(state, 2, sip_get(state, 2) ^ 0xff)
+    sip_round(state)
+    sip_round(state)
+    sip_round(state)
+    (sip_get(state, 0) ^ sip_get(state, 1) ^ sip_get(state, 2) ^ sip_get(state, 3)) as i64
+
+// ── HashMap operations (D96) ───────────────────────────────────────
 //
-// HashMap struct layout:
-//   0: keys (*mut u8)       8: vals (*mut u8)      16: occupied (*mut u8)
-//  24: cap (i64)           32: len (i64)           40: key_size (i64)
-//  48: val_size (i64)      56: is_str_key (i32)
-// Total: 64 bytes
+// Entries are a dense array in insertion order (keys, values, a live flag
+// each); a separate open-addressing index of i32 maps a hash to an entry:
+// -1 is an empty slot, -2 a removed one. Iteration walks the entries, so a
+// map iterates in insertion order whatever the seed (Python's dict layout).
+// A removal leaves its entry dead in place; growing compacts the entries.
+//
+// Layout:
+//   0: keys            8: vals           16: live (u8 per entry)
+//  24: entry capacity 32: len (live)     40: key_size       48: val_size
+//  56: is_str_key (i32)                  64: hash_fn        72: eq_fn
+//  80: index (*mut i32)                  88: index capacity 96: entries used
+// Total: 104 bytes
+//
+// A key is hashed and compared by its kind (#2180): a key whose bytes are
+// its value by those bytes, a `str` by the bytes it views, and any other key
+// by the hash and equality functions the compiler generated for its type.
 
 let HM_OFF_KEYS: i64 = 0
 let HM_OFF_VALS: i64 = 8
-let HM_OFF_OCC: i64 = 16
-let HM_OFF_CAP: i64 = 24
+let HM_OFF_LIVE: i64 = 16
+let HM_OFF_ECAP: i64 = 24
 let HM_OFF_LEN: i64 = 32
 let HM_OFF_KSZ: i64 = 40
 let HM_OFF_VSZ: i64 = 48
 let HM_OFF_ISSTR: i64 = 56
-let HM_SIZE: i64 = 64
+let HM_OFF_HASHFN: i64 = 64
+let HM_OFF_EQFN: i64 = 72
+let HM_OFF_INDEX: i64 = 80
+let HM_OFF_ICAP: i64 = 88
+let HM_OFF_NENT: i64 = 96
+let HM_SIZE: i64 = 104
 
-fn hm_keys(m: i64) -> *mut u8:
-    unsafe *(m as *const *mut u8)
-fn hm_vals(m: i64) -> *mut u8:
-    unsafe *((m + HM_OFF_VALS) as *const *mut u8)
-fn hm_occ(m: i64) -> *mut u8:
-    unsafe *((m + HM_OFF_OCC) as *const *mut u8)
-fn hm_cap(m: i64) -> i64:
-    unsafe *((m + HM_OFF_CAP) as *const i64)
-fn hm_len(m: i64) -> i64:
-    unsafe *((m + HM_OFF_LEN) as *const i64)
-fn hm_key_size(m: i64) -> i64:
-    unsafe *((m + HM_OFF_KSZ) as *const i64)
-fn hm_val_size(m: i64) -> i64:
-    unsafe *((m + HM_OFF_VSZ) as *const i64)
-fn hm_is_str_key(m: i64) -> i32:
-    unsafe *((m + HM_OFF_ISSTR) as *const i32)
+pub type MapKeyHashFn = *const fn(*const u8) -> u64
+pub type MapKeyEqFn = *const fn(*const u8, *const u8) -> i32
 
-fn hm_set_keys(m: i64, v: *mut u8):
-    unsafe *(m as *mut *mut u8) = v
-fn hm_set_vals(m: i64, v: *mut u8):
-    unsafe *((m + HM_OFF_VALS) as *mut *mut u8) = v
-fn hm_set_occ(m: i64, v: *mut u8):
-    unsafe *((m + HM_OFF_OCC) as *mut *mut u8) = v
-fn hm_set_cap(m: i64, v: i64):
-    unsafe *((m + HM_OFF_CAP) as *mut i64) = v
-fn hm_set_len(m: i64, v: i64):
-    unsafe *((m + HM_OFF_LEN) as *mut i64) = v
-fn hm_set_key_size(m: i64, v: i64):
-    unsafe *((m + HM_OFF_KSZ) as *mut i64) = v
-fn hm_set_val_size(m: i64, v: i64):
-    unsafe *((m + HM_OFF_VSZ) as *mut i64) = v
-fn hm_set_is_str_key(m: i64, v: i32):
-    unsafe *((m + HM_OFF_ISSTR) as *mut i32) = v
+fn hm_field(m: i64, at: i64) -> i64: unsafe *((m + at) as *const i64)
+fn hm_set_field(m: i64, at: i64, v: i64): unsafe *((m + at) as *mut i64) = v
+fn hm_keys(m: i64) -> *mut u8: hm_field(m, HM_OFF_KEYS) as *mut u8
+fn hm_vals(m: i64) -> *mut u8: hm_field(m, HM_OFF_VALS) as *mut u8
+fn hm_live(m: i64) -> *mut u8: hm_field(m, HM_OFF_LIVE) as *mut u8
+fn hm_index(m: i64) -> *mut i32: hm_field(m, HM_OFF_INDEX) as *mut i32
+fn hm_ecap(m: i64) -> i64: hm_field(m, HM_OFF_ECAP)
+fn hm_icap(m: i64) -> i64: hm_field(m, HM_OFF_ICAP)
+fn hm_nent(m: i64) -> i64: hm_field(m, HM_OFF_NENT)
+fn hm_len(m: i64) -> i64: hm_field(m, HM_OFF_LEN)
+fn hm_key_size(m: i64) -> i64: hm_field(m, HM_OFF_KSZ)
+fn hm_val_size(m: i64) -> i64: hm_field(m, HM_OFF_VSZ)
+fn hm_is_str_key(m: i64) -> i32: unsafe *((m + HM_OFF_ISSTR) as *const i32)
+fn hm_set_is_str_key(m: i64, v: i32): unsafe *((m + HM_OFF_ISSTR) as *mut i32) = v
+fn hm_hash_fn(m: i64) -> MapKeyHashFn: unsafe *((m + HM_OFF_HASHFN) as *const MapKeyHashFn)
+fn hm_eq_fn(m: i64) -> MapKeyEqFn: unsafe *((m + HM_OFF_EQFN) as *const MapKeyEqFn)
+fn hm_set_key_fns(m: i64, hash_fn: MapKeyHashFn, eq_fn: MapKeyEqFn):
+    unsafe:
+        *((m + HM_OFF_HASHFN) as *mut MapKeyHashFn) = hash_fn
+        *((m + HM_OFF_EQFN) as *mut MapKeyEqFn) = eq_fn
 
-// FNV-1a hash
-fn fnv_hash(data: *const u8, len: i64) -> u64:
-    // FNV offset basis: 14695981039346656037
-    var h: u64 = 14695981039346656037
-    var i: i64 = 0
-    while i < len:
-        let byte = unsafe data[i]
-        h = h ^ (byte as u64)
-        // FNV prime: 1099511628211
-        h = h *% 1099511628211
-        i = i + 1
-    h
+fn hm_key_at(m: i64, e: i64) -> *mut u8: (hm_keys(m) as i64 + e * hm_key_size(m)) as *mut u8
+fn hm_val_at(m: i64, e: i64) -> *mut u8: (hm_vals(m) as i64 + e * hm_val_size(m)) as *mut u8
+fn hm_entry_live(m: i64, e: i64) -> bool: (unsafe hm_live(m)[e]) != 0
+fn hm_slot(m: i64, i: i64) -> i64: (unsafe hm_index(m)[i]) as i64
+fn hm_set_slot(m: i64, i: i64, e: i64): unsafe *((hm_index(m) as i64 + i * 4) as *mut i32) = e as i32
 
 fn hm_hash_key(m: i64, key: *const u8) -> u64:
+    let hash_fn = hm_hash_fn(m)
+    if hash_fn as i64 != 0: return hash_fn(key)
+    var state: [7]u64 = [0 as u64; 7]
+    let s = (&raw mut state) as *mut [7]u64 as *mut u8
+    with_hasher_init(s)
     if hm_is_str_key(m) != 0:
-        // key points to a str value {ptr, len}
-        let str_ptr = unsafe *(key as *const *const u8)
-        let str_len = unsafe *((key as i64 + 8) as *const i64)
-        return fnv_hash(str_ptr, str_len)
-    fnv_hash(key, hm_key_size(m))
+        // key points to a str value {ptr, len}: its length, then its bytes.
+        with_hasher_write(s, (key as i64 + 8) as *const u8, 8)
+        with_hasher_write(s, unsafe *(key as *const *const u8), unsafe *((key as i64 + 8) as *const i64))
+    else:
+        with_hasher_write(s, key, hm_key_size(m))
+    with_hasher_finish(s) as u64
 
 fn hm_keys_eq(m: i64, a: *const u8, b: *const u8) -> i32:
+    let eq_fn = hm_eq_fn(m)
+    if eq_fn as i64 != 0: return eq_fn(a, b)
     if hm_is_str_key(m) != 0:
         let a_ptr = unsafe *(a as *const *const u8)
         let a_len = unsafe *((a as i64 + 8) as *const i64)
@@ -3717,54 +3834,95 @@ fn hm_keys_eq(m: i64, a: *const u8, b: *const u8) -> i32:
         return if rt_memcmp(a_ptr, b_ptr, a_len) == 0: 1 else: 0
     if rt_memcmp(a, b, hm_key_size(m)) == 0: 1 else: 0
 
-fn hm_grow(m: i64):
-    let old_cap = hm_cap(m)
-    let old_keys = hm_keys(m)
-    let old_vals = hm_vals(m)
-    let old_occ = hm_occ(m)
+// The index slot that holds `key`'s entry, or -1.
+fn hm_find_slot(m: i64, key: *const u8) -> i64:
+    if hm_len(m) == 0: return -1
+    let mask = hm_icap(m) - 1
+    var i = (hm_hash_key(m, key) & (mask as u64)) as i64
+    var probes: i64 = 0
+    while probes <= mask:
+        let e = hm_slot(m, i)
+        if e == -1: return -1
+        if e >= 0 and hm_keys_eq(m, hm_key_at(m, e) as *const u8, key) != 0: return i
+        i = (i + 1) & mask
+        probes = probes + 1
+    -1
+
+// Puts entry `e` in the first free (empty or removed) slot of its probe.
+fn hm_place(m: i64, e: i64):
+    let mask = hm_icap(m) - 1
+    var i = (hm_hash_key(m, hm_key_at(m, e) as *const u8) & (mask as u64)) as i64
+    while hm_slot(m, i) >= 0:
+        i = (i + 1) & mask
+    hm_set_slot(m, i, e)
+
+fn hm_rebuild_index(m: i64, icap: i64):
+    let old = hm_index(m)
+    if old as i64 != 0: rt_free_sized(old as *mut u8, hm_icap(m) * 4)
+    let index = rt_alloc(icap * 4)
+    rt_memset(index, 0xff, icap * 4)
+    hm_set_field(m, HM_OFF_INDEX, index as i64)
+    hm_set_field(m, HM_OFF_ICAP, icap)
+    for e in 0..hm_nent(m):
+        if hm_entry_live(m, e): hm_place(m, e)
+
+// The entries are full: drop the dead ones, keeping order, and double the
+// capacity unless half of it is dead; then index the result.
+fn hm_grow_entries(m: i64):
     let ksz = hm_key_size(m)
     let vsz = hm_val_size(m)
+    let old_cap = hm_ecap(m)
+    let new_cap = if hm_len(m) * 2 <= old_cap: old_cap else: old_cap * 2
+    let keys = rt_alloc(new_cap * ksz)
+    let vals = rt_alloc(new_cap * vsz)
+    let live = rt_alloc(new_cap)
+    rt_memset(live, 0, new_cap)
+    var n: i64 = 0
+    for e in 0..hm_nent(m):
+        if hm_entry_live(m, e):
+            rt_memcpy((keys as i64 + n * ksz) as *mut u8, hm_key_at(m, e) as *const u8, ksz)
+            rt_memcpy((vals as i64 + n * vsz) as *mut u8, hm_val_at(m, e) as *const u8, vsz)
+            unsafe *((live as i64 + n) as *mut u8) = 1
+            n = n + 1
+    rt_free_sized(hm_keys(m), old_cap * ksz)
+    rt_free_sized(hm_vals(m), old_cap * vsz)
+    rt_free_sized(hm_live(m), old_cap)
+    hm_set_field(m, HM_OFF_KEYS, keys as i64)
+    hm_set_field(m, HM_OFF_VALS, vals as i64)
+    hm_set_field(m, HM_OFF_LIVE, live as i64)
+    hm_set_field(m, HM_OFF_ECAP, new_cap)
+    hm_set_field(m, HM_OFF_NENT, n)
+    var icap = hm_icap(m)
+    while new_cap * 3 > icap * 2: icap = icap * 2
+    hm_rebuild_index(m, icap)
 
-    let new_cap = old_cap * 2
-    hm_set_cap(m, new_cap)
-    hm_set_keys(m, rt_alloc(new_cap * ksz))
-    hm_set_vals(m, rt_alloc(new_cap * vsz))
-    hm_set_occ(m, rt_alloc(new_cap))
-    rt_memset(hm_occ(m), 0, new_cap)
-    hm_set_len(m, 0)
+// A map whose key kind the compiler states (#2180): 0, its bytes are its
+// value; 1, a `str`; 2, `hash_fn` and `eq_fn` hash and compare it.
+pub fn with_hashmap_new_keyed(key_size: i64, val_size: i64, key_kind: i64, hash_fn: MapKeyHashFn, eq_fn: MapKeyEqFn) -> *mut u8:
+    let m = with_hashmap_new(key_size, val_size)
+    let mi = m as i64
+    hm_set_is_str_key(mi, if key_kind == 1: 1 else: 0)
+    hm_set_key_fns(mi, if key_kind == 2: hash_fn else: 0 as MapKeyHashFn, if key_kind == 2: eq_fn else: 0 as MapKeyEqFn)
+    m
 
-    var i: i64 = 0
-    while i < old_cap:
-        if (unsafe old_occ[i]) != 0:
-            let k = (old_keys as i64 + i * ksz) as *const u8
-            let v = (old_vals as i64 + i * vsz) as *const u8
-            // Re-insert
-            var h = (hm_hash_key(m, k) % (new_cap as u64)) as i64
-            while (unsafe hm_occ(m)[h]) != 0:
-                h = ((h + 1) as u64 % (new_cap as u64)) as i64
-            rt_memcpy((hm_keys(m) as i64 + h * ksz) as *mut u8, k, ksz)
-            rt_memcpy((hm_vals(m) as i64 + h * vsz) as *mut u8, v, vsz)
-            unsafe *((hm_occ(m) as i64 + h) as *mut u8) = 1
-            hm_set_len(m, hm_len(m) + 1)
-        i = i + 1
-
-    rt_free_sized(old_keys, old_cap * ksz)
-    rt_free_sized(old_vals, old_cap * vsz)
-    rt_free_sized(old_occ, old_cap)
-
+// The map of a compiler that names no key kind: a 16-byte key is taken to
+// be a `str`. Kept for code an earlier compiler generated; this compiler
+// calls with_hashmap_new_keyed.
 pub fn with_hashmap_new(key_size: i64, val_size: i64) -> *mut u8:
     let m = rt_alloc(HM_SIZE)
     let mi = m as i64
-    hm_set_cap(mi, 16)
-    hm_set_len(mi, 0)
-    hm_set_key_size(mi, key_size)
-    hm_set_val_size(mi, val_size)
-    // str is 16 bytes (ptr + len)
+    rt_memset(m, 0, HM_SIZE)
+    hm_set_key_fns(mi, 0 as MapKeyHashFn, 0 as MapKeyEqFn)
+    hm_set_field(mi, HM_OFF_KSZ, key_size)
+    hm_set_field(mi, HM_OFF_VSZ, val_size)
     hm_set_is_str_key(mi, if key_size == 16: 1 else: 0)
-    hm_set_keys(mi, rt_alloc(16 * key_size))
-    hm_set_vals(mi, rt_alloc(16 * val_size))
-    hm_set_occ(mi, rt_alloc(16))
-    rt_memset(hm_occ(mi), 0, 16)
+    hm_set_field(mi, HM_OFF_ECAP, 8)
+    hm_set_field(mi, HM_OFF_KEYS, rt_alloc(8 * key_size) as i64)
+    hm_set_field(mi, HM_OFF_VALS, rt_alloc(8 * val_size) as i64)
+    let live = rt_alloc(8)
+    rt_memset(live, 0, 8)
+    hm_set_field(mi, HM_OFF_LIVE, live as i64)
+    hm_rebuild_index(mi, 16)
     m
 
 pub fn with_hashmap_new_out(out: *mut *mut u8, key_size: i64, val_size: i64):
@@ -3776,51 +3934,33 @@ pub fn with_hashmap_new_at(base: *mut u8, offset: i64, key_size: i64, val_size: 
 
 pub fn with_hashmap_insert(map: *mut u8, key: *const u8, val: *const u8, is_str_key: i64):
     let m = map as i64
-    // Store is_str_key if first insert
     if is_str_key != 0:
         hm_set_is_str_key(m, 1)
-    // Grow at 70% load
-    if hm_len(m) * 10 >= hm_cap(m) * 7:
-        hm_grow(m)
-
-    let cap = hm_cap(m)
-    let ksz = hm_key_size(m)
-    let vsz = hm_val_size(m)
-
-    var h = (hm_hash_key(m, key) % (cap as u64)) as i64
-    loop:
-        if (unsafe hm_occ(m)[h]) == 0:
-            break
-        if hm_keys_eq(m, (hm_keys(m) as i64 + h * ksz) as *const u8, key) != 0:
-            // Update existing
-            rt_memcpy((hm_vals(m) as i64 + h * vsz) as *mut u8, val, vsz)
-            return
-        h = ((h + 1) as u64 % (cap as u64)) as i64
-    rt_memcpy((hm_keys(m) as i64 + h * ksz) as *mut u8, key, ksz)
-    rt_memcpy((hm_vals(m) as i64 + h * vsz) as *mut u8, val, vsz)
-    unsafe *((hm_occ(m) as i64 + h) as *mut u8) = 1
-    hm_set_len(m, hm_len(m) + 1)
+    let slot = hm_find_slot(m, key)
+    if slot >= 0:
+        // The key is present: its value is replaced where it stands.
+        rt_memcpy(hm_val_at(m, hm_slot(m, slot)), val, hm_val_size(m))
+        return
+    if hm_nent(m) == hm_ecap(m):
+        hm_grow_entries(m)
+    else if (hm_nent(m) + 1) * 3 > hm_icap(m) * 2:
+        hm_rebuild_index(m, hm_icap(m) * 2)
+    let e = hm_nent(m)
+    rt_memcpy(hm_key_at(m, e), key, hm_key_size(m))
+    rt_memcpy(hm_val_at(m, e), val, hm_val_size(m))
+    unsafe *((hm_live(m) as i64 + e) as *mut u8) = 1
+    hm_set_field(m, HM_OFF_NENT, e + 1)
+    hm_set_field(m, HM_OFF_LEN, hm_len(m) + 1)
+    hm_place(m, e)
 
 // D22 lookup primitive: a nullable pointer observes map-owned value storage.
 // The compiler wraps it as Option[&V]; this function never transfers ownership.
 pub fn with_hashmap_get_ptr(map: *mut u8, key: *const u8, is_str_key: i64) -> *mut u8:
     let _ = is_str_key  // key type already stored in struct
     let m = map as i64
-    if hm_len(m) == 0: return 0 as *mut u8
-    let cap = hm_cap(m)
-    let ksz = hm_key_size(m)
-    let vsz = hm_val_size(m)
-
-    var h = (hm_hash_key(m, key) % (cap as u64)) as i64
-    var probes: i64 = 0
-    while probes < cap:
-        if (unsafe hm_occ(m)[h]) == 0:
-            return 0 as *mut u8
-        if hm_keys_eq(m, (hm_keys(m) as i64 + h * ksz) as *const u8, key) != 0:
-            return (hm_vals(m) as i64 + h * vsz) as *mut u8
-        h = ((h + 1) as u64 % (cap as u64)) as i64
-        probes = probes + 1
-    0 as *mut u8
+    let slot = hm_find_slot(m, key)
+    if slot < 0: return 0 as *mut u8
+    hm_val_at(m, hm_slot(m, slot))
 
 // TODO(D22): legacy copying helper for internal callers. User-facing get must
 // not lower through this path; remove or narrowly retain it only after every
@@ -3836,133 +3976,90 @@ pub fn with_hashmap_get(map: *mut u8, key: *const u8, val_out: *mut u8, is_str_k
 pub fn with_hashmap_contains(map: *mut u8, key: *const u8, is_str_key: i64) -> i32:
     if with_hashmap_get_ptr(map, key, is_str_key) as i64 != 0: 1 else: 0
 
+// Removes `key`'s entry: its value's bytes go to `val_out`, its slot becomes
+// a removed one and its entry dead, the others keep their order.
 pub fn with_hashmap_remove(map: *mut u8, key: *const u8, val_out: *mut u8, is_str_key: i64) -> i32:
     let _ = is_str_key  // key type already stored in struct
     let m = map as i64
-    if hm_len(m) == 0: return 0
-    let cap = hm_cap(m)
-    let ksz = hm_key_size(m)
-    let vsz = hm_val_size(m)
-
-    var h = (hm_hash_key(m, key) % (cap as u64)) as i64
-    var probes: i64 = 0
-    while probes < cap:
-        if (unsafe hm_occ(m)[h]) == 0:
-            return 0
-        if hm_keys_eq(m, (hm_keys(m) as i64 + h * ksz) as *const u8, key) != 0:
-            if val_out as i64 != 0:
-                rt_memcpy(val_out, (hm_vals(m) as i64 + h * vsz) as *const u8, vsz)
-            unsafe *((hm_occ(m) as i64 + h) as *mut u8) = 0
-            hm_set_len(m, hm_len(m) - 1)
-            // Rehash following entries
-            var next = ((h + 1) as u64 % (cap as u64)) as i64
-            while (unsafe hm_occ(m)[next]) != 0:
-                // Save key+val, clear slot, re-insert
-                let tmpk = rt_alloc(ksz)
-                let tmpv = rt_alloc(vsz)
-                rt_memcpy(tmpk, (hm_keys(m) as i64 + next * ksz) as *const u8, ksz)
-                rt_memcpy(tmpv, (hm_vals(m) as i64 + next * vsz) as *const u8, vsz)
-                unsafe *((hm_occ(m) as i64 + next) as *mut u8) = 0
-                hm_set_len(m, hm_len(m) - 1)
-                with_hashmap_insert(map, tmpk as *const u8, tmpv as *const u8, hm_is_str_key(m) as i64)
-                rt_free_sized(tmpk, ksz)
-                rt_free_sized(tmpv, vsz)
-                next = ((next + 1) as u64 % (cap as u64)) as i64
-            return 1
-        h = ((h + 1) as u64 % (cap as u64)) as i64
-        probes = probes + 1
-    0
+    let slot = hm_find_slot(m, key)
+    if slot < 0: return 0
+    let e = hm_slot(m, slot)
+    if val_out as i64 != 0:
+        rt_memcpy(val_out, hm_val_at(m, e) as *const u8, hm_val_size(m))
+    hm_set_slot(m, slot, -2)
+    unsafe *((hm_live(m) as i64 + e) as *mut u8) = 0
+    hm_set_field(m, HM_OFF_LEN, hm_len(m) - 1)
+    1
 
 // #1189: removal transfers the stored key out as well as the value. The
 // table is type-erased, so only the caller can drop a key that owns memory;
-// `remove` alone cleared the slot and the key's buffer leaked. The stored
-// key's bytes are transported into `key_out` before the slot is vacated
-// (`remove` still compares stored keys while it rehashes the entries that
-// follow), leaving `key_out` the key's sole owner.
+// `remove` alone leaves the key's bytes in the dead entry and its buffer
+// leaked. The stored key's bytes are transported into `key_out`, leaving
+// `key_out` the key's sole owner.
 pub fn with_hashmap_remove_entry(map: *mut u8, key: *const u8, key_out: *mut u8, val_out: *mut u8) -> i32:
     let m = map as i64
-    if hm_len(m) == 0: return 0
-    let cap = hm_cap(m)
-    let ksz = hm_key_size(m)
-    var h = (hm_hash_key(m, key) % (cap as u64)) as i64
-    var probes: i64 = 0
-    while probes < cap:
-        if (unsafe hm_occ(m)[h]) == 0: return 0
-        let stored = (hm_keys(m) as i64 + h * ksz) as *const u8
-        if hm_keys_eq(m, stored, key) != 0:
-            if key_out as i64 != 0: rt_memcpy(key_out, stored, ksz)
-            return with_hashmap_remove(map, key, val_out, 0)
-        h = ((h + 1) as u64 % (cap as u64)) as i64
-        probes = probes + 1
-    0
+    let slot = hm_find_slot(m, key)
+    if slot < 0: return 0
+    if key_out as i64 != 0: rt_memcpy(key_out, hm_key_at(m, hm_slot(m, slot)) as *const u8, hm_key_size(m))
+    with_hashmap_remove(map, key, val_out, 0)
 
 pub fn with_hashmap_len(map: *mut u8) -> i64:
     if map as i64 == 0:
         return 0
     hm_len(map as i64)
 
-// Typed drop glue cannot see through HashMap's opaque one-pointer compiler
-// representation. These accessors let it walk only live runtime slots while
-// keeping the table layout private to rt_core.
+// Typed drop glue and iteration cannot see through HashMap's opaque
+// one-pointer compiler representation. These accessors walk the entries in
+// insertion order, live ones only, keeping the layout private to rt_core.
 pub fn with_hashmap_capacity(map: *mut u8) -> i64:
     if map as i64 == 0:
         return 0
-    hm_cap(map as i64)
+    hm_nent(map as i64)
 
 pub fn with_hashmap_slot_occupied(map: *mut u8, index: i64) -> i32:
     if map as i64 == 0:
         return 0
     let m = map as i64
-    if index < 0 or index >= hm_cap(m):
+    if index < 0 or index >= hm_nent(m):
         return 0
-    if (unsafe hm_occ(m)[index]) != 0: 1 else: 0
+    if hm_entry_live(m, index): 1 else: 0
 
 pub fn with_hashmap_key_ptr_at(map: *mut u8, index: i64) -> *mut u8:
     if with_hashmap_slot_occupied(map, index) == 0:
         return 0 as *mut u8
-    let m = map as i64
-    (hm_keys(m) as i64 + index * hm_key_size(m)) as *mut u8
+    hm_key_at(map as i64, index)
 
 pub fn with_hashmap_value_ptr_at(map: *mut u8, index: i64) -> *mut u8:
     if with_hashmap_slot_occupied(map, index) == 0:
         return 0 as *mut u8
-    let m = map as i64
-    (hm_vals(m) as i64 + index * hm_val_size(m)) as *mut u8
+    hm_val_at(map as i64, index)
 
 pub fn with_hashmap_clear(map: *mut u8):
     let m = map as i64
-    rt_memset(hm_occ(m), 0, hm_cap(m))
-    hm_set_len(m, 0)
+    rt_memset(hm_live(m), 0, hm_ecap(m))
+    rt_memset(hm_index(m) as *mut u8, 0xff, hm_icap(m) * 4)
+    hm_set_field(m, HM_OFF_NENT, 0)
+    hm_set_field(m, HM_OFF_LEN, 0)
 
 pub fn with_hashmap_keys_out(out: *mut u8, map: *mut u8, key_size: i64):
     let m = map as i64
     if m == 0:
         with_vec_new_out(out, key_size)
         return
-    let cap = hm_cap(m)
     let ksz = hm_key_size(m)
-    let effective_ksz = if ksz > 0: ksz else: key_size
-    with_vec_new_out(out, effective_ksz)
-    var i: i64 = 0
-    while i < cap:
-        if (unsafe hm_occ(m)[i]) != 0:
-            with_vec_push(out, (hm_keys(m) as i64 + i * ksz) as *const u8)
-        i = i + 1
+    with_vec_new_out(out, if ksz > 0: ksz else: key_size)
+    for e in 0..hm_nent(m):
+        if hm_entry_live(m, e): with_vec_push(out, hm_key_at(m, e) as *const u8)
 
 pub fn with_hashmap_values_out(out: *mut u8, map: *mut u8, val_size: i64) -> Unit:
     let m = map as i64
     if m == 0:
         with_vec_new_out(out, val_size)
         return
-    let cap = hm_cap(m)
     let vsz = hm_val_size(m)
-    let effective_vsz = if vsz > 0: vsz else: val_size
-    with_vec_new_out(out, effective_vsz)
-    var i: i64 = 0
-    while i < cap:
-        if (unsafe hm_occ(m)[i]) != 0:
-            with_vec_push(out, (hm_vals(m) as i64 + i * vsz) as *const u8)
-        i = i + 1
+    with_vec_new_out(out, if vsz > 0: vsz else: val_size)
+    for e in 0..hm_nent(m):
+        if hm_entry_live(m, e): with_vec_push(out, hm_val_at(m, e) as *const u8)
 
 pub fn with_hashmap_items_out(out: *mut u8, map: *mut u8, key_size: i64, val_size: i64, pair_size: i64, val_offset: i64) -> Unit:
     let m = map as i64
@@ -3970,29 +4067,27 @@ pub fn with_hashmap_items_out(out: *mut u8, map: *mut u8, key_size: i64, val_siz
     with_vec_new_out(out, effective_pair_size)
     if m == 0:
         return
-    let cap = hm_cap(m)
     let ksz = hm_key_size(m)
     let vsz = hm_val_size(m)
     let effective_ksz = if ksz > 0: ksz else: key_size
     let effective_vsz = if vsz > 0: vsz else: val_size
     let tmp = rt_alloc(effective_pair_size)
-    var i: i64 = 0
-    while i < cap:
-        if (unsafe hm_occ(m)[i]) != 0:
+    for e in 0..hm_nent(m):
+        if hm_entry_live(m, e):
             rt_memset(tmp, 0, effective_pair_size)
-            rt_memcpy(tmp, (hm_keys(m) as i64 + i * ksz) as *const u8, effective_ksz)
-            rt_memcpy((tmp as i64 + val_offset) as *mut u8, (hm_vals(m) as i64 + i * vsz) as *const u8, effective_vsz)
+            rt_memcpy(tmp, hm_key_at(m, e) as *const u8, effective_ksz)
+            rt_memcpy((tmp as i64 + val_offset) as *mut u8, hm_val_at(m, e) as *const u8, effective_vsz)
             with_vec_push(out, tmp as *const u8)
-        i = i + 1
     rt_free_sized(tmp, effective_pair_size)
 
 pub fn with_hashmap_free(map: *mut u8):
     if map as i64 == 0: return
     let m = map as i64
-    let cap = hm_cap(m)
-    rt_free_sized(hm_keys(m), cap * hm_key_size(m))
-    rt_free_sized(hm_vals(m), cap * hm_val_size(m))
-    rt_free_sized(hm_occ(m), cap)
+    let ecap = hm_ecap(m)
+    rt_free_sized(hm_keys(m), ecap * hm_key_size(m))
+    rt_free_sized(hm_vals(m), ecap * hm_val_size(m))
+    rt_free_sized(hm_live(m), ecap)
+    rt_free_sized(hm_index(m) as *mut u8, hm_icap(m) * 4)
     rt_free_sized(map, HM_SIZE)
 
 pub fn with_hashmap_increment(map: *mut u8, key: *const u8, is_str_key: i64):

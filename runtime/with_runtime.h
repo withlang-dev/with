@@ -128,6 +128,7 @@ with_option_i32 with_vec_pop_i32(with_vec *v);
 // ── HashMap (from helpers.c — re-declared for convenience) ─────────
 
 void *with_hashmap_new(int64_t key_size, int64_t val_size);
+void *with_hashmap_new_keyed(int64_t key_size, int64_t val_size, int64_t key_kind, int64_t (*hash_fn)(const void *), int32_t (*eq_fn)(const void *, const void *));
 void with_hashmap_new_out(void **out, int64_t key_size, int64_t val_size);
 void with_hashmap_new_at(void *base, int64_t offset, int64_t key_size, int64_t val_size);
 void with_hashmap_insert(void *handle, const void *key, const void *val, int64_t is_str_key);

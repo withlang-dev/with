@@ -9,6 +9,7 @@
 // Complexity contract: O(1) average insert, lookup and remove; the engine
 // resizes by one power of two at a time.
 
+use std.hash
 use std.option
 use std.traits
 use std.tommyds.defs
@@ -38,7 +39,7 @@ pub unsafe fn hash_slot_compare(probe: *const c_void, data: *const c_void) -> c_
     let compare = (*(probe as *const HashSlotHead)).compare.clone()
     compare(probe as *const u8, data as *const u8) as c_int
 
-/// Keys hash through `Hash.hash_value` and compare through `Eq.eq` (D41).
+/// Keys hash through `std.hash.hash_of` and compare through `==` (D96).
 /// `get` observes (`Option[&V]`), `remove` transfers (`Option[V]`), `insert`
 /// of an existing key transfers the previous value out.
 /// `probe` is one slot-shaped buffer the lookups reuse: the engine compares
@@ -48,7 +49,7 @@ pub unsafe fn hash_slot_compare(probe: *const c_void, data: *const c_void) -> c_
 /// engine's cost plus one hash and one comparison.
 pub type HashIndex[K, V] { map: *mut tommy_hashdyn_struct, probe: *mut HashSlot[K, V] }
 
-pub fn HashIndex.new[K: Hash + Eq, V]() -> HashIndex[K, V]:
+pub fn HashIndex.new[K: Key, V]() -> HashIndex[K, V]:
     let map = unsafe { with_alloc(sizeof[tommy_hashdyn_struct]() as i64) } as *mut tommy_hashdyn_struct
     unsafe { tommy_hashdyn_init(map) }
     let probe = unsafe { with_alloc(sizeof[HashSlot[K, V]]() as i64) } as *mut HashSlot[K, V]
@@ -93,21 +94,21 @@ impl[K, V] Drop for HashIndex[K, V]:
         unsafe { with_free(self.map as *mut u8) }
         unsafe { with_free(self.probe as *mut u8) }
 
-impl[K: Hash + Eq, V] HashIndex[K, V]:
+impl[K: Key, V] HashIndex[K, V]:
     fn comparator() -> fn(*const u8, *const u8) -> i32:
         (a, b) =>
             let left = unsafe { &(*(a as *const HashSlot[K, V])).key }
             let right = unsafe { &(*(b as *const HashSlot[K, V])).key }
             if left == right: 0 else: 1
 
-    fn hash_of(key: &K) -> c_ulonglong: key.hash_value() as c_ulonglong
+    fn key_hash(key: &K) -> c_ulonglong: hash_of(key) as c_ulonglong
 
     /// The slot holding `key`, or null (the probe's key is a byte image).
     fn find(key: &K) -> *mut HashSlot[K, V]:
         let slot = self.probe
         unsafe { (*slot).head.compare = self.comparator() }
         unsafe { with_memcpy(&raw mut (*slot).key as *mut u8, &raw const *key as *const u8, sizeof[K]() as i64) }
-        unsafe { tommy_hashdyn_search(self.map, hash_slot_compare, slot as *const c_void, self.hash_of(key)) } as *mut HashSlot[K, V]
+        unsafe { tommy_hashdyn_search(self.map, hash_slot_compare, slot as *const c_void, self.key_hash(key)) } as *mut HashSlot[K, V]
 
     /// Observes the value stored under `key`.
     pub fn get(key: &K) -> Option[&V]:
@@ -120,7 +121,7 @@ impl[K: Hash + Eq, V] HashIndex[K, V]:
     /// replaced and its value transferred back.
     pub mut fn insert(key: K, value: V) -> Option[V]:
         let previous = self.remove(&key)
-        let hash = self.hash_of(&key)
+        let hash = self.key_hash(&key)
         let slot = unsafe { with_alloc(sizeof[HashSlot[K, V]]() as i64) } as *mut HashSlot[K, V]
         let node = tommy_node_struct { next: null, prev: null, data: null, index: 0 }
         unsafe { *slot = HashSlot { head: HashSlotHead { node: node, compare: self.comparator() }, key: key, value: value } }

@@ -5601,19 +5601,6 @@ impl Codegen:
             return ""
         text.slice((dot + 1) as i64, text.len())
 
-    fn get_hashmap_new_fn_type() -> i64:
-        let params: Vec[i64] = Vec.new()
-        params.push(wl_i64_type(self.context))
-        params.push(wl_i64_type(self.context))
-        wl_function_type(wl_ptr_type(self.context), vec_data_i64(&params), 2, 0)
-
-    fn ensure_hashmap_new_declared() -> i64:
-        let existing = wl_get_named_function(self.llmod, "with_hashmap_new")
-        if existing != 0:
-            return existing
-        let fn_ty = self.get_hashmap_new_fn_type()
-        wl_add_function(self.llmod, "with_hashmap_new", fn_ty)
-
     fn fn_decl_name_from_node(node: i32) -> str:
         let text = self.ident_text_from_node(node)
         if text.len() < 3:

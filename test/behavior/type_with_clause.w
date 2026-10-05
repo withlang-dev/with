@@ -1,3 +1,5 @@
+use std.hash
+
 type Inline { x: i32, y: i32 }
     with Copy
 
@@ -10,13 +12,13 @@ type Block {
 type SameLine {
     x: i32,
     y: i32,
-} with Copy, Eq, Hash
+} with Copy, Eq
 
 const INLINE_IS_COPY: bool = comptime Inline.is_copy()
 const BLOCK_IS_COPY: bool = comptime Block.is_copy()
 const SAME_LINE_IS_COPY: bool = comptime SameLine.is_copy()
 const SAME_LINE_HAS_EQ: bool = comptime SameLine.implements(Eq)
-const SAME_LINE_HAS_HASH: bool = comptime SameLine.implements(Hash)
+const SAME_LINE_IS_KEY: bool = comptime SameLine.implements(Key)
 
 fn take_inline(p: Inline) -> i32:
     p.x + p.y
@@ -29,7 +31,7 @@ fn main:
     assert(BLOCK_IS_COPY)
     assert(SAME_LINE_IS_COPY)
     assert(SAME_LINE_HAS_EQ)
-    assert(SAME_LINE_HAS_HASH)
+    assert(SAME_LINE_IS_KEY)
 
     let inline = Inline { x: 1, y: 2 }
     let inline_sum = take_inline(inline)
@@ -42,5 +44,5 @@ fn main:
     let same_line_sum = take_same_line(a)
     assert(same_line_sum == 9)
     assert(a.x == 4)
-    assert(SameLine { x: 4, y: 5 }.hash_value() == SameLine { x: 4, y: 5 }.hash_value())
-    assert(SameLine { x: 4, y: 5 }.hash_value() != SameLine { x: 5, y: 4 }.hash_value())
+    assert(hash_of(&SameLine { x: 4, y: 5 }) == hash_of(&SameLine { x: 4, y: 5 }))
+    assert(hash_of(&SameLine { x: 4, y: 5 }) != hash_of(&SameLine { x: 5, y: 4 }))

@@ -1,6 +1,7 @@
 //! expect-stdout: ok
+use std.collections.HashSet
 
-@[derive(Eq, Hash, Ord, Debug, Clone)]
+@[derive(Eq, Ord, Debug, Clone)]
 type Color { r: u8, g: u8, b: u8 }
 
 @[derive(all)]
@@ -28,13 +29,13 @@ enum Role { Admin | Member | Guest }
 enum PayloadRole { Admin(i32) | Guest }
 
 const COLOR_HAS_EQ: bool = comptime Color.implements(Eq)
-const COLOR_HAS_HASH: bool = comptime Color.implements(Hash)
+const COLOR_IS_KEY: bool = comptime Color.implements(Key)
 const COLOR_HAS_ORD: bool = comptime Color.implements(Ord)
 const COLOR_HAS_DEBUG: bool = comptime Color.implements(Debug)
 const COLOR_HAS_CLONE: bool = comptime Color.implements(Clone)
 const PIXEL_HAS_DEFAULT: bool = comptime Pixel.implements(Default)
 const PIXEL_HAS_EQ: bool = comptime Pixel.implements(Eq)
-const PIXEL_HAS_HASH: bool = comptime Pixel.implements(Hash)
+const PIXEL_IS_KEY: bool = comptime Pixel.implements(Key)
 const PIXEL_HAS_ORD: bool = comptime Pixel.implements(Ord)
 const PIXEL_HAS_DEBUG: bool = comptime Pixel.implements(Debug)
 const PIXEL_HAS_CLONE: bool = comptime Pixel.implements(Clone)
@@ -47,13 +48,13 @@ const COPY_PAIR_IS_COPY: bool = comptime CopyPair.is_copy()
 
 fn main:
     assert(COLOR_HAS_EQ)
-    assert(COLOR_HAS_HASH)
+    assert(COLOR_IS_KEY)
     assert(COLOR_HAS_ORD)
     assert(COLOR_HAS_DEBUG)
     assert(COLOR_HAS_CLONE)
     assert(PIXEL_HAS_DEFAULT)
     assert(PIXEL_HAS_EQ)
-    assert(PIXEL_HAS_HASH)
+    assert(PIXEL_IS_KEY)
     assert(PIXEL_HAS_ORD)
     assert(PIXEL_HAS_DEBUG)
     assert(PIXEL_HAS_CLONE)
@@ -71,8 +72,12 @@ fn main:
     assert(Color { r: 255, g: 0, b: 0 }.cmp(Color { r: 255, g: 0, b: 0 }) == 0)
     assert(Color { r: 0, g: 0, b: 255 }.cmp(Color { r: 255, g: 0, b: 0 }) < 0)
     assert(Color { r: 255, g: 0, b: 0 }.cmp(Color { r: 0, g: 0, b: 255 }) > 0)
-    assert(Color { r: 255, g: 0, b: 0 }.hash_value() == Color { r: 255, g: 0, b: 0 }.hash_value())
-    assert(Color { r: 255, g: 0, b: 0 }.hash_value() != blue.hash_value())
+    // A key is hashed by the compiler (D96): equal colors are one entry.
+    var colors: HashSet[Color] = HashSet.new()
+    colors.insert(red.clone())
+    colors.insert(red2.clone())
+    colors.insert(blue.clone())
+    assert(colors.len() == 2)
     assert(Color { r: 255, g: 0, b: 0 }.debug_str() == "Color { r: 255, g: 0, b: 0 }")
 
     let original = Color { r: 1, g: 2, b: 3 }

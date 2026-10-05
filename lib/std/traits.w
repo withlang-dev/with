@@ -71,9 +71,17 @@ pub trait Try[T, E]:
 pub trait Deref[T]:
     fn deref(self: &Self) -> &T
 
-/// Hashing. Implement to use a type as a HashMap key or HashSet element.
-pub trait Hash:
-    fn hash_value(self: &Self) -> i64
+/// A key (§11.7, D96): a `HashMap` key or `HashSet` element. Every type
+/// whose `==` is structural and that holds no float is one, and the compiler
+/// hashes it. A type whose equality is about one part of its value states
+/// that part, its key projection, and `==` and the hash both follow from it:
+///
+///     impl Key for Tag:
+///         fn key(): self.name.to_lower()
+///
+/// `key` returns a key of the type its body gives.
+pub trait Key:
+    fn key(self: &Self)
 
 /// Debug formatting. Used by `f"{value:?}"` format specifier.
 pub trait Debug:
@@ -285,33 +293,6 @@ impl Display for f32:  fn to_str(): f"{*self}"
 impl Display for f64:  fn to_str(): f"{*self}"
 impl Display for bool: fn to_str(): f"{*self}"
 impl Display for str:  fn to_str(): self ++ ""
-
-impl Hash for i32:
-    fn hash_value() -> i64: (1469598103934665603 *% 1099511628211) ^ (*self as i64)
-
-impl Hash for u8:
-    fn hash_value() -> i64: (1469598103934665603 *% 1099511628211) ^ (*self as i64)
-
-impl Hash for i64:
-    fn hash_value() -> i64: (1469598103934665603 *% 1099511628211) ^ *self
-
-impl Hash for bool:
-    fn hash_value() -> i64:
-        if *self:
-            1
-        else:
-            0
-
-impl Hash for str:
-    fn hash_value() -> i64:
-        let value = *self
-        var h: i64 = 1469598103934665603
-        var i: i64 = 0
-        while i < value.len():
-            // FNV-1a folds the byte value 0..255 into the signed accumulator.
-            h = (h *% 1099511628211) ^ (value[i] as i64)
-            i = i + 1
-        h
 
 /// Multi-dimensional indexing. Implement to enable `a[i, j]` and slice syntax.
 pub trait MultiIndex[O]:

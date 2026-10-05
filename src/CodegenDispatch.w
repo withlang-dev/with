@@ -2370,6 +2370,27 @@ impl Codegen:
     mut fn mir_emit_eq_ptrs(lp: i64, rp: i64, ty: i64, sema_ty: i32) -> i64:
         let resolved = self.mir_eq_live_type(sema_ty)
         let tk = self.sema.get_type_kind(resolved as TypeId)
+        // §11.7 (D96): a type with a key projection is equal where its keys are.
+        let key_sig: i32 = self.sema.concrete_key_sigs.get(resolved) ?? -1
+        let key_sym: i32 = self.sema.concrete_key_mono_syms.get(resolved) ?? 0
+        if key_sig >= 0 and key_sym != 0:
+            let concrete = self.ensure_concrete_mir_function(0, key_sig, key_sym, 0, "Key.key")
+            if concrete.sym == 0:
+                return wl_get_undef(wl_i1_type(self.context))
+            let key_ret = self.sema.sig_return_type(key_sig)
+            let left_args: Vec[i64] = [lp]
+            let left = self.build_call_fn_value(concrete.sym, concrete.value, concrete.fn_type, -1, 0, left_args, 1, "key projection", 0)
+            let right_args: Vec[i64] = [rp]
+            let right = self.build_call_fn_value(concrete.sym, concrete.value, concrete.fn_type, -1, 0, right_args, 1, "key projection", 0)
+            let key_ty = wl_type_of(left)
+            let left_tmp = self.create_entry_alloca(key_ty)
+            let right_tmp = self.create_entry_alloca(key_ty)
+            wl_build_store(self.builder, left, left_tmp)
+            wl_build_store(self.builder, right, right_tmp)
+            let equal = self.mir_emit_eq_ptrs(left_tmp, right_tmp, key_ty, key_ret)
+            self.mir_emit_drop_ptr_for_sema_type(left_tmp, key_ty, key_ret)
+            self.mir_emit_drop_ptr_for_sema_type(right_tmp, key_ty, key_ret)
+            return equal
         let eq_sig: i32 = self.sema.concrete_eq_sigs.get(resolved) ?? -1
         let eq_sym: i32 = self.sema.concrete_eq_mono_syms.get(resolved) ?? 0
         if eq_sig >= 0 and eq_sym != 0:
@@ -2634,6 +2655,343 @@ impl Codegen:
             wl_position_at_end(self.builder, next_bb)
         wl_build_br(self.builder, done_bb)
         wl_position_at_end(self.builder, done_bb)
+
+    // ── Map keys (§11.7, D96) ───────────────────────────────────────────
+    // A map hashes and compares a key by its type: 0, by its bytes (an
+    // integer, a bool, a raw pointer); 1, as a `str`; 2, by the functions
+    // generated here. The hash is the runtime's keyed hasher, fed the key's
+    // parts in the order its `==` compares them, so equal keys hash alike.
+    fn mir_map_key_kind(key_sema: i32) -> i32:
+        if key_sema <= 0:
+            return 0
+        let resolved = self.mir_eq_live_type(key_sema)
+        let tk = self.sema.get_type_kind(resolved as TypeId)
+        if tk == TypeKind.TY_STR:
+            return 1
+        if tk == TypeKind.TY_REF and self.sema.get_type_kind(self.sema.resolve_alias(self.sema.get_type_d0(resolved as TypeId) as TypeId)) == TypeKind.TY_STR:
+            return 1
+        if tk == TypeKind.TY_INT or tk == TypeKind.TY_BOOL or tk == TypeKind.TY_PTR:
+            return 0
+        2
+
+    // A new map whose keys have With type `key_sema`.
+    mut fn mir_emit_hashmap_new(key_sema: i32, key_ty: i64, key_size: i64, val_size: i64) -> i64:
+        let i64_ty = wl_i64_type(self.context)
+        let ptr_ty = wl_ptr_type(self.context)
+        let kind = self.mir_map_key_kind(key_sema)
+        var hash_fn = wl_const_null(ptr_ty)
+        var eq_fn = wl_const_null(ptr_ty)
+        if kind == 2 and key_ty != 0:
+            hash_fn = self.mir_map_key_hash_fn(key_sema, key_ty)
+            eq_fn = self.mir_map_key_eq_fn(key_sema, key_ty)
+        let params: Vec[i64] = [i64_ty, i64_ty, i64_ty, ptr_ty, ptr_ty]
+        let args: Vec[i64] = [wl_const_int(i64_ty, key_size, 0), wl_const_int(i64_ty, val_size, 0), wl_const_int(i64_ty, kind as i64, 0), hash_fn, eq_fn]
+        self.call_runtime_checked("with_hashmap_new_keyed", ptr_ty, &params, &args)
+
+    // `__with_keyhash_<type>(key) -> i64`: a keyed hasher fed the key.
+    mut fn mir_map_key_hash_fn(key_sema: i32, key_ty: i64) -> i64:
+        let resolved = self.mir_eq_live_type(key_sema)
+        let fn_name = f"__with_keyhash_{resolved}"
+        let existing = wl_get_named_function(self.llmod, fn_name)
+        if existing != 0:
+            return existing
+        let i64_ty = wl_i64_type(self.context)
+        let ptr_ty = wl_ptr_type(self.context)
+        let params: Vec[i64] = [ptr_ty]
+        let helper = wl_add_function(self.llmod, fn_name, wl_function_type(i64_ty, vec_data_i64(&params), 1, 0))
+        wl_set_linkage(helper, wl_internal_linkage())
+        let saved_fn: i64 = self.current_function
+        let saved_fn_name_sym: i32 = self.current_function_name_sym
+        let saved_fn_node: i32 = self.current_function_node
+        let saved_ret_ty: i64 = self.current_ret_type
+        let saved_bb = wl_get_insert_block(self.builder)
+        self.current_function = helper
+        self.current_function_name_sym = 0
+        self.current_function_node = 0
+        self.current_ret_type = i64_ty
+        wl_position_at_end(self.builder, wl_append_bb(self.context, helper, "entry"))
+        // A hasher is 56 bytes the caller owns (rt_core: SIP_SIZE).
+        let state = self.create_entry_alloca(wl_array_type(i64_ty, 7))
+        let init_params: Vec[i64] = [ptr_ty]
+        let init_args: Vec[i64] = [state]
+        let _ = self.call_runtime_checked("with_hasher_init", wl_void_type(self.context), &init_params, &init_args)
+        self.mir_emit_hash_ptrs(wl_get_param(helper, 0), key_ty, key_sema, state)
+        let finish_args: Vec[i64] = [state]
+        let _ = wl_build_ret(self.builder, self.call_runtime_checked("with_hasher_finish", i64_ty, &init_params, &finish_args))
+        self.current_function = saved_fn
+        self.current_function_name_sym = saved_fn_name_sym
+        self.current_function_node = saved_fn_node
+        self.current_ret_type = saved_ret_ty
+        if saved_bb != 0:
+            wl_position_at_end(self.builder, saved_bb)
+        helper
+
+    // `__with_keyeq_<type>(a, b) -> i32`, the equality the runtime map calls.
+    mut fn mir_map_key_eq_fn(key_sema: i32, key_ty: i64) -> i64:
+        let resolved = self.mir_eq_live_type(key_sema)
+        let fn_name = f"__with_keyeq_{resolved}"
+        let existing = wl_get_named_function(self.llmod, fn_name)
+        if existing != 0:
+            return existing
+        let i32_ty = wl_i32_type(self.context)
+        let params: Vec[i64] = [wl_ptr_type(self.context), wl_ptr_type(self.context)]
+        let helper = wl_add_function(self.llmod, fn_name, wl_function_type(i32_ty, vec_data_i64(&params), 2, 0))
+        wl_set_linkage(helper, wl_internal_linkage())
+        let saved_fn: i64 = self.current_function
+        let saved_fn_name_sym: i32 = self.current_function_name_sym
+        let saved_fn_node: i32 = self.current_function_node
+        let saved_ret_ty: i64 = self.current_ret_type
+        let saved_bb = wl_get_insert_block(self.builder)
+        self.current_function = helper
+        self.current_function_name_sym = 0
+        self.current_function_node = 0
+        self.current_ret_type = i32_ty
+        wl_position_at_end(self.builder, wl_append_bb(self.context, helper, "entry"))
+        let equal = self.mir_emit_eq_ptrs(wl_get_param(helper, 0), wl_get_param(helper, 1), key_ty, key_sema)
+        let _ = wl_build_ret(self.builder, wl_build_zext(self.builder, equal, i32_ty))
+        self.current_function = saved_fn
+        self.current_function_name_sym = saved_fn_name_sym
+        self.current_function_node = saved_fn_node
+        self.current_ret_type = saved_ret_ty
+        if saved_bb != 0:
+            wl_position_at_end(self.builder, saved_bb)
+        helper
+
+    // Feeds the `size` bytes at `p` to the hasher.
+    mut fn mir_hash_write(state: i64, p: i64, size: i64):
+        let ptr_ty = wl_ptr_type(self.context)
+        let i64_ty = wl_i64_type(self.context)
+        let params: Vec[i64] = [ptr_ty, ptr_ty, i64_ty]
+        let args: Vec[i64] = [state, p, wl_const_int(i64_ty, size, 0)]
+        let _ = self.call_runtime_checked("with_hasher_write", wl_void_type(self.context), &params, &args)
+
+    // Feeds a value (a tag, a length, a marker) to the hasher.
+    mut fn mir_hash_write_value(state: i64, value: i64):
+        let ty = wl_type_of(value)
+        let tmp = self.create_entry_alloca(ty)
+        wl_build_store(self.builder, value, tmp)
+        let size = self.abi_size_of(ty)
+        self.mir_hash_write(state, tmp, size)
+
+    // Feeds the value of With type `sema_ty` at `p` to the hasher, part by
+    // part as mir_emit_eq_ptrs compares it.
+    mut fn mir_emit_hash_ptrs(p: i64, ty: i64, sema_ty: i32, state: i64):
+        let resolved = self.mir_eq_live_type(sema_ty)
+        let tk = self.sema.get_type_kind(resolved as TypeId)
+        let key_sig: i32 = self.sema.concrete_key_sigs.get(resolved) ?? -1
+        let key_sym: i32 = self.sema.concrete_key_mono_syms.get(resolved) ?? 0
+        if key_sig >= 0 and key_sym != 0:
+            // A key projection: the type hashes as its key.
+            let concrete = self.ensure_concrete_mir_function(0, key_sig, key_sym, 0, "Key.key")
+            if concrete.sym == 0:
+                return
+            let args: Vec[i64] = [p]
+            let projected = self.build_call_fn_value(concrete.sym, concrete.value, concrete.fn_type, -1, 0, args, 1, "key projection", 0)
+            let key_ret = self.sema.sig_return_type(key_sig)
+            let tmp = self.create_entry_alloca(wl_type_of(projected))
+            wl_build_store(self.builder, projected, tmp)
+            self.mir_emit_hash_ptrs(tmp, wl_type_of(projected), key_ret, state)
+            self.mir_emit_drop_ptr_for_sema_type(tmp, wl_type_of(projected), key_ret)
+            return
+        let observes_str = tk == TypeKind.TY_REF and self.sema.get_type_kind(self.sema.resolve_alias(self.sema.get_type_d0(resolved as TypeId) as TypeId)) == TypeKind.TY_STR
+        if tk == TypeKind.TY_STR or observes_str:
+            let v = self.mir_coerce_compare_operand(wl_build_load(self.builder, ty, p), resolved)
+            let params: Vec[i64] = [wl_ptr_type(self.context), self.str_llvm_type()]
+            let fn_val = self.ensure_internal_runtime_fn("with_hasher_write_str", params, 2, wl_void_type(self.context))
+            let fn_sym = self.intern.intern("with_hasher_write_str")
+            let fn_ty = self.fn_fn_types.get(fn_sym).unwrap() as i64
+            let args: Vec[i64] = [state, self.str_view_arg(v)]
+            let _ = self.build_call_fn_value(fn_sym, fn_val, fn_ty, -1, 0, args, 2, "with_hasher_write_str", 0)
+            return
+        if tk == TypeKind.TY_REF:
+            let pointee = self.sema.get_type_d0(resolved as TypeId)
+            let pointee_ty = self.mir_sema_type_to_llvm(pointee)
+            if pointee_ty != 0 and wl_get_type_kind(ty) == wl_pointer_type_kind():
+                self.mir_emit_hash_ptrs(wl_build_load(self.builder, ty, p), pointee_ty, pointee, state)
+                return
+        if tk == TypeKind.TY_TUPLE or tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ENUM or tk == TypeKind.TY_GENERIC_INST:
+            let walk = self.mir_hash_fn(resolved, ty)
+            if walk != 0:
+                let args: Vec[i64] = [p, state]
+                let _ = wl_build_call(self.builder, self.mir_hash_fn_type(), walk, vec_data_i64(&args), 2)
+                return
+        let size = self.abi_size_of(ty)
+        self.mir_hash_write(state, p, size)
+
+    fn mir_hash_fn_type() -> i64:
+        let params: Vec[i64] = [wl_ptr_type(self.context), wl_ptr_type(self.context)]
+        wl_function_type(wl_void_type(self.context), vec_data_i64(&params), 2, 0)
+
+    // `__with_hash_<type>(p, state)`: one aggregate type's parts, fed to the
+    // hasher. 0 when the type has no walk (mir_eq_type_has_walk): its bytes
+    // are fed instead.
+    mut fn mir_hash_fn(resolved: i32, ty: i64) -> i64:
+        if not self.mir_eq_type_has_walk(resolved, ty):
+            return 0
+        let fn_name = f"__with_hash_{resolved}"
+        let existing = wl_get_named_function(self.llmod, fn_name)
+        if existing != 0:
+            return existing
+        let walk = wl_add_function(self.llmod, fn_name, self.mir_hash_fn_type())
+        wl_set_linkage(walk, wl_internal_linkage())
+        let saved_fn: i64 = self.current_function
+        let saved_fn_name_sym: i32 = self.current_function_name_sym
+        let saved_fn_node: i32 = self.current_function_node
+        let saved_ret_ty: i64 = self.current_ret_type
+        let saved_bb = wl_get_insert_block(self.builder)
+        self.current_function = walk
+        self.current_function_name_sym = 0
+        self.current_function_node = 0
+        self.current_ret_type = wl_void_type(self.context)
+        wl_position_at_end(self.builder, wl_append_bb(self.context, walk, "entry"))
+        self.mir_emit_hash_walk(wl_get_param(walk, 0), ty, resolved, wl_get_param(walk, 1))
+        let _ = wl_build_ret_void(self.builder)
+        self.current_function = saved_fn
+        self.current_function_name_sym = saved_fn_name_sym
+        self.current_function_node = saved_fn_node
+        self.current_ret_type = saved_ret_ty
+        if saved_bb != 0:
+            wl_position_at_end(self.builder, saved_bb)
+        walk
+
+    // `count` elements of `elem_sema` at `buf`, each fed to the hasher.
+    mut fn mir_hash_elements(buf: i64, elem_ty: i64, elem_sema: i32, count: i64, state: i64):
+        let i64_ty = wl_i64_type(self.context)
+        let zero = wl_const_int(i64_ty, 0, 0)
+        let entry_bb = wl_get_insert_block(self.builder)
+        let loop_bb = wl_append_bb(self.context, self.current_function, "hash.elems")
+        let done_bb = wl_append_bb(self.context, self.current_function, "hash.elems.done")
+        wl_build_cond_br(self.builder, wl_build_icmp(self.builder, wl_int_sgt(), count, zero), loop_bb, done_bb)
+        wl_position_at_end(self.builder, loop_bb)
+        let idx = wl_build_phi(self.builder, i64_ty)
+        let indices: Vec[i64] = [idx]
+        let element = wl_build_gep(self.builder, elem_ty, buf, vec_data_i64(&indices), 1)
+        self.mir_emit_hash_ptrs(element, elem_ty, elem_sema, state)
+        let step_bb = wl_get_insert_block(self.builder)
+        let next_idx = wl_build_add(self.builder, idx, wl_const_int(i64_ty, 1, 0))
+        wl_build_cond_br(self.builder, wl_build_icmp(self.builder, wl_int_slt(), next_idx, count), loop_bb, done_bb)
+        let phi_vals: Vec[i64] = [zero, next_idx]
+        let phi_bbs: Vec[i64] = [entry_bb, step_bb]
+        wl_add_incoming(idx, vec_data_i64(&phi_vals), vec_data_i64(&phi_bbs), 2)
+        wl_position_at_end(self.builder, done_bb)
+
+    // The parts mir_emit_eq_walk compares, fed to the hasher in its order.
+    mut fn mir_emit_hash_walk(p: i64, ty: i64, resolved: i32, state: i64):
+        let tk = self.sema.get_type_kind(resolved as TypeId)
+        let i64_ty = wl_i64_type(self.context)
+        let ptr_ty = wl_ptr_type(self.context)
+        if tk == TypeKind.TY_TUPLE:
+            for i in 0..self.sema.get_type_d1(resolved as TypeId):
+                let elem_sema = self.mir_project_field_sema_type(resolved, i)
+                let elem_ty = self.mir_sema_type_to_llvm(elem_sema)
+                if elem_sema > 0 and elem_ty != 0:
+                    let elem_ptr = self.tuple_elem_ptr(ty, p, i)
+                    self.mir_emit_hash_ptrs(elem_ptr, elem_ty, elem_sema, state)
+            return
+        if tk == TypeKind.TY_ARRAY:
+            let elem_sema = self.sema.get_type_d0(resolved as TypeId)
+            let count = self.sema.get_type_d1(resolved as TypeId)
+            self.mir_hash_elements(p, wl_get_element_type(ty), elem_sema, wl_const_int(i64_ty, count as i64, 0), state)
+            return
+        if self.mir_sema_type_is_std_vec(resolved):
+            let elem_sema = self.mir_vec_elem_sema_type_from_sema_type(resolved)
+            let elem_ty = self.mir_sema_type_to_llvm(elem_sema)
+            let len = self.mir_vec_len_inline(p)
+            self.mir_hash_write_value(state, len)
+            if elem_sema > 0 and elem_ty != 0:
+                let data = wl_build_load(self.builder, ptr_ty, p)
+                self.mir_hash_elements(data, elem_ty, elem_sema, len, state)
+            return
+        if self.mir_eq_type_is_box(resolved):
+            let pointee = self.sema.get_generic_inst_arg(resolved, 0)
+            let pointee_ty = self.mir_sema_type_to_llvm(pointee)
+            let pointee_kind = self.sema.get_type_kind(self.sema.resolve_alias(pointee as TypeId))
+            if pointee_ty == 0 or pointee_kind == TypeKind.TY_TRAIT_OBJ or wl_get_type_kind(ty) != wl_pointer_type_kind():
+                // A `Box[dyn Trait]` is equal only to itself: its address.
+                let size = self.abi_size_of(ty)
+                self.mir_hash_write(state, p, size)
+                return
+            let target = wl_build_load(self.builder, ty, p)
+            self.mir_emit_hash_ptrs(target, pointee_ty, pointee, state)
+            return
+        let variant_count = self.mir_enum_variant_count(resolved)
+        if variant_count > 0:
+            self.mir_emit_hash_enum_walk(p, ty, resolved, variant_count, state)
+            return
+        if tk == TypeKind.TY_STRUCT and self.sema.distinct_type_names.contains(self.sema.get_type_d0(resolved as TypeId)):
+            let underlying: i32 = self.sema.type_extra[(self.sema.get_type_d1(resolved as TypeId) + 1)]
+            self.mir_emit_hash_ptrs(p, ty, underlying, state)
+            return
+        let struct_idx = self.find_struct_index_by_type(ty)
+        let field_start: i32 = self.struct_field_starts[struct_idx]
+        let field_count: i32 = self.struct_field_counts[struct_idx]
+        for fi in 0..field_count:
+            let field_sym: i32 = self.struct_field_names[field_start + fi]
+            let field_ty: i64 = self.struct_field_types[field_start + fi]
+            let field_ptr = wl_build_struct_gep(self.builder, ty, p, self.get_llvm_field_index(ty, fi))
+            let field_sema = self.mir_project_field_sema_type(resolved, field_sym)
+            if field_sema > 0:
+                self.mir_emit_hash_ptrs(field_ptr, field_ty, field_sema, state)
+            else:
+                let size = self.abi_size_of(field_ty)
+                self.mir_hash_write(state, field_ptr, size)
+
+    // An enum feeds its variant, then that variant's payloads, in the three
+    // representations mir_emit_eq_enum_walk reads.
+    mut fn mir_emit_hash_enum_walk(p: i64, ty: i64, resolved: i32, variant_count: i32, state: i64):
+        let i8_ty = wl_i8_type(self.context)
+        if wl_get_type_kind(ty) == wl_pointer_type_kind():
+            var some_idx = -1
+            for vi in 0..variant_count:
+                if self.mir_enum_variant_payload_count(resolved, vi) == 1: some_idx = vi
+            let is_none = wl_build_icmp(self.builder, wl_int_eq(), wl_build_load(self.builder, ty, p), wl_const_null(ty))
+            self.mir_hash_write_value(state, wl_build_zext(self.builder, wl_build_not(self.builder, is_none), i8_ty))
+            let payload_bb = wl_append_bb(self.context, self.current_function, "hash.some")
+            let done_bb = wl_append_bb(self.context, self.current_function, "hash.option.done")
+            wl_build_cond_br(self.builder, is_none, done_bb, payload_bb)
+            wl_position_at_end(self.builder, payload_bb)
+            if some_idx >= 0:
+                let payload_sema = self.mir_enum_payload_sema_type(resolved, some_idx, 0)
+                if payload_sema > 0:
+                    self.mir_emit_hash_ptrs(p, ty, payload_sema, state)
+            wl_build_br(self.builder, done_bb)
+            wl_position_at_end(self.builder, done_bb)
+            return
+        if wl_get_type_kind(ty) != wl_struct_type_kind() or wl_count_struct_elem_types(ty) < 2:
+            let size = self.abi_size_of(ty)
+            self.mir_hash_write(state, p, size)
+            return
+        let tag_ty = wl_struct_get_type_at(ty, 0)
+        let tag = wl_build_load(self.builder, tag_ty, wl_build_struct_gep(self.builder, ty, p, 0))
+        self.mir_hash_write_value(state, tag)
+        let data = wl_build_struct_gep(self.builder, ty, p, 1)
+        let done_bb = wl_append_bb(self.context, self.current_function, "hash.enum.done")
+        for vi in 0..variant_count:
+            let payload_count = self.mir_enum_variant_payload_count(resolved, vi)
+            if payload_count == 0:
+                continue
+            let case_bb = wl_append_bb(self.context, self.current_function, "hash.enum.case")
+            let next_bb = wl_append_bb(self.context, self.current_function, "hash.enum.next")
+            let disc = self.mir_enum_variant_discriminant(resolved, vi)
+            wl_build_cond_br(self.builder, wl_build_icmp(self.builder, wl_int_eq(), tag, wl_const_int(tag_ty, disc, 0)), case_bb, next_bb)
+            wl_position_at_end(self.builder, case_bb)
+            let payload_ty = self.mir_enum_variant_payload_llvm_type(resolved, vi)
+            if payload_count == 1:
+                let payload_sema = self.mir_enum_payload_sema_type(resolved, vi, 0)
+                if payload_sema > 0 and payload_ty != 0:
+                    self.mir_emit_hash_ptrs(data, payload_ty, payload_sema, state)
+            else if payload_ty != 0 and wl_get_type_kind(payload_ty) == wl_struct_type_kind():
+                for pf in 0..payload_count:
+                    let payload_sema = self.mir_enum_payload_sema_type(resolved, vi, pf)
+                    if payload_sema > 0:
+                        let part_ptr = self.tuple_elem_ptr(payload_ty, data, pf)
+                        let part_ty = self.tuple_elem_type(payload_ty, pf)
+                        self.mir_emit_hash_ptrs(part_ptr, part_ty, payload_sema, state)
+            wl_build_br(self.builder, done_bb)
+            wl_position_at_end(self.builder, next_bb)
+        wl_build_br(self.builder, done_bb)
+        wl_position_at_end(self.builder, done_bb)
+
 
     fn coerce_float_operand_to(val: i64, target_ty: i64, is_unsigned: bool) -> i64:
         let val_ty = wl_type_of(val)
@@ -9216,6 +9574,8 @@ impl Codegen:
             var hm_val_size: i64 = 8
             var hm_ty: i64 = 0
             var hm_base_sym = 0
+            var hm_key_sema = 0
+            var hm_key_llvm: i64 = 0
             let dest_sema = self.mir_intrinsic_dest_sema_type(body, dest_place)
             if dest_sema > 0:
                 let resolved = self.mir_resolve_alias_at(dest_sema)
@@ -9230,6 +9590,8 @@ impl Codegen:
                         let key_llvm = self.sema_type_to_llvm(key_sema)
                         let val_llvm = self.sema_type_to_llvm(val_sema)
                         if key_llvm != 0 and val_llvm != 0:
+                            hm_key_sema = key_sema
+                            hm_key_llvm = key_llvm
                             hm_key_size = self.abi_size_of(key_llvm)
                             hm_val_size = self.abi_size_of(val_llvm)
                             hm_ty = self.get_or_create_hashmap_type(dest_sema, key_llvm, val_llvm)
@@ -9238,15 +9600,12 @@ impl Codegen:
                         let elem_sema = self.mir_type_extra_at(args_start)
                         let elem_llvm = self.sema_type_to_llvm(elem_sema)
                         if elem_llvm != 0:
+                            hm_key_sema = elem_sema
+                            hm_key_llvm = elem_llvm
                             hm_key_size = self.abi_size_of(elem_llvm)
                             hm_val_size = 1
                             hm_ty = self.get_or_create_hashset_type(dest_sema, elem_llvm)
-            let new_fn = self.ensure_hashmap_new_declared()
-            let fn_ty = self.get_hashmap_new_fn_type()
-            let new_args: Vec[i64] = Vec.new()
-            new_args.push(wl_const_int(i64_ty, hm_key_size, 0))
-            new_args.push(wl_const_int(i64_ty, hm_val_size, 0))
-            let handle = wl_build_call(self.builder, fn_ty, new_fn, vec_data_i64(&new_args), 2)
+            let handle = self.mir_emit_hashmap_new(hm_key_sema, hm_key_llvm, hm_key_size, hm_val_size)
             // Wrap handle in HashMap struct { ptr }.
             if hm_ty == 0:
                 if hm_base_sym == self.sym_hashset:
@@ -9432,7 +9791,10 @@ impl Codegen:
                 args.push(out_alloca)
                 if rm_key_llvm == 0: args.push(is_str_val)
                 let found = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 4)
-                if rm_key_llvm != 0: self.mir_emit_drop_ptr_for_sema_type(stored_key_alloca, rm_key_llvm, rm_key_sema)
+                if rm_key_llvm != 0:
+                    self.mir_emit_drop_ptr_for_sema_type(stored_key_alloca, rm_key_llvm, rm_key_sema)
+                    // `remove(key: K)` consumes its key: the probe is dropped too.
+                    self.mir_emit_drop_ptr_for_sema_type(key_alloca, rm_key_llvm, rm_key_sema)
                 let val = wl_build_load(self.builder, val_ty, out_alloca)
                 var dest_llvm = self.get_or_create_option_type(0, val_ty)
                 if dest_llvm != 0:
@@ -9446,7 +9808,9 @@ impl Codegen:
                 args.push(wl_const_null(ptr_ty))
                 if rm_key_llvm == 0: args.push(is_str_val)
                 let raw = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 4)
-                if rm_key_llvm != 0: self.mir_emit_drop_ptr_for_sema_type(stored_key_alloca, rm_key_llvm, rm_key_sema)
+                if rm_key_llvm != 0:
+                    self.mir_emit_drop_ptr_for_sema_type(stored_key_alloca, rm_key_llvm, rm_key_sema)
+                    self.mir_emit_drop_ptr_for_sema_type(key_alloca, rm_key_llvm, rm_key_sema)
                 result = wl_build_icmp(self.builder, wl_int_ne(), raw, wl_const_int(wl_i32_type(self.context), 0, 0))
 
         else if intrinsic == MirIntrinsic.MAP_CLEAR:
@@ -11454,12 +11818,9 @@ impl Codegen:
             let val_ty = if val_ty0 != 0: val_ty0 else: byte_ty
             let map_ty0 = self.mir_dest_llvm_type(body, dest_place)
             let map_ty = if map_ty0 != 0: map_ty0 else: if base_sym == self.sym_hashset: self.get_or_create_hashset_type(0, key_ty) else: self.get_or_create_hashmap_type(0, key_ty, val_ty)
-            let new_fn = self.ensure_hashmap_new_declared()
-            let new_ty = self.get_hashmap_new_fn_type()
-            let new_args2: Vec[i64] = Vec.new()
-            new_args2.push(wl_const_int(i64_ty, self.abi_size_of(key_ty), 0))
-            new_args2.push(wl_const_int(i64_ty, self.abi_size_of(val_ty), 0))
-            let handle = wl_build_call(self.builder, new_ty, new_fn, vec_data_i64(&new_args2), 2)
+            let key_size = self.abi_size_of(key_ty)
+            let val_size = self.abi_size_of(val_ty)
+            let handle = self.mir_emit_hashmap_new(first_tid, key_ty, key_size, val_size)
             let map_value = wl_build_insert_value(self.builder, self.build_default_value(map_ty), handle, 0)
             let insert_params: Vec[i64] = Vec.new()
             insert_params.push(ptr_ty)
@@ -13712,17 +14073,9 @@ impl Codegen:
             let map_ty = if map_ty0 != 0: map_ty0 else: if dest_base_sym == self.sym_hashset: self.get_or_create_hashset_type(dest_sema, key_ty) else: self.get_or_create_hashmap_type(dest_sema, key_ty, val_ty)
             let out_ptr = self.create_entry_alloca(map_ty)
             wl_build_store(self.builder, self.build_default_value(map_ty), out_ptr)
-            let new_params: Vec[i64] = Vec.new()
-            new_params.push(i64_ty)
-            new_params.push(i64_ty)
-            let new_ty = wl_function_type(ptr_ty, vec_data_i64(&new_params), 2, 0)
-            var new_fn = wl_get_named_function(self.llmod, "with_hashmap_new")
-            if new_fn == 0:
-                new_fn = wl_add_function(self.llmod, "with_hashmap_new", new_ty)
-            let new_args: Vec[i64] = Vec.new()
-            new_args.push(wl_const_int(i64_ty, self.abi_size_of(key_ty), 0))
-            new_args.push(wl_const_int(i64_ty, self.abi_size_of(val_ty), 0))
-            let handle = wl_build_call(self.builder, new_ty, new_fn, vec_data_i64(&new_args), 2)
+            let key_size = self.abi_size_of(key_ty)
+            let val_size = self.abi_size_of(val_ty)
+            let handle = self.mir_emit_hashmap_new(if key_tid != 0: key_tid else: elem_tid, key_ty, key_size, val_size)
             let map_init = wl_build_insert_value(self.builder, self.build_default_value(map_ty), handle, 0)
             wl_build_store(self.builder, map_init, out_ptr)
             let insert_params: Vec[i64] = Vec.new()
@@ -15170,7 +15523,7 @@ impl Codegen:
                 // user generic-function map.
                 let gc_is_generic_builtin = gc_call_builtin == CallBuiltin.Transmute or gc_call_builtin == CallBuiltin.SizeOf or
                     gc_call_builtin == CallBuiltin.AlignOf or gc_call_builtin == CallBuiltin.NameOf or
-                    gc_call_builtin == CallBuiltin.EmbedFile or gc_call_builtin == CallBuiltin.Chan
+                    gc_call_builtin == CallBuiltin.EmbedFile or gc_call_builtin == CallBuiltin.Chan or gc_call_builtin == CallBuiltin.KeyHash
                 let gc_fallback_mir_count = body.call_arg_counts[args_id]
                 let gc_fallback_ast_count = if self.pool.kind(gc_node) == NodeKind.NK_CALL: self.pool.get_data2(gc_node) else: -1
                 var gc_is_static_field_access_call = false
@@ -15338,6 +15691,17 @@ impl Codegen:
                         if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
                             let gc_next_val = self.mir_bb_values[next_bb]
                             wl_build_br(self.builder, gc_next_val)
+                        return true
+                    if gc_builtin == CallBuiltin.KeyHash:
+                        let kh_result = self.gen_key_hash(body, args_id)
+                        if dest_place >= 0 and kh_result != 0:
+                            let kh_local = body.place_locals[dest_place]
+                            let kh_alloca = self.create_entry_alloca(wl_type_of(kh_result))
+                            wl_build_store(self.builder, kh_result, kh_alloca)
+                            self.mir_local_ptrs.insert(kh_local, kh_alloca)
+                            self.mir_local_types.insert(kh_local, wl_type_of(kh_result))
+                        if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                            wl_build_br(self.builder, self.mir_bb_values[next_bb])
                         return true
                     if gc_builtin == CallBuiltin.Transmute:
                         let gc_result = self.gen_transmute(gc_node, body, args_id)
@@ -19299,6 +19663,28 @@ impl Codegen:
         v
 
     // ── transmute intrinsic ───────────────────────────────────────────
+
+    // D96: `with_key_hash[K](key)`: the seeded hash a map gives its key.
+    mut fn gen_key_hash(body: &MirBody, args_id: i32) -> i64:
+        let arg_op = body.call_arg_operands[body.call_arg_starts[args_id]]
+        let view_sema = self.mir_eq_live_type(self.mir_operand_sema_type(body, arg_op))
+        if self.sema.get_type_kind(view_sema as TypeId) != TypeKind.TY_REF:
+            with_eprint("error: internal: with_key_hash reached codegen without a view of its key")
+            self.had_error = 1
+            return 0
+        let key_sema = self.sema.get_type_d0(view_sema as TypeId)
+        let key_ty = self.mir_sema_type_to_llvm(key_sema)
+        // A view codegen lays out as the value itself (`&str`) is spilled:
+        // the key hasher reads its key through an address.
+        var key_ptr = self.mir_eval_operand(body, arg_op, 0)
+        if wl_get_type_kind(self.mir_sema_type_to_llvm(view_sema)) != wl_pointer_type_kind():
+            let spill = self.create_entry_alloca(key_ty)
+            wl_build_store(self.builder, key_ptr, spill)
+            key_ptr = spill
+        let hash_fn = self.mir_map_key_hash_fn(key_sema, key_ty)
+        let params: Vec[i64] = [wl_ptr_type(self.context)]
+        let args: Vec[i64] = [key_ptr]
+        wl_build_call(self.builder, wl_function_type(wl_i64_type(self.context), vec_data_i64(&params), 1, 0), hash_fn, vec_data_i64(&args), 1)
 
     mut fn gen_transmute(node: i32, body: &MirBody, args_id: i32) -> i64:
         // transmute[T](value) — reinterpret bits as type T

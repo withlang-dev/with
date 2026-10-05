@@ -6923,7 +6923,7 @@ impl CCodegen:
                     val_tid = self.sema.ty_i64 as i32
                 let key_ty = self.c_type(key_tid, 0)
                 let val_ty = self.c_type(val_tid, 0)
-                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = (int64_t)(intptr_t)with_hashmap_new(sizeof(" ++ key_ty ++ "), sizeof(" ++ val_ty ++ "));\n"
+                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = (int64_t)(intptr_t)with_hashmap_new_keyed(sizeof(" ++ key_ty ++ "), sizeof(" ++ val_ty ++ "), " ++ self.map_key_kind_text(key_tid) ++ ", 0, 0);\n"
             else:
                 out = out ++ "    (void)0;\n"
             out = out ++ f"    goto bb{next_bb};"
@@ -8268,7 +8268,7 @@ impl CCodegen:
         let key_ty = self.c_type(key_tid, 0)
         let val_ty = self.c_type(val_tid, 0)
         let is_str_key = if self.sema.get_type_kind(self.sema.resolve_alias(key_tid as TypeId)) == TypeKind.TY_STR: "1" else: "0"
-        out = out ++ " void* __with_h = with_hashmap_new(sizeof(" ++ key_ty ++ "), sizeof(" ++ val_ty ++ "));"
+        out = out ++ " void* __with_h = with_hashmap_new_keyed(sizeof(" ++ key_ty ++ "), sizeof(" ++ val_ty ++ "), " ++ self.map_key_kind_text(key_tid) ++ ", 0, 0);"
         let entry_count = if is_set: argc else: argc / 2
         for i in 0..entry_count:
             let key_idx = if is_set: i else: i * 2
@@ -9921,6 +9921,18 @@ impl CCodegen:
     // are named one by one: the block declares five, and a `with_fiber_`
     // prefix here left every other fiber extern (std.task's coroutine calls
     // for g.pull()) with no prototype at all.
+    // #2180: how the runtime map hashes and compares a key: 0, by its
+    // bytes; 1, as a `str`. A key that needs hash and equality functions
+    // has none in the emit-C lane yet, and is refused rather than compared
+    // by its bytes.
+    mut fn map_key_kind_text(key_tid: i32) -> str:
+        let resolved = self.sema.resolve_alias(key_tid as TypeId)
+        let tk = self.sema.get_type_kind(resolved)
+        if tk == TypeKind.TY_STR: return "1"
+        if tk == TypeKind.TY_INT or tk == TypeKind.TY_BOOL or tk == TypeKind.TY_PTR: return "0"
+        self.fail("emit-c has no hash and equality functions for a map key of type " ++ self.sema.type_name(key_tid) ++ " (#2180)")
+        "0"
+
     fn prelude_block_declares(name: &str) -> bool:
         cc_str_starts_with(name, "with_str_") != 0 or cc_str_starts_with(name, "with_fmt_") != 0 or
         name == "with_fiber_in_fiber" or name == "with_fiber_await" or name == "with_fiber_cleanup_await" or

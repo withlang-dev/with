@@ -4000,7 +4000,8 @@ impl Sema:
                 if target_tid != 0:
                     impl_type_tid = target_tid
             let ret_node: i32 = self.trait_method_ret_nodes[mt_idx]
-            let ret_tid = self.resolve_trait_default_method_type(ret_node, impl_type_sym, impl_type_tid, trait_sym, impl_node)
+            // §11.7 (D96): a key projection returns the type its body gives.
+            let ret_tid = if trait_sym == self.std_key_trait(): 0 else: self.resolve_trait_default_method_type(ret_node, impl_type_sym, impl_type_tid, trait_sym, impl_node)
             return SemaTraitImplMethodContract {
                 ok: 1,
                 trait_sym,
@@ -7069,7 +7070,7 @@ impl Sema:
                 return true
         // A type-level builtin (`transmute[T](f)`, `sizeof[T]()`, …) never
         // invokes its operand: handing it a callable is not a suspend site.
-        if self.is_sizeof_or_alignof(callee) != 0 or self.is_nameof_call(callee) != 0 or self.is_transmute_call(callee) != 0 or self.is_chan_call(callee) != 0:
+        if self.is_sizeof_or_alignof(callee) != 0 or self.is_nameof_call(callee) != 0 or self.is_transmute_call(callee) != 0 or self.is_chan_call(callee) != 0 or self.is_key_hash_call(callee) != 0:
             return false
         self.args_hand_over_suspending_callable(node, self.ast.get_data1(node), self.ast.get_data2(node), site)
 
@@ -10901,10 +10902,9 @@ impl Sema:
                 if self.record_btree_insert_contract(self.syms.btreemap, map_target_ty, key_expr) == 0:
                     return 0
             else:
-                let hash_trait2 = self.pool_lookup_symbol("Hash")
-                if hash_trait2 != 0 and stored_key_ty != 0 and self.type_implements_trait(stored_key_ty, hash_trait2) == 0:
-                    self.emit_error("HashMap comprehension key type must implement Hash", node)
-                    return 0
+                if stored_key_ty != 0:
+                    self.check_map_key(stored_key_ty, node)
+                    self.note_structural_equality(stored_key_ty, node)
             self.typed_expr_types.insert(node, map_target_ty)
             return map_target_ty as TypeId
 
@@ -19145,10 +19145,9 @@ impl Sema:
                 if self.record_btree_insert_contract(self.syms.btreemap, target_ty, self.ast.get_extra(extra_start + i * 2)) == 0:
                     return 0
         else:
-            let hash_trait = self.pool_lookup_symbol("Hash")
-            if hash_trait != 0 and key_ty != 0 and self.type_implements_trait(key_ty, hash_trait) == 0:
-                self.emit_error("HashMap literal key type must implement Hash", node)
-                return 0
+            if key_ty != 0:
+                self.check_map_key(key_ty, node)
+                self.note_structural_equality(key_ty, node)
         self.typed_expr_types.insert(node, target_ty)
         target_ty
 
@@ -23773,6 +23772,14 @@ impl Sema:
             return 1
         0
 
+    // D96: `with_key_hash[K](key: &K) -> u64`, the compiler's seeded key hash;
+    // std.hash.hash_of is its one caller.
+    fn is_key_hash_call(callee: i32) -> i32:
+        let kind = self.ast.kind(callee)
+        if kind != NodeKind.NK_TYPE_GENERIC and kind != NodeKind.NK_INDEX:
+            return 0
+        if self.generic_builtin_callee_name(callee) == "with_key_hash": 1 else: 0
+
     fn is_transmute_call(callee: i32) -> i32:
         let kind = self.ast.kind(callee)
         if kind != NodeKind.NK_TYPE_GENERIC and kind != NodeKind.NK_INDEX:
@@ -24326,13 +24333,14 @@ impl Sema:
             return vector_call
 
         // sizeof[T]() / alignof[T]() / transmute[T]() / nameof[T]() builtins
-        if self.is_sizeof_or_alignof(callee) != 0 or self.is_nameof_call(callee) != 0 or self.is_transmute_call(callee) != 0 or self.is_chan_call(callee) != 0:
+        if self.is_sizeof_or_alignof(callee) != 0 or self.is_nameof_call(callee) != 0 or self.is_transmute_call(callee) != 0 or self.is_chan_call(callee) != 0 or self.is_key_hash_call(callee) != 0:
             self.note_call_callee(node, CallCalleeKind.TypeLevelBuiltin)
             let tl_name = self.generic_builtin_callee_name(callee)
             let tl_builtin = if tl_name == "sizeof" or tl_name == "size_of": CallBuiltin.SizeOf
                 else if tl_name == "alignof" or tl_name == "align_of": CallBuiltin.AlignOf
                 else if tl_name == "nameof" or tl_name == "type_name": CallBuiltin.NameOf
                 else if tl_name == "transmute": CallBuiltin.Transmute
+                else if tl_name == "with_key_hash": CallBuiltin.KeyHash
                 else: CallBuiltin.Chan
             self.call_builtins.insert(node, tl_builtin as i32)
         if self.is_sizeof_or_alignof(callee) != 0:
@@ -24366,6 +24374,21 @@ impl Sema:
             if arg_count >= 1:
                 self.mark_moved_if_consumed(self.ast.get_extra(extra_start))
             return transmute_ty
+        if self.is_key_hash_call(callee) != 0:
+            // The key is observed: hashed through a view, never consumed.
+            if arg_count != 1:
+                self.emit_error("with_key_hash takes the key", node)
+                return 0
+            let arg_ty = self.check_expr(self.ast.get_extra(extra_start)) as i32
+            let resolved_arg = self.resolve_alias(arg_ty as TypeId)
+            if self.get_type_kind(resolved_arg) != TypeKind.TY_REF:
+                self.emit_error("with_key_hash takes a view of the key", node)
+                return 0
+            let key_ty = self.get_type_d0(resolved_arg) as i32
+            self.check_map_key(key_ty, node)
+            self.note_structural_equality(key_ty, node)
+            self.typed_expr_types.insert(node, self.ty_u64 as i32)
+            return self.ty_u64 as i32
         if self.is_chan_call(callee) != 0:
             let chan_ty = self.chan_return_type(callee)
             if chan_ty != 0:
@@ -27031,6 +27054,9 @@ impl Sema:
             return self.type_is_sync(resolved as i32)
         if trait_sym == self.syms.scoped_send_trait:
             return self.type_is_scoped_send(resolved as i32)
+        // §11.7 (D96): every key implements `Key`; a projection is one way.
+        if trait_sym == self.std_key_trait():
+            return if self.map_key_problem(resolved as i32) == 0: 1 else: 0
         // Formatting observes (§18.2, D55): a `&T` is Display/Debug exactly
         // when `T` is, the way an f-string formats a view's pointee.
         if self.formatting_trait_through_reference(resolved, trait_sym) != 0:
@@ -27783,11 +27809,21 @@ impl Sema:
     // the walk from the frozen types (mir_emit_eq_ptrs); which method a part
     // is compared by is decided here, before the freeze, and never
     // reconstructed there (D65). `node` is the comparison, for a refusal.
+    // §11.7 (D96): `==` compares a part with a key projection by its key,
+    // and a part with its own `eq` by that `eq`.
     mut fn note_structural_equality(tid: i32, node: i32):
+        self.note_structural_contract(tid, node, "key")
+        self.note_structural_contract(tid, node, "eq")
+
+    // §11.7, §11.8 (D95, D96): a structural comparison, ordering or map
+    // hash of a value of type `tid` calls `method` (`eq`, `cmp`, or `key`,
+    // a key projection) on every part whose type declares it, and walks the
+    // rest.
+    mut fn note_structural_contract(tid: i32, node: i32, method: &str):
         var seen: HashMap[i32, i32] = sema_new_map_i32_i32()
         let work: Vec[i32] = Vec.new()
         work.push(tid)
-        let eq_sym = self.pool_intern("eq")
+        let eq_sym = self.pool_intern(method)
         var k = 0
         while k < work.len() as i32:
             var t: i32 = self.resolve_alias(work[k] as TypeId) as i32
@@ -27802,13 +27838,18 @@ impl Sema:
             let declared = tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ENUM or tk == TypeKind.TY_GENERIC_INST
             // A generic type's `eq` is its impl's template, which has no
             // signature until it is specialized (ensure_eq_contract).
-            let generic_eq = tk == TypeKind.TY_GENERIC_INST and self.lookup_generic_method_fn(self.get_generic_inst_base(t), eq_sym) != 0
-            if generic_eq or (declared and self.type_has_operator_method(t, eq_sym) != 0):
+            let projected = method == "key"
+            let generic_eq = not projected and tk == TypeKind.TY_GENERIC_INST and self.lookup_generic_method_fn(self.get_generic_inst_base(t), eq_sym) != 0
+            let has_method = if projected: declared and self.type_has_key_projection(t) else: generic_eq or (declared and self.type_has_operator_method(t, eq_sym) != 0)
+            if has_method:
                 self.ensure_eq_contract(t, eq_sym, node)
+                // What a projection returns is compared and hashed in turn.
+                if projected and self.structural_contract_sig(eq_sym, t) >= 0:
+                    work.push(self.sig_return_type(self.structural_contract_sig(eq_sym, t)))
                 // The comparison calls that method (#1819: an operator is a
                 // call of its method), whatever the global-effects analysis
                 // needs to know of it.
-                let part_sig: i32 = self.concrete_eq_sigs.get(t) ?? -1
+                let part_sig = self.structural_contract_sig(eq_sym, t)
                 if part_sig >= 0:
                     let no_args: Vec[i32] = Vec.new()
                     let no_places: Vec[bool] = Vec.new()
@@ -27832,8 +27873,89 @@ impl Sema:
     // ensure_generic_drop_specialization). The walk hands it two views, so
     // the method takes its receiver and its operand by reference, as
     // `Eq.eq` declares them.
+    // §11.7 (D96): std.traits' `Key`, the trait of a key projection; 0 when
+    // none is in scope.
+    fn std_key_trait() -> i32:
+        let sym = self.pool_lookup_symbol("Key")
+        if sym == 0 or not self.trait_decl_node_cache.contains(sym):
+            return 0
+        let node: i32 = self.trait_decl_node_cache.get(sym).unwrap()
+        if self.decl_source_path_for_node(node).ends_with("std/traits.w"): sym else: 0
+
+    // An `impl Key for T` the program wrote: the type's key projection.
+    mut fn type_has_key_projection(t: i32) -> bool:
+        let key_trait = self.std_key_trait()
+        if key_trait == 0:
+            return false
+        let resolved = self.resolve_alias(t as TypeId)
+        if self.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST:
+            return self.select_trait_impl_for_generic_inst(resolved as i32, key_trait) != 0
+        let type_sym = self.get_type_name(resolved)
+        type_sym != 0 and self.select_trait_impl(type_sym, key_trait) != 0
+
+    // §11.7 (D96): why `tid` is not a key, packed as kind * 2^32 + the part
+    // at fault (kind 1, a float; kind 2, its own `eq` and no projection), or
+    // 0 when it is one.
+    mut fn map_key_problem(tid: i32) -> i64:
+        var seen: HashMap[i32, i32] = sema_new_map_i32_i32()
+        let work: Vec[i32] = [tid]
+        let eq_sym = self.pool_intern("eq")
+        let eq_trait = self.pool_lookup_symbol("Eq")
+        var k = 0
+        while k < work.len() as i32:
+            var t: i32 = self.resolve_alias(work[k] as TypeId) as i32
+            k = k + 1
+            while t > 0 and self.get_type_kind(t as TypeId) == TypeKind.TY_REF:
+                t = self.resolve_alias(self.get_type_d0(t as TypeId) as TypeId) as i32
+            if t <= 0 or seen.contains(t):
+                continue
+            seen.insert(t, 1)
+            let tk = self.get_type_kind(t as TypeId)
+            if tk == TypeKind.TY_FLOAT:
+                return 4294967296 + t as i64
+            let declared = tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ENUM or tk == TypeKind.TY_GENERIC_INST
+            if declared and self.type_has_key_projection(t):
+                continue
+            if declared and self.type_has_operator_method(t, eq_sym) != 0:
+                let owner = if tk == TypeKind.TY_GENERIC_INST: self.get_generic_inst_base(t) else: self.get_type_name(t as TypeId)
+                let decl_node: i32 = self.type_decl_nodes.get(owner) ?? 0
+                let derived = decl_node != 0 and ((eq_trait != 0 and self.type_decl_has_derive(decl_node, eq_trait) != 0) or self.type_decl_has_derive(decl_node, self.pool_intern("all")) != 0)
+                if not derived:
+                    return 2 * 4294967296 + t as i64
+            if tk == TypeKind.TY_TUPLE:
+                for ei in 0..self.get_type_d1(t as TypeId): work.push(self.type_extra[(self.get_type_d0(t as TypeId) + ei)])
+            else if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE:
+                work.push(self.get_type_d0(t as TypeId))
+            else if declared:
+                if tk == TypeKind.TY_GENERIC_INST:
+                    for ai in 0..self.get_generic_inst_arg_count(t): work.push(self.get_generic_inst_arg(t, ai))
+                for fi in 0..self.type_reflection_field_count(t): work.push(self.type_reflection_field_type(t, fi))
+                for vi in 0..self.type_reflection_variant_count(t):
+                    for pi in 0..self.type_reflection_variant_payload_count(t, vi): work.push(self.type_reflection_variant_payload_type(t, vi, pi))
+        0
+
+    // §11.7 (D96): a map key holds no float, and a part that defines its own
+    // `eq` states what that equality is about as a key projection.
+    mut fn check_map_key(tid: i32, node: i32):
+        let problem = self.map_key_problem(tid)
+        if problem == 0:
+            return
+        let part = (problem % 4294967296) as i32
+        if problem / 4294967296 == 1:
+            let what = if part == self.resolve_alias(tid as TypeId) as i32: "it is a float" else: f"it holds a `{self.type_name(part)}`"
+            self.emit_error_with_help(f"`{self.type_name(tid)}` cannot be a map key: {what}, and a NaN key is never found again (§11.7)", node, "key by a projection that is a key, such as `impl Key for T: fn key(): (self.x * 1000.0) as i64`")
+            return
+        self.emit_error_with_help(f"`{self.type_name(part)}` cannot be a map key: it defines its own `eq`, and a map hashes it by its parts, which that `eq` may not compare (§11.7)", node, f"state the part equality is about: `impl Key for {self.type_name(part)}: fn key(): ...`")
+
+    // The signature of the `method` contract recorded for `t`, or -1.
+    fn structural_contract_sig(method_sym: i32, t: i32) -> i32:
+        let method = self.pool_resolve(method_sym)
+        if method == "cmp": return self.concrete_cmp_sigs.get(t) ?? -1
+        if method == "key": return self.concrete_key_sigs.get(t) ?? -1
+        self.concrete_eq_sigs.get(t) ?? -1
+
     mut fn ensure_eq_contract(resolved: i32, eq_sym: i32, node: i32):
-        if self.concrete_eq_sigs.contains(resolved):
+        if self.structural_contract_sig(eq_sym, resolved) >= 0:
             return
         var sig_idx = -1
         var mono_sym = 0
@@ -27893,12 +28015,27 @@ impl Sema:
                 sig_idx = self.check_fn_body_concrete(method_node, subst.names, subst.types, mono_sym, concrete_params)
         if sig_idx < 0 or mono_sym == 0:
             return
-        let by_view = self.sig_get_param_count(sig_idx) == 2 and self.get_type_kind(self.resolve_alias(self.sig_param_type(sig_idx, 0) as TypeId)) == TypeKind.TY_REF and self.get_type_kind(self.resolve_alias(self.sig_param_type(sig_idx, 1) as TypeId)) == TypeKind.TY_REF
-        if not by_view or self.types_compatible(self.ty_bool as i32, self.sig_return_type(sig_idx)) == 0:
-            self.emit_error_with_help(f"`==` compares a `{self.type_name(resolved)}` inside this value by `{self.type_name(resolved)}.eq`, which does not have the shape of `Eq.eq` (§11.7)", node, "declare it `fn eq(other: &Self) -> bool`")
+        let method = self.pool_resolve(eq_sym).clone()
+        let params = if method == "key": 1 else: 2
+        var by_view = self.sig_get_param_count(sig_idx) == params
+        for pi in 0..params:
+            if by_view and self.get_type_kind(self.resolve_alias(self.sig_param_type(sig_idx, pi) as TypeId)) != TypeKind.TY_REF: by_view = false
+        // A key projection returns a key of the type its body gives.
+        let want = if method == "cmp": self.ty_i32 as i32 else if method == "key": self.sig_return_type(sig_idx) else: self.ty_bool as i32
+        if not by_view or self.types_compatible(want, self.sig_return_type(sig_idx)) == 0:
+            let what = if method == "cmp": "`<` orders" else if method == "key": "`==` and a map compare" else: "`==` compares"
+            let shape = if method == "cmp": "fn cmp(other: &Self) -> i32" else if method == "key": "fn key()" else: "fn eq(other: &Self) -> bool"
+            self.emit_error_with_help(f"{what} a `{self.type_name(resolved)}` inside this value by `{self.type_name(resolved)}.{method}`, which does not have the shape the trait declares (§11.7)", node, f"declare it `{shape}`")
             return
-        self.concrete_eq_sigs.insert(resolved, sig_idx)
-        self.concrete_eq_mono_syms.insert(resolved, mono_sym)
+        if method == "cmp":
+            self.concrete_cmp_sigs.insert(resolved, sig_idx)
+            self.concrete_cmp_mono_syms.insert(resolved, mono_sym)
+        else if method == "key":
+            self.concrete_key_sigs.insert(resolved, sig_idx)
+            self.concrete_key_mono_syms.insert(resolved, mono_sym)
+        else:
+            self.concrete_eq_sigs.insert(resolved, sig_idx)
+            self.concrete_eq_mono_syms.insert(resolved, mono_sym)
 
     // Autoderef's user-Deref dispatch: specialize deref for the concrete
     // receiver and RECORD the resolution on the base expression node —
@@ -30789,6 +30926,14 @@ impl Sema:
         let recv = if raw_recv != 0 and raw_recv != self.ty_void as i32: self.auto_deref_method_type_frozen(raw_recv as TypeId, field) as i32 else: raw_recv
         var intrinsic = self.builtin_method_intrinsic(recv, self.pool_resolve(field))
         let lowering = self.method_lowering_kind(raw_recv, recv, expr, field, arg_count, intrinsic)
+        // A map or set hashes and compares its key (#2180).
+        if recv > 0:
+            let map_ty = self.auto_deref_ref_ptr_type(self.resolve_alias(recv as TypeId)) as i32
+            if self.get_type_kind(map_ty as TypeId) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_arg_count(map_ty) >= 1:
+                let base = self.canonical_symbol_by_text(self.get_generic_inst_base(map_ty))
+                if base == self.syms.hashmap or base == self.syms.hashset:
+                    self.check_map_key(self.get_generic_inst_arg(map_ty, 0), node)
+                    self.note_structural_equality(self.get_generic_inst_arg(map_ty, 0), node)
         // `v.contains(x)` and `x in v` compare each element with `x` (#2137).
         if intrinsic == MirIntrinsic.VEC_CONTAINS and recv > 0:
             let vec_ty = self.auto_deref_ref_ptr_type(self.resolve_alias(recv as TypeId)) as i32
@@ -32582,7 +32727,7 @@ impl Sema:
     // those predicates.
     fn generic_builtin_syms() -> Vec[i32]:
         let out: Vec[i32] = Vec.new()
-        let names = ["sizeof", "size_of", "alignof", "align_of", "transmute", "nameof", "type_name", "chan"]
+        let names = ["sizeof", "size_of", "alignof", "align_of", "transmute", "nameof", "type_name", "chan", "with_key_hash"]
         for i in 0..names.len() as i32:
             let sym = self.pool_lookup_symbol(names[i])
             if sym != 0: out.push(sym)
@@ -32610,7 +32755,7 @@ impl Sema:
             if self.is_intrinsic_fn_sym(sym) != 0 or self.fn_symbol_is_std_builtins_drop(sym) != 0:
                 return 1
             return 0
-        if self.is_sizeof_or_alignof(callee) != 0 or self.is_transmute_call(callee) != 0 or self.is_nameof_call(callee) != 0 or self.is_chan_call(callee) != 0:
+        if self.is_sizeof_or_alignof(callee) != 0 or self.is_transmute_call(callee) != 0 or self.is_nameof_call(callee) != 0 or self.is_chan_call(callee) != 0 or self.is_key_hash_call(callee) != 0:
             return 1
         if self.typeinfo_module_field(callee) != 0:
             return 1

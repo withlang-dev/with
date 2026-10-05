@@ -1,6 +1,12 @@
-// std.hash — pure-With hash helpers.
+// std.hash — hashing.
 //
-// Provides deterministic 64-bit hash utilities for common scalar inputs.
+// `hash_of` is the hash a `HashMap` gives a key (§11.7, D96): seeded once
+// per process, consistent with the key's `==`, for a container a library
+// writes over a generic key. The helpers after it are deterministic 64-bit
+// hashes of scalars, the same on every run.
+
+/// The hash the standard maps give `key`.
+pub fn hash_of[K: Key](key: &K) -> u64: with_key_hash[K](key)
 
 pub type Hasher {
     state: i64,
