@@ -763,25 +763,20 @@ impl Zcu:
             let decl = out.get_decl(i)
             if out.kind(decl) != NodeKind.NK_C_FACADE:
                 continue
+            let facade_name: str = with_str_clone_ref(self.pool.resolve(out.get_data0(decl)))
+            // Ruling Amendment 3: a function presented twice has a declaration
+            // per later presentation, in the pool before the block is rendered.
+            let aliases = facade_render_presentation_aliases(out, self.pool, decl as i32, &self.decl_is_c_import)
+            if aliases.len() > 0:
+                out = self.splice_facade_text_frontend(out, &aliases, "<facade " ++ facade_name ++ " presentations>", i)
             let text = facade_render_block(out, self.pool, decl as i32, &self.decl_is_c_import)
             if text.len() == 0:
                 continue
-            let facade_name: str = with_str_clone_ref(self.pool.resolve(out.get_data0(decl)))
             // WITH_DUMP_FACADE=1: the rendered text, as the parser sees it — a
             // diagnostic at `<facade NAME>:line:col` points into this.
             if with_getenv_str("WITH_DUMP_FACADE").len() > 0:
                 eprint("<facade " ++ facade_name ++ ">\n" ++ text)
-            let file_id: i32 = self.next_file_id
-            self.next_file_id = self.next_file_id + 1
-            self.add_source_text_mapping(file_id, "<facade " ++ facade_name ++ ">", text)
-            let before = out.decl_count()
-            var lexer = Lexer.init(text, file_id)
-            let tokens = lexer.tokenize()
-            var parser = Parser.init_with_pool(move tokens, text, file_id, self.pool, move self.diagnostics, out)
-            out = parser.parse_module()
-            self.pool = parser.intern
-            self.diagnostics = move parser.diags
-            self.append_decl_source_paths(out.decl_count() - before, self.decl_source_path_frontend(i), file_id)
+            out = self.splice_facade_text_frontend(out, &text, "<facade " ++ facade_name ++ ">", i)
         out
 
     fn c_import_cache_key_frontend(pool: AstPool, decl: i32, header_spec: &str) -> str:

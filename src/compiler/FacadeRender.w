@@ -109,6 +109,67 @@ pub fn facade_render_block(pool: AstPool, intern: InternPool, facade: i32, ci: &
     out = out ++ facade_render_free_ops(pool, intern, ci, facade)
     facade_render_public(out)
 
+// Two presentations of one function (ruling Amendment 3, §16.2b.11): "An fn
+// item may be written more than once when each states a distinct `rename`.
+// Each is a presentation with its own fixed parameters." The first item
+// keeps the C declaration. Each later one gets a declaration of its own that
+// links to the same C symbol,
+//
+//     @[link_name("sqlite3_exec")]
+//     extern fn __with_presented_exec_with__of__sqlite3_exec(…) -> c_int
+//
+// and is renamed to it, so every rule that reads an fn item by the function
+// it names — its contract, its hosting, its fixed parameters, its rendering —
+// reads this presentation's own. Returns those declarations as source text
+// ("" when the block repeats nothing); a repetition without distinct
+// renames is left as written, and Sema refuses it.
+pub fn facade_render_presentation_prefix() -> str: "__with_presented_"
+
+pub fn facade_render_presentation_aliases(pool: AstPool, intern: InternPool, facade: i32, ci: &Vec[i32]) -> str:
+    var out = ""
+    let start = pool.get_data1(facade as NodeId)
+    let count = pool.get_data2(facade as NodeId)
+    for i in 0..count:
+        let item = pool.get_extra(start + i)
+        if pool.kind(item as NodeId) != NodeKind.NK_FACADE_FN:
+            continue
+        let cname: str = intern.resolve(pool.get_data0(item as NodeId))
+        // Every item of this block naming the same function, in order.
+        let group: Vec[i32] = Vec.new()
+        for k in 0..count:
+            let other = pool.get_extra(start + k)
+            if pool.kind(other as NodeId) == NodeKind.NK_FACADE_FN and intern.resolve(pool.get_data0(other as NodeId)) == cname: group.push(other)
+        if group.len() < 2 or group[0] != item:
+            continue
+        var renames: Vec[str] = Vec.new()
+        var distinct = true
+        for g in 0..group.len() as i32:
+            let rename = facade_render_item_rename_of(pool, intern, group[g])
+            if rename.len() == 0 or renames.contains(rename): distinct = false
+            renames.push(rename)
+        let decl = facade_render_find_fn(pool, intern, ci, pool.get_data0(item as NodeId))
+        let meta = if decl != 0: pool.find_fn_meta(decl as NodeId) else: -1
+        if not distinct or meta < 0:
+            continue
+        var params = ""
+        let pstart = pool.fn_meta_param_start(meta)
+        for pi in 0..pool.fn_meta_param_count(meta):
+            if pi > 0: params = params ++ ", "
+            params = params ++ facade_render_param_name(pool, intern, pstart, pi) ++ ": " ++ render_type_expr(pool, intern, pool.fn_param_type(pstart, pi) as NodeId)
+        for g in 1..group.len() as i32:
+            let alias = facade_render_presentation_prefix() ++ renames[g] ++ "__of__" ++ cname
+            out = out ++ "@[link_name(\"" ++ cname ++ "\")]\nextern fn " ++ alias ++ "(" ++ params ++ ")" ++ facade_render_return(pool, intern, decl) ++ "\n"
+            pool.set_data0(group[g] as NodeId, intern.intern(alias))
+    out
+
+// The `rename` an fn item itself states, or "".
+fn facade_render_item_rename_of(pool: AstPool, intern: InternPool, item: i32) -> str:
+    let cstart = pool.get_data1(item as NodeId)
+    for k in 0..pool.get_data2(item as NodeId):
+        let clause = pool.get_extra(cstart + k)
+        if pool.get_data0(clause as NodeId) == FACADE_CLAUSE_RENAME: return intern.resolve(pool.get_extra(pool.get_data1(clause as NodeId))).clone()
+    ""
+
 // `message <fn>` (ruling Amendment 3, §16.2b.4): how one of `resource`'s
 // methods reads the text of its most recent failure — the text view the
 // clause names, on the resource itself or on the one parent it holds — or
@@ -1976,7 +2037,18 @@ pub fn facade_render_bridge_name(cname: &str) -> str: "__with_facade_" ++ cname
 // named after its presented name (`compress` → `CompressError`).
 pub fn facade_render_fn_error_name(presented: &str) -> str:
     if presented.len() == 0: return "Error"
-    presented.slice(0, 1).to_upper() ++ presented.slice(1, presented.len()) ++ "Error"
+    // A snake_case presented name is CamelCased (`exec_with` →
+    // `ExecWithError`); a name with capitals of its own keeps them
+    // (`BZ2_bzBuffToBuffCompress`).
+    var snake = true
+    for i in 0..presented.len():
+        if presented[i] >= 'A' and presented[i] <= 'Z': snake = false
+    if not snake:
+        return presented.slice(0, 1).to_upper() ++ presented.slice(1, presented.len()) ++ "Error"
+    var out = ""
+    for part in presented.split("_"):
+        if part.len() > 0: out = out ++ part.slice(0, 1).to_upper() ++ part.slice(1, part.len())
+    out ++ "Error"
 
 // The error type an inout operation under `ok` returns: `Failed` alone —
 // nothing is produced, so there is no resource to own.

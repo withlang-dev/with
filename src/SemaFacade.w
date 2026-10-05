@@ -1543,7 +1543,9 @@ impl Sema:
             let lk = self.ast.kind(lit)
             let is_int = lk == NodeKind.NK_INT_LIT or (lk == NodeKind.NK_UNARY and self.ast.get_data0(lit) == UnaryOp.UOP_NEGATE)
             if lk == NodeKind.NK_NULL_LIT:
-                if self.get_type_kind(ptype) != TypeKind.TY_PTR:
+                // A callback parameter is a C function pointer: NULL is the
+                // presentation that passes none (ruling Amendment 3).
+                if self.get_type_kind(ptype) != TypeKind.TY_PTR and not self.facade_param_is_callable(sig, pi):
                     self.emit_error(f"fn '{fname}': 'param {pi} fixed null' binds {shown}, which is not a pointer (§16.2b.11)", clause)
                     return c
             else if lk == NodeKind.NK_BOOL_LIT:
