@@ -7,8 +7,8 @@
 [![windows aarch64](https://github.com/withlang-dev/with/actions/workflows/selfhost-windows-aarch64.yml/badge.svg?branch=main)](https://github.com/withlang-dev/with/actions/workflows/selfhost-windows-aarch64.yml)
 
 With is a systems language that compiles to native code. It has no garbage
-collector and no lifetime annotations, it is designed to be exactly as safe
-as Rust, and it treats C as a first-class citizen.
+collector and no lifetime annotations, it is designed to be at least as
+safe as Rust, and it treats C as a first-class citizen.
 
 One rule drives the design: **if the program has already determined
 something, you should not have to write it.** When only one meaning is
@@ -107,7 +107,8 @@ with run tiny.w
 ```
 
 `with migrate` turns C source into With source that you check in and
-maintain. Parts of the standard library are its output: the regex engine
+maintain. (`--no-c-export` makes the result plain With functions; by
+default they are also exported under their C names for C callers.) Parts of the standard library are its output: the regex engine
 behind `=~` is PCRE2 (35 modules), and `std.zlib` is zlib (22 modules), both
 migrated from the upstream C and kept in step with it by a drift check in
 the build. The translation is literal: migrated code keeps C's pointer
@@ -279,8 +280,7 @@ cat people.txt | with -p 'line = /(\w+) (\d+)/.replace(line, "$2 $1")'
 cat access.log | with -n 'if line =~ /(\d+)$/: if $1 == "500": print(f"{nr}: {line}")'
 
 # jq: a field of a JSON document
-echo '{"a":{"b":3}}' | with -e 'use std.json
-print(JsonDocument.parse(read_all()).root().field("a").field("b").raw())'
+echo '{"a":{"b":3}}' | with -e 'use std.json; print(JsonDocument.parse(read_all()).root().field("a").field("b").raw())'
 ```
 
 Regular expressions are part of the language: `/pattern/flags` literals,
@@ -388,8 +388,8 @@ The same binary is the whole toolchain:
 ## The compiler is written in With
 
 The compiler, the runtime and the build system are written in With (about
-233,000 lines in `src/`), with a few assembly files for fiber context
-switches and no C or C++. It compiles itself,
+233,000 lines in `src/`), plus a few assembly files for fiber context
+switches. It compiles itself,
 and `with build :fixpoint` checks that the compiler built by itself and the
 compiler built by that one are byte-identical. The test suite has more
 than 1,600 behavior programs, 1,600 programs that must fail with a specific
