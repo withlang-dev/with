@@ -939,9 +939,12 @@ Environment switches (set on the compiler's run unless noted):
 | `WITH_TRACE_GRAPH=1` | build | the build graph as it materializes |
 | `WITH_MIGRATE_TRACE_PORT=1`, `WITH_MIGRATE_RAW_STATS=1`, `WITH_MIGRATE_TRACE_LIBC_CONSTANTS=1` | migrator | each ported declaration; raw-pointer statistics; each libc constant candidate and its value |
 
-`WITH_DEBUG_FALLBACK=1` prints a warning where codegen hits an invalid MIR
-id and emits `undef`. That a switch decides whether this is reported at all
-is a defect (#2199): the failure must always be loud.
+Codegen that meets MIR it cannot lower (an id out of range, a place with no
+address, a kind with no lowering, a noalias walk past a function's
+parameters) stops with ``error: code generation failed: BUG: <what> in
+`<function>` ``; there is no switch to turn it on (#2199 retired
+`WITH_DEBUG_FALLBACK`, which decided whether the `undef` it emitted was
+reported at all). The named function is where to start `--dump-mir`.
 
 ## Verification Targets
 

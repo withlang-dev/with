@@ -334,7 +334,7 @@ impl Codegen:
     // bug, reported (D65: post-Sema invalid MIR is loud, never guessed).
     mut fn cg_vector_unsupported(what: &str) -> i64:
         self.had_error = 1
-        self.codegen_error_detail = f"code generation failed: {what} (§4.3d)"
+        self.codegen_error_detail = f"{what} (§4.3d)"
         wl_get_undef(wl_i32_type(self.context))
 
     // The lane pointer of `v[i]` on a vector place: a GEP over the lane

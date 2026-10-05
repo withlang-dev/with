@@ -77,7 +77,7 @@ impl Zcu:
         self.last_bundle_unlowered_globals = sema_clone_str_vec(&cg.bundle_unlowered_globals)
         if result != 0:
             self.last_sema = cg.take_sema()
-            runtime_eprint("error: code generation failed")
+            runtime_eprint(codegen_failure_message("error: code generation failed", &cg.codegen_error_detail))
             return 1
         if do_profile:
             let codegen_ns = runtime_clock_nanos() - t_codegen
@@ -168,7 +168,7 @@ impl Zcu:
             self.tracked_input_paths = tracked_input_merge_unique(move tracked, &cg.tracked_input_paths)
             if rc != 0:
                 self.last_sema = cg.take_sema()
-                runtime_eprint(f"error: code generation failed for unit {k}")
+                runtime_eprint(codegen_failure_message(f"error: code generation failed for unit {k}", &cg.codegen_error_detail))
                 let _ = pipeline.finish()
                 return 1
             codegen_units_apply_global_ownership(cg.llmod, k)
@@ -233,7 +233,7 @@ impl Zcu:
         self.tracked_input_paths = tracked_input_merge_unique(move tracked_paths, &cg.tracked_input_paths)
         self.last_sema = cg.take_sema()
         if result != 0:
-            runtime_eprint("error: code generation failed")
+            runtime_eprint(codegen_failure_message("error: code generation failed", &cg.codegen_error_detail))
             return false
         cg.print_ir()
         true
@@ -315,3 +315,7 @@ fn backend_dump_struct_extras(pool: AstPool, intern: InternPool):
             runtime_eprint(f"[sd] OK {name} d={decl as i32} es={es} fc={fc}")
 
 let _backend_eof_guard = 0
+
+// The failure line with codegen's reason, when it gave one (#2199: the
+// detail was recorded and never printed).
+fn codegen_failure_message(head: &str, detail: &str): if detail.len() > 0: f"{head}: {detail}" else: head.clone()

@@ -1729,9 +1729,7 @@ impl Codegen:
                 materialize_ty = self.mir_sema_type_to_llvm(const_sema_ty)
         let fallback_ty = if materialize_ty != 0: materialize_ty else: wl_i32_type(self.context)
         if const_id < 0 or const_id >= body.const_kinds.len() as i32:
-            if self.debug_fallback_enabled():
-                with_eprint(f"warning: [fallback] mir_const_value: invalid const_id={const_id}")
-            return wl_get_undef(fallback_ty)
+            return self.mir_bug_undef(f"MIR constant id {const_id} is out of range", fallback_ty)
 
         let ck = body.const_kinds[const_id]
         let cd = body.const_d0[const_id]
@@ -1831,8 +1829,7 @@ impl Codegen:
             // so gen_closure can find captured variables and their types.
             let closure_node = cd
             if closure_node <= 0 or closure_node >= self.pool.node_count():
-                with_eprint(f"warning: [ck-closure] invalid node={closure_node}")
-                return wl_get_undef(fallback_ty)
+                return self.mir_bug_undef(f"closure constant {const_id} names no node ({closure_node})", fallback_ty)
             for li in 0..body.local_count():
                 let name_sym = body.local_names[li]
                 if name_sym != 0:
@@ -1854,7 +1851,7 @@ impl Codegen:
             // Same preamble as CK_CLOSURE: populate local_allocas/local_types from MIR locals
             let ab_node = cd
             if ab_node <= 0 or ab_node >= self.pool.node_count():
-                return wl_get_undef(fallback_ty)
+                return self.mir_bug_undef(f"async-block constant {const_id} names no node ({ab_node})", fallback_ty)
             for ab_li in 0..body.local_count():
                 let ab_name_sym = body.local_names[ab_li]
                 if ab_name_sym != 0:
@@ -1917,20 +1914,18 @@ impl Codegen:
             // here compiled and jumped into garbage at run time; it is a BUG.
             sema_phase_bug(f"BUG: function constant names no function: sym={fn_sym} name={fn_name} (not in fn_values or the LLVM module)")
 
-        wl_get_undef(fallback_ty)
+        self.mir_bug_undef(f"MIR constant {const_id} of kind {ck} has no lowering", fallback_ty)
 
     mut fn mir_eval_operand(body: &MirBody, operand_id: i32, expected_ty: i64) -> i64:
         let fallback_ty = if expected_ty != 0: expected_ty else: wl_i32_type(self.context)
         if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
-            if self.debug_fallback_enabled():
-                with_eprint(f"warning: [fallback] mir_eval_operand: invalid operand_id={operand_id}")
-            return wl_get_undef(fallback_ty)
+            return self.mir_bug_undef(f"MIR operand id {operand_id} is out of range", fallback_ty)
 
         let ok = body.operand_kinds[operand_id]
         let od = body.operand_d0[operand_id]
         if ok == OperandKind.OK_COPY or ok == OperandKind.OK_MOVE:
             if od < 0 or od >= body.place_locals.len() as i32:
-                return wl_get_undef(fallback_ty)
+                return self.mir_bug_undef(f"operand {operand_id} names place {od}, out of range", fallback_ty)
             let local_id = body.place_locals[od]
             if body.place_proj_counts[od] == 0:
                 let value_opt = self.mir_local_values.get(local_id)
@@ -1952,7 +1947,7 @@ impl Codegen:
                     if sema_llvm_ty != 0:
                         ptr = self.mir_place_ptr(body, od, true, sema_llvm_ty)
             if ptr == 0:
-                return wl_get_undef(fallback_ty)
+                return self.mir_bug_undef(f"operand {operand_id}: place {od} has no address", fallback_ty)
             var ptr_ty: i64 = 0
             let p_count = body.place_proj_counts[od]
             if p_count > 0:
@@ -1968,7 +1963,7 @@ impl Codegen:
                 if sema_ty > 0:
                     ptr_ty = self.mir_sema_type_to_llvm(sema_ty)
             if ptr_ty == 0:
-                return wl_get_undef(fallback_ty)
+                return self.mir_bug_undef(f"operand {operand_id}: place {od} has no type", fallback_ty)
             // An unprojected local FnAbi passes by address (an indirect local)
             // is read through the address its slot holds. Decided before the
             // bitpacked view below: that one applies to projected places only.
@@ -2038,7 +2033,7 @@ impl Codegen:
         if ok == OperandKind.OK_CONSTANT:
             return self.mir_const_value(body, od, expected_ty)
 
-        wl_get_undef(fallback_ty)
+        self.mir_bug_undef(f"MIR operand {operand_id} of kind {ok} has no lowering", fallback_ty)
 
     mut fn mir_operand_is_unsigned(body: &MirBody, operand_id: i32) -> bool:
         if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
@@ -4427,9 +4422,7 @@ impl Codegen:
     mut fn mir_eval_rvalue(body: &MirBody, rval_id: i32, dest_ty: i64, dest_sema_ty: i32) -> i64:
         let fallback_ty = if dest_ty != 0: dest_ty else: wl_i32_type(self.context)
         if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
-            if self.debug_fallback_enabled():
-                with_eprint(f"warning: [fallback] mir_eval_rvalue: invalid rval_id={rval_id}")
-            return wl_get_undef(fallback_ty)
+            return self.mir_bug_undef(f"MIR rvalue id {rval_id} is out of range", fallback_ty)
 
         let rk = body.rval_kinds[rval_id]
         let d0 = body.rval_d0[rval_id]
@@ -4530,7 +4523,7 @@ impl Codegen:
         if rk == RvalueKind.RK_REF:
             var ptr = self.mir_place_ptr(body, d1, false, 0)
             if ptr == 0:
-                return wl_get_undef(fallback_ty)
+                return self.mir_bug_undef(f"reference rvalue {rval_id}: place {d1} has no address", fallback_ty)
             ptr = self.mir_ref_through_indirect_base(body, d1, ptr)
             let dyn_ref = self.mir_build_dyn_trait_value_from_ref_place(body, d1, ptr, dest_ty, dest_sema_ty)
             if wl_type_of(dyn_ref) == dest_ty:
@@ -4548,7 +4541,7 @@ impl Codegen:
         if rk == RvalueKind.RK_ADDR_OF:
             var ptr = self.mir_place_ptr(body, d0, false, 0)
             if ptr == 0:
-                return wl_get_undef(fallback_ty)
+                return self.mir_bug_undef(f"address-of rvalue {rval_id}: place {d0} has no address", fallback_ty)
             ptr = self.mir_ref_through_indirect_base(body, d0, ptr)
             if dest_ty != 0 and wl_type_of(ptr) != dest_ty and wl_get_type_kind(dest_ty) == wl_pointer_type_kind():
                 return wl_build_bitcast(self.builder, ptr, dest_ty)
@@ -4791,7 +4784,7 @@ impl Codegen:
                         wl_build_store(self.builder, coerced_val, gep)
                 self.mir_store_liveness_byte(struct_ty, alloca)
                 return wl_build_load(self.builder, struct_ty, alloca)
-            return wl_get_undef(fallback_ty)
+            return self.mir_bug_undef(f"aggregate rvalue {rval_id} names field list {agg_fields_id}, out of range", fallback_ty)
 
         if rk == RvalueKind.RK_CAST:
             // §4.3d: a lane-wise conversion between vectors.
@@ -4954,7 +4947,7 @@ impl Codegen:
         if rk == RvalueKind.RK_SLICE:
             let base_ptr = self.mir_place_ptr(body, d0, false, 0)
             if base_ptr == 0:
-                return wl_get_undef(fallback_ty)
+                return self.mir_bug_undef(f"slice rvalue {rval_id}: place {d0} has no address", fallback_ty)
             var base_ty = self.mir_place_projected_type(body, d0)
             if base_ty == 0:
                 let base_local = body.place_locals[d0]
@@ -5049,7 +5042,7 @@ impl Codegen:
                         wl_build_store(self.builder, af_coerced, af_gep)
                 return wl_build_load(self.builder, af_ty, af_alloca)
 
-        wl_get_undef(fallback_ty)
+        self.mir_bug_undef(f"MIR rvalue {rval_id} of kind {rk} has no lowering", fallback_ty)
 
     mut fn mir_emit_drop_fields_ptr(ptr: i64, ty: i64, owner_sym: i32, owner_sema_ty: i32) -> Unit:
         if ptr == 0 or ty == 0:
