@@ -108,9 +108,6 @@ enum CcBuiltin: i32:
     MAP_INCREMENT
     MAP_DECREMENT
     MAP_UPDATE
-    MAP_KEYS
-    MAP_VALUES
-    MAP_ITEMS
     MAP_SLOT_WALK
     VEC_MAP
     VEC_FILTER
@@ -6635,9 +6632,6 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: MirIntrinsic) -> CcBuiltin:
     if intrinsic == MirIntrinsic.MAP_INCREMENT: return CcBuiltin.MAP_INCREMENT
     if intrinsic == MirIntrinsic.MAP_DECREMENT: return CcBuiltin.MAP_DECREMENT
     if intrinsic == MirIntrinsic.MAP_UPDATE: return CcBuiltin.MAP_UPDATE
-    if intrinsic == MirIntrinsic.MAP_KEYS: return CcBuiltin.MAP_KEYS
-    if intrinsic == MirIntrinsic.MAP_VALUES: return CcBuiltin.MAP_VALUES
-    if intrinsic == MirIntrinsic.MAP_ITEMS: return CcBuiltin.MAP_ITEMS
     if intrinsic == MirIntrinsic.MAP_CAPACITY or intrinsic == MirIntrinsic.MAP_SLOT_OCCUPIED or intrinsic == MirIntrinsic.MAP_KEY_AT or intrinsic == MirIntrinsic.MAP_VALUE_AT: return CcBuiltin.MAP_SLOT_WALK
     if intrinsic == MirIntrinsic.VEC_MAP: return CcBuiltin.VEC_MAP
     if intrinsic == MirIntrinsic.VEC_FILTER: return CcBuiltin.VEC_FILTER
@@ -7588,29 +7582,8 @@ impl CCodegen:
             out = out ++ f"    goto bb{next_bb};"
             return out
 
-        if kind == CcBuiltin.MAP_KEYS:
-            if argc < 1:
-                self.fail("map.keys expects a receiver")
-                return "    abort();"
-            let recv = self.map_recv_text(body, args_id)
-            let keys_recv_operand = self.call_arg_operand(body, args_id, 0)
-            var keys_key_tid = self.hashmap_key_tid(self.operand_tid(body, keys_recv_operand))
-            if keys_key_tid == 0 or self.is_void_tid(keys_key_tid) != 0:
-                keys_key_tid = self.sema.ty_i64 as i32
-            let keys_key_ty = self.c_type(keys_key_tid, 0)
-            var out = ""
-            if has_ret != 0:
-                out = "    with_hashmap_keys_out((void*)&(" ++ self.place_text(body, dest_place) ++ "), (void*)(intptr_t)(" ++ recv ++ "), sizeof(" ++ keys_key_ty ++ "));\n"
-            else:
-                out = "    (void)0;\n"
-            out = out ++ f"    goto bb{next_bb};"
-            return out
-
         if kind == CcBuiltin.MAP_SLOT_WALK:
             return self.map_slot_walk_term(body, args_id, dest_place, next_bb, argc, has_ret)
-        if kind == CcBuiltin.MAP_VALUES or kind == CcBuiltin.MAP_ITEMS:
-            self.fail("emit-c: HashMap.values()/items() lowering is not implemented; use keys() or the LLVM backend")
-            return "    abort();"
 
         if kind == CcBuiltin.MAP_UPDATE:
             self.fail("emit-c: HashMap.update requires closure lowering")

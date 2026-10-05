@@ -66,13 +66,12 @@ impl[K, V] BTreeMap[K, V]:
     pub mut fn clear() -> Unit:
         self.entries.clear()
 
+impl[K, V] BTreeMap[K, V]:
+    fn key_at(index: i64) -> &K: &self.entries[index].0
+
+    fn value_at(index: i64) -> &V: &self.entries[index].1
+
 impl[K: Ord, V] BTreeMap[K, V]:
-    fn key_at(index: i64) -> &K:
-        unsafe { &(*(self.entries.ptr + (index as usize))).0 }
-
-    fn value_at(index: i64) -> &V:
-        unsafe { &(*(self.entries.ptr + (index as usize))).1 }
-
     // #773: pure read — takes &K so both view-holding callers (get/contains)
     // and owning callers (remove, whose D22 contract keeps `key: K`) borrow.
     fn last_index_of(key: &K) -> i64:
@@ -129,39 +128,15 @@ impl[K: Ord, V] BTreeMap[K, V]:
         let (_, removed_value) = self.entries.remove(idx)
         Some(removed_value)
 
-    pub fn keys() -> Vec[K]:
-        let out: Vec[K] = Vec.new()
-        var entry_i = 0
-        while entry_i < self.entries.len():
-            // #773/D27: entries.get yields a view; the owned Vec[K] demand
-            // materializes via clone (per-instantiation dispatch).
-            let (key, _) = self.entries[entry_i]
-            out.push(key.clone())
-            entry_i = entry_i + 1
-        out
+    // D44: traversal observes. Each yields views into the entries.
+    @[iter_of_self]
+    pub fn iter() -> MapIter[K, V]: MapIter { source: .Tree(self), at: 0 }
 
-    pub fn values() -> Vec[V]:
-        let out: Vec[V] = Vec.new()
-        var entry_i = 0
-        while entry_i < self.entries.len():
-            let (_, value) = self.entries[entry_i]
-            out.push(value.clone())
-            entry_i = entry_i + 1
-        out
+    @[iter_of_self]
+    pub fn keys() -> MapKeys[K, V]: MapKeys { source: .Tree(self), at: 0 }
 
-    pub fn items() -> Vec[(K, V)]:
-        let out: Vec[(K, V)] = Vec.new()
-        var entry_i = 0
-        while entry_i < self.entries.len():
-            // #773/D27: views materialize into the owned tuple.
-            let (key, value) = self.entries[entry_i]
-            out.push((key.clone(), value.clone()))
-            entry_i = entry_i + 1
-        out
-
-impl[K: Ord, V] Iterable[(K, V)] for BTreeMap[K, V]:
-    fn iter() -> VecIter[(K, V)]:
-        self.entries.iter()
+    @[iter_of_self]
+    pub fn values() -> MapValues[K, V]: MapValues { source: .Tree(self), at: 0 }
 
 // §15.4.7 / D61: the `:?` forms of the maps. The compiler calls these for
 // every map an f-string formats with `:?`, at any depth; `{k:?}` and `{v:?}`
@@ -473,8 +448,96 @@ impl[T] Iter[T] for VecIntoIter[T]:
         if self.vec.len() == 0: return None
         Some(self.vec.remove(0))
 
+// ── Map traversal (D44) ───────────────────────────────────────────
+// The observing traversals of a keyed map: concrete ephemeral structs over a
+// view of the map, whose items are views into its storage. Nothing is copied
+// out (§2.3). A HashMap or HashSet is walked through its entry slots in
+// insertion order (D96), skipping removed entries; a BTreeMap through its
+// key-ordered entries.
+
+enum MapSource[K, V] ephemeral:
+    Hash(&HashMap[K, V])
+    Tree(&BTreeMap[K, V])
+
+impl[K, V] MapSource[K, V]:
+    // The first live position at or after `at`, or -1 at the end.
+    fn live_from(at: i64) -> i64:
+        match self:
+            .Hash(m) =>
+                var slot = at
+                while slot < m.slot_count():
+                    if m.slot_live(slot): return slot
+                    slot = slot + 1
+                -1
+            .Tree(t) => if at < t.entries.len(): at else: -1
+
+    fn key_at(at: i64) -> &K:
+        match self:
+            .Hash(m) => m.slot_key(at)
+            .Tree(t) => t.key_at(at)
+
+    fn value_at(at: i64) -> &V:
+        match self:
+            .Hash(m) => m.slot_value(at)
+            .Tree(t) => t.value_at(at)
+
+/// `map.iter()`, and what `for (k, v) in map` walks: each entry as views.
+pub type MapIter[K, V] ephemeral { source: MapSource[K, V], at: i64 }
+
+/// `map.keys()`: each key as a view.
+pub type MapKeys[K, V] ephemeral { source: MapSource[K, V], at: i64 }
+
+/// `map.values()`: each value as a view.
+pub type MapValues[K, V] ephemeral { source: MapSource[K, V], at: i64 }
+
+impl[K, V] Iter[(&K, &V)] for MapIter[K, V]:
+    mut fn next() -> Option[(&K, &V)]:
+        let slot = self.source.live_from(self.at)
+        if slot < 0: return None
+        self.at = slot + 1
+        Some((self.source.key_at(slot), self.source.value_at(slot)))
+
+impl[K, V] Iter[&K] for MapKeys[K, V]:
+    mut fn next() -> Option[&K]:
+        let slot = self.source.live_from(self.at)
+        if slot < 0: return None
+        self.at = slot + 1
+        Some(self.source.key_at(slot))
+
+impl[K, V] Iter[&V] for MapValues[K, V]:
+    mut fn next() -> Option[&V]:
+        let slot = self.source.live_from(self.at)
+        if slot < 0: return None
+        self.at = slot + 1
+        Some(self.source.value_at(slot))
+
+impl[K, V] HashMap[K, V]:
+    @[iter_of_self]
+    pub fn iter() -> MapIter[K, V]: MapIter { source: .Hash(self), at: 0 }
+
+    @[iter_of_self]
+    pub fn keys() -> MapKeys[K, V]: MapKeys { source: .Hash(self), at: 0 }
+
+    @[iter_of_self]
+    pub fn values() -> MapValues[K, V]: MapValues { source: .Hash(self), at: 0 }
+
+/// `set.iter()`, and what `for x in set` walks: each element as a view.
+pub type SetIter[T] ephemeral { set: &HashSet[T], at: i64 }
+
+impl[T] Iter[&T] for SetIter[T]:
+    mut fn next() -> Option[&T]:
+        while self.at < self.set.slot_count():
+            let slot = self.at
+            self.at = slot + 1
+            if self.set.slot_live(slot): return Some(self.set.slot_key(slot))
+        None
+
+impl[T] HashSet[T]:
+    @[iter_of_self]
+    pub fn iter() -> SetIter[T]: SetIter { set: self, at: 0 }
+
 /// Lazy iterator adapter produced by `.map(f)`.
-pub type MapIter[I, T, U] ephemeral { iter: I, f: fn(T) -> U }
+pub type MappedIter[I, T, U] ephemeral { iter: I, f: fn(T) -> U }
 
 /// Lazy iterator adapter produced by `.filter(pred)`.
 pub type FilterIter[I, T] ephemeral { iter: I, pred: fn(T) -> bool }
@@ -526,7 +589,7 @@ impl[T] Iter[T] for VecIter[T]:
 impl[I, T] Iter[T] for FilterIter[I, T]:
     mut fn next() -> Option[T]: self.next()
 
-impl[I, T, U] Iter[U] for MapIter[I, T, U]:
+impl[I, T, U] Iter[U] for MappedIter[I, T, U]:
     mut fn next() -> Option[U]: self.next()
 
 impl[I, T, U] Iter[U] for FilterMapIter[I, T, U]:

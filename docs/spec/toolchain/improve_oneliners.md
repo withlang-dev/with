@@ -526,10 +526,10 @@ Affected one-liners (10):
 with -e 'let s="banana";let n=2;let g:BTreeSet[str]=[s.slice(i,i+n) for i in 0..=s.len32()-n];for x in g.items():print(x)'
 
 # Print n-gram occurrence counts
-with -e 'let s="banana";let n=2;var c:BTreeMap[str,i32]=BTreeMap.new();for i in 0..=s.len32()-n{let g=s.slice(i,i+n);c.insert(g,c.get(g).unwrap_or(0)+1)};for (g,k) in c.items():print(f"{g} {k}")'
+with -e 'let s="banana";let n=2;var c:BTreeMap[str,i32]=BTreeMap.new();for i in 0..=s.len32()-n{let g=s.slice(i,i+n);c.insert(g,c.get(g).unwrap_or(0)+1)};for (g,k) in c:print(f"{g} {k}")'
 
 # Print word occurrence counts
-with -e 'let w=/\s+/.split(stdin.lines()[0]);var c:BTreeMap[str,i32]=BTreeMap.new();for x in w:c.insert(x,c.get(x).unwrap_or(0)+1);for (x,n) in c.items():print(f"{x} {n}")' <example.txt
+with -e 'let w=/\s+/.split(stdin.lines()[0]);var c:BTreeMap[str,i32]=BTreeMap.new();for x in w:c.insert(x,c.get(x).unwrap_or(0)+1);for (x,n) in c:print(f"{x} {n}")' <example.txt
 
 # Print the Dice coefficient over sets of 1-grams
 with -e 'fn s(a:str)->BTreeSet[str]:[a.slice(i,i+1) for i in 0..a.len()];let x=s("banana");let y=s("anna");let z=x.intersection(&y);print(f"{2.0*z.len() as f64/(x.len()+y.len()) as f64}")'
@@ -544,10 +544,10 @@ with -e 'fn s(a:str)->BTreeSet[str]:[a.slice(i,i+1) for i in 0..a.len()];let x=s
 with -e 'fn s(a:str)->BTreeSet[str]:[a.slice(i,i+1) for i in 0..a.len()];let x=s("banana");let y=s("anna");let z=x.intersection(&y);print(f"{z.len() as f64/sqrt((x.len()*y.len()) as f64)}")'
 
 # Build an index of character positions
-with -e 'let s="banana";var m:BTreeMap[str,str]=BTreeMap.new();for i in 0..s.len(){let c=s.slice(i,i+1);let v=m.get(c).cloned().unwrap_or("");m.insert(c,v++if v=="":f"{i}" else:f" {i}")};for (c,i) in m.items():print(f"{c}: {i}")'
+with -e 'let s="banana";var m:BTreeMap[str,str]=BTreeMap.new();for i in 0..s.len(){let c=s.slice(i,i+1);let v=m.get(c).cloned().unwrap_or("");m.insert(c,v++if v=="":f"{i}" else:f" {i}")};for (c,i) in m:print(f"{c}: {i}")'
 
 # Build an index of word positions
-with -e 'let w=/\s+/.split(stdin.lines()[0]);var m:BTreeMap[str,str]=BTreeMap.new();for i in 0..w.len(){let x=w[i];let v=m.get(x).cloned().unwrap_or("");m.insert(x,v++if v=="":f"{i}" else:f" {i}")};for (x,i) in m.items():print(f"{x}: {i}")' <example.txt
+with -e 'let w=/\s+/.split(stdin.lines()[0]);var m:BTreeMap[str,str]=BTreeMap.new();for i in 0..w.len(){let x=w[i];let v=m.get(x).cloned().unwrap_or("");m.insert(x,v++if v=="":f"{i}" else:f" {i}")};for (x,i) in m:print(f"{x}: {i}")' <example.txt
 
 # Print lines containing all vowels
 with -n 'if line.contains("a") and line.contains("e") and line.contains("i") and line.contains("o") and line.contains("u"):print(line)' <example.txt

@@ -6769,19 +6769,6 @@ impl Sema:
     // lookup_generic_method_fn + concrete_owner_method_sig is the canonical
     // resolution/specialization path. Record that Sema decision for MIR rather
     // than re-resolving a frozen trait call during lowering.
-    // D44 / §2.3: keys(), values() and items() return independent elements. A
-    // Copy element is copied; any other is cloned through its Clone impl,
-    // resolved here and recorded on `anchor` for MIR. The byte copy these
-    // methods once made gave the Vec and the map the same buffers (#1158).
-    // The view MIR reads the slot through must exist before types freeze.
-    mut fn record_map_snapshot_clone(elem_ty: i32, anchor: i32, report: i32, method: &str):
-        if elem_ty == 0 or self.is_copy(elem_ty as TypeId) != 0: return
-        if self.type_implements_trait(elem_ty, self.syms.clone_trait) == 0:
-            self.emit_error("HashMap." ++ method ++ "() returns independent elements, so the element type must implement Clone; iterate the map to observe it instead", report)
-            return
-        let _view = self.ensure_exact_type(TypeKind.TY_REF, elem_ty, 0, 0)
-        let _contract = self.record_clone_contract(elem_ty, anchor)
-
     mut fn record_clone_contract(payload_ty: i32, anchor_node: i32) -> i32:
         let owner_ty = self.resolve_alias(payload_ty as TypeId) as i32
         let owner_sym = self.method_owner_symbol_for_type(owner_ty)
@@ -7009,7 +6996,7 @@ impl Sema:
         callable != 0 and self.get_type_kind(callable) == TypeKind.TY_FN
 
     // #2019 (§14.3 INVARIANT 5): a lazy iterator adapter that holds a closure
-    // (`xs.iter().map(f)`: MapIter, FilterIter, ...), directly or in the
+    // (`xs.iter().map(f)`: MappedIter, FilterIter, ...), directly or in the
     // chain under it, is a callable value for the suspension summary: the
     // closure runs inside whatever drives the adapter (`collect`, `fold`,
     // `next`, ...), so the driving call reads the adapter's fact.
@@ -7651,9 +7638,9 @@ impl Sema:
             if method_name == "partition": return MirIntrinsic.ITER_PARTITION
             if method_name == "unzip": return MirIntrinsic.ITER_UNZIP
             return MirIntrinsic.NONE
-        if type_name == "MapIter" or type_name == "FilterIter" or type_name == "FilterMapIter" or type_name == "TakeIter" or type_name == "DropIter" or type_name == "TakeWhileIter" or type_name == "DropWhileIter" or type_name == "ZipIter" or type_name == "EnumerateIter" or type_name == "ChainIter" or type_name == "ZipWithIter" or type_name == "StepByIter" or type_name == "FlatMapIter":
+        if type_name == "MappedIter" or type_name == "FilterIter" or type_name == "FilterMapIter" or type_name == "TakeIter" or type_name == "DropIter" or type_name == "TakeWhileIter" or type_name == "DropWhileIter" or type_name == "ZipIter" or type_name == "EnumerateIter" or type_name == "ChainIter" or type_name == "ZipWithIter" or type_name == "StepByIter" or type_name == "FlatMapIter":
             if method_name == "next":
-                if type_name == "MapIter": return MirIntrinsic.MAPITER_NEXT
+                if type_name == "MappedIter": return MirIntrinsic.MAPITER_NEXT
                 if type_name == "FilterIter": return MirIntrinsic.FILTERITER_NEXT
                 if type_name == "FilterMapIter": return MirIntrinsic.FILTERMAPITER_NEXT
                 if type_name == "TakeIter": return MirIntrinsic.TAKEITER_NEXT
@@ -7741,9 +7728,8 @@ impl Sema:
             if method_name == "increment": return MirIntrinsic.MAP_INCREMENT
             if method_name == "decrement": return MirIntrinsic.MAP_DECREMENT
             if method_name == "update": return MirIntrinsic.MAP_UPDATE
-            if method_name == "keys": return MirIntrinsic.MAP_KEYS
-            if method_name == "values": return MirIntrinsic.MAP_VALUES
-            if method_name == "items": return MirIntrinsic.MAP_ITEMS
+            let map_slot_intrinsic = mir_map_slot_intrinsic(method_name)
+            if map_slot_intrinsic != MirIntrinsic.NONE: return map_slot_intrinsic
             if method_name == "entry": return MirIntrinsic.MAP_ENTRY
             return MirIntrinsic.NONE
         if type_name == "HashMapEntry":
@@ -7759,6 +7745,8 @@ impl Sema:
             if set_len_intrinsic != MirIntrinsic.NONE: return set_len_intrinsic
             if method_name == "remove": return MirIntrinsic.MAP_REMOVE
             if method_name == "clear": return MirIntrinsic.MAP_CLEAR
+            let set_slot_intrinsic = mir_map_slot_intrinsic(method_name)
+            if set_slot_intrinsic != MirIntrinsic.NONE and set_slot_intrinsic != MirIntrinsic.MAP_VALUE_AT: return set_slot_intrinsic
             return MirIntrinsic.NONE
         if type_name == "Option":
             if method_name == "is_some": return MirIntrinsic.OPT_IS_SOME
@@ -14116,6 +14104,11 @@ impl Sema:
                     var tail_deps: Vec[i32] = Vec.new()
                     tail_deps = self.collect_expr_view_deps(tail, move tail_deps)
                     self.note_returned_global_origins(&tail_deps, tail)
+                    // And its parameter origins: a view reached through a
+                    // pattern binding (`.One(v) => &v.name`, `let .One(v) = s
+                    // else: …`) carries them on the binding, which the
+                    // body-level call after teardown no longer finds.
+                    self.note_returned_transparent_view_effects(tail)
             else if tail_materializes == 0 and node != self.body_tail_block and tail_is_value != 0 and (self.type_is_ephemeral_value(tail_type as i32) != 0 or self.expr_is_ephemeral_value(tail) != 0):
                 // An inner block's tail that is an ephemeral VALUE — a stage
                 // over a generator viewing the block's `v`, a view-holding
@@ -15315,6 +15308,14 @@ impl Sema:
         if kind == NodeKind.NK_BLOCK:
             out = self.collect_expr_view_deps(self.ast.get_data2(node), move out)
             return out
+        if kind == NodeKind.NK_MATCH:
+            for arm_body in self.match_arm_bodies(node):
+                if self.expr_view_param_origins.contains(arm_body):
+                    for di in 0..self.expr_view_dep_count(arm_body):
+                        out = self.push_unique_i32(move out, self.expr_view_dep_at(arm_body, di))
+                else:
+                    out = self.collect_expr_view_deps(arm_body, move out)
+            return out
         if kind == NodeKind.NK_IF_EXPR:
             out = self.collect_expr_view_deps(self.ast.get_data1(node), move out)
             out = self.collect_expr_view_deps(self.ast.get_data2(node), move out)
@@ -15369,6 +15370,17 @@ impl Sema:
                 out = self.push_unique_i32(move out, self.expr_view_dep_at(node, i))
         out
 
+    // A match yields one of its arms. Each arm body's view facts were frozen
+    // while its pattern bindings were in scope (check_match_expr): read
+    // after the match, `.One(v) => &v.name` no longer finds `v`.
+    fn match_arm_bodies(node: i32) -> Vec[i32]:
+        let bodies: Vec[i32] = Vec.new()
+        let extra_start = self.ast.get_data1(node)
+        for ai in 0..self.ast.get_data2(node):
+            let arm = self.ast.get_extra(extra_start + ai)
+            if arm != 0 and self.ast.get_data1(arm) != 0: bodies.push(self.ast.get_data1(arm))
+        bodies
+
     fn compute_expr_view_origin_mask(node: i32) -> i32:
         if node == 0:
             return 0
@@ -15412,6 +15424,11 @@ impl Sema:
             return left_mask | right_mask
         if kind == NodeKind.NK_BLOCK:
             return self.compute_expr_view_origin_mask(self.ast.get_data2(node))
+        if kind == NodeKind.NK_MATCH:
+            var match_mask = 0
+            for arm_body in self.match_arm_bodies(node):
+                match_mask = match_mask | (if self.expr_view_param_origins.contains(arm_body): self.expr_view_origin_mask(arm_body) else: self.compute_expr_view_origin_mask(arm_body))
+            return match_mask
         if kind == NodeKind.NK_IF_EXPR:
             let then_mask = self.compute_expr_view_origin_mask(self.ast.get_data1(node))
             let else_mask = self.compute_expr_view_origin_mask(self.ast.get_data2(node))
@@ -15471,6 +15488,22 @@ impl Sema:
     fn type_is_view_handle(tid: i32) -> bool:
         tid > 0 and self.param_type_is_by_value(tid) == 0
 
+    // A reference to a view: a pattern binding of a view payload through a
+    // view of its enum (`.Hash(m)` on `&MapSource` binds `m: &&HashMap`).
+    // A place reached through it is auto-dereferenced through both handles,
+    // so it lies in what the inner view views: the outer handle's storage is
+    // only the slot the inner view was read from.
+    // `node` is a view of a view: its recorded type, or for a binding its
+    // declared type (a method receiver records the auto-dereferenced one).
+    fn node_is_view_of_view(node: i32) -> bool:
+        if self.type_is_view_of_view(self.typed_expr_types.get(node) ?? 0): return true
+        self.ast.kind(node) == NodeKind.NK_IDENT and self.type_is_view_of_view(self.scope_lookup(self.ast.get_data0(node)))
+
+    fn type_is_view_of_view(tid: i32) -> bool:
+        if tid <= 0: return false
+        let resolved = self.resolve_alias(tid as TypeId)
+        self.get_type_kind(resolved) == TypeKind.TY_REF and self.type_is_view_handle(self.get_type_d0(resolved))
+
     // The parameters whose own storage the VALUE of `node` may point into.
     fn compute_expr_storage_origin_mask(node: i32) -> i32:
         if node == 0:
@@ -15512,6 +15545,11 @@ impl Sema:
             return self.compute_expr_storage_origin_mask(self.ast.get_data1(node)) | self.compute_expr_storage_origin_mask(self.ast.get_data2(node))
         if kind == NodeKind.NK_BLOCK:
             return self.compute_expr_storage_origin_mask(self.ast.get_data2(node))
+        if kind == NodeKind.NK_MATCH:
+            var match_storage = 0
+            for arm_body in self.match_arm_bodies(node):
+                match_storage = match_storage | (if self.expr_view_param_origins.contains(arm_body): self.expr_view_storage_mask(arm_body) else: self.compute_expr_storage_origin_mask(arm_body))
+            return match_storage
         if kind == NodeKind.NK_IF_EXPR:
             return self.compute_expr_storage_origin_mask(self.ast.get_data1(node)) | self.compute_expr_storage_origin_mask(self.ast.get_data2(node))
         if kind == NodeKind.NK_TUPLE:
@@ -15552,7 +15590,10 @@ impl Sema:
             return self.compute_place_storage_origin_mask(self.ast.get_data0(node))
         if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_INDEX:
             let base = self.ast.get_data0(node)
-            if self.type_is_view_handle(self.typed_expr_types.get(base) ?? 0):
+            let base_ty = self.typed_expr_types.get(base) ?? 0
+            if self.type_is_view_of_view(base_ty):
+                return 0
+            if self.type_is_view_handle(base_ty):
                 return self.compute_expr_storage_origin_mask(base)
             return self.compute_place_storage_origin_mask(base)
         if kind == NodeKind.NK_UNARY and self.ast.get_data0(node) == UnaryOp.UOP_DEREF:
@@ -15568,6 +15609,9 @@ impl Sema:
     fn compute_contents_storage_origin_mask(node: i32) -> i32:
         if node == 0:
             return 0
+        // Behind a view of a view, the contents are what the inner view views.
+        if self.node_is_view_of_view(node):
+            return 0
         let kind = self.ast.kind(node)
         if kind == NodeKind.NK_GROUPED:
             return self.compute_contents_storage_origin_mask(self.ast.get_data0(node))
@@ -15577,7 +15621,10 @@ impl Sema:
             return self.compute_expr_storage_origin_mask(node)
         if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_INDEX:
             let base = self.ast.get_data0(node)
-            if self.type_is_view_handle(self.typed_expr_types.get(base) ?? 0):
+            let base_ty = self.typed_expr_types.get(base) ?? 0
+            if self.type_is_view_of_view(base_ty):
+                return 0
+            if self.type_is_view_handle(base_ty):
                 return self.compute_expr_storage_origin_mask(base)
             return self.compute_contents_storage_origin_mask(base)
         self.compute_expr_storage_origin_mask(node)
@@ -15586,6 +15633,8 @@ impl Sema:
     // place (auto-dereferenced through a handle), any other argument by its
     // value — `&x` is x's storage, a reference local's is what it views.
     fn arg_storage_origin_mask(arg: i32, is_receiver: bool) -> i32:
+        if is_receiver and self.node_is_view_of_view(arg):
+            return 0
         if is_receiver and not self.type_is_view_handle(self.typed_expr_types.get(arg) ?? 0):
             return self.compute_place_storage_origin_mask(arg)
         self.compute_expr_storage_origin_mask(arg)
@@ -15616,8 +15665,11 @@ impl Sema:
         let param_mask = self.compute_expr_view_origin_mask(source_node)
         var deps: Vec[i32] = Vec.new()
         deps = self.collect_expr_view_deps(source_node, move deps)
+        // Read before writing: freezing an arm on itself (`result_node ==
+        // source_node`) resets its storage to the whole mask.
+        let storage_mask = self.compute_expr_storage_origin_mask(source_node)
         self.set_expr_view_deps(result_node, param_mask, deps)
-        self.set_expr_view_storage_mask(result_node, self.compute_expr_storage_origin_mask(source_node))
+        self.set_expr_view_storage_mask(result_node, storage_mask)
         // #962: a carrier of a view into a temporary is a view into it too.
         let temp_ty = self.view_into_temporary_type(source_node)
         if temp_ty != 0:
@@ -15807,9 +15859,16 @@ impl Sema:
     mut fn record_pattern_view_bindings(node: i32, subject_node: i32):
         if subject_node == 0:
             return
+        // A view payload bound out of a subject held by value is that view
+        // itself, read out of the subject: it views what the subject holds,
+        // not the subject (as a handle read out of a field does).
+        let subject_by_value = self.pattern_subject_ref_mutability(self.typed_expr_types.get(subject_node) ?? 0) < 0
         for sym in self.pattern_binding_syms(node):
-            if self.type_is_ephemeral_value(self.scope_lookup(sym)) != 0:
+            let sym_ty = self.scope_lookup(sym)
+            if self.type_is_ephemeral_value(sym_ty) != 0:
                 self.record_view_binding_from_expr(sym, subject_node)
+                if subject_by_value and self.type_is_view_handle(sym_ty):
+                    self.set_binding_view_storage_mask(sym, 0)
 
     fn view_origin_is_stack_local(sym: i32) -> i32:
         if sym == 0:
@@ -17208,6 +17267,16 @@ impl Sema:
     // closure `each` calls, keyed by the iterable (D69, #1727), and the
     // generator value is consumed; anything else steps an Iter[T]. Returns
     // the element type.
+    // A keyed map or a HashSet, or a view of one: a collection whose D44
+    // traversal is its `iter()`.
+    fn is_keyed_collection_type(tid: i32) -> bool:
+        var resolved = self.resolve_alias(tid as TypeId)
+        if self.get_type_kind(resolved) == TypeKind.TY_REF:
+            resolved = self.resolve_alias(self.get_type_d0(resolved))
+        if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST: return false
+        let base = self.get_generic_inst_base(resolved as i32)
+        base == self.syms.hashmap or base == self.syms.hashset or base == self.syms.btreemap
+
     mut fn check_comprehension_clause_iterable(iterable: i32) -> i32:
         let outer_loop_iterable: i32 = self.loop_iterable_node
         self.loop_iterable_node = iterable
@@ -17217,8 +17286,17 @@ impl Sema:
         if gen_elem != 0:
             self.mark_moved_if_consumed(iterable)
             return gen_elem
-        var elem = self.for_loop_element_type(iterable, iter_ty as i32)
+        var elem = 0
         var stepped_type = iter_ty as i32
+        // D44: a map or set clause is the collection's `iter()`, binding
+        // views of its entries; a clause has no in-place table walk.
+        if self.is_keyed_collection_type(iter_ty as i32):
+            let map_iter_type = self.resolve_implicit_iter_for(iterable, iterable, iter_ty as i32)
+            if map_iter_type != 0:
+                stepped_type = map_iter_type
+                elem = self.infer_for_element_type(map_iter_type)
+        if elem == 0 and stepped_type == iter_ty as i32:
+            elem = self.for_loop_element_type(iterable, iter_ty as i32)
         if elem == 0:
             // §13.5 (#1837): the inserted `.iter()`, keyed by the iterable.
             let implicit_iter_type = self.resolve_implicit_iter_for(iterable, iterable, iter_ty as i32)
@@ -18550,8 +18628,11 @@ impl Sema:
         var container_tid = resolved
         var container_tk = tk
         if container_tk == TypeKind.TY_REF:
-            container_tid = self.resolve_alias(self.get_type_d0(container_tid))
-            container_tk = self.get_type_kind(container_tid)
+            // Indexing auto-dereferences through every view: a pattern binds a
+            // view payload through a view of its enum as `&&Vec[T]`.
+            while container_tk == TypeKind.TY_REF:
+                container_tid = self.resolve_alias(self.get_type_d0(container_tid))
+                container_tk = self.get_type_kind(container_tid)
             if container_tk == TypeKind.TY_PTR:
                 self.check_runtime_index_operand(index)
                 self.note_raw_pointer_validity_precondition(expr)
@@ -19935,8 +20016,7 @@ impl Sema:
         var tk = self.get_type_kind(resolved)
         var enum_resolved = resolved
         if tk == TypeKind.TY_GENERIC_INST:
-            let base_sym = self.get_generic_inst_base(resolved as i32)
-            let base_tid = self.lookup_named_type_visible(base_sym)
+            let base_tid = self.generic_inst_template_tid(resolved as i32)
             if base_tid != 0:
                 let base_resolved = self.resolve_alias(base_tid as TypeId)
                 if self.get_type_kind(base_resolved) == TypeKind.TY_ENUM:
@@ -21095,7 +21175,7 @@ impl Sema:
             return result
         if kind == TypeKind.TY_GENERIC_INST:
             let base_sym = self.get_generic_inst_base(resolved)
-            let base_tid = self.lookup_named_type_visible(base_sym)
+            let base_tid = self.generic_inst_template_tid(resolved)
             if base_tid == 0:
                 return result
             if self.get_type_kind(base_tid) != TypeKind.TY_ENUM:
@@ -21215,8 +21295,7 @@ impl Sema:
         if kind == TypeKind.TY_ENUM:
             return resolved as i32
         if kind == TypeKind.TY_GENERIC_INST:
-            let base_sym = self.get_generic_inst_base(resolved as i32)
-            let base_tid = self.lookup_named_type_visible(base_sym)
+            let base_tid = self.generic_inst_template_tid(resolved as i32)
             if base_tid != 0 and self.get_type_kind(self.resolve_alias(base_tid as TypeId)) == TypeKind.TY_ENUM:
                 return self.resolve_alias(base_tid as TypeId) as i32
         0
@@ -23115,7 +23194,9 @@ impl Sema:
                 return 1
             if field == self.syms.get or field == self.syms.contains or field == self.syms.remove:
                 return 1
-            if self.is_collection_len_method(field) or field == self.syms.keys or field == self.syms.values or field == self.syms.items or field == self.syms.entry:
+            if self.is_collection_len_method(field) or field == self.syms.entry:
+                return 1
+            if mir_map_slot_intrinsic(self.pool_resolve(field)) != MirIntrinsic.NONE:
                 return 1
             let method_name = self.pool_resolve(field)
             if method_name == "increment" or method_name == "decrement" or method_name == "update":
@@ -23129,6 +23210,9 @@ impl Sema:
             if field == self.syms.insert or field == self.syms.clear:
                 return 1
             if field == self.syms.contains or field == self.syms.remove or self.is_collection_len_method(field):
+                return 1
+            let set_slot = mir_map_slot_intrinsic(self.pool_resolve(field))
+            if set_slot != MirIntrinsic.NONE and set_slot != MirIntrinsic.MAP_VALUE_AT:
                 return 1
         if owner_sym == self.syms.slotmap:
             if field == self.syms.new or field == self.syms.insert or field == self.syms.get:
@@ -25653,8 +25737,7 @@ impl Sema:
         let resolved_kind = self.get_type_kind(resolved)
         let bare_variant_sym = self.unqualified_enum_variant_sym(variant_sym)
         if resolved_kind == TypeKind.TY_GENERIC_INST:
-            let base_sym = self.get_generic_inst_base(resolved)
-            let base_tid = self.lookup_named_type_visible(base_sym)
+            let base_tid = self.generic_inst_template_tid(resolved)
             if base_tid != 0:
                 return self.enum_has_variant(base_tid, variant_sym)
             return 0
@@ -25676,7 +25759,7 @@ impl Sema:
     fn enum_first_payload_variant(enum_tid: i32) -> i32:
         let resolved = self.resolve_alias(enum_tid)
         if self.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST:
-            let base_tid = self.lookup_named_type_visible(self.get_generic_inst_base(resolved))
+            let base_tid = self.generic_inst_template_tid(resolved)
             return if base_tid != 0: self.enum_first_payload_variant(base_tid) else: 0
         if self.get_type_kind(resolved) != TypeKind.TY_ENUM:
             return 0
@@ -25697,7 +25780,7 @@ impl Sema:
             return self.get_type_d0(resolved)
         if resolved_kind == TypeKind.TY_GENERIC_INST:
             let base_sym = self.get_generic_inst_base(resolved)
-            let base_tid = self.lookup_named_type_visible(base_sym)
+            let base_tid = self.generic_inst_template_tid(resolved)
             if base_tid != 0:
                 if self.get_type_kind(self.resolve_alias(base_tid)) == TypeKind.TY_ENUM:
                     return base_sym
@@ -25711,8 +25794,7 @@ impl Sema:
         if resolved_kind == TypeKind.TY_ENUM:
             return resolved as i32
         if resolved_kind == TypeKind.TY_GENERIC_INST:
-            let base_sym = self.get_generic_inst_base(resolved)
-            let base_tid = self.lookup_named_type_visible(base_sym)
+            let base_tid = self.generic_inst_template_tid(resolved)
             if base_tid != 0:
                 if self.get_type_kind(self.resolve_alias(base_tid)) == TypeKind.TY_ENUM:
                     return resolved as i32
@@ -27132,7 +27214,7 @@ impl Sema:
         if not self.type_decl_nodes.contains(base_sym):
             return 0
         let decl: i32 = self.type_decl_nodes.get(base_sym).unwrap()
-        let base_tid = self.lookup_named_type_visible(base_sym)
+        let base_tid = self.generic_inst_template_tid(resolved as i32)
         if base_tid == 0:
             return 0
         let tp_start = self.type_decl_tp_start(decl)
@@ -28749,6 +28831,22 @@ impl Sema:
         let args: Vec[i32] = Vec.new()
         args.push(elem_ty)
         self.ensure_generic_inst_type(self.syms.slotmapslot, args, 1) as i32
+
+    // D44: the slot walk a map's (or set's) traversal is written over in
+    // std.collections: `slot_count()`, `slot_live(i)`, `slot_key(i) -> &K`,
+    // `slot_value(i) -> &V`. Positions run in insertion order (D96) and
+    // include removed entries, so they are no API: only the standard
+    // library calls them. A view's origin is the map. 0 when `name` is no
+    // slot accessor.
+    mut fn map_slot_accessor_type(recv_type: i32, name: &str, node: i32, expr: i32) -> i32:
+        if mir_map_slot_intrinsic(name) == MirIntrinsic.NONE: return 0
+        if self.current_module_is_std_implementation() == 0:
+            self.emit_error(f"`{name}` walks a map's storage and is internal to std.collections; traverse with `iter()`, `keys()` or `values()` (§13.5)", node)
+        if name == "slot_count": return self.ty_i64 as i32
+        if name == "slot_live": return self.ty_bool as i32
+        self.record_builtin_receiver_view_origins(node, expr)
+        let elem = self.get_generic_inst_arg(recv_type, if name == "slot_key": 0 else: 1)
+        self.ensure_exact_type(TypeKind.TY_REF, elem, 0, 0) as i32
 
     fn ensure_option_ref_type_for(elem_ty: i32) -> i32:
         let ref_ty = self.ensure_exact_type(TypeKind.TY_REF, elem_ty, 0, 0) as i32
@@ -30561,12 +30659,6 @@ impl Sema:
                 return 1
         if type_name_sym == self.syms.vecrange:
             if field == self.syms.split_at or field == self.syms.split_at_mut:
-                return 1
-        if type_name_sym == self.syms.hashmap:
-            if field == self.syms.iter or field == self.syms.keys or field == self.syms.values or field == self.syms.items:
-                return 1
-        if type_name_sym == self.syms.hashset:
-            if field == self.syms.iter:
                 return 1
         0
 
@@ -32417,23 +32509,9 @@ impl Sema:
                     return self.ensure_option_type_for(self.get_generic_inst_arg(recv_type, 1))
                 if generic_len_ret != 0:
                     return generic_len_ret
-                if field == self.syms.keys:
-                    let key_ty = self.get_generic_inst_arg(recv_type, 0)
-                    self.record_map_snapshot_clone(key_ty, node, node, "keys")
-                    return self.ensure_vec_type_for(key_ty)
-                if field == self.syms.values:
-                    let value_ty = self.get_generic_inst_arg(recv_type, 1)
-                    self.record_map_snapshot_clone(value_ty, node, node, "values")
-                    return self.ensure_vec_type_for(value_ty)
-                if field == self.syms.items:
-                    // The key's clone contract is anchored on the call, the
-                    // value's on its callee: one contract per node.
-                    self.record_map_snapshot_clone(self.get_generic_inst_arg(recv_type, 0), node, node, "items")
-                    self.record_map_snapshot_clone(self.get_generic_inst_arg(recv_type, 1), self.ast.get_data0(node), node, "items")
-                    let item_elems: Vec[i32] = Vec.new()
-                    item_elems.push(self.get_generic_inst_arg(recv_type, 0))
-                    item_elems.push(self.get_generic_inst_arg(recv_type, 1))
-                    return self.ensure_vec_type_for(self.ensure_tuple_type(item_elems, 2) as i32)
+                let map_slot_ret = self.map_slot_accessor_type(recv_type, mc_method_name_raw, node, expr)
+                if map_slot_ret != 0:
+                    return map_slot_ret
                 if field == self.syms.entry:
                     let ek = self.get_generic_inst_arg(recv_type, 0)
                     let ev = self.get_generic_inst_arg(recv_type, 1)
@@ -32453,6 +32531,10 @@ impl Sema:
                     return self.ty_void as i32
                 if field == self.syms.contains or field == self.syms.remove:
                     return self.ty_bool as i32
+                if mc_method_name_raw != "slot_value":
+                    let set_slot_ret = self.map_slot_accessor_type(recv_type, mc_method_name_raw, node, expr)
+                    if set_slot_ret != 0:
+                        return set_slot_ret
                 if generic_len_ret != 0:
                     return generic_len_ret
             if type_name_sym == self.syms.slotmap:
@@ -33208,8 +33290,7 @@ impl Sema:
         if tk == TypeKind.TY_ENUM:
             return resolved as i32
         if tk == TypeKind.TY_GENERIC_INST:
-            let base_sym = self.get_generic_inst_base(resolved as i32)
-            let base_tid = self.lookup_named_type_visible(base_sym)
+            let base_tid = self.generic_inst_template_tid(resolved as i32)
             if base_tid != 0:
                 let base_resolved = self.resolve_alias(base_tid as TypeId)
                 if self.get_type_kind(base_resolved) == TypeKind.TY_ENUM:

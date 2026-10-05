@@ -7,8 +7,8 @@ fn main:
     m.insert("beta", 2)
     m.insert("alpha", 3)
 
-    let ks = m.keys()
+    let ks = m.keys() |> map(it.clone()) |> collect[Vec]()
     assert(ks.len() == 2)
-    assert(ks.contains("alpha"))
-    assert(ks.contains("beta"))
+    assert(ks[0] == "alpha")
+    assert(ks[1] == "beta")
     print("ok")

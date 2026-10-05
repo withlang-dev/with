@@ -295,8 +295,6 @@ type SemaBuiltinSymbols {
     clear: i32,
     pop: i32,
     keys: i32,
-    values: i32,
-    items: i32,
     next: i32,
     unwrap: i32,
     expect: i32,
@@ -2571,12 +2569,7 @@ pub fn sema_clone_i32_vec(values: &Vec[i32]) -> Vec[i32]:
 // Sema was exactly this bug). Mirrors sema_clone_str_vec's owned-text policy.
 pub fn sema_clone_str_str_hashmap(src: &HashMap[str, str]) -> HashMap[str, str]:
     var out: HashMap[str, str] = HashMap.new()
-    let ks = src.keys()
-    for i in 0..ks.len() as i32:
-        let k = ks[i]
-        let v = src.get(k)
-        if v.is_some():
-            out.insert(sema_owned_text(k), sema_owned_text(v.unwrap()))
+    for (k, v) in src: out.insert(sema_owned_text(k), sema_owned_text(v))
     out
 
 impl Sema:
@@ -2823,8 +2816,6 @@ fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
         clear: 0,
         pop: 0,
         keys: 0,
-        values: 0,
-        items: 0,
         next: 0,
         unwrap: 0,
         expect: 0,
@@ -4942,7 +4933,7 @@ impl Sema:
         self.syms.vec = self.pool_intern("Vec")
         self.syms.fixed_string = self.pool_intern("FixedString")
         self.syms.veciter = self.pool_intern("VecIter")
-        self.syms.mapiter = self.pool_intern("MapIter")
+        self.syms.mapiter = self.pool_intern("MappedIter")
         self.syms.filteriter = self.pool_intern("FilterIter")
         self.syms.filtermapiter = self.pool_intern("FilterMapIter")
         self.syms.takeiter = self.pool_intern("TakeIter")
@@ -5032,8 +5023,6 @@ impl Sema:
         self.syms.clear = self.pool_intern("clear")
         self.syms.pop = self.pool_intern("pop")
         self.syms.keys = self.pool_intern("keys")
-        self.syms.values = self.pool_intern("values")
-        self.syms.items = self.pool_intern("items")
         self.syms.next = self.pool_intern("next")
         self.syms.unwrap = self.pool_intern("unwrap")
         self.syms.expect = self.pool_intern("expect")

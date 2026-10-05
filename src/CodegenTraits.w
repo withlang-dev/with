@@ -133,10 +133,9 @@ impl Codegen:
         if self.trait_map.len() as i32 != trait_count:
             self.analysis_fail(f"trait map size={self.trait_map.len() as i32} indexed-symbols={trait_count}")
 
-        let mapped_syms = self.trait_map.keys()
-        for ki in 0..mapped_syms.len() as i32:
-            let trait_sym = mapped_syms[ki]
-            let trait_idx = self.trait_map.get(trait_sym).unwrap()
+        let mapped: Vec[(i32, i32)] = Vec.new()
+        for (trait_sym, trait_idx) in self.trait_map: mapped.push((trait_sym, trait_idx))
+        for (trait_sym, trait_idx) in mapped:
             if trait_idx < 0 or trait_idx >= trait_count:
                 self.analysis_fail(f"trait map symbol={trait_sym}: index={trait_idx} is out of range 0..{trait_count}")
             else if self.trait_idx_syms[trait_idx] != trait_sym:

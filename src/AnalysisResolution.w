@@ -276,9 +276,7 @@ fn resolution_audit_unlowered_calls(report: &AnalysisReport, sema: &Sema, mir_mo
         prefix_max_end.push(running)
     var checked = 0
     var drop_calls = 0
-    let resolved_nodes = sema.resolved_call_sigs.keys()
-    for ri in 0..resolved_nodes.len() as i32:
-        let node = resolved_nodes[ri]
+    for (node, _) in sema.resolved_call_sigs:
         if node <= 0 or node >= sema.ast.node_count(): continue
         if sema.ast.kind(node) != NodeKind.NK_CALL: continue
         if lowered_nodes.contains(node): continue

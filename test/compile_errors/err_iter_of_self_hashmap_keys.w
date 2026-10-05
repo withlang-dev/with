@@ -2,12 +2,12 @@
 
 // docs/mut.md Rev 8 §15.8 — verifies the mechanism is *not* hardcoded to
 // the method name "iter": HashMap.keys is also marked @[iter_of_self]
-// (built-in side, since the method has no user-source declaration).
+// (its std.collections declaration, D44).
 
-use std.collections.HashMap
-fn use_keys(keys: Vec[i32], cb: fn(i32) -> i32) -> i32:
+use std.collections
+fn use_keys(keys: MapKeys[i32, i32], cb: fn(i32) -> i32) -> i32:
     var sum = 0
-    for k in keys.iter():
+    for k in keys:
         sum = sum + cb(k)
     sum
 

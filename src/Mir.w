@@ -20,18 +20,9 @@ impl MirModule:
             self.sema_type_extra.push(sema.type_extra[i])
         // Deep-copy like the type-table Vecs above: assigning the handle would
         // leave sema and this module as two owners of one map, and both drop.
-        let bitpacked_tids = sema.bitpacked_types.keys()
-        for i in 0..bitpacked_tids.len():
-            let tid = bitpacked_tids[i]
-            self.sema_bitpacked_types.insert(tid, sema.bitpacked_types.get(tid).unwrap())
-        let disc_repr_tids = sema.disc_repr_types.keys()
-        for i in 0..disc_repr_tids.len():
-            let tid = disc_repr_tids[i]
-            self.sema_disc_repr_types.insert(tid, sema.disc_repr_types.get(tid).unwrap())
-        let distinct_type_syms = sema.distinct_type_names.keys()
-        for i in 0..distinct_type_syms.len():
-            let sym = distinct_type_syms[i]
-            self.sema_distinct_type_names.insert(sym, sema.distinct_type_names.get(sym).unwrap())
+        for (tid, packed) in sema.bitpacked_types: self.sema_bitpacked_types.insert(tid, packed)
+        for (tid, repr) in sema.disc_repr_types: self.sema_disc_repr_types.insert(tid, repr)
+        for (sym, name) in sema.distinct_type_names: self.sema_distinct_type_names.insert(sym, name)
         self.sema_result_sym = sema.syms.result
         self.sema_task_sym = sema.syms.task
         self.sema_scoped_task_sym = sema.syms.scoped_task
@@ -51,9 +42,7 @@ impl MirModule:
             let name = sema.pool_resolve(sema.sig_names[si])
             if name.len() > 0:
                 self.sema_callable_syms.insert(pool.intern(name), MirCallableClass.Signature as i32)
-        let generic_syms = sema.generic_fn_nodes.keys()
-        for gi in 0..generic_syms.len() as i32:
-            let sym = generic_syms[gi]
+        for (sym, _) in sema.generic_fn_nodes:
             if sema.generic_fn_node_for_symbol(sym) == 0: continue
             let mir_sym = pool.intern(sema.pool_resolve(sym))
             if not self.sema_callable_syms.contains(mir_sym):

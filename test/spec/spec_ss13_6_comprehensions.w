@@ -95,7 +95,7 @@ fn test_btreemap_expected_type:
     assert(index.len() == 2)
     assert(index.get("a").unwrap() == 2)
     assert(index.get("b").unwrap() == 8)
-    let keys = index.keys()
+    let keys = index.keys() |> collect[Vec]()
     assert(keys[0] == "a")
     assert(keys[1] == "b")
 

@@ -488,12 +488,12 @@ Print unique n-grams
 
 Print occurrence counts of n-grams
 
-    with -e 'let s="banana";let n=2;var c:BTreeMap[str,i32]=BTreeMap.new();for i in 0..=s.len32()-n{let g=s.slice(i,i+n);c.insert(g,c.get(g).unwrap_or(0)+1)};for (g,k) in c.items():print(f"{g} {k}")'
+    with -e 'let s="banana";let n=2;var c:BTreeMap[str,i32]=BTreeMap.new();for i in 0..=s.len32()-n{let g=s.slice(i,i+n);c.insert(g,c.get(g).unwrap_or(0)+1)};for (g,k) in c:print(f"{g} {k}")'
     POSSIBLE_IMPROVE
 
 Print occurrence counts of words on the first line
 
-    with -e 'let w=/\s+/.split(stdin.lines()[0]);var c:BTreeMap[str,i32]=BTreeMap.new();for x in w:c.insert(x,c.get(x).unwrap_or(0)+1);for (x,n) in c.items():print(f"{x} {n}")' <example.txt
+    with -e 'let w=/\s+/.split(stdin.lines()[0]);var c:BTreeMap[str,i32]=BTreeMap.new();for x in w:c.insert(x,c.get(x).unwrap_or(0)+1);for (x,n) in c:print(f"{x} {n}")' <example.txt
     POSSIBLE_IMPROVE
 
 Print the Dice similarity coefficient based on sets of 1-grams
@@ -518,12 +518,12 @@ Print the cosine similarity based on sets of 1-grams
 
 Build and print an index of characters within a string
 
-    with -e 'let s="banana";var m:BTreeMap[str,str]=BTreeMap.new();for i in 0..s.len(){let c=s.slice(i,i+1);let v=m.get(c).cloned().unwrap_or("");m.insert(c,v++if v=="":f"{i}" else:f" {i}")};for (c,i) in m.items():print(f"{c}: {i}")'
+    with -e 'let s="banana";var m:BTreeMap[str,str]=BTreeMap.new();for i in 0..s.len(){let c=s.slice(i,i+1);let v=m.get(c).cloned().unwrap_or("");m.insert(c,v++if v=="":f"{i}" else:f" {i}")};for (c,i) in m:print(f"{c}: {i}")'
     POSSIBLE_IMPROVE
 
 Build and print an index of words within the first line
 
-    with -e 'let w=/\s+/.split(stdin.lines()[0]);var m:BTreeMap[str,str]=BTreeMap.new();for i in 0..w.len(){let x=w[i];let v=m.get(x).cloned().unwrap_or("");m.insert(x,v++if v=="":f"{i}" else:f" {i}")};for (x,i) in m.items():print(f"{x}: {i}")' <example.txt
+    with -e 'let w=/\s+/.split(stdin.lines()[0]);var m:BTreeMap[str,str]=BTreeMap.new();for i in 0..w.len(){let x=w[i];let v=m.get(x).cloned().unwrap_or("");m.insert(x,v++if v=="":f"{i}" else:f" {i}")};for (x,i) in m:print(f"{x}: {i}")' <example.txt
     POSSIBLE_IMPROVE
 
 ## Selective Line Printing

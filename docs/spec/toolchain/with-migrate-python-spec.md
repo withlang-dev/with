@@ -441,7 +441,7 @@ Negative indexing is flagged when not the common `-1` pattern.
 | `.get(k, default)` | `.get(k) ?? default` (Copy value or matching borrowed default; clone explicitly for an owned non-Copy result) |
 | `.keys()` | `.keys()` |
 | `.values()` | `.values()` |
-| `.items()` | `.entries()` |
+| `.items()` | `.iter()` (or iterate the map: `for (k, v) in m`, D44) |
 | `.update(other)` | `.merge(other)` |
 | `.pop(k)` | `.remove(k)` |
 | `.clear()` | `.clear()` |

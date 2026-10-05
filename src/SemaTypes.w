@@ -224,9 +224,6 @@ pub enum MirIntrinsic: i32:
     FMT_DEBUG
     FMT_SPEC
     INT_SWAP_BYTES
-    MAP_KEYS
-    MAP_VALUES
-    MAP_ITEMS
     POPCOUNT
     CLZ
     CTZ
@@ -375,6 +372,14 @@ pub enum MirIntrinsic: i32:
 // Copy: MirIntrinsic is a lightweight integer tag passed by value, stored in
 // Vec/HashMap, and compared throughout MIR lowering and codegen.
 impl Copy for MirIntrinsic
+
+// D44: the std-only slot accessors a map traversal walks (std.collections).
+pub fn mir_map_slot_intrinsic(name: &str) -> MirIntrinsic:
+    if name == "slot_count": return MirIntrinsic.MAP_CAPACITY
+    if name == "slot_live": return MirIntrinsic.MAP_SLOT_OCCUPIED
+    if name == "slot_key": return MirIntrinsic.MAP_KEY_AT
+    if name == "slot_value": return MirIntrinsic.MAP_VALUE_AT
+    MirIntrinsic.NONE
 
 pub fn mir_len_method_intrinsic(base: MirIntrinsic, method_name: &str) -> MirIntrinsic:
     if method_name == "len":

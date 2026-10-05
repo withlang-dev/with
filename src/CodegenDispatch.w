@@ -9734,7 +9734,10 @@ impl Codegen:
             slot_args.push(slot)
             if intrinsic == MirIntrinsic.MAP_SLOT_OCCUPIED:
                 let occupied_fn = self.ensure_hashmap_slot_runtime_fn("with_hashmap_slot_occupied", i32_ty)
-                result = wl_build_call(self.builder, self.hashmap_slot_runtime_fn_type(i32_ty), occupied_fn, vec_data_i64(&slot_args), 2)
+                let occupied = wl_build_call(self.builder, self.hashmap_slot_runtime_fn_type(i32_ty), occupied_fn, vec_data_i64(&slot_args), 2)
+                // std.collections reads it as `slot_live(i) -> bool`.
+                let occupied_dest = self.mir_dest_llvm_type(body, dest_place)
+                result = if occupied_dest != 0 and wl_get_type_kind(occupied_dest) == wl_integer_type_kind() and wl_get_int_type_width(occupied_dest) == 1: wl_build_icmp(self.builder, wl_int_ne(), occupied, wl_const_int(i32_ty, 0, 0)) else: occupied
             else:
                 let at_name = if intrinsic == MirIntrinsic.MAP_KEY_AT: "with_hashmap_key_ptr_at" else: "with_hashmap_value_ptr_at"
                 let at_fn = self.ensure_hashmap_slot_runtime_fn(at_name, ptr_ty)
@@ -9829,128 +9832,6 @@ impl Codegen:
             let args: Vec[i64] = Vec.new()
             args.push(map_ptr)
             result = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 1)
-
-        else if intrinsic == MirIntrinsic.MAP_KEYS:
-            let recv_op = body.call_arg_operands[arg_start]
-            let map_ptr = self.mir_intrinsic_map_handle(body, args_id)
-            var key_ty = self.mir_hashmap_key_type(body, recv_op)
-            if key_ty == 0:
-                key_ty = i64_ty
-            let key_size = self.abi_size_of(key_ty)
-            var vec_ty = self.mir_dest_llvm_type(body, dest_place)
-            if vec_ty == 0:
-                vec_ty = self.get_or_create_vec_type(0, key_ty)
-            let out_alloca = self.create_entry_alloca(vec_ty)
-            wl_build_store(self.builder, self.build_default_value(vec_ty), out_alloca)
-            let keys_name = "with_hashmap_keys_out"
-            var keys_fn = wl_get_named_function(self.llmod, keys_name)
-            let keys_params: Vec[i64] = Vec.new()
-            keys_params.push(ptr_ty)
-            keys_params.push(ptr_ty)
-            keys_params.push(i64_ty)
-            let keys_ty = wl_function_type(void_ty, vec_data_i64(&keys_params), 3, 0)
-            if keys_fn == 0:
-                keys_fn = wl_add_function(self.llmod, keys_name, keys_ty)
-            let keys_args: Vec[i64] = Vec.new()
-            keys_args.push(out_alloca)
-            keys_args.push(map_ptr)
-            keys_args.push(wl_const_int(i64_ty, key_size, 0))
-            let _ = wl_build_call(self.builder, keys_ty, keys_fn, vec_data_i64(&keys_args), 3)
-            result = wl_build_load(self.builder, vec_ty, out_alloca)
-
-        else if intrinsic == MirIntrinsic.MAP_VALUES:
-            let recv_op = body.call_arg_operands[arg_start]
-            let map_ptr = self.mir_intrinsic_map_handle(body, args_id)
-            var val_ty = self.mir_hashmap_value_type(body, recv_op)
-            if val_ty == 0:
-                val_ty = i64_ty
-            let val_size = self.abi_size_of(val_ty)
-            var vec_ty = self.mir_dest_llvm_type(body, dest_place)
-            if vec_ty == 0:
-                vec_ty = self.get_or_create_vec_type(0, val_ty)
-            let out_alloca = self.create_entry_alloca(vec_ty)
-            wl_build_store(self.builder, self.build_default_value(vec_ty), out_alloca)
-            let values_name = "with_hashmap_values_out"
-            var values_fn = wl_get_named_function(self.llmod, values_name)
-            let values_params: Vec[i64] = Vec.new()
-            values_params.push(ptr_ty)
-            values_params.push(ptr_ty)
-            values_params.push(i64_ty)
-            let values_ty = wl_function_type(void_ty, vec_data_i64(&values_params), 3, 0)
-            if values_fn == 0:
-                values_fn = wl_add_function(self.llmod, values_name, values_ty)
-            let values_args: Vec[i64] = Vec.new()
-            values_args.push(out_alloca)
-            values_args.push(map_ptr)
-            values_args.push(wl_const_int(i64_ty, val_size, 0))
-            let _ = wl_build_call(self.builder, values_ty, values_fn, vec_data_i64(&values_args), 3)
-            result = wl_build_load(self.builder, vec_ty, out_alloca)
-
-        else if intrinsic == MirIntrinsic.MAP_ITEMS:
-            let recv_op = body.call_arg_operands[arg_start]
-            let map_ptr = self.mir_intrinsic_map_handle(body, args_id)
-            var key_ty = self.mir_hashmap_key_type(body, recv_op)
-            if key_ty == 0:
-                key_ty = i64_ty
-            var val_ty = self.mir_hashmap_value_type(body, recv_op)
-            if val_ty == 0:
-                val_ty = i64_ty
-            let key_size = self.abi_size_of(key_ty)
-            let val_size = self.abi_size_of(val_ty)
-            var pair_ty: i64 = 0
-            var pair_tid = 0
-            let dest_sema = self.mir_intrinsic_dest_sema_type(body, dest_place)
-            if dest_sema > 0:
-                let dest_resolved = self.mir_resolve_alias_at(dest_sema)
-                if self.mir_type_kind_at(dest_resolved) == TypeKind.TY_GENERIC_INST and self.mir_type_d2_at(dest_resolved) > 0:
-                    let dest_arg_start = self.mir_type_d1_at(dest_resolved)
-                    pair_tid = self.mir_type_extra_at(dest_arg_start)
-                    pair_ty = self.mir_sema_type_to_llvm(pair_tid)
-            if pair_ty == 0:
-                let pair_fields: Vec[i64] = Vec.new()
-                pair_fields.push(key_ty)
-                pair_fields.push(val_ty)
-                pair_ty = self.tuple_type_from_elems(&pair_fields)
-            let pair_size = self.abi_size_of(pair_ty)
-            var val_offset = key_size
-            if pair_tid != 0:
-                let pair_resolved = self.mir_resolve_alias_at(pair_tid)
-                if self.mir_type_kind_at(pair_resolved) == TypeKind.TY_TUPLE and self.mir_type_d1_at(pair_resolved) >= 2:
-                    val_offset = self.sema.type_layout_tuple_elem_offset_frozen(pair_resolved, 1)
-                else:
-                    val_offset = self.sema.type_layout_struct_field_offset_frozen(pair_tid, 1)
-            else:
-                let val_align = self.declared_align_of(val_ty)
-                if val_align > 1:
-                    let rem = val_offset % val_align
-                    if rem != 0:
-                        val_offset = val_offset + (val_align - rem)
-            var vec_ty = self.mir_dest_llvm_type(body, dest_place)
-            if vec_ty == 0:
-                vec_ty = self.get_or_create_vec_type(0, pair_ty)
-            let out_alloca = self.create_entry_alloca(vec_ty)
-            wl_build_store(self.builder, self.build_default_value(vec_ty), out_alloca)
-            let items_name = "with_hashmap_items_out"
-            var items_fn = wl_get_named_function(self.llmod, items_name)
-            let items_params: Vec[i64] = Vec.new()
-            items_params.push(ptr_ty)
-            items_params.push(ptr_ty)
-            items_params.push(i64_ty)
-            items_params.push(i64_ty)
-            items_params.push(i64_ty)
-            items_params.push(i64_ty)
-            let items_ty = wl_function_type(void_ty, vec_data_i64(&items_params), 6, 0)
-            if items_fn == 0:
-                items_fn = wl_add_function(self.llmod, items_name, items_ty)
-            let items_args: Vec[i64] = Vec.new()
-            items_args.push(out_alloca)
-            items_args.push(map_ptr)
-            items_args.push(wl_const_int(i64_ty, key_size, 0))
-            items_args.push(wl_const_int(i64_ty, val_size, 0))
-            items_args.push(wl_const_int(i64_ty, pair_size, 0))
-            items_args.push(wl_const_int(i64_ty, val_offset, 0))
-            let _ = wl_build_call(self.builder, items_ty, items_fn, vec_data_i64(&items_args), 6)
-            result = wl_build_load(self.builder, vec_ty, out_alloca)
 
         else if intrinsic == MirIntrinsic.SLOTMAP_NEW:
             var sm_elem_ty = i64_ty
@@ -13140,7 +13021,7 @@ impl Codegen:
         if name == "VecIterRef":
             let elem_tid = self.mir_generic_arg_tid(iter_sema, 0)
             return self.sema.find_exact_type(TypeKind.TY_REF, elem_tid, 0, 0) as i32
-        if name == "MapIter":
+        if name == "MappedIter":
             return self.mir_generic_arg_tid(iter_sema, 2)
         if name == "FilterMapIter":
             return self.mir_generic_arg_tid(iter_sema, 2)
@@ -13309,7 +13190,7 @@ impl Codegen:
             with_eprint("error: iterator codegen missing LLVM type for iterator '" ++ name ++ "'")
             self.had_error = 1
             return self.build_option_none(opt_type)
-        if name == "MapIter":
+        if name == "MappedIter":
             let upstream_tid = self.mir_generic_arg_tid(iter_sema, 0)
             let in_tid = self.mir_generic_arg_tid(iter_sema, 1)
             let in_ty0 = self.mir_sema_type_to_llvm(in_tid)
@@ -14046,7 +13927,11 @@ impl Codegen:
             let str_call_ty: i64 = self.fn_fn_types.get(str_sym).unwrap()
             let str_args: Vec[i64] = Vec.new()
             str_args.push(out_ptr)
-            return self.build_call_fn_value(str_sym, str_fn, str_call_ty, -1, 0, str_args, 1, "collect_str", 0)
+            let collected = self.build_call_fn_value(str_sym, str_fn, str_call_ty, -1, 0, str_args, 1, "collect_str", 0)
+            // The str is a copy of the bytes; the staging Vec is this
+            // lowering's own and dies here.
+            self.mir_emit_vec_free_ptr(out_ptr)
+            return collected
 
         if dest_base_sym == self.sym_hashset or dest_base_sym == self.sym_hashmap:
             var key_tid = 0

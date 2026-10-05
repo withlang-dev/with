@@ -15,23 +15,17 @@ fn test_btreemap_operations:
     assert(map.get("b").unwrap() == 20)
     assert(map.get("z").is_none())
 
-    let keys = map.keys()
+    // D44: traversal observes; a Vec of views is collected where wanted.
+    let keys = map.keys() |> collect[Vec]()
     assert(keys[0] == "a")
     assert(keys[1] == "b")
     assert(keys[2] == "c")
 
-    let values = map.values()
-    assert(values[0] == 1)
-    assert(values[1] == 20)
-    assert(values[2] == 3)
+    let values = map.values() |> map(it.clone()) |> collect[Vec]()
+    assert(values == [1, 20, 3])
 
-    let items = map.items()
-    let (k0, v0) = items[0]
-    let (k1, v1) = items[1]
-    let (k2, v2) = items[2]
-    assert(k0 == "a" and v0 == 1)
-    assert(k1 == "b" and v1 == 20)
-    assert(k2 == "c" and v2 == 3)
+    let entries = map.iter() |> map(e => f"{e.0}={e.1}") |> collect[Vec]()
+    assert(entries.join(",") == "a=1,b=20,c=3")
 
     assert(map.remove("b").unwrap() == 20)
     assert(map.get("b").is_none())

@@ -67,7 +67,7 @@ fn test_collect_btreemap:
     assert(map.len() == 2)
     assert(map.get("a").unwrap() == 3)
     assert(map.get("b").unwrap() == 2)
-    let keys = map.keys()
+    let keys = map.keys() |> collect[Vec]()
     assert(keys[0] == "a")
     assert(keys[1] == "b")
 
