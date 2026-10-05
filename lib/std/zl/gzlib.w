@@ -112,7 +112,7 @@ pub unsafe fn gzrewind(__param_file: *mut gzFile_s) -> c_int {
     }
 
 
-    if ((if lseek(__local_state.fd, __local_state.start, (0 as c_int)) == -1: 1 else: 0) != 0) {
+    if ((if lseek(__local_state.fd, __local_state.start, (libc.SEEK_SET as c_int)) == -1: 1 else: 0) != 0) {
         return -1
     }
 
@@ -334,8 +334,8 @@ pub unsafe fn gzseek64(__param_file: *mut gzFile_s, __param_offset: c_longlong, 
 
     var __ci_expr_logic_2: c_int = 0
 
-    if ((if __param_whence != 0: 1 else: 0) != 0) {
-        (__ci_expr_logic_2 = (if (if __param_whence != 1: 1 else: 0) != 0: 1 else: 0))
+    if ((if __param_whence != libc.SEEK_SET: 1 else: 0) != 0) {
+        (__ci_expr_logic_2 = (if (if __param_whence != libc.SEEK_CUR: 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_2 != 0) {
@@ -343,7 +343,7 @@ pub unsafe fn gzseek64(__param_file: *mut gzFile_s, __param_offset: c_longlong, 
     }
 
 
-    if ((if __param_whence == 0: 1 else: 0) != 0) {
+    if ((if __param_whence == libc.SEEK_SET: 1 else: 0) != 0) {
         (__local_offset = __local_offset - (*(&raw const __local_state.x as *const gzFile_s)).pos)
     } else {
         var __ci_expr_ternary_3: c_longlong = 0
@@ -374,7 +374,7 @@ pub unsafe fn gzseek64(__param_file: *mut gzFile_s, __param_offset: c_longlong, 
     }
 
     if (__ci_expr_logic_5 != 0) {
-        (__local_ret = ((lseek(__local_state.fd, ((__local_offset - ((*(&raw const __local_state.x as *const gzFile_s)).have as c_longlong)) as c_longlong), (1 as c_int)) as c_longlong)))
+        (__local_ret = ((lseek(__local_state.fd, ((__local_offset - ((*(&raw const __local_state.x as *const gzFile_s)).have as c_longlong)) as c_longlong), (libc.SEEK_CUR as c_int)) as c_longlong)))
 
         if ((if __local_ret == -1: 1 else: 0) != 0) {
             return -1
@@ -513,7 +513,7 @@ pub unsafe fn gzoffset64(__param_file: *mut gzFile_s) -> c_longlong {
     }
 
 
-    (__local_offset = ((lseek(__local_state.fd, (0 as c_longlong), (1 as c_int)) as c_longlong)))
+    (__local_offset = ((lseek(__local_state.fd, (0 as c_longlong), (libc.SEEK_CUR as c_int)) as c_longlong)))
 
     if ((if __local_offset == -1: 1 else: 0) != 0) {
         return -1
@@ -687,7 +687,7 @@ unsafe fn gz_open(__param_path: *const c_void, __param_fd: c_int, __param_mode: 
                         0
                     },
                     101 => {
-                        (__local_oflag = (__local_oflag as c_int) | (16777216 as c_int))
+                        (__local_oflag = (__local_oflag as c_int) | (libc.O_CLOEXEC as c_int))
                     },
                     120 => {
                         (__local_exclusive = ((1 as c_int)))
@@ -708,7 +708,7 @@ unsafe fn gz_open(__param_path: *const c_void, __param_fd: c_int, __param_mode: 
                         (__local_state.direct = ((-1 as c_int)))
                     },
                     78 => {
-                        (__local_oflag = (__local_oflag as c_int) | (4 as c_int))
+                        (__local_oflag = (__local_oflag as c_int) | (libc.O_NONBLOCK as c_int))
                     },
                     84 => {
                         (__local_state.direct = ((1 as c_int)))
@@ -770,12 +770,12 @@ unsafe fn gz_open(__param_path: *const c_void, __param_fd: c_int, __param_mode: 
     var __ci_expr_ternary_5: c_int = 0
 
     if ((if __local_state.mode == 7247: 1 else: 0) != 0) {
-        (__ci_expr_ternary_5 = ((0 as c_int)))
+        (__ci_expr_ternary_5 = ((libc.O_RDONLY as c_int)))
     } else {
         var __ci_expr_ternary_3: c_int = 0
 
         if (__local_exclusive != 0) {
-            (__ci_expr_ternary_3 = ((2048 as c_int)))
+            (__ci_expr_ternary_3 = ((libc.O_EXCL as c_int)))
         } else {
             (__ci_expr_ternary_3 = ((0 as c_int)))
         }
@@ -783,12 +783,12 @@ unsafe fn gz_open(__param_path: *const c_void, __param_fd: c_int, __param_mode: 
         var __ci_expr_ternary_4: c_int = 0
 
         if ((if __local_state.mode == 31153: 1 else: 0) != 0) {
-            (__ci_expr_ternary_4 = ((1024 as c_int)))
+            (__ci_expr_ternary_4 = ((libc.O_TRUNC as c_int)))
         } else {
-            (__ci_expr_ternary_4 = ((8 as c_int)))
+            (__ci_expr_ternary_4 = ((libc.O_APPEND as c_int)))
         }
 
-        (__ci_expr_ternary_5 = ((((((((1 as c_int) | (512 as c_int)) as c_int) | (__ci_expr_ternary_3 as c_int)) as c_int) | (__ci_expr_ternary_4 as c_int)) as c_int)))
+        (__ci_expr_ternary_5 = ((((((((libc.O_WRONLY as c_int) | (libc.O_CREAT as c_int)) as c_int) | (__ci_expr_ternary_3 as c_int)) as c_int) | (__ci_expr_ternary_4 as c_int)) as c_int)))
 
     }
 
@@ -798,12 +798,12 @@ unsafe fn gz_open(__param_path: *const c_void, __param_fd: c_int, __param_mode: 
     if ((if __param_fd == -1: 1 else: 0) != 0) {
         (__local_state.fd = ((open(((__param_path as *const c_char) as *const i8), __local_oflag, 438) as c_int)))
     } else {
-        if (((__local_oflag as c_int) & (4 as c_int)) != 0) {
-            fcntl(__param_fd, (4 as c_int), ((fcntl(__param_fd, (3 as c_int)) as c_int) | (4 as c_int)))
+        if (((__local_oflag as c_int) & (libc.O_NONBLOCK as c_int)) != 0) {
+            fcntl(__param_fd, (libc.F_SETFL as c_int), ((fcntl(__param_fd, (libc.F_GETFL as c_int)) as c_int) | (libc.O_NONBLOCK as c_int)))
         }
 
-        if (((__local_oflag as c_int) & (16777216 as c_int)) != 0) {
-            fcntl(__param_fd, (2 as c_int), ((fcntl(__param_fd, (1 as c_int)) as c_int) | (16777216 as c_int)))
+        if (((__local_oflag as c_int) & (libc.O_CLOEXEC as c_int)) != 0) {
+            fcntl(__param_fd, (libc.F_SETFD as c_int), ((fcntl(__param_fd, (libc.F_GETFD as c_int)) as c_int) | (libc.O_CLOEXEC as c_int)))
         }
 
         (__local_state.fd = __param_fd)
@@ -820,14 +820,14 @@ unsafe fn gz_open(__param_path: *const c_void, __param_fd: c_int, __param_mode: 
     }
 
     if ((if __local_state.mode == 1: 1 else: 0) != 0) {
-        lseek(__local_state.fd, (0 as c_longlong), (2 as c_int))
+        lseek(__local_state.fd, (0 as c_longlong), (libc.SEEK_END as c_int))
 
         (__local_state.mode = ((31153 as c_int)))
 
     }
 
     if ((if __local_state.mode == 7247: 1 else: 0) != 0) {
-        (__local_state.start = ((lseek(__local_state.fd, (0 as c_longlong), (1 as c_int)) as c_longlong)))
+        (__local_state.start = ((lseek(__local_state.fd, (0 as c_longlong), (libc.SEEK_CUR as c_int)) as c_longlong)))
 
         if ((if __local_state.start == -1: 1 else: 0) != 0) {
             (__local_state.start = ((0 as c_longlong)))

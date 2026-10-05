@@ -843,48 +843,54 @@ pub fn migrate_add_define(define: &str) -> Unit:
     else:
         g_migrate_defines = g_migrate_defines ++ "#define " ++ define ++ "\n"
 
+// What precedes a migrated unit. It names no platform and includes no
+// header: a libc header included here would fix the feature set before the
+// unit's own feature-test macros (#2071: glibc then never declares what a
+// later `_LARGEFILE64_SOURCE` asks for), and the unit is to be parsed as a
+// C compiler on that target parses it.
+//   - `_FORTIFY_SOURCE 0`: a libc that fortifies the copy and format
+//     functions does it with macros over compiler builtins; off, a call to
+//     memcpy is a call to memcpy on every libc.
+//   - `HAVE_UNISTD_H`: migrate often sees a config.h template instead of a
+//     configured header, so the one probe a unit most often gates on is
+//     answered by asking the target's headers.
 fn migrate_host_compat_preamble() -> str:
-    // Migrate often sees config.h templates instead of configured headers.
-    // Provide a minimal host parse environment before the original source.
-    "#if !defined(_POSIX_C_SOURCE)\n#define _POSIX_C_SOURCE 200809L\n#endif\n" ++
-    "#if defined(__APPLE__) && !defined(_DARWIN_C_SOURCE)\n#define _DARWIN_C_SOURCE 1\n#endif\n" ++
-    "#if !defined(HAVE_UNISTD_H)\n#ifdef __has_include\n#if __has_include(<unistd.h>)\n#define HAVE_UNISTD_H 1\n#endif\n#endif\n#endif\n" ++
-    // Apple's <string.h> and <stdio.h> define the copy and format
-    // functions as fortified macros; including them here and undefining
-    // those leaves the unit's calls plain calls. No other libc needs it,
-    // and a libc header included here fixes the feature set before the
-    // unit's own feature-test macros: glibc then never declares what a
-    // later `_LARGEFILE64_SOURCE` asks for (#2071, zlib's fopen64).
-    "#if defined(__APPLE__)\n#include <string.h>\n#include <stdio.h>\n" ++
-    "#undef memcpy\n#undef memmove\n#undef memset\n" ++
-    "#undef strcpy\n#undef strncpy\n#undef strcat\n#undef strncat\n" ++
-    "#undef snprintf\n#undef sprintf\n#undef vsnprintf\n#undef vsprintf\n" ++
-    "#undef stpcpy\n#undef stpncpy\n#endif\n"
+    "#if !defined(_FORTIFY_SOURCE)\n#define _FORTIFY_SOURCE 0\n#endif\n" ++
+    "#if !defined(HAVE_UNISTD_H)\n#ifdef __has_include\n#if __has_include(<unistd.h>)\n#define HAVE_UNISTD_H 1\n#endif\n#endif\n#endif\n"
 
 // D90: the object-like macros a system header defines, and the shape of
 // an object-like macro's body as a use of it parses: `leaf` (one token),
 // `paren` (one parenthesized expression), `other`. A one-token body that
 // names another macro has that macro's shape.
 var g_migrate_system_object_macros: HashMap[str, i32] = HashMap.new()
+// Each object-like macro's last definition: the one a use after the
+// includes expands. A header may define a name twice (clang's <limits.h>
+// redefines ULONG_MAX after including the libc's), and the first is not
+// the one in effect.
+var g_migrate_macro_last_values: HashMap[str, str] = HashMap.new()
 
 pub fn ci_migrate_system_object_macro(name: &str) -> bool: g_migrate_system_object_macros.contains(name)
 
-pub fn ci_migrate_object_macro_shape(name: &str, depth: i32) -> str:
-    if depth > 16 or not g_migrate_macro_values.contains(name): return "other"
-    // The replacement list, without the comment a header puts after it.
-    var text: str = g_migrate_macro_values.get(name).unwrap().clone()
+// The replacement list of `name`'s definition in effect, without the comment
+// a header puts after it; "" for a name that is no object-like macro.
+pub fn ci_migrate_object_macro_body(name: &str) -> str:
+    if not g_migrate_macro_last_values.contains(name): return ""
+    var text = g_migrate_macro_last_values.get(name).unwrap().clone()
     let block_comment = text.find("/*")
     if block_comment >= 0: text = text.slice(0, block_comment)
     let line_comment = text.find("//")
     if line_comment >= 0: text = text.slice(0, line_comment)
-    let body = ci_trim(text)
-    if body.len() == 0: return "other"
+    ci_trim(text)
+
+pub fn ci_migrate_object_macro_shape(name: &str, depth: i32) -> str:
+    let body = ci_migrate_object_macro_body(name)
+    if depth > 16 or body.len() == 0: return "other"
     var one_token = true
     for i in 0..body.len():
         let c = body[i]
         if not ((c >= 'a' and c <= 'z') or (c >= 'A' and c <= 'Z') or (c >= '0' and c <= '9') or c == '_' or c == '.'): one_token = false
     if one_token:
-        if g_migrate_macro_values.contains(body) and body != name: return ci_migrate_object_macro_shape(body, depth + 1)
+        if g_migrate_macro_last_values.contains(body) and body != name: return ci_migrate_object_macro_shape(body, depth + 1)
         return "leaf"
     if body[0] != '(': return "other"
     var nesting = 0
@@ -898,6 +904,7 @@ pub fn ci_migrate_object_macro_shape(name: &str, depth: i32) -> str:
 fn ci_capture_macro_values(session: i64):
     g_migrate_macro_values = HashMap.new()
     g_migrate_system_object_macros = HashMap.new()
+    g_migrate_macro_last_values = HashMap.new()
     g_migrate_macro_miss_names = HashMap.new()
     let count = with_cimport_macro_count(session)
     var i = 0
@@ -905,6 +912,9 @@ fn ci_capture_macro_values(session: i64):
         if with_cimport_macro_is_fn_like(session, i) == 0:
             let name = with_cimport_macro_name(session, i)
             let value = with_cimport_macro_value(session, i)
+            if name.len() > 0 and value.len() > 0:
+                g_migrate_macro_last_values.remove(name)
+                g_migrate_macro_last_values.insert(ci_ir_owned_text(name), ci_ir_owned_text(value))
             if name.len() > 0 and value.len() > 0 and not g_migrate_macro_values.contains(name):
                 g_migrate_macro_values.insert(ci_ir_owned_text(name), ci_ir_owned_text(value))
                 if with_cimport_macro_is_system(session, i) != 0: g_migrate_system_object_macros.insert(ci_ir_owned_text(name), 1)

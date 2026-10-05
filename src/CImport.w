@@ -11,6 +11,7 @@ use std.cfg.stackify
 use compiler.ClangBridge.*
 use compiler.EmbeddedClangResource
 use compiler.EmbeddedSysroot
+use compiler.EmbeddedStdlib
 use std.string.StringBuilder
 use TargetSpec
 use MathBuiltins
@@ -17954,11 +17955,32 @@ fn ci_libc_symbol_kind_mask(name: &str) -> i32:
 
 pub let CI_LIBC_KIND_CONST: i32 = 8
 
-// D90: the integer constants std.libc exports. A constant and the function
-// that consumes it come from this one table: the value is what the With
-// seam accepts, never a header's.
+// The value of a C integer literal (decimal, octal or hex, any `u`/`l`
+// suffix) as the 64-bit pattern libclang evaluates it to; None for any
+// other text.
+fn ci_c_int_literal_value(text: &str) -> Option[i64]:
+    var end = text.len()
+    while end > 0 and (text[end - 1] == 'u' or text[end - 1] == 'U' or text[end - 1] == 'l' or text[end - 1] == 'L'): end -= 1
+    let digits = text.slice(0, end)
+    if digits.len() == 0: return None
+    let hex = digits.starts_with("0x") or digits.starts_with("0X")
+    let radix: i64 = if hex: 16 else if digits.len() > 1 and digits[0] == '0': 8 else: 10
+    var value: i64 = 0
+    for i in (if hex: 2i64 else: 0i64)..digits.len():
+        let ch = digits[i]
+        let d: i64 = if ch >= '0' and ch <= '9': (ch - '0') as i64 else if ch >= 'a' and ch <= 'f': (ch - 'a') as i64 + 10 else if ch >= 'A' and ch <= 'F': (ch - 'A') as i64 + 10 else: 99
+        if d >= radix: return None
+        value = value *% radix +% d
+    Some(value)
+
+// D90: a constant and the function that consumes it come from one table,
+// std.libc: the value is what the With seam accepts, never a header's. A
+// constant is known when the std.libc this compiler carries declares it.
 fn ci_libc_constant_known(name: &str) -> bool:
-    false
+    if not embedded_std_source("std/libc.w").contains("\npub const " ++ name ++ ":"): return false
+    // The module names std.libc, so it imports it.
+    ci_migrate_note_libc_symbol(name)
+    true
 
 // D90 (#2060, #2070): a use of an integer constant that a system header
 // defines by an object-like macro is the std.libc constant of that name,
@@ -18003,6 +18025,15 @@ fn ci_libc_constant_use(session: i64, cursor: i32, kind: i32) -> str:
         // the use cannot be read back, so it is not named by guesswork.
         if shape == "other" and g_ci_bail_message.len() == 0:
             g_ci_bail_message = "libc macro `" ++ name ++ "` has an unparenthesized body; its use cannot be named as a std.libc constant"
+            g_ci_bail_location = with_ci_cursor_location(session, cursor)
+            g_ci_bail_kind = at_kind
+        return ""
+    // A one-literal definition and the expression at the use must agree: a
+    // literal inside some other expansion of the name is not the constant.
+    let defined = ci_c_int_literal_value(ci_migrate_object_macro_body(name))
+    if shape == "leaf" and defined.is_some() and defined != Some(with_ci_eval_int_value(session, at)):
+        if g_ci_bail_message.len() == 0:
+            g_ci_bail_message = "libc macro `" ++ name ++ "`: the expression at this use is not its definition `" ++ ci_migrate_object_macro_body(name) ++ "`; its use cannot be named as a std.libc constant"
             g_ci_bail_location = with_ci_cursor_location(session, cursor)
             g_ci_bail_kind = at_kind
         return ""

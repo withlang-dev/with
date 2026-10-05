@@ -392,6 +392,9 @@ pub let MIN_MATCH: c_int = 3
 pub let MAX_MATCH: c_int = 258
 pub let PRESET_DICT: c_int = 0x20
 pub let OS_CODE: c_int = 19
+pub fn zmemzero[T](dest: T, len: T) -> T {
+    unsafe { with_memset(dest as *mut u8, 0, len as i64) }
+}
 pub fn Assert(cond: i32, msg: i32) {
     return
 }

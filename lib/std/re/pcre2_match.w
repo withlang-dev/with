@@ -28,6 +28,7 @@ use std.re.pcre2_string_utils
 use std.re.pcre2_study
 use std.re.pcre2_valid_utf
 use std.re.pcre2_xclass
+use std.libc
 
 pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *const u8, __param_length: c_ulong, __param_start_offset: c_ulong, __param_options: c_uint, __param_match_data: *mut pcre2_real_match_data_8, __param_mcontext: *mut pcre2_real_match_context_8) -> c_int writes _pcre2_default_match_context_8 {
     var __local_subject = __param_subject
@@ -4737,7 +4738,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
 
     '__ci_bb_3 {
         (__local_usedsize__goto_765_14 = (((((((__local_N__goto_693_12 as *mut c_char) as usize) -% (((*__param_match_data).heapframes as *mut c_char) as usize)) as c_long) / (sizeof[c_char]() as c_long)) as c_ulong)))
-        if ((if (*__param_match_data).heapframes_size >= ((((0 as c_ulong) -% 1) as c_ulong) / (2 as c_ulong)): 1 else: 0) != 0) {
+        if ((if (*__param_match_data).heapframes_size >= ((libc.UINTPTR_MAX as c_ulong) / (2 as c_ulong)): 1 else: 0) != 0) {
             goto '__ci_bb_5
         } else {
             goto '__ci_bb_6
@@ -4752,7 +4753,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5 {
-        if ((if (*__param_match_data).heapframes_size == ((((0 as c_ulong) -% 1) as c_ulong) -% (1 as c_ulong)): 1 else: 0) != 0) {
+        if ((if (*__param_match_data).heapframes_size == ((libc.UINTPTR_MAX as c_ulong) -% (1 as c_ulong)): 1 else: 0) != 0) {
             goto '__ci_bb_8
         } else {
             goto '__ci_bb_9
@@ -4777,7 +4778,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_9 {
-        (__local_newsize__goto_764_14 = ((((((0 as c_ulong) -% 1) as c_ulong) -% (1 as c_ulong)) as c_ulong)))
+        (__local_newsize__goto_764_14 = ((((libc.UINTPTR_MAX as c_ulong) -% (1 as c_ulong)) as c_ulong)))
         goto '__ci_bb_7
     }
 
@@ -6849,7 +6850,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     '__ci_bb_366 {
         (__local_reptype__goto_716_10 = ((2 as c_uint)))
         ((*__local_F__goto_692_12).temp_32[0] = ((0 as c_uint)))
-        ((*__local_F__goto_692_12).temp_32[1] = ((4294967295 as c_uint)))
+        ((*__local_F__goto_692_12).temp_32[1] = ((libc.UINT32_MAX as c_uint)))
         ((*__local_F__goto_692_12).ecode = (*__local_F__goto_692_12).ecode + 1)
         goto '__ci_bb_362
     }
@@ -6857,7 +6858,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     '__ci_bb_367 {
         (__local_reptype__goto_716_10 = ((2 as c_uint)))
         ((*__local_F__goto_692_12).temp_32[0] = ((1 as c_uint)))
-        ((*__local_F__goto_692_12).temp_32[1] = ((4294967295 as c_uint)))
+        ((*__local_F__goto_692_12).temp_32[1] = ((libc.UINT32_MAX as c_uint)))
         ((*__local_F__goto_692_12).ecode = (*__local_F__goto_692_12).ecode + 1)
         goto '__ci_bb_362
     }
@@ -8723,7 +8724,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     '__ci_bb_699 {
         (__local_reptype__goto_716_10 = ((2 as c_uint)))
         ((*__local_F__goto_692_12).temp_32[0] = ((0 as c_uint)))
-        ((*__local_F__goto_692_12).temp_32[1] = ((4294967295 as c_uint)))
+        ((*__local_F__goto_692_12).temp_32[1] = ((libc.UINT32_MAX as c_uint)))
         ((*__local_F__goto_692_12).ecode = (*__local_F__goto_692_12).ecode + 1)
         goto '__ci_bb_696
     }
@@ -8731,7 +8732,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     '__ci_bb_700 {
         (__local_reptype__goto_716_10 = ((2 as c_uint)))
         ((*__local_F__goto_692_12).temp_32[0] = ((1 as c_uint)))
-        ((*__local_F__goto_692_12).temp_32[1] = ((4294967295 as c_uint)))
+        ((*__local_F__goto_692_12).temp_32[1] = ((libc.UINT32_MAX as c_uint)))
         ((*__local_F__goto_692_12).ecode = (*__local_F__goto_692_12).ecode + 1)
         goto '__ci_bb_696
     }
@@ -11485,7 +11486,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1199 {
-        ((*__local_F__goto_692_12).temp_32[1] = ((4294967295 as c_uint)))
+        ((*__local_F__goto_692_12).temp_32[1] = ((libc.UINT32_MAX as c_uint)))
         goto '__ci_bb_1200
     }
 
@@ -12972,7 +12973,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1477 {
-        ((*__local_F__goto_692_12).temp_32[1] = ((4294967295 as c_uint)))
+        ((*__local_F__goto_692_12).temp_32[1] = ((libc.UINT32_MAX as c_uint)))
         goto '__ci_bb_1478
     }
 
@@ -13905,7 +13906,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_1642 {
-        ((*__local_F__goto_692_12).temp_32[1] = ((4294967295 as c_uint)))
+        ((*__local_F__goto_692_12).temp_32[1] = ((libc.UINT32_MAX as c_uint)))
         goto '__ci_bb_1643
     }
 
@@ -18674,7 +18675,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     '__ci_bb_2446 {
         (__local_reptype__goto_716_10 = ((2 as c_uint)))
         ((*__local_F__goto_692_12).temp_32[0] = ((0 as c_uint)))
-        ((*__local_F__goto_692_12).temp_32[1] = ((4294967295 as c_uint)))
+        ((*__local_F__goto_692_12).temp_32[1] = ((libc.UINT32_MAX as c_uint)))
         ((*__local_F__goto_692_12).ecode = (*__local_F__goto_692_12).ecode + 1)
         goto '__ci_bb_2444
     }
@@ -18682,7 +18683,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     '__ci_bb_2447 {
         (__local_reptype__goto_716_10 = ((2 as c_uint)))
         ((*__local_F__goto_692_12).temp_32[0] = ((1 as c_uint)))
-        ((*__local_F__goto_692_12).temp_32[1] = ((4294967295 as c_uint)))
+        ((*__local_F__goto_692_12).temp_32[1] = ((libc.UINT32_MAX as c_uint)))
         ((*__local_F__goto_692_12).ecode = (*__local_F__goto_692_12).ecode + 1)
         goto '__ci_bb_2444
     }
@@ -36754,7 +36755,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_5512 {
-        if ((if (*__local_F__goto_692_12).temp_32[1] < 4294967295: 1 else: 0) != 0) {
+        if ((if (*__local_F__goto_692_12).temp_32[1] < libc.UINT32_MAX: 1 else: 0) != 0) {
             goto '__ci_bb_5513
         } else {
             goto '__ci_bb_5514
@@ -41354,7 +41355,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_6186 {
-        ((*__local_F__goto_692_12).temp_32[1] = ((4294967295 as c_uint)))
+        ((*__local_F__goto_692_12).temp_32[1] = ((libc.UINT32_MAX as c_uint)))
         goto '__ci_bb_6187
     }
 

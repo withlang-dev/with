@@ -1678,7 +1678,6 @@ pub fn CU2BYTES[T](x: T) -> T {
 pub fn BYTES2CU[T](x: T) -> T {
     (x / (8 / 8))
 }
-pub let LOOKBEHIND_MAX: c_int = ((65535 as c_int) as c_int)
 pub let HEAPFRAME_ALIGNMENT: c_ulong = 8
 pub let _pcre2_default_tables_8: [1088]u8 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 91, 92, 93, 94, 95, 96, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255, 0x00, 0x3e, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0x03, 0x7e, 0x00, 0x00, 0x00, 0x7e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xfe, 0xff, 0xff, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xfe, 0xff, 0xff, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0x03, 0xfe, 0xff, 0xff, 0x87, 0xfe, 0xff, 0xff, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xfe, 0xff, 0x00, 0xfc, 0x01, 0x00, 0x00, 0xf8, 0x01, 0x00, 0x00, 0x78, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x01, 0x01, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x16, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
 
@@ -1741,7 +1740,7 @@ pub var _pcre2_default_compile_context_8: pcre2_real_compile_context_8 = pcre2_r
 
 pub var _pcre2_default_match_context_8: pcre2_real_match_context_8 = pcre2_real_match_context_8 { memctl: pcre2_memctl { malloc: default_malloc, free: default_free, memory_data: (null) }, callout: (null), callout_data: (null), substitute_callout: (null), substitute_callout_data: (null), substitute_case_callout: (null), substitute_case_callout_data: (null), offset_limit: ((~(0 as c_ulong))), heap_limit: 20000000, match_limit: 10000000, depth_limit: 10000000 }
 
-pub var _pcre2_default_convert_context_8: pcre2_real_convert_context_8 = pcre2_real_convert_context_8 { memctl: pcre2_memctl { malloc: default_malloc, free: default_free, memory_data: null }, glob_separator: 47, glob_escape: 92 }
+pub var _pcre2_default_convert_context_8: pcre2_real_convert_context_8 = pcre2_real_convert_context_8 { memctl: pcre2_memctl { malloc: default_malloc, free: default_free, memory_data: (null) }, glob_separator: 47, glob_escape: 92 }
 
 pub let POSIX_START_REGEX: c_int = 0
 pub let POSIX_ANCHORED: c_int = 1
@@ -1971,9 +1970,6 @@ pub fn META_DIFF[T](x: T, y: T) -> T {
 pub let SIZEOFFSET: c_int = 2
 pub let CLASS_IS_ECLASS: c_int = 0x1
 pub let MAX_UCHAR_VALUE: c_uint = 0xff
-pub fn GET_MAX_CHAR_VALUE[T](utf: T) -> T {
-    (if utf != 0: 0x10ffff else: 0xff)
-}
 pub fn SELECT_VALUE8[T](value8: T, value: T) -> T {
     value8
 }
@@ -2045,7 +2041,7 @@ pub let CLASS_MODE_NORMAL: c_int = 0
 pub let CLASS_MODE_ALT_EXT: c_int = 1
 pub let CLASS_MODE_PERL_EXT: c_int = 2
 pub let CLASS_MODE_PERL_EXT_LEAF: c_int = 3
-pub let _pcre2_posix_class_maps8: [42]c_int = [(160 as c_int), (64 as c_int), (-2 as c_int), (128 as c_int), (-1 as c_int), (0 as c_int), (96 as c_int), (-1 as c_int), (0 as c_int), (160 as c_int), (-1 as c_int), (2 as c_int), (224 as c_int), (288 as c_int), (0 as c_int), (0 as c_int), (-1 as c_int), (1 as c_int), (288 as c_int), (-1 as c_int), (0 as c_int), (64 as c_int), (-1 as c_int), (0 as c_int), (192 as c_int), (-1 as c_int), (0 as c_int), (224 as c_int), (-1 as c_int), (0 as c_int), (256 as c_int), (-1 as c_int), (0 as c_int), (0 as c_int), (-1 as c_int), (0 as c_int), (160 as c_int), (-1 as c_int), (0 as c_int), (32 as c_int), (-1 as c_int), (0 as c_int)]
+pub let _pcre2_posix_class_maps8: [42]c_int = [160, 64, -2, 128, -1, 0, 96, -1, 0, 160, -1, 2, 224, 288, 0, 0, -1, 1, 288, -1, 0, 64, -1, 0, 192, -1, 0, 224, -1, 0, 256, -1, 0, 0, -1, 0, 160, -1, 0, 32, -1, 0]
 
 pub fn XDIGIT[T](c: T) -> T {
     xdigitab[c]
@@ -2058,6 +2054,7 @@ pub let GROUPINFO_DEFAULT_SIZE: c_int = 256
 pub let WORK_SIZE_SAFETY_MARGIN: c_int = 100
 pub let NAMED_GROUP_LIST_SIZE: c_int = 20
 pub let PARSED_PATTERN_DEFAULT_SIZE: c_int = 1024
+pub let OFLOW_MAX: c_int = (2147483647 - 20)
 pub let REQ_UNSET: c_uint = 0xffffffff
 pub let REQ_NONE: c_uint = 0xfffffffe
 pub let REQ_CASELESS: c_uint = 0x00000001
@@ -2065,17 +2062,17 @@ pub let REQ_VARY: c_uint = 0x00000002
 pub let GI_SET_FIXED_LENGTH: c_uint = 0x80000000
 pub let GI_NOT_FIXED_LENGTH: c_uint = 0x40000000
 pub let GI_FIXED_LENGTH_MASK: c_uint = 0x0000ffff
-pub fn IS_DIGIT[T](x: T) -> c_int {
-    (((x >= 48) and (x <= 57)) as c_int)
-}
 pub let ESCAPES_FIRST: c_int = 48
-pub let ESCAPES_LAST: c_int = 122
 pub fn UPPER_CASE[T](c: T) -> T {
     (c - 32)
 }
+pub let PUBLIC_LITERAL_COMPILE_EXTRA_OPTIONS: c_int = 65676
+pub let PUBLIC_COMPILE_EXTRA_OPTIONS: c_int = 131071
 pub let NSF_RESET: c_uint = 0x0001
 pub let NSF_CONDASSERT: c_uint = 0x0002
 pub let NSF_ATOMICSR: c_uint = 0x0004
+pub let PARSE_TRACKED_OPTIONS: c_int = 17048808
+pub let PARSE_TRACKED_EXTRA_OPTIONS: c_int = 8064
 pub let RSCAN_CACHE_SIZE: c_int = 8
 pub fn charfn_to[T](c: T) -> T {
     c
@@ -2095,6 +2092,7 @@ impl Copy for stateblock
 pub type RWS_anchor { next: *mut RWS_anchor = null, size: c_uint = 0, free: c_uint = 0 }
 impl Copy for RWS_anchor
 
+pub let PUBLIC_DFA_MATCH_OPTIONS: c_int = 1610629375
 pub let OP_PROP_EXTRA: c_int = 300
 pub let OP_EXTUNI_EXTRA: c_int = 320
 pub let OP_ANYNL_EXTRA: c_int = 340
@@ -2102,12 +2100,11 @@ pub let OP_HSPACE_EXTRA: c_int = 360
 pub let OP_VSPACE_EXTRA: c_int = 380
 pub let INTS_PER_STATEBLOCK: c_int = (((sizeof[stateblock]() / sizeof[c_int]()) as c_int) as c_int)
 pub let OVEC_UNIT: c_ulong = ((sizeof[usize]() / sizeof[c_int]()) as c_ulong)
-pub let RWS_BASE_SIZE: c_ulong = ((30720 / sizeof[c_int]()) as c_ulong)
 pub let RWS_RSIZE: c_int = 1000
 pub let RWS_OVEC_RSIZE: c_ulong = ((1000 * OVEC_UNIT) as c_ulong)
 pub let RWS_OVEC_OSIZE: c_ulong = ((2 * OVEC_UNIT) as c_ulong)
 pub let RWS_ANCHOR_SIZE: c_ulong = ((sizeof[RWS_anchor]() / sizeof[c_int]()) as c_ulong)
-pub let FF: c_int = 196608
+pub let OO: c_int = 12
 pub let REPTYPE_MIN: c_int = 0
 pub let REPTYPE_MAX: c_int = 1
 pub let REPTYPE_POS: c_int = 2
@@ -2180,6 +2177,7 @@ pub let RM222: c_int = 222
 pub let RM223: c_int = 223
 pub let RM224: c_int = 224
 pub let RECURSE_UNSET: c_uint = 0xffffffff
+pub let PUBLIC_JIT_MATCH_OPTIONS: c_int = 1073758271
 pub let MATCH_MATCH: c_int = 1
 pub let MATCH_NOMATCH: c_int = 0
 pub let MATCH_ACCEPT: c_int = -999
@@ -2202,13 +2200,11 @@ pub fn GF_DATAMASK[T](a: T) -> T {
     (a & 0x0000ffffu32)
 }
 pub let SERIALIZED_DATA_MAGIC: c_uint = 0x50523253
-pub let SERIALIZED_DATA_VERSION: c_int = ((10 | (47 << 16)) as c_int)
 @[repr(C)]
 pub type case_state { to_case: c_int = 0, single_char: c_int = 0 }
 impl Copy for case_state
 
 pub let PTR_STACK_SIZE: c_int = 20
-pub let SUBSTITUTE_OPTIONS: c_int = 237312
 pub let PCRE2_SUBSTITUTE_CASE_NONE: c_int = 0
 pub let PCRE2_SUBSTITUTE_CASE_REVERSE_TITLE_FIRST: c_int = 4
 pub let SSB_FAIL: c_int = 0
@@ -2216,6 +2212,7 @@ pub let SSB_DONE: c_int = 1
 pub let SSB_CONTINUE: c_int = 2
 pub let SSB_UNKNOWN: c_int = 3
 pub let SSB_TOODEEP: c_int = 4
+pub let LOOKBEHIND_MAX: c_int = ((65535 as c_int) as c_int)
 pub let MAX_CACHE_BACKREF: c_int = 128
 pub let SCRIPT_UNSET: c_int = 0
 pub let SCRIPT_MAP: c_int = 1
@@ -2525,6 +2522,8 @@ pub let CTL_ALLPD: c_int = 1343258655
 pub let CTL2_ALLPD: c_int = 537069823
 pub let MAXCPYGET: c_int = 10
 pub let LENCPYGET: c_int = 64
+pub let PCRE2_EXTRA_ASCII_ALL: c_int = 3840
+pub let POSIX_SUPPORTED_COMPILE_OPTIONS: c_int = 34473000
 pub let POSIX_SUPPORTED_COMPILE_EXTRA_OPTIONS: c_int = 0
 pub let POSIX_SUPPORTED_COMPILE_CONTROLS: c_int = 562103299
 pub let POSIX_SUPPORTED_COMPILE_CONTROLS2: c_int = 0

@@ -28,6 +28,7 @@ use std.re.pcre2_string_utils
 use std.re.pcre2_study
 use std.re.pcre2_valid_utf
 use std.re.pcre2_xclass
+use std.libc
 
 pub unsafe fn _pcre2_ckd_smul_8(__param_r: *mut c_ulong, __param_a: c_int, __param_b: c_int) -> c_int {
     var __local_m: c_longlong
@@ -44,7 +45,7 @@ pub unsafe fn _pcre2_ckd_smul_8(__param_r: *mut c_ulong, __param_a: c_int, __par
     var __ci_expr_logic_0: c_int = 0
 
     if ((if (sizeof[c_longlong]() as usize) > (sizeof[c_ulong]() as usize): 1 else: 0) != 0) {
-        (__ci_expr_logic_0 = (if (if __local_m > ((((0 as c_ulong) -% 1) as c_longlong)): 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if (if __local_m > ((libc.UINTPTR_MAX as c_longlong)): 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_0 != 0) {

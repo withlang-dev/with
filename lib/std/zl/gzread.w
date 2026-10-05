@@ -592,10 +592,10 @@ unsafe fn gz_load(__param_state: *mut gz_state, __param_buf: *mut u8, __param_le
     if ((if __local_ret < 0: 1 else: 0) != 0) {
         var __ci_expr_logic_0: c_int
 
-        if ((if (*(errno_ptr())) == 35: 1 else: 0) != 0) {
+        if ((if (*(errno_ptr())) == libc.EAGAIN: 1 else: 0) != 0) {
             (__ci_expr_logic_0 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_0 = (if (if (*(errno_ptr())) == 35: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_0 = (if (if (*(errno_ptr())) == libc.EAGAIN: 1 else: 0) != 0: 1 else: 0))
         }
 
         if (__ci_expr_logic_0 != 0) {

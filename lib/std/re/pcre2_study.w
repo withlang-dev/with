@@ -28,6 +28,7 @@ use std.re.pcre2_script_run
 use std.re.pcre2_string_utils
 use std.re.pcre2_valid_utf
 use std.re.pcre2_xclass
+use std.libc
 
 pub unsafe fn _pcre2_study_8(__param_re: *mut pcre2_real_code_8) -> c_int {
     var __local_count__goto_1917_5: c_int = 0
@@ -546,8 +547,8 @@ pub unsafe fn _pcre2_study_8(__param_re: *mut pcre2_real_code_8) -> c_int {
 
     '__ci_bb_71 {
         (__ci_expr_ternary_6 = 0)
-        if ((if __local_min__goto_2056_7 > 65535: 1 else: 0) != 0) {
-            (__ci_expr_ternary_6 = ((65535 as c_int)))
+        if ((if __local_min__goto_2056_7 > libc.UINT16_MAX: 1 else: 0) != 0) {
+            (__ci_expr_ternary_6 = ((libc.UINT16_MAX as c_int)))
         } else {
             (__ci_expr_ternary_6 = __local_min__goto_2056_7)
         }
@@ -754,7 +755,7 @@ unsafe fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *co
     }
 
     '__ci_bb_8 {
-        if ((if __local_branchlength__goto_107_5 >= 65535: 1 else: 0) != 0) {
+        if ((if __local_branchlength__goto_107_5 >= libc.UINT16_MAX: 1 else: 0) != 0) {
             goto '__ci_bb_11
         } else {
             goto '__ci_bb_12
@@ -766,7 +767,7 @@ unsafe fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *co
     }
 
     '__ci_bb_11 {
-        (__local_branchlength__goto_107_5 = ((65535 as c_int)))
+        (__local_branchlength__goto_107_5 = ((libc.UINT16_MAX as c_int)))
         (__local_cc__goto_116_12 = __local_nextbranch__goto_115_12)
         goto '__ci_bb_12
     }
@@ -1818,7 +1819,7 @@ unsafe fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *co
         if (__ci_expr_logic_25 != 0) {
             (__ci_expr_logic_26 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_26 = (if (if (65535 - __local_branchlength__goto_107_5) < (__local_min__goto_137_10 * __local_d__goto_137_7): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_26 = (if (if (libc.UINT16_MAX - __local_branchlength__goto_107_5) < (__local_min__goto_137_10 * __local_d__goto_137_7): 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_26 != 0) {
             goto '__ci_bb_181
@@ -1939,7 +1940,7 @@ unsafe fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *co
     }
 
     '__ci_bb_181 {
-        (__local_branchlength__goto_107_5 = ((65535 as c_int)))
+        (__local_branchlength__goto_107_5 = ((libc.UINT16_MAX as c_int)))
         goto '__ci_bb_183
     }
 

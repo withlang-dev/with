@@ -2155,7 +2155,7 @@ pub fn main() -> c_int writes SEED, compare_counter {
 
     printf(c"OK\n".ptr)
 
-    return 0
+    return libc.EXIT_SUCCESS
 
 }
 

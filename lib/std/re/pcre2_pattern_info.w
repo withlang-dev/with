@@ -28,6 +28,7 @@ use std.re.pcre2_string_utils
 use std.re.pcre2_study
 use std.re.pcre2_valid_utf
 use std.re.pcre2_xclass
+use std.libc
 
 pub unsafe fn pcre2_pattern_info_8(__param_code: *const pcre2_real_code_8, __param_what: c_uint, __param_where_: *mut c_void) -> c_int {
     var __local_re: *const pcre2_real_code_8 = __param_code
@@ -151,7 +152,7 @@ pub unsafe fn pcre2_pattern_info_8(__param_code: *const pcre2_real_code_8, __par
             21 => {
                 ((*(__param_where_ as *mut c_uint)) = (*__local_re).limit_depth)
 
-                if ((if (*__local_re).limit_depth == 4294967295: 1 else: 0) != 0) {
+                if ((if (*__local_re).limit_depth == libc.UINT32_MAX: 1 else: 0) != 0) {
                     return -55
                 }
 
@@ -216,7 +217,7 @@ pub unsafe fn pcre2_pattern_info_8(__param_code: *const pcre2_real_code_8, __par
             25 => {
                 ((*(__param_where_ as *mut c_uint)) = (*__local_re).limit_heap)
 
-                if ((if (*__local_re).limit_heap == 4294967295: 1 else: 0) != 0) {
+                if ((if (*__local_re).limit_heap == libc.UINT32_MAX: 1 else: 0) != 0) {
                     return -55
                 }
 
@@ -257,7 +258,7 @@ pub unsafe fn pcre2_pattern_info_8(__param_code: *const pcre2_real_code_8, __par
             14 => {
                 ((*(__param_where_ as *mut c_uint)) = (*__local_re).limit_match)
 
-                if ((if (*__local_re).limit_match == 4294967295: 1 else: 0) != 0) {
+                if ((if (*__local_re).limit_match == libc.UINT32_MAX: 1 else: 0) != 0) {
                     return -55
                 }
 

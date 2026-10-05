@@ -740,10 +740,10 @@ unsafe fn gz_comp(__param_state: *mut gz_state, __param_flush: c_int) -> c_int {
             if ((if __local_writ < 0: 1 else: 0) != 0) {
                 var __ci_expr_logic_2: c_int
 
-                if ((if (*(errno_ptr())) == 35: 1 else: 0) != 0) {
+                if ((if (*(errno_ptr())) == libc.EAGAIN: 1 else: 0) != 0) {
                     (__ci_expr_logic_2 = (if true: 1 else: 0))
                 } else {
-                    (__ci_expr_logic_2 = (if (if (*(errno_ptr())) == 35: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_2 = (if (if (*(errno_ptr())) == libc.EAGAIN: 1 else: 0) != 0: 1 else: 0))
                 }
 
                 if (__ci_expr_logic_2 != 0) {
@@ -834,10 +834,10 @@ unsafe fn gz_comp(__param_state: *mut gz_state, __param_flush: c_int) -> c_int {
                 if ((if __local_writ < 0: 1 else: 0) != 0) {
                     var __ci_expr_logic_8: c_int
 
-                    if ((if (*(errno_ptr())) == 35: 1 else: 0) != 0) {
+                    if ((if (*(errno_ptr())) == libc.EAGAIN: 1 else: 0) != 0) {
                         (__ci_expr_logic_8 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_8 = (if (if (*(errno_ptr())) == 35: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_8 = (if (if (*(errno_ptr())) == libc.EAGAIN: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_8 != 0) {

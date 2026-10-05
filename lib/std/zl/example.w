@@ -89,7 +89,7 @@ unsafe fn test_gzio(__param_fname: *const i8, __param_uncompr: *mut u8, __param_
 
     }
 
-    gzseek(__local_file, (1 as c_longlong), (1 as c_int))
+    gzseek(__local_file, (1 as c_longlong), (libc.SEEK_CUR as c_int))
 
     gzclose(__local_file)
 
@@ -121,7 +121,7 @@ unsafe fn test_gzio(__param_fname: *const i8, __param_uncompr: *mut u8, __param_
 
     }
 
-    (__local_pos = ((gzseek(__local_file, (-8 as c_longlong), (1 as c_int)) as c_longlong)))
+    (__local_pos = ((gzseek(__local_file, (-8 as c_longlong), (libc.SEEK_CUR as c_int)) as c_longlong)))
 
     var __ci_expr_logic_0: c_int
 

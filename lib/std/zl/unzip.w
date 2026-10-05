@@ -13,6 +13,7 @@ use std.zl.gzclose
 use std.zl.adler32
 use std.zl.crc32
 use std.zl.ioapi
+use std.libc
 
 pub unsafe fn unzStringFileNameCompare(__param_fileName1: *const i8, __param_fileName2: *const i8, __param_iCaseSensitivity: c_int) -> c_int {
     var __local_iCaseSensitivity = __param_iCaseSensitivity
@@ -655,7 +656,7 @@ pub unsafe fn unzOpenCurrentFile3(__param_file: *mut c_void, __param_method: *mu
 
         init_keys(__param_password, (&(*__local_s).keys[0] as *mut c_ulong), (*__local_s).pcrc_32_tab)
 
-        if ((if call_zseek64((((&raw const (*__local_s).z_filefunc as *const zlib_filefunc64_32_def_s) as *mut zlib_filefunc64_32_def_s) as *const zlib_filefunc64_32_def_s), (*__local_s).filestream, ((((*(*__local_s).pfile_in_zip_read).pos_in_zipfile as c_ulong) +% ((*(*__local_s).pfile_in_zip_read).byte_before_the_zipfile as c_ulong)) as c_ulong), (0 as c_int)) != 0: 1 else: 0) != 0) {
+        if ((if call_zseek64((((&raw const (*__local_s).z_filefunc as *const zlib_filefunc64_32_def_s) as *mut zlib_filefunc64_32_def_s) as *const zlib_filefunc64_32_def_s), (*__local_s).filestream, ((((*(*__local_s).pfile_in_zip_read).pos_in_zipfile as c_ulong) +% ((*(*__local_s).pfile_in_zip_read).byte_before_the_zipfile as c_ulong)) as c_ulong), (libc.SEEK_SET as c_int)) != 0: 1 else: 0) != 0) {
             return -104
         }
 

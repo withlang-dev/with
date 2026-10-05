@@ -30,6 +30,7 @@ use std.re.pcre2_valid_utf
 use std.re.pcre2_xclass
 use std.re.pcre2_compile_class
 use std.re.pcre2_compile_cgroup
+use std.libc
 
 pub unsafe fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_options: c_uint, __param_errorptr: *mut c_int, __param_erroroffset: *mut c_ulong, __param_ccontext: *mut pcre2_real_compile_context_8) -> *mut pcre2_real_code_8 writes _pcre2_default_compile_context_8 {
     var __local_pattern = __param_pattern
@@ -228,9 +229,9 @@ pub unsafe fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulon
         (__local_null_str__goto_10284_13 = [(205 as u8)])
         (__local_length__goto_10290_12 = ((1 as c_ulong)))
         (__local_setflags__goto_10297_10 = ((0 as c_uint)))
-        (__local_limit_heap__goto_10301_10 = ((4294967295 as c_uint)))
-        (__local_limit_match__goto_10302_10 = ((4294967295 as c_uint)))
-        (__local_limit_depth__goto_10303_10 = ((4294967295 as c_uint)))
+        (__local_limit_heap__goto_10301_10 = ((libc.UINT32_MAX as c_uint)))
+        (__local_limit_match__goto_10302_10 = ((libc.UINT32_MAX as c_uint)))
+        (__local_limit_depth__goto_10303_10 = ((libc.UINT32_MAX as c_uint)))
         (__local_newline__goto_10305_5 = ((0 as c_int)))
         (__local_bsr__goto_10306_5 = ((0 as c_int)))
         (__local_errorcode__goto_10307_5 = ((0 as c_int)))
@@ -681,7 +682,7 @@ pub unsafe fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulon
     }
 
     '__ci_bb_56 {
-        if ((if __local_c__goto_10503_18 > ((((4294967295 as c_uint) / (10 as c_uint)) as c_uint) -% (1 as c_uint)): 1 else: 0) != 0) {
+        if ((if __local_c__goto_10503_18 > ((((libc.UINT32_MAX as c_uint) / (10 as c_uint)) as c_uint) -% (1 as c_uint)): 1 else: 0) != 0) {
             goto '__ci_bb_58
         } else {
             goto '__ci_bb_59
@@ -5358,7 +5359,7 @@ unsafe fn get_branchlength(__param_pptrptr: *mut *mut c_uint, __param_minptr: *m
         } else {
             (__local_branchlength__goto_9580_5 = ((((__local_branchlength__goto_9580_5 as c_uint) + __local_itemlength__goto_9608_12) as c_int)))
 
-            (__ci_expr_logic_10 = (if (if __local_branchlength__goto_9580_5 > 65535: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_10 = (if (if __local_branchlength__goto_9580_5 > libc.UINT16_MAX: 1 else: 0) != 0: 1 else: 0))
 
         }
         if (__ci_expr_logic_10 != 0) {

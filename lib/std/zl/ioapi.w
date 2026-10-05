@@ -229,13 +229,13 @@ unsafe fn fseek_file_func(__param_opaque_: *mut c_void, __param_stream: *mut c_v
     while true {
         match __param_origin {
             1 => {
-                (__local_fseek_origin = ((1 as c_int)))
+                (__local_fseek_origin = ((libc.SEEK_CUR as c_int)))
             },
             2 => {
-                (__local_fseek_origin = ((2 as c_int)))
+                (__local_fseek_origin = ((libc.SEEK_END as c_int)))
             },
             0 => {
-                (__local_fseek_origin = ((0 as c_int)))
+                (__local_fseek_origin = ((libc.SEEK_SET as c_int)))
             },
             _ => {
                 return -1
@@ -265,13 +265,13 @@ unsafe fn fseek64_file_func(__param_opaque_: *mut c_void, __param_stream: *mut c
     while true {
         match __param_origin {
             1 => {
-                (__local_fseek_origin = ((1 as c_int)))
+                (__local_fseek_origin = ((libc.SEEK_CUR as c_int)))
             },
             2 => {
-                (__local_fseek_origin = ((2 as c_int)))
+                (__local_fseek_origin = ((libc.SEEK_END as c_int)))
             },
             0 => {
-                (__local_fseek_origin = ((0 as c_int)))
+                (__local_fseek_origin = ((libc.SEEK_SET as c_int)))
             },
             _ => {
                 return -1

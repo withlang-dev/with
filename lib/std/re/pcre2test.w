@@ -3141,9 +3141,9 @@ unsafe fn patctl_zero(__param_p: *mut patctl) {
 
     ((*__param_p).replacement[0] = ((255 as u8)))
 
-    ((*__param_p).convert_type = ((4294967295 as c_uint)))
+    ((*__param_p).convert_type = ((libc.UINT32_MAX as c_uint)))
 
-    ((*__param_p).convert_length = ((4294967295 as c_uint)))
+    ((*__param_p).convert_length = ((libc.UINT32_MAX as c_uint)))
 
     ((*__param_p).regerror_buffsize = ((-1 as c_int)))
 
@@ -3164,17 +3164,17 @@ unsafe fn datctl_zero(__param_d: *mut datctl) {
 
     ((*__param_d).get_numbers[0] = ((-1 as c_int)))
 
-    ((*__param_d).startend[1] = ((4294967295 as c_uint)))
+    ((*__param_d).startend[1] = ((libc.UINT32_MAX as c_uint)))
 
     ((*__param_d).startend[0] = (((*__param_d).startend[1] as c_uint)))
 
 
-    ((*__param_d).cerror[1] = ((4294967295 as c_uint)))
+    ((*__param_d).cerror[1] = ((libc.UINT32_MAX as c_uint)))
 
     ((*__param_d).cerror[0] = (((*__param_d).cerror[1] as c_uint)))
 
 
-    ((*__param_d).cfail[1] = ((4294967295 as c_uint)))
+    ((*__param_d).cfail[1] = ((libc.UINT32_MAX as c_uint)))
 
     ((*__param_d).cfail[0] = (((*__param_d).cfail[1] as c_uint)))
 
@@ -7234,7 +7234,7 @@ unsafe fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pct
     }
 
     '__ci_bb_97 {
-        if ((if (*(__local_field__goto_703_9 as *mut c_uint)) == 4294967295: 1 else: 0) != 0) {
+        if ((if (*(__local_field__goto_703_9 as *mut c_uint)) == libc.UINT32_MAX: 1 else: 0) != 0) {
             goto '__ci_bb_99
         } else {
             goto '__ci_bb_100
@@ -7911,7 +7911,7 @@ unsafe fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pct
             if (__ci_expr_logic_35 != 0) {
                 (__ci_expr_logic_36 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_36 = (if (if (*__param_pctl).locale[0] != 255: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_36 = (if (if (*__param_pctl).locale[0] != libc.UINT8_MAX: 1 else: 0) != 0: 1 else: 0))
             }
 
             if (__ci_expr_logic_36 != 0) {
@@ -9763,7 +9763,7 @@ fn process_pattern_8() -> c_int {
 
     '__ci_bb_26 {
         (__ci_expr_logic_5 = 0)
-        if ((if (unsafe *(&raw const pat_patctl as *const patctl)).convert_type != 4294967295: 1 else: 0) != 0) {
+        if ((if (unsafe *(&raw const pat_patctl as *const patctl)).convert_type != libc.UINT32_MAX: 1 else: 0) != 0) {
             (__ci_expr_logic_5 = (if (if (((unsafe *(&raw const pat_patctl as *const patctl)).control as c_uint) & (8388608 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_5 != 0) {
@@ -9861,7 +9861,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_39 {
-        if ((if (unsafe *(&raw const pat_patctl as *const patctl)).locale[0] != 255: 1 else: 0) != 0) {
+        if ((if (unsafe *(&raw const pat_patctl as *const patctl)).locale[0] != libc.UINT8_MAX: 1 else: 0) != 0) {
             goto '__ci_bb_93
         } else {
             goto '__ci_bb_94
@@ -10276,7 +10276,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_97 {
-        if ((if setlocale((2 as c_int), ((&(unsafe *(&raw const pat_patctl as *const patctl)).locale[0] as *const c_char) + ((1 as isize) as usize))) == null: 1 else: 0) != 0) {
+        if ((if setlocale((libc.LC_CTYPE as c_int), ((&(unsafe *(&raw const pat_patctl as *const patctl)).locale[0] as *const c_char) + ((1 as isize) as usize))) == null: 1 else: 0) != 0) {
             goto '__ci_bb_98
         } else {
             goto '__ci_bb_99
@@ -10417,7 +10417,7 @@ fn process_pattern_8() -> c_int {
     '__ci_bb_118 {
         (__local_cflags__goto_2350_7 = ((0 as c_int)))
         (__local_msg__goto_2351_15 = c"** Ignored with POSIX interface:".ptr)
-        if ((if (unsafe *(&raw const pat_patctl as *const patctl)).locale[0] != 255: 1 else: 0) != 0) {
+        if ((if (unsafe *(&raw const pat_patctl as *const patctl)).locale[0] != libc.UINT8_MAX: 1 else: 0) != 0) {
             goto '__ci_bb_120
         } else {
             goto '__ci_bb_121
@@ -10438,7 +10438,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_121 {
-        if ((if (unsafe *(&raw const pat_patctl as *const patctl)).replacement[0] != 255: 1 else: 0) != 0) {
+        if ((if (unsafe *(&raw const pat_patctl as *const patctl)).replacement[0] != libc.UINT8_MAX: 1 else: 0) != 0) {
             goto '__ci_bb_122
         } else {
             goto '__ci_bb_123
@@ -10861,7 +10861,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_176 {
-        if ((if (unsafe *(&raw const pat_patctl as *const patctl)).replacement[0] != 255: 1 else: 0) != 0) {
+        if ((if (unsafe *(&raw const pat_patctl as *const patctl)).replacement[0] != libc.UINT8_MAX: 1 else: 0) != 0) {
             goto '__ci_bb_178
         } else {
             goto '__ci_bb_179
@@ -10870,7 +10870,7 @@ fn process_pattern_8() -> c_int {
 
     '__ci_bb_177 {
         (__local_errorcode__goto_2015_9 = ((0 as c_int)))
-        if ((if (unsafe *(&raw const pat_patctl as *const patctl)).convert_type != 4294967295: 1 else: 0) != 0) {
+        if ((if (unsafe *(&raw const pat_patctl as *const patctl)).convert_type != libc.UINT32_MAX: 1 else: 0) != 0) {
             goto '__ci_bb_184
         } else {
             goto '__ci_bb_185
@@ -10930,7 +10930,7 @@ fn process_pattern_8() -> c_int {
         (__local_convert_return__goto_2563_7 = PR_OK)
         (__local_convert_options__goto_2564_12 = (unsafe *(&raw const pat_patctl as *const patctl)).convert_type)
         (__local_converted_length__goto_2566_14 = ((3735928559 as c_ulong)))
-        if ((if (unsafe *(&raw const pat_patctl as *const patctl)).convert_length != 4294967295: 1 else: 0) != 0) {
+        if ((if (unsafe *(&raw const pat_patctl as *const patctl)).convert_length != libc.UINT32_MAX: 1 else: 0) != 0) {
             goto '__ci_bb_186
         } else {
             goto '__ci_bb_187
@@ -11051,7 +11051,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_199 {
-        if ((if (unsafe *(&raw const pat_patctl as *const patctl)).convert_length != 4294967295: 1 else: 0) != 0) {
+        if ((if (unsafe *(&raw const pat_patctl as *const patctl)).convert_length != libc.UINT32_MAX: 1 else: 0) != 0) {
             goto '__ci_bb_212
         } else {
             goto '__ci_bb_213
@@ -11963,7 +11963,7 @@ unsafe fn check_match_limit_8(__param_pp: *const u8, __param_ulen: c_ulong, __pa
 
     var __local_mid: c_uint = ((64 as c_uint))
 
-    var __local_max: c_uint = ((4294967295 as c_uint))
+    var __local_max: c_uint = ((libc.UINT32_MAX as c_uint))
 
     var __local_saved_outfile: *mut c_void = outfile
 
@@ -12050,7 +12050,7 @@ unsafe fn check_match_limit_8(__param_pp: *const u8, __param_ulen: c_ulong, __pa
             } else {
                 var __ci_expr_ternary_1: c_uint = 0
 
-                if ((if __local_max != 4294967295: 1 else: 0) != 0) {
+                if ((if __local_max != libc.UINT32_MAX: 1 else: 0) != 0) {
                     (__ci_expr_ternary_1 = ((((((__local_min as c_uint) +% (__local_max as c_uint)) as c_uint) / (2 as c_uint)) as c_uint)))
                 } else {
                     (__ci_expr_ternary_1 = ((((__local_mid as c_uint) *% (2 as c_uint)) as c_uint)))
@@ -13964,7 +13964,7 @@ fn process_data_8() -> c_int {
         (dat_datctl.control = ((unsafe *(&raw const dat_datctl as *const datctl)).control as c_uint) | ((((unsafe *(&raw const pat_patctl as *const patctl)).control as c_uint) & (((((((((((((((((1 as c_uint) | (2 as c_uint)) as c_uint) | (4 as c_uint)) as c_uint) | (8 as c_uint)) as c_uint) | (16 as c_uint)) as c_uint) | (32768 as c_uint)) as c_uint) | (1048576 as c_uint)) as c_uint) | (268435456 as c_uint)) as c_uint) | (1073741824 as c_uint)) as c_uint)) as c_uint))
         (dat_datctl.control2 = ((unsafe *(&raw const dat_datctl as *const datctl)).control2 as c_uint) | ((((unsafe *(&raw const pat_patctl as *const patctl)).control2 as c_uint) & (((((((((((((((((((((((1 as c_uint) | (2 as c_uint)) as c_uint) | (4 as c_uint)) as c_uint) | (8 as c_uint)) as c_uint) | (16 as c_uint)) as c_uint) | (32 as c_uint)) as c_uint) | (64 as c_uint)) as c_uint) | (128 as c_uint)) as c_uint) | (2048 as c_uint)) as c_uint) | (65536 as c_uint)) as c_uint) | (131072 as c_uint)) as c_uint) | (536870912 as c_uint)) as c_uint)) as c_uint))
         (dat_datctl.replacement[0] = (((unsafe *(&raw const pat_patctl as *const patctl)).replacement[0] as u8)))
-        if ((if (unsafe *(&raw const pat_patctl as *const patctl)).replacement[0] != 255: 1 else: 0) != 0) {
+        if ((if (unsafe *(&raw const pat_patctl as *const patctl)).replacement[0] != libc.UINT8_MAX: 1 else: 0) != 0) {
             goto '__ci_bb_1
         } else {
             goto '__ci_bb_2
@@ -14153,7 +14153,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_26 {
-        if ((if dbuffer_size < ((((0 as c_ulong) -% 1) as c_ulong) / (2 as c_ulong)): 1 else: 0) != 0) {
+        if ((if dbuffer_size < ((libc.UINTPTR_MAX as c_ulong) / (2 as c_ulong)): 1 else: 0) != 0) {
             goto '__ci_bb_28
         } else {
             goto '__ci_bb_29
@@ -14314,7 +14314,7 @@ fn process_data_8() -> c_int {
         (__local_replen__goto_3956_10 = ((((((__local_q__goto_3851_14 as usize) -% (__local_start_rep__goto_3852_14 as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         (__ci_expr_logic_10 = 0)
         if ((if __local_i__goto_3955_7 > 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_10 = (if (if __local_replen__goto_3956_10 > ((((((0 as c_ulong) -% 1) as c_ulong) -% (__local_needlen__goto_3842_8 as c_ulong)) as c_ulong) / (__local_i__goto_3955_7 as c_ulong)): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_10 = (if (if __local_replen__goto_3956_10 > ((((libc.UINTPTR_MAX as c_ulong) -% (__local_needlen__goto_3842_8 as c_ulong)) as c_ulong) / (__local_i__goto_3955_7 as c_ulong)): 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_10 != 0) {
             goto '__ci_bb_46
@@ -14358,7 +14358,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_51 {
-        if ((if dbuffer_size < ((((0 as c_ulong) -% 1) as c_ulong) / (2 as c_ulong)): 1 else: 0) != 0) {
+        if ((if dbuffer_size < ((libc.UINTPTR_MAX as c_ulong) / (2 as c_ulong)): 1 else: 0) != 0) {
             goto '__ci_bb_53
         } else {
             goto '__ci_bb_54
@@ -15320,7 +15320,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_181 {
-        if ((if (unsafe *(&raw const dat_datctl as *const datctl)).replacement[0] != 255: 1 else: 0) != 0) {
+        if ((if (unsafe *(&raw const dat_datctl as *const datctl)).replacement[0] != libc.UINT8_MAX: 1 else: 0) != 0) {
             goto '__ci_bb_184
         } else {
             goto '__ci_bb_185
@@ -15350,7 +15350,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_185 {
-        if ((if (unsafe *(&raw const dat_datctl as *const datctl)).substitute_subject[0] != 255: 1 else: 0) != 0) {
+        if ((if (unsafe *(&raw const dat_datctl as *const datctl)).substitute_subject[0] != libc.UINT8_MAX: 1 else: 0) != 0) {
             goto '__ci_bb_195
         } else {
             goto '__ci_bb_196
@@ -15408,7 +15408,7 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_192 {
         (__ci_expr_logic_43 = 0)
-        if ((if (unsafe *(&raw const dat_datctl as *const datctl)).substitute_subject[0] != 255: 1 else: 0) != 0) {
+        if ((if (unsafe *(&raw const dat_datctl as *const datctl)).substitute_subject[0] != libc.UINT8_MAX: 1 else: 0) != 0) {
             (__ci_expr_logic_43 = (if (if (((unsafe *(&raw const dat_datctl as *const datctl)).control2 as c_uint) & (8 as c_uint)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_43 != 0) {
@@ -15512,10 +15512,10 @@ fn process_data_8() -> c_int {
         (__local_eflags__goto_4393_7 = ((0 as c_int)))
         (__local_pmatch__goto_4394_15 = ((null as *mut regmatch_t)))
         (__local_msg__goto_4396_15 = c"** Ignored with POSIX interface:".ptr)
-        if ((if (unsafe *(&raw const dat_datctl as *const datctl)).cerror[0] != 4294967295: 1 else: 0) != 0) {
+        if ((if (unsafe *(&raw const dat_datctl as *const datctl)).cerror[0] != libc.UINT32_MAX: 1 else: 0) != 0) {
             (__ci_expr_logic_46 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_46 = (if (if (unsafe *(&raw const dat_datctl as *const datctl)).cerror[1] != 4294967295: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_46 = (if (if (unsafe *(&raw const dat_datctl as *const datctl)).cerror[1] != libc.UINT32_MAX: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_46 != 0) {
             goto '__ci_bb_207
@@ -15525,7 +15525,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_206 {
-        if ((if (unsafe *(&raw const dat_datctl as *const datctl)).startend[0] != 4294967295: 1 else: 0) != 0) {
+        if ((if (unsafe *(&raw const dat_datctl as *const datctl)).startend[0] != libc.UINT32_MAX: 1 else: 0) != 0) {
             goto '__ci_bb_264
         } else {
             goto '__ci_bb_265
@@ -15538,10 +15538,10 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_208 {
-        if ((if (unsafe *(&raw const dat_datctl as *const datctl)).cfail[0] != 4294967295: 1 else: 0) != 0) {
+        if ((if (unsafe *(&raw const dat_datctl as *const datctl)).cfail[0] != libc.UINT32_MAX: 1 else: 0) != 0) {
             (__ci_expr_logic_47 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_47 = (if (if (unsafe *(&raw const dat_datctl as *const datctl)).cfail[1] != 4294967295: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_47 = (if (if (unsafe *(&raw const dat_datctl as *const datctl)).cfail[1] != libc.UINT32_MAX: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_47 != 0) {
             goto '__ci_bb_209
@@ -15684,7 +15684,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_226 {
-        if ((if (unsafe *(&raw const dat_datctl as *const datctl)).startend[0] != 4294967295: 1 else: 0) != 0) {
+        if ((if (unsafe *(&raw const dat_datctl as *const datctl)).startend[0] != libc.UINT32_MAX: 1 else: 0) != 0) {
             goto '__ci_bb_229
         } else {
             goto '__ci_bb_230
@@ -16156,7 +16156,7 @@ fn process_data_8() -> c_int {
         (__local_oveccount__goto_3849_10 = ((unsafe { pcre2_get_ovector_count_8(match_data_8) } as c_uint)))
         (__ci_expr_logic_59 = 0)
         (__ci_expr_logic_58 = 0)
-        if ((if (unsafe *(&raw const dat_datctl as *const datctl)).replacement[0] != 255: 1 else: 0) != 0) {
+        if ((if (unsafe *(&raw const dat_datctl as *const datctl)).replacement[0] != libc.UINT8_MAX: 1 else: 0) != 0) {
             (__ci_expr_logic_58 = (if (if (((unsafe *(&raw const dat_datctl as *const datctl)).control as c_uint) & (512 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_58 != 0) {
@@ -16178,7 +16178,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_293 {
-        if ((if (unsafe *(&raw const dat_datctl as *const datctl)).replacement[0] != 255: 1 else: 0) != 0) {
+        if ((if (unsafe *(&raw const dat_datctl as *const datctl)).replacement[0] != libc.UINT8_MAX: 1 else: 0) != 0) {
             goto '__ci_bb_294
         } else {
             goto '__ci_bb_295
@@ -16471,7 +16471,7 @@ fn process_data_8() -> c_int {
         (__local_rbptr__goto_4649_16 = __ci_expr_ternary_72)
         (__local_sbptr__goto_4650_16 = __local_pp__goto_3853_14)
         (__local_slen__goto_4653_54 = __local_arg_ulen__goto_3836_18)
-        if ((if (unsafe *(&raw const dat_datctl as *const datctl)).substitute_subject[0] != 255: 1 else: 0) != 0) {
+        if ((if (unsafe *(&raw const dat_datctl as *const datctl)).substitute_subject[0] != libc.UINT8_MAX: 1 else: 0) != 0) {
             goto '__ci_bb_326
         } else {
             goto '__ci_bb_327
@@ -24357,7 +24357,7 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
     '__ci_bb_34 {
         (__local_stack_size__goto_3781_14 = ((__local_uli__goto_3684_17 as c_uint)))
-        getrlimit((3 as c_int), (&raw mut __local_rlim_old__goto_3782_25 as *mut rlimit))
+        getrlimit((libc.RLIMIT_STACK as c_int), (&raw mut __local_rlim_old__goto_3782_25 as *mut rlimit))
         with_memcpy((&raw mut __local_rlim__goto_3782_19 as *mut u8), (&raw const __local_rlim_old__goto_3782_25 as *const u8), sizeof[rlimit]())
         (__local_rlim__goto_3782_19.rlim_cur = ((((((__local_stack_size__goto_3781_14 as c_uint) *% (1024 as c_uint)) as c_uint) *% (1024 as c_uint)) as c_ulonglong)))
         (__ci_expr_logic_4 = 0)
@@ -24436,7 +24436,7 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
     }
 
     '__ci_bb_43 {
-        (__local_rc__goto_3780_9 = ((setrlimit((3 as c_int), ((&raw mut __local_rlim__goto_3782_19 as *mut rlimit) as *const rlimit)) as c_int)))
+        (__local_rc__goto_3780_9 = ((setrlimit((libc.RLIMIT_STACK as c_int), ((&raw mut __local_rlim__goto_3782_19 as *mut rlimit) as *const rlimit)) as c_int)))
         goto '__ci_bb_44
     }
 
@@ -25399,7 +25399,7 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
     '__ci_bb_166 {
         free_active_pattern()
         (__local_skipping__goto_3649_6 = ((0 as c_int)))
-        setlocale((2 as c_int), c"C".ptr)
+        setlocale((libc.LC_CTYPE as c_int), c"C".ptr)
         goto '__ci_bb_164
     }
 
