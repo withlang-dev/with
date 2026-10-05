@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D99 — `TotalF64` lives in `std.traits` and is imported (delegated)](2026-10-05-D99-totalf64-lives-in-std-traits.md)
 - [D98 — Delegated decisions: an agent implements its prediction and Eric vetoes afterwards](2026-10-05-D98-delegated-decisions.md)
 - [D97 — `TotalF64` is a numeric float key; `None` sorts first by declaration order; a facade may state one error type](2026-10-05-D97-totalf64-none-first-one-facade-error-type.md)
 - [D96 — A key is any structurally comparable value; a custom equality is a key projection; maps are seeded and iterate in insertion order](2026-10-05-D96-keys-are-structural-a-key-projection-seeded-insertion-ordered-maps.md)

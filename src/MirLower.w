@@ -5019,9 +5019,20 @@ impl MirBuilder:
             self.expected_type = lhs_ty
         else:
             self.expected_type = saved_expected
-        let rhs = if observes_strings and self.type_id_is_str(rhs_ty) != 0: self.lower_observer_probe_arg(rhs_expr) else: self.lower_comparison_operand(is_cmp, rhs_expr)
+        var rhs = if observes_strings and self.type_id_is_str(rhs_ty) != 0: self.lower_observer_probe_arg(rhs_expr) else: self.lower_comparison_operand(is_cmp, rhs_expr)
         self.expected_type = saved_expected
-        let rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, op, lhs, rhs)
+        // §11.7 (D96, D97): a type that compares by its key projection or its
+        // `cmp` (TotalF64, a distinct float) keeps that type on both operands:
+        // a folded `T64(1.0)` is a bare float constant otherwise, and codegen
+        // would compare the floats.
+        var lhs_cmp = lhs
+        if is_cmp and lhs_ty != 0 and lhs_ty == rhs_ty and (self.sema.concrete_key_sigs.contains(lhs_resolved) or self.sema.concrete_cmp_sigs.contains(lhs_resolved)):
+            let span = self.ast.get_start(node)
+            let lhs_place = self.materialize_operand(lhs, lhs_ty, span)
+            lhs_cmp = self.operand_for_place(lhs_place, lhs_ty)
+            let rhs_place = self.materialize_operand(rhs, rhs_ty, span)
+            rhs = self.operand_for_place(rhs_place, rhs_ty)
+        let rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, op, lhs_cmp, rhs)
         var ty = self.expr_type(node)
         if ty == 0 or ty == self.sema.ty_void:
             let lhs_op_ty = self.operand_type(lhs)
@@ -15880,7 +15891,15 @@ impl MirBuilder:
                 let fa_base_resolved = self.sema.resolve_alias(fa_base_type)
                 let fa_base_sym = self.sema.get_type_d0(fa_base_resolved)
                 if fa_base_sym > 0 and self.sema.distinct_type_names.contains(fa_base_sym):
-                    return self.lower_expr(fa_base)
+                    // The same bytes, with Sema's type for `.value` (the inner
+                    // type): a consumer that reads the operand's type (an
+                    // f-string's formatter) must see `f64`, not the wrapper.
+                    let fa_inner_ty = self.expr_type(node)
+                    let fa_value = self.lower_expr(fa_base)
+                    if fa_inner_ty == 0 or fa_inner_ty == fa_base_type:
+                        return fa_value
+                    let fa_place = self.materialize_operand(fa_value, fa_inner_ty, self.ast.get_start(node))
+                    return self.operand_for_place(fa_place, fa_inner_ty)
             // Enum variant access: Color.Red → discriminant value constant
             if self.ast.kind(fa_base) == NodeKind.NK_IDENT:
                 let fa_base_ast_sym = self.ast.get_data0(fa_base)

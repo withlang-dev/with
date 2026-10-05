@@ -83,6 +83,41 @@ pub trait Deref[T]:
 pub trait Key:
     fn key(self: &Self)
 
+/// A float as a key (§11.7, D97): `==` is numeric except that every NaN
+/// equals every NaN and `-0.0` equals `0.0`; the order is the float order
+/// with NaN above every number. `TotalF64(x)` wraps, `.value` unwraps.
+pub type TotalF64 = distinct f64
+
+/// `TotalF64` for an `f32`.
+pub type TotalF32 = distinct f32
+
+// Every NaN is one key and -0.0 is 0.0; any other float keys by its bits.
+impl Key for TotalF64:
+    fn key() -> u64:
+        let v = self.value
+        if v != v: return 0x7ff8000000000000
+        if v == 0.0: return 0
+        unsafe { transmute[u64](v) }
+
+impl Key for TotalF32:
+    fn key() -> u32:
+        let v = self.value
+        if v != v: return 0x7fc00000
+        if v == 0.0: return 0
+        unsafe { transmute[u32](v) }
+
+impl Ord for TotalF64:
+    fn cmp(other: &Self) -> i32: total_float_cmp(self.value, other.value)
+
+impl Ord for TotalF32:
+    fn cmp(other: &Self) -> i32: total_float_cmp(self.value as f64, other.value as f64)
+
+// The float order with every NaN above every number and equal to the others.
+fn total_float_cmp(a: f64, b: f64) -> i32:
+    if a != a: return if b != b: 0 else: 1
+    if b != b: return -1
+    if a < b: -1 else if a > b: 1 else: 0
+
 /// Debug formatting. Used by `f"{value:?}"` format specifier.
 pub trait Debug:
     fn debug_str(self: &Self) -> str

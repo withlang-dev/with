@@ -28025,7 +28025,7 @@ impl Sema:
         let part = (problem % 4294967296) as i32
         if problem / 4294967296 == 1:
             let what = if part == self.resolve_alias(tid as TypeId) as i32: "it is a float" else: f"it holds a `{self.type_name(part)}`"
-            self.emit_error_with_help(f"`{self.type_name(tid)}` cannot be a map key: {what}, and a NaN key is never found again (§11.7)", node, "key by a projection that is a key, such as `impl Key for T: fn key(): (self.x * 1000.0) as i64`")
+            self.emit_error_with_help(f"`{self.type_name(tid)}` cannot be a map key: {what}, and a NaN key is never found again (§11.7)", node, "wrap the float as `TotalF64(x)` (`use std.traits.TotalF64`), whose NaN equals NaN and whose -0.0 equals 0.0, or key by a projection that is a key")
             return
         self.emit_error_with_help(f"`{self.type_name(part)}` cannot be a map key: it defines its own `eq`, and a map hashes it by its parts, which that `eq` may not compare (§11.7)", node, f"state the part equality is about: `impl Key for {self.type_name(part)}: fn key(): ...`")
 

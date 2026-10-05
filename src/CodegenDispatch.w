@@ -2312,6 +2312,17 @@ impl Codegen:
         self.compare_str_order(lhs_cmp, rhs_cmp, op)
 
     mut fn mir_build_eq_from_sema(op: i32, lhs: i64, rhs: i64, lhs_sema: i32, rhs_sema: i32) -> i64:
+        // §11.7 (D96): a type with a key projection is equal where its keys
+        // are, whatever represents it (a distinct float: TotalF64, D97).
+        let keyed_live = self.mir_eq_live_type(lhs_sema)
+        if self.sema.concrete_key_sigs.contains(keyed_live) and keyed_live == self.mir_eq_live_type(rhs_sema) and wl_type_of(lhs) == wl_type_of(rhs):
+            let keyed_ty = wl_type_of(lhs)
+            let lhs_keyed = self.create_entry_alloca(keyed_ty)
+            let rhs_keyed = self.create_entry_alloca(keyed_ty)
+            wl_build_store(self.builder, lhs, lhs_keyed)
+            wl_build_store(self.builder, rhs, rhs_keyed)
+            let keyed_equal = self.mir_emit_eq_ptrs(lhs_keyed, rhs_keyed, keyed_ty, lhs_sema)
+            return if op == BinaryOp.OP_EQ: keyed_equal else: wl_build_not(self.builder, keyed_equal)
         let lhs_kind = self.mir_compare_dispatch_kind(lhs_sema)
         let rhs_kind = self.mir_compare_dispatch_kind(rhs_sema)
         if lhs_kind == 0 or rhs_kind == 0 or lhs_kind != rhs_kind:
@@ -2376,6 +2387,8 @@ impl Codegen:
         if key_sig >= 0 and key_sym != 0:
             let concrete = self.ensure_concrete_mir_function(0, key_sig, key_sym, 0, "Key.key")
             if concrete.sym == 0:
+                with_eprint("error: internal compiler error: a key projection Sema recorded has no function to call")
+                self.had_error = 1
                 return wl_get_undef(wl_i1_type(self.context))
             let key_ret = self.sema.sig_return_type(key_sig)
             let left_args: Vec[i64] = [lp]
