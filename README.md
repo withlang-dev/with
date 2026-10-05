@@ -107,8 +107,7 @@ with run tiny.w
 ```
 
 `with migrate` turns C source into With source that you check in and
-maintain. (`--c-export` also exports the functions under their C names,
-for C code that still calls them.) Parts of the standard library are its output: the regex engine
+maintain. Parts of the standard library are its output: the regex engine
 behind `=~` is PCRE2 (35 modules), and `std.zlib` is zlib (22 modules), both
 migrated from the upstream C and kept in step with it by a drift check in
 the build. The translation is literal: migrated code keeps C's pointer
