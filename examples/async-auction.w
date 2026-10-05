@@ -23,7 +23,7 @@ var bids_submitted: Atomic[i32] = Atomic.new(0)
 var rounds_completed: Atomic[i32] = Atomic.new(0)
 var defer_trace: Atomic[i32] = Atomic.new(0)
 
-fn cleanups() -> i32: cleanup_count.load(.SeqCst)
+fn cleanups(): cleanup_count.load(.SeqCst)
 
 // ---------------------------------------------------------------------------
 // Domain types
@@ -106,7 +106,7 @@ async fn process_winning_bid(amount: i32) -> Result[i32, str]:
 // Task escaping a sync function
 // ---------------------------------------------------------------------------
 
-fn spawn_valuation(bid: Bid) -> Task[i32]:
+fn spawn_valuation(bid: Bid):
     full_valuation(bid)
 
 // ---------------------------------------------------------------------------

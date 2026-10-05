@@ -228,7 +228,7 @@ fn endpoint(settings: &HashMap[str, str]) -> Result[str, ConfigError]:
     f"{host}:{port}"
 
 fn main:
-    var settings: HashMap[str, str] = ["host": "localhost", "port": "8080"]
+    var settings = ["host": "localhost", "port": "8080"]
     match endpoint(settings):
         .Ok(e) => print(e)                               // localhost:8080
         .Err(.Missing(key)) => print(f"missing '{key}'")

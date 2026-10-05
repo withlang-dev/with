@@ -60,9 +60,9 @@ type Tokenizer {
     pos: usize = 0,
 }
 
-fn is_whitespace(ch: u8) -> bool: ch in [b' ', b'\t', b'\n', b'\r']
+fn is_whitespace(ch: u8): ch in [b' ', b'\t', b'\n', b'\r']
 
-fn is_digit(ch: u8) -> bool: ch in b'0'..=b'9'
+fn is_digit(ch: u8): ch in b'0'..=b'9'
 
 fn Tokenizer.new(input: str): Tokenizer { input }
 
@@ -172,8 +172,8 @@ extend Tokenizer:
 
 // Simple number parsing helper
 fn parse_number_str(text: str, start: usize) -> Result[f64, JsonError]:
-    var result: f64 = 0.0
-    var sign: f64 = 1.0
+    var result = 0.0
+    var sign = 1.0
     var i: usize = 0
 
     // handle sign
@@ -189,7 +189,7 @@ fn parse_number_str(text: str, start: usize) -> Result[f64, JsonError]:
     // fractional part
     if i < text.len() and text.byte_at(i as i64) == b'.':
         i += 1
-        var frac: f64 = 0.1
+        var frac = 0.1
         while i < text.len() and is_digit(text.byte_at(i as i64) as u8):
             result = result + (text.byte_at(i as i64) - b'0') as f64 * frac
             frac = frac * 0.1
@@ -249,7 +249,7 @@ extend Parser:
 
     // Called after '[' was consumed.
     mut fn parse_array() -> Result[JsonValue, JsonError]:
-        var items: Vec[JsonValue] = Vec.new()
+        var items = Vec.new()
         // empty array
         if is_rbracket(&self.current):
             self.advance()?
@@ -272,7 +272,7 @@ extend Parser:
 
     // Called after '{' was consumed.
     mut fn parse_object() -> Result[JsonValue, JsonError]:
-        var entries: Vec[JsonKV] = Vec.new()
+        var entries = Vec.new()
         // empty object
         if is_rbrace(&self.current):
             self.advance()?
@@ -324,13 +324,13 @@ fn json_to_string(val: &JsonValue) -> str:
         .Number(n)  => f"{n}"
         .Str(s)     => "\"" ++ s ++ "\""
         .Array(items) =>
-            var parts: Vec[str] = Vec.new()
+            var parts = Vec.new()
             for item in items:
                 parts.push(json_to_string(item))
             let inner = parts.join(", ")
             "[" ++ inner ++ "]"
         .Object(entries) =>
-            var parts: Vec[str] = Vec.new()
+            var parts = Vec.new()
             for entry in entries:
                 let v = json_to_string(&entry.value)
                 parts.push("\"" ++ entry.key ++ "\": " ++ v)

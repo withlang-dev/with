@@ -17,7 +17,7 @@ fn find_user(id: i32) -> LookupResult:
     else:
         .NotFound
 
-fn format_user(user: User) -> str:
+fn format_user(user: User):
     f"{user.name} (#{user.id})"
 
 fn get_dashboard(user_id: i32) -> str:
@@ -34,9 +34,9 @@ fn get_dashboard(user_id: i32) -> str:
 
 // --- Pipeline composition ---
 
-fn double(x: i32) -> i32: x * 2
-fn add_one(x: i32) -> i32: x + 1
-fn to_str(x: i32) -> str: f"{x}"
+fn double(x: i32): x * 2
+fn add_one(x: i32): x + 1
+fn to_str(x: i32): f"{x}"
 
 fn pipeline_demo:
     let result = 5 |> double |> add_one |> to_str

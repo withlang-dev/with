@@ -900,7 +900,7 @@ fn gate_fixed_targets() -> Vec[str]:
     // Built by push: the pinned seed evaluating build.w cannot take .len() of a
     // collection literal (the #1122 class).
     var fixed: Vec[str] = Vec.new()
-    for name in "build selfcheck reseed-check-build-w abi-hash-check unit-return-review spec-inventory-check sema-order-check examples-tests benchmarks-check c-migrator-basic-tests deep-debug-tool-tests user-programs-safe no-host-toolchain every-target-check source-fetch-tests source-cache-tests corpus-drift-check".split(" "): fixed.push(name.clone())
+    for name in "build selfcheck reseed-check-build-w abi-hash-check unit-return-review spec-inventory-check sema-order-check examples-tests benchmarks-check c-migrator-basic-tests deep-debug-tool-tests user-programs-safe no-host-toolchain every-target-check source-fetch-tests source-cache-tests corpus-drift-check ceremony-check".split(" "): fixed.push(name.clone())
     fixed
 
 fn gate_times_ledger_path() -> str: "out/.build-state/battery-times.tsv"
@@ -2198,6 +2198,34 @@ fn run_unit_return_review_action(ctx: ActionCtx) -> i32:
     print(fs.read_text(stdout_rel))
     if result.rc != 0:
         ctx.diagnostics().error("unit-return-review: " ++ fs.read_text(stderr_rel))
+    0
+
+// #2140: the text we publish spells nothing the compiler already decides.
+// tools/ceremony_audit.w removes each candidate return type and annotation,
+// recompiles, and reports the ones whose removal changes no type; a finding
+// is a red. The UAT fixtures join the list when their one finding
+// (libcurl_main.w `fetch_bytes`) is approved.
+fn run_ceremony_check_action(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    let out_dir = ctx.output()
+    if fs.mkdir_all(out_dir) != 0: return 1
+    let root = ctx.project_info().project_root()
+    let compiler = build_project_abs(root, ctx.inputs()[0])
+    var args: Vec[str] = Vec.new()
+    args.push(compiler.clone())
+    args.push("run")
+    args.push("tools/ceremony_audit.w")
+    args.push("--with")
+    args.push(compiler.clone())
+    args.push("--scratch")
+    args.push(build_project_join(out_dir, "work"))
+    for file in "README.md examples/hello.w examples/fizzbuzz.w examples/json_test.w examples/async-auction.w examples/async-collection-await.w examples/async-tuple-await.w examples/idiomatic/idiomatic.w examples/channels/pipeline.w examples/ephemerality-and-lowering/ephemerality_and_lowering.w examples/json-parser/json.w".split(" "): args.push(file ++ "")
+    let stdout_rel = build_project_join(out_dir, "audit.stdout")
+    let stderr_rel = build_project_join(out_dir, "audit.stderr")
+    let result = ctx.process_runner().run_capture_cwd(args, build_project_abs(root, stdout_rel), build_project_abs(root, stderr_rel), 1200000, root)
+    print(fs.read_text(stdout_rel))
+    if result.rc != 0:
+        ctx.diagnostics().error("ceremony-check: the text above spells what the compiler already decides (`with run tools/ceremony_audit.w --fix <file>` rewrites a .w file)\n" ++ fs.read_text(stderr_rel))
     0
 
 fn run_rt_decl_audit_action(ctx: ActionCtx) -> i32:
@@ -3956,6 +3984,15 @@ pub fn build(ctx: BuildCtx) -> Build:
     unit_review = unit_review.dep("build")
     unit_review = unit_review.write_scope("out/unit-return-review")
     out = out.add_target(unit_review)
+    var ceremony_check = target_new(.Action, "ceremony-check", "").output("out/ceremony-check")
+    ceremony_check.action = run_ceremony_check_action
+    ceremony_check = ceremony_check.input(release_compiler_bin("with"))
+    ceremony_check = ceremony_check.input("tools/ceremony_audit.w")
+    ceremony_check = ceremony_check.input("README.md")
+    ceremony_check = ceremony_check.input("examples")
+    ceremony_check = ceremony_check.dep("build")
+    ceremony_check = ceremony_check.write_scope("out/ceremony-check")
+    out = out.add_target(ceremony_check)
     var rt_decl_audit = target_new(.Action, "rt-decl-audit", "").output("out/rt-decl-audit")
     rt_decl_audit.action = run_rt_decl_audit_action
     rt_decl_audit = rt_decl_audit.allow_parallel()
