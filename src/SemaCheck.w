@@ -16620,6 +16620,11 @@ impl Sema:
                     self.emit_aggregate_assignment_mismatch(expected_value_type, value_type, node)
                 else if self.types_compatible(expected_value_type as TypeId, value_type as TypeId) == 0 and self.has_contextual_copy_adjustment(value) == 0:
                     if self.arithmetic_result_type(expected_value_type as TypeId, value_type as TypeId) == 0:
+                        // D93: an assignment from a literal's binding to a typed
+                        // place demands the place's collection of it, and one
+                        // into the binding demands the value's.
+                        self.note_literal_demand(value, expected_value_type, node)
+                        self.note_literal_demand(base_expr, value_type, node)
                         self.emit_error("type mismatch in assignment", node)
 
             self.mark_moved_if_consumed(value)
@@ -16730,6 +16735,9 @@ impl Sema:
                 self.emit_aggregate_assignment_mismatch(target_type as i32, value_type as i32, node)
             else if self.types_compatible(target_type as i32, value_type as i32) == 0 and self.has_contextual_copy_adjustment(value) == 0:
                 if self.arithmetic_result_type(target_type, value_type) == 0:
+                    // D93, as at a projected place above.
+                    self.note_literal_demand(value, target_type as i32, node)
+                    self.note_literal_demand(target, value_type as i32, node)
                     self.emit_error("type mismatch in assignment", node)
 
         self.warn_loop_string_concat_accumulation(node, target, value, target_type)

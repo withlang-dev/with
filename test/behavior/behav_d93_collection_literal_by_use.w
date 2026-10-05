@@ -6,6 +6,7 @@
 //! expect-stdout: 3
 //! expect-stdout: 6 3
 //! expect-stdout: 2 1
+//! expect-stdout: 3
 
 // D93 (§4.3c rule 1): a binding with no annotation whose initializer is an
 // element-form literal takes its type from its uses in its own function — a
@@ -57,3 +58,15 @@ fn main:
     later.push("x")
     later.push("y")
     print(f"{later.len()} {later[0].len()}")
+    print(assigned([9, 8]).len())
+
+// Assignment is a demand in both directions: into the binding, and from
+// the binding to a typed place.
+fn assigned(replacement: Vec[i32]) -> Vec[i32]:
+    var xs = [1, 2, 3]
+    xs = replacement
+    var held: Vec[i32] = Vec.new()
+    let ys = [4, 5]
+    held = ys
+    xs.push(held.len() as i32)
+    xs
