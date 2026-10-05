@@ -119,10 +119,7 @@ The signature says whether a function borrows or takes ownership. The call
 site says nothing:
 
 ```
-fn total(xs: &Vec[i32]):               // &T borrows
-    var sum = 0
-    for x in xs: sum += x
-    sum
+fn total(xs: &Vec[i32]): xs.iter() |> sum()                      // &T borrows
 
 fn archive(xs: Vec[i32]): print(f"archived {xs.len()} values")   // T takes ownership
 
@@ -246,11 +243,7 @@ impl Area for Shape:
             .Rect(w, h) => w * h
             .Unit => 0.0
 
-fn largest[T: Area](items: &Vec[T]):
-    var best = 0.0
-    for item in items:
-        if item.area() > best: best = item.area()
-    best
+fn largest[T: Area](items: &Vec[T]): (items.iter() |> map(it.area()) |> max()) ?? 0.0
 
 fn main:
     let shapes: Vec[Shape] = [.Circle(1.0), .Rect(2.0, 3.0), .Unit]
