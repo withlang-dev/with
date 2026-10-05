@@ -2,6 +2,10 @@
 
 **Date:** 2026-10-04. **Status:** BDFL ruling (Eric: "Rule A", with the
 five points below, which are his). Issues #2060, #2070, #2071; PR #2064.
+**Amended by [D94](2026-10-05-D94-a-corpus-is-migrated-against-every-target-and-merged.md)**:
+a corpus is migrated against every target's headers and merged, not
+against one fixed header set (point 5's input); point 4's handling of
+platform conditionals and type sizes is how D94 merges.
 **The migrator and `std.libc` are NON-COMPLIANT**: the bundled corpora
 (zlib, pcre2, tommyds, c-algorithms) carry Darwin's macro values as integer
 literals, so `gz_open` passes Darwin's `O_EXCL` to a seam that reads it as
