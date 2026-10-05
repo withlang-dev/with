@@ -283,6 +283,7 @@ pub const FACADE_CLAUSE_ABANDON: i32 = 29          // [fn_sym] resource-only: th
 pub const FACADE_CLAUSE_HANDLE: i32 = 30           // [] the parser's marker on the NK_FACADE_RESOURCE a `handle Name wraps *mut T` item makes: a callback-scope handle (§16.2b.9), never written as a clause
 pub const FACADE_CLAUSE_CALLBACK_ARGV: i32 = 31    // [callback_ref, argv_ref, argc_ref, type(node)]  (`callback param N argv param A paired with argc param C as &[H]`: A and C index the callback's own parameters, §16.2b.9, D76)
 pub const FACADE_CLAUSE_USER_DATA: i32 = 32        // [accessor_sym, type(node)]  (`user_data from <fn> as &U`: the registered userdata the facade boxed, read back through <fn>, §16.2b.9, D76)
+pub const FACADE_CLAUSE_MESSAGE: i32 = 33          // [fn_sym] resource-only: `message <fn>`, the operation that describes the resource's most recent failure (ruling Amendment 3, §16.2b.4)
 pub const FACADE_PARAM_REF_NAME: i32 = 0
 pub const FACADE_PARAM_REF_INDEX: i32 = 1
 pub const FACADE_PARAM_REF_TYPE: i32 = 2

@@ -4695,6 +4695,14 @@ impl Parser:
             let f = self.expect_ident()
             if f == 0: return 0
             ops.push(f)
+        else if word == "message":
+            // `message <fn>` (ruling Amendment 3, §16.2b.4): the operation
+            // that describes the resource's most recent failure. Sema
+            // verifies it is a text view of the resource or of its parent.
+            kind = FACADE_CLAUSE_MESSAGE
+            let f = self.expect_ident()
+            if f == 0: return 0
+            ops.push(f)
         else if word == "lend":
             kind = FACADE_CLAUSE_LEND
         else if word == "consumes":

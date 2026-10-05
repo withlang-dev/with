@@ -525,6 +525,8 @@ pub type FacadeResource {
     thread_caps: i32,     // bit0 creator, bit1 send, bit2 share, bit3 drop_any_thread
     abandon: i32,         // `abandon <fn>` (§16.2b.9): the `callbacks none` operation run before the destroyer on a drop path not proven callback-free, or 0
     abandon_node: i32,
+    message: i32,         // `message <fn>` (ruling Amendment 3): the operation describing the most recent failure, or 0
+    message_node: i32,
     handle: i32,          // 1 for a callback-scope `handle Name wraps *mut T` (§16.2b.9): no producer, destroyer or Drop; borrowed for the callback's invocation
 }
 

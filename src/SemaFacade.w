@@ -40,6 +40,7 @@ impl Sema:
         self.verify_facade_buffers()
         self.verify_facade_variadic_items()
         self.verify_facade_abandon()
+        self.verify_facade_messages()
         self.verify_facade_borrowed_returns()
         self.verify_facade_text_views()
         self.verify_facade_callback_items()
@@ -788,7 +789,7 @@ impl Sema:
         let repr_tid = self.resolve_type_expr(repr_node) as i32
         if repr_tid == 0:
             return
-        var r = FacadeResource { name, facade, node: item, decl, repr_tid, producers: Vec.new(), out_params: Vec.new(), init: 0, preinit: 0, drop: 0, destroyers: Vec.new(), ok_consts: Vec.new(), ok_node: 0, borrows: Vec.new(), borrows_owner: Vec.new(), borrows_nodes: Vec.new(), last_producer: -2, independent: 0, independent_node: 0, movable: 0, thread_caps: 0, abandon: 0, abandon_node: 0, handle: 0 }
+        var r = FacadeResource { name, facade, node: item, decl, repr_tid, producers: Vec.new(), out_params: Vec.new(), init: 0, preinit: 0, drop: 0, destroyers: Vec.new(), ok_consts: Vec.new(), ok_node: 0, borrows: Vec.new(), borrows_owner: Vec.new(), borrows_nodes: Vec.new(), last_producer: -2, independent: 0, independent_node: 0, movable: 0, thread_caps: 0, abandon: 0, abandon_node: 0, message: 0, message_node: 0, handle: 0 }
         for ci in 0..clause_count:
             let clause = self.ast.get_extra(extra_start + 1 + ci)
             r = self.collect_resource_clause(rname, move r, clause)
@@ -944,6 +945,19 @@ impl Sema:
                 return r
             r.abandon = f
             r.abandon_node = clause
+            return r
+        if kind == FACADE_CLAUSE_MESSAGE:
+            // `message <fn>` (ruling Amendment 3, §16.2b.4): that the
+            // operation is a text view of this resource or of its parent is
+            // verified once every item is collected (verify_facade_message).
+            let f = self.ast.get_extra(ops)
+            if self.facade_fn_sig(f, clause) < 0:
+                return r
+            if r.message != 0:
+                self.emit_error(f"resource '{rname}': 'message' is stated twice; a resource has one description of its most recent failure (§16.2b.4)", clause)
+                return r
+            r.message = f
+            r.message_node = clause
             return r
         if kind == FACADE_CLAUSE_HANDLE:
             // The parser's marker for `handle Name wraps *mut T` (§16.2b.9):
@@ -2155,6 +2169,33 @@ impl Sema:
     // initializer, drop or destroyer — and itself `callbacks none`, so the
     // abandonment path cannot invoke an incomplete pair. Any other
     // operation is refused; nothing about the path is inferred from a name.
+    // `message <fn>` (ruling Amendment 3, §16.2b.4): the operation is a
+    // text view (`returns borrow CStr from param 0`) of the resource itself
+    // or of the one resource it depends on, so an error from one of the
+    // resource's operations can read it at once.
+    mut fn verify_facade_messages():
+        for ri in 0..self.facade_resources.len() as i32:
+            let f = self.facade_resources[ri].message
+            if f == 0:
+                continue
+            let rname: str = self.pool_resolve(self.facade_resources[ri].name)
+            let fnm: str = self.pool_resolve(f)
+            let node = self.facade_resources[ri].message_node
+            let ci = self.facade_contract_for(f)
+            if ci < 0 or self.foreign_contracts[ci].returns_borrow_resource == 0 or self.pool_resolve(self.foreign_contracts[ci].returns_borrow_resource) != "CStr" or self.foreign_contracts[ci].returns_borrow_from != 0:
+                self.emit_error_with_help(f"resource '{rname}': 'message {fnm}' names an operation that is not a text view of its first parameter (§16.2b.4)", node, f"state it on the fn item: 'fn {fnm}' with 'returns borrow CStr from param 0'")
+                continue
+            let sig = self.get_sig(f)
+            if sig < 0:
+                continue
+            if self.facade_accepts_repr(sig, self.facade_resources[ri].repr_tid):
+                continue
+            var through_parent = 0
+            for pi in 0..self.facade_resources.len() as i32:
+                if pi != ri and self.facade_is_parent_of(ri, pi) and self.facade_accepts_repr(sig, self.facade_resources[pi].repr_tid): through_parent += 1
+            if through_parent != 1:
+                self.emit_error(f"resource '{rname}': 'message {fnm}' takes neither {rname}'s representation nor that of the one resource {rname} depends on, so an error from a {rname} operation has nothing to read it from (§16.2b.4)", node)
+
     mut fn verify_facade_abandon():
         for ri in 0..self.facade_resources.len() as i32:
             let f = self.facade_resources[ri].abandon
@@ -2268,6 +2309,7 @@ pub fn facade_clause_name(kind: i32) -> str:
     if kind == FACADE_CLAUSE_INDEPENDENT: return "independent"
     if kind == FACADE_CLAUSE_MOVABLE: return "movable"
     if kind == FACADE_CLAUSE_ABANDON: return "abandon"
+    if kind == FACADE_CLAUSE_MESSAGE: return "message"
     if kind == FACADE_CLAUSE_LEND: return "lend"
     if kind == FACADE_CLAUSE_CONSUMES: return "consumes"
     if kind == FACADE_CLAUSE_RETAINS: return "retains"
@@ -2287,6 +2329,7 @@ pub fn facade_clause_name(kind: i32) -> str:
     if kind == FACADE_CLAUSE_VARIADIC: return "variadic param … selected by param …"
     if kind == FACADE_CLAUSE_VARIADIC_CASE: return "case"
     if kind == FACADE_CLAUSE_ABANDON: return "abandon"
+    if kind == FACADE_CLAUSE_MESSAGE: return "message"
     if kind == FACADE_CLAUSE_HANDLE: return "handle"
     if kind == FACADE_CLAUSE_CALLBACK_ARGV: return "callback … argv … paired with argc"
     if kind == FACADE_CLAUSE_USER_DATA: return "user_data from"
