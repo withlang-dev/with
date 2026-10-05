@@ -16902,7 +16902,10 @@ impl Sema:
 
         self.union_clear_last_written()
         // #1349: the iterable is a value (`for p in if c: xs else: ys`).
+        let outer_loop_iterable: i32 = self.loop_iterable_node
+        self.loop_iterable_node = iterable
         let iter_type = self.check_expr_value_context(iterable)
+        self.loop_iterable_node = outer_loop_iterable
         // §13.6a: over an Option or Result the `for` is a one-clause
         // comprehension, not a loop — the body runs once on Some/Ok, not at
         // all on None/Err, and a body that is `yield E` makes it a value.
@@ -16984,6 +16987,12 @@ impl Sema:
             label = self.ast.for_meta_label(for_meta)
             if index_binding != 0:
                 self.scope_put_at(index_binding, self.ty_i64 as i32, 0, node)
+                // #2152: `for x, i in xs` is parsed and typed but is not in
+                // the spec, and MIR never bound the index: every such loop
+                // failed to lower with no diagnostic. §13.5 spells an
+                // indexed loop with `enumerate()`.
+                if self.in_comptime_fn == 0:
+                    self.emit_error_with_help("a `for` binds one pattern; a second name is not an index (§13.5)", node, f"write `for ({self.pool_resolve(index_binding)}, {self.pool_resolve(binding)}) in <collection>.enumerate():`")
         self.loop_depth = self.loop_depth + 1
         self.push_label_frame(label, LabelFrameKind.LFK_FOR, node)
         let for_frame_idx = self.label_syms.len() as i32 - 1
@@ -17076,7 +17085,10 @@ impl Sema:
     // generator value is consumed; anything else steps an Iter[T]. Returns
     // the element type.
     mut fn check_comprehension_clause_iterable(iterable: i32) -> i32:
+        let outer_loop_iterable: i32 = self.loop_iterable_node
+        self.loop_iterable_node = iterable
         let iter_ty = self.check_expr(iterable)
+        self.loop_iterable_node = outer_loop_iterable
         let gen_elem = self.resolve_gen_for(iterable, iterable, iter_ty as i32)
         if gen_elem != 0:
             self.mark_moved_if_consumed(iterable)
@@ -30566,8 +30578,36 @@ impl Sema:
     // #2043 (D65): a method call that is a compiler builtin records which
     // one, decided here from the resolution this check made; codegen's
     // dispatch switches on the record.
-    mut fn check_method_call_parts(expr: i32, field: i32, extra_start: i32, arg_count: i32, node: i32, known_recv_ty: i32) -> i32:
+    mut fn check_method_call_parts(expr0: i32, field0: i32, extra_start: i32, arg_count: i32, node: i32, known_recv_ty0: i32) -> i32:
+        let expr = expr0
+        var field = field0
+        var known_recv_ty = known_recv_ty0
+        // #2145 (§2.3, §13.1: "Vec[i32]'s iterator yields &i32"): `v.iter()`
+        // on a vector whose elements own something is the view iterator.
+        // The by-value `VecIter[T]` handed each element out as a byte copy,
+        // a second owner, and every `.iter() |> filter/map/collect` over a
+        // `Vec[str]` double-freed. A Copy element keeps the by-value
+        // iterator until D22's contextual Copy reaches pipelines, and a
+        // loop's own iterable is the loop's to lower (it binds views).
+        if field == self.syms.iter and arg_count == 0 and node != self.loop_iterable_node and self.static_receiver_type_is_known(expr) == 0:
+            if known_recv_ty == 0: known_recv_ty = self.check_expr(expr) as i32
+            let vec_ty = if known_recv_ty != 0: self.auto_deref_ref_ptr_type(self.resolve_alias(known_recv_ty as TypeId)) as i32 else: 0
+            // Where the by-value iterator is what is asked for (std's own
+            // `Iterable.iter`, declared `-> VecIter[T]`), it is what is made.
+            let wanted = if self.has_expected_type != 0 and self.expected_expr_type != 0: self.resolve_alias(self.expected_expr_type) as i32 else: 0
+            let wants_by_value = wanted != 0 and self.get_type_kind(wanted as TypeId) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(wanted) == self.syms.veciter
+            if not wants_by_value and vec_ty != 0 and self.std_generic_of(vec_ty) == StdGeneric.Vec and self.is_copy(self.get_generic_inst_arg(vec_ty, 0) as TypeId) == 0:
+                field = self.syms.iter_ref
         let ret = self.check_method_call_parts_inner(expr, field, extra_start, arg_count, node, known_recv_ty)
+        // §15.3: `next()` advances the iterator, so it needs a place. The
+        // view iterator's `next` is a builtin with no declaration to carry
+        // `mut fn`; `VecIter.next` gets the same rule through its trait
+        // (check_trait_receiver_mode).
+        if field == self.syms.next and ret != 0 and self.ast.kind(node) != NodeKind.NK_PIPELINE:
+            let stepped: i32 = self.typed_expr_types.get(expr) ?? 0
+            let stepped_ty = if stepped != 0: self.resolve_alias(stepped as TypeId) as i32 else: 0
+            if stepped_ty != 0 and self.get_type_kind(stepped_ty as TypeId) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(stepped_ty) == self.syms.veciterref and unpack_place_kind(self.classify_place(expr)) == PlaceKind.PK_NotPlace:
+                self.emit_error("mutating method requires a place receiver (§15.3)", node)
         // D93: a method called on the binding of an empty literal, which has
         // no type until a use gives it one (`var xs = []`, `xs.push(1)`).
         if ret == 0 and arg_count >= 1 and extra_start >= 0 and self.literal_binding_let(expr) != 0:

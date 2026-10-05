@@ -453,6 +453,12 @@ pub trait Iterable[T]:
 impl[T] Iterable[T] for Vec[T]:
     fn iter() -> VecIter[T]: self.iter()
 
+/// Each element with its index (§13.5): `for (i, x) in xs.enumerate():`.
+impl[T] Vec[T]:
+    // The result type is the body's: over elements that own something
+    // `iter()` yields views (#2145), so the pairs hold `&T`.
+    fn enumerate(): self.iter() |> enumerate()
+
 /// Consuming iterator over Vec[T] (§13, D33). Obtain via `vec.into_iter()`:
 /// the Vec moves into the iterator and each `.next()` moves one element out.
 /// Dropping the iterator early (break, `?`, return) releases the un-yielded
@@ -522,6 +528,41 @@ pub type FlatMapIter[I, C, J, T, U] ephemeral {
 impl[T] Iter[T] for VecIter[T]:
     mut fn next() -> Option[T]:
         self.next()
+
+// #2152 (§13.1, §13.5): every adapter is an iterator, so a `for` steps
+// through it. Each `next` is the adapter's own.
+impl[I, T] Iter[T] for FilterIter[I, T]:
+    mut fn next() -> Option[T]: self.next()
+
+impl[I, T, U] Iter[U] for MapIter[I, T, U]:
+    mut fn next() -> Option[U]: self.next()
+
+impl[I, T, U] Iter[U] for FilterMapIter[I, T, U]:
+    mut fn next() -> Option[U]: self.next()
+
+impl[I, T] Iter[T] for TakeIter[I, T]:
+    mut fn next() -> Option[T]: self.next()
+
+impl[I, T] Iter[T] for DropIter[I, T]:
+    mut fn next() -> Option[T]: self.next()
+
+impl[I, T] Iter[T] for TakeWhileIter[I, T]:
+    mut fn next() -> Option[T]: self.next()
+
+impl[I, T] Iter[T] for DropWhileIter[I, T]:
+    mut fn next() -> Option[T]: self.next()
+
+impl[A, B, T, U] Iter[(T, U)] for ZipIter[A, B, T, U]:
+    mut fn next() -> Option[(T, U)]: self.next()
+
+impl[I, T] Iter[(i64, T)] for EnumerateIter[I, T]:
+    mut fn next() -> Option[(i64, T)]: self.next()
+
+impl[A, B, T] Iter[T] for ChainIter[A, B, T]:
+    mut fn next() -> Option[T]: self.next()
+
+impl[I, T] Iter[T] for StepByIter[I, T]:
+    mut fn next() -> Option[T]: self.next()
 
 /// Index specification for multi-dimensional indexing.
 /// Used by the MultiIndex trait. kind: 0=scalar, 1=slice, 2=ellipsis, 3=newaxis.

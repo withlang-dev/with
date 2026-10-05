@@ -9015,7 +9015,11 @@ impl MirBuilder:
             let call_callee = self.ast.get_data0(iter_expr)
             if self.ast.kind(call_callee) == NodeKind.NK_FIELD_ACCESS:
                 let recv = self.ast.get_data0(call_callee)
-                if self.sema.method_intrinsic_in_body(self.body.instance_sym, iter_expr) == MirIntrinsic.VEC_ITER:
+                // `v.iter()` and `v.iter_ref()` both step through the
+                // vector's elements as views (#2152: the second failed to
+                // lower here).
+                let clause_iter = self.sema.method_intrinsic_in_body(self.body.instance_sym, iter_expr)
+                if clause_iter == MirIntrinsic.VEC_ITER or clause_iter == MirIntrinsic.VEC_ITER_REF:
                     let recv_ty = self.expr_type(recv)
                     if recv_ty != 0:
                         let recv_resolved = self.sema.resolve_alias(recv_ty)

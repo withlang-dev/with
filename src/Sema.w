@@ -1830,6 +1830,10 @@ pub type Sema {
     concrete_specialization_param_types: Vec[i32],
     // Synthetic drop glue has no AST call node. Map each concrete generic
     // instance to the Drop.drop contract registered before MIR freeze.
+    // #2145: the iterable a `for` or a comprehension clause is stepping
+    // through directly. Its `v.iter()` is lowered by the loop, which binds
+    // each element as a view; it is never the by-value library iterator.
+    loop_iterable_node: i32,
     concrete_drop_sigs: HashMap[i32, i32],
     concrete_drop_mono_syms: HashMap[i32, i32],
     // #2137: structural equality has no AST call node either. A type whose
@@ -3516,6 +3520,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         concrete_specialization_param_starts: Vec.new(),
         concrete_specialization_param_counts: Vec.new(),
         concrete_specialization_param_types: Vec.new(),
+        loop_iterable_node: 0,
         concrete_drop_sigs: sema_new_map_i32_i32(),
         concrete_drop_mono_syms: sema_new_map_i32_i32(),
         concrete_eq_sigs: sema_new_map_i32_i32(),
