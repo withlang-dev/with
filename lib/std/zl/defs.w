@@ -301,9 +301,11 @@ pub type alloc_func = unsafe extern "C" fn(*mut c_void, c_uint, c_uint) -> *mut 
 
 pub type free_func = unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit
 
+@[repr(C)]
 pub type internal_state { strm: *mut z_stream_s = null, status: c_int = 0, pending_buf: *mut u8 = null, pending_buf_size: c_ulong = 0, pending_out: *mut u8 = null, pending: c_ulong = 0, wrap: c_int = 0, gzhead: *mut gz_header_s = null, gzindex: c_ulong = 0, method: u8 = 0, last_flush: c_int = 0, w_size: c_uint = 0, w_bits: c_uint = 0, w_mask: c_uint = 0, window: *mut u8 = null, window_size: c_ulong = 0, prev: *mut c_ushort = null, head: *mut c_ushort = null, ins_h: c_uint = 0, hash_size: c_uint = 0, hash_bits: c_uint = 0, hash_mask: c_uint = 0, hash_shift: c_uint = 0, block_start: c_long = 0, match_length: c_uint = 0, prev_match: c_uint = 0, match_available: c_int = 0, strstart: c_uint = 0, match_start: c_uint = 0, lookahead: c_uint = 0, prev_length: c_uint = 0, max_chain_length: c_uint = 0, max_lazy_match: c_uint = 0, level: c_int = 0, strategy: c_int = 0, good_match: c_uint = 0, nice_match: c_int = 0, dyn_ltree: [573]ct_data_s, dyn_dtree: [61]ct_data_s, bl_tree: [39]ct_data_s, l_desc: tree_desc_s, d_desc: tree_desc_s, bl_desc: tree_desc_s, bl_count: [16]c_ushort = [0 as c_ushort; 16], heap: [573]c_int = [0 as c_int; 573], heap_len: c_int = 0, heap_max: c_int = 0, depth: [573]u8 = [0 as u8; 573], sym_buf: *mut u8 = null, lit_bufsize: c_uint = 0, sym_next: c_uint = 0, sym_end: c_uint = 0, opt_len: c_ulong = 0, static_len: c_ulong = 0, matches: c_uint = 0, insert: c_uint = 0, bi_buf: c_ushort = 0, bi_valid: c_int = 0, bi_used: c_int = 0, high_water: c_ulong = 0, slid: c_int = 0 }
 impl Copy for internal_state
 
+@[repr(C)]
 pub type z_stream_s { next_in: *mut u8 = null, avail_in: c_uint = 0, total_in: c_ulong = 0, next_out: *mut u8 = null, avail_out: c_uint = 0, total_out: c_ulong = 0, msg: *mut i8 = null, state: *mut internal_state = null, zalloc: unsafe extern "C" fn(*mut c_void, c_uint, c_uint) -> *mut c_void, zfree: unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit, opaque_: *mut c_void = null, data_type: c_int = 0, adler: c_ulong = 0, reserved: c_ulong = 0 }
 impl Copy for z_stream_s
 
@@ -311,6 +313,7 @@ pub type z_stream = z_stream_s
 
 pub type z_streamp = *mut z_stream_s
 
+@[repr(C)]
 pub type gz_header_s { text: c_int = 0, time: c_ulong = 0, xflags: c_int = 0, os: c_int = 0, extra: *mut u8 = null, extra_len: c_uint = 0, extra_max: c_uint = 0, name: *mut u8 = null, name_max: c_uint = 0, comment: *mut u8 = null, comm_max: c_uint = 0, hcrc: c_int = 0, done: c_int = 0 }
 impl Copy for gz_header_s
 
@@ -324,6 +327,7 @@ pub type out_func = unsafe extern "C" fn(*mut c_void, *mut u8, c_uint) -> c_int
 
 pub type gzFile = *mut gzFile_s
 
+@[repr(C)]
 pub type gzFile_s { have: c_uint = 0, next: *mut u8 = null, pos: c_longlong = 0 }
 impl Copy for gzFile_s
 
@@ -420,16 +424,19 @@ pub type ct_data_s_fc = union { freq: c_ushort = 0, code: c_ushort = 0 }
 impl Copy for ct_data_s_fc
 pub type ct_data_s_dl = union { dad: c_ushort = 0, len: c_ushort = 0 }
 impl Copy for ct_data_s_dl
+@[repr(C)]
 pub type ct_data_s { fc: ct_data_s_fc, dl: ct_data_s_dl }
 impl Copy for ct_data_s
 
 pub type ct_data = ct_data_s
 
+@[repr(C)]
 pub type static_tree_desc_s { static_tree: *const ct_data_s = null, extra_bits: *const c_int = null, extra_base: c_int = 0, elems: c_int = 0, max_length: c_int = 0 }
 impl Copy for static_tree_desc_s
 
 pub type static_tree_desc = static_tree_desc_s
 
+@[repr(C)]
 pub type tree_desc_s { dyn_tree: *mut ct_data_s = null, max_code: c_int = 0, stat_desc: *const static_tree_desc_s = null }
 impl Copy for tree_desc_s
 
@@ -451,6 +458,7 @@ pub let finish_started: c_int = 2
 pub let finish_done: c_int = 3
 pub type compress_func = unsafe extern "C" fn(*mut internal_state, c_int) -> i32
 
+@[repr(C)]
 pub type config_s { good_length: c_ushort = 0, max_lazy: c_ushort = 0, nice_length: c_ushort = 0, max_chain: c_ushort = 0, func: unsafe extern "C" fn(*mut internal_state, c_int) -> i32 }
 impl Copy for config_s
 
@@ -492,6 +500,7 @@ pub let MAX_STORED: c_int = 65535
 pub fn MIN[T](a: T, b: T) -> T {
     (if (a > b): b else: a)
 }
+@[repr(C)]
 pub type gz_state { x: gzFile_s, mode: c_int = 0, fd: c_int = 0, path: *mut i8 = null, size: c_uint = 0, want: c_uint = 0, in_: *mut u8 = null, out: *mut u8 = null, direct: c_int = 0, junk: c_int = 0, how: c_int = 0, again: c_int = 0, start: c_longlong = 0, eof: c_int = 0, past: c_int = 0, level: c_int = 0, strategy: c_int = 0, reset: c_int = 0, skip: c_longlong = 0, err: c_int = 0, msg: *mut i8 = null, strm: z_stream_s }
 impl Copy for gz_state
 
@@ -508,6 +517,7 @@ pub let GZIP: c_int = 2
 pub fn GT_OFF[T](x: T) -> T {
     sizeof[c_int]()
 }
+@[repr(C)]
 pub type code { op: u8 = 0, bits: u8 = 0, val: c_ushort = 0 }
 impl Copy for code
 
@@ -549,6 +559,7 @@ pub let DONE: c_int = 16208
 pub let BAD: c_int = 16209
 pub let MEM: c_int = 16210
 pub let SYNC: c_int = 16211
+@[repr(C)]
 pub type inflate_state { strm: *mut z_stream_s = null, mode: i32 = 0, last: c_int = 0, wrap: c_int = 0, havedict: c_int = 0, flags: c_int = 0, dmax: c_uint = 0, check_: c_ulong = 0, total: c_ulong = 0, head: *mut gz_header_s = null, wbits: c_uint = 0, wsize: c_uint = 0, whave: c_uint = 0, wnext: c_uint = 0, window: *mut u8 = null, hold: c_ulong = 0, bits: c_uint = 0, length: c_uint = 0, offset: c_uint = 0, extra: c_uint = 0, lencode: *const code = null, distcode: *const code = null, lenbits: c_uint = 0, distbits: c_uint = 0, ncode: c_uint = 0, nlen: c_uint = 0, ndist: c_uint = 0, have: c_uint = 0, next: *mut code = null, lens: [320]c_ushort = [0 as c_ushort; 320], work: [288]c_ushort = [0 as c_ushort; 288], codes: [1444]code, sane: c_int = 0, back: c_int = 0, was: c_uint = 0 }
 impl Copy for inflate_state
 
@@ -590,6 +601,7 @@ pub type tell_file_func = unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_lo
 
 pub type seek_file_func = unsafe extern "C" fn(*mut c_void, *mut c_void, c_ulong, c_int) -> c_long
 
+@[repr(C)]
 pub type zlib_filefunc_def_s { zopen_file: unsafe extern "C" fn(*mut c_void, *const i8, c_int) -> *mut c_void, zread_file: unsafe extern "C" fn(*mut c_void, *mut c_void, *mut c_void, c_ulong) -> c_ulong, zwrite_file: unsafe extern "C" fn(*mut c_void, *mut c_void, *const c_void, c_ulong) -> c_ulong, ztell_file: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_long, zseek_file: unsafe extern "C" fn(*mut c_void, *mut c_void, c_ulong, c_int) -> c_long, zclose_file: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int, zerror_file: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int, opaque_: *mut c_void = null }
 impl Copy for zlib_filefunc_def_s
 
@@ -601,11 +613,13 @@ pub type seek64_file_func = unsafe extern "C" fn(*mut c_void, *mut c_void, c_ulo
 
 pub type open64_file_func = unsafe extern "C" fn(*mut c_void, *const c_void, c_int) -> *mut c_void
 
+@[repr(C)]
 pub type zlib_filefunc64_def_s { zopen64_file: unsafe extern "C" fn(*mut c_void, *const c_void, c_int) -> *mut c_void, zread_file: unsafe extern "C" fn(*mut c_void, *mut c_void, *mut c_void, c_ulong) -> c_ulong, zwrite_file: unsafe extern "C" fn(*mut c_void, *mut c_void, *const c_void, c_ulong) -> c_ulong, ztell64_file: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_ulong, zseek64_file: unsafe extern "C" fn(*mut c_void, *mut c_void, c_ulong, c_int) -> c_long, zclose_file: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int, zerror_file: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int, opaque_: *mut c_void = null }
 impl Copy for zlib_filefunc64_def_s
 
 pub type zlib_filefunc64_def = zlib_filefunc64_def_s
 
+@[repr(C)]
 pub type zlib_filefunc64_32_def_s { zfile_func64: zlib_filefunc64_def_s, zopen32_file: unsafe extern "C" fn(*mut c_void, *const i8, c_int) -> *mut c_void, ztell32_file: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_long, zseek32_file: unsafe extern "C" fn(*mut c_void, *mut c_void, c_ulong, c_int) -> c_long }
 impl Copy for zlib_filefunc64_32_def_s
 
@@ -635,36 +649,43 @@ pub fn ZSEEK64[T](filefunc: T, filestream: T, pos: T, mode: T) -> T {
 }
 pub type unzFile = *mut c_void
 
+@[repr(C)]
 pub type tm_unz_s { tm_sec: c_int = 0, tm_min: c_int = 0, tm_hour: c_int = 0, tm_mday: c_int = 0, tm_mon: c_int = 0, tm_year: c_int = 0 }
 impl Copy for tm_unz_s
 
 pub type tm_unz = tm_unz_s
 
+@[repr(C)]
 pub type unz_global_info64_s { number_entry: c_ulong = 0, size_comment: c_ulong = 0 }
 impl Copy for unz_global_info64_s
 
 pub type unz_global_info64 = unz_global_info64_s
 
+@[repr(C)]
 pub type unz_global_info_s { number_entry: c_ulong = 0, size_comment: c_ulong = 0 }
 impl Copy for unz_global_info_s
 
 pub type unz_global_info = unz_global_info_s
 
+@[repr(C)]
 pub type unz_file_info64_s { version: c_ulong = 0, version_needed: c_ulong = 0, flag: c_ulong = 0, compression_method: c_ulong = 0, dosDate: c_ulong = 0, crc: c_ulong = 0, compressed_size: c_ulong = 0, uncompressed_size: c_ulong = 0, size_filename: c_ulong = 0, size_file_extra: c_ulong = 0, size_file_comment: c_ulong = 0, disk_num_start: c_ulong = 0, internal_fa: c_ulong = 0, external_fa: c_ulong = 0, tmu_date: tm_unz_s }
 impl Copy for unz_file_info64_s
 
 pub type unz_file_info64 = unz_file_info64_s
 
+@[repr(C)]
 pub type unz_file_info_s { version: c_ulong = 0, version_needed: c_ulong = 0, flag: c_ulong = 0, compression_method: c_ulong = 0, dosDate: c_ulong = 0, crc: c_ulong = 0, compressed_size: c_ulong = 0, uncompressed_size: c_ulong = 0, size_filename: c_ulong = 0, size_file_extra: c_ulong = 0, size_file_comment: c_ulong = 0, disk_num_start: c_ulong = 0, internal_fa: c_ulong = 0, external_fa: c_ulong = 0, tmu_date: tm_unz_s }
 impl Copy for unz_file_info_s
 
 pub type unz_file_info = unz_file_info_s
 
+@[repr(C)]
 pub type unz_file_pos_s { pos_in_zip_directory: c_ulong = 0, num_of_file: c_ulong = 0 }
 impl Copy for unz_file_pos_s
 
 pub type unz_file_pos = unz_file_pos_s
 
+@[repr(C)]
 pub type unz64_file_pos_s { pos_in_zip_directory: c_ulong = 0, num_of_file: c_ulong = 0 }
 impl Copy for unz64_file_pos_s
 
@@ -696,14 +717,17 @@ pub let SMALLEST: c_int = 1
 pub fn smaller[T](tree: T, n: T, m: T, depth: T) -> c_int {
     (((tree[n].Freq < tree[m].Freq) or ((tree[n].Freq == tree[m].Freq) and (depth[n] <= depth[m]))) as c_int)
 }
+@[repr(C)]
 pub type unz_file_info64_internal_s { offset_curfile: c_ulong = 0 }
 impl Copy for unz_file_info64_internal_s
 
 pub type unz_file_info64_internal = unz_file_info64_internal_s
 
+@[repr(C)]
 pub type file_in_zip64_read_info_s { read_buffer: *mut i8 = null, stream: z_stream_s, pos_in_zipfile: c_ulong = 0, stream_initialised: c_ulong = 0, offset_local_extrafield: c_ulong = 0, size_local_extrafield: c_uint = 0, pos_local_extrafield: c_ulong = 0, total_out_64: c_ulong = 0, crc32: c_ulong = 0, crc32_wait: c_ulong = 0, rest_read_compressed: c_ulong = 0, rest_read_uncompressed: c_ulong = 0, z_filefunc: zlib_filefunc64_32_def_s, filestream: *mut c_void = null, compression_method: c_ulong = 0, byte_before_the_zipfile: c_ulong = 0, raw: c_int = 0 }
 impl Copy for file_in_zip64_read_info_s
 
+@[repr(C)]
 pub type unz64_s { z_filefunc: zlib_filefunc64_32_def_s, is64bitOpenFunction: c_int = 0, filestream: *mut c_void = null, gi: unz_global_info64_s, byte_before_the_zipfile: c_ulong = 0, num_file: c_ulong = 0, pos_in_central_dir: c_ulong = 0, current_file_ok: c_ulong = 0, central_pos: c_ulong = 0, size_central_dir: c_ulong = 0, offset_central_dir: c_ulong = 0, cur_file_info: unz_file_info64_s, cur_file_info_internal: unz_file_info64_internal_s, pfile_in_zip_read: *mut file_in_zip64_read_info_s = null, encrypted: c_int = 0, isZip64: c_int = 0, keys: [3]c_ulong = [0 as c_ulong; 3], pcrc_32_tab: *const c_uint = null }
 impl Copy for unz64_s
 
