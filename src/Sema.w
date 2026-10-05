@@ -1819,6 +1819,12 @@ pub type Sema {
     // instance to the Drop.drop contract registered before MIR freeze.
     concrete_drop_sigs: HashMap[i32, i32],
     concrete_drop_mono_syms: HashMap[i32, i32],
+    // #2137: structural equality has no AST call node either. A type whose
+    // `==` is its own `eq` method, compared as a part of another value
+    // (a field, an element, a payload), maps to that method's contract —
+    // the method itself, or its specialization for a generic instance.
+    concrete_eq_sigs: HashMap[i32, i32],
+    concrete_eq_mono_syms: HashMap[i32, i32],
     generic_inst_cache: HashMap[i64, i32],
     // D7: eager tables filled in preregister_mir_types (before freeze) so the frozen
     // consumers read answers via &Self twins instead of re-deriving them through the
@@ -3496,6 +3502,8 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         concrete_specialization_param_types: Vec.new(),
         concrete_drop_sigs: sema_new_map_i32_i32(),
         concrete_drop_mono_syms: sema_new_map_i32_i32(),
+        concrete_eq_sigs: sema_new_map_i32_i32(),
+        concrete_eq_mono_syms: sema_new_map_i32_i32(),
         generic_inst_cache,
         layout_size_cache,
         layout_align_cache,

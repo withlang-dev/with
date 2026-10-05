@@ -2328,11 +2328,302 @@ impl Codegen:
             return self.compare_str_eq(lhs_cmp, rhs_cmp, op)
 
         if lhs_kind == 2:
-            let cmp_kind = wl_get_type_kind(lhs_ty)
-            if cmp_kind == wl_struct_type_kind() or cmp_kind == wl_array_type_kind():
-                return self.compare_aggregate_eq(lhs_cmp, rhs_cmp, op)
+            // #2137: an aggregate compares as its With type says — field by
+            // field, element by element, variant by variant, a part with an
+            // `eq` by that method — never as the bytes of its representation.
+            let lhs_slot = self.create_entry_alloca(lhs_ty)
+            let rhs_slot = self.create_entry_alloca(lhs_ty)
+            wl_build_store(self.builder, lhs_cmp, lhs_slot)
+            wl_build_store(self.builder, rhs_cmp, rhs_slot)
+            let equal = self.mir_emit_eq_ptrs(lhs_slot, rhs_slot, lhs_ty, lhs_sema)
+            if op == BinaryOp.OP_EQ:
+                return equal
+            return wl_build_not(self.builder, equal)
+
+        // Two views compare as the values they observe (§11.7); only raw
+        // pointers compare by address.
+        if lhs_kind == 4 and wl_get_type_kind(lhs_ty) == wl_pointer_type_kind():
+            let lhs_live = self.mir_eq_live_type(lhs_sema)
+            let rhs_live = self.mir_eq_live_type(rhs_sema)
+            if self.sema.get_type_kind(lhs_live as TypeId) == TypeKind.TY_REF and self.sema.get_type_kind(rhs_live as TypeId) == TypeKind.TY_REF:
+                let pointee = self.sema.get_type_d0(lhs_live as TypeId)
+                if self.mir_compare_dispatch_kind(pointee) == 2:
+                    let pointee_ty = self.mir_sema_type_to_llvm(pointee)
+                    if pointee_ty != 0:
+                        let equal = self.mir_emit_eq_ptrs(lhs_cmp, rhs_cmp, pointee_ty, pointee)
+                        if op == BinaryOp.OP_EQ:
+                            return equal
+                        return wl_build_not(self.builder, equal)
 
         0
+
+    // The live Sema type a comparison's operand type names, alias-resolved.
+    fn mir_eq_live_type(sema_ty: i32) -> i32:
+        let live = self.mir_type_to_live_sema_type(sema_ty)
+        self.sema.resolve_alias((if live > 0: live else: sema_ty) as TypeId) as i32
+
+    // #2137 (§11.7, §11.8): whether the values of With type `sema_ty` at
+    // `lp` and `rp` are equal, as an i1. A type with an `eq` Sema recorded
+    // (note_structural_equality) is compared by it; a str and a view of one
+    // by their bytes; a view by what it observes; an aggregate by its
+    // per-type walk (mir_eq_fn); anything else by its value.
+    mut fn mir_emit_eq_ptrs(lp: i64, rp: i64, ty: i64, sema_ty: i32) -> i64:
+        let resolved = self.mir_eq_live_type(sema_ty)
+        let tk = self.sema.get_type_kind(resolved as TypeId)
+        let sig_opt = self.sema.concrete_eq_sigs.get(resolved)
+        let sym_opt = self.sema.concrete_eq_mono_syms.get(resolved)
+        if sig_opt.is_some() and sym_opt.is_some():
+            let concrete = self.ensure_concrete_mir_function(0, sig_opt.unwrap(), sym_opt.unwrap(), 0, "Eq.eq")
+            if concrete.sym == 0:
+                return wl_get_undef(wl_i1_type(self.context))
+            let args: Vec[i64] = Vec.new()
+            args.push(lp)
+            args.push(rp)
+            let ret = self.build_call_fn_value(concrete.sym, concrete.value, concrete.fn_type, -1, 0, args, 2, "structural ==", 0)
+            if wl_type_of(ret) == wl_i1_type(self.context):
+                return ret
+            return wl_build_icmp(self.builder, wl_int_ne(), ret, wl_const_int(wl_type_of(ret), 0, 0))
+        let observes_str = tk == TypeKind.TY_REF and self.sema.get_type_kind(self.sema.resolve_alias(self.sema.get_type_d0(resolved as TypeId) as TypeId)) == TypeKind.TY_STR
+        if tk == TypeKind.TY_STR or observes_str:
+            let lv = self.mir_coerce_compare_operand(wl_build_load(self.builder, ty, lp), resolved)
+            let rv = self.mir_coerce_compare_operand(wl_build_load(self.builder, ty, rp), resolved)
+            return self.compare_str_eq(lv, rv, BinaryOp.OP_EQ)
+        if tk == TypeKind.TY_REF:
+            let pointee = self.sema.get_type_d0(resolved as TypeId)
+            let pointee_ty = self.mir_sema_type_to_llvm(pointee)
+            if pointee_ty != 0 and wl_get_type_kind(ty) == wl_pointer_type_kind():
+                return self.mir_emit_eq_ptrs(wl_build_load(self.builder, ty, lp), wl_build_load(self.builder, ty, rp), pointee_ty, pointee)
+        if tk == TypeKind.TY_TUPLE or tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ENUM or tk == TypeKind.TY_GENERIC_INST:
+            let walk = self.mir_eq_fn(resolved, ty)
+            if walk != 0:
+                let args: Vec[i64] = Vec.new()
+                args.push(lp)
+                args.push(rp)
+                return wl_build_call(self.builder, self.mir_eq_fn_type(), walk, vec_data_i64(&args), 2)
+        self.compare_value_eq(wl_build_load(self.builder, ty, lp), wl_build_load(self.builder, ty, rp), ty, BinaryOp.OP_EQ)
+
+    fn mir_eq_fn_type() -> i64:
+        let params: Vec[i64] = Vec.new()
+        params.push(wl_ptr_type(self.context))
+        params.push(wl_ptr_type(self.context))
+        wl_function_type(wl_i1_type(self.context), vec_data_i64(&params), 2, 0)
+
+    // The walk of one aggregate type: `__with_eq_<type>(l, r) -> i1`,
+    // declared before its body is emitted so a type recursive through a Box
+    // or a Vec compares through a call (ensure_structural_drop_fn's reason).
+    // 0 when the type has no walk: a representation Sema describes no parts
+    // of (a union, a bit-packed struct, an opaque runtime handle) compares
+    // by value.
+    mut fn mir_eq_fn(resolved: i32, ty: i64) -> i64:
+        if not self.mir_eq_type_has_walk(resolved, ty):
+            return 0
+        let fn_name = "__with_eq_" ++ f"{resolved}"
+        let existing = wl_get_named_function(self.llmod, fn_name)
+        if existing != 0:
+            return existing
+        let walk = wl_add_function(self.llmod, fn_name, self.mir_eq_fn_type())
+        wl_set_linkage(walk, wl_internal_linkage())
+
+        let saved_fn: i64 = self.current_function
+        let saved_fn_name_sym: i32 = self.current_function_name_sym
+        let saved_fn_node: i32 = self.current_function_node
+        let saved_ret_ty: i64 = self.current_ret_type
+        let saved_bb = wl_get_insert_block(self.builder)
+        self.current_function = walk
+        self.current_function_name_sym = 0
+        self.current_function_node = 0
+        self.current_ret_type = wl_i1_type(self.context)
+
+        let entry = wl_append_bb(self.context, walk, "entry")
+        let differ = wl_append_bb(self.context, walk, "differ")
+        wl_position_at_end(self.builder, entry)
+        self.mir_emit_eq_walk(wl_get_param(walk, 0), wl_get_param(walk, 1), ty, resolved, differ)
+        let _ = wl_build_ret(self.builder, wl_const_int(wl_i1_type(self.context), 1, 0))
+        wl_position_at_end(self.builder, differ)
+        let _ = wl_build_ret(self.builder, wl_const_int(wl_i1_type(self.context), 0, 0))
+
+        self.current_function = saved_fn
+        self.current_function_name_sym = saved_fn_name_sym
+        self.current_function_node = saved_fn_node
+        self.current_ret_type = saved_ret_ty
+        if saved_bb != 0:
+            wl_position_at_end(self.builder, saved_bb)
+        walk
+
+    fn mir_eq_type_has_walk(resolved: i32, ty: i64) -> bool:
+        let tk = self.sema.get_type_kind(resolved as TypeId)
+        if tk == TypeKind.TY_TUPLE or tk == TypeKind.TY_ARRAY:
+            return true
+        if self.mir_sema_type_is_std_vec(resolved) or self.mir_eq_type_is_box(resolved):
+            return true
+        if self.mir_enum_variant_count(resolved) > 0:
+            return true
+        if wl_get_type_kind(ty) != wl_struct_type_kind():
+            return false
+        if tk == TypeKind.TY_STRUCT and self.sema.distinct_type_names.contains(self.sema.get_type_d0(resolved as TypeId)):
+            return true
+        let struct_idx = self.find_struct_index_by_type(ty)
+        struct_idx >= 0 and not self.is_union_struct_index(struct_idx) and not self.is_bitpacked_struct(ty)
+
+    fn mir_eq_type_is_box(resolved: i32) -> bool:
+        self.sema.get_type_kind(resolved as TypeId) == TypeKind.TY_GENERIC_INST and self.sema.get_generic_inst_arg_count(resolved) == 1 and self.sema.type_symbol_is_std_box(self.sema.get_generic_inst_base(resolved)) != 0
+
+    // Continue only where `equal` holds: the walk returns false at the first
+    // part that differs.
+    mut fn mir_eq_require(equal: i64, differ: i64):
+        let next = wl_append_bb(self.context, self.current_function, "eq.next")
+        wl_build_cond_br(self.builder, equal, next, differ)
+        wl_position_at_end(self.builder, next)
+
+    // `count` elements of `elem_sema` at `lbuf` and `rbuf`, pairwise.
+    mut fn mir_eq_elements(lbuf: i64, rbuf: i64, elem_ty: i64, elem_sema: i32, count: i64, differ: i64):
+        let i64_ty = wl_i64_type(self.context)
+        let zero = wl_const_int(i64_ty, 0, 0)
+        let entry_bb = wl_get_insert_block(self.builder)
+        let loop_bb = wl_append_bb(self.context, self.current_function, "eq.elems")
+        let step_bb = wl_append_bb(self.context, self.current_function, "eq.elems.step")
+        let done_bb = wl_append_bb(self.context, self.current_function, "eq.elems.done")
+        wl_build_cond_br(self.builder, wl_build_icmp(self.builder, wl_int_sgt(), count, zero), loop_bb, done_bb)
+        wl_position_at_end(self.builder, loop_bb)
+        let idx = wl_build_phi(self.builder, i64_ty)
+        let indices: Vec[i64] = Vec.new()
+        indices.push(idx)
+        let le = wl_build_gep(self.builder, elem_ty, lbuf, vec_data_i64(&indices), 1)
+        let re = wl_build_gep(self.builder, elem_ty, rbuf, vec_data_i64(&indices), 1)
+        let equal = self.mir_emit_eq_ptrs(le, re, elem_ty, elem_sema)
+        wl_build_cond_br(self.builder, equal, step_bb, differ)
+        wl_position_at_end(self.builder, step_bb)
+        let next_idx = wl_build_add(self.builder, idx, wl_const_int(i64_ty, 1, 0))
+        wl_build_cond_br(self.builder, wl_build_icmp(self.builder, wl_int_slt(), next_idx, count), loop_bb, done_bb)
+        let phi_vals: Vec[i64] = Vec.new()
+        phi_vals.push(zero)
+        phi_vals.push(next_idx)
+        let phi_bbs: Vec[i64] = Vec.new()
+        phi_bbs.push(entry_bb)
+        phi_bbs.push(step_bb)
+        wl_add_incoming(idx, vec_data_i64(&phi_vals), vec_data_i64(&phi_bbs), 2)
+        wl_position_at_end(self.builder, done_bb)
+
+    mut fn mir_emit_eq_walk(lp: i64, rp: i64, ty: i64, resolved: i32, differ: i64):
+        let tk = self.sema.get_type_kind(resolved as TypeId)
+        let i64_ty = wl_i64_type(self.context)
+        let ptr_ty = wl_ptr_type(self.context)
+        if tk == TypeKind.TY_TUPLE:
+            for i in 0..self.sema.get_type_d1(resolved as TypeId):
+                let elem_sema = self.mir_project_field_sema_type(resolved, i)
+                let elem_ty = self.mir_sema_type_to_llvm(elem_sema)
+                if elem_sema > 0 and elem_ty != 0:
+                    self.mir_eq_require(self.mir_emit_eq_ptrs(self.tuple_elem_ptr(ty, lp, i), self.tuple_elem_ptr(ty, rp, i), elem_ty, elem_sema), differ)
+            return
+        if tk == TypeKind.TY_ARRAY:
+            let elem_sema = self.sema.get_type_d0(resolved as TypeId)
+            let count = self.sema.get_type_d1(resolved as TypeId)
+            self.mir_eq_elements(lp, rp, wl_get_element_type(ty), elem_sema, wl_const_int(i64_ty, count as i64, 0), differ)
+            return
+        if self.mir_sema_type_is_std_vec(resolved):
+            let elem_sema = self.mir_vec_elem_sema_type_from_sema_type(resolved)
+            let elem_ty = self.mir_sema_type_to_llvm(elem_sema)
+            let llen = self.mir_vec_len_inline(lp)
+            self.mir_eq_require(wl_build_icmp(self.builder, wl_int_eq(), llen, self.mir_vec_len_inline(rp)), differ)
+            if elem_sema > 0 and elem_ty != 0:
+                self.mir_eq_elements(wl_build_load(self.builder, ptr_ty, lp), wl_build_load(self.builder, ptr_ty, rp), elem_ty, elem_sema, llen, differ)
+            return
+        if self.mir_eq_type_is_box(resolved):
+            let pointee = self.sema.get_generic_inst_arg(resolved, 0)
+            let pointee_ty = self.mir_sema_type_to_llvm(pointee)
+            let pointee_kind = self.sema.get_type_kind(self.sema.resolve_alias(pointee as TypeId))
+            if pointee_ty == 0 or pointee_kind == TypeKind.TY_TRAIT_OBJ or wl_get_type_kind(ty) != wl_pointer_type_kind():
+                // A `Box[dyn Trait]` holds a value of a type this walk cannot
+                // name: two boxes are equal when they are the same box.
+                self.mir_eq_require(self.compare_value_eq(wl_build_load(self.builder, ty, lp), wl_build_load(self.builder, ty, rp), ty, BinaryOp.OP_EQ), differ)
+                return
+            self.mir_eq_require(self.mir_emit_eq_ptrs(wl_build_load(self.builder, ty, lp), wl_build_load(self.builder, ty, rp), pointee_ty, pointee), differ)
+            return
+        let variant_count = self.mir_enum_variant_count(resolved)
+        if variant_count > 0:
+            self.mir_emit_eq_enum_walk(lp, rp, ty, resolved, variant_count, differ)
+            return
+        if tk == TypeKind.TY_STRUCT and self.sema.distinct_type_names.contains(self.sema.get_type_d0(resolved as TypeId)):
+            // §4.5: a distinct type has its underlying type's representation,
+            // and its equality.
+            self.mir_eq_require(self.mir_emit_eq_ptrs(lp, rp, ty, self.sema.type_extra[(self.sema.get_type_d1(resolved as TypeId) + 1)]), differ)
+            return
+        let struct_idx = self.find_struct_index_by_type(ty)
+        let field_start: i32 = self.struct_field_starts[struct_idx]
+        let field_count: i32 = self.struct_field_counts[struct_idx]
+        for fi in 0..field_count:
+            let field_sym: i32 = self.struct_field_names[field_start + fi]
+            let field_ty: i64 = self.struct_field_types[field_start + fi]
+            let llvm_fi = self.get_llvm_field_index(ty, fi)
+            let lf = wl_build_struct_gep(self.builder, ty, lp, llvm_fi)
+            let rf = wl_build_struct_gep(self.builder, ty, rp, llvm_fi)
+            let field_sema = self.mir_project_field_sema_type(resolved, field_sym)
+            if field_sema > 0:
+                self.mir_eq_require(self.mir_emit_eq_ptrs(lf, rf, field_ty, field_sema), differ)
+            else:
+                self.mir_eq_require(self.compare_value_eq(wl_build_load(self.builder, field_ty, lf), wl_build_load(self.builder, field_ty, rf), field_ty, BinaryOp.OP_EQ), differ)
+
+    // An enum is equal to another when both are the same variant and that
+    // variant's payloads are equal. Three representations (see
+    // mir_emit_drop_enum_ptr): the Option niche (the payload's own pointer,
+    // null for None), a bare tag (no variant carries a payload), and
+    // `{tag, data}`.
+    mut fn mir_emit_eq_enum_walk(lp: i64, rp: i64, ty: i64, resolved: i32, variant_count: i32, differ: i64):
+        if wl_get_type_kind(ty) == wl_pointer_type_kind():
+            var some_idx = -1
+            for vi in 0..variant_count:
+                if self.mir_enum_variant_payload_count(resolved, vi) == 1: some_idx = vi
+            let lv = wl_build_load(self.builder, ty, lp)
+            let rv = wl_build_load(self.builder, ty, rp)
+            let none = wl_const_null(ty)
+            let l_none = wl_build_icmp(self.builder, wl_int_eq(), lv, none)
+            let r_none = wl_build_icmp(self.builder, wl_int_eq(), rv, none)
+            // Both None, or both Some.
+            self.mir_eq_require(wl_build_icmp(self.builder, wl_int_eq(), l_none, r_none), differ)
+            let payload_bb = wl_append_bb(self.context, self.current_function, "eq.some")
+            let done_bb = wl_append_bb(self.context, self.current_function, "eq.option.done")
+            wl_build_cond_br(self.builder, l_none, done_bb, payload_bb)
+            wl_position_at_end(self.builder, payload_bb)
+            if some_idx >= 0:
+                let payload_sema = self.mir_enum_payload_sema_type(resolved, some_idx, 0)
+                if payload_sema > 0:
+                    self.mir_eq_require(self.mir_emit_eq_ptrs(lp, rp, ty, payload_sema), differ)
+            wl_build_br(self.builder, done_bb)
+            wl_position_at_end(self.builder, done_bb)
+            return
+        if wl_get_type_kind(ty) != wl_struct_type_kind() or wl_count_struct_elem_types(ty) < 2:
+            self.mir_eq_require(self.compare_value_eq(wl_build_load(self.builder, ty, lp), wl_build_load(self.builder, ty, rp), ty, BinaryOp.OP_EQ), differ)
+            return
+        let tag_ty = wl_struct_get_type_at(ty, 0)
+        let l_tag = wl_build_load(self.builder, tag_ty, wl_build_struct_gep(self.builder, ty, lp, 0))
+        let r_tag = wl_build_load(self.builder, tag_ty, wl_build_struct_gep(self.builder, ty, rp, 0))
+        self.mir_eq_require(wl_build_icmp(self.builder, wl_int_eq(), l_tag, r_tag), differ)
+        let l_data = wl_build_struct_gep(self.builder, ty, lp, 1)
+        let r_data = wl_build_struct_gep(self.builder, ty, rp, 1)
+        let done_bb = wl_append_bb(self.context, self.current_function, "eq.enum.done")
+        for vi in 0..variant_count:
+            let payload_count = self.mir_enum_variant_payload_count(resolved, vi)
+            if payload_count == 0:
+                continue
+            let case_bb = wl_append_bb(self.context, self.current_function, "eq.enum.case")
+            let next_bb = wl_append_bb(self.context, self.current_function, "eq.enum.next")
+            let disc = self.mir_enum_variant_discriminant(resolved, vi)
+            wl_build_cond_br(self.builder, wl_build_icmp(self.builder, wl_int_eq(), l_tag, wl_const_int(tag_ty, disc, 0)), case_bb, next_bb)
+            wl_position_at_end(self.builder, case_bb)
+            let payload_ty = self.mir_enum_variant_payload_llvm_type(resolved, vi)
+            if payload_count == 1:
+                let payload_sema = self.mir_enum_payload_sema_type(resolved, vi, 0)
+                if payload_sema > 0 and payload_ty != 0:
+                    self.mir_eq_require(self.mir_emit_eq_ptrs(l_data, r_data, payload_ty, payload_sema), differ)
+            else if payload_ty != 0 and wl_get_type_kind(payload_ty) == wl_struct_type_kind():
+                for pf in 0..payload_count:
+                    let payload_sema = self.mir_enum_payload_sema_type(resolved, vi, pf)
+                    if payload_sema > 0:
+                        self.mir_eq_require(self.mir_emit_eq_ptrs(self.tuple_elem_ptr(payload_ty, l_data, pf), self.tuple_elem_ptr(payload_ty, r_data, pf), self.tuple_elem_type(payload_ty, pf), payload_sema), differ)
+            wl_build_br(self.builder, done_bb)
+            wl_position_at_end(self.builder, next_bb)
+        wl_build_br(self.builder, done_bb)
+        wl_position_at_end(self.builder, done_bb)
 
     fn coerce_float_operand_to(val: i64, target_ty: i64, is_unsigned: bool) -> i64:
         let val_ty = wl_type_of(val)
