@@ -7,5 +7,5 @@ pub fn build -> Build:
     var out = ctx.new_build().compile_c_object("tally-object", "vendor/tally.c", "out/lib/tally.o")
     out = out.add_target(target_new(.CreateStaticArchive, "tally", "").output("out/lib/libtally.a").input("out/lib/tally.o").dep("tally-object"))
     out = out.add_target(target_new(.Executable, "c-interop", "src/main.w").include_path("vendor").dep("tally"))
-    out = out.test("test", "test/*.w")
+    out = out.add_target(target_new(.Test, "test", "test/*.w").include_path("vendor").dep("tally"))
     out.default("c-interop")

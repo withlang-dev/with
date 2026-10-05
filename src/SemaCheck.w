@@ -27494,6 +27494,14 @@ impl Sema:
             let generic_eq = tk == TypeKind.TY_GENERIC_INST and self.lookup_generic_method_fn(self.get_generic_inst_base(t), eq_sym) != 0
             if generic_eq or (declared and self.type_has_operator_method(t, eq_sym) != 0):
                 self.ensure_eq_contract(t, eq_sym, node)
+                // The comparison calls that method (#1819: an operator is a
+                // call of its method), whatever the global-effects analysis
+                // needs to know of it.
+                let part_sig: i32 = self.concrete_eq_sigs.get(t) ?? -1
+                if part_sig >= 0:
+                    let no_args: Vec[i32] = Vec.new()
+                    let no_places: Vec[bool] = Vec.new()
+                    self.note_call_global_effects(node, part_sig, 0, 0, false, no_args, no_places)
                 continue
             if tk == TypeKind.TY_TUPLE:
                 for ei in 0..self.get_type_d1(t as TypeId): work.push(self.type_extra[(self.get_type_d0(t as TypeId) + ei)])

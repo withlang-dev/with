@@ -8,6 +8,7 @@ module build.examples
 // lane's output directory and the tests run from the project root.
 
 use std.build
+use std.sysinfo
 
 fn ex_join(left: &str, right: &str) -> str:
     if left.ends_with("/"): left ++ right else: left ++ "/" ++ right
@@ -50,6 +51,15 @@ fn ex_packages() -> Vec[str]:
     out.push("examples/ecs")
     out.push("examples/nebula")
     out.push("examples/service")
+    out
+
+/// Projects with a build.w of their own: `with run`, then their `test`
+/// target, from the project directory, as their README says to. They were
+/// in no lane, and examples/c-interop's tests failed on main unseen (#2137).
+/// It reads the host's sqlite3.h, which a Windows host does not have.
+fn ex_projects() -> Vec[str]:
+    var out = Vec.new()
+    if os() != "Windows": out.push("examples/c-interop")
     out
 
 /// Package test files (standalone), run with `with test` from the root.
@@ -196,6 +206,18 @@ pub fn run_examples_tests_action(ctx: ActionCtx) -> i32:
         run_args.push(binary.clone())
         failures += ex_run(ctx, run_args, slug ++ ".run", ex_abs(root, package), 60000)
 
+    for project in ex_projects():
+        let slug = ex_slug(project)
+        var run_args: Vec[str] = Vec.new()
+        run_args.push(compiler.clone())
+        run_args.push("run")
+        failures += ex_run(ctx, run_args, slug ++ ".run", ex_abs(root, project), 300000)
+        var test_args: Vec[str] = Vec.new()
+        test_args.push(compiler.clone())
+        test_args.push("build")
+        test_args.push(":test")
+        failures += ex_run(ctx, test_args, slug ++ ".test", ex_abs(root, project), 300000)
+
     for test in ex_tests():
         var args: Vec[str] = Vec.new()
         args.push(compiler.clone())
@@ -205,7 +227,7 @@ pub fn run_examples_tests_action(ctx: ActionCtx) -> i32:
 
     if failures > 0:
         ctx.diagnostics().error(f"examples-tests: {failures} step(s) failed; an example tracks the current spec (D55 ruling 4): a spec change updates it in the same change, a compiler or stdlib change that breaks it is a defect")
-    let total = ex_checked().len() + ex_programs().len() + ex_packages().len() + ex_tests().len()
+    let total = ex_checked().len() + ex_programs().len() + ex_packages().len() + ex_projects().len() * 2 + ex_tests().len()
     let _ = fs.write_text(ex_join(out_dir, ".stamp"), f"ok: {total} example steps\n")
     print(f"examples-tests: {total} steps green")
     0
