@@ -523,7 +523,7 @@ With has `unsafe` with the same semantics.
 ```
 
 Known derives that map: `Clone`, `Debug`, `Default`, `PartialEq`,
-`Eq`, `Hash`. Everything else → flag.
+`Eq`; `Hash` is dropped, since the compiler hashes every key (D96). Everything else → flag.
 
 #### Trait associated types
 

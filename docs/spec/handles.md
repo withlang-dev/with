@@ -6,7 +6,7 @@ A handle is a typed index with a generation counter.
 
 ```
 type Handle[T] { index: u32, generation: u32 }
-    with Copy, Eq, Hash
+    with Copy, Eq
 ```
 
 Handles are `Copy`, type-parameterized (`Handle[Texture]` incompatible

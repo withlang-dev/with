@@ -27,7 +27,7 @@ fn render[T](value: T):
 ```
 
 No `use` is needed for `Vec`, `String`, `Option`, `Result`,
-`Debug`/`Display`/`Default`, `Iter`/`IntoIter`, `Eq`/`Hash`/`Ord`,
+`Debug`/`Display`/`Default`, `Iter`/`IntoIter`, `Eq`/`Key`/`Ord`,
 or core print/assert helpers.
 
 ---

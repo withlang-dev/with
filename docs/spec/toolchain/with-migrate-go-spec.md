@@ -918,7 +918,7 @@ fn map_slice[T, U](s: &Vec[T], f: fn(&T) -> U) -> Vec[U]:
 ```
 
 Go generics `[T any]` → With generics `[T]`.
-Go constraint `comparable` → With `Eq + Hash`.
+Go constraint `comparable` → With `Key`.
 Go constraint `~int | ~float64` → With trait or flag.
 Custom constraints → translate to With trait bounds or flag.
 

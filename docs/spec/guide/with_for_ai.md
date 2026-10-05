@@ -551,7 +551,7 @@ process(refs)
 Long-lived relationships use typed handles, not references or raw pointers.
 
 ```with
-type Handle[T] { index: u32, generation: u32 } with Copy, Eq, Hash
+type Handle[T] { index: u32, generation: u32 } with Copy, Eq
 ```
 
 `SlotMap[T]` owns values and returns `Handle[T]`.
@@ -852,7 +852,7 @@ fn double[T](x: T): x + x
 The body is checked when instantiated. Explicit bounds are available:
 
 ```with
-fn debug[T: Show + Hash](x: &T):
+fn debug[T: Show + Key](x: &T):
     print(x.show())
 ```
 

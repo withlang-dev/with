@@ -34,7 +34,7 @@ use math.vector.{Vec3, dot, cross}
 - Primitive types (`i32`, `i64`, `f64`, `bool`, `Int`, `UInt`, etc.)
 - `Unit`
 - `Vec[T]`, `String` / `str`
-- Traits: `Eq`, `Ord`, `Hash`, `Debug`, `Display`, `Default`, `Drop`
+- Traits: `Eq`, `Ord`, `Key`, `Debug`, `Display`, `Default`, `Drop`
 - `print`, `eprint` — `print[T: Display](v: &T)`: any `Display` value
   prints; `&str` is one instance. A `match` whose arms do not share a
   `Display` type yields nothing joinable, and the diagnostic's fix-it is the
@@ -358,7 +358,7 @@ that doesn't need a heap allocator or OS:
 | Category | What's included |
 |----------|----------------|
 | Primitives | `i8`–`i64`, `u8`–`u64`, `f32`, `f64`, `bool`, `usize` |
-| Traits | `Copy`, `Clone`, `Drop`, `Default`, `Debug`, `Eq`, `Ord`, `Hash` |
+| Traits | `Copy`, `Clone`, `Drop`, `Default`, `Debug`, `Eq`, `Ord`, `Key` |
 | Option/Result | `Option[T]`, `Result[T, E]` and all methods |
 | Slices | `&[T]` — borrowed views into arrays |
 | Fixed arrays | `[T; N]` — stack-allocated |

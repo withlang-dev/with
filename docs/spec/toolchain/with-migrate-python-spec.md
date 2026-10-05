@@ -632,7 +632,7 @@ in the class body take precedence.
 | `__add__` | `impl Add for Type:` |
 | `__sub__` | `impl Sub for Type:` |
 | `__mul__` | `impl Mul for Type:` |
-| `__hash__` | `impl Hash for Type:` |
+| `__hash__` | with `__eq__` over the same fields: `impl Key for Type: fn key()` projecting them (D96); otherwise flag |
 | `__contains__` | `fn contains(self: &Self, item: T) -> bool` |
 | `__iter__` | `fn iter(self: &Self) -> ...` (flag if complex) |
 | `__getitem__` | `fn get(self: &Self, idx: T) -> V` |

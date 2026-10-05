@@ -517,7 +517,7 @@ fn largest[T: Ord](array: &Vec[T]) -> T: ...
 ```
 
 `<T>` → `[T]`. `Comparable` → `Ord`. `Equatable` → `Eq`.
-`Hashable` → `Hash`. `CustomStringConvertible` → `Display`.
+`Hashable` → `Eq` (a structurally equal type is a key, D96; a custom `hash(into:)` → flag, the author writes a key projection). `CustomStringConvertible` → `Display`.
 `CustomDebugStringConvertible` → `Debug`.
 `Codable` → flag (no direct equivalent).
 
@@ -529,14 +529,14 @@ fn largest[T: Ord](array: &Vec[T]) -> T: ...
 |---|---|---|
 | `Equatable` | `Eq` | Direct |
 | `Comparable` | `Ord` | Direct |
-| `Hashable` | `Hash` | Direct |
+| `Hashable` | `Eq` | Direct; the compiler hashes every key (D96) |
 | `CustomStringConvertible` | `Display` | `.description` → `.to_str()` |
 | `CustomDebugStringConvertible` | `Debug` | Direct |
 | `Sequence` | `IntoIter[T]` | Conceptually similar |
 | `IteratorProtocol` | `Iter[T]` | `.next()` → `.next()` |
 | `Collection` | flag | No single equivalent |
 | `Codable` | flag | No serialization framework |
-| `Identifiable` | flag | Use `Eq` + `Hash` |
+| `Identifiable` | flag | Use `impl Key for T: fn key(): self.id` |
 | `Error` | `Error` (trait) | Direct |
 | `Sendable` | (implicit) | With's concurrency model handles this |
 

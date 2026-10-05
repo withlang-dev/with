@@ -41,7 +41,7 @@ With keeps a practical prelude in scope for every module. You do not
 need to import:
 
 - `Vec`, `HashMap`, `HashSet`, `Option`, `Result`, `String`
-- `Debug`, `Display`, `Default`, `Iter`, `IntoIter`, `Eq`, `Hash`, `Ord`
+- `Debug`, `Display`, `Default`, `Iter`, `IntoIter`, `Eq`, `Key`, `Ord`
 - `print`, `println`, `assert` and related assertion/panic helpers
 
 Write these names directly unless you want explicit qualification for

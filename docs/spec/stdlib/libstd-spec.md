@@ -57,7 +57,7 @@ document does not redefine them; each module's header comment does.
 | `prelude`, `prelude_core`, `prelude_alloc` | Ambient imports |
 | `option` | `Option[T]` — Some, None, unwrap, map |
 | `result` | `Result[T, E]` — Ok, Err, ContextError, `?` operator |
-| `traits` | Eq, Ord, Hash, Debug, Display, Default, Clone, Drop, Scoped, ScopedMut, Iter, IntoIter, MultiIndex, MultiIndexMut, Add/Sub/Mul/Div/MatMul/Neg, Try, ControlFlow, Deref, **Error** (`display`, `source`), Contains, IndexGet, IndexPlace |
+| `traits` | Eq, Ord, Key, Debug, Display, Default, Clone, Drop, Scoped, ScopedMut, Iter, IntoIter, MultiIndex, MultiIndexMut, Add/Sub/Mul/Div/MatMul/Neg, Try, ControlFlow, Deref, **Error** (`display`, `source`), Contains, IndexGet, IndexPlace |
 | `collections` | Vec, HashMap, HashSet, BTreeMap, BTreeSet, SlotMap/Handle, Atomic, Order, fence, Iterable/IntoIter and the adapter family (Map, Filter, FilterMap, Take, Drop, TakeWhile, DropWhile, Zip, ZipWith, Enumerate, Chain, StepBy, FlatMap), IndexSpec |
 | `collections/sorted_vec`, `collections/binary_heap`, `collections/trie`, `collections/hash_index`, `collections/engine_slot` | Facades over migrated engines (c-algorithms, TommyDS) — see *Sourced from corpora* |
 | `box`, `rc` | `Box[T]` single-owner heap cell; `Rc[T]` explicit reference counting |
