@@ -8,6 +8,7 @@
 use std.libc
 use std.fs
 use std.process
+use std.os.Target
 
 fn main:
     let path_text = f"out/with-d90-flags-{pid()}.txt"
@@ -21,19 +22,25 @@ fn main:
     assert(libc.close(first) == 0)
     assert(libc.open(path, libc.O_WRONLY | libc.O_CREAT | libc.O_EXCL, 420) < 0, "O_EXCL on an existing file")
 
-    // Append: every write lands at the end, and F_GETFL says so in
-    // std.libc's numbering.
+    // Append: every write lands at the end, wherever the offset was put.
     let appender = libc.open(path, libc.O_WRONLY | libc.O_APPEND, 0)
     assert(appender >= 0)
-    let status = libc.fcntl(appender, libc.F_GETFL)
-    assert((status & libc.O_APPEND) != 0, "F_GETFL reports O_APPEND")
-    assert((status & 3) == libc.O_WRONLY)
     assert(libc.lseek(appender, 0, libc.SEEK_SET) == 0)
     assert(libc.write(appender, c"de".ptr as *const c_void, 2) == 2)
 
-    // F_SETFL takes the same numbering back.
-    assert(libc.fcntl(appender, libc.F_SETFL, status | libc.O_NONBLOCK) >= 0)
-    assert((libc.fcntl(appender, libc.F_GETFL) & libc.O_NONBLOCK) != 0, "O_NONBLOCK set through F_SETFL")
+    // F_GETFL reports the flags in std.libc's numbering and F_SETFL takes
+    // the same numbering back. Windows has no fcntl: a HANDLE has no
+    // status flags to read or set, and the seam reports -1
+    // (rt/windows_*.w rt_fcntl). The first run of this test on Windows
+    // read that -1 as a flag word, and its O_APPEND bit as set.
+    let status = libc.fcntl(appender, libc.F_GETFL)
+    if Target.os == .Windows:
+        assert(status == -1, "no fcntl on Windows")
+    else:
+        assert((status & libc.O_APPEND) != 0, "F_GETFL reports O_APPEND")
+        assert((status & 3) == libc.O_WRONLY)
+        assert(libc.fcntl(appender, libc.F_SETFL, status | libc.O_NONBLOCK) >= 0)
+        assert((libc.fcntl(appender, libc.F_GETFL) & libc.O_NONBLOCK) != 0, "O_NONBLOCK set through F_SETFL")
     assert(libc.close(appender) == 0)
     assert(read_file(path_text).unwrap() == "abcde")
     libc.unlink(path)
