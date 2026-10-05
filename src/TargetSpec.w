@@ -80,6 +80,21 @@ pub fn target_spec_os() -> str:
         return "Wasi"
     with_sysinfo_os()
 
+// The variants of std.os's OsKind and ArchKind, one per target the compiler
+// has and no other (§17.5): the names a module-level `comptime match` on
+// `Target.os` or `Target.arch` must cover.
+pub fn target_spec_os_kinds() -> Vec[str]: ["Macos", "Linux", "Windows", "Wasi"]
+pub fn target_spec_arch_kinds() -> Vec[str]: ["Aarch64", "X86_64", "Wasm32", "Wasm64"]
+
+// The active target's ArchKind variant.
+pub fn target_spec_arch_kind() -> str:
+    let a = target_spec_arch()
+    if a == "aarch64": return "Aarch64"
+    if a == "x86_64" or a == "amd64": return "X86_64"
+    if a == "wasm32": return "Wasm32"
+    if a == "wasm64": return "Wasm64"
+    ""
+
 // Resolved target arch. Cross targets and the host now share one canonical
 // spelling ("x86_64"/"aarch64"/"wasm32"/"wasm64"), so a native target
 // returns exactly what the host sysinfo reports.

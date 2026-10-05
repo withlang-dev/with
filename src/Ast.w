@@ -1486,6 +1486,11 @@ impl AstPool:
             ast_pool_phase_bug("BUG: AstPool.add_decl called after freeze")
         self.state.decls.push(node_idx as i32)
 
+    // Drops the declarations added after the first `count` (§17.5: an arm
+    // of a module-level target selection that is not taken).
+    mut fn truncate_decls(count: i32):
+        while self.state.decls.len() as i32 > count: let _ = self.state.decls.pop()
+
     fn decl_count() -> i32:
         self.state.decls.len() as i32
 

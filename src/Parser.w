@@ -22,6 +22,13 @@ fn parser_active_arch() -> str:
     let a = target_spec_arch()
     if a == "amd64": "x86_64" else: a
 
+// The variants of `Target.os` or `Target.arch` (std.os's OsKind and
+// ArchKind), and the active target's, by the names those enums use.
+fn parser_target_variants(field: &str) -> Vec[str]: if field == "os": target_spec_os_kinds() else: target_spec_arch_kinds()
+fn parser_target_enum(field: &str): if field == "os": "OsKind" else: "ArchKind"
+fn parser_target_variant_list(field: &str): [f".{v}" for v in parser_target_variants(field)].join(", ")
+fn parser_active_target(field: &str): if field == "os": target_spec_os() else: target_spec_arch_kind()
+
 fn parser_target_guard_arch_known(arch: &str) -> bool:
     arch == "aarch64" or arch == "x86_64" or arch == "wasm32" or arch == "wasm64"
 
@@ -1024,78 +1031,267 @@ impl Parser:
             self.skip_separators()
             if self.peek() == TokenKind.TK_EOF:
                 break
-
-            if self.peek() == TokenKind.TK_KW_PUB:
-                let saved_pos: i32 = self.pos
-                self.advance()
-                if self.peek() == TokenKind.TK_KW_IMPL or self.peek() == TokenKind.TK_KW_EXTEND:
-                    self.parse_impl_block(Visibility.Public)
-                    self.skip_separators()
-                    continue
-                if self.peek() == TokenKind.TK_KW_TRAIT:
-                    self.parse_trait_decl(Visibility.Public)
-                    self.skip_separators()
-                    continue
-                self.pos = saved_pos
-            else if self.peek() == TokenKind.TK_KW_IMPL or self.peek() == TokenKind.TK_KW_EXTEND:
-                self.parse_impl_block(Visibility.Private)
-                self.skip_separators()
-                continue
-            else if self.peek() == TokenKind.TK_KW_TRAIT:
-                self.parse_trait_decl(Visibility.Private)
-                self.skip_separators()
-                continue
-            else if self.peek() == TokenKind.TK_KW_COMPTIME:
-                if self.pos + 1 < self.tokens.len() and self.tokens.get_tag(self.pos + 1) == TokenKind.TK_COLON:
-                    self.parse_comptime_decl_block()
-                    self.skip_separators()
-                    continue
-
-            if self.implicit_main_mode != 0 and self.top_level_starts_decl() == 0:
-                let stmt = self.parse_expr()
-                if stmt != 0:
-                    self.record_top_level_stmt(stmt)
-                else:
-                    self.recover_to_top_level()
-            else if self.module_label.len() > 0 and self.top_level_starts_stmt() != 0:
-                // §18.5b (D74): an imported module may not hold executable
-                // statements. The statement is parsed so the error covers it
-                // and the rest of the module is still diagnosed.
-                let stmt = self.parse_expr()
-                if stmt != 0:
-                    self.emit_module_top_level_stmt(stmt)
-                else:
-                    self.recover_to_top_level()
-            else:
-                let decl = self.parse_decl()
-                if decl != 0:
-                    // §16.13 @[target("arch")] guard: a declaration guarded for an
-                    // architecture other than the active target is excluded from
-                    // compilation entirely (not collected, not checked, not lowered)
-                    // so non-portable code stays explicit without breaking other
-                    // hosts. Matching guards are recorded on the node (visible to
-                    // later phases) and compiled normally.
-                    // fn decls record the guard on the node (parse_fn_decl); other
-                    // decl kinds still carry it in pending_target.
-                    var guard = self.pending_target
-                    self.pending_target = 0
-                    if self.pool.kind(decl) == NodeKind.NK_FN_DECL:
-                        guard = self.pool.fn_target_arch_of(decl)
-                    if guard != 0 and self.intern.resolve(guard) != parser_active_arch():
-                        // Drop: do not add to the pool, and discard any post-decls
-                        // it generated so nothing dangling references it.
-                        self.pending_post_decls = Vec.new()
-                    else:
-                        self.pool.add_decl(decl)
-                        if self.pool.kind(decl) == NodeKind.NK_FN_DECL and self.intern.resolve(self.pool.get_data0(decl)) == "main":
-                            self.explicit_main_decl = decl as i32
-                        self.flush_pending_post_decls()
-                else:
-                    self.recover_to_top_level()
+            self.parse_top_level_item()
             self.skip_separators()
 
         self.synthesize_implicit_main()
         self.pool
+
+    // One module-level item: a declaration, an impl/trait block, a
+    // `comptime:` block, a target selection, or (implicit main) a statement.
+    mut fn parse_top_level_item():
+        if self.peek() == TokenKind.TK_KW_PUB:
+            let saved_pos: i32 = self.pos
+            self.advance()
+            if self.peek() == TokenKind.TK_KW_IMPL or self.peek() == TokenKind.TK_KW_EXTEND:
+                self.parse_impl_block(Visibility.Public)
+                return
+            if self.peek() == TokenKind.TK_KW_TRAIT:
+                self.parse_trait_decl(Visibility.Public)
+                return
+            self.pos = saved_pos
+        else if self.peek() == TokenKind.TK_KW_IMPL or self.peek() == TokenKind.TK_KW_EXTEND:
+            self.parse_impl_block(Visibility.Private)
+            return
+        else if self.peek() == TokenKind.TK_KW_TRAIT:
+            self.parse_trait_decl(Visibility.Private)
+            return
+        else if self.peek() == TokenKind.TK_KW_COMPTIME and self.pos + 1 < self.tokens.len():
+            let next = self.tokens.get_tag(self.pos + 1)
+            if next == TokenKind.TK_COLON:
+                self.parse_comptime_decl_block()
+                return
+            if next == TokenKind.TK_KW_MATCH or next == TokenKind.TK_KW_IF:
+                self.parse_target_select()
+                return
+
+        if self.implicit_main_mode != 0 and self.top_level_starts_decl() == 0:
+            let stmt = self.parse_expr()
+            if stmt != 0:
+                self.record_top_level_stmt(stmt)
+            else:
+                self.recover_to_top_level()
+        else if self.module_label.len() > 0 and self.top_level_starts_stmt() != 0:
+            // §18.5b (D74): an imported module may not hold executable
+            // statements. The statement is parsed so the error covers it
+            // and the rest of the module is still diagnosed.
+            let stmt = self.parse_expr()
+            if stmt != 0:
+                self.emit_module_top_level_stmt(stmt)
+            else:
+                self.recover_to_top_level()
+        else:
+            let decl = self.parse_decl()
+            if decl != 0:
+                // §16.13 @[target("arch")] guard: a declaration guarded for an
+                // architecture other than the active target is excluded from
+                // compilation entirely (not collected, not checked, not lowered)
+                // so non-portable code stays explicit without breaking other
+                // hosts. Matching guards are recorded on the node (visible to
+                // later phases) and compiled normally.
+                // fn decls record the guard on the node (parse_fn_decl); other
+                // decl kinds still carry it in pending_target.
+                var guard = self.pending_target
+                self.pending_target = 0
+                if self.pool.kind(decl) == NodeKind.NK_FN_DECL:
+                    guard = self.pool.fn_target_arch_of(decl)
+                if guard != 0 and self.intern.resolve(guard) != parser_active_arch():
+                    // Drop: do not add to the pool, and discard any post-decls
+                    // it generated so nothing dangling references it.
+                    self.pending_post_decls.clear()
+                else:
+                    self.pool.add_decl(decl)
+                    if self.pool.kind(decl) == NodeKind.NK_FN_DECL and self.intern.resolve(self.pool.get_data0(decl)) == "main":
+                        self.explicit_main_decl = decl as i32
+                    self.flush_pending_post_decls()
+            else:
+                self.recover_to_top_level()
+
+    // ── Per-target declarations (§17.5, D94) ───────────────────────────
+    //
+    // At module level a `comptime match` on `Target.os` or `Target.arch`, or
+    // a `comptime if` on them, selects declarations: each arm holds whole
+    // declarations, indented under it, and the taken arm's are the module's.
+    // The target is a build input the compilation already has, so the arm is
+    // chosen here, as the §16.13 guard is: an arm not taken is parsed and
+    // nothing more, so it may name what exists only on its own target.
+
+    mut fn parse_target_select():
+        let select_col = column_of(self.source, self.current_start())
+        self.advance()  // comptime
+        if self.peek() == TokenKind.TK_KW_MATCH:
+            self.parse_target_match(select_col)
+            return
+        // comptime if <cond>: … [else if <cond>: …] [else: …]
+        var decided = false
+        var is_else = false
+        while true:
+            var taken = not decided
+            if not is_else:
+                self.advance()  // if
+                let cond = self.parse_target_condition()
+                taken = not decided and cond
+            if self.expect(TokenKind.TK_COLON) == 0:
+                self.recover_to_top_level()
+                return
+            self.parse_target_arm_decls(select_col, taken)
+            if taken: decided = true
+            if is_else: return
+            self.skip_newlines()
+            if self.peek() != TokenKind.TK_KW_ELSE or column_of(self.source, self.current_start()) != select_col:
+                return
+            self.advance()  // else
+            is_else = self.peek() != TokenKind.TK_KW_IF
+
+    // `Target.os` or `Target.arch`: which field; "" (an error is reported)
+    // for anything else.
+    mut fn parse_target_field() -> str:
+        if self.peek() != TokenKind.TK_IDENT or self.current_text() != "Target":
+            self.emit_error("a module-level comptime selection reads `Target.os` or `Target.arch` (§17.5)")
+            return ""
+        self.advance()
+        if self.expect(TokenKind.TK_DOT) == 0:
+            return ""
+        let field = self.current_text()
+        if self.peek() != TokenKind.TK_IDENT or (field != "os" and field != "arch"):
+            self.emit_error("`Target` has the fields `os` and `arch` (§17.5)")
+            return ""
+        self.advance()
+        field
+
+    // The variant a `.Name` names for `field`, checked against the targets
+    // the compiler has; "" (an error is reported) for an unknown one.
+    mut fn parse_target_variant(field: &str) -> str:
+        if self.peek() != TokenKind.TK_DOT_IDENT:
+            self.emit_error("expected a target variant such as `.Linux`")
+            return ""
+        let name = self.current_text().slice(1, self.current_text().len())
+        let known = parser_target_variants(field)
+        if not known.contains(&name):
+            self.emit_error(f"`{parser_target_enum(field)}` has no variant `.{name}`; it has {parser_target_variant_list(field)}")
+        self.advance()
+        name
+
+    // A condition on the target: `Target.os == .X`, `!=`, `not`, `and`, `or`
+    // and parentheses.
+    mut fn parse_target_condition() -> bool:
+        var value = self.parse_target_conjunction()
+        while self.peek() == TokenKind.TK_KW_OR:
+            self.advance()
+            let rhs = self.parse_target_conjunction()
+            value = value or rhs
+        value
+
+    mut fn parse_target_conjunction() -> bool:
+        var value = self.parse_target_atom()
+        while self.peek() == TokenKind.TK_KW_AND:
+            self.advance()
+            let rhs = self.parse_target_atom()
+            value = value and rhs
+        value
+
+    mut fn parse_target_atom() -> bool:
+        if self.peek() == TokenKind.TK_KW_NOT:
+            self.advance()
+            return not self.parse_target_atom()
+        if self.peek() == TokenKind.TK_L_PAREN:
+            self.advance()
+            let inner = self.parse_target_condition()
+            let _ = self.expect(TokenKind.TK_R_PAREN)
+            return inner
+        let field = self.parse_target_field()
+        if field.len() == 0:
+            return false
+        let equal = self.peek() == TokenKind.TK_EQ_EQ
+        if not equal and self.peek() != TokenKind.TK_BANG_EQ:
+            self.emit_error("compare the target with `==` or `!=` (§17.5)")
+            return false
+        self.advance()
+        let variant = self.parse_target_variant(field)
+        (variant == parser_active_target(field)) == equal
+
+    // comptime match Target.os: … — arms `.A | .B =>`, or `_ =>`, each with
+    // its declarations indented below; exhaustive, as every match is.
+    mut fn parse_target_match(select_col: i32):
+        self.advance()  // match
+        let field = self.parse_target_field()
+        if field.len() == 0 or self.expect(TokenKind.TK_COLON) == 0:
+            self.recover_to_top_level()
+            return
+        self.skip_newlines()
+        let arm_col = column_of(self.source, self.current_start())
+        if arm_col <= select_col:
+            self.emit_error("a comptime match needs its arms indented below it")
+            return
+        let active = parser_active_target(field)
+        var named: Vec[str] = Vec.new()
+        var wildcard = false
+        var decided = false
+        while self.peek() != TokenKind.TK_EOF and column_of(self.source, self.current_start()) == arm_col:
+            var matches = false
+            if self.peek() == TokenKind.TK_IDENT and self.current_text() == "_":
+                self.advance()
+                wildcard = true
+                matches = true
+            else:
+                while true:
+                    let variant = self.parse_target_variant(field)
+                    if variant.len() > 0:
+                        if named.contains(&variant): self.emit_error(f"`.{variant}` has an arm already")
+                        named.push(variant.clone())
+                    if variant == active: matches = true
+                    if self.peek() != TokenKind.TK_PIPE: break
+                    self.advance()
+            if self.expect(TokenKind.TK_FAT_ARROW) == 0:
+                self.recover_to_top_level()
+                return
+            let taken = matches and not decided
+            self.parse_target_arm_decls(arm_col, taken)
+            if taken: decided = true
+            self.skip_newlines()
+        if not wildcard:
+            var missing: Vec[str] = Vec.new()
+            for variant in parser_target_variants(field):
+                if not named.contains(variant): missing.push(f".{variant}")
+            if missing.len() > 0:
+                self.emit_error(f"the comptime match on `Target.{field}` does not name {missing.join(", ")}: every target needs its declarations (§17.5)")
+
+    // The declarations indented below an arm whose own line is at column
+    // `arm_col`. An arm not taken is parsed, and its declarations are then
+    // dropped, with anything they added.
+    mut fn parse_target_arm_decls(arm_col: i32, taken: bool):
+        if self.peek() != TokenKind.TK_NEWLINE:
+            self.emit_error("an arm's declarations start on the line below it")
+            self.recover_to_top_level()
+            return
+        self.skip_newlines()
+        let decl_start = self.pool.decl_count()
+        let main_before = self.explicit_main_decl
+        let stmts_before = self.top_level_stmts.len() as i32
+        let body_col = column_of(self.source, self.current_start())
+        if body_col <= arm_col:
+            self.emit_error("an arm holds at least one declaration, indented below it")
+            return
+        while self.peek() != TokenKind.TK_EOF:
+            self.skip_newlines()
+            self.skip_attributes()
+            self.skip_newlines()
+            if self.peek() == TokenKind.TK_EOF or column_of(self.source, self.current_start()) < body_col:
+                break
+            if column_of(self.source, self.current_start()) > body_col:
+                self.emit_error("unexpected indentation in an arm's declarations")
+                self.recover_to_top_level()
+                break
+            if self.top_level_starts_decl() == 0 and not (self.peek() == TokenKind.TK_KW_COMPTIME):
+                self.emit_error("an arm of a module-level comptime selection holds declarations, not statements (§17.5)")
+                self.recover_to_top_level()
+                continue
+            self.parse_top_level_item()
+        if not taken:
+            self.pool.truncate_decls(decl_start)
+            self.pending_post_decls = Vec.new()
+            self.explicit_main_decl = main_before
+            while self.top_level_stmts.len() as i32 > stmts_before: let _ = self.top_level_stmts.pop()
 
     // ── Declaration parsing ──────────────────────────────────────────
 
