@@ -18,7 +18,7 @@ This is a regression alarm, not an asymptotic proof or a microbenchmark ranking.
 | HashMap and HashSet insert/lookup/remove | PASS |
 | Vec consuming iteration | XFAIL #938 |
 | BTreeMap/BTreeSet ascending and descending workloads | XFAIL #937 |
-| HashMap removal without allocating temporary buffers | XFAIL #939 |
+| HashMap removal without allocating temporary buffers | PASS after #939 (D96: a removal leaves a tombstone) |
 | `stdin.lines()` and `read_all()` (a child run of the fixture per sample, stdin from a file) | PASS after #1352 |
 
 Only a failed cost bound is eligible for XFAIL. Wrong results, crashes,

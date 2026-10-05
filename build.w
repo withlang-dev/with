@@ -2355,9 +2355,11 @@ fn run_stdlib_complexity_action(ctx: ActionCtx):
     let removal = complexity_allocation_count(trace, "hash-remove")
     if empty != 0 or control <= 0 or removal < 0:
         ctx.diagnostics().error(f"stdlib-complexity: invalid allocation trace empty={empty} control={control} removal={removal}\n" ++ trace)
-    if removal == 0:
-        ctx.diagnostics().error("stdlib-complexity: XPASS HashMap removal #939; update its expectation with fix evidence")
-    let report = fs.read_text(timing_out) ++ f"XFAIL hash-remove-allocation #939 allocations={removal}\n"
+    // #939, D96: a removal leaves a tombstone and moves no other entry, so
+    // it allocates nothing.
+    if removal != 0:
+        ctx.diagnostics().error(f"stdlib-complexity: HashMap removal allocated {removal} times; it allocates nothing (#939, D96)\n" ++ trace)
+    let report = fs.read_text(timing_out) ++ f"PASS hash-remove-allocation allocations={removal}\n"
     if fs.write_text(build_project_join(output, "report.txt"), report) != 0:
         ctx.diagnostics().error("stdlib-complexity: cannot write report")
     if fs.write_text(build_project_join(output, ".stamp"), "ok") != 0: return 1
