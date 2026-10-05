@@ -16442,6 +16442,9 @@ impl Sema:
         let target_type = self.assignment_target_value_type(target, target_exact_type as i32)
         let value_type = if target_type != 0: self.check_expr_with_owned_demand(value, target_type) else: self.check_expr(value)
         self.reject_owned_demand_from_view_projection(value, target_type as i32, "assignment")
+        // A pending generic binding is settled by what is assigned to it.
+        if value_type != 0 and self.ast.kind(target) == NodeKind.NK_IDENT and self.pending_generic_binding_base.contains(self.ast.get_data0(target)):
+            let _ = self.settle_pending_generic_binding(self.ast.get_data0(target), value_type as i32, target)
         // A facade-rendered type's fields are its rendering's (§16.2b.3).
         if self.ast.kind(target) == NodeKind.NK_FIELD_ACCESS:
             let written_recv_ty = self.check_expr(self.ast.get_data0(target)) as i32
@@ -27642,6 +27645,15 @@ impl Sema:
             return self.pending_generic_constructor_base(self.ast.get_data0(value), val_type)
         if self.ast.kind(value) == NodeKind.NK_IDENT:
             let src_sym = self.ast.get_data0(value)
+            // A payloadless variant of a generic enum written with nothing to
+            // say its type arguments (`var best = None`, #2103) is pending as
+            // `Vec.new()` is: a later use settles it.
+            if self.variant_lookup.contains(src_sym) and not self.pending_generic_binding_base.contains(src_sym):
+                let enum_ty = self.resolve_alias(val_type as TypeId)
+                if self.get_type_kind(enum_ty) == TypeKind.TY_ENUM:
+                    let enum_name = self.get_type_d0(enum_ty)
+                    if self.type_decl_nodes.contains(enum_name) and self.type_decl_tp_count(self.type_decl_nodes.get(enum_name).unwrap()) > 0: return enum_name
+                return 0
             if self.pending_generic_binding_base.contains(src_sym):
                 return self.pending_generic_binding_base.get(src_sym).unwrap()
             return 0
@@ -27688,10 +27700,13 @@ impl Sema:
         if base_sym == 0:
             return
         self.pending_generic_binding_base.insert(sym, base_sym)
-        let call_node = self.pending_generic_constructor_call_node(value)
+        var call_node = self.pending_generic_constructor_call_node(value)
+        // The variant itself is the node a settlement retypes.
+        if call_node == 0 and self.ast.kind(value) == NodeKind.NK_IDENT and self.variant_lookup.contains(self.ast.get_data0(value)):
+            self.pending_generic_binding_call.insert(sym, value)
         if call_node != 0:
             self.pending_generic_binding_call.insert(sym, call_node)
-            self.note_allocation_site(call_node, AllocConstructKind.VEC_NEW, 0, 0)
+            if self.ast.kind(call_node) == NodeKind.NK_CALL: self.note_allocation_site(call_node, AllocConstructKind.VEC_NEW, 0, 0)
         if decl_node != 0:
             self.pending_generic_binding_decl.insert(sym, decl_node)
 
@@ -27719,6 +27734,10 @@ impl Sema:
             if settled != 0:
                 self.typed_expr_types.insert(value, settled)
             return settled
+        // A bare variant of a generic enum takes the type its place gives it.
+        if kind == NodeKind.NK_IDENT and self.variant_lookup.contains(self.ast.get_data0(value)) and not self.pending_generic_binding_base.contains(self.ast.get_data0(value)):
+            self.typed_expr_types.insert(value, concrete)
+            return concrete
         if kind == NodeKind.NK_IDENT:
             return self.settle_pending_generic_binding(self.ast.get_data0(value), concrete, value)
         let call_node = self.pending_generic_constructor_call_node(value)
