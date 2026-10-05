@@ -241,6 +241,40 @@ fn astpool_clone_deep(src: AstPool) -> AstPool:
     out
 
 impl AstPool:
+    // A default method is a method of every impl that does not define it,
+    // and everything Sema decides about a body it records by the body's
+    // nodes. One shared body gave every impl the call targets and generic
+    // instances of the impl checked last (`A.shout()` ran B's `name`), so
+    // each impl of a trait has its own copy of each default body. The trait
+    // is found by its name, as Sema finds it; the copies keep the trait's
+    // file, since a default body is the trait's code.
+    mut fn clone_default_method_bodies():
+        let traits: Vec[i32] = Vec.new()
+        for di in 0..self.decl_count():
+            let decl = self.get_decl(di)
+            if self.kind(decl) == NodeKind.NK_TRAIT_DECL: traits.push(decl as i32)
+        if traits.len() == 0: return
+        let saved_file: i32 = self.state.current_file_id
+        for di in 0..self.decl_count():
+            let impl_node = self.get_decl(di) as i32
+            if self.kind(impl_node) != NodeKind.NK_IMPL_DECL: continue
+            let trait_sym = self.get_data2(impl_node)
+            if trait_sym == 0: continue
+            for ti in 0..traits.len():
+                let trait_node: i32 = traits[ti]
+                if self.get_data0(trait_node) != trait_sym: continue
+                for mi in 0..self.trait_method_count(trait_node as NodeId):
+                    let body = self.trait_method_field(trait_node as NodeId, mi, TRAIT_METHOD_DEFAULT_BODY)
+                    let key = (impl_node as i64) * 4294967296 + body as i64
+                    if body == 0 or self.state.default_body_clone_index.contains(key): continue
+                    self.state.current_file_id = self.state.files[body]
+                    let own_body = self.ct_clone_tree_with_subst(body, 0, 0, 0, 0)
+                    self.state.default_body_clone_index.insert(key, self.state.default_body_clones.len() as i32)
+                    self.state.default_body_clone_impls.push(impl_node)
+                    self.state.default_body_clone_origins.push(body)
+                    self.state.default_body_clones.push(own_body)
+        self.state.current_file_id = saved_file
+
     mut fn ct_new_node_copy(kind: i32, start: i32, end: i32, d0: i32, d1: i32, d2: i32, suffix: i32) -> i32:
         let node = self.add_node(kind, start, end, d0, d1, d2)
         self.set_literal_suffix(node, suffix)

@@ -500,7 +500,7 @@ impl MirBuilder:
         let semantic_sym = self.sema.fn_decl_semantic_symbol_at(fn_node, raw_sym, decl_index)
         // Sema's rule for a drop body (check_fn_body: current_drop_type_sym),
         // and nothing else: MIR never reads the function's spelling (#2043).
-        if self.sema.drop_owner_for_fn_symbol(semantic_sym) != 0: 1 else: 0
+        if self.sema.fn_node_is_drop_body(fn_node, semantic_sym): 1 else: 0
 
     fn schedule_with_guard_cleanup(guard_local: i32, payload_local: i32, method_sym: i32, sig_idx: i32, mono_sym: i32, drop_kind: i32) -> Unit:
         self.with_cleanup_guard_locals.push(guard_local)

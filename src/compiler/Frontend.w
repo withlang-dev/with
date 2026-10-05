@@ -2101,6 +2101,8 @@ impl Zcu:
             if text_name.starts_with("<c_import ") or text_name.starts_with("<facade ") or text_name.starts_with("<toolchain facade "):
                 generated_files.push(self.source_text_file_ids[si])
         pool.resolve_receiver_field_names(self.pool, &self.decl_is_c_import, &generated_files)
+        // Each impl's own copy of its trait's default method bodies.
+        pool.clone_default_method_bodies()
 
         // The comptime transform may replace the AstPool and remap every node. Cache
         // only the final pool: MIR preparation must never re-enter Sema with the

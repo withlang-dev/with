@@ -3193,7 +3193,7 @@ impl Sema:
                 else:
                     // The trait's default body, checked as this impl's
                     // method (check_trait_default_method_body_for_impl).
-                    let default_sig = self.lookup_method_sig(self.ast.get_data0(decl), b)
+                    let default_sig = self.lookup_method_sig(self.impl_owner_key_symbol(decl), b)
                     if default_sig >= 0:
                         out.push(default_sig)
         else if kind == GLOBAL_DISPATCH_CALLABLE:
@@ -4783,9 +4783,12 @@ impl Sema:
         if ref_param_count == 1: ref_param_index else: DECLARED_ORIGIN_AMBIGUOUS
 
     mut fn check_trait_default_method_body_for_impl(impl_node: i32, method_idx: i32):
-        let body: i32 = self.trait_method_default_bodies[method_idx]
-        if body == 0:
+        let trait_body: i32 = self.trait_method_default_bodies[method_idx]
+        if trait_body == 0:
             return
+        // The impl's own copy of the body: what is decided here is this
+        // impl's (AstPool.clone_default_method_bodies).
+        let body = self.ast.impl_default_body(impl_node, trait_body)
         let impl_type_sym = self.ast.get_data0(impl_node)
         let method_sym: i32 = self.trait_method_names[method_idx]
         if self.impl_decl_has_method(impl_node, method_sym) != 0:
@@ -6887,6 +6890,14 @@ impl Sema:
                 let default_body: i32 = self.trait_method_default_bodies[ti]
                 if default_body != 0 and not self.suspend_fact_nodes.contains(default_body) and self.expr_may_suspend(default_body) != 0:
                     self.suspend_fact_nodes.insert(default_body, 1)
+                    changed = true
+            // A default body is checked as each impl's copy: a copy that may
+            // suspend says so for itself and for the trait's method.
+            for ci in 0..self.ast.default_body_clone_count():
+                let own_body = self.ast.default_body_clone(ci)
+                if not self.suspend_fact_nodes.contains(own_body) and self.expr_may_suspend(own_body) != 0:
+                    self.suspend_fact_nodes.insert(own_body, 1)
+                    if not self.suspend_fact_nodes.contains(self.ast.default_body_clone_origin(ci)): self.suspend_fact_nodes.insert(self.ast.default_body_clone_origin(ci), 1)
                     changed = true
         for node in 1..self.ast.node_count():
             let kind = self.ast.kind(node)
@@ -9999,7 +10010,9 @@ impl Sema:
             return self.check_if_expr(node) as TypeId
 
         if kind == NodeKind.NK_CALL:
-            return self.check_call(node) as TypeId
+            let call_ty = self.check_call(node)
+            self.ensure_method_lowering_record(node, call_ty)
+            return call_ty as TypeId
 
         if kind == NodeKind.NK_RETURN:
             return self.check_return(node) as TypeId
@@ -30210,6 +30223,19 @@ impl Sema:
                 self.mark_resolved_call_arg_default(call_node, pi4 - param_offset)
         param_count - param_offset
 
+    // #2043: every call written `recv.name(..)` or `recv.name[T](..)` has a
+    // lowering record for the body being checked, whichever rule resolved
+    // it (a namespace-qualified extension call, a variadic contract, …).
+    // MirLower's method lowering reads the record and refuses a call that
+    // has none.
+    mut fn ensure_method_lowering_record(node: i32, ret: i32):
+        var callee = self.ast.get_data0(node)
+        if self.ast.kind(callee) == NodeKind.NK_INDEX: callee = self.ast.get_data0(callee)
+        if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS and not self.method_call_recorded_in_body(self.current_specialization_sym, node):
+            let field = self.ast.get_data1(callee)
+            let recorded = self.record_method_lowering(self.ast.get_data0(callee), field, self.ast.get_data2(node), node, ret, 0)
+            if recorded != 0: self.typed_expr_types.insert(node, recorded)
+
     // #2043 (D65): a method call that is a compiler builtin records which
     // one, decided here from the resolution this check made; codegen's
     // dispatch switches on the record.
@@ -30258,7 +30284,7 @@ impl Sema:
     // type (`Vec.new()`), or the call's own result when the receiver names
     // it, through the references and user derefs the method resolves over.
     // `raw` is the same before that auto-deref.
-    fn method_lowering_raw_recv_type(expr: i32, ret: i32, known_recv_ty: i32) -> i32:
+    mut fn method_lowering_raw_recv_type(expr: i32, ret: i32, known_recv_ty: i32) -> i32:
         var recv = self.typed_expr_types.get(expr) ?? known_recv_ty
         if recv == 0 or recv == self.ty_void as i32:
             recv = self.static_type_receiver_type(expr)
@@ -30267,16 +30293,18 @@ impl Sema:
                 recv = ret
         recv
 
-    fn static_type_receiver_type(node: i32) -> i32:
+    // Asked while the body is being checked: the type a written receiver
+    // names is resolved (and registered) here, not looked up as frozen.
+    mut fn static_type_receiver_type(node: i32) -> i32:
         let kind = self.ast.kind(node)
         if kind == NodeKind.NK_TYPE_NAMED or kind == NodeKind.NK_TYPE_GENERIC or kind == NodeKind.NK_TYPE_PTR or kind == NodeKind.NK_TYPE_REF or kind == NodeKind.NK_TYPE_ARRAY or kind == NodeKind.NK_TYPE_SLICE or kind == NodeKind.NK_TYPE_TUPLE or kind == NodeKind.NK_TYPE_FN or kind == NodeKind.NK_TYPE_EXTERN_FN or kind == NodeKind.NK_TYPE_TRAIT_OBJ:
-            return self.resolve_type_expr_frozen(node) as i32
+            return self.resolve_type_expr(node) as i32
         if kind == NodeKind.NK_IDENT:
             let sym = self.ast.get_data0(node)
             if self.named_types.contains(sym):
                 return self.named_types.get(sym).unwrap()
-        if kind == NodeKind.NK_INDEX:
-            let indexed_ty = self.resolve_type_level_arg_expr_frozen(node)
+        if kind == NodeKind.NK_INDEX and self.receiver_names_type(node):
+            let indexed_ty = self.resolve_type_level_arg_expr(node)
             if indexed_ty != 0:
                 return indexed_ty
             let base = self.ast.get_data0(node)
@@ -35256,6 +35284,14 @@ impl Sema:
             if d_owner == self.current_drop_type_sym:
                 return false
         true
+
+    // A method of an `impl Drop for T` block is T's drop body, whatever key
+    // T's methods are registered under (§18.1: std's `CString.drop` beside
+    // a user's own `CString`, whose name the function's text resolves to).
+    fn fn_node_is_drop_body(node: i32, fn_sym: i32) -> bool:
+        let impl_node = self.impl_node_for_method_decl(node)
+        if impl_node != 0 and self.ast.get_data2(impl_node) == self.syms.drop: return true
+        self.drop_owner_for_fn_symbol(fn_sym) != 0
 
     fn drop_owner_for_fn_symbol(fn_sym: i32) -> i32:
         let text = self.pool_resolve(fn_sym)

@@ -522,9 +522,11 @@ impl Codegen:
         self.type_bindings_len = saved_len
 
     mut fn generate_default_trait_method_for_impl(impl_type_sym: i32, method_idx: i32, impl_node: i32):
-        let body_node: i32 = self.trait_method_default_bodies[method_idx]
-        if body_node == 0:
+        let trait_body_node: i32 = self.trait_method_default_bodies[method_idx]
+        if trait_body_node == 0:
             return
+        // This impl's own copy of the body, the one Sema checked for it.
+        let body_node = self.pool.impl_default_body(impl_node, trait_body_node)
 
         let method_sym = self.trait_method_names[method_idx]
         let method_name = self.intern.resolve(method_sym)

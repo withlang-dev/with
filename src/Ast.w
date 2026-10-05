@@ -738,6 +738,12 @@ type AstPoolState {
     fn_view_origin_names: Vec[i32],             // parameter or global name sym
     // NK_COPY_ARG nodes that require a .clone() call (type is Clone-only, not Copy)
     copy_arg_needs_clone: HashMap[i32, i32],   // node → 1
+    // A trait's default method body as one impl's own nodes
+    // (clone_default_method_bodies): the impl, the trait's body, the copy.
+    default_body_clone_impls: Vec[i32],
+    default_body_clone_origins: Vec[i32],
+    default_body_clones: Vec[i32],
+    default_body_clone_index: HashMap[i64, i32],   // (impl, trait body) → index
     // D61: type symbols whose Debug impl the compiler generated (a derive,
     // an `error` declaration). `:?` formats them with the generated form.
     generated_debug_type_syms: Vec[i32],
@@ -873,6 +879,10 @@ fn AstPool.new -> AstPool:
             fn_view_origin_paths: Vec.new(),
             fn_view_origin_names: Vec.new(),
             copy_arg_needs_clone: HashMap.new(),
+            default_body_clone_impls: Vec.new(),
+            default_body_clone_origins: Vec.new(),
+            default_body_clones: Vec.new(),
+            default_body_clone_index: HashMap.new(),
             generated_debug_type_syms: Vec.new(),
             frozen: 0,
         }
@@ -1513,6 +1523,16 @@ impl AstPool:
 
     fn trait_method_field(node: NodeId, method: i32, field: i32):
         self.get_extra(self.trait_method_start(node) + method * TRAIT_METHOD_STRIDE + field)
+
+    // The body of a trait's default method as `impl_node`'s own nodes; the
+    // trait's body itself when the impl has no copy.
+    fn impl_default_body(impl_node: i32, body: i32) -> i32:
+        let index = self.state.default_body_clone_index.get((impl_node as i64) * 4294967296 + body as i64)
+        if index.is_some(): self.state.default_body_clones[index.unwrap()] else: body
+
+    fn default_body_clone_count(): self.state.default_body_clones.len() as i32
+    fn default_body_clone_origin(index: i32) -> i32: self.state.default_body_clone_origins[index]
+    fn default_body_clone(index: i32) -> i32: self.state.default_body_clones[index]
 
     fn set_use_alias(node: NodeId, alias: i32):
         self.state.use_alias_map.insert(node as i32, alias)
