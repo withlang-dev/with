@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.21
+# The With Programming Language — Specification v7.22
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,13 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.22:** modeled-C Amendment 3, 2026-10-04 (D92). §16.2b.4: an
+fn item whose C function returns a status may state `ok`, with one
+constant or several, and is then presented as a `Result`; a resource may
+name the operation that describes its most recent failure (`message`),
+and its operations' errors carry the text. §16.2b.11: an fn item may be
+written more than once under distinct `rename`s. The implementation is
+NON-COMPLIANT until it catches up.
 **Changelog v7.21:** the target at compile time, 2026-10-04 (D91). §17.1a:
 `Target` is a declared build input. §17.5: `Target.os` and `Target.arch`
 are compile-time constants of `OsKind` and `ArchKind`; a per-target value

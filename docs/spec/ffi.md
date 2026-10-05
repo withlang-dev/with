@@ -509,6 +509,25 @@ ok SQLITE_ROW, SQLITE_DONE           // several success statuses
 When `ok` lists several constants, any of them is success, and the `Ok` side
 carries the status that matched alongside the produced value.
 
+**A status-returning operation.** An fn item whose C function returns a
+status may state `ok`, with one constant or several. The presented operation
+returns `Result[T, E]`. With one constant, `T` is what the operation
+presents apart from the status, `Unit` when that is nothing. With several,
+`T` carries the status that matched. `E` is an error type the compiler
+generates for the operation, with `Failed(status: c_int)`.
+
+```
+fn sqlite3_exec
+    ok SQLITE_OK                     // db.exec(sql)?
+fn sqlite3_step
+    ok SQLITE_ROW, SQLITE_DONE       // while stmt.step()? == SQLITE_ROW:
+```
+
+**The failure's text.** A resource may name the operation that describes
+its most recent failure: `message sqlite3_errmsg`. An error produced by an
+operation on that resource then also carries `message: str`, an owned copy
+read before any other operation on the resource.
+
 There is no rule that `0` means success, for C in general or for any library.
 Without `ok`, the status is uninterpreted. A failed status does not imply that
 nothing was produced: the compiler keeps the status, whether a resource was
@@ -995,6 +1014,22 @@ The presented `prepare(sql)` always passes those literals; the raw operation
 stays available for any other value. A fixed argument is a stated facade
 fact, never an inference from the C type, and it is not an optional argument
 a caller may override.
+
+**Two presentations.** An fn item may be written more than once when each
+states a distinct `rename`. Each is a presentation with its own fixed
+parameters:
+
+```
+fn sqlite3_exec
+    rename exec
+    param callback fixed null
+    param arg fixed null
+    ok SQLITE_OK
+fn sqlite3_exec
+    rename exec_with
+    callback param 2 userdata param 3
+    ok SQLITE_OK
+```
 
 #### 16.2b.12 Convention profiles
 

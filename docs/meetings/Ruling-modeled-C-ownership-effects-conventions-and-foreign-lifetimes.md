@@ -2003,3 +2003,27 @@ a callback-scope handle (`argv paired with argc as &[Value]`) and its
 registered user data as the value the facade boxed (`user_data as &U`). The
 compiler generates the wrapper; both are valid for the callback's invocation
 only.
+
+---
+
+# Amendment 3 (Eric, 2026-10-04)
+
+Blessed for the SQLite facade's flagship example (D92). It extends the
+status rule from producers to operations and adds two clauses; it does not
+change any rule above.
+
+**§17, a status-returning operation.** An fn item whose C function returns a
+status may state `ok`, with one constant or several. The presented operation
+returns `Result[T, E]`. With one constant, `T` is what the operation
+presents apart from the status, `Unit` when that is nothing. With several,
+`T` carries the status that matched. `E` is an error type the compiler
+generates for the operation, with `Failed(status: c_int)`.
+
+**The failure's text.** A resource may name the operation that describes
+its most recent failure: `message sqlite3_errmsg`. An error produced by an
+operation on that resource then also carries `message: str`, an owned copy
+read before any other operation on the resource.
+
+**Two presentations.** An fn item may be written more than once when each
+states a distinct `rename`. Each is a presentation with its own fixed
+parameters.
