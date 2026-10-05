@@ -4625,6 +4625,103 @@ pub fn with_ci_cursor_expansion_location(session: i64, cursor_idx: i32) -> str:
         clang_disposeString(fname)
         session_make_str(s, &buf as *const [1024]u8 as *const u8)
 
+unsafe fn define_skip_blank(contents: *const u8, from: i64, end: i64) -> i64:
+    var p = from
+    while p < end:
+        let c = contents[p]
+        if c == ' ' as u8 or c == '\t' as u8 or c == '\r' as u8 or c == '\n' as u8 or c == '\\' as u8: p += 1
+        else: break
+    p
+
+fn define_ident_byte(c: u8): (c >= 'a' as u8 and c <= 'z' as u8) or (c >= 'A' as u8 and c <= 'Z' as u8) or (c >= '0' as u8 and c <= '9' as u8) or c == '_' as u8
+
+// D90: the object-like macro, defined in a system header, whose body the
+// expression at `cursor_idx` starts. "" when the expression's first token
+// was written where it is used, in one of the project's own macros, or in
+// a function-like macro. The answer is "<shape> <NAME>": `leaf` when the
+// body is one token, `paren` when it is one parenthesized expression,
+// `other` otherwise. The caller names the use only when the expression is
+// that whole body, which the shape lets it decide (libclang reports an
+// expression's end at its use, never inside the definition).
+pub fn with_ci_cursor_system_macro(session: i64, cursor_idx: i32) -> str:
+    unsafe:
+        let s = session as *mut CImportSession
+        if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return ""
+        let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
+        let loc = clang_getRangeStart(clang_getCursorExtent(cursor))
+        var spelled_file: *mut u8 = null
+        var spelled: u32 = 0
+        clang_getSpellingLocation(loc, &raw mut spelled_file, null, null, &raw mut spelled)
+        var used_file: *mut u8 = null
+        var used: u32 = 0
+        clang_getExpansionLocation(loc, &raw mut used_file, null, null, &raw mut used)
+        if spelled_file as i64 == 0 or (spelled_file as i64 == used_file as i64 and spelled == used): return ""
+        let fname = clang_getFileName(spelled_file)
+        let is_system = cimport_location_path_is_system(clang_getCString(fname))
+        clang_disposeString(fname)
+        if is_system == 0: return ""
+        var size: u64 = 0
+        let contents = clang_getFileContents((*s).tu, spelled_file, &raw mut size)
+        if contents as i64 == 0 or spelled as u64 >= size: return ""
+        let len = size as i64
+        // The logical line the token is on: a definition may continue
+        // over several physical lines.
+        var start = spelled as i64
+        while start > 0 and contents[start - 1] != '\n' as u8: start -= 1
+        while start > 0:
+            var previous_end = start - 1
+            if previous_end > 0 and contents[previous_end - 1] == '\r' as u8: previous_end -= 1
+            if previous_end == 0 or contents[previous_end - 1] != '\\' as u8: break
+            start = previous_end - 1
+            while start > 0 and contents[start - 1] != '\n' as u8: start -= 1
+        var end = start
+        while end < len:
+            if contents[end] == '\n' as u8:
+                let previous_end = if end > start and contents[end - 1] == '\r' as u8: end - 1 else: end
+                if previous_end == start or contents[previous_end - 1] != '\\' as u8: break
+            end += 1
+        var p = define_skip_blank(contents, start, end)
+        if p >= end or contents[p] != '#' as u8: return ""
+        p = define_skip_blank(contents, p + 1, end)
+        let keyword = "define"
+        for ki in 0..keyword.len():
+            if p + ki >= end or contents[p + ki] != keyword[ki] as u8: return ""
+        p = define_skip_blank(contents, p + keyword.len(), end)
+        let name_start = p
+        while p < end and define_ident_byte(contents[p]): p += 1
+        if p == name_start or (p < end and contents[p] == '(' as u8): return ""
+        var name_buf: [256]u8 = [0 as u8; 256]
+        let name_len = p - name_start
+        if name_len >= 255: return ""
+        with_memcpy(&raw mut name_buf as *mut [256]u8 as *mut u8, (contents as i64 + name_start) as *const u8, name_len)
+        let body_start = define_skip_blank(contents, p, end)
+        if body_start != spelled as i64: return ""
+        // The body's end: before a trailing comment and blanks.
+        var body_end = body_start
+        var q = body_start
+        while q < end:
+            if contents[q] == '/' as u8 and q + 1 < end and (contents[q + 1] == '/' as u8 or contents[q + 1] == '*' as u8): break
+            if contents[q] != ' ' as u8 and contents[q] != '\t' as u8 and contents[q] != '\r' as u8 and contents[q] != '\n' as u8 and contents[q] != '\\' as u8: body_end = q + 1
+            q += 1
+        var one_token = true
+        for bi in body_start..body_end:
+            if not define_ident_byte(contents[bi]) and contents[bi] != '.' as u8: one_token = false
+        var shape = "other"
+        if one_token: shape = "leaf"
+        else if contents[body_start] == '(' as u8:
+            // One parenthesized expression: the first `(` closes at the end.
+            var depth = 0
+            var closes_at: i64 = -1
+            for bi in body_start..body_end:
+                if contents[bi] == '(' as u8: depth += 1
+                if contents[bi] == ')' as u8:
+                    depth -= 1
+                    if depth == 0:
+                        closes_at = bi
+                        break
+            if closes_at == body_end - 1: shape = "paren"
+        shape ++ " " ++ make_str(&name_buf as *const [256]u8 as *const u8)
+
 pub fn with_ci_cursor_spelling_location(session: i64, cursor_idx: i32) -> str:
     unsafe:
         let s = session as *mut CImportSession

@@ -8375,6 +8375,13 @@ impl CiExprPool:
     fn lower_expr_ir(session: i64, cursor: i32, types: CiTypePool, scope: CiScope) -> CiExprId:
         let kind = with_ci_cursor_kind(session, cursor)
 
+        // D90: a libc constant is named. The literal kind holds its text,
+        // so it takes every conversion a literal in its place would.
+        let libc_constant = ci_libc_constant_use(session, cursor, kind)
+        if libc_constant.len() > 0:
+            let libc_text = self.add_string("libc." ++ libc_constant)
+            return self.int_lit(libc_text, 0 as CiTypeId)
+
         if kind == CXK_UNEXPOSED_STMT:
             let inner_cursor = ci_find_last_expr_child(session, cursor)
             if inner_cursor >= 0:
@@ -17942,6 +17949,68 @@ fn ci_libc_symbol_kind_mask(name: &str) -> i32:
     if name == "mach_timebase_info": return CI_LIBC_KIND_FN | CI_LIBC_KIND_TYPE
     if name == "mach_timebase_info_data_t" or name == "kern_return_t": return CI_LIBC_KIND_TYPE
     0
+
+pub let CI_LIBC_KIND_CONST: i32 = 8
+
+// D90: the integer constants std.libc exports. A constant and the function
+// that consumes it come from this one table: the value is what the With
+// seam accepts, never a header's.
+fn ci_libc_constant_known(name: &str) -> bool:
+    false
+
+// D90 (#2060, #2070): a use of an integer constant that a system header
+// defines by an object-like macro is the std.libc constant of that name,
+// never the value the migration's headers gave it. "" when `cursor` is not
+// such a use. A macro std.libc has no constant for fails the migration and
+// is named (no silent fallback to the header's number).
+fn ci_libc_constant_use(session: i64, cursor: i32, kind: i32) -> str:
+    if not ci_translate_in_migrate_mode(): return ""
+    var at = cursor
+    var at_kind = kind
+    // An implicit conversion of the constant starts where it starts.
+    while at_kind == 100 and with_ci_num_children(session, at) == 1:
+        at = with_ci_child(session, at, 0)
+        at_kind = with_ci_cursor_kind(session, at)
+    if at_kind != CXK_INT_LITERAL and at_kind != CXK_CHAR_LITERAL and at_kind != CXK_PAREN_EXPR and at_kind != CXK_UNARY_OP and at_kind != CXK_BINARY_OP and at_kind != CXK_CSTYLE_CAST: return ""
+    if with_ci_eval_int_valid(session, at) == 0: return ""
+    // An integer constant: `NULL` is a pointer, and has its own lowering.
+    if with_ci_type_spelling(session, with_ci_cursor_type(session, at)).contains("*"): return ""
+    // A direct use is the macro's name where the expression is written
+    // (a constant the compiler predefines, `INT_MAX`, has no header to be
+    // spelled in). A use inside one of the project's macros is found by
+    // where its first token is spelled.
+    var shape = ""
+    var name = ci_trim(with_ci_cursor_expansion_text(session, at))
+    if ci_migrate_system_object_macro(name):
+        shape = ci_migrate_object_macro_shape(name, 0)
+    else:
+        let site = with_ci_cursor_system_macro(session, at)
+        if site.len() == 0: return ""
+        let space = site.find(" ")
+        shape = site.slice(0, space)
+        name = site.slice(space + 1, site.len())
+    // The expression is the macro's whole body: a one-token body's literal,
+    // or a parenthesized body's parenthesized expression.
+    let whole = (shape == "leaf" and (at_kind == CXK_INT_LITERAL or at_kind == CXK_CHAR_LITERAL)) or (shape == "paren" and at_kind == CXK_PAREN_EXPR)
+    let trace = with_getenv_str("WITH_MIGRATE_TRACE_LIBC_CONSTANTS")
+    if trace.len() > 0:
+        eprint(f"libc-constant\t{name}\t{shape}\tkind={at_kind}\twhole={whole}\tvalue={ci_eval_int_text(session, at)}\t{with_ci_cursor_location(session, cursor)}")
+        return ""
+    if not whole:
+        // An unparenthesized body of several tokens: where it ends inside
+        // the use cannot be read back, so it is not named by guesswork.
+        if shape == "other" and g_ci_bail_message.len() == 0:
+            g_ci_bail_message = "libc macro `" ++ name ++ "` has an unparenthesized body; its use cannot be named as a std.libc constant"
+            g_ci_bail_location = with_ci_cursor_location(session, cursor)
+            g_ci_bail_kind = at_kind
+        return ""
+    if not ci_libc_constant_known(name):
+        if g_ci_bail_message.len() == 0:
+            g_ci_bail_message = "libc macro `" ++ name ++ "` has no std.libc constant; add it to std.libc (a constant and the function that consumes it come from one table, D90)"
+            g_ci_bail_location = with_ci_cursor_location(session, cursor)
+            g_ci_bail_kind = at_kind
+        return ""
+    name
 
 pub fn ci_libc_symbol_allowed_as(name: &str, kind: i32) -> bool:
     (ci_libc_symbol_kind_mask(name) & kind) != 0

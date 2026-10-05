@@ -855,8 +855,43 @@ fn migrate_host_compat_preamble() -> str:
     "#undef snprintf\n#undef sprintf\n#undef vsnprintf\n#undef vsprintf\n" ++
     "#undef stpcpy\n#undef stpncpy\n"
 
+// D90: the object-like macros a system header defines, and the shape of
+// an object-like macro's body as a use of it parses: `leaf` (one token),
+// `paren` (one parenthesized expression), `other`. A one-token body that
+// names another macro has that macro's shape.
+var g_migrate_system_object_macros: HashMap[str, i32] = HashMap.new()
+
+pub fn ci_migrate_system_object_macro(name: &str) -> bool: g_migrate_system_object_macros.contains(name)
+
+pub fn ci_migrate_object_macro_shape(name: &str, depth: i32) -> str:
+    if depth > 16 or not g_migrate_macro_values.contains(name): return "other"
+    // The replacement list, without the comment a header puts after it.
+    var text: str = g_migrate_macro_values.get(name).unwrap().clone()
+    let block_comment = text.find("/*")
+    if block_comment >= 0: text = text.slice(0, block_comment)
+    let line_comment = text.find("//")
+    if line_comment >= 0: text = text.slice(0, line_comment)
+    let body = ci_trim(text)
+    if body.len() == 0: return "other"
+    var one_token = true
+    for i in 0..body.len():
+        let c = body[i]
+        if not ((c >= 'a' and c <= 'z') or (c >= 'A' and c <= 'Z') or (c >= '0' and c <= '9') or c == '_' or c == '.'): one_token = false
+    if one_token:
+        if g_migrate_macro_values.contains(body) and body != name: return ci_migrate_object_macro_shape(body, depth + 1)
+        return "leaf"
+    if body[0] != '(': return "other"
+    var nesting = 0
+    for i in 0..body.len():
+        if body[i] == '(': nesting += 1
+        if body[i] == ')':
+            nesting -= 1
+            if nesting == 0: return if i == body.len() - 1: "paren" else: "other"
+    "other"
+
 fn ci_capture_macro_values(session: i64):
     g_migrate_macro_values = HashMap.new()
+    g_migrate_system_object_macros = HashMap.new()
     g_migrate_macro_miss_names = HashMap.new()
     let count = with_cimport_macro_count(session)
     var i = 0
@@ -866,6 +901,7 @@ fn ci_capture_macro_values(session: i64):
             let value = with_cimport_macro_value(session, i)
             if name.len() > 0 and value.len() > 0 and not g_migrate_macro_values.contains(name):
                 g_migrate_macro_values.insert(ci_ir_owned_text(name), ci_ir_owned_text(value))
+                if with_cimport_macro_is_system(session, i) != 0: g_migrate_system_object_macros.insert(ci_ir_owned_text(name), 1)
         i = i + 1
 
 pub fn ci_collect_macro_type_names(session: i64) -> str:
