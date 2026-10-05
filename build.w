@@ -2629,6 +2629,13 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
         return 1
     if deep_debug_unknown_flag_refused(ctx, root, compiler, build_project_abs(root, "test/hello.w"), out_dir) != 0:
         return 1
+    // D65 operand types: every expression's MIR operand has Sema's type.
+    // The TotalF64 fixture is the D97 class (a distinct wrapper lowered with
+    // its inner type), and its `==` must lower through the key projection.
+    if deep_debug_analyze_expect(ctx, root, compiler, build_project_abs(root, "test/behavior/behav_2182_total_f64.w"), out_dir, "analyze-operand-types", "audit:resolution", "disagree=0") != 0:
+        return 1
+    if deep_debug_analyze_expect(ctx, root, compiler, build_project_abs(root, "test/behavior/behav_2182_total_f64.w"), out_dir, "analyze-operator-route", "select:kind=operator,detail~lhs:TotalF64", "route:key-projection") != 0:
+        return 1
     // D65 phase 2 (#1647): the codegen mode-provenance lane runs and every
     // site's owner fact agrees with the LLVM representation. The &fn
     // marshalling fixture passes a function item, a callable binding and a

@@ -2533,6 +2533,18 @@ impl MirBuilder:
         let pointee = if kind == TypeKind.TY_PTR or kind == TypeKind.TY_REF: self.sema.get_type_d0(resolved) else: 0
         self.body.new_deref_place(base, pointee)
 
+    // An operand's type as MIR recorded it: a place's recorded type
+    // (place_sema_types), a constant's own. What codegen reads.
+    fn operand_recorded_type(operand_id: i32) -> i32:
+        if operand_id < 0 or operand_id >= self.body.operand_kinds.len(): return 0
+        let kind = self.body.operand_kinds[operand_id]
+        let data: i32 = self.body.operand_d0[operand_id]
+        if kind == OperandKind.OK_CONSTANT:
+            return if data >= 0 and data < self.body.const_types.len(): self.body.const_types[data] else: 0
+        if (kind == OperandKind.OK_COPY or kind == OperandKind.OK_MOVE) and data >= 0 and data < self.body.place_sema_types.len():
+            return self.body.place_sema_types[data]
+        0
+
     mut fn operand_type(operand_id: i32) -> i32:
         if operand_id < 0 or operand_id >= self.body.operand_kinds.len():
             return self.sema.ty_void as i32
@@ -5019,20 +5031,9 @@ impl MirBuilder:
             self.expected_type = lhs_ty
         else:
             self.expected_type = saved_expected
-        var rhs = if observes_strings and self.type_id_is_str(rhs_ty) != 0: self.lower_observer_probe_arg(rhs_expr) else: self.lower_comparison_operand(is_cmp, rhs_expr)
+        let rhs = if observes_strings and self.type_id_is_str(rhs_ty) != 0: self.lower_observer_probe_arg(rhs_expr) else: self.lower_comparison_operand(is_cmp, rhs_expr)
         self.expected_type = saved_expected
-        // §11.7 (D96, D97): a type that compares by its key projection or its
-        // `cmp` (TotalF64, a distinct float) keeps that type on both operands:
-        // a folded `T64(1.0)` is a bare float constant otherwise, and codegen
-        // would compare the floats.
-        var lhs_cmp = lhs
-        if is_cmp and lhs_ty != 0 and lhs_ty == rhs_ty and (self.sema.concrete_key_sigs.contains(lhs_resolved) or self.sema.concrete_cmp_sigs.contains(lhs_resolved)):
-            let span = self.ast.get_start(node)
-            let lhs_place = self.materialize_operand(lhs, lhs_ty, span)
-            lhs_cmp = self.operand_for_place(lhs_place, lhs_ty)
-            let rhs_place = self.materialize_operand(rhs, rhs_ty, span)
-            rhs = self.operand_for_place(rhs_place, rhs_ty)
-        let rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, op, lhs_cmp, rhs)
+        let rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, op, lhs, rhs)
         var ty = self.expr_type(node)
         if ty == 0 or ty == self.sema.ty_void:
             let lhs_op_ty = self.operand_type(lhs)
@@ -15732,7 +15733,28 @@ impl MirBuilder:
             return self.body.new_operand(OperandKind.OK_COPY, result_place)
         self.body.new_operand(OperandKind.OK_MOVE, result_place)
 
+    // Every expression's operand, recorded with Sema's type for its node
+    // (D65: audit:resolution judges they agree). A contextual copy is
+    // Sema's own adjustment: its operand has the adjusted type.
     mut fn lower_expr(node: i32) -> i32:
+        let op = self.lower_expr_node(node)
+        // Grouping, a block and the other pass-through forms yield their
+        // inner value: that node is judged, with any adjustment Sema made.
+        let kind = if node > 0: self.ast.kind(node) else: NodeKind.NK_BLOCK
+        let passes_through = kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_BLOCK or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_UNSAFE_BLOCK or kind == NodeKind.NK_NO_SUSPEND
+        if node > 0 and op >= 0 and not passes_through and self.has_contextual_copy_adjustment(node) == 0:
+            // A splat or lane conversion Sema recorded on the node is its
+            // own adjustment: the operand has the adjusted type (§4.3d).
+            var sema_ty = self.expr_type(node)
+            if node != self.vector_raw_node:
+                if self.sema.vector_splats.contains(node):
+                    sema_ty = self.concrete_type(self.sema.vector_splats.get(node).unwrap())
+                else if self.sema.vector_conversions.contains(node):
+                    sema_ty = self.concrete_type(self.sema.vector_conversions.get(node).unwrap())
+            self.body.note_expr_operand(node, sema_ty, self.operand_recorded_type(op))
+        op
+
+    mut fn lower_expr_node(node: i32) -> i32:
         if node == 0:
             return self.unit_operand()
 
@@ -16311,9 +16333,14 @@ impl MirBuilder:
                 let dt_args_start = self.ast.get_data1(node)
                 if self.ast.get_data2(node) != 1:
                     sema_phase_bug(f"BUG: Sema accepted a distinct type constructor without exactly one argument: node={node}")
-                // Transparent: distinct types have same LLVM type as inner,
-                // so the constructor is just the inner value itself
-                return self.lower_expr(self.ast.get_extra(dt_args_start))
+                // The inner value's bytes, with the wrapper's type (D65: the
+                // operand has Sema's type for the call). Returned bare, a
+                // folded `TotalF64(1.0)` was an `f64` constant, and codegen
+                // compared floats where the wrapper compares by its key.
+                let dt_inner = self.lower_expr(self.ast.get_extra(dt_args_start))
+                let dt_ty = self.expr_type(node)
+                let dt_place = self.materialize_operand(dt_inner, dt_ty, self.ast.get_start(node))
+                return self.operand_for_place(dt_place, dt_ty)
             // Callable type syntax: TypeName(args) → the `TypeName.new` Sema resolved
             if self.ast.kind(callee) == NodeKind.NK_IDENT and callee_kind == CallCalleeKind.TypeConstructor:
                 let ct_sema_sym: i32 = self.sema.type_ctor_call_syms.get(node) ?? 0

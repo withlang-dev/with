@@ -14,7 +14,10 @@ tool; fix it or file it.
 
 ## Which binary
 
-`with` in the recipes is a compiler; pick the one the question needs.
+`with` in the recipes is a compiler; pick the one the question needs. Any
+of them refuses a flag it does not know on `check`, `ir` and `run`
+(`error: unknown option \`--x\` for \`with check\`; did you mean …`,
+exit 2, #2198): a misspelled or removed flag never reads as a clean run.
 
 - **`with` on PATH** (`~/.local/bin/with`, installed from main): every
   dump, trace, `analyze`, `reduce` and allocator recipe. It carries no
@@ -143,6 +146,16 @@ diverging layer, `lldb:<query>` for breakpoints from real facts, then lldb
 on the compiler branch. `--dump-abi` answers "is this parameter lowered
 consistently at caller and callee" — never infer that from MIR.
 
+When codegen picked the wrong formatter, comparison or ABI for a value (a
+`BUG: … no registered :? formatter`, floats compared where a key
+projection should be, a wrapper passed as its inner type), run
+`analyze repro.w audit:resolution` first: its operand-type check names the
+exact expression whose MIR operand has a type Sema did not give it, with
+both types, before any debugger session. Then
+`analyze repro.w 'select:kind=operator,detail~fn:<fn>'` shows how codegen
+lowered each binary operator in that function: the route it took and the
+operand types it saw (below).
+
 ### A hot loop reloads a struct's fields after every store
 
 The compiler's own optimized IR (`WITH_DUMP_LLIR_POST=1`) says why. Two
@@ -250,6 +263,40 @@ hand-built Sema answer) and `test/internals/mir_unknown_callee_test.w`
 and c_facade fixtures and on `build.w`. Phases 2–5 (codegen mode
 provenance, places and origins, effects, MirLower cleanup):
 `docs/spec/implementation/mir-sema-hardening.md`.
+
+**Operand types.** `audit:resolution` also judges every expression MIR
+lowers: the operand `MirBuilder.lower_expr` returns for a source node has
+the type Sema gave that node in this body's instance (MIR records the pair,
+`MirBody.expr_operand_*`; the operand's type is the place's recorded type,
+never re-derived). Sema's own adjustments are its type: a contextual copy
+is not judged, a splat or lane conversion (§4.3d) is judged against the
+adjusted type, and a pass-through form (grouping, a block, `comptime`,
+`unsafe`) is judged through its inner node. A violation reads
+`an expression lowered to an operand of another type (MIR M, Sema f64,
+node kind 27)` at the node's `path:line:column`. It would have caught both
+of D97's bugs before codegen: a distinct's `.value` lowered with the
+wrapper's type, and `TotalF64(1.0)` folded to a bare `f64` constant, so
+the f-string formatter and `==` read the wrong type. The note line
+`expression-operands judged=N disagree=0` reports the count.
+
+**Operator facts.** `select:kind=operator` (a `select` that names codegen
+facts runs the backend) lists one fact per binary operator codegen
+lowered, with `detail` in `key:value` words so a query can filter it
+(`detail~fn:main`, `detail~route:float`, `detail~lhs:TotalF64`):
+
+```
+route:key-projection fn:main span:429 lhs:TotalF64 rhs:TotalF64 llvm-lhs-kind:3 llvm-rhs-kind:3
+```
+
+`route` is the branch of `Codegen.mir_build_bin_op` that produced the
+instruction: `int`, `float`, `str`, `str-order`, `str-view`,
+`key-projection`, `structural`, `view-pointee`, `aggregate-bytes`,
+`pointer-arith`, `pointer-null`, `pointer-address`, `shift`, `concat`.
+`span` is the statement's source offset. "Why did these compare as
+floats" is `route:float` on a type with a key projection: one query, no
+trace print (D97's `TotalF64 ==` was exactly that). An operator spelled
+as a method (`<` through `cmp`) is a call and appears under
+`kind=codegen-argument` instead.
 
 `audit:all` is the proof gate before an expensive build. It validates MIR shape,
 types, and ownership; receiver declaration coverage and finalized contracts;

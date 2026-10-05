@@ -113,6 +113,10 @@ pub type Codegen {
     sema_symbol_texts: Vec[str],
     overflow_mode: i32,
     analysis_enabled: i32,
+    // The route mir_build_bin_op took for the operator it last lowered, and
+    // the span of the MIR statement being lowered (operator facts).
+    binop_route: str,
+    cur_stmt_span: i32,
     analysis_query: str,
     analysis_report: AnalysisReport,
     analysis_last_marshal_strategy: AnalysisMarshalStrategy,
@@ -1081,6 +1085,8 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         sema_symbol_texts: Vec.new(),
         overflow_mode: overflow_mode_default(),
         analysis_enabled: 0,
+        binop_route: "",
+        cur_stmt_span: 0,
         analysis_query: "",
         analysis_report: AnalysisReport.init(),
         analysis_last_marshal_strategy: AnalysisMarshalStrategy.DirectValue,

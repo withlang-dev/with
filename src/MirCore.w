@@ -274,6 +274,13 @@ pub type MirBody {
     // ... and each `let` binding with MIR's materialization: 1 when the
     // name aliases a place, 0 when it owns a local.
     let_binding_nodes: Vec[i32],
+    // D65 (operand types): each operand MirLower.lower_expr produced from a
+    // source expression, with Sema's type for the node in this body's
+    // instance and the type of the operand MIR made. audit:resolution
+    // judges that the two agree.
+    expr_operand_nodes: Vec[i32],
+    expr_operand_sema_types: Vec[i32],
+    expr_operand_mir_types: Vec[i32],
     let_binding_aliases: Vec[i32],
     // ... the place an aliasing `let` names (-1 for an owning local), whose
     // root audit:resolution joins to Sema's view origins for the value.
@@ -549,6 +556,9 @@ fn MirBody.init_for_fn(fn_sym: i32) -> MirBody:
         field_place_places: Vec.new(),
         field_place_bases: Vec.new(),
         let_binding_nodes: Vec.new(),
+        expr_operand_nodes: Vec.new(),
+        expr_operand_sema_types: Vec.new(),
+        expr_operand_mir_types: Vec.new(),
         let_binding_aliases: Vec.new(),
         let_binding_places: Vec.new(),
         index_place_nodes: Vec.new(),
@@ -853,6 +863,12 @@ impl MirBody:
 
     mut fn note_elided_call_node(node: i32):
         if node > 0: self.elided_call_nodes.push(node)
+
+    mut fn note_expr_operand(node: i32, sema_ty: i32, mir_ty: i32):
+        if node <= 0: return
+        self.expr_operand_nodes.push(node)
+        self.expr_operand_sema_types.push(sema_ty)
+        self.expr_operand_mir_types.push(mir_ty)
 
     mut fn note_let_binding(node: i32, alias_place: i32):
         if node <= 0: return

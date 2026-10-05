@@ -58,13 +58,16 @@ instruction level and showing the fix needs foundation work you can point to.
 orders the tools by bug class, and every recipe in it was run as written
 (2026-10-05). Open it at the start of a hunt and follow the route's
 recipes as printed; improvising flags is how a hunt stalls (an unknown flag
-prints `ok`, #2198). Before the first edit for a bug, name the route you
+is refused, #2198, so a typo stops the run instead of reading as clean). Before the first edit for a bug, name the route you
 are on and run its first steps: a drop, free, or leak bug starts with the
 debug allocator, `WITH_ALLOC_NO_REUSE`, the address trap
 (`WITH_DEBUG_ALLOC_TRAP_FREE`, under lldb: outside it the address changes
 every run), and the runner's own binary — never with `grep` or a trace
 print. A wrong view origin starts with `WITH_DEBUG_BORROWS=1`; a
-generic-instance `BUG:` with `WITH_TRACE_INST=1` (the page's switch
+generic-instance `BUG:` with `WITH_TRACE_INST=1`; codegen reading a value
+as the wrong type (wrong formatter, wrong comparison, wrong ABI) with
+`with analyze repro.w audit:resolution`, whose operand-type check names
+the expression whose MIR type Sema did not give it (the page's switch
 tables list the rest). A fix commit cites the tool output that proves the
 exact line: the allocator report and backtrace, the `matrix` row, the
 validator error, the IR of the block. Output that only characterizes
@@ -921,6 +924,7 @@ with analyze repro.w summary
 with analyze repro.w 'matrix:name~function_name'
 with analyze repro.w 'select:stage=sema,kind=parameter,name~function_name'
 with analyze repro.w 'explain:call:function_name'
+with analyze repro.w 'select:kind=operator,detail~fn:function_name'
 with analyze repro.w move-sites
 with analyze repro.w 'explain:effect:Type.method:self'
 with analyze repro.w 'path:call:caller:callee'
@@ -947,7 +951,9 @@ Requests:
   suspicious-configuration audit (`docs/spec/toolchain/deep-debugging-tools.md`).
 - `audit:resolution`: D65 — every MIR callee and argument count agrees with
   Sema's resolution of the call it lowers (the #1635 class; phase 1 of
-  `docs/spec/implementation/mir-sema-hardening.md`).
+  `docs/spec/implementation/mir-sema-hardening.md`), and every expression's
+  MIR operand has the type Sema gave that expression (the D97 class: a
+  distinct wrapper lowered with its inner type).
 - `audit:calls|effects|storage|methods|mir|returns|receivers|receiver-surface|phase|pool-views|contract|resolution|codegen|trait-tables|all`:
   hard invariants. `all` covers typed/ownership MIR validators, receiver
   declarations/contracts, fixed-point effects, freeze/eager-cache/specialization,

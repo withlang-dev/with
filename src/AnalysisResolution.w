@@ -725,6 +725,34 @@ fn resolution_audit_resolved_calls(report: &AnalysisReport, sema: &Sema, mir_mod
     report.note(f"resolution-audit: resolved-calls judged={checked} foreign={foreign} redirected={redirected} retargeted-methods={methods} value-conversions={conversions}")
     checked
 
+// D65 (operand types): the operand MIR lowered for an expression has the
+// type Sema gave that expression in this instance. A wrapper lowered as its
+// own bytes (a distinct's `.value` typed as the wrapper) or a call folded to
+// a bare constant (`TotalF64(1.0)` as an `f64`) reaches codegen with the
+// wrong type, and codegen picks its formatter, comparison or ABI from it.
+fn resolution_audit_expr_operands(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> i32:
+    var checked = 0
+    var disagree = 0
+    for bi in 0..mir_mod.bodies.len() as i32:
+        let body = &mir_mod.bodies[bi]
+        if body.lowering_failed != 0: continue
+        let site = resolution_site(sema, pool, body, source_path, source_text)
+        for oi in 0..body.expr_operand_nodes.len() as i32:
+            let node = body.expr_operand_nodes[oi]
+            let sema_raw = body.expr_operand_sema_types[oi]
+            let mir_raw = body.expr_operand_mir_types[oi]
+            if node <= 0 or node >= sema.ast.node_count() or sema_raw <= 0 or mir_raw <= 0: continue
+            let sema_ty = sema.resolve_alias(sema_raw as TypeId) as i32
+            let mir_ty = sema.resolve_alias(mir_raw as TypeId) as i32
+            let sema_kind = sema.get_type_kind(sema_ty as TypeId)
+            if sema_kind == TypeKind.TY_VOID or sema_kind == TypeKind.TY_NEVER or sema_kind == TypeKind.TY_ERR: continue
+            checked = checked + 1
+            if sema_ty == mir_ty or sema.types_identical(sema_ty, mir_ty): continue
+            disagree = disagree + 1
+            report.fail(f"resolution: {pool.resolve(body.fn_sym)} at {resolution_where(sema, &site, node)}: an expression lowered to an operand of another type (MIR {sema.type_name(mir_ty)}, Sema {sema.type_name(sema_ty)}, node kind {sema.ast.kind(node) as i32})")
+    report.note(f"resolution-audit: expression-operands judged={checked} disagree={disagree}")
+    checked
+
 pub fn analysis_audit_resolution(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str):
     let calls = resolution_audit_calls(report, sema, mir_mod, pool, source_path, source_text)
     let field_places = resolution_audit_field_places(report, sema, mir_mod, pool, source_path, source_text)
@@ -733,6 +761,7 @@ pub fn analysis_audit_resolution(report: &AnalysisReport, sema: &Sema, mir_mod: 
     let index_places = resolution_audit_index_places(report, sema, mir_mod, pool, source_path, source_text)
     let view_origins = resolution_audit_view_origins(report, sema, mir_mod, pool, source_path, source_text)
     let captures = resolution_audit_captures(report, sema, mir_mod, pool, source_path, source_text)
+    resolution_audit_expr_operands(report, sema, mir_mod, pool, source_path, source_text)
     resolution_audit_callee_kinds(report, sema, mir_mod, pool, source_path, source_text)
     resolution_audit_resolved_calls(report, sema, mir_mod, pool, source_path, source_text)
     report.note(f"resolution-audit: field-places={field_places} let-bindings={lets} call-arguments={effects} index-places={index_places} alias-lets={view_origins} closure-captures={captures}")

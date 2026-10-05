@@ -2442,7 +2442,8 @@ fn analysis_help() -> str:
         "  explain:call|value|effect|specialization|diagnostic|type|field|expression|method:<text>\n" ++
         "  explain:node:<id>                       bounded AST + Sema type/resolution tree\n" ++
         "  audit:calls|effects|storage|methods|mir|returns|receivers|receiver-surface|phase|pool-views|contract|resolution|codegen|trait-tables|all\n" ++
-        "  audit:resolution                        D65: every MIR callee and argument count agrees with Sema's resolution of the call it lowers\n" ++
+        "  audit:resolution                        D65: every MIR callee and argument count agrees with Sema's resolution of the call it lowers, and every expression's operand has Sema's type\n" ++
+        "  select:kind=operator,detail~fn:<fn>     how codegen lowered each binary operator (route, operand types)\n" ++
         "  contract                                the modeled foreign contract (§16.2b): every fact with its provenance, then audit:contract\n" ++
         "  move-sites | seam-sites                 ownership worklists (owned-param call sites; aliasing/blanking seams)\n" ++
         "  path:call:<from>:<to>                   shortest live MIR call path\n" ++
@@ -2512,6 +2513,10 @@ pub fn compiler_analysis_run(sema: &Sema, mir_mod: &MirModule, pool: &InternPool
         if query.contains("name"):
             needs_codegen = true
             codegen_query = "matrix:" ++ query
+    else if request.starts_with("select:") and (request.contains("stage=codegen") or request.contains("kind=operator") or request.contains("kind=codegen-argument")):
+        // Codegen facts exist only once the backend runs with the query.
+        needs_codegen = true
+        codegen_query = analysis_slice(request, 7, request.len() as i32)
     else if request.starts_with("explain:call:"):
         needs_codegen = true
         codegen_query = "name~" ++ analysis_slice(request, 13, request.len() as i32)

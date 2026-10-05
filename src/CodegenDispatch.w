@@ -2321,6 +2321,7 @@ impl Codegen:
             let rhs_keyed = self.create_entry_alloca(keyed_ty)
             wl_build_store(self.builder, lhs, lhs_keyed)
             wl_build_store(self.builder, rhs, rhs_keyed)
+            self.binop_route = "key-projection"
             let keyed_equal = self.mir_emit_eq_ptrs(lhs_keyed, rhs_keyed, keyed_ty, lhs_sema)
             return if op == BinaryOp.OP_EQ: keyed_equal else: wl_build_not(self.builder, keyed_equal)
         let lhs_kind = self.mir_compare_dispatch_kind(lhs_sema)
@@ -2336,12 +2337,14 @@ impl Codegen:
             return 0
 
         if lhs_kind == 1 and self.is_str_type(lhs_ty):
+            self.binop_route = "str-view"
             return self.compare_str_eq(lhs_cmp, rhs_cmp, op)
 
         if lhs_kind == 2:
             // #2137: an aggregate compares as its With type says — field by
             // field, element by element, variant by variant, a part with an
             // `eq` by that method — never as the bytes of its representation.
+            self.binop_route = "structural"
             let lhs_slot = self.create_entry_alloca(lhs_ty)
             let rhs_slot = self.create_entry_alloca(lhs_ty)
             wl_build_store(self.builder, lhs_cmp, lhs_slot)
@@ -2361,6 +2364,7 @@ impl Codegen:
                 if self.mir_compare_dispatch_kind(pointee) == 2:
                     let pointee_ty = self.mir_sema_type_to_llvm(pointee)
                     if pointee_ty != 0:
+                        self.binop_route = "view-pointee"
                         let equal = self.mir_emit_eq_ptrs(lhs_cmp, rhs_cmp, pointee_ty, pointee)
                         if op == BinaryOp.OP_EQ:
                             return equal
@@ -3214,19 +3218,40 @@ impl Codegen:
         wl_position_at_end(self.builder, ok_bb)
         self.mir_build_raw_int_bin_op(op, l, r, false)
 
+    // An `operator` fact (analyze): the route mir_build_bin_op took for one
+    // binary operator, with the operand types it saw (Sema's and LLVM's) and
+    // the statement's source offset. `select:stage=codegen,kind=operator`.
+    mut fn record_operator_fact(body: &MirBody, rval_id: i32, op: i32, lhs_sema: i32, rhs_sema: i32, lhs: i64, rhs: i64):
+        var fact = AnalysisFact.new(AnalysisStage.Codegen, AnalysisFactKind.Operator)
+        fact.id = rval_id
+        fact.body_sym = body.fn_sym
+        fact.index = op
+        fact.type_id = lhs_sema
+        fact.start = self.cur_stmt_span
+        fact.name = mir_binop_name(op)
+        let lhs_name = if lhs_sema > 0: self.sema.type_name(lhs_sema) else: "?"
+        let rhs_name = if rhs_sema > 0: self.sema.type_name(rhs_sema) else: "?"
+        // `key:value` words: a query splits on `=`, so `detail~fn:main` and
+        // `detail~route:float` select.
+        fact.detail = f"route:{self.binop_route} fn:{self.sema.pool_resolve(body.fn_sym)} span:{self.cur_stmt_span} lhs:{lhs_name} rhs:{rhs_name} llvm-lhs-kind:{wl_get_type_kind(wl_type_of(lhs))} llvm-rhs-kind:{wl_get_type_kind(wl_type_of(rhs))}"
+        self.analysis_add(move fact)
+
     mut fn mir_build_bin_op(op: i32, lhs: i64, rhs: i64, is_unsigned: bool, lhs_sema: i32, rhs_sema: i32) -> i64:
         let lk = wl_get_type_kind(wl_type_of(lhs))
         let rk = wl_get_type_kind(wl_type_of(rhs))
+        self.binop_route = "int"
 
         // Pointer arithmetic: ptr +/- int → GEP
         if lk == wl_pointer_type_kind() and rk == wl_integer_type_kind():
             if op == BinaryOp.OP_ADD or op == BinaryOp.OP_SUB:
+                self.binop_route = "pointer-arith"
                 let idx_val = if op == BinaryOp.OP_SUB: wl_build_neg(self.builder, rhs) else: rhs
                 let indices: Vec[i64] = Vec.new()
                 indices.push(idx_val)
                 return wl_build_gep(self.builder, wl_i8_type(self.context), lhs, vec_data_i64(&indices), 1)
 
         if self.is_str_type(wl_type_of(lhs)) and self.is_str_type(wl_type_of(rhs)):
+            self.binop_route = "str"
             if op == BinaryOp.OP_EQ or op == BinaryOp.OP_NEQ:
                 return self.compare_str_eq(lhs, rhs, op)
             if op == BinaryOp.OP_LT or op == BinaryOp.OP_GT or op == BinaryOp.OP_LTE or op == BinaryOp.OP_GTE:
@@ -3235,6 +3260,7 @@ impl Codegen:
         if op == BinaryOp.OP_LT or op == BinaryOp.OP_GT or op == BinaryOp.OP_LTE or op == BinaryOp.OP_GTE:
             let sema_ord = self.mir_build_str_order_from_sema(op, lhs, rhs, lhs_sema, rhs_sema)
             if sema_ord != 0:
+                self.binop_route = "str-order"
                 return sema_ord
 
         if op == BinaryOp.OP_EQ or op == BinaryOp.OP_NEQ:
@@ -3242,16 +3268,19 @@ impl Codegen:
             if sema_cmp != 0:
                 return sema_cmp
             if lk == wl_pointer_type_kind() and rk == wl_integer_type_kind():
+                self.binop_route = "pointer-null"
                 if self.is_const_int_value(rhs) and wl_const_int_sext_val(rhs) == 0:
                     let cmp_rhs = wl_const_null(wl_type_of(lhs))
                     return wl_build_icmp(self.builder, if op == BinaryOp.OP_EQ: wl_int_eq() else: wl_int_ne(), lhs, cmp_rhs)
             if rk == wl_pointer_type_kind() and lk == wl_integer_type_kind():
+                self.binop_route = "pointer-null"
                 if self.is_const_int_value(lhs) and wl_const_int_sext_val(lhs) == 0:
                     let cmp_lhs = wl_const_null(wl_type_of(rhs))
                     return wl_build_icmp(self.builder, if op == BinaryOp.OP_EQ: wl_int_eq() else: wl_int_ne(), cmp_lhs, rhs)
 
         let pointer_compare = op == BinaryOp.OP_EQ or op == BinaryOp.OP_NEQ or op == BinaryOp.OP_LT or op == BinaryOp.OP_GT or op == BinaryOp.OP_LTE or op == BinaryOp.OP_GTE
         if pointer_compare and lk == wl_pointer_type_kind() and rk == wl_pointer_type_kind() and self.mir_sema_type_is_raw_pointer_or_ref(lhs_sema) and self.mir_sema_type_is_raw_pointer_or_ref(rhs_sema):
+            self.binop_route = "pointer-address"
             let i64_ty = wl_i64_type(self.context)
             let l_addr = wl_build_ptr_to_int(self.builder, lhs, i64_ty)
             let r_addr = wl_build_ptr_to_int(self.builder, rhs, i64_ty)
@@ -3264,6 +3293,7 @@ impl Codegen:
 
         let is_float = lk == wl_float_type_kind() or lk == wl_double_type_kind() or rk == wl_float_type_kind() or rk == wl_double_type_kind()
         if is_float:
+            self.binop_route = "float"
             let common_float_ty =
                 if lk == wl_double_type_kind() or rk == wl_double_type_kind():
                     wl_f64_type(self.context)
@@ -3282,6 +3312,8 @@ impl Codegen:
             if op == BinaryOp.OP_GT: return wl_build_fcmp(self.builder, wl_real_ogt(), lhs_float, rhs_float)
             if op == BinaryOp.OP_LTE: return wl_build_fcmp(self.builder, wl_real_ole(), lhs_float, rhs_float)
             if op == BinaryOp.OP_GTE: return wl_build_fcmp(self.builder, wl_real_oge(), lhs_float, rhs_float)
+            with_eprint("error: internal compiler error: float operator '" ++ mir_binop_name(op) ++ "' reached LLVM codegen with no lowering")
+            self.had_error = 1
             return wl_get_undef(wl_i32_type(self.context))
 
         if op == BinaryOp.OP_EQ or op == BinaryOp.OP_NEQ:
@@ -3290,9 +3322,11 @@ impl Codegen:
             if lhs_ty == rhs_ty:
                 let cmp_kind = wl_get_type_kind(lhs_ty)
                 if cmp_kind == wl_struct_type_kind() or cmp_kind == wl_array_type_kind():
+                    self.binop_route = "aggregate-bytes"
                     return self.compare_aggregate_eq(lhs, rhs, op)
 
         if op == BinaryOp.OP_SHL or op == BinaryOp.OP_SHR:
+            self.binop_route = "shift"
             return self.mir_build_total_shift(op, lhs, rhs, is_unsigned)
 
         // Coerce both operands to the wider integer type (never truncate)
@@ -3353,6 +3387,7 @@ impl Codegen:
         // pointer — same view read as comparisons (#293). Under #747 a borrowed
         // param concatenated its POINTER bytes as a header (garbage output).
         if op == BinaryOp.OP_CONCAT:
+            self.binop_route = "concat"
             let cc_lhs = self.mir_coerce_compare_operand(lhs, lhs_sema)
             let cc_rhs = self.mir_coerce_compare_operand(rhs, rhs_sema)
             return self.mir_str_concat(cc_lhs, cc_rhs)
@@ -4448,6 +4483,7 @@ impl Codegen:
                     return wl_build_gep(self.builder, if elem_ty != 0: elem_ty else: wl_i8_type(self.context), rhs, vec_data_i64(&indices), 1)
             let is_unsigned = self.mir_operand_is_unsigned(body, d1)
             let out = self.mir_build_bin_op(d0, lhs, rhs, is_unsigned, lhs_sema, rhs_sema)
+            if self.analysis_enabled != 0: self.record_operator_fact(body, rval_id, d0, lhs_sema, rhs_sema, lhs, rhs)
             if d0 == BinaryOp.OP_CONCAT:
                 return out
             if dest_ty != 0:
@@ -17287,6 +17323,7 @@ impl Codegen:
             for si in 0..stmt_count:
                 let stmt_id = stmt_start + si
                 let stmt_span = body.stmt_spans[stmt_id]
+                self.cur_stmt_span = stmt_span
                 if self.debug_mir_codegen_enabled():
                     let stmt_kind = body.stmt_kinds[stmt_id]
                     let stmt_d0 = body.stmt_d0[stmt_id]
