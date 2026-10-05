@@ -11,8 +11,8 @@ fn valid_arch(s: str) -> bool:
 fn main:
     assert(valid_os(os()), "unexpected std.os.os(): " ++ os())
     assert(valid_arch(arch()), "unexpected std.os.arch(): " ++ arch())
-    assert(os_kind() != OsKind.Unknown)
-    assert(arch_kind() != ArchKind.Unknown)
+    assert(os_kind() == Target.os)
+    assert(arch_kind() == Target.arch)
     assert(hostname().len() > 0)
     assert(process_id() > 0)
     assert(set_env("WITH_STD_OS_TEST", "ok") == 0)

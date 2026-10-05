@@ -900,7 +900,7 @@ fn gate_fixed_targets() -> Vec[str]:
     // Built by push: the pinned seed evaluating build.w cannot take .len() of a
     // collection literal (the #1122 class).
     var fixed: Vec[str] = Vec.new()
-    for name in "build selfcheck reseed-check-build-w abi-hash-check unit-return-review spec-inventory-check sema-order-check examples-tests benchmarks-check c-migrator-basic-tests deep-debug-tool-tests user-programs-safe no-host-toolchain source-fetch-tests source-cache-tests corpus-drift-check".split(" "): fixed.push(name.clone())
+    for name in "build selfcheck reseed-check-build-w abi-hash-check unit-return-review spec-inventory-check sema-order-check examples-tests benchmarks-check c-migrator-basic-tests deep-debug-tool-tests user-programs-safe no-host-toolchain every-target-check source-fetch-tests source-cache-tests corpus-drift-check".split(" "): fixed.push(name.clone())
     fixed
 
 fn gate_times_ledger_path() -> str: "out/.build-state/battery-times.tsv"
@@ -3046,6 +3046,24 @@ pub fn build(ctx: BuildCtx) -> Build:
     user_programs_safe = user_programs_safe.input("uat/fixtures").input("examples")
     out = out.add_target(user_programs_safe)
 
+    // D91 (§17.5): a branch a `comptime if Target…` does not take is not
+    // compiled, so a mistake in another target's branch is invisible here.
+    // `with check --target <t>` checks the same programs as each target
+    // compiles them; checking needs no linker for the target.
+    var every_target_check = target_new(.Group, "every-target-check", "")
+    for target_name in "linux_x86_64 linux_aarch64 darwin_aarch64 windows_x86_64 windows_aarch64 wasm32".split(" "):
+        var target_check = target_new(.RunCorpusTest, "every-target-check-" ++ target_name, release_compiler_bin("with"))
+        target_check = target_check.output("out/corpus/every-target-check-" ++ target_name)
+        target_check = target_check.arg("check")
+        target_check = target_check.arg("--target")
+        target_check = target_check.arg(target_name.clone())
+        target_check = target_check.arg("test/target/every_target.w")
+        target_check = target_check.input("test/target/every_target.w")
+        target_check = target_check.dep("build")
+        out = out.add_target(target_check)
+        every_target_check = every_target_check.dep("every-target-check-" ++ target_name)
+    out = out.add_target(every_target_check)
+
     // #1915: the build reads no host toolchain (build/host_toolchain.w).
     var no_host_toolchain = target_new(.Action, "no-host-toolchain", "").output("out/.build-state/no-host-toolchain.txt")
     no_host_toolchain.action = run_no_host_toolchain_action
@@ -4451,6 +4469,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     battery_checks = battery_checks.dep("test-with-audits")
     battery_checks = battery_checks.dep("user-programs-safe")
     battery_checks = battery_checks.dep("no-host-toolchain")
+    battery_checks = battery_checks.dep("every-target-check")
     battery_checks = battery_checks.dep("source-fetch-tests")
     battery_checks = battery_checks.dep("source-cache-tests")
     battery_checks = battery_checks.dep("last-green")

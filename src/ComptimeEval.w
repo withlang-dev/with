@@ -6629,8 +6629,10 @@ impl ComptimeEvaluator:
                 with_eprint(f"[comptime] disc_variant miss: enum ty={enum_resolved as i32} repr={self.sema.disc_repr_types.contains(enum_resolved as i32)} payload={self.sema.disc_has_payload.contains(enum_resolved as i32)}")
             return self.unsupported(node)
         let disc = self.sema.enum_variant_discriminant_for_type(enum_resolved as i32, sym)
-        let repr_ty = self.sema.disc_repr_types.get(enum_resolved as i32).unwrap()
-        comptime_control_value(comptime_value_int(self.node_type_or(node, repr_ty), disc))
+        // The value is the enum's, not its representation's: typed as the
+        // integer it lost its variant when a constant was folded back into
+        // source (`Pair { os: .Linux }` became `Pair { os: 1 }`).
+        comptime_control_value(comptime_value_int(self.node_type_or(node, enum_resolved as i32), disc))
 
     mut fn eval_variant_shorthand(node: i32) -> ComptimeControl:
         let arg_count = self.ast.get_data2(node)
@@ -7972,7 +7974,10 @@ impl ComptimeEvaluator:
                     if comptime_value_is_intlike(arg_values[0]) == 0:
                         return self.fail(node, "StringBuilder.with_capacity() expects an integer capacity")
                     return comptime_control_value(self.empty_string_builder_value(ret_type_for_constructor, comptime_value_intlike(arg_values[0])))
-        if fn_node == 0 and self.allow_runtime_calls != 0:
+        // D91 (§17.1a): the target's OS and architecture are a declared
+        // build input, readable by any compile-time code.
+        let reads_target = fn_node == 0 and (fn_name == "with_sysinfo_os" or fn_name == "with_sysinfo_arch")
+        if fn_node == 0 and (self.allow_runtime_calls != 0 or reads_target):
             let runtime_signal = self.eval_allowed_runtime_call(fn_sym, arg_values, node)
             if runtime_signal.kind != ComptimeControlKind.CTL_ERROR or self.had_error != 0:
                 return runtime_signal

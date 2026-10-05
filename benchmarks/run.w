@@ -19,6 +19,7 @@
 //   with run benchmarks/run.w -o results         write results.md, results.csv, results.json
 //
 // Missing toolchains are skipped, not fatal.
+use std.builtins.ewrite
 use std.fs
 use std.json
 use std.os
