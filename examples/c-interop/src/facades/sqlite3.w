@@ -35,8 +35,10 @@
 //                                                     SQLITE_DONE) and create_function_v2
 //                                                     (Amendment 3)
 //   the failure's text .............................. message sqlite3_errmsg (Amendment 3)
+//   one error for the whole library ................. c facade sqlite error SqliteError
+//                                                     (D97, #2179)
 //   failed-open resource production ................. ok on an out-parameter producer:
-//                                                     DatabaseError.FailedWithResource
+//                                                     SqliteError.FailedWithDatabase
 //   sqlite3_close / sqlite3_close_v2 ................ drop / destroys
 //   sqlite3_stmt as a dependent child ............... resource Statement, borrows param 0
 //   sqlite3_prepare_v2 / sqlite3_finalize ........... from / drop
@@ -57,14 +59,18 @@
 //   an explicit presentation override ............... rename prepare
 use c_import("sqlite3.h", link: "sqlite3")
 
-c facade sqlite:
+// Every operation that can fail returns `Result[_, SqliteError]` (§16.2b.4,
+// D97): one SQLite error, as the library has one set of result codes, so a
+// program that opens, prepares, executes and steps writes one error type
+// and no conversions.
+c facade sqlite error SqliteError:
     // A connection is an owned pointer resource (§10, §11). Its producer
     // writes the handle through the second parameter, and the status it
     // returns is read against SQLITE_OK (§16, §17). Production is not
     // success: "Whether or not an error occurs when it is opened, resources
     // associated with the database connection handle should be released by
     // passing it to sqlite3_close() when it is no longer required" — so a
-    // failed open that produced a handle is `FailedWithResource`, which owns
+    // failed open that produced a handle is `FailedWithDatabase`, which owns
     // it as a `FailedDatabase` and closes it (§18). Two destroyers (§23):
     // sqlite3_close is the automatic Drop; sqlite3_close_v2 is the explicit
     // consuming method. Both are consuming; neither is callable as a lend.
@@ -88,7 +94,7 @@ c facade sqlite:
     // A prepared statement is produced from a connection and depends on it
     // (§27): it is finalized before the connection closes, on every path,
     // and cannot be stored beside it (§30). `ok SQLITE_OK` projects the
-    // producer onto Result[Statement, StatementError]; a dependent value is
+    // producer onto Result[Statement, SqliteError]; a dependent value is
     // never carried by an error, so a failed prepare that still produced a
     // handle finalizes it at once (D59).
     resource Statement wraps *mut sqlite3_stmt
@@ -236,7 +242,8 @@ c facade sqlite:
     // "SQLITE_DONE means that the statement has finished executing
     // successfully". Either is the `Ok` value, so the program tells a row
     // from the end by comparing it (`while stmt.step()? == SQLITE_ROW:`);
-    // every other status is a `StepError` with the connection's message.
+    // every other status is `SqliteError.Failed` with the connection's
+    // message.
     fn sqlite3_step
         lend
         ok SQLITE_ROW, SQLITE_DONE

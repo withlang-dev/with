@@ -31,7 +31,7 @@
 // registered function reading its arguments as `&[Value]` and its
 // application data as `&AppData` and setting its result through the
 // callback-scope `Context` SQLite passes it (§16.2b.9, ruling Amendments 1
-// and 2), a failed open that still produced a handle (`FailedWithResource`,
+// and 2), a failed open that still produced a handle (`FailedWithDatabase`,
 // closed when the error is dropped), and close_v2 as the explicit
 // destroyer.
 use facades.sqlite3
@@ -71,7 +71,7 @@ fn main:
     let created = db.exec_with("CREATE TABLE t(v INTEGER, s TEXT); INSERT INTO t VALUES (42, 'hi'), (7, NULL);", on_row, Ctx { tag: 1 })
     print(f"exec: {created.is_ok()}")
     match db.exec_with("SELECT v, s FROM t", on_row, Ctx { tag: 2 }):
-        Err(ExecWithError.Failed(status, message)) => print(f"exec aborted by the callback: {status == SQLITE_ABORT} {message}")
+        Err(SqliteError.Failed(status, message)) => print(f"exec aborted by the callback: {status == SQLITE_ABORT} {message}")
         Ok(_) => print("unexpected")
 
     let stmt = db.prepare("SELECT v, s FROM t ORDER BY v DESC").unwrap()
@@ -94,12 +94,12 @@ fn main:
     db.exec("CREATE TABLE u(v INTEGER NOT NULL)").unwrap()
     let bad = db.prepare("INSERT INTO u VALUES (NULL)").unwrap()
     match bad.step():
-        Err(StepError.Failed(status, message)) => print(f"step failed: constraint={status == SQLITE_CONSTRAINT} {message}")
+        Err(SqliteError.Failed(status, message)) => print(f"step failed: constraint={status == SQLITE_CONSTRAINT} {message}")
         Ok(_) => print("unexpected")
     drop(bad)
 
     match db.prepare("SELEKT"):
-        Err(StatementError.Failed(status, message)) => print(f"prepare failed: {status} {message}")
+        Err(SqliteError.Failed(status, message)) => print(f"prepare failed: {status} {message}")
         _ => print("unexpected")
 
     // xStep and xFinal are not given (a scalar function).
@@ -112,7 +112,7 @@ fn main:
     drop(stmt)
 
     match Database.open("/nonexistent-with-dir/x.db"):
-        Err(DatabaseError.FailedWithResource(status, failed)) => print(f"failed open: cantopen={status == SQLITE_CANTOPEN} handle produced")
+        Err(SqliteError.FailedWithDatabase(status, failed)) => print(f"failed open: cantopen={status == SQLITE_CANTOPEN} handle produced")
         Err(e) => print(f"failed open: {e:?}")
         Ok(_) => print("unexpected")
 

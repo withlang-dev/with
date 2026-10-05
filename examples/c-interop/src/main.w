@@ -9,12 +9,10 @@ use c_import("sqlite3.h", link: "sqlite3")
 use c_import("tally.h")
 use tally
 
-// Every SQLite call that can fail returns a `Result`, with an error type the
-// compiler generates from the facade. Each carries the status SQLite returned
-// and the message it keeps on the connection, copied before the next call
-// replaces it. One `error` declaration gathers them, so `?` carries any of
-// them out.
-error ScoreError from DatabaseError, ExecError, StatementError, BindIntError, CreateFunctionV2Error, StepError
+// Every SQLite call that can fail returns a `Result` whose error is the one
+// the facade states for the library, `SqliteError`: the status SQLite
+// returned and the message it keeps on the connection, copied before the
+// next call replaces it. One error type, so `?` carries any of them out.
 
 // An SQL function written in With. SQLite calls it with its context, its
 // arguments and the application data registered with it; the facade
@@ -28,7 +26,7 @@ fn boosted(ctx: Context, args: &[Value], bonus: &Bonus):
     for i in 0..args.len() as i32: sum = sum + args[i].int()
     ctx.result_int(sum + bonus.points)
 
-fn scores -> Result[Unit, ScoreError]:
+fn scores -> Result[Unit, SqliteError]:
     // An owned connection: closed when `db` leaves its scope, on every path.
     let db = Database.open(":memory:")?
     db.exec("CREATE TABLE users (name TEXT, email TEXT, score INTEGER); INSERT INTO users VALUES ('Alice', NULL, 95), ('Bob', NULL, 82), ('Charlie', NULL, 91)")?

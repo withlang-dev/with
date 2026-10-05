@@ -47,5 +47,5 @@ fn main:
             all.push(db)
         assert(all.len() == 3)
     match Database.open("/nonexistent-with-dir/x.db"):
-        Err(DatabaseError.FailedWithResource(status, failed)) => assert(status == SQLITE_CANTOPEN)
+        Err(SqliteError.FailedWithDatabase(status, failed)) => assert(status == SQLITE_CANTOPEN)
         _ => assert(false)

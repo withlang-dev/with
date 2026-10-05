@@ -179,6 +179,11 @@ pub enum NodeKind: i32:
     NK_C_CONVENTION = 140
     NK_FACADE_RULE = 141
     NK_FACADE_PROFILE_MATCH = 142
+    // The one error type a facade's header states (`c facade sqlite error
+    // SqliteError:`, §16.2b.4, D97), kept as an item so every rewrite of the
+    // item list carries it.
+    // NK_FACADE_ERROR:        d0=error name(sym), d1=0, d2=0
+    NK_FACADE_ERROR = 143
     // Type expressions
     NK_TYPE_NAMED = 80
     NK_TYPE_GENERIC = 81
@@ -301,6 +306,30 @@ fn facade_clause_operand_count(kind: i32) -> i32:
     -1
 
 // Whether an NK_FACADE_RESOURCE item is a callback-scope handle (§16.2b.9).
+// The one error type a facade states for all of its fallible operations
+// (§16.2b.4, D97), or 0 when each resource and operation has its own.
+pub fn facade_error_sym(pool: AstPool, facade: i32) -> i32:
+    let extra_start = pool.get_data1(facade as NodeId)
+    for k in 0..pool.get_data2(facade as NodeId):
+        let item = pool.get_extra(extra_start + k)
+        if pool.kind(item as NodeId) == NodeKind.NK_FACADE_ERROR: return pool.get_data0(item as NodeId)
+    0
+
+// The `c facade` block an item belongs to, or 0.
+pub fn facade_of_item(pool: AstPool, item: i32) -> i32:
+    for di in 0..pool.decl_count():
+        let decl = pool.get_decl(di)
+        if pool.kind(decl) != NodeKind.NK_C_FACADE: continue
+        let extra_start = pool.get_data1(decl)
+        for k in 0..pool.get_data2(decl):
+            if pool.get_extra(extra_start + k) == item: return decl as i32
+    0
+
+// The shared error type of the facade an item belongs to, or 0.
+pub fn facade_item_error_sym(pool: AstPool, item: i32) -> i32:
+    let facade = facade_of_item(pool, item)
+    if facade == 0: 0 else: facade_error_sym(pool, facade)
+
 pub fn facade_item_is_handle(pool: AstPool, item: i32) -> bool:
     if item <= 0 or pool.kind(item as NodeId) != NodeKind.NK_FACADE_RESOURCE: return false
     let extra_start = pool.get_data1(item as NodeId)
@@ -2481,7 +2510,7 @@ impl AstPool:
 //
 // NodeKind.NK_C_FACADE (D51 §16.2b, stage 1: parsed, facts not yet collected):
 //                   d0=name(sym), d1=extra_start, d2=item_count; extra=[item(node)...]
-//                   items: NK_FACADE_RESOURCE (extra=[wraps_type, clause...]),
+//                   items: NK_FACADE_ERROR (the header's `error E`, d0=E sym), NK_FACADE_RESOURCE (extra=[wraps_type, clause...]),
 //                   NK_FACADE_FN (extra=[clause...]), NK_FACADE_DOMAIN (d1=kind sym),
 //                   NK_FACADE_CONVENTION (extra=[path_sym..., match...]). A clause is
 //                   NK_FACADE_CLAUSE d0=FACADE_CLAUSE_* with its operands in extra

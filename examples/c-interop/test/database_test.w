@@ -52,10 +52,10 @@ fn a_c_error_becomes_with_values:
 @[test]
 fn a_failed_open_still_has_its_message:
     // The handle SQLite produced for a failed open is owned by the error
-    // (`FailedWithResource`) and closed when the error is dropped; the one
+    // (`FailedWithDatabase`) and closed when the error is dropped; the one
     // operation valid on it is reading why it failed.
     match Database.open("/no/such/directory/db.sqlite"):
-        Err(DatabaseError.FailedWithResource(status, failed)) =>
+        Err(SqliteError.FailedWithDatabase(status, failed)) =>
             assert(status == SQLITE_CANTOPEN)
             assert(failed.errmsg().map(m => m.to_str_lossy()) == Some("unable to open database file"))
         _ => assert(false)

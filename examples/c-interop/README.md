@@ -24,7 +24,8 @@ with build :test  # 13 tests over the real libraries
   borrows its connection; `sqlite3_errmsg` as a view of the connection.
   Every clause quotes the SQLite sentence it relies on.
 - From those facts the compiler renders the safe surface. `Database.open`
-  returns `Result[Database, DatabaseError]`; `db.exec`, `db.prepare`,
+  returns `Result[Database, SqliteError]`, the one error the facade states
+  for the library (`c facade sqlite error SqliteError`); `db.exec`, `db.prepare`,
   `stmt.step`, `stmt.bind_int`, `stmt.column_int`, `stmt.column_text` are
   the C functions, presented as methods. Each one whose return is a status
   is a `Result`, so the program is written with `?`: `db.exec(sql)?`,

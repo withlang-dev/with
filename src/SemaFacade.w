@@ -41,6 +41,7 @@ impl Sema:
         self.verify_facade_variadic_items()
         self.verify_facade_abandon()
         self.verify_facade_messages()
+        self.verify_facade_shared_errors()
         self.verify_facade_borrowed_returns()
         self.verify_facade_text_views()
         self.verify_facade_callback_items()
@@ -179,6 +180,48 @@ impl Sema:
     // Every status the clause reads is carried by the one `<R>Error` the
     // projection renders (FacadeRender.w facade_render_error_type), so the
     // producers it reads return one status type.
+    // The error a resource's `ok` projection returns: the facade's one error
+    // type (§16.2b.4, D97), or the resource's own `<R>Error`.
+    fn facade_resource_error_name(ri: i32) -> str:
+        let shared = facade_render_shared_error(self.ast, self.pool, self.facade_resources[ri].node)
+        if shared.len() > 0: shared else: facade_render_error_name(self.pool_resolve(self.facade_resources[ri].name))
+
+    // `c facade F error E` (§16.2b.4, D97): E carries every status the
+    // facade's `ok` clauses read — its producers' and its operations' — so
+    // they read one status type.
+    mut fn verify_facade_shared_errors():
+        for di in 0..self.ast.decl_count():
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) != NodeKind.NK_C_FACADE or facade_error_sym(self.ast, decl as i32) == 0:
+                continue
+            let err: str = self.pool_resolve(facade_error_sym(self.ast, decl as i32))
+            var first = 0
+            var first_ret = 0
+            var readers: Vec[i32] = Vec.new()
+            for ri in 0..self.facade_resources.len() as i32:
+                if self.facade_resources[ri].decl != di or self.facade_resources[ri].ok_consts.len() == 0:
+                    continue
+                for pi in 0..self.facade_resources[ri].producers.len() as i32:
+                    if self.facade_resources[ri].out_params[pi] >= 0: readers.push(self.facade_resources[ri].producers[pi])
+                if self.facade_resources[ri].init != 0: readers.push(self.facade_resources[ri].init)
+            for ci in 0..self.foreign_contracts.len() as i32:
+                if self.foreign_contracts[ci].decl == di and self.foreign_contracts[ci].ok_const != 0: readers.push(self.foreign_contracts[ci].fn_sym)
+            for k in 0..readers.len() as i32:
+                let sig = self.get_sig(readers[k])
+                let ret = if sig >= 0: self.sig_return_type(sig) else: 0
+                if ret == 0 or self.get_type_kind(self.resolve_alias(ret as TypeId)) == TypeKind.TY_VOID:
+                    continue
+                if first == 0:
+                    first = readers[k]
+                    first_ret = ret
+                else if self.resolve_alias(ret as TypeId) != self.resolve_alias(first_ret as TypeId):
+                    let fnm: str = self.pool_resolve(first)
+                    let pn: str = self.pool_resolve(readers[k])
+                    let ft: str = self.type_name(first_ret)
+                    let rt: str = self.type_name(ret)
+                    self.emit_error(f"facade states one error type '{err}', whose status is one type, but '{fnm}' returns {ft} and '{pn}' returns {rt} (§16.2b.4)", decl as i32)
+                    break
+
     mut fn verify_facade_ok_producers(ri: i32) -> bool:
         let rname: str = self.pool_resolve(self.facade_resources[ri].name)
         let node = self.facade_resources[ri].node
@@ -210,7 +253,7 @@ impl Sema:
                 let fnm: str = self.pool_resolve(first)
                 let ft: str = self.type_name(first_ret)
                 let rt: str = self.type_name(ret)
-                let err = facade_render_error_name(rname)
+                let err = self.facade_resource_error_name(ri)
                 self.emit_error(f"resource '{rname}': 'ok {cn}' reads producer '{fnm}''s status as {ft} and producer '{pn}''s as {rt}; the one error type '{err}' carries a status of one type (§16.2b.4)", node)
                 return false
             statuses = statuses + 1
@@ -279,7 +322,7 @@ impl Sema:
         roles.push(if self.facade_resources[ri].handle != 0: "the handle type" else: "the resource type")
         if self.facade_projects_status(ri):
             let cn = self.facade_ok_text(ri)
-            names.push(facade_render_error_name(rname))
+            names.push(self.facade_resource_error_name(ri))
             roles.push(f"the error type of its 'ok {cn}' projection")
             if self.facade_has_failed_state(ri):
                 names.push(facade_render_failed_name(rname))
@@ -2963,7 +3006,8 @@ impl Sema:
         let facade_name: str = self.pool_resolve(self.foreign_contracts[ci].facade)
         let rendered_file = "<facade " ++ facade_name ++ ">"
         if ok_const != 0:
-            let err = facade_render_fn_error_name(presented_name)
+            let shared = facade_render_shared_error(self.ast, self.pool, self.foreign_contracts[ci].node)
+            let err = if shared.len() > 0: shared else: facade_render_fn_error_name(presented_name)
             let other = self.facade_generated_name_clash(err, rendered_file, -1)
             if other.len() > 0:
                 self.emit_error(f"fn '{fname}' renders '{err}', the error type of its 'ok' projection, and {other}; the compiler never picks between two types of one name — rename one (§16.2b.4)", node)

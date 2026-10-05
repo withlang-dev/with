@@ -18,7 +18,7 @@ use c_import("sqlite3.h", link: "sqlite3")
 
 fn main:
     match Database.open("/nonexistent-with-dir/x.db"):
-        Err(DatabaseError.FailedWithResource(status, failed)) => print(f"failed open: cantopen={status == SQLITE_CANTOPEN} message={failed.errmsg().unwrap().to_str().unwrap()}")
+        Err(SqliteError.FailedWithDatabase(status, failed)) => print(f"failed open: cantopen={status == SQLITE_CANTOPEN} message={failed.errmsg().unwrap().to_str().unwrap()}")
         Err(e) => print(f"failed open: {e:?}")
         Ok(_) => print("unexpected")
     print("ok")

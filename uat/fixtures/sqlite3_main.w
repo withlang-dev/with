@@ -9,9 +9,7 @@
 use facades.sqlite3
 use c_import("sqlite3.h")
 
-error QueryError from DatabaseError, ExecError, StatementError, StepError
-
-fn total(db: &Database) -> Result[i32, QueryError]:
+fn total(db: &Database) -> Result[i32, SqliteError]:
     db.exec("CREATE TABLE t(value INTEGER); INSERT INTO t(value) VALUES (40), (2);")?
     let stmt = db.prepare("SELECT value FROM t")?
     var sum = 0

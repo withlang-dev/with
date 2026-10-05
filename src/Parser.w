@@ -4532,9 +4532,18 @@ impl Parser:
         self.advance()
         let name = self.expect_ident()
         if name == 0: return self.poisoned_expr()
+        // `c facade sqlite error SqliteError:` (§16.2b.4, D97): one error
+        // type for every fallible operation the facade presents.
+        let items: Vec[i32] = Vec.new()
+        if self.peek() == TokenKind.TK_KW_ERROR:
+            let error_start = self.current_start()
+            self.advance()
+            let error_name = self.expect_ident()
+            if error_name == 0: return self.poisoned_expr()
+            items.push(self.pool.add_node(NodeKind.NK_FACADE_ERROR, error_start, self.prev_end(), error_name, 0, 0) as i32)
+        let header_items = items.len()
         if self.expect(TokenKind.TK_COLON) == 0: return self.poisoned_expr()
         self.skip_newlines()
-        let items: Vec[i32] = Vec.new()
         while self.peek() != TokenKind.TK_EOF:
             let col = column_of(self.source, self.current_start())
             if col == 0: break
@@ -4542,7 +4551,7 @@ impl Parser:
             if item == 0: return self.poisoned_expr()
             items.push(item)
             self.skip_newlines()
-        if items.len() == 0:
+        if items.len() == header_items:
             self.emit_error("c facade block is empty; expected resource, fn, domain or use convention (§16.2b)")
             return self.poisoned_expr()
         let extra_start = self.pool.extra_len()

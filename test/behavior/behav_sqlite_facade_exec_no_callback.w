@@ -23,6 +23,6 @@ fn main:
     print(f"insert: {inserted.is_ok()} changes={db.changes()}")
     print(f"select without callback: {db.exec("SELECT v FROM t").is_ok()}")
     match db.exec("SELEC 1"):
-        Err(ExecError.Failed(status, message)) => print(f"refused: {status} {message}")
+        Err(SqliteError.Failed(status, message)) => print(f"refused: {status} {message}")
         Ok(_) => print("unexpected")
     print("ok")
