@@ -12,6 +12,8 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D98 — Delegated decisions: an agent implements its prediction and Eric vetoes afterwards](2026-10-05-D98-delegated-decisions.md)
+- [D97 — `TotalF64` is a numeric float key; `None` sorts first by declaration order; a facade may state one error type](2026-10-05-D97-totalf64-none-first-one-facade-error-type.md)
 - [D96 — A key is any structurally comparable value; a custom equality is a key projection; maps are seeded and iterate in insertion order](2026-10-05-D96-keys-are-structural-a-key-projection-seeded-insertion-ordered-maps.md)
 - [D95 — Five rulings: `let _` drops, `pub const` takes its value's type, `??` binds below `|>`, structural types derive, the SQLite fixture](2026-10-05-D95-five-rulings-discard-pub-const-default-precedence-structural-traits.md)
 - [D94 — A corpus is migrated against every target's C, and the results are merged per declaration](2026-10-05-D94-a-corpus-is-migrated-against-every-target-and-merged.md)

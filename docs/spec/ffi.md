@@ -571,6 +571,14 @@ A facade that declares or imports a type with the generated name is a
 compile-time error naming both. When `ok` is stated, the
 `(status, Option[Resource])` constructor is not generated.
 
+A facade may state one error type for all of its fallible operations:
+`error SqliteError` in the facade header. Every producer and status
+operation with `ok` then returns `Result[_, SqliteError]` instead of its own
+error. `SqliteError` has `Failed(status: c_int)`; `message: str` on that
+variant when the failing resource has a `message` operation;
+`FailedWith<R>(status: c_int, resource: Failed<R>)` for each producer whose
+failure can produce its resource; and `NothingProduced(status: c_int)`.
+
 An in-place producer with `ok` returns `Result[R, RError]` whose error has
 only `Failed`, since a failed initialization produced nothing and a
 successful one always did. On

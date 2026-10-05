@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.25
+# The With Programming Language — Specification v7.26
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,13 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.26:** three rulings, 2026-10-05 (D97). §11.7: `std.TotalF64`
+(and `TotalF32`) is a float key: NaN equals NaN and sorts last, `-0.0` equals
+`0.0` (#2182). §11.8: derived `Ord` orders an enum's variants by
+declaration, then their payloads; §10.1: `Option` is declared
+`None | Some(T)`, so `None` sorts first. §16.2b.4: a facade may state one
+error type for all of its fallible operations, `error SqliteError` (#2179).
+The implementation is NON-COMPLIANT until it catches up.
 **Changelog v7.25:** keys and maps, 2026-10-05 (D96). §11.7: a key is any
 type whose `==` is structural and that holds no float; every key implements
 `Key`; a type whose equality is about one part of its value states that

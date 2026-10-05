@@ -429,6 +429,11 @@ implements `Key`, which is the bound a generic container states
 else can mutate one while it is inside, so a `Vec` is as good a key as an
 integer.
 
+`std.TotalF64` (and `TotalF32`) wraps a float as a key. Its `==` is
+numeric with two changes: every NaN equals every NaN, and `-0.0` equals
+`0.0`. Its order is the float order with NaN above every number.
+`TotalF64(x)` wraps, and `.value` unwraps.
+
 A key is hashed by the compiler, structurally and consistently with `==`,
 with a hash seeded once per process from the runtime's randomness
 capability. No program writes a hash. A type whose equality is about one
@@ -575,7 +580,7 @@ structure. The following traits may be derived:
 | `Clone` | All fields are `Clone` | Field-by-field clone |
 | `Default` | All fields are `Default` | Field-by-field default |
 | `Eq` | All fields are `Eq` | Field-by-field equality |
-| `Ord` | All fields are `Ord` | Lexicographic comparison |
+| `Ord` | All fields are `Ord` | Lexicographic comparison; an enum's variants in declaration order, then their payloads |
 | `Debug` | Always | "{TypeName} { field: value, ... }" |
 | `Display` | Always (enums) | Variant name as string |
 

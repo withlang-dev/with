@@ -697,6 +697,14 @@ see, one clause saying why is enough.
 Then Eric rules. For spec changes, the blessed wording lands immediately as the
 ruling itself, and the implementation is non-compliant until it conforms.
 
+**Delegated decisions (D98).** A question that is not about C interop,
+ownership or safety, is easy to reverse, and has a prediction of 75% or
+higher does not wait. Implement the prediction, spec words included, and
+record the full brief in the decision log as a **delegated** entry. Eric
+vetoes afterwards; a veto is a revert. UAT fixtures, examples and published
+programs stay his, as do C interop, ownership, safety and anything hard to
+reverse.
+
 ---
 
 ## Filing Bugs
