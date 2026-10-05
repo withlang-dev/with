@@ -102,13 +102,13 @@ The rules are in [spec §16.2b](docs/spec/ffi.md).
 ## Translate C into With
 
 ```sh
-with migrate tiny.c -o tiny.w --no-c-export
+with migrate tiny.c -o tiny.w
 with run tiny.w
 ```
 
 `with migrate` turns C source into With source that you check in and
-maintain. (`--no-c-export` makes the result plain With functions; by
-default they are also exported under their C names for C callers.) Parts of the standard library are its output: the regex engine
+maintain. (`--c-export` also exports the functions under their C names,
+for C code that still calls them.) Parts of the standard library are its output: the regex engine
 behind `=~` is PCRE2 (35 modules), and `std.zlib` is zlib (22 modules), both
 migrated from the upstream C and kept in step with it by a drift check in
 the build. The translation is literal: migrated code keeps C's pointer

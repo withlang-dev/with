@@ -4994,7 +4994,7 @@ fn migrate_apply_std_use_fixits(output_path: &str) -> i32:
 
 fn run_migrate_command(argc: i32) -> i32:
     if argc < 3:
-        eprint("usage: with migrate <file.c|dir/> [-o output] [-I include_dir] [-include header] [--exclude basename] [--c-target triple --c-sysroot dir]")
+        eprint("usage: with migrate <file.c|dir/> [-o output] [-I include_dir] [-include header] [--exclude basename] [--c-export] [--c-target triple --c-sysroot dir]")
         return 1
     // #1915: the migrator parses C as c_import does (compiler.Frontend): on
     // Windows x86_64 for the windows-gnu target against the C runtime the
@@ -5006,6 +5006,12 @@ fn run_migrate_command(argc: i32) -> i32:
     // and exit. Used by the cli-selfhost-ir-roundtrip test.
     if with_arg_at(2) == "--ir-roundtrip":
         return ci_ir_roundtrip_test()
+
+    // The result is With functions (Eric, 2026-10-04): exporting them
+    // under their C names is a different program — a symbol that collides
+    // with a linked C library's, a public ABI nobody asked for — so it is
+    // spelled, with `--c-export`, by whoever still has C calling them.
+    migrate_set_no_c_export(1)
 
     // Parse arguments
     var source_path = ""
@@ -5045,6 +5051,11 @@ fn run_migrate_command(argc: i32) -> i32:
         if arg == "--check" or arg == "--diff" or arg == "--stats":
             ai = ai + 1
             continue  // TODO: implement modes
+        if arg == "--c-export":
+            migrate_set_no_c_export(0)
+            ai = ai + 1
+            continue
+        // The default, still accepted where it is spelled.
         if arg == "--no-c-export":
             migrate_set_no_c_export(1)
             ai = ai + 1
