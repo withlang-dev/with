@@ -2503,7 +2503,9 @@ pub fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs
             else:
                 "impl " ++ safe_name ++ ":\n" ++ accessor_method ++ "\n"
 
-    let packed_prefix = if is_really_packed: "@[packed]\n" else if pack_cap > 0: f"@[repr(packed({pack_cap}))]\n" else: ""
+    // A C record has C layout (§16.1): it is `@[repr(C)]`, so a by-value
+    // parameter or result of an exported function is expressible (#2119).
+    let packed_prefix = if is_really_packed: "@[packed]\n" else if pack_cap > 0: f"@[repr(packed({pack_cap}))]\n" else if is_union: "" else: "@[repr(C)]\n"
     let part1 = "type " ++ safe_name
     let part2 = if is_union: part1 ++ " = union \{ " else: part1 ++ " \{ "
     let part3 = part2 ++ field_str

@@ -849,11 +849,17 @@ fn migrate_host_compat_preamble() -> str:
     "#if !defined(_POSIX_C_SOURCE)\n#define _POSIX_C_SOURCE 200809L\n#endif\n" ++
     "#if defined(__APPLE__) && !defined(_DARWIN_C_SOURCE)\n#define _DARWIN_C_SOURCE 1\n#endif\n" ++
     "#if !defined(HAVE_UNISTD_H)\n#ifdef __has_include\n#if __has_include(<unistd.h>)\n#define HAVE_UNISTD_H 1\n#endif\n#endif\n#endif\n" ++
-    "#include <string.h>\n#include <stdio.h>\n" ++
+    // Apple's <string.h> and <stdio.h> define the copy and format
+    // functions as fortified macros; including them here and undefining
+    // those leaves the unit's calls plain calls. No other libc needs it,
+    // and a libc header included here fixes the feature set before the
+    // unit's own feature-test macros: glibc then never declares what a
+    // later `_LARGEFILE64_SOURCE` asks for (#2071, zlib's fopen64).
+    "#if defined(__APPLE__)\n#include <string.h>\n#include <stdio.h>\n" ++
     "#undef memcpy\n#undef memmove\n#undef memset\n" ++
     "#undef strcpy\n#undef strncpy\n#undef strcat\n#undef strncat\n" ++
     "#undef snprintf\n#undef sprintf\n#undef vsnprintf\n#undef vsprintf\n" ++
-    "#undef stpcpy\n#undef stpncpy\n"
+    "#undef stpcpy\n#undef stpncpy\n#endif\n"
 
 fn ci_capture_macro_values(session: i64):
     g_migrate_macro_values = HashMap.new()
