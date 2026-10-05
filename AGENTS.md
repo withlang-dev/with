@@ -39,8 +39,13 @@ cause and fix that, not the symptom.
 `with build`, state the question you're answering and what each outcome tells
 you. If `grep`, `nm`, `otool`, `lldb`, or reading code can answer it, do that.
 
-**Use the debugger.** The project has debug symbols. One `lldb` breakpoint
-answers in seconds what print-and-rebuild takes minutes to.
+**Use the debugger.** One `lldb` breakpoint answers in seconds what
+print-and-rebuild takes minutes to. Debug the compiler with
+`out/bootstrap/bin/with-stage1` (after `with build :dev`; it has a `.dSYM`:
+dotted breakpoints, source lines, parameters). The installed `with` has no
+debug info: lldb finds its functions only by regex, with no source or
+arguments. A program any compiler builds carries debug info for its own
+code and the runtime.
 
 **"Root cause" means the exact line** — the exact function, branch, and
 condition producing the wrong state, observed in `lldb` or the debug allocator.
@@ -50,11 +55,17 @@ characterization alone. Deferring is valid only after locating the bug at the
 instruction level and showing the fix needs foundation work you can point to.
 
 **Every bug has a route, and you state it.** `docs/spec/toolchain/deep-debugging-tools.md`
-orders the tools by bug class. Before the first edit for a bug, name the
-route you are on and run its first steps: a drop, free, or leak bug starts
-with the debug allocator, `WITH_ALLOC_NO_REUSE`, the address trap
-(`WITH_DEBUG_ALLOC_TRAP_FREE`), and the runner's own binary — never with
-`grep` or a trace print. A fix commit cites the tool output that proves the
+orders the tools by bug class, and every recipe in it was run as written
+(2026-10-05). Open it at the start of a hunt and follow the route's
+recipes as printed; improvising flags is how a hunt stalls (an unknown flag
+prints `ok`, #2198). Before the first edit for a bug, name the route you
+are on and run its first steps: a drop, free, or leak bug starts with the
+debug allocator, `WITH_ALLOC_NO_REUSE`, the address trap
+(`WITH_DEBUG_ALLOC_TRAP_FREE`, under lldb: outside it the address changes
+every run), and the runner's own binary — never with `grep` or a trace
+print. A wrong view origin starts with `WITH_DEBUG_BORROWS=1`; a
+generic-instance `BUG:` with `WITH_TRACE_INST=1` (the page's switch
+tables list the rest). A fix commit cites the tool output that proves the
 exact line: the allocator report and backtrace, the `matrix` row, the
 validator error, the IR of the block. Output that only characterizes
 (counts, dump greps, trace prints) is a hypothesis and does not justify an
@@ -865,26 +876,33 @@ fails silently when `old_string` doesn't match due to stale context.
 
 ## Stage Debugging
 
+`with` below is the installed compiler; it runs every dump, trace,
+`analyze`, `reduce` and allocator recipe. For source you changed, use the
+compiler built from it, `out/bootstrap/bin/with-stage1` (`with build :dev`);
+for lldb on the compiler, always stage1 (debug info). `out/stage/bin/
+with-stage2` exists only after a full build. The full catalog, with what
+each tool proves, is `docs/spec/toolchain/deep-debugging-tools.md`.
+
 ### Quick repro
 ```
-time ./out/stage/bin/with-stage2 check src/main.w
+out/bootstrap/bin/with-stage1 check src/main.w
 ```
 
 ### Deep compiler tools
 Use these before edit/compile/trace loops on MIR, ownership, codegen, or fixpoint
 bugs:
 ```
-./out/stage/bin/with-stage2 reduce repro.w --contains "diagnostic" -- ./out/stage/bin/with-stage2 check {file}
-./out/stage/bin/with-stage2 check repro.w --trace-place main:_1
-./out/stage/bin/with-stage2 check repro.w --explain-mir-origin main:_1
-./out/stage/bin/with-stage2 check repro.w --trace-ownership main:_1
-./out/stage/bin/with-stage2 check repro.w --dump-drop-plan
-./out/stage/bin/with-stage2 check repro.w --dump-place-map
-./out/stage/bin/with-stage2 check repro.w --dump-abi
-./out/stage/bin/with-stage2 check repro.w --trace-cleanup-edge 'main:bb0->bb1'
-./out/stage/bin/with-stage2 check repro.w --dump-drop-state
-./out/stage/bin/with-stage2 check repro.w --validate-all
-./out/stage/bin/with-stage2 check repro.w --validate-ownership
+with reduce repro.w --contains "diagnostic" -- with check {file}
+with check repro.w --trace-place main:_1
+with check repro.w --explain-mir-origin main:_1
+with check repro.w --trace-ownership main:_1
+with check repro.w --dump-drop-plan
+with check repro.w --dump-place-map
+with check repro.w --dump-abi
+with check repro.w --trace-cleanup-edge 'main:bb0->bb1'
+with check repro.w --dump-drop-state
+with check repro.w --validate-all
+with check repro.w --validate-ownership
 with build :fixpoint-diff
 ```
 
@@ -897,18 +915,18 @@ branches, and audits its own marshalling coverage — so an uninstrumented ordin
 call path is a failure, not a blind spot.
 
 ```sh
-./out/stage/bin/with-stage2 analyze repro.w audit:all
-./out/stage/bin/with-stage2 analyze repro.w audit:storage
-./out/stage/bin/with-stage2 analyze repro.w summary
-./out/stage/bin/with-stage2 analyze repro.w 'matrix:name~function_name'
-./out/stage/bin/with-stage2 analyze repro.w 'select:stage=sema,kind=parameter,name~function_name'
-./out/stage/bin/with-stage2 analyze repro.w 'explain:call:function_name'
-./out/stage/bin/with-stage2 analyze repro.w move-sites
-./out/stage/bin/with-stage2 analyze repro.w 'explain:effect:Type.method:self'
-./out/stage/bin/with-stage2 analyze repro.w 'path:call:caller:callee'
-./out/stage/bin/with-stage2 analyze repro.w 'closure:call:root_function'
-./out/stage/bin/with-stage2 analyze repro.w 'lldb:kind=call,name~function_name'
-./out/stage/bin/with-stage2 analyze repro.w contract
+with analyze repro.w audit:all
+with analyze repro.w audit:storage
+with analyze repro.w summary
+with analyze repro.w 'matrix:name~function_name'
+with analyze repro.w 'select:stage=sema,kind=parameter,name~function_name'
+with analyze repro.w 'explain:call:function_name'
+with analyze repro.w move-sites
+with analyze repro.w 'explain:effect:Type.method:self'
+with analyze repro.w 'path:call:caller:callee'
+with analyze repro.w 'closure:call:root_function'
+with analyze repro.w 'lldb:kind=call,name~function_name'
+with analyze repro.w contract
 ```
 
 Requests:
@@ -946,8 +964,8 @@ Requests:
 Also a reducer predicate:
 
 ```sh
-./out/stage/bin/with-stage2 reduce repro.w --exit-code nonzero -- \
-  ./out/stage/bin/with-stage2 analyze {file} audit:all
+with reduce repro.w --exit-code nonzero -- \
+  with analyze {file} audit:all
 ```
 
 Do not start a full build to test an ABI/ownership hypothesis. First require the
@@ -988,7 +1006,7 @@ cells and the #608 POD-leak pins read as `same`).
 The compiler's objects name their sources under `/with-src`, not under the
 checkout (D50: one tree, one binary, in any worktree), so give lldb the map:
 ```
-lldb -o "settings set target.source-map /with-src $PWD" -- ./out/stage/bin/with-stage2 check src/main.w
+lldb -o "settings set target.source-map /with-src $PWD" -- out/bootstrap/bin/with-stage1 check src/main.w
 (lldb) run
 (lldb) bt all
 ```
@@ -997,11 +1015,11 @@ lldb -o "settings set target.source-map /with-src $PWD" -- ./out/stage/bin/with-
 Use before any edit/compile/trace loop for drop, lifetime, double-free,
 use-after-free, and leak bugs:
 ```
-./out/stage/bin/with-stage2 run --debug-alloc repro.w
-./out/stage/bin/with-stage2 run --debug-alloc --debug-alloc-filter=non-root repro.w
-./out/stage/bin/with-stage2 check repro.w --dump-drop-state
-./out/stage/bin/with-stage2 check repro.w --dump-drop-plan
-./out/stage/bin/with-stage2 check repro.w --trace-ownership main:_1
+with run --debug-alloc repro.w
+with run --debug-alloc --debug-alloc-filter=non-root repro.w
+with check repro.w --dump-drop-state
+with check repro.w --dump-drop-plan
+with check repro.w --trace-ownership main:_1
 with build :debug-alloc-tests
 ./out/release/bin/with build tools/debug_drop.w -o out/debug-alloc-tests/debug_drop
 out/debug-alloc-tests/debug_drop run ./out/release/bin/with repro.w
@@ -1012,14 +1030,19 @@ lldb --batch -s tools/debug_drop_sites.lldb \
 ```
 
 ### Heap corruption
+The malloc tools see only malloc zones; With's allocator is its own, so
+without `WITH_ALLOC_SYSTEM=1` they report a clean heap whatever happened
+(`leaks` said `0 leaks` for a program that leaked 4 KB):
 ```
-MallocScribble=1 MallocGuardEdges=1 \
-./out/stage/bin/with-stage2 check src/main.w
+WITH_ALLOC_SYSTEM=1 MallocScribble=1 MallocGuardEdges=1 \
+out/bootstrap/bin/with-stage1 check src/main.w
 ```
 
 ### Leak detection
+First choice is the debug allocator (`WITH_DEBUG_ALLOC=1`, it names the
+block and its origin). The system tool, with the system allocator:
 ```
-leaks --atExit -- ./out/stage/bin/with-stage2 check src/main.w
+WITH_ALLOC_SYSTEM=1 leaks --atExit -- out/bootstrap/bin/with-stage1 check src/main.w
 ```
 
 If stacks are nonsense, suspect seed corruption. Replace the seed with a
