@@ -1,25 +1,28 @@
 //! skip-on: windows no host sqlite3 on Windows: this c_imports the host library's header (Linux CI installs it); the release UAT project gets it from `with get`
-//! expect-stdout: create: 0
-//! expect-stdout: insert: 0 changes=2
-//! expect-stdout: select without callback: 0
+//! expect-stdout: create: true
+//! expect-stdout: insert: true changes=2
+//! expect-stdout: select without callback: true
+//! expect-stdout: refused: 1 near "SELEC": syntax error
 //! expect-stdout: ok
 
-// D51 stage 12b (#1618; ruling §43, §66; spec §16.2b.8-9): sqlite3_exec
-// with no callback, as every DDL and DML statement runs it. The header
-// states no nullability and the facade does ("If the callback pointer to
-// sqlite3_exec() is NULL, then no callback is ever invoked and result
-// rows are ignored"), so `db.exec(sql, None, None)` is the call
-// the release UAT makes as `sqlite3_exec(db, sql, null, null, null)` —
-// with no `unsafe`, no raw pointer and no no-op callback: the absent
-// callback takes its userdata with it. A SELECT with no callback
-// succeeds and its rows are ignored, as documented.
+// D92 (ruling Amendment 3; spec §16.2b.4, §16.2b.11; #1618): sqlite3_exec
+// with no callback, as every DDL and DML statement runs it. The facade
+// presents the function twice; `exec` fixes the callback and its userdata
+// to NULL ("If the callback pointer to sqlite3_exec() is NULL, then no
+// callback is ever invoked and result rows are ignored"), so the call is
+// `db.exec(sql)`, and `ok SQLITE_OK` makes it a `Result` whose error
+// carries the connection's message. A SELECT with no callback succeeds
+// and its rows are ignored, as documented.
 use facades.sqlite3
 use c_import("sqlite3.h", link: "sqlite3")
 
 fn main:
     let db = Database.open(":memory:").unwrap()
-    print(f"create: {db.exec("CREATE TABLE t(v INTEGER)", None, None)}")
-    let rc = db.exec("INSERT INTO t VALUES (1), (2)", None, None)
-    print(f"insert: {rc} changes={db.changes()}")
-    print(f"select without callback: {db.exec("SELECT v FROM t", None, None)}")
+    print(f"create: {db.exec("CREATE TABLE t(v INTEGER)").is_ok()}")
+    let inserted = db.exec("INSERT INTO t VALUES (1), (2)")
+    print(f"insert: {inserted.is_ok()} changes={db.changes()}")
+    print(f"select without callback: {db.exec("SELECT v FROM t").is_ok()}")
+    match db.exec("SELEC 1"):
+        Err(ExecError.Failed(status, message)) => print(f"refused: {status} {message}")
+        Ok(_) => print("unexpected")
     print("ok")

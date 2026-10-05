@@ -1,12 +1,13 @@
 //! skip-on: windows no host sqlite3 on Windows: this c_imports the host library's header (Linux CI installs it); the release UAT project gets it from `with get`
 //! expect-stdout: version: 3
-//! expect-stdout: exec: 0
+//! expect-stdout: exec: true
 //! expect-stdout: row: tag=2 cols=2
-//! expect-stdout: exec aborted by the callback: true
+//! expect-stdout: exec aborted by the callback: true query aborted
 //! expect-stdout: prepared: cols=2
 //! expect-stdout: row 1: 42 hi bytes=2 name=s
 //! expect-stdout: row 2: 7 NULL
 //! expect-stdout: done: true changes=2
+//! expect-stdout: step failed: constraint=true NOT NULL constraint failed: u.v
 //! expect-stdout: prepare failed: 1 near "SELEKT": syntax error
 //! expect-stdout: function registered: 0
 //! expect-stdout: shout called: 2 argument(s), application data 1 shout
@@ -63,16 +64,19 @@ fn shout(ctx: Context, args: &[Value], app: &AppData):
 fn main:
     print(f"version: {sqlite3_libversion().unwrap().to_str().unwrap().slice(0, 1)}")
     var db = Database.open(":memory:").unwrap()
-    // The callback is nullable (#1618): `Some` of the callback and of its
-    // userdata, or `None` for both (behav_sqlite_facade_exec_no_callback).
-    let rc = db.exec("CREATE TABLE t(v INTEGER, s TEXT); INSERT INTO t VALUES (42, 'hi'), (7, NULL);", Some(on_row), Some(Ctx { tag: 1 }))
-    print(f"exec: {rc}")
-    let aborted = db.exec("SELECT v, s FROM t", Some(on_row), Some(Ctx { tag: 2 }))
-    print(f"exec aborted by the callback: {aborted == SQLITE_ABORT}")
+    // sqlite3_exec is presented twice (D92, §16.2b.11): `exec(sql)` with
+    // no callback (behav_sqlite_facade_exec_no_callback) and `exec_with`,
+    // which takes the callback and its userdata. Both are `Result`s: a
+    // callback that aborts the query is the `Err`, with SQLite's message.
+    let created = db.exec_with("CREATE TABLE t(v INTEGER, s TEXT); INSERT INTO t VALUES (42, 'hi'), (7, NULL);", on_row, Ctx { tag: 1 })
+    print(f"exec: {created.is_ok()}")
+    match db.exec_with("SELECT v, s FROM t", on_row, Ctx { tag: 2 }):
+        Err(ExecWithError.Failed(status, message)) => print(f"exec aborted by the callback: {status == SQLITE_ABORT} {message}")
+        Ok(_) => print("unexpected")
 
     let stmt = db.prepare("SELECT v, s FROM t ORDER BY v DESC").unwrap()
     print(f"prepared: cols={stmt.column_count()}")
-    assert(stmt.step() == SQLITE_ROW)
+    assert(stmt.step().unwrap() == SQLITE_ROW)
     // The int first: `column_int` states no preservation (a column accessor
     // of another type may convert in place), so a text view taken before it
     // would be refused at its use — err_sqlite_facade_column_text_after_step
@@ -80,21 +84,29 @@ fn main:
     let v = stmt.column_int(0)
     let text = stmt.column_text(1).unwrap()
     print(f"row 1: {v} {text.to_str().unwrap()} bytes={stmt.column_bytes(1)} name={stmt.column_name(1).unwrap().to_str().unwrap()}")
-    assert(stmt.step() == SQLITE_ROW)
+    assert(stmt.step().unwrap() == SQLITE_ROW)
     let v2 = stmt.column_int(0)
     let second = stmt.column_text(1)
     print(f"row 2: {v2} {if second.is_none(): "NULL" else: "text"}")
-    print(f"done: {stmt.step() == SQLITE_DONE} changes={db.changes()}")
+    // The end of the rows is a success too (`ok SQLITE_ROW, SQLITE_DONE`);
+    // any other status is the error, carrying the connection's message.
+    print(f"done: {stmt.step().unwrap() == SQLITE_DONE} changes={db.changes()}")
+    db.exec("CREATE TABLE u(v INTEGER NOT NULL)").unwrap()
+    let bad = db.prepare("INSERT INTO u VALUES (NULL)").unwrap()
+    match bad.step():
+        Err(StepError.Failed(status, message)) => print(f"step failed: constraint={status == SQLITE_CONSTRAINT} {message}")
+        Ok(_) => print("unexpected")
+    drop(bad)
 
     match db.prepare("SELEKT"):
-        Err(StatementError.Failed(status)) => print(f"prepare failed: {status} {db.errmsg().unwrap().to_str().unwrap()}")
+        Err(StatementError.Failed(status, message)) => print(f"prepare failed: {status} {message}")
         _ => print("unexpected")
 
     // xStep and xFinal are not given (a scalar function).
     let registered = db.create_function_v2("shout", 2, SQLITE_UTF8, AppData { id: 1, name: "shout", scale: 1 }, shout, null, null)
     print(f"function registered: {registered}")
     let call = db.prepare("SELECT shout(20, 22)").unwrap()
-    assert(call.step() == SQLITE_ROW)
+    assert(call.step().unwrap() == SQLITE_ROW)
     print(f"shout(20, 22) = {call.column_int(0)}")
     drop(call)
     drop(stmt)

@@ -23,7 +23,7 @@ fn early() -> i32:
     let db = Database.open(":memory:").unwrap()
     if register(db, 21) == SQLITE_OK:
         let stmt = db.prepare("SELECT silent()").unwrap()
-        return stmt.step()
+        return stmt.step().unwrap()
     0
 
 fn main:
@@ -33,7 +33,7 @@ fn main:
         // Replaced: the first data is destroyed by the replacement.
         assert(register(db, 12) == SQLITE_OK)
         let stmt = db.prepare("SELECT silent()").unwrap()
-        assert(stmt.step() == SQLITE_ROW)
+        assert(stmt.step().unwrap() == SQLITE_ROW)
     assert(early() == SQLITE_ROW)
     if true:
         let db = Database.open(":memory:").unwrap()

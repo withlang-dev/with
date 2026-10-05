@@ -125,8 +125,11 @@ pub fn facade_render_block(pool: AstPool, intern: InternPool, facade: i32, ci: &
 // renames is left as written, and Sema refuses it.
 pub fn facade_render_presentation_prefix() -> str: "__with_presented_"
 
-pub fn facade_render_presentation_aliases(pool: AstPool, intern: InternPool, facade: i32, ci: &Vec[i32]) -> str:
+pub fn facade_render_presentation_aliases(pool: AstPool, intern: InternPool, facade: i32, ci: &Vec[i32]) -> (str, Vec[i32]):
     var out = ""
+    // Per declaration emitted, the index of the import's declaration it
+    // is another name for.
+    var origins: Vec[i32] = Vec.new()
     let start = pool.get_data1(facade as NodeId)
     let count = pool.get_data2(facade as NodeId)
     for i in 0..count:
@@ -160,7 +163,9 @@ pub fn facade_render_presentation_aliases(pool: AstPool, intern: InternPool, fac
             let alias = facade_render_presentation_prefix() ++ renames[g] ++ "__of__" ++ cname
             out = out ++ "@[link_name(\"" ++ cname ++ "\")]\nextern fn " ++ alias ++ "(" ++ params ++ ")" ++ facade_render_return(pool, intern, decl) ++ "\n"
             pool.set_data0(group[g] as NodeId, intern.intern(alias))
-    out
+            for di in 0..pool.decl_count():
+                if pool.get_decl(di) as i32 == decl: origins.push(di)
+    (out, origins)
 
 // The `rename` an fn item itself states, or "".
 fn facade_render_item_rename_of(pool: AstPool, intern: InternPool, item: i32) -> str:
@@ -203,6 +208,21 @@ fn facade_render_message_call(pool: AstPool, intern: InternPool, ci: &Vec[i32], 
         if field.len() > 0:
             return "self." ++ field ++ "." ++ facade_render_present(pool, intern, ci, parent, fname) ++ "()"
     ""
+
+// The same text for a producer received through a parent (ruling Amendment
+// 3: `sqlite3_prepare_v2(db, …)` is an operation on the connection, so a
+// failed prepare carries the connection's message): the parent's message
+// call, read through the producer's first parameter. "" when the producer
+// has no receiver or the receiver states no `message`.
+fn facade_render_producer_message_call(pool: AstPool, intern: InternPool, ci: &Vec[i32], producer: i32) -> str:
+    let parent = facade_render_receiver(pool, intern, producer)
+    let meta = pool.find_fn_meta(producer as NodeId)
+    if parent <= 0 or meta < 0:
+        return ""
+    let call = facade_render_message_call(pool, intern, ci, parent)
+    if not call.starts_with("self."):
+        return ""
+    facade_render_param_name(pool, intern, pool.fn_meta_param_start(meta), 0) ++ call.slice(4, call.len())
 
 // The `<Fn>Error` types of the resource's lend methods that present a
 // copied-back length under `ok` (D64): declared beside the resource, since
@@ -1084,19 +1104,26 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, ci: &Vec[i32], item
     // producer or the in-place `init` — onto `Result[R, <R>Error]`
     // (facade_render_error_type); only out-parameter production can still
     // produce on failure, so only it adds the failed-state resource.
+    // `Failed` also carries the library's text when every producer that
+    // can fail is received through a parent stating `message` (ruling
+    // Amendment 3): one error type, one shape.
     var status_type = ""
     var failed_state = false
+    var with_message = true
     if ok_syms.len() > 0:
         for pi in 0..producers.len() as i32:
             let ret = if producers[pi] != 0 and out_refs[pi] != 0: facade_render_return(pool, intern, producers[pi]) else: ""
             if ret.len() > 0:
                 failed_state = true
+                if facade_render_producer_message_call(pool, intern, ci, producers[pi]).len() == 0: with_message = false
                 if status_type.len() == 0:
                     status_type = ret.slice(4, ret.len())
         if init_fn != 0:
             let ret = facade_render_return(pool, intern, init_fn)
             if ret.len() > 0:
                 status_type = ret.slice(4, ret.len())
+                with_message = false
+    if not failed_state: with_message = false
     // The generated error never owns a dependent child (ruling §18: the
     // error "may" own the failure-state resource "where required" — an
     // error escapes scopes, a dependent value cannot). A dependent
@@ -1105,7 +1132,7 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, ci: &Vec[i32], item
     // `FailedWithResource`.
     let dependent = deps.slot_res.len() > 0
     if status_type.len() > 0:
-        out = out ++ facade_render_error_type(pool, intern, name, repr_text, status_type, failed_state, failed_state and not dependent, drop_fn, failed_methods)
+        out = out ++ facade_render_error_type(pool, intern, name, repr_text, status_type, failed_state, failed_state and not dependent, drop_fn, failed_methods, with_message)
     // Borrowed returns of this resource (ruling §26): `Borrowed<R>`.
     out = out ++ facade_render_borrowed_type(pool, intern, ci, item, repr_text, plain_methods)
     for pi in 0..producers.len() as i32:
@@ -1120,7 +1147,7 @@ fn facade_render_resource(pool: AstPool, intern: InternPool, ci: &Vec[i32], item
             let slot = facade_render_param_ref(pool, intern, producer, out_refs[pi])
             if slot < 0:
                 continue
-            let (ctor, result) = facade_render_out_producer(pool, intern, name, repr_text, producer, pname, slot, &ok_syms, made_deps, drop_fn)
+            let (ctor, result) = facade_render_out_producer(pool, intern, name, repr_text, producer, pname, slot, &ok_syms, made_deps, drop_fn, if with_message: facade_render_producer_message_call(pool, intern, ci, producer) else: "")
             out = out ++ ctor ++ facade_render_receiver_method(pool, intern, ci, item, producer, slot, pname, result)
             continue
         let (params, args) = facade_render_params_but(pool, intern, producer, 0, -1, "")
@@ -1556,7 +1583,7 @@ fn facade_render_ok_value(ok_syms: &Vec[i32], status: &str, made: &str) -> str:
 // `R.<pname>`, the producer's presented name (§16.2b.11: `Database.open`
 // for `sqlite3_open`, or its `rename`). Returns the constructor and its
 // result type, which the receiver method repeats.
-fn facade_render_out_producer(pool: AstPool, intern: InternPool, name: &str, repr_text: &str, producer: i32, pname: &str, slot: i32, ok_syms: &Vec[i32], deps: &str, drop_fn: i32) -> (str, str):
+fn facade_render_out_producer(pool: AstPool, intern: InternPool, name: &str, repr_text: &str, producer: i32, pname: &str, slot: i32, ok_syms: &Vec[i32], deps: &str, drop_fn: i32, message_call: &str) -> (str, str):
     let taken = facade_render_param_names(pool, intern, producer)
     let slot_var = facade_render_fresh("slot", taken)
     let (params, args) = facade_render_params_but(pool, intern, producer, 0, slot, "&raw mut " ++ slot_var)
@@ -1577,12 +1604,20 @@ fn facade_render_out_producer(pool: AstPool, intern: InternPool, name: &str, rep
     let result = "Result[" ++ facade_render_ok_type(ok_syms, status_type, name) ++ ", " ++ err ++ "]"
     var out = head ++ " -> " ++ result ++ ":\n" ++ null_slot ++ "    let " ++ status ++ " = " ++ call ++ "\n"
     out = out ++ "    if " ++ facade_render_not_ok(intern, ok_syms, status) ++ ":\n"
-    out = out ++ "        if " ++ slot_var ++ " == null: return Err(" ++ err ++ ".Failed(" ++ status ++ "))\n"
+    // The text is read first: destroying what a failure produced is another
+    // call into the library, which may overwrite it.
+    var failed_args = status.clone()
+    if message_call.len() > 0:
+        let text = facade_render_fresh("facade_text", taken)
+        let message = facade_render_fresh("facade_message", taken)
+        out = out ++ "        let " ++ message ++ ": str = match " ++ message_call ++ ":\n            Some(" ++ text ++ ") => " ++ text ++ ".to_str_lossy()\n            None => \"\"\n"
+        failed_args = status ++ ", " ++ message
+    out = out ++ "        if " ++ slot_var ++ " == null: return Err(" ++ err ++ ".Failed(" ++ failed_args ++ "))\n"
     if deps.len() > 0:
         // A dependent resource: the generated error never owns a child
         // (see facade_render_error_type), so a failure that still produced
         // is destroyed here, exactly once, and reported as `Failed`.
-        out = out ++ "        " ++ facade_render_call(pool, intern, drop_fn, facade_render_repr_arg(pool, intern, drop_fn, repr_text, slot_var, false)) ++ "\n        return Err(" ++ err ++ ".Failed(" ++ status ++ "))\n"
+        out = out ++ "        " ++ facade_render_call(pool, intern, drop_fn, facade_render_repr_arg(pool, intern, drop_fn, repr_text, slot_var, false)) ++ "\n        return Err(" ++ err ++ ".Failed(" ++ failed_args ++ "))\n"
     else:
         out = out ++ "        return Err(" ++ err ++ ".FailedWithResource(" ++ status ++ ", " ++ facade_render_failed_name(name) ++ " { repr: " ++ slot_var ++ " }))\n"
     out = out ++ "    if " ++ slot_var ++ " == null: return Err(" ++ err ++ ".NothingProduced(" ++ status ++ "))\n"
@@ -1626,7 +1661,7 @@ pub fn facade_render_failed_name(name: &str) -> str: "Failed" ++ name
 //             unsafe { sqlite3_close(self.repr) }
 //     impl FailedDatabase:
 //         fn errmsg() -> Option[CStr]: …                 // `valid on failed`
-fn facade_render_error_type(pool: AstPool, intern: InternPool, name: &str, repr_text: &str, status_type: &str, out_param: bool, failed_state: bool, drop_fn: i32, failed_methods: &str) -> str:
+fn facade_render_error_type(pool: AstPool, intern: InternPool, name: &str, repr_text: &str, status_type: &str, out_param: bool, failed_state: bool, drop_fn: i32, failed_methods: &str, with_message: bool) -> str:
     let err = facade_render_error_name(name)
     var out = ""
     if failed_state:
@@ -1634,7 +1669,7 @@ fn facade_render_error_type(pool: AstPool, intern: InternPool, name: &str, repr_
         out = "type " ++ failed ++ " { repr: " ++ repr_text ++ " }\nimpl Drop for " ++ failed ++ ":\n    move fn drop():\n        " ++ facade_render_call(pool, intern, drop_fn, facade_render_repr_arg(pool, intern, drop_fn, repr_text, "self.repr", false)) ++ "\n"
         if failed_methods.len() > 0:
             out = out ++ "impl " ++ failed ++ ":\n" ++ failed_methods
-    out = out ++ "error " ++ err ++ " =\n    | Failed(status: " ++ status_type ++ ")\n"
+    out = out ++ "error " ++ err ++ " =\n    | Failed(status: " ++ status_type ++ (if with_message: ", message: str" else: "") ++ ")\n"
     if failed_state:
         out = out ++ "    | FailedWithResource(status: " ++ status_type ++ ", resource: " ++ facade_render_failed_name(name) ++ ")\n"
     if out_param:

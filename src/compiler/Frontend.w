@@ -766,9 +766,15 @@ impl Zcu:
             let facade_name: str = with_str_clone_ref(self.pool.resolve(out.get_data0(decl)))
             // Ruling Amendment 3: a function presented twice has a declaration
             // per later presentation, in the pool before the block is rendered.
-            let aliases = facade_render_presentation_aliases(out, self.pool, decl as i32, &self.decl_is_c_import)
+            // Each is the import's declaration under another name, so it
+            // takes the import's origin: every rule that asks whether a
+            // function is a c_import translation, and which library it
+            // belongs to, answers for it as for the function it names.
+            let (aliases, origins) = facade_render_presentation_aliases(out, self.pool, decl as i32, &self.decl_is_c_import)
             if aliases.len() > 0:
+                let first = out.decl_count()
                 out = self.splice_facade_text_frontend(out, &aliases, "<facade " ++ facade_name ++ " presentations>", i)
+                for k in 0..origins.len() as i32: self.adopt_decl_origin(first + k, origins[k])
             let text = facade_render_block(out, self.pool, decl as i32, &self.decl_is_c_import)
             if text.len() == 0:
                 continue

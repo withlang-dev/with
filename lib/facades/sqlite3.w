@@ -63,6 +63,7 @@ c facade sqlite:
         drop sqlite3_close
         destroys sqlite3_close_v2
         ok SQLITE_OK
+        message sqlite3_errmsg
         thread creator
     // A prepared statement is produced from a connection and depends on it
     // (§27): it is finalized before the connection closes, on every path,
@@ -75,6 +76,7 @@ c facade sqlite:
         drop sqlite3_finalize
         borrows param 0
         ok SQLITE_OK
+        message sqlite3_errmsg
         thread creator
     fn sqlite3_close_v2
         destroys
@@ -111,24 +113,34 @@ c facade sqlite:
     // sqlite3_exec runs its callback once per result row, during the call
     // (§44): the callback and its userdata are borrowed for the call, and
     // the callback receives the userdata typed (`&U`) where C declares
-    // `void *`. The callback is nullable (§43, #1618): "If the callback
-    // pointer to sqlite3_exec() is NULL, then no callback is ever invoked
-    // and result rows are ignored" — the header
-    // states no nullability, so the facade does, and an absent callback
-    // takes its userdata with it: `db.exec(sql, None, None)` runs
-    // DDL and DML with no callback. The fifth parameter, `char **errmsg`,
-    // is fixed to NULL (D64, §16.2b.11): "If the 5th parameter to
-    // sqlite3_exec() is not NULL then any error message is written into
-    // memory obtained from sqlite3_malloc() … To avoid memory leaks, the
-    // application should invoke sqlite3_free() on error message strings
-    // returned through the 5th parameter" — an owned foreign string the
-    // facade would have to model as a resource to present safely; the
-    // presented call declines it, and `db.errmsg()` reads the same message
-    // as a view (§32).
+    // `void *`. It is presented twice (D92, ruling Amendment 3,
+    // §16.2b.11), because the two uses are two calls to the programmer:
+    // `db.exec(sql)` runs DDL and DML, and `db.exec_with(sql, callback,
+    // data)` reads rows. The first fixes the callback and its userdata to
+    // NULL: "If the callback pointer to sqlite3_exec() is NULL, then no
+    // callback is ever invoked and result rows are ignored". Both read the
+    // status against SQLITE_OK (§16.2b.4), so each is a `Result` whose
+    // error carries the connection's message. The fifth parameter,
+    // `char **errmsg`, is fixed to NULL (D64, §16.2b.11): "If the 5th
+    // parameter to sqlite3_exec() is not NULL then any error message is
+    // written into memory obtained from sqlite3_malloc() … To avoid memory
+    // leaks, the application should invoke sqlite3_free() on error message
+    // strings returned through the 5th parameter" — an owned foreign string
+    // the facade would have to model as a resource to present safely; the
+    // presented calls decline it, and the error's message is the same text,
+    // read from `sqlite3_errmsg` and copied before anything can overwrite
+    // it.
     fn sqlite3_exec
-        callback param 2 userdata param 3
-        nullable param 2
+        rename exec
+        param 2 fixed null
+        param 3 fixed null
         param errmsg fixed null
+        ok SQLITE_OK
+    fn sqlite3_exec
+        rename exec_with
+        callback param 2 userdata param 3
+        param errmsg fixed null
+        ok SQLITE_OK
     // "sqlite3_create_function_v2 … xDestroy will be invoked when the
     // function is deleted, either by being overloaded or when the database
     // connection closes": the application data (param 4, `void *pApp`)
@@ -194,8 +206,17 @@ c facade sqlite:
     // dies at either (§38; finalize is the Drop, so a view cannot outlive
     // it). A column accessor of another type may convert in place, so
     // sqlite3_column_int states nothing either.
+    //
+    // sqlite3_step has two successes (D92, §16.2b.4): "If the SQL statement
+    // being executed returns any data, then SQLITE_ROW is returned each
+    // time a new row of data is ready for processing by the caller", and
+    // "SQLITE_DONE means that the statement has finished executing
+    // successfully". Either is the `Ok` value, so the program tells a row
+    // from the end by comparing it (`while stmt.step()? == SQLITE_ROW:`);
+    // every other status is a `StepError` with the connection's message.
     fn sqlite3_step
         lend
+        ok SQLITE_ROW, SQLITE_DONE
     fn sqlite3_reset
         lend
     fn sqlite3_bind_int

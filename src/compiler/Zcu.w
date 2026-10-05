@@ -241,6 +241,14 @@ impl Zcu:
             self.decl_source_file_ids.push(file_id)
             self.decl_is_c_import.push(1)
 
+    // `decl_index` is a declaration the compiler made for something
+    // declaration `like` already declares: it has that declaration's module,
+    // file and c_import origin.
+    mut fn adopt_decl_origin(decl_index: i32, like: i32):
+        self.decl_source_paths[decl_index] = zcu_owned_text(self.decl_source_paths[like])
+        self.decl_source_file_ids[decl_index] = self.decl_source_file_ids[like]
+        self.decl_is_c_import[decl_index] = self.decl_is_c_import[like]
+
     fn decl_source_path_frontend(decl_index: i32) -> str:
         if decl_index >= 0 and decl_index < self.decl_source_paths.len() as i32:
             return with_str_clone_ref(self.decl_source_paths[decl_index])

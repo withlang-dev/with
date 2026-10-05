@@ -14,5 +14,5 @@ fn main:
     let db = Database.open(":memory:").unwrap()
     let seen = 0
     let ctx = Ctx { rows: 0 }
-    let rc = db.exec("SELECT 1", Some((c, n, values, names) => seen + n), Some(&ctx))
-    print(f"{rc}")
+    let rc = db.exec_with("SELECT 1", (c, n, values, names) => seen + n, &ctx)
+    print(f"{rc.is_ok()}")
