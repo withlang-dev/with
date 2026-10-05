@@ -1026,15 +1026,19 @@ program uses the presented methods:
 use facades.sqlite3            // lib/facades/sqlite3.w, the project's own
 use c_import("sqlite3.h")
 
-let Ok(db) = Database.open(":memory:") else:      // closed by its scope
-    print("open failed")
-    return 1
-db.exec("CREATE TABLE t(v INTEGER); INSERT INTO t VALUES (42);", None, None)
-let Ok(stmt) = db.prepare("SELECT v FROM t") else:   // finalized before db closes
-    print(f"prepare failed: {db.errmsg().unwrap().to_str().unwrap()}")
-    return 1
-if stmt.step() == SQLITE_ROW: print(stmt.column_int(0))
+error DbError from DatabaseError, ExecError, StatementError, StepError
+
+fn print_values -> Result[Unit, DbError]:
+    let db = Database.open(":memory:")?                // closed by its scope
+    db.exec("CREATE TABLE t(v INTEGER); INSERT INTO t VALUES (42);")?
+    let stmt = db.prepare("SELECT v FROM t")?          // finalized before db closes
+    while stmt.step()? == SQLITE_ROW: print(stmt.column_int(0))
 ```
+
+A C call whose return is a status is a `Result` where the facade states its
+success (`ok SQLITE_OK`; `ok SQLITE_ROW, SQLITE_DONE` when there are two, and
+`Ok` carries the one that matched). The error is `Failed(status, message)`:
+the status C returned and the library's own text for it.
 
 Manual `extern "C"` functions require `unsafe` to call. Prefer `c_import` when a header is available; manual `extern` declarations are lower-level and should be used only when no header exists or fine-grained control is needed.
 

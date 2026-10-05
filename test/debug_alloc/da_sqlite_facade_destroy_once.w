@@ -16,12 +16,12 @@ type AppData { id: i32, name: str, seen: Vec[i32] }
 
 fn silent(ctx: Context, args: &[Value], app: &AppData): ()
 
-fn register(db: &Database, id: i32) -> c_int:
-    db.create_function_v2("silent", 0, SQLITE_UTF8, AppData { id: id, name: f"data {id}", seen: Vec.new() }, silent, null, null)
+fn register(db: &Database, id: i32) -> bool:
+    db.create_function_v2("silent", 0, SQLITE_UTF8, AppData { id: id, name: f"data {id}", seen: Vec.new() }, silent, null, null).is_ok()
 
 fn early() -> i32:
     let db = Database.open(":memory:").unwrap()
-    if register(db, 21) == SQLITE_OK:
+    if register(db, 21):
         let stmt = db.prepare("SELECT silent()").unwrap()
         return stmt.step().unwrap()
     0
@@ -29,21 +29,21 @@ fn early() -> i32:
 fn main:
     if true:
         let db = Database.open(":memory:").unwrap()
-        assert(register(db, 11) == SQLITE_OK)
+        assert(register(db, 11))
         // Replaced: the first data is destroyed by the replacement.
-        assert(register(db, 12) == SQLITE_OK)
+        assert(register(db, 12))
         let stmt = db.prepare("SELECT silent()").unwrap()
         assert(stmt.step().unwrap() == SQLITE_ROW)
     assert(early() == SQLITE_ROW)
     if true:
         let db = Database.open(":memory:").unwrap()
-        assert(register(db, 31) == SQLITE_OK)
+        assert(register(db, 31))
         assert(db.close_v2() == SQLITE_OK)
     if true:
         var all: Vec[Database] = Vec.new()
         for i in 1..4:
             let db = Database.open(":memory:").unwrap()
-            assert(register(db, 40 + i) == SQLITE_OK)
+            assert(register(db, 40 + i))
             all.push(db)
         assert(all.len() == 3)
     match Database.open("/nonexistent-with-dir/x.db"):

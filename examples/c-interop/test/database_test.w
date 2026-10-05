@@ -3,10 +3,8 @@ use c_import("sqlite3.h", link: "sqlite3")
 
 fn seeded -> Database:
     let db = Database.open(":memory:").unwrap()
-    assert(db.exec("CREATE TABLE t (name TEXT, n INTEGER); INSERT INTO t VALUES ('a', 1), (NULL, 2), ('c', 3)", None, None) == SQLITE_OK)
+    db.exec("CREATE TABLE t (name TEXT, n INTEGER); INSERT INTO t VALUES ('a', 1), (NULL, 2), ('c', 3)").unwrap()
     db
-
-fn message(db: &Database) -> str: db.errmsg().map(m => m.to_str_lossy()) ?? ""
 
 type Scale { by: i32 }
 fn scaled(ctx: Context, args: &[Value], scale: &Scale):
@@ -17,7 +15,7 @@ fn scaled(ctx: Context, args: &[Value], scale: &Scale):
 @[test]
 fn exec_reports_rows_changed:
     let db = seeded()
-    assert(db.exec("UPDATE t SET n = n + 1 WHERE n > 1", None, None) == SQLITE_OK)
+    assert(db.exec("UPDATE t SET n = n + 1 WHERE n > 1").is_ok())
     assert(db.changes() == 2)
 
 @[test]
@@ -25,30 +23,31 @@ fn rows_come_back_in_order:
     let db = seeded()
     let rows = db.prepare("SELECT n FROM t ORDER BY n DESC").unwrap()
     var seen = ""
-    while rows.step() == SQLITE_ROW: seen = seen ++ f"{rows.column_int(0)} "
+    while rows.step().unwrap() == SQLITE_ROW: seen = seen ++ f"{rows.column_int(0)} "
     assert(seen == "3 2 1 ")
 
 @[test]
 fn a_null_column_is_none:
     let db = seeded()
     let rows = db.prepare("SELECT name FROM t ORDER BY n").unwrap()
-    assert(rows.step() == SQLITE_ROW and rows.column_text(0).map(t => t.to_str_lossy()) == Some("a"))
-    assert(rows.step() == SQLITE_ROW and rows.column_text(0).is_none())
+    assert(rows.step().unwrap() == SQLITE_ROW and rows.column_text(0).map(t => t.to_str_lossy()) == Some("a"))
+    assert(rows.step().unwrap() == SQLITE_ROW and rows.column_text(0).is_none())
 
 @[test]
 fn a_bound_parameter_narrows_the_query:
     let db = seeded()
     let above = db.prepare("SELECT n FROM t WHERE n > ? ORDER BY n").unwrap()
-    assert(above.bind_int(1, 1) == SQLITE_OK)
-    assert(above.step() == SQLITE_ROW and above.column_int(0) == 2)
-    assert(above.step() == SQLITE_ROW and above.column_int(0) == 3)
-    assert(above.step() == SQLITE_DONE)
+    above.bind_int(1, 1).unwrap()
+    assert(above.step().unwrap() == SQLITE_ROW and above.column_int(0) == 2)
+    assert(above.step().unwrap() == SQLITE_ROW and above.column_int(0) == 3)
+    assert(above.step().unwrap() == SQLITE_DONE)
 
 @[test]
 fn a_c_error_becomes_with_values:
     let db = seeded()
-    assert(db.exec("SELECT * FROM nowhere", None, None) != SQLITE_OK)
-    assert(db.errcode() == SQLITE_ERROR and message(&db).contains("nowhere"))
+    match db.exec("SELECT * FROM nowhere"):
+        Err(.Failed(status, message)) => assert(status == SQLITE_ERROR and message.contains("nowhere"))
+        Ok(_) => assert(false)
 
 @[test]
 fn a_failed_open_still_has_its_message:
@@ -67,6 +66,6 @@ fn a_with_function_reads_its_sql_arguments_and_its_data:
     // and the application data the registration boxed as `&Scale`, valid for
     // the call; the body needs no `unsafe`.
     let db = seeded()
-    assert(db.create_function_v2("scaled", -1, SQLITE_UTF8, Scale { by: 10 }, scaled, null, null) == SQLITE_OK)
+    db.create_function_v2("scaled", -1, SQLITE_UTF8, Scale { by: 10 }, scaled, null, null).unwrap()
     let rows = db.prepare("SELECT scaled(n, 2), scaled() FROM t WHERE n = 3").unwrap()
-    assert(rows.step() == SQLITE_ROW and rows.column_int(0) == 50 and rows.column_int(1) == 0)
+    assert(rows.step().unwrap() == SQLITE_ROW and rows.column_int(0) == 50 and rows.column_int(1) == 0)

@@ -16,7 +16,11 @@
 // What the ruling asks for and where it is met (§66):
 //   sqlite3 as an owned pointer resource ............ resource Database
 //   sqlite3_open out-parameter production ........... from sqlite3_open(out param 1)
-//   SQLITE_OK ....................................... ok SQLITE_OK
+//   SQLITE_OK ....................................... ok SQLITE_OK, on the producers and on
+//                                                     exec, step (with SQLITE_ROW and
+//                                                     SQLITE_DONE) and create_function_v2
+//                                                     (Amendment 3)
+//   the failure's text .............................. message sqlite3_errmsg (Amendment 3)
 //   failed-open resource production ................. ok on an out-parameter producer:
 //                                                     DatabaseError.FailedWithResource
 //   sqlite3_close / sqlite3_close_v2 ................ drop / destroys
@@ -26,14 +30,16 @@
 //   nullable borrowed text from sqlite3_column_text . returns borrow CStr from param 0
 //   view invalidation across statement mutation ..... step/reset state nothing (invalidate);
 //                                                     preserves where the docs guarantee it
-//   a callback API with userdata .................... sqlite3_exec
+//   a callback API with userdata .................... sqlite3_exec, presented as exec_with;
+//                                                     exec is the same call with no callback
+//                                                     (Amendment 3)
 //   consume with destroy callback ................... sqlite3_create_function_v2
 //   retained callback lifetime ...................... retains param 5/6/7 by param 0
 //   the function's callback-scope context ........... handle Context (Amendment 1)
 //   the function's arguments and application data ... handle Value; argv … as &[Value],
 //                                                     user_data … as &U (Amendment 2)
 //   thread capability declarations .................. thread creator (see the note)
-//   method presentation from sqlite3_* .............. Database.open, db.exec, stmt.column_text, …
+//   method presentation from sqlite3_* .............. Database.open, db.changes, stmt.column_text, …
 //   an explicit presentation override ............... rename prepare
 use c_import("sqlite3.h", link: "sqlite3")
 
@@ -165,6 +171,8 @@ c facade sqlite:
     // 5th parameter)": the application data the method boxed, presented to
     // xFunc, xStep and xFinal as `&U`. The compiler generates the wrapper
     // C calls; the slice and the `&U` are valid for the invocation only.
+    // The status is read against SQLITE_OK (D92, §16.2b.4): registering is
+    // `db.create_function_v2(…)?`.
     fn sqlite3_create_function_v2
         consumes param 4 destroyed_by param 8
         retains param 5 by param 0
@@ -173,6 +181,7 @@ c facade sqlite:
         callback param xFunc argv param 2 paired with argc param 1 as &[Value]
         callback param xStep argv param 2 paired with argc param 1 as &[Value]
         user_data from sqlite3_user_data as &U
+        ok SQLITE_OK
     // The function's context is a callback-scope handle (§44, §16.2b.9;
     // ruling Amendment 1): "The context in which an SQL function executes
     // is stored in an sqlite3_context object. A pointer to an
@@ -217,10 +226,14 @@ c facade sqlite:
     fn sqlite3_step
         lend
         ok SQLITE_ROW, SQLITE_DONE
+    // Reset and bind return a status with one success (D92, §16.2b.4):
+    // `stmt.bind_int(1, 80)?`.
     fn sqlite3_reset
         lend
+        ok SQLITE_OK
     fn sqlite3_bind_int
         lend
+        ok SQLITE_OK
     fn sqlite3_column_int
         lend
     // Reads that touch no value: the column count and a column's declared

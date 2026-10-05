@@ -26,7 +26,9 @@ with build :test  # 13 tests over the real libraries
 - From those facts the compiler renders the safe surface. `Database.open`
   returns `Result[Database, DatabaseError]`; `db.exec`, `db.prepare`,
   `stmt.step`, `stmt.bind_int`, `stmt.column_int`, `stmt.column_text` are
-  the C functions, presented as methods. A `str` is passed where C wants
+  the C functions, presented as methods. Each one whose return is a status
+  is a `Result`, so the program is written with `?`: `db.exec(sql)?`,
+  `while stmt.step()? == SQLITE_ROW:`. A `str` is passed where C wants
   `const char *`.
 - Ownership without `Drop` impls: the connection is closed when `db` leaves
   its scope, on every path; the statement is finalized first, because it
@@ -35,8 +37,9 @@ with build :test  # 13 tests over the real libraries
   view of the statement. Conversion to With text is explicit
   (`to_str_lossy()`), and a view taken before the next `step` is refused
   after it.
-- A C error is With values: the status the call returned, and `db.errmsg()`,
-  read before the next call replaces it.
+- A C error is With values: `Failed(status, message)`, the status the call
+  returned and SQLite's message for it, copied from the connection before
+  the next call replaces it.
 - The facade is the project's own copy of the With repository's
   `lib/facades/sqlite3.w`, until the `c.sqlite3` package ships it.
 

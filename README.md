@@ -82,27 +82,31 @@ with a backup. It is a whole program, not a feature demo.
 A raw C API hands you pointers and asks you to remember who frees them. A
 `c facade` states that contract once (who owns what, what closes what, what
 borrows from what), and the compiler enforces it from then on. This program
-has no `unsafe` and no raw pointer. The statement is finalized and the
-database is closed by their scopes, on every path:
+has no `unsafe`, no raw pointer and no status code checked by hand. Every
+call that can fail is a `Result` whose error carries SQLite's own message,
+and the statement is finalized and the database closed by their scopes, on
+every path:
 
 ```
 use facades.sqlite3
 use c_import("sqlite3.h")
 
+error QueryError from DatabaseError, ExecError, StatementError, StepError
+
+fn total(db: &Database) -> Result[i32, QueryError]:
+    db.exec("CREATE TABLE t(value INTEGER); INSERT INTO t(value) VALUES (40), (2);")?
+    let stmt = db.prepare("SELECT value FROM t")?
+    var sum = 0
+    while stmt.step()? == SQLITE_ROW: sum += stmt.column_int(0)
+    sum
+
 fn main:
     let Ok(db) = Database.open(":memory:") else:
         print("sqlite3 open failed")
         return 1
-    if db.exec("CREATE TABLE t(value INTEGER); INSERT INTO t(value) VALUES (42);", None, None) != SQLITE_OK:
-        print("sqlite3 exec failed")
-        return 1
-    let Ok(stmt) = db.prepare("SELECT value FROM t") else:
-        print("sqlite3 prepare failed")
-        return 1
-    if stmt.step() != SQLITE_ROW:
-        print("sqlite3 step failed")
-        return 1
-    print(stmt.column_int(0))
+    match total(db):
+        Ok(sum) => print(sum)                       // 42
+        Err(e) => print(f"sqlite3 failed: {e}")     // e.g. Failed(1, no such table: t)
 ```
 
 Today the facade is a file in your project

@@ -9,7 +9,7 @@
 //! expect-stdout: done: true changes=2
 //! expect-stdout: step failed: constraint=true NOT NULL constraint failed: u.v
 //! expect-stdout: prepare failed: 1 near "SELEKT": syntax error
-//! expect-stdout: function registered: 0
+//! expect-stdout: function registered: true
 //! expect-stdout: shout called: 2 argument(s), application data 1 shout
 //! expect-stdout: shout(20, 22) = 42
 //! expect-stdout: failed open: cantopen=true handle produced
@@ -104,7 +104,7 @@ fn main:
 
     // xStep and xFinal are not given (a scalar function).
     let registered = db.create_function_v2("shout", 2, SQLITE_UTF8, AppData { id: 1, name: "shout", scale: 1 }, shout, null, null)
-    print(f"function registered: {registered}")
+    print(f"function registered: {registered.is_ok()}")
     let call = db.prepare("SELECT shout(20, 22)").unwrap()
     assert(call.step().unwrap() == SQLITE_ROW)
     print(f"shout(20, 22) = {call.column_int(0)}")
