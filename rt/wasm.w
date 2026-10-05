@@ -127,8 +127,9 @@ let WASI_ENOENT: i32 = 44
 let WASI_ENOSYS: i32 = 52
 let WASI_ENOTDIR: i32 = 54
 
-// Canonical rt_open flags (rt_core.w): O_RDONLY=0, O_WRONLY=1, O_RDWR=2,
-// O_CREAT=0x200, O_TRUNC=0x400, O_APPEND=0x800.
+// Canonical rt_open flags (std.libc's O_* constants, D90): O_RDONLY=0,
+// O_WRONLY=1, O_RDWR=2, O_CREAT=0x200, O_TRUNC=0x400, O_APPEND=0x800,
+// O_EXCL=0x1000.
 let RT_O_WRONLY: i32 = 1
 let RT_O_RDWR: i32 = 2
 let RT_O_CREAT: i32 = 512
@@ -672,6 +673,7 @@ pub fn rt_open(path: *const u8, flags: i32, mode: i32) -> i32:
     var fdflags = 0
     if (flags & RT_O_CREAT) != 0: oflags = oflags | WASI_O_CREAT
     if (flags & RT_O_TRUNC) != 0: oflags = oflags | WASI_O_TRUNC
+    if (flags & 0x1000) != 0: oflags = oflags | WASI_O_EXCL
     if (flags & RT_O_APPEND) != 0: fdflags = fdflags | WASI_FDFLAG_APPEND
     wasm_open_wasi(path, oflags, fdflags, wasm_open_rights(flags & 3))
 

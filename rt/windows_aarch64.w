@@ -71,7 +71,9 @@ let STD_ERROR_HANDLE: i32 = -12
 let GENERIC_READ: u32 = 0x80000000 as u32
 let GENERIC_WRITE: u32 = 0x40000000 as u32
 let FILE_SHARE_ALL: u32 = 7 as u32
+let CREATE_NEW: u32 = 1 as u32
 let CREATE_ALWAYS: u32 = 2 as u32
+let FILE_APPEND_DATA: u32 = 4 as u32
 let OPEN_EXISTING: u32 = 3 as u32
 let OPEN_ALWAYS: u32 = 4 as u32
 let FILE_ATTRIBUTE_READONLY: u32 = 1 as u32
@@ -415,9 +417,14 @@ pub fn rt_open(path: *const u8, flags: i32, mode: i32) -> i32:
     win_open_w(&wpath as *const [4096]u16 as *const u16, flags)
 
 fn win_open_w(wpath: *const u16, flags: i32) -> i32:
-    let access = if (flags & 3) == 0: GENERIC_READ else if (flags & 3) == 1: GENERIC_WRITE else: GENERIC_READ | GENERIC_WRITE
+    // std.libc's O_* numbering (D90). O_APPEND (0x800) is a handle that
+    // can only append (FILE_APPEND_DATA): every write lands at the end, as
+    // POSIX's does (#2070: it was opened as a plain write handle). O_CREAT
+    // with O_EXCL (0x1000) is CREATE_NEW, which fails on an existing file.
+    let write_access = if (flags & 0x800) != 0: FILE_APPEND_DATA else: GENERIC_WRITE
+    let access = if (flags & 3) == 0: GENERIC_READ else if (flags & 3) == 1: write_access else: GENERIC_READ | write_access
     let creation = if (flags & 0x200) != 0:
-        if (flags & 0x400) != 0: CREATE_ALWAYS else: OPEN_ALWAYS
+        if (flags & 0x1000) != 0: CREATE_NEW else if (flags & 0x400) != 0: CREATE_ALWAYS else: OPEN_ALWAYS
     else:
         OPEN_EXISTING
     win_alloc_fd(CreateFileW(wpath, access, FILE_SHARE_ALL, 0 as *mut u8, creation, FILE_ATTRIBUTE_NORMAL, 0))
