@@ -2424,6 +2424,23 @@ fn deep_debug_analyze_expect(ctx: &ActionCtx, root: &str, compiler: &str, source
         ctx.diagnostics().error("deep-debug-tool-tests: " ++ name ++ " report missing '" ++ needle ++ "'; stdout=" ++ stdout_path)
     0
 
+// #2198: a flag `check` does not know is refused, never ignored: the removed
+// `--dump-drop-flags` printed `ok` for a dump that never ran.
+fn deep_debug_unknown_flag_refused(ctx: &ActionCtx, root: &str, compiler: &str, source_path: &str, out_dir: &str) -> i32:
+    let args: Vec[str] = Vec.new()
+    args.push(build_owned_text(compiler))
+    args.push("check")
+    args.push(build_owned_text(source_path))
+    args.push("--dump-drop-flags")
+    let stdout_path = build_project_abs(root, build_project_join(out_dir, "unknown-flag.stdout"))
+    let stderr_rel = build_project_join(out_dir, "unknown-flag.stderr")
+    let result = ctx.process_runner().run_capture_cwd(args, stdout_path, build_project_abs(root, stderr_rel), 120000, root)
+    if result.rc == 0:
+        ctx.diagnostics().error("deep-debug-tool-tests: `check --dump-drop-flags` (a removed flag) exited 0; an unknown flag must be refused (#2198)")
+    if not ctx.fs().read_text(stderr_rel).contains("unknown option `--dump-drop-flags`"):
+        ctx.diagnostics().error("deep-debug-tool-tests: the unknown-flag refusal does not name the flag; stderr=" ++ build_project_abs(root, stderr_rel))
+    0
+
 // An audit fixture with a planted defect: the audit must exit nonzero, name
 // the defect (`needle`) and stay silent about the clean cases (`absent`). A
 // green verdict over the planted defect is the failure this guards.
@@ -2609,6 +2626,8 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
     // so the specialization's LLVM function stays a declaration — both were
     // audit reds over correct programs.
     if deep_debug_analyze_expect(ctx, root, compiler, build_project_abs(root, "test/behavior/behav_c_facade_resource_in_place_pinned.w"), out_dir, "analyze-audit-in-place-pinned", "audit:all", "violations=0 ok") != 0:
+        return 1
+    if deep_debug_unknown_flag_refused(ctx, root, compiler, build_project_abs(root, "test/hello.w"), out_dir) != 0:
         return 1
     // D65 phase 2 (#1647): the codegen mode-provenance lane runs and every
     // site's owner fact agrees with the LLVM representation. The &fn

@@ -302,6 +302,39 @@ fn cli_value_or_prefix(argc: i32, flag: &str, prefix: &str) -> str:
         i = i + 1
     ""
 
+// Every flag the driver reads, for any command (#2198). A flag is known by
+// its name, the part before any `=`.
+fn cli_known_flags() -> Vec[str]:
+    ["--abi-sha", "--alloc", "--bundle-corpus", "--bundle-fingerprint", "--c-export-functions", "--c-export", "--c-sysroot", "--c-target", "--check", "--contains", "--convert-goto-to-structured", "--debug-alloc-filter", "--debug-alloc", "--deterministic", "--diff", "--dry-run", "--dump-abi", "--dump-ast", "--dump-async-mir", "--dump-drop-plan", "--dump-drop-state", "--dump-mir", "--dump-place-map", "--dump-project-info", "--dump-resolved", "--dump-tokens", "--dump-typed", "--emit-bundle-interface", "--emit-bundle-manifest", "--emit-c", "--emit-obj", "--exclude", "--exit-code", "--explain-mir-origin", "--explain", "--fail-fast", "--filter", "--force-reinstall", "--force", "--freestanding", "--from-source", "--generation", "--graph", "--help", "--ir-roundtrip", "--keep-binary", "--lib", "--link-bundle", "--link-object", "--migrate-one", "--name", "--no-c-export", "--no-deps", "--no-prelude", "--no-runtime", "--no-std", "--open", "--out", "--output", "--overflow", "--prefer-brace", "--prefer-colon", "--prefer-curly", "--prelude", "--quiet", "--release", "--runtime-generation", "--self-id", "--sema-body-order-reverse", "--shared-defs", "--shared-fragment", "--stats", "--strict-effects", "--target", "--test", "--trace-alloc", "--trace-cleanup-edge", "--trace-ownership", "--trace-place", "--validate-all", "--validate-ownership", "--verbose", "--version", "--width-slice", "-D", "-e", "-f", "-g0", "-h", "-I", "-include", "-l", "-n", "-o", "-O0", "-O1", "-O2", "-O3", "-p", "-q", "-v", "-w"]
+
+// The first argument that looks like a flag and names none the driver
+// knows, or "". A flag's value (`-o out`, `--target x`) is skipped.
+fn cli_unknown_flag(argc: i32) -> str:
+    let known = cli_known_flags()
+    var i = 2
+    while i < argc:
+        let arg = with_arg_at(i)
+        if arg == "--": return ""
+        if arg.len() > 1 and arg.starts_with("-") and not arg.starts_with("-I") and not arg.starts_with("-D") and not arg.starts_with("-l"):
+            let eq = arg.find("=")
+            let name = arg.slice(0, if eq > 0: eq else: arg.len())
+            if not known.contains(name): return arg.clone()
+        i = i + (if cli_option_takes_value(arg): 2 else: 1)
+    ""
+
+// The known flag sharing the longest prefix with `arg`, if that prefix is
+// most of it.
+fn cli_nearest_flag(arg: &str) -> str:
+    var best = ""
+    var best_len = 0
+    for flag in cli_known_flags():
+        var n = 0
+        while n < flag.len() and n < arg.len() and flag[n] == arg[n]: n = n + 1
+        if n > best_len:
+            best_len = n
+            best = flag.clone()
+    if best_len * 2 > arg.len(): best else: ""
+
 fn cli_option_takes_value(arg: &str) -> bool:
     arg == "-o" or arg == "--output" or arg == "--target" or
     arg == "--trace-place" or arg == "--explain-mir-origin" or
@@ -868,6 +901,17 @@ fn run_cli(full_argc: i32) -> i32:
             return 1
         print(tools_dir)
         return 0
+    // #2198: a flag `check`, `ir` or `run` does not know is an error. It
+    // used to be ignored, so a misspelled `--validate-al` (or the removed
+    // `--dump-drop-flags`) printed `ok` for a check that never ran.
+    let cli_cmd = cli_command(argc)
+    if cli_cmd == "check" or cli_cmd == "ir" or cli_cmd == "run":
+        let unknown = cli_unknown_flag(argc)
+        if unknown.len() > 0:
+            let near = cli_nearest_flag(unknown)
+            let hint = if near.len() > 0: f"; did you mean `{near}`?" else: ""
+            with_eprint(f"error: unknown option `{unknown}` for `with {cli_cmd}`{hint}")
+            return 2
     if cli_command(argc) == "__framework-stubs":
         let stub_args: Vec[str] = Vec.new()
         for i in 2..argc: stub_args.push(with_arg_at(i))
