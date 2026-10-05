@@ -2206,6 +2206,15 @@ fn comp_record_seed_input(ctx: &ActionCtx, compiler_path: &str, capture_dir: &st
     let sha = comp_sha256_file(ctx, capture_dir, "seed-input", resolved_path)
     if sha.len() == 0:
         return comp_fail(ctx, "could not hash seed compiler: " ++ resolved_path)
+    // The stage is compiled by WITH, else `with` on PATH, else src/main. When
+    // that is not the seed seed.lock pins for this host, name it: a host
+    // whose PATH held an old `with` failed stage1 with type errors in the
+    // compiler's own source, and nothing said which compiler reported them
+    // (#2134).
+    let host_tag = (if os() == "Macos": "darwin" else if os() == "Linux": "linux" else: "windows") ++ "-" ++ arch()
+    let pinned = lock_value(if fs.exists("seed.lock"): fs.read_text("seed.lock") else: "", "with-" ++ host_tag ++ comp_host_exe_suffix())
+    if pinned.len() == 64 and pinned != sha:
+        print("[build] " ++ ctx.target_name() ++ " is compiled by " ++ resolved_path ++ " (" ++ version ++ "), not the seed seed.lock pins; after `with build :seed`, WITH=<root>/src/main compiles it as the battery does")
     let text =
         "{\n" ++
         "  \"compiler_arg\": \"" ++ comp_json_escape(compiler_path) ++ "\",\n" ++
