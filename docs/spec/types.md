@@ -871,6 +871,9 @@ enum variant shorthand (§4.4):
 ```
 let a = [1, 2, 3]                      // [i32; 3] — fixed array (default)
 let v: Vec[i32] = [1, 2, 3]            // Vec via expected type
+let w: Vec = [1, 2, 3]                 // Vec[i32]: the elements decide T
+let xs = [1, 2, 3]                     // Vec[i32]: `total` below takes one
+print(total(xs))                       // fn total(xs: &Vec[i32])
 let s: HashSet[str] = ["a", "b"]       // HashSet via expected type
 let o: BTreeSet[i32] = [3, 1, 2]       // BTreeSet via expected type
 
@@ -885,9 +888,19 @@ let none: Vec[i32] = []                // empty sequence (type from context)
 
 **Rules:**
 
-1. The element form `[a, b, c]` defaults to a fixed array `[T; N]`
-   (§4.3a). When the expected type is `Vec[T]`, `HashSet[T]`, or
-   `BTreeSet[T]`, the literal builds that collection instead.
+1. The element form `[a, b, c]` builds the collection its expected type
+   names: `Vec[T]`, `HashSet[T]`, `BTreeSet[T]`, a slice, or a fixed array
+   `[T; N]` (§4.3a). An annotation may name the collection without its
+   arguments, and the elements decide them: `let w: Vec = [1, 2, 3]` is a
+   `Vec[i32]`.
+
+   A binding with no annotation takes the collection its uses demand, as
+   an unsuffixed numeric literal takes its type (§4.2.1): where the
+   binding is passed to a parameter, assigned to a typed place, or
+   returned as one of those collections (or a view of one), the literal
+   builds that collection. With no such use it is a fixed array. Uses that
+   demand two different collections are an error at the second, which
+   names both.
 2. The map form `[k: v, ...]` defaults to `HashMap[K, V]`. When the
    expected type is `BTreeMap[K, V]`, it builds that instead. `[:]`
    is the empty map and requires an expected map type.
