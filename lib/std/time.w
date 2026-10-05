@@ -7,6 +7,7 @@ extern fn with_time_now() -> i64
 extern fn with_clock_nanos() -> i64
 extern fn with_nanosleep(ns: i64) -> i32
 extern fn with_usleep(usecs: i32) -> i32
+extern fn with_fiber_sleep_until(wake_at: i64) -> i32
 
 /// A duration in milliseconds.
 pub type Duration = i32
@@ -32,9 +33,9 @@ pub fn now -> i64:
 pub fn sleep_secs(secs: i32) -> i32:
     with_nanosleep(secs as i64 * 1000000000)
 
-/// Sleep for a Duration (async-compatible).
-pub async fn sleep(d: Duration) -> i32:
-    with_nanosleep(d as i64 * 1000000)
+/// Sleep for a Duration. The task is suspended, not its thread: other tasks
+/// run while it sleeps (§14.3).
+pub async fn sleep(d: Duration): with_fiber_sleep_until(with_clock_nanos() + d as i64 * 1000000)
 
 /// Get monotonic time in nanoseconds (for benchmarking).
 pub fn now_ns() -> i64:

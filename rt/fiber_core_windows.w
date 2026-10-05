@@ -21,6 +21,8 @@ extern fn rt_fiber_install_signal_handlers(alt_stack: *mut u8, alt_stack_size: i
 extern fn rt_fiber_reset_signal_handler(sig: i32) -> Unit
 extern fn rt_fiber_fault_addr(info: *const u8) -> i64
 extern fn rt_fiber_protect_guard(region: *mut u8, len: i64) -> Unit
+extern fn rt_nanosleep(ns: i64) -> i32
+extern fn rt_clock_ns() -> i64
 
 extern fn with_fiber_switch(save: *mut u8, restore: *mut u8) -> Unit
 extern fn with_fiber_prepare_initial_context(ctx: *mut u8, stack: *mut u8, stack_size: i64) -> Unit
@@ -37,7 +39,7 @@ let FIBER_STATE_SUSPENDED: i32 = 2
 let FIBER_STATE_DONE: i32 = 3
 
 let FIBER_CTX_SIZE: i64 = 328
-let FIBER_SIZE: i64 = 448
+let FIBER_SIZE: i64 = 456
 let FIBER_OFF_STATE: i64 = 328
 let FIBER_OFF_STACK: i64 = 336
 let FIBER_OFF_STACK_SIZE: i64 = 344
@@ -55,6 +57,7 @@ let FIBER_OFF_HAS_PANIC: i64 = 416
 let FIBER_OFF_PANIC_MSG: i64 = 424
 let FIBER_OFF_PANIC_MSG_LEN: i64 = 432
 let FIBER_OFF_COMPLETION_SEQUENCE: i64 = 440
+let FIBER_OFF_WAKE_AT: i64 = 448
 
 let PROT_NONE: i32 = 0
 let PROT_READ_WRITE: i32 = 3
@@ -644,6 +647,7 @@ pub fn with_fiber_spawn(entry_fn: *const u8, arg: *mut u8, result_buf: *mut u8, 
     fiber_set_panic_msg(f, 0 as *const u8)
     fiber_set_panic_msg_len(f, 0)
     fiber_set_completion_sequence(f, 0)
+    fiber_set_wake_at(f, 0)
     fiber_set_next(f, 0)
     store_i64_index(fibers_by_slot_base(), slot, f)
     live_fiber_count = live_fiber_count + 1
@@ -661,6 +665,47 @@ pub fn with_fiber_yield():
         return
     fiber_set_state(current_fiber, FIBER_STATE_SUSPENDED)
     with_fiber_switch(current_fiber as *mut u8, scheduler_ctx_ptr())
+
+// ── Sleep (§14.3) ─────────────────────────────────────────────────────────
+// The Darwin core's contract (rt/fiber_core_darwin.w): a sleeping fiber is
+// suspended, not its thread (#2117). The thread blocks only when every
+// queued fiber is asleep, and then no longer than the earliest wake time.
+
+fn fiber_wake_at(f: i64) -> i64:
+    load_i64(f, FIBER_OFF_WAKE_AT)
+
+fn fiber_set_wake_at(f: i64, value: i64):
+    store_i64(f, FIBER_OFF_WAKE_AT, value)
+
+// The earlier of `earliest` and the wake times of one queue's fibers, or 0
+// when one of them is not asleep.
+fn earliest_wake_in_queue(base: i64, head: i32, count: i32, earliest: i64) -> i64:
+    var out = earliest
+    for k in 0..count:
+        let queued = load_i64_index(base, fiber_ring_index(head + k))
+        if queued == 0: continue
+        let wake = fiber_wake_at(queued)
+        if wake == 0: return 0
+        if wake < out: out = wake
+    out
+
+pub fn with_fiber_sleep_until(wake_at: i64) -> i32:
+    let current = current_fiber
+    if current == 0:
+        let wait = wake_at - rt_clock_ns()
+        return if wait > 0: rt_nanosleep(wait) else: 0
+    while true:
+        if fiber_cancel_requested(current) != 0: return -1
+        let now = rt_clock_ns()
+        if now >= wake_at: return 0
+        fiber_set_wake_at(current, wake_at)
+        var earliest = earliest_wake_in_queue(ready_queue_base(), ready_queue_head, ready_queue_count, wake_at)
+        if earliest != 0: earliest = earliest_wake_in_queue(steal_queue_base(), steal_queue_head, steal_queue_count, earliest)
+        if earliest > now:
+            let _ = rt_nanosleep(earliest - now)
+        with_fiber_yield()
+        fiber_set_wake_at(current, 0)
+    0
 
 // ── Coroutines (§13.4 `g.pull()`) ─────────────────────────────────────────
 // The Darwin core's contract (rt/fiber_core_darwin.w): a coroutine runs

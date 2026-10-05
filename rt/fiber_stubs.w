@@ -6,6 +6,8 @@
 extern fn rt_libc_abort() -> Unit
 extern fn with_debug_alloc_report_leaks() -> Unit
 extern fn rt_write(fd: i32, buf: *const u8, len: i64) -> i64
+extern fn rt_nanosleep(ns: i64) -> i32
+extern fn rt_clock_ns() -> i64
 
 pub fn with_runtime_init():
     let _ = 0
@@ -91,6 +93,12 @@ pub fn with_runtime_completed_cancelled_return(fiber_id: i32) -> i32:
 
 pub fn with_fiber_yield():
     let _ = 0
+
+// §14.3: with no fiber runtime linked there is no fiber to suspend; the
+// thread sleeps until the wake time.
+pub fn with_fiber_sleep_until(wake_at: i64) -> i32:
+    let wait = wake_at - rt_clock_ns()
+    if wait > 0: rt_nanosleep(wait) else: 0
 
 pub fn with_runtime_has_fibers() -> i32:
     0

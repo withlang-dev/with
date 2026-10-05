@@ -31,6 +31,7 @@ extern fn rt_fiber_fault_addr(info: *const u8) -> i64
 extern fn rt_thread_spawn(start_routine: *mut u8, arg: *mut u8) -> i64
 extern fn rt_thread_join(handle: i64) -> i32
 extern fn rt_nanosleep(ns: i64) -> i32
+extern fn rt_clock_ns() -> i64
 @[link_name("pthread_self")]
 extern fn rt_libc_pthread_self() -> i64
 @[link_name("pthread_mutex_init")]
@@ -62,7 +63,7 @@ let FIBER_STATE_SUSPENDED: i32 = 2
 let FIBER_STATE_DONE: i32 = 3
 
 let FIBER_CTX_SIZE: i64 = 168
-let FIBER_SIZE: i64 = 288
+let FIBER_SIZE: i64 = 296
 let FIBER_OFF_STATE: i64 = 168
 let FIBER_OFF_STACK: i64 = 176
 let FIBER_OFF_STACK_SIZE: i64 = 184
@@ -81,6 +82,8 @@ let FIBER_OFF_PANIC_MSG: i64 = 264
 let FIBER_OFF_PANIC_MSG_LEN: i64 = 272
 let FIBER_OFF_OWNER_WORKER: i64 = 276
 let FIBER_OFF_COMPLETION_SEQUENCE: i64 = 280
+let FIBER_OFF_WAKE_AT: i64 = 288
+let FIBER_SLEEP_SLICE_NS: i64 = 2000000
 
 let PROT_NONE: i32 = 0
 let PROT_READ_WRITE: i32 = 3
@@ -837,6 +840,7 @@ pub fn with_fiber_spawn(entry_fn: *const u8, arg: *mut u8, result_buf: *mut u8, 
     fiber_set_panic_msg_len(f, 0)
     fiber_set_owner_worker(f, current_worker_index())
     fiber_set_completion_sequence(f, 0)
+    fiber_set_wake_at(f, 0)
     fiber_set_next(f, 0)
     store_i64_index(fibers_by_slot_base(), slot, f)
     live_fiber_count = live_fiber_count + 1
@@ -857,6 +861,59 @@ pub fn with_fiber_yield():
     scheduler_wake_all()
     scheduler_unlock()
     with_fiber_switch(current as *mut u8, scheduler_ctx_ptr(worker))
+
+// ── Sleep (§14.3) ─────────────────────────────────────────────────────────
+// A sleeping fiber is suspended, not its thread: it records when it wakes and
+// yields, so the other fibers run while it waits (#2117). The thread itself
+// blocks only when every queued fiber is asleep, and then no longer than the
+// earliest wake time or FIBER_SLEEP_SLICE_NS, which bounds how late a
+// cancellation requested from another thread is seen.
+
+fn fiber_wake_at(f: i64) -> i64:
+    load_i64(f, FIBER_OFF_WAKE_AT)
+
+fn fiber_set_wake_at(f: i64, value: i64):
+    store_i64(f, FIBER_OFF_WAKE_AT, value)
+
+// The earliest wake time among the queued fibers and `own`, or 0 when a
+// queued fiber is not asleep. Caller holds the scheduler lock.
+fn earliest_wake_if_all_asleep(own: i64) -> i64:
+    var earliest = own
+    for worker in 0..active_worker_count:
+        let head = worker_queue_head(worker)
+        for k in 0..worker_queue_count(worker):
+            let queued = load_i64_index(worker_queue_base(), worker_queue_slot(worker, head + k))
+            if queued == 0: continue
+            let wake = fiber_wake_at(queued)
+            if wake == 0: return 0
+            if wake < earliest: earliest = wake
+    earliest
+
+/// Suspend the current fiber until the monotonic clock reads `wake_at`, or
+/// until its cancellation is requested. Returns 0 at the wake time and -1
+/// when cut short. Outside a fiber the thread sleeps.
+pub fn with_fiber_sleep_until(wake_at: i64) -> i32:
+    let worker = current_worker_index()
+    let current = worker_current_fibers[worker]
+    if current == 0:
+        let wait = wake_at - rt_clock_ns()
+        return if wait > 0: rt_nanosleep(wait) else: 0
+    while true:
+        if fiber_cancel_requested(current) != 0: return -1
+        let now = rt_clock_ns()
+        if now >= wake_at: return 0
+        scheduler_lock()
+        fiber_set_wake_at(current, wake_at)
+        let earliest = earliest_wake_if_all_asleep(wake_at)
+        scheduler_unlock()
+        if earliest > now:
+            let idle = earliest - now
+            let _ = rt_nanosleep(if idle < FIBER_SLEEP_SLICE_NS: idle else: FIBER_SLEEP_SLICE_NS)
+        with_fiber_yield()
+        scheduler_lock()
+        fiber_set_wake_at(current, 0)
+        scheduler_unlock()
+    0
 
 // ── Coroutines (§13.4 `g.pull()`) ─────────────────────────────────────────
 // A coroutine runs `entry(arg)` on a pooled fiber stack, driven by its caller
