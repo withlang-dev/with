@@ -26270,6 +26270,7 @@ impl Sema:
             self.generic_subst_param_syms = saved_generic_call_subst_syms
             self.generic_subst_type_ids = saved_generic_call_subst_tys
             return 0
+        self.bind_unbound_type_params_from_result(ret_node, tp_start, tp_count, call_node)
         let ege_before = self.diags.count_by_severity(DiagSeverity.Error)
         self.ensure_generic_substitutions(tp_start, tp_count, param_start, param_count, call_node)
         // #598: an uninferable type param already got its one teaching
@@ -26476,6 +26477,38 @@ impl Sema:
         for _ in 0..count:
             let _ = self.generic_subst_param_syms.pop()
             let _ = self.generic_subst_type_ids.pop()
+
+    // A type parameter no argument mentions takes its type from the result
+    // the call is checked against (`var xs: ArenaVec[i32] =
+    // arena_vec_new_in(arena)`, the restructure the uninferable-parameter
+    // diagnostic teaches): the declared return type is matched against the
+    // demanded type. A parameter the arguments bound keeps its binding; a
+    // return type that does not match the demand binds nothing, and the
+    // ordinary result mismatch reports it.
+    mut fn bind_unbound_type_params_from_result(ret_node: i32, tp_start: i32, tp_count: i32, call_node: i32):
+        let expected = self.expected_expr_type as i32
+        if ret_node == 0 or self.has_expected_type == 0 or expected == 0 or expected == self.ty_void as i32 or self.current_value_expr_root != call_node: return
+        var unbound: Vec[i32] = Vec.new()
+        var pos = tp_start
+        for _ in 0..tp_count:
+            let tp_name = self.ast.get_extra(pos)
+            if self.lookup_generic_subst(tp_name) == 0: unbound.push(tp_name)
+            pos = pos + 2 + self.ast.get_extra(pos + 1)
+        if unbound.len() == 0: return
+        let saved_syms = sema_clone_i32_vec(&self.generic_subst_param_syms)
+        let saved_types = sema_clone_i32_vec(&self.generic_subst_type_ids)
+        let saved_diag_count = self.diags.items.len() as i32
+        self.clear_generic_substitution()
+        self.bind_type_params_from_type_expr(ret_node, expected, tp_start, tp_count, call_node)
+        let clean = self.diags.items.len() as i32 == saved_diag_count
+        while self.diags.items.len() as i32 > saved_diag_count:
+            self.diags.items.pop()
+        var found: Vec[i32] = Vec.new()
+        for tp_name in unbound: found.push(if clean: self.lookup_generic_subst(tp_name) else: 0)
+        self.generic_subst_param_syms = saved_syms
+        self.generic_subst_type_ids = saved_types
+        for ui in 0..unbound.len() as i32:
+            if found[ui] != 0: self.put_generic_subst(unbound[ui], found[ui], call_node)
 
     mut fn put_generic_subst(param_sym: i32, tid: i32, node: i32) -> Unit:
         if tid == 0:
