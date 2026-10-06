@@ -2684,7 +2684,10 @@ fn ci_build_one_field(session: i64, idx: i32, fi: i32, known_structs: &str) -> s
     let actual_name = if fname.len() == 0: f"unnamed_{fi}" else: fname
     // D100 (§18.3): every C field is public; the record leaves its package whole.
     let safe_fname = "pub " ++ ci_escape_reserved(actual_name)
-    let default_val = ci_default_for_type(ftype)
+    // A field of another imported record is zero-initialized as C does it
+    // (C11 6.7.9p10): that record's own zero literal.
+    let scalar_default = ci_default_for_type(ftype)
+    let default_val = if scalar_default.len() == 0 and ci_str_contains(known_structs, "|" ++ ftype ++ "|"): ftype ++ " {}" else: scalar_default
     let ftype_render = ci_unsafe_fn_ptr_type(ftype)
     if default_val.len() > 0:
         safe_fname ++ ": " ++ ftype_render ++ " = " ++ default_val

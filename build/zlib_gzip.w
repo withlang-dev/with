@@ -11,7 +11,10 @@ fn bytes_from_str(data: &str) -> Vec[u8]:
         i = i + 1
     out
 
-fn bytes_to_str(data: Vec[u8]) -> str: StringBuilder { bytes: data }.to_str()
+fn bytes_to_str(data: Vec[u8]):
+    var out = StringBuilder.with_capacity(data.len())
+    for b in data: out.push_byte(b)
+    out.to_str()
 
 fn main -> i32:
     let argv = args()

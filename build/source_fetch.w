@@ -300,6 +300,14 @@ fn sct_build_w(pin: &str, source: &str) -> str:
     "    out = out.add_target(target)\n" ++
     "    out.default(\"fetch\")\n"
 
+// The case's report, or "" when its fetch never wrote one: the child's
+// output then says why, and the expectation prints it.
+fn sct_report(fs: &ToolFs, path: &str): if fs.exists(path): fs.read_text(path) else: ""
+
+// The case's report, or "" when its fetch never wrote one: the child's
+// output then says why, and the expectation prints it.
+fn sct_report(fs: &ToolFs, path: &str): if fs.exists(path): fs.read_text(path) else: ""
+
 // Writes the case's project and runs `<compiler> build` in it with the
 // shared cache directory (or "none"). The child's result.
 fn sct_run(ctx: &ActionCtx, compiler: &str, scratch: &str, case_name: &str, pin: &str, source: &str, cache: &str) -> ToolProcessResult:
@@ -339,7 +347,7 @@ pub fn run_source_cache_tests_action(ctx: ActionCtx) -> i32:
     // 1. The first worktree fetches (from a file beside it) and the bytes
     //    land in the machine's source cache under their digest.
     let r1 = sct_run(ctx, compiler, scratch, "first-worktree", pin, "archive-src.bin", cache)
-    let report1 = fs.read_text(sf_join(scratch, "first-worktree/out/fetch/report.txt"))
+    let report1 = sct_report(fs, sf_join(scratch, "first-worktree/out/fetch/report.txt"))
     var rc = sft_expect(ctx, "first-worktree", r1.rc == 0 and report1.starts_with("fetched\n") and fs.sha256_file(sf_join(scratch, "first-worktree/out/fetch/archive.bin")) == pin, f"the first fetch did not deliver the archive (exit {r1.rc}):\n" ++ report1 ++ r1.stdout ++ r1.stderr)
     if rc != 0: return rc
     rc = sft_expect(ctx, "first-worktree", fs.sha256_file(entry) == pin, "the fetched archive is not in the source cache at " ++ entry)
@@ -349,7 +357,7 @@ pub fn run_source_cache_tests_action(ctx: ActionCtx) -> i32:
     //    the cache: it fetches nothing, and does not even build the fetch
     //    program.
     let r2 = sct_run(ctx, compiler, scratch, "second-worktree", pin, down, cache)
-    let report2 = fs.read_text(sf_join(scratch, "second-worktree/out/fetch/report.txt"))
+    let report2 = sct_report(fs, sf_join(scratch, "second-worktree/out/fetch/report.txt"))
     rc = sft_expect(ctx, "second-worktree", r2.rc == 0 and report2.starts_with("cache\n") and fs.sha256_file(sf_join(scratch, "second-worktree/out/fetch/archive.bin")) == pin, f"a second worktree was not served from the source cache (exit {r2.rc}):\n" ++ report2 ++ r2.stdout ++ r2.stderr)
     if rc != 0: return rc
     rc = sft_expect(ctx, "second-worktree", not fs.exists(sf_join(scratch, "second-worktree/out/command/fetch/https_fetch")) and not fs.exists(sf_join(scratch, "second-worktree/out/command/fetch/https_fetch.exe")) and not fs.exists(sf_join(scratch, "second-worktree/out/command/fetch/https_fetch.stdout")), "a second worktree built or ran the fetch program although the archive was cached")
@@ -372,7 +380,7 @@ pub fn run_source_cache_tests_action(ctx: ActionCtx) -> i32:
     // inputs the build store would restore the action's output and the
     // fetch would not run at all.)
     let r4 = sct_run(ctx, compiler, scratch, "corrupt-cache", pin, "./archive-src.bin", cache)
-    let report4 = fs.read_text(sf_join(scratch, "corrupt-cache/out/fetch/report.txt"))
+    let report4 = sct_report(fs, sf_join(scratch, "corrupt-cache/out/fetch/report.txt"))
     rc = sft_expect(ctx, "corrupt-cache", r4.rc == 0 and report4.starts_with("fetched\n") and fs.sha256_file(sf_join(scratch, "corrupt-cache/out/fetch/archive.bin")) == pin and fs.sha256_file(entry) == pin, f"a corrupt cache entry was served or left in place (exit {r4.rc}):\n" ++ report4 ++ r4.stdout ++ r4.stderr)
     if rc != 0: return rc
 

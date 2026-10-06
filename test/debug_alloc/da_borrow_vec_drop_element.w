@@ -21,7 +21,7 @@ fn new_w(drops: *mut i32) -> W:
 
 fn body_at(bodies: &Vec[Body], index: i64) -> &Body:
     assert(index >= 0 and index < bodies.len())
-    unsafe { (bodies.ptr + (index as usize)) as &Body }
+    unsafe { (bodies.as_ptr() + (index as usize)) as &Body }
 
 fn main:
     var drops = 0

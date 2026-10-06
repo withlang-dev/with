@@ -10,9 +10,9 @@
 // consuming parameters, an `extern "C" fn` pointer field, and an impl block
 // with `fn`, `mut fn` and `move fn` methods. Layout attributes cover both
 // an unused type and a demanded packed type in the on-demand consumer.
-pub type Pair { a: i32, b: i32 }
+pub type Pair { pub a: i32, pub b: i32 }
 @[repr(packed)]
-pub type Packet { tag: u8, word: i32 }
+pub type Packet { pub tag: u8, pub word: i32 }
 pub type Word = i32
 pub type VarArgs = c_va_list
 pub type Handle = distinct i32

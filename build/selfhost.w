@@ -1976,7 +1976,7 @@ fn bs_check_runtime_manifest_config(ctx: &ActionCtx, compiler_path: &str, case_d
     rc = bs_write_fixture(ctx, bs_join(scheduler_dir, "with.toml"), "[package]\nname = \"runtimeworkers\"\nversion = \"0.1.0\"\n\n[runtime]\nfiber_worker_count = 2\nfiber_pool_size = 8\n", "runtime worker manifest")
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(scheduler_dir, "src/main.w"),
-        "use std.sync\n\n" ++
+        "use std.sync\nuse std.task.Task\n\n" ++
         "extern fn with_fiber_yield() -> Unit\n" ++
         "extern fn with_runtime_run_one_step() -> Unit\n" ++
         "extern fn with_fiber_is_cancelled() -> i32\n" ++
@@ -2006,6 +2006,8 @@ fn bs_check_runtime_manifest_config(ctx: &ActionCtx, compiler_path: &str, case_d
         "    marker.set(1)\n" ++
         "    with_fiber_set_cancelled_return()\n" ++
         "    7\n\n" ++
+        "// D100: Task is std's; the runtime seam takes its fiber id, the first word.\n" ++
+        "fn fiber_of(t: &Task[i32]): unsafe *(t as *const Task[i32] as *const i32)\n\n" ++
         "fn main:\n" ++
         "    assert(with_fiber_worker_count() == 2)\n" ++
         "    let marker = Mutex.new(0)\n" ++
@@ -2015,9 +2017,9 @@ fn bs_check_runtime_manifest_config(ctx: &ActionCtx, compiler_path: &str, case_d
         "    let c = busy(3)\n" ++
         "    let d = busy(4)\n" ++
         "    var guard = 0\n" ++
-        "    while with_runtime_fiber_running_worker(victim.fiber_id) != 1 and guard < 2000000:\n" ++
+        "    while with_runtime_fiber_running_worker(fiber_of(victim)) != 1 and guard < 2000000:\n" ++
         "        guard = guard + 1\n" ++
-        "    let running_worker = with_runtime_fiber_running_worker(victim.fiber_id)\n" ++
+        "    let running_worker = with_runtime_fiber_running_worker(fiber_of(victim))\n" ++
         "    assert(running_worker == 1)\n" ++
         "    let before_cancel = with_fiber_cross_thread_cancels()\n" ++
         "    victim.cancel()\n" ++
@@ -8782,12 +8784,12 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     mutation_names |> push("ref-to-owned")
     mutation_names |> push("once-dropped")
     var mutation_from: Vec[str] = Vec.new()
-    mutation_from |> push("pub type Pair { a: i32, b: i32 }")
+    mutation_from |> push("pub type Pair { pub a: i32, pub b: i32 }")
     mutation_from |> push("High = 200")
     mutation_from |> push("pub fn add(p: &Pair) -> i32")
     mutation_from |> push("pub fn call_once(f: once fn() -> i32) -> i32")
     var mutation_to: Vec[str] = Vec.new()
-    mutation_to |> push("pub type Pair { a: i32 }")
+    mutation_to |> push("pub type Pair { pub a: i32 }")
     mutation_to |> push("High = 201")
     mutation_to |> push("pub fn add(p: Pair) -> i32")
     mutation_to |> push("pub fn call_once(f: fn() -> i32) -> i32")
