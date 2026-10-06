@@ -4197,7 +4197,8 @@ fn bs_check_migrate_global_init_list(ctx: &ActionCtx, compiler_path: &str, case_
     args |> push(bs_abs(root, out_w))
     let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-global-init-list", args)
     if result.rc != 0: return result.rc
-    rc = bs_file_contains(ctx, out_w, "var g: outer = outer { in_: inner { cb: add1, data: null }, limit: 7 }", "global_init_list")
+    // D102: a function in a C record's function-pointer slot is `Some` of it.
+    rc = bs_file_contains(ctx, out_w, "var g: outer = outer { in_: inner { cb: Some(add1), data: null }, limit: 7 }", "global_init_list")
     if rc != 0: return rc
     rc = bs_file_contains(ctx, out_w, "var table: [10]config_s", "global_init_list")
     if rc != 0: return rc
@@ -4213,6 +4214,33 @@ fn bs_check_migrate_global_init_list(ctx: &ActionCtx, compiler_path: &str, case_
     rc = bs_assert_contains(ctx, ir.stdout, "@static_tree = internal constant [2 x %tree_entry] [%tree_entry { %code_len { i16 12 }, %code_len { i16 8 } }, %tree_entry { %code_len { i16 140 }, %code_len { i16 9 } }]", "global_init_list_union_ir")
     if rc != 0: return rc
     0
+
+// D102 (§16.6): a C record's function-pointer field migrates as `Option` of
+// the pointer; a function stored into it wraps in `Some`; a call through it
+// unwraps, so a NULL there panics where C's call is undefined behavior; a
+// local copy is `Option` too and returns as the (`Option`) return type.
+fn bs_check_migrate_nullable_fn_pointer(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "nullable_fn.c")
+    let out_w = bs_join(case_dir, "nullable_fn.w")
+    let c_text = "typedef int (*op_t)(int);\nstruct box { op_t f; int n; };\nstatic int add1(int x) { return x + 1; }\nint call_box(struct box *b, int x) { if (b->f) return b->f(x); return 0; }\nvoid arm_box(struct box *b) { b->f = add1; }\nop_t copy_box(struct box *b) { op_t f = b->f; return f; }\n"
+    var rc = bs_write_fixture(ctx, src, c_text, "migrate nullable function pointer")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+     |> push("migrate")
+     |> push(bs_abs(root, src))
+     |> push("--no-c-export")
+     |> push("-o")
+     |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-nullable-fn-pointer", args)
+    if result.rc != 0: return result.rc
+    rc = bs_file_contains(ctx, out_w, "pub f: Option[", "nullable_fn_pointer_field")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, out_w, ".f.unwrap()(", "nullable_fn_pointer_call_unwraps")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, out_w, "Some(add1)", "nullable_fn_pointer_store_wraps")
+    if rc != 0: return rc
+    bs_file_contains(ctx, out_w, ": Option[", "nullable_fn_pointer_local")
 
 fn bs_check_migrate_compound_array_whole_values(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let root = ctx.project_info().project_root()
@@ -5025,6 +5053,8 @@ pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     let compiler_path = bs_abs(ctx.project_info().project_root(), compiler_input)
 
     var rc = bs_check_migrate_global_init_list(ctx, compiler_path, bs_join(output_dir, "global_init_list"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_nullable_fn_pointer(ctx, compiler_path, bs_join(output_dir, "nullable_fn_pointer"))
     if rc != 0: return rc
     rc = bs_check_migrate_compound_array_whole_values(ctx, compiler_path, bs_join(output_dir, "compound_array_whole_values"))
     if rc != 0: return rc

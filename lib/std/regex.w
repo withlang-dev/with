@@ -79,7 +79,10 @@ fn regex_engine_free(block: *mut c_void, data: *mut c_void):
     with_free(block as *mut u8)
 
 fn regex_general_context(what: &str) -> *mut pcre2_real_general_context_8:
-    let gcontext = unsafe { pcre2_general_context_create_8(regex_engine_malloc, regex_engine_free, null) }
+    // D102: a migrated definition's function-pointer parameter keeps C's
+    // nullability (`Option`); the allocator pair is present (#2217 would let
+    // the `Some` go).
+    let gcontext = unsafe { pcre2_general_context_create_8(Some(regex_engine_malloc), Some(regex_engine_free), null) }
     if gcontext as i64 == 0:
         with_panic(what ++ ": general context creation failed", "", 0)
     gcontext

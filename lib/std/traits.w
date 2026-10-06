@@ -6,8 +6,11 @@
 // available through the prelude for documentation and tooling.
 
 // The adapters below (§13.3, #1746) spell Option; a module sees only its
-// own imports (§18.2), the core prelude not included.
+// own imports (§18.2), the core prelude not included. The formatting
+// impls name the runtime's `with_*_to_str` seams, which std.builtins
+// declares (D102: a no-prelude module reaches `Option` through these).
 use std.option
+use std.builtins
 
 /// Equality comparison (§11.7): `eq` backs `==` and `!=`; a type may
 /// override `!=` with `ne`. Both operands are observed.

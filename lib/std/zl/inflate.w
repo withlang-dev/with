@@ -13,6 +13,7 @@ use std.zl.adler32
 use std.zl.crc32
 use std.zl.inftrees
 use std.zl.inffast
+use std.option
 
 pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_int {
     var __local_state__goto_475_31: *mut inflate_state = null
@@ -4705,10 +4706,10 @@ pub unsafe fn inflateEnd(__param_strm: *mut z_stream_s) -> c_int {
     (__local_state = (((*__param_strm).state as *mut inflate_state)))
 
     if ((if (*__local_state).window != 0: 1 else: 0) != 0) {
-        (*__param_strm).zfree((*__param_strm).opaque_, ((*__local_state).window as *mut c_void))
+        (*__param_strm).zfree.unwrap()((*__param_strm).opaque_, ((*__local_state).window as *mut c_void))
     }
 
-    (*__param_strm).zfree((*__param_strm).opaque_, ((*__param_strm).state as *mut c_void))
+    (*__param_strm).zfree.unwrap()((*__param_strm).opaque_, ((*__param_strm).state as *mut c_void))
 
     ((*__param_strm).state = null)
 
@@ -4919,7 +4920,7 @@ pub unsafe fn inflateCopy(__param_dest: *mut z_stream_s, __param_source: *mut z_
 
     (__local_state = (((*__param_source).state as *mut inflate_state)))
 
-    (__local_copy_ = (((*__param_source).zalloc((*__param_source).opaque_, (1 as c_uint), (7160 as c_uint)) as *mut inflate_state)))
+    (__local_copy_ = (((*__param_source).zalloc.unwrap()((*__param_source).opaque_, (1 as c_uint), (7160 as c_uint)) as *mut inflate_state)))
 
     if ((if __local_copy_ == 0: 1 else: 0) != 0) {
         return -4
@@ -4930,10 +4931,10 @@ pub unsafe fn inflateCopy(__param_dest: *mut z_stream_s, __param_source: *mut z_
     (__local_window = null)
 
     if ((if (*__local_state).window != 0: 1 else: 0) != 0) {
-        (__local_window = (((*__param_source).zalloc((*__param_source).opaque_, (((1 as c_uint) << ((*__local_state).wbits as c_uint)) as c_uint), (1 as c_uint)) as *mut u8)))
+        (__local_window = (((*__param_source).zalloc.unwrap()((*__param_source).opaque_, (((1 as c_uint) << ((*__local_state).wbits as c_uint)) as c_uint), (1 as c_uint)) as *mut u8)))
 
         if ((if __local_window == 0: 1 else: 0) != 0) {
-            (*__param_source).zfree((*__param_source).opaque_, (__local_copy_ as *mut c_void))
+            (*__param_source).zfree.unwrap()((*__param_source).opaque_, (__local_copy_ as *mut c_void))
 
             return -4
 
@@ -5051,7 +5052,7 @@ pub unsafe fn inflateReset2(__param_strm: *mut z_stream_s, __param_windowBits: c
     }
 
     if (__ci_expr_logic_2 != 0) {
-        (*__param_strm).zfree((*__param_strm).opaque_, ((*__local_state).window as *mut c_void))
+        (*__param_strm).zfree.unwrap()((*__param_strm).opaque_, ((*__local_state).window as *mut c_void))
 
         ((*__local_state).window = null)
 
@@ -5202,17 +5203,17 @@ pub unsafe fn inflateInit2_(__param_strm: *mut z_stream_s, __param_windowBits: c
     ((*__param_strm).msg = null)
 
     if ((if (*__param_strm).zalloc == ((0 as unsafe extern "C" fn(*mut c_void, c_uint, c_uint) -> *mut c_void)): 1 else: 0) != 0) {
-        ((*__param_strm).zalloc = zcalloc)
+        ((*__param_strm).zalloc = Some(zcalloc))
 
         ((*__param_strm).opaque_ = ((0 as *mut c_void)))
 
     }
 
     if ((if (*__param_strm).zfree == ((0 as unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit)): 1 else: 0) != 0) {
-        ((*__param_strm).zfree = zcfree)
+        ((*__param_strm).zfree = Some(zcfree))
     }
 
-    (__local_state = (((*__param_strm).zalloc((*__param_strm).opaque_, (1 as c_uint), (7160 as c_uint)) as *mut inflate_state)))
+    (__local_state = (((*__param_strm).zalloc.unwrap()((*__param_strm).opaque_, (1 as c_uint), (7160 as c_uint)) as *mut inflate_state)))
 
     if ((if __local_state == 0: 1 else: 0) != 0) {
         return -4
@@ -5232,7 +5233,7 @@ pub unsafe fn inflateInit2_(__param_strm: *mut z_stream_s, __param_windowBits: c
     (__local_ret = ((inflateReset2(__param_strm, __param_windowBits) as c_int)))
 
     if ((if __local_ret != 0: 1 else: 0) != 0) {
-        (*__param_strm).zfree((*__param_strm).opaque_, (__local_state as *mut c_void))
+        (*__param_strm).zfree.unwrap()((*__param_strm).opaque_, (__local_state as *mut c_void))
 
         ((*__param_strm).state = null)
 
@@ -5441,7 +5442,7 @@ unsafe fn updatewindow(__param_strm: *mut z_stream_s, __param_end: *const u8, __
     (__local_state = (((*__param_strm).state as *mut inflate_state)))
 
     if ((if (*__local_state).window == 0: 1 else: 0) != 0) {
-        ((*__local_state).window = (((*__param_strm).zalloc((*__param_strm).opaque_, (((1 as c_uint) << ((*__local_state).wbits as c_uint)) as c_uint), (1 as c_uint)) as *mut u8)))
+        ((*__local_state).window = (((*__param_strm).zalloc.unwrap()((*__param_strm).opaque_, (((1 as c_uint) << ((*__local_state).wbits as c_uint)) as c_uint), (1 as c_uint)) as *mut u8)))
 
         if ((if (*__local_state).window == 0: 1 else: 0) != 0) {
             return 1

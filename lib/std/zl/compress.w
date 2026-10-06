@@ -83,9 +83,9 @@ pub unsafe fn compress2_z(__param_dest: *mut u8, __param_destLen: *mut c_ulong, 
 
     ((*__param_destLen) = ((0 as c_ulong)))
 
-    (__local_stream.zalloc = ((0 as unsafe extern "C" fn(*mut c_void, c_uint, c_uint) -> *mut c_void)))
+    (__local_stream.zalloc = null)
 
-    (__local_stream.zfree = ((0 as unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit)))
+    (__local_stream.zfree = null)
 
     (__local_stream.opaque_ = ((0 as *mut c_void)))
 

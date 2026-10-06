@@ -6,6 +6,7 @@ use std.calg_testing.hash_int
 use std.calg_testing.hash_pointer
 use std.calg_testing.hash_string
 use std.libc
+use std.option
 
 pub fn test_pointer_hash() {
     var __local_array: [200]c_int
@@ -188,4 +189,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 }
 
-var tests: [5]extern "C" fn() -> Unit = [test_pointer_hash, test_int_hash, test_string_hash, test_string_nocase_hash, null]
+var tests: [5]Option[extern "C" fn() -> Unit] = [Some(test_pointer_hash), Some(test_int_hash), Some(test_string_hash), Some(test_string_nocase_hash), null]

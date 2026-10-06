@@ -1,6 +1,7 @@
 // Migrated from C
 use std.calg_testing.defs
 use std.calg_testing.alloc_testing
+use std.option
 
 pub unsafe fn sortedarray_get(__param_array: *mut _SortedArray, __param_i: c_uint) -> *mut c_void {
     var __ci_expr_logic_0: c_int
@@ -26,7 +27,7 @@ pub unsafe fn sortedarray_length(__param_array: *mut _SortedArray) -> c_uint {
 
 }
 
-pub fn sortedarray_new(__param_length: c_uint, __param_cmp_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int) -> *mut _SortedArray writes allocation_limit {
+pub fn sortedarray_new(__param_length: c_uint, __param_cmp_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int]) -> *mut _SortedArray writes allocation_limit {
     var __local_length = __param_length
     var __local_array: *mut *mut c_void
 
@@ -150,7 +151,7 @@ pub unsafe fn sortedarray_insert(__param_sortedarray: *mut _SortedArray, __param
     while ((if __local_left != __local_right: 1 else: 0) != 0) {
         (__local_index = ((((((__local_left as c_uint) +% (__local_right as c_uint)) as c_uint) / (2 as c_uint)) as c_uint)))
 
-        (__local_order = (((*__param_sortedarray).cmp_func(__local_data, ((*__param_sortedarray).data[__local_index])) as c_int)))
+        (__local_order = (((*__param_sortedarray).cmp_func.unwrap()(__local_data, ((*__param_sortedarray).data[__local_index])) as c_int)))
 
         if ((if __local_order < 0: 1 else: 0) != 0) {
             (__local_right = __local_index)
@@ -170,7 +171,7 @@ pub unsafe fn sortedarray_insert(__param_sortedarray: *mut _SortedArray, __param
     var __ci_expr_logic_1: c_int = 0
 
     if ((if (*__param_sortedarray).length > 0: 1 else: 0) != 0) {
-        (__ci_expr_logic_1 = (if (if (*__param_sortedarray).cmp_func(__local_data, ((*__param_sortedarray).data[__local_index])) > 0: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_1 = (if (if (*__param_sortedarray).cmp_func.unwrap()(__local_data, ((*__param_sortedarray).data[__local_index])) > 0: 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_1 != 0) {
@@ -244,7 +245,7 @@ pub unsafe fn sortedarray_index_of(__param_sortedarray: *mut _SortedArray, __par
     while ((if __local_left != __local_right: 1 else: 0) != 0) {
         (__local_index = ((((((__local_left as c_uint) +% (__local_right as c_uint)) as c_uint) / (2 as c_uint)) as c_uint)))
 
-        (__local_order = (((*__param_sortedarray).cmp_func(__param_data, ((*__param_sortedarray).data[__local_index])) as c_int)))
+        (__local_order = (((*__param_sortedarray).cmp_func.unwrap()(__param_data, ((*__param_sortedarray).data[__local_index])) as c_int)))
 
         if ((if __local_order < 0: 1 else: 0) != 0) {
             (__local_right = __local_index)

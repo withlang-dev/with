@@ -1,6 +1,7 @@
 // Migrated from C
 use std.tommyds.defs
 use std.libc
+use std.option
 
 fn tommy_ilog2_u32(__param_value: c_uint) -> c_uint {
     return (((((__param_value as u32).clz() as c_int) ^ (31 as c_int)) as c_uint))
@@ -69,7 +70,7 @@ fn tommy_haszero_u32(__param_value: c_uint) -> c_int {
 
 }
 
-pub unsafe fn tommy_tree_init(__param_tree: *mut tommy_tree_struct, __param_cmp: unsafe extern "C" fn(*const c_void, *const c_void) -> c_int) {
+pub unsafe fn tommy_tree_init(__param_tree: *mut tommy_tree_struct, __param_cmp: Option[unsafe extern "C" fn(*const c_void, *const c_void) -> c_int]) {
     ((*__param_tree).root = null)
 
     ((*__param_tree).count = ((0 as c_ulonglong)))
@@ -125,7 +126,7 @@ pub unsafe fn tommy_tree_search(__param_tree: *mut tommy_tree_struct, __param_da
 
 }
 
-pub unsafe fn tommy_tree_search_compare(__param_tree: *mut tommy_tree_struct, __param_cmp: unsafe extern "C" fn(*const c_void, *const c_void) -> c_int, __param_cmp_arg: *mut c_void) -> *mut c_void {
+pub unsafe fn tommy_tree_search_compare(__param_tree: *mut tommy_tree_struct, __param_cmp: Option[unsafe extern "C" fn(*const c_void, *const c_void) -> c_int], __param_cmp_arg: *mut c_void) -> *mut c_void {
     var __local_node: *mut tommy_node_struct = tommy_tree_search_node(__param_cmp, (*__param_tree).root, __param_cmp_arg)
 
     if ((if not (__local_node != null): 1 else: 0) != 0) {
@@ -149,12 +150,12 @@ pub unsafe fn tommy_tree_remove_existing(__param_tree: *mut tommy_tree_struct, _
 
 }
 
-pub unsafe fn tommy_tree_foreach(__param_tree: *mut tommy_tree_struct, __param_func: unsafe extern "C" fn(*mut c_void) -> Unit) {
+pub unsafe fn tommy_tree_foreach(__param_tree: *mut tommy_tree_struct, __param_func: Option[unsafe extern "C" fn(*mut c_void) -> Unit]) {
     tommy_tree_foreach_node((*__param_tree).root, __param_func)
 
 }
 
-pub unsafe fn tommy_tree_foreach_arg(__param_tree: *mut tommy_tree_struct, __param_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit, __param_arg: *mut c_void) {
+pub unsafe fn tommy_tree_foreach_arg(__param_tree: *mut tommy_tree_struct, __param_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit], __param_arg: *mut c_void) {
     tommy_tree_foreach_arg_node((*__param_tree).root, __param_func, __param_arg)
 
 }
@@ -278,14 +279,14 @@ unsafe fn tommy_tree_move_right(__param_root: *mut tommy_node_struct, __param_no
 
 }
 
-unsafe fn tommy_tree_insert_node(__param_cmp: unsafe extern "C" fn(*const c_void, *const c_void) -> c_int, __param_root: *mut tommy_node_struct, __param_let_: *mut *mut tommy_node_struct) -> *mut tommy_node_struct {
+unsafe fn tommy_tree_insert_node(__param_cmp: Option[unsafe extern "C" fn(*const c_void, *const c_void) -> c_int], __param_root: *mut tommy_node_struct, __param_let_: *mut *mut tommy_node_struct) -> *mut tommy_node_struct {
     var __local_c: c_int
 
     if ((if not (__param_root != null): 1 else: 0) != 0) {
         return (*__param_let_)
     }
 
-    (__local_c = ((__param_cmp(((*(*__param_let_)).data as *const c_void), ((*__param_root).data as *const c_void)) as c_int)))
+    (__local_c = ((__param_cmp.unwrap()(((*(*__param_let_)).data as *const c_void), ((*__param_root).data as *const c_void)) as c_int)))
 
     if ((if __local_c < 0: 1 else: 0) != 0) {
         ((*__param_root).prev = tommy_tree_insert_node(__param_cmp, (*__param_root).prev, __param_let_))
@@ -307,14 +308,14 @@ unsafe fn tommy_tree_insert_node(__param_cmp: unsafe extern "C" fn(*const c_void
 
 }
 
-unsafe fn tommy_tree_remove_node(__param_cmp: unsafe extern "C" fn(*const c_void, *const c_void) -> c_int, __param_root: *mut tommy_node_struct, __param_data: *mut c_void, __param_let_: *mut *mut tommy_node_struct) -> *mut tommy_node_struct {
+unsafe fn tommy_tree_remove_node(__param_cmp: Option[unsafe extern "C" fn(*const c_void, *const c_void) -> c_int], __param_root: *mut tommy_node_struct, __param_data: *mut c_void, __param_let_: *mut *mut tommy_node_struct) -> *mut tommy_node_struct {
     var __local_c: c_int
 
     if ((if not (__param_root != null): 1 else: 0) != 0) {
         return ((0 as *mut tommy_node_struct))
     }
 
-    (__local_c = ((__param_cmp((__param_data as *const c_void), ((*__param_root).data as *const c_void)) as c_int)))
+    (__local_c = ((__param_cmp.unwrap()((__param_data as *const c_void), ((*__param_root).data as *const c_void)) as c_int)))
 
     if ((if __local_c < 0: 1 else: 0) != 0) {
         ((*__param_root).prev = tommy_tree_remove_node(__param_cmp, (*__param_root).prev, __param_data, __param_let_))
@@ -336,14 +337,14 @@ unsafe fn tommy_tree_remove_node(__param_cmp: unsafe extern "C" fn(*const c_void
 
 }
 
-unsafe fn tommy_tree_search_node(__param_cmp: unsafe extern "C" fn(*const c_void, *const c_void) -> c_int, __param_root: *mut tommy_node_struct, __param_data: *mut c_void) -> *mut tommy_node_struct {
+unsafe fn tommy_tree_search_node(__param_cmp: Option[unsafe extern "C" fn(*const c_void, *const c_void) -> c_int], __param_root: *mut tommy_node_struct, __param_data: *mut c_void) -> *mut tommy_node_struct {
     var __local_c: c_int
 
     if ((if not (__param_root != null): 1 else: 0) != 0) {
         return ((0 as *mut tommy_node_struct))
     }
 
-    (__local_c = ((__param_cmp((__param_data as *const c_void), ((*__param_root).data as *const c_void)) as c_int)))
+    (__local_c = ((__param_cmp.unwrap()((__param_data as *const c_void), ((*__param_root).data as *const c_void)) as c_int)))
 
     if ((if __local_c < 0: 1 else: 0) != 0) {
         return ((tommy_tree_search_node(__param_cmp, (*__param_root).prev, __param_data) as *mut tommy_node_struct))
@@ -357,7 +358,7 @@ unsafe fn tommy_tree_search_node(__param_cmp: unsafe extern "C" fn(*const c_void
 
 }
 
-unsafe fn tommy_tree_foreach_node(__param_root: *mut tommy_node_struct, __param_func: unsafe extern "C" fn(*mut c_void) -> Unit) {
+unsafe fn tommy_tree_foreach_node(__param_root: *mut tommy_node_struct, __param_func: Option[unsafe extern "C" fn(*mut c_void) -> Unit]) {
     var __local_next: *mut tommy_node_struct
 
     if ((if not (__param_root != null): 1 else: 0) != 0) {
@@ -368,13 +369,13 @@ unsafe fn tommy_tree_foreach_node(__param_root: *mut tommy_node_struct, __param_
 
     (__local_next = (*__param_root).next)
 
-    __param_func((*__param_root).data)
+    __param_func.unwrap()((*__param_root).data)
 
     tommy_tree_foreach_node(__local_next, __param_func)
 
 }
 
-unsafe fn tommy_tree_foreach_arg_node(__param_root: *mut tommy_node_struct, __param_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit, __param_arg: *mut c_void) {
+unsafe fn tommy_tree_foreach_arg_node(__param_root: *mut tommy_node_struct, __param_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit], __param_arg: *mut c_void) {
     var __local_next: *mut tommy_node_struct
 
     if ((if not (__param_root != null): 1 else: 0) != 0) {
@@ -385,7 +386,7 @@ unsafe fn tommy_tree_foreach_arg_node(__param_root: *mut tommy_node_struct, __pa
 
     (__local_next = (*__param_root).next)
 
-    __param_func(__param_arg, (*__param_root).data)
+    __param_func.unwrap()(__param_arg, (*__param_root).data)
 
     tommy_tree_foreach_arg_node(__local_next, __param_func, __param_arg)
 

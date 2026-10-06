@@ -19,6 +19,7 @@ use std.c_algorithms.set
 use std.c_algorithms.slist
 use std.c_algorithms.trie
 use std.libc
+use std.option
 
 fn test_compare_int() -> Unit {
     var __local_a: c_int
@@ -196,7 +197,7 @@ fn test_arraylist() {
 fn test_avl_tree() {
     var __local_avl_tree: *mut _AVLTree
 
-    (__local_avl_tree = avl_tree_new(string_compare))
+    (__local_avl_tree = avl_tree_new(Some(string_compare)))
 
     unsafe { avl_tree_free(__local_avl_tree) }
 
@@ -205,7 +206,7 @@ fn test_avl_tree() {
 fn test_binary_heap() {
     var __local_heap: *mut _BinaryHeap
 
-    (__local_heap = binary_heap_new((1 as i32), string_compare))
+    (__local_heap = binary_heap_new((1 as i32), Some(string_compare)))
 
     unsafe { binary_heap_free(__local_heap) }
 
@@ -214,7 +215,7 @@ fn test_binary_heap() {
 fn test_binomial_heap() {
     var __local_heap: *mut _BinomialHeap
 
-    (__local_heap = binomial_heap_new((1 as i32), string_compare))
+    (__local_heap = binomial_heap_new((1 as i32), Some(string_compare)))
 
     unsafe { binomial_heap_free(__local_heap) }
 
@@ -223,7 +224,7 @@ fn test_binomial_heap() {
 fn test_bloom_filter() {
     var __local_filter: *mut _BloomFilter
 
-    (__local_filter = bloom_filter_new((16 as c_uint), string_hash, (10 as c_uint)))
+    (__local_filter = bloom_filter_new((16 as c_uint), Some(string_hash), (10 as c_uint)))
 
     unsafe { bloom_filter_free(__local_filter) }
 
@@ -232,7 +233,7 @@ fn test_bloom_filter() {
 fn test_hash_table() {
     var __local_hash_table: *mut _HashTable
 
-    (__local_hash_table = hash_table_new(string_hash, string_equal))
+    (__local_hash_table = hash_table_new(Some(string_hash), Some(string_equal)))
 
     unsafe { hash_table_free(__local_hash_table) }
 
@@ -270,7 +271,7 @@ fn test_queue() {
 fn test_set() {
     var __local_set: *mut _Set
 
-    (__local_set = set_new(string_hash, string_equal))
+    (__local_set = set_new(Some(string_hash), Some(string_equal)))
 
     unsafe { set_free(__local_set) }
 
@@ -310,4 +311,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 }
 
-var tests: [18]extern "C" fn() -> Unit = [test_compare_int, test_compare_pointer, test_compare_string, test_hash_int, test_hash_pointer, test_hash_string, test_arraylist, test_avl_tree, test_binary_heap, test_binomial_heap, test_bloom_filter, test_hash_table, test_list, test_queue, test_set, test_slist, test_trie, null]
+var tests: [18]Option[extern "C" fn() -> Unit] = [Some(test_compare_int), Some(test_compare_pointer), Some(test_compare_string), Some(test_hash_int), Some(test_hash_pointer), Some(test_hash_string), Some(test_arraylist), Some(test_avl_tree), Some(test_binary_heap), Some(test_binomial_heap), Some(test_bloom_filter), Some(test_hash_table), Some(test_list), Some(test_queue), Some(test_set), Some(test_slist), Some(test_trie), null]

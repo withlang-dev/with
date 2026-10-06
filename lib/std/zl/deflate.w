@@ -13,6 +13,7 @@ use std.zl.adler32
 use std.zl.crc32
 use std.zl.inftrees
 use std.zl.trees
+use std.option
 
 pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_int {
     var __local_old_flush: c_int
@@ -917,7 +918,7 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
                 if ((if (*__local_s).strategy == 3: 1 else: 0) != 0) {
                     (__ci_expr_ternary_66 = ((deflate_rle(__local_s, __param_flush) as c_uint)))
                 } else {
-                    (__ci_expr_ternary_66 = ((configuration_table[(*__local_s).level].func(__local_s, __param_flush) as c_uint)))
+                    (__ci_expr_ternary_66 = ((configuration_table[(*__local_s).level].func.unwrap()(__local_s, __param_flush) as c_uint)))
                 }
 
                 (__ci_expr_ternary_67 = __ci_expr_ternary_66)
@@ -1130,30 +1131,30 @@ pub unsafe fn deflateEnd(__param_strm: *mut z_stream_s) -> c_int {
     (__local_status = (*(*__param_strm).state).status)
 
     if ((*(*__param_strm).state).pending_buf != null) {
-        (*__param_strm).zfree((*__param_strm).opaque_, ((*(*__param_strm).state).pending_buf as *mut c_void))
+        (*__param_strm).zfree.unwrap()((*__param_strm).opaque_, ((*(*__param_strm).state).pending_buf as *mut c_void))
     }
 
 
 
     if ((*(*__param_strm).state).head != null) {
-        (*__param_strm).zfree((*__param_strm).opaque_, ((*(*__param_strm).state).head as *mut c_void))
+        (*__param_strm).zfree.unwrap()((*__param_strm).opaque_, ((*(*__param_strm).state).head as *mut c_void))
     }
 
 
 
     if ((*(*__param_strm).state).prev != null) {
-        (*__param_strm).zfree((*__param_strm).opaque_, ((*(*__param_strm).state).prev as *mut c_void))
+        (*__param_strm).zfree.unwrap()((*__param_strm).opaque_, ((*(*__param_strm).state).prev as *mut c_void))
     }
 
 
 
     if ((*(*__param_strm).state).window != null) {
-        (*__param_strm).zfree((*__param_strm).opaque_, ((*(*__param_strm).state).window as *mut c_void))
+        (*__param_strm).zfree.unwrap()((*__param_strm).opaque_, ((*(*__param_strm).state).window as *mut c_void))
     }
 
 
 
-    (*__param_strm).zfree((*__param_strm).opaque_, ((*__param_strm).state as *mut c_void))
+    (*__param_strm).zfree.unwrap()((*__param_strm).opaque_, ((*__param_strm).state as *mut c_void))
 
     ((*__param_strm).state = null)
 
@@ -1387,7 +1388,7 @@ pub unsafe fn deflateCopy(__param_dest: *mut z_stream_s, __param_source: *mut z_
 
     with_memcpy(((__param_dest as *mut c_void) as *mut u8), ((__param_source as *const c_void) as *const u8), ((sizeof[z_stream_s]() as c_ulong) as i64))
 
-    (__local_ds = (((*__param_dest).zalloc((*__param_dest).opaque_, (1 as c_uint), (5968 as c_uint)) as *mut internal_state)))
+    (__local_ds = (((*__param_dest).zalloc.unwrap()((*__param_dest).opaque_, (1 as c_uint), (5968 as c_uint)) as *mut internal_state)))
 
     if ((if __local_ds == 0: 1 else: 0) != 0) {
         return -4
@@ -1401,13 +1402,13 @@ pub unsafe fn deflateCopy(__param_dest: *mut z_stream_s, __param_source: *mut z_
 
     ((*__local_ds).strm = __param_dest)
 
-    ((*__local_ds).window = (((*__param_dest).zalloc((*__param_dest).opaque_, (*__local_ds).w_size, (2 as c_uint)) as *mut u8)))
+    ((*__local_ds).window = (((*__param_dest).zalloc.unwrap()((*__param_dest).opaque_, (*__local_ds).w_size, (2 as c_uint)) as *mut u8)))
 
-    ((*__local_ds).prev = (((*__param_dest).zalloc((*__param_dest).opaque_, (*__local_ds).w_size, (2 as c_uint)) as *mut c_ushort)))
+    ((*__local_ds).prev = (((*__param_dest).zalloc.unwrap()((*__param_dest).opaque_, (*__local_ds).w_size, (2 as c_uint)) as *mut c_ushort)))
 
-    ((*__local_ds).head = (((*__param_dest).zalloc((*__param_dest).opaque_, (*__local_ds).hash_size, (2 as c_uint)) as *mut c_ushort)))
+    ((*__local_ds).head = (((*__param_dest).zalloc.unwrap()((*__param_dest).opaque_, (*__local_ds).hash_size, (2 as c_uint)) as *mut c_ushort)))
 
-    ((*__local_ds).pending_buf = (((*__param_dest).zalloc((*__param_dest).opaque_, (*__local_ds).lit_bufsize, (4 as c_uint)) as *mut u8)))
+    ((*__local_ds).pending_buf = (((*__param_dest).zalloc.unwrap()((*__param_dest).opaque_, (*__local_ds).lit_bufsize, (4 as c_uint)) as *mut u8)))
 
     var __ci_expr_logic_3: c_int
 
@@ -1499,7 +1500,7 @@ pub unsafe fn deflateParams(__param_strm: *mut z_stream_s, __param_level: c_int,
     var __local_level = __param_level
     var __local_s: *mut internal_state
 
-    var __local_func: unsafe extern "C" fn(*mut internal_state, c_int) -> i32
+    var __local_func: Option[unsafe extern "C" fn(*mut internal_state, c_int) -> i32]
 
     if (deflateStateCheck(__param_strm) != 0) {
         return -2
@@ -2017,14 +2018,14 @@ pub unsafe fn deflateInit2_(__param_strm: *mut z_stream_s, __param_level: c_int,
     ((*__param_strm).msg = null)
 
     if ((if (*__param_strm).zalloc == ((0 as unsafe extern "C" fn(*mut c_void, c_uint, c_uint) -> *mut c_void)): 1 else: 0) != 0) {
-        ((*__param_strm).zalloc = zcalloc)
+        ((*__param_strm).zalloc = Some(zcalloc))
 
         ((*__param_strm).opaque_ = ((0 as *mut c_void)))
 
     }
 
     if ((if (*__param_strm).zfree == ((0 as unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit)): 1 else: 0) != 0) {
-        ((*__param_strm).zfree = zcfree)
+        ((*__param_strm).zfree = Some(zcfree))
     }
 
     if ((if __local_level == -1: 1 else: 0) != 0) {
@@ -2138,7 +2139,7 @@ pub unsafe fn deflateInit2_(__param_strm: *mut z_stream_s, __param_level: c_int,
         (__local_windowBits = ((9 as c_int)))
     }
 
-    (__local_s = (((*__param_strm).zalloc((*__param_strm).opaque_, (1 as c_uint), (5968 as c_uint)) as *mut internal_state)))
+    (__local_s = (((*__param_strm).zalloc.unwrap()((*__param_strm).opaque_, (1 as c_uint), (5968 as c_uint)) as *mut internal_state)))
 
     if ((if __local_s == 0: 1 else: 0) != 0) {
         return -4
@@ -2170,17 +2171,17 @@ pub unsafe fn deflateInit2_(__param_strm: *mut z_stream_s, __param_level: c_int,
 
     ((*__local_s).hash_shift = (((((((((*__local_s).hash_bits as c_uint) +% (3 as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint) / (3 as c_uint)) as c_uint)))
 
-    ((*__local_s).window = (((*__param_strm).zalloc((*__param_strm).opaque_, (*__local_s).w_size, (2 as c_uint)) as *mut u8)))
+    ((*__local_s).window = (((*__param_strm).zalloc.unwrap()((*__param_strm).opaque_, (*__local_s).w_size, (2 as c_uint)) as *mut u8)))
 
-    ((*__local_s).prev = (((*__param_strm).zalloc((*__param_strm).opaque_, (*__local_s).w_size, (2 as c_uint)) as *mut c_ushort)))
+    ((*__local_s).prev = (((*__param_strm).zalloc.unwrap()((*__param_strm).opaque_, (*__local_s).w_size, (2 as c_uint)) as *mut c_ushort)))
 
-    ((*__local_s).head = (((*__param_strm).zalloc((*__param_strm).opaque_, (*__local_s).hash_size, (2 as c_uint)) as *mut c_ushort)))
+    ((*__local_s).head = (((*__param_strm).zalloc.unwrap()((*__param_strm).opaque_, (*__local_s).hash_size, (2 as c_uint)) as *mut c_ushort)))
 
     ((*__local_s).high_water = ((0 as c_ulong)))
 
     ((*__local_s).lit_bufsize = ((((1 as c_int) << ((__param_memLevel + 6) as c_uint)) as c_uint)))
 
-    ((*__local_s).pending_buf = (((*__param_strm).zalloc((*__param_strm).opaque_, (*__local_s).lit_bufsize, (4 as c_uint)) as *mut u8)))
+    ((*__local_s).pending_buf = (((*__param_strm).zalloc.unwrap()((*__param_strm).opaque_, (*__local_s).lit_bufsize, (4 as c_uint)) as *mut u8)))
 
     ((*__local_s).pending_buf_size = (((((*__local_s).lit_bufsize as c_ulong) *% (4 as c_ulong)) as c_ulong)))
 
@@ -4529,4 +4530,4 @@ unsafe fn longest_match(__param_s: *mut internal_state, __param_cur_match: c_uin
 
 }
 
-let configuration_table: [10]config_s = [config_s { good_length: 0, max_lazy: 0, nice_length: 0, max_chain: 0, func: deflate_stored }, config_s { good_length: 4, max_lazy: 4, nice_length: 8, max_chain: 4, func: deflate_fast }, config_s { good_length: 4, max_lazy: 5, nice_length: 16, max_chain: 8, func: deflate_fast }, config_s { good_length: 4, max_lazy: 6, nice_length: 32, max_chain: 32, func: deflate_fast }, config_s { good_length: 4, max_lazy: 4, nice_length: 16, max_chain: 16, func: deflate_slow }, config_s { good_length: 8, max_lazy: 16, nice_length: 32, max_chain: 32, func: deflate_slow }, config_s { good_length: 8, max_lazy: 16, nice_length: 128, max_chain: 128, func: deflate_slow }, config_s { good_length: 8, max_lazy: 32, nice_length: 128, max_chain: 256, func: deflate_slow }, config_s { good_length: 32, max_lazy: 128, nice_length: 258, max_chain: 1024, func: deflate_slow }, config_s { good_length: 32, max_lazy: 258, nice_length: 258, max_chain: 4096, func: deflate_slow }]
+let configuration_table: [10]config_s = [config_s { good_length: 0, max_lazy: 0, nice_length: 0, max_chain: 0, func: Some(deflate_stored) }, config_s { good_length: 4, max_lazy: 4, nice_length: 8, max_chain: 4, func: Some(deflate_fast) }, config_s { good_length: 4, max_lazy: 5, nice_length: 16, max_chain: 8, func: Some(deflate_fast) }, config_s { good_length: 4, max_lazy: 6, nice_length: 32, max_chain: 32, func: Some(deflate_fast) }, config_s { good_length: 4, max_lazy: 4, nice_length: 16, max_chain: 16, func: Some(deflate_slow) }, config_s { good_length: 8, max_lazy: 16, nice_length: 32, max_chain: 32, func: Some(deflate_slow) }, config_s { good_length: 8, max_lazy: 16, nice_length: 128, max_chain: 128, func: Some(deflate_slow) }, config_s { good_length: 8, max_lazy: 32, nice_length: 128, max_chain: 256, func: Some(deflate_slow) }, config_s { good_length: 32, max_lazy: 128, nice_length: 258, max_chain: 1024, func: Some(deflate_slow) }, config_s { good_length: 32, max_lazy: 258, nice_length: 258, max_chain: 4096, func: Some(deflate_slow) }]

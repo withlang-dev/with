@@ -1,4 +1,5 @@
 // std.tommyds.defs — shared definitions for migrated PCRE2
+use std.option
 
 pub fn is_alpha(__with_c: i32) -> bool {
     (__with_c >= 65 and __with_c <= 90) or (__with_c >= 97 and __with_c <= 122)
@@ -346,7 +347,7 @@ pub type tommy_list = *mut tommy_node_struct
 pub type tommy_tree_node = tommy_node_struct
 
 @[repr(C)]
-pub type tommy_tree_struct { pub root: *mut tommy_node_struct = null, pub cmp: unsafe extern "C" fn(*const c_void, *const c_void) -> c_int, pub count: c_ulonglong = 0 }
+pub type tommy_tree_struct { pub root: *mut tommy_node_struct = null, pub cmp: Option[unsafe extern "C" fn(*const c_void, *const c_void) -> c_int] = null, pub count: c_ulonglong = 0 }
 impl Copy for tommy_tree_struct
 
 pub type tommy_tree = tommy_tree_struct

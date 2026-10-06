@@ -28,7 +28,7 @@ pub type BinaryHeap[T] { heap: *mut _BinaryHeap }
 
 fn binary_heap_engine(max: bool) -> *mut _BinaryHeap:
     let heap_type = if max: HEAP_TYPE_MAX else: HEAP_TYPE_MIN
-    let heap = binary_heap_new(heap_type as i32, slot_compare)
+    let heap = binary_heap_new(heap_type as i32, Some(slot_compare))
     assert(heap as i64 != 0)
     heap
 

@@ -247,7 +247,7 @@ pub unsafe fn pcre2_converted_pattern_free_8(__param_converted: *mut u8) {
     if ((if __param_converted != null: 1 else: 0) != 0) {
         var __local_memctl: *mut pcre2_memctl = ((((__param_converted as *mut c_char) - (sizeof[pcre2_memctl]() as usize)) as *mut pcre2_memctl))
 
-        (*__local_memctl).free((__local_memctl as *mut c_void), (*__local_memctl).memory_data)
+        (*__local_memctl).free.unwrap()((__local_memctl as *mut c_void), (*__local_memctl).memory_data)
 
     }
 

@@ -13,40 +13,41 @@ use std.zl.gzclose
 use std.zl.adler32
 use std.zl.crc32
 use std.libc
+use std.option
 
 pub unsafe fn fill_fopen64_filefunc(__param_pzlib_filefunc_def: *mut zlib_filefunc64_def_s) {
-    ((*__param_pzlib_filefunc_def).zopen64_file = fopen64_file_func)
+    ((*__param_pzlib_filefunc_def).zopen64_file = Some(fopen64_file_func))
 
-    ((*__param_pzlib_filefunc_def).zread_file = fread_file_func)
+    ((*__param_pzlib_filefunc_def).zread_file = Some(fread_file_func))
 
-    ((*__param_pzlib_filefunc_def).zwrite_file = fwrite_file_func)
+    ((*__param_pzlib_filefunc_def).zwrite_file = Some(fwrite_file_func))
 
-    ((*__param_pzlib_filefunc_def).ztell64_file = ftell64_file_func)
+    ((*__param_pzlib_filefunc_def).ztell64_file = Some(ftell64_file_func))
 
-    ((*__param_pzlib_filefunc_def).zseek64_file = fseek64_file_func)
+    ((*__param_pzlib_filefunc_def).zseek64_file = Some(fseek64_file_func))
 
-    ((*__param_pzlib_filefunc_def).zclose_file = fclose_file_func)
+    ((*__param_pzlib_filefunc_def).zclose_file = Some(fclose_file_func))
 
-    ((*__param_pzlib_filefunc_def).zerror_file = ferror_file_func)
+    ((*__param_pzlib_filefunc_def).zerror_file = Some(ferror_file_func))
 
     ((*__param_pzlib_filefunc_def).opaque_ = null)
 
 }
 
 pub unsafe fn fill_fopen_filefunc(__param_pzlib_filefunc_def: *mut zlib_filefunc_def_s) {
-    ((*__param_pzlib_filefunc_def).zopen_file = fopen_file_func)
+    ((*__param_pzlib_filefunc_def).zopen_file = Some(fopen_file_func))
 
-    ((*__param_pzlib_filefunc_def).zread_file = fread_file_func)
+    ((*__param_pzlib_filefunc_def).zread_file = Some(fread_file_func))
 
-    ((*__param_pzlib_filefunc_def).zwrite_file = fwrite_file_func)
+    ((*__param_pzlib_filefunc_def).zwrite_file = Some(fwrite_file_func))
 
-    ((*__param_pzlib_filefunc_def).ztell_file = ftell_file_func)
+    ((*__param_pzlib_filefunc_def).ztell_file = Some(ftell_file_func))
 
-    ((*__param_pzlib_filefunc_def).zseek_file = fseek_file_func)
+    ((*__param_pzlib_filefunc_def).zseek_file = Some(fseek_file_func))
 
-    ((*__param_pzlib_filefunc_def).zclose_file = fclose_file_func)
+    ((*__param_pzlib_filefunc_def).zclose_file = Some(fclose_file_func))
 
-    ((*__param_pzlib_filefunc_def).zerror_file = ferror_file_func)
+    ((*__param_pzlib_filefunc_def).zerror_file = Some(ferror_file_func))
 
     ((*__param_pzlib_filefunc_def).opaque_ = null)
 
@@ -54,32 +55,32 @@ pub unsafe fn fill_fopen_filefunc(__param_pzlib_filefunc_def: *mut zlib_filefunc
 
 pub unsafe fn call_zopen64(__param_pfilefunc: *const zlib_filefunc64_32_def_s, __param_filename: *const c_void, __param_mode: c_int) -> *mut c_void {
     if ((if (*(&raw const (*__param_pfilefunc).zfile_func64 as *const zlib_filefunc64_def_s)).zopen64_file != null: 1 else: 0) != 0) {
-        return (((*(&raw const (*__param_pfilefunc).zfile_func64 as *const zlib_filefunc64_def_s)).zopen64_file((*(&raw const (*__param_pfilefunc).zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, __param_filename, __param_mode) as *mut c_void))
+        return (((*(&raw const (*__param_pfilefunc).zfile_func64 as *const zlib_filefunc64_def_s)).zopen64_file.unwrap()((*(&raw const (*__param_pfilefunc).zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, __param_filename, __param_mode) as *mut c_void))
     }
-    return (((*__param_pfilefunc).zopen32_file((*(&raw const (*__param_pfilefunc).zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, (__param_filename as *const c_char), __param_mode) as *mut c_void))
+    return (((*__param_pfilefunc).zopen32_file.unwrap()((*(&raw const (*__param_pfilefunc).zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, (__param_filename as *const c_char), __param_mode) as *mut c_void))
 
 
 }
 
 pub unsafe fn call_zseek64(__param_pfilefunc: *const zlib_filefunc64_32_def_s, __param_filestream: *mut c_void, __param_offset: c_ulong, __param_origin: c_int) -> c_long {
     if ((if (*(&raw const (*__param_pfilefunc).zfile_func64 as *const zlib_filefunc64_def_s)).zseek64_file != null: 1 else: 0) != 0) {
-        return (*(&raw const (*__param_pfilefunc).zfile_func64 as *const zlib_filefunc64_def_s)).zseek64_file((*(&raw const (*__param_pfilefunc).zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, __param_filestream, __param_offset, __param_origin)
+        return (*(&raw const (*__param_pfilefunc).zfile_func64 as *const zlib_filefunc64_def_s)).zseek64_file.unwrap()((*(&raw const (*__param_pfilefunc).zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, __param_filestream, __param_offset, __param_origin)
     }
     var __local_offsetTruncated: c_ulong = __param_offset
 
     if ((if __local_offsetTruncated != __param_offset: 1 else: 0) != 0) {
         return -1
     }
-    return (*__param_pfilefunc).zseek32_file((*(&raw const (*__param_pfilefunc).zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, __param_filestream, __local_offsetTruncated, __param_origin)
+    return (*__param_pfilefunc).zseek32_file.unwrap()((*(&raw const (*__param_pfilefunc).zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, __param_filestream, __local_offsetTruncated, __param_origin)
 
 
 }
 
 pub unsafe fn call_ztell64(__param_pfilefunc: *const zlib_filefunc64_32_def_s, __param_filestream: *mut c_void) -> c_ulong {
     if ((if (*(&raw const (*__param_pfilefunc).zfile_func64 as *const zlib_filefunc64_def_s)).zseek64_file != null: 1 else: 0) != 0) {
-        return (*(&raw const (*__param_pfilefunc).zfile_func64 as *const zlib_filefunc64_def_s)).ztell64_file((*(&raw const (*__param_pfilefunc).zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, __param_filestream)
+        return (*(&raw const (*__param_pfilefunc).zfile_func64 as *const zlib_filefunc64_def_s)).ztell64_file.unwrap()((*(&raw const (*__param_pfilefunc).zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, __param_filestream)
     }
-    var __local_tell_uLong: c_ulong = (((*__param_pfilefunc).ztell32_file((*(&raw const (*__param_pfilefunc).zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, __param_filestream) as c_ulong))
+    var __local_tell_uLong: c_ulong = (((*__param_pfilefunc).ztell32_file.unwrap()((*(&raw const (*__param_pfilefunc).zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, __param_filestream) as c_ulong))
 
     if ((if __local_tell_uLong == 4294967295: 1 else: 0) != 0) {
         return ((-1 as c_ulong))

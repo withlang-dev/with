@@ -4,6 +4,7 @@ use std.calg_testing.alloc_testing
 use std.calg_testing.framework
 use std.calg_testing.queue
 use std.libc
+use std.option
 
 pub fn generate_queue() -> *mut _Queue writes allocation_limit, variable1, variable2, variable3, variable4 {
     var __local_queue: *mut _Queue
@@ -567,4 +568,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 }
 
-var tests: [9]extern "C" fn() -> Unit = [test_queue_new_free, test_queue_push_head, test_queue_pop_head, test_queue_peek_head, test_queue_push_tail, test_queue_pop_tail, test_queue_peek_tail, test_queue_is_empty, null]
+var tests: [9]Option[extern "C" fn() -> Unit] = [Some(test_queue_new_free), Some(test_queue_push_head), Some(test_queue_pop_head), Some(test_queue_peek_head), Some(test_queue_push_tail), Some(test_queue_pop_tail), Some(test_queue_peek_tail), Some(test_queue_is_empty), null]

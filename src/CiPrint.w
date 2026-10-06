@@ -566,6 +566,9 @@ pub fn ci_type_needs_memcpy_assignment(types: CiTypePool, ty: CiTypeId) -> bool:
         let printed = ci_print_type(types, ty)
         if ci_starts_with_str(printed, "extern ") or ci_starts_with_str(printed, "unsafe extern "):
             return false
+        // D102: a nullable function pointer is one pointer-sized word.
+        if ci_starts_with_str(printed, "Option[extern ") or ci_starts_with_str(printed, "Option[unsafe extern "):
+            return false
         return not ci_named_type_is_scalar(name) and not ci_starts_with_str(name, "*")
     false
 

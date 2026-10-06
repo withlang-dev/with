@@ -5,6 +5,7 @@ use std.calg_testing.binomial_heap
 use std.calg_testing.compare_int
 use std.calg_testing.framework
 use std.libc
+use std.option
 
 pub fn test_binomial_heap_new_free() -> Unit writes allocation_limit {
     var __local_heap: *mut _BinomialHeap
@@ -14,7 +15,7 @@ pub fn test_binomial_heap_new_free() -> Unit writes allocation_limit {
     (__local_i = ((0 as c_int)))
 
     while ((if __local_i < 10000: 1 else: 0) != 0) {
-        (__local_heap = binomial_heap_new((0 as i32), int_compare))
+        (__local_heap = binomial_heap_new((0 as i32), Some(int_compare)))
 
         unsafe { binomial_heap_free(__local_heap) }
 
@@ -26,7 +27,7 @@ pub fn test_binomial_heap_new_free() -> Unit writes allocation_limit {
 
     alloc_test_set_limit((0 as c_int))
 
-    if (((if not ((if binomial_heap_new((0 as i32), int_compare) == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
+    if (((if not ((if binomial_heap_new((0 as i32), Some(int_compare)) == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_binomial_heap_new_free".ptr, c"test-binomial-heap.c".ptr, (47 as c_int), c"binomial_heap_new(BINOMIAL_HEAP_TYPE_MIN, int_compare) == NULL".ptr)
     } else {
         0
@@ -39,7 +40,7 @@ pub fn test_binomial_heap_insert() writes allocation_limit, test_array {
 
     var __local_i: c_int
 
-    (__local_heap = binomial_heap_new((0 as i32), int_compare))
+    (__local_heap = binomial_heap_new((0 as i32), Some(int_compare)))
 
     (__local_i = ((0 as c_int)))
 
@@ -83,7 +84,7 @@ pub fn test_min_heap() writes allocation_limit, test_array {
 
     var __local_i: c_int
 
-    (__local_heap = binomial_heap_new((0 as i32), int_compare))
+    (__local_heap = binomial_heap_new((0 as i32), Some(int_compare)))
 
     (__local_i = ((0 as c_int)))
 
@@ -136,7 +137,7 @@ pub fn test_max_heap() writes allocation_limit, test_array {
 
     var __local_i: c_int
 
-    (__local_heap = binomial_heap_new((1 as i32), int_compare))
+    (__local_heap = binomial_heap_new((1 as i32), Some(int_compare)))
 
     (__local_i = ((0 as c_int)))
 
@@ -187,7 +188,7 @@ fn generate_heap() -> *mut _BinomialHeap {
 
     var __local_i: c_int
 
-    (__local_heap = binomial_heap_new((0 as i32), int_compare))
+    (__local_heap = binomial_heap_new((0 as i32), Some(int_compare)))
 
     (__local_i = ((0 as c_int)))
 
@@ -334,4 +335,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 }
 
-var tests: [7]extern "C" fn() -> Unit = [test_binomial_heap_new_free, test_binomial_heap_insert, test_min_heap, test_max_heap, test_insert_out_of_memory, test_pop_out_of_memory, null]
+var tests: [7]Option[extern "C" fn() -> Unit] = [Some(test_binomial_heap_new_free), Some(test_binomial_heap_insert), Some(test_min_heap), Some(test_max_heap), Some(test_insert_out_of_memory), Some(test_pop_out_of_memory), null]

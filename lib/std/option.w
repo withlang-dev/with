@@ -3,6 +3,11 @@
 // Keep this module minimal for selfhost compatibility. The compiler owns
 // the lowering/runtime behavior for option methods and constructors; this
 // module provides the user-facing type name so it resolves by import.
+// It imports the trait it implements: a module with no prelude (a migrated
+// corpus holding `Option[extern "C" fn]` fields, D102) reaches `Option`
+// through `use std.option` alone.
+
+use std.traits
 
 /// A value that may or may not be present.
 /// `Some(value)` contains a value, `None` represents absence.

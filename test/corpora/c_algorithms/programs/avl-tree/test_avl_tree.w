@@ -5,6 +5,7 @@ use std.calg_testing.avl_tree
 use std.calg_testing.compare_int
 use std.calg_testing.framework
 use std.libc
+use std.option
 
 pub unsafe fn find_subtree_height(__param_node: *mut _AVLTreeNode) -> c_int {
     var __local_left_subtree: *mut _AVLTreeNode
@@ -155,7 +156,7 @@ pub fn create_tree() -> *mut _AVLTree writes allocation_limit, test_array {
 
     var __local_i: c_int
 
-    (__local_tree = avl_tree_new(int_compare))
+    (__local_tree = avl_tree_new(Some(int_compare)))
 
     (__local_i = ((0 as c_int)))
 
@@ -177,7 +178,7 @@ pub fn create_tree() -> *mut _AVLTree writes allocation_limit, test_array {
 pub fn test_avl_tree_new() -> Unit writes allocation_limit {
     var __local_tree: *mut _AVLTree
 
-    (__local_tree = avl_tree_new(int_compare))
+    (__local_tree = avl_tree_new(Some(int_compare)))
 
     if (((if not ((if __local_tree != null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_avl_tree_new".ptr, c"test-avl-tree.c".ptr, (172 as c_int), c"tree != NULL".ptr)
@@ -201,7 +202,7 @@ pub fn test_avl_tree_new() -> Unit writes allocation_limit {
 
     alloc_test_set_limit((0 as c_int))
 
-    (__local_tree = avl_tree_new(int_compare))
+    (__local_tree = avl_tree_new(Some(int_compare)))
 
     if (((if not ((if __local_tree == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_avl_tree_new".ptr, c"test-avl-tree.c".ptr, (183 as c_int), c"tree == NULL".ptr)
@@ -220,7 +221,7 @@ pub fn test_avl_tree_insert_lookup() writes allocation_limit, counter, test_arra
 
     var __local_value: *mut c_int
 
-    (__local_tree = avl_tree_new(int_compare))
+    (__local_tree = avl_tree_new(Some(int_compare)))
 
     (__local_i = ((0 as c_uint)))
 
@@ -309,7 +310,7 @@ pub fn test_avl_tree_child() writes allocation_limit {
 
     var __local_i: c_int
 
-    (__local_tree = avl_tree_new(int_compare))
+    (__local_tree = avl_tree_new(Some(int_compare)))
 
     (__local_i = ((0 as c_int)))
 
@@ -405,7 +406,7 @@ pub fn test_out_of_memory() writes allocation_limit, counter, test_array {
 pub fn test_avl_tree_free() writes allocation_limit, test_array {
     var __local_tree: *mut _AVLTree
 
-    (__local_tree = avl_tree_new(int_compare))
+    (__local_tree = avl_tree_new(Some(int_compare)))
 
     unsafe { avl_tree_free(__local_tree) }
 
@@ -579,7 +580,7 @@ pub fn test_avl_tree_to_array() writes allocation_limit, counter {
 
     var __local_array: *mut *mut c_int
 
-    (__local_tree = avl_tree_new(int_compare))
+    (__local_tree = avl_tree_new(Some(int_compare)))
 
     (__local_i = ((0 as c_uint)))
 
@@ -640,4 +641,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 }
 
-var tests: [9]extern "C" fn() -> Unit = [test_avl_tree_new, test_avl_tree_free, test_avl_tree_child, test_avl_tree_insert_lookup, test_avl_tree_lookup, test_avl_tree_remove, test_avl_tree_to_array, test_out_of_memory, null]
+var tests: [9]Option[extern "C" fn() -> Unit] = [Some(test_avl_tree_new), Some(test_avl_tree_free), Some(test_avl_tree_child), Some(test_avl_tree_insert_lookup), Some(test_avl_tree_lookup), Some(test_avl_tree_remove), Some(test_avl_tree_to_array), Some(test_out_of_memory), null]

@@ -1,6 +1,7 @@
 // Migrated from C
 use std.calg_testing.defs
 use std.calg_testing.alloc_testing
+use std.option
 
 pub unsafe fn list_free(__param_list: *mut _ListEntry) {
     var __local_entry: *mut _ListEntry
@@ -281,7 +282,7 @@ pub unsafe fn list_remove_entry(__param_list: *mut *mut _ListEntry, __param_entr
 
 }
 
-pub unsafe fn list_remove_data(__param_list: *mut *mut _ListEntry, __param_callback: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int, __param_data: *mut c_void) -> c_uint {
+pub unsafe fn list_remove_data(__param_list: *mut *mut _ListEntry, __param_callback: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int], __param_data: *mut c_void) -> c_uint {
     var __local_entries_removed: c_uint
 
     var __local_rover: *mut _ListEntry
@@ -309,7 +310,7 @@ pub unsafe fn list_remove_data(__param_list: *mut *mut _ListEntry, __param_callb
     while ((if __local_rover != null: 1 else: 0) != 0) {
         (__local_next = (*__local_rover).next)
 
-        if (__param_callback((*__local_rover).data, __param_data) != 0) {
+        if (__param_callback.unwrap()((*__local_rover).data, __param_data) != 0) {
             if ((if (*__local_rover).prev == null: 1 else: 0) != 0) {
                 ((*__param_list) = (*__local_rover).next)
 
@@ -337,18 +338,18 @@ pub unsafe fn list_remove_data(__param_list: *mut *mut _ListEntry, __param_callb
 
 }
 
-pub unsafe fn list_sort(__param_list: *mut *mut _ListEntry, __param_compare_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int) -> Unit {
+pub unsafe fn list_sort(__param_list: *mut *mut _ListEntry, __param_compare_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int]) -> Unit {
     list_sort_internal(__param_list, __param_compare_func)
 
 }
 
-pub unsafe fn list_find_data(__param_list: *mut _ListEntry, __param_callback: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int, __param_data: *mut c_void) -> *mut _ListEntry {
+pub unsafe fn list_find_data(__param_list: *mut _ListEntry, __param_callback: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int], __param_data: *mut c_void) -> *mut _ListEntry {
     var __local_rover: *mut _ListEntry
 
     (__local_rover = __param_list)
 
     while ((if __local_rover != null: 1 else: 0) != 0) {
-        if ((if __param_callback((*__local_rover).data, __param_data) != 0: 1 else: 0) != 0) {
+        if ((if __param_callback.unwrap()((*__local_rover).data, __param_data) != 0: 1 else: 0) != 0) {
             return __local_rover
 
         }
@@ -444,7 +445,7 @@ pub unsafe fn list_iter_remove(__param_iter: *mut _ListIterator) {
 
 }
 
-unsafe fn list_sort_internal(__param_list: *mut *mut _ListEntry, __param_compare_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int) -> *mut _ListEntry {
+unsafe fn list_sort_internal(__param_list: *mut *mut _ListEntry, __param_compare_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int]) -> *mut _ListEntry {
     var __local_pivot: *mut _ListEntry
 
     var __local_rover: *mut _ListEntry
@@ -498,7 +499,7 @@ unsafe fn list_sort_internal(__param_list: *mut *mut _ListEntry, __param_compare
     while ((if __local_rover != null: 1 else: 0) != 0) {
         var __local_next: *mut _ListEntry = (*__local_rover).next
 
-        if ((if __param_compare_func((*__local_rover).data, (*__local_pivot).data) < 0: 1 else: 0) != 0) {
+        if ((if __param_compare_func.unwrap()((*__local_rover).data, (*__local_pivot).data) < 0: 1 else: 0) != 0) {
             ((*__local_rover).prev = ((null as *mut _ListEntry)))
 
             ((*__local_rover).next = __local_less_list)

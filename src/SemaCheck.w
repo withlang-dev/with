@@ -9943,6 +9943,12 @@ impl Sema:
                 if self.get_type_kind(expected) == TypeKind.TY_INT:
                     self.emit_error("null is not an integer; use a typed pointer context", node)
                     return 0 as TypeId
+                // D102 (#2216): a null in the safe function-pointer type was
+                // callable from safe code and trapped with no diagnostic.
+                if self.get_type_kind(expected) == TypeKind.TY_EXTERN_FN:
+                    let fn_name = self.type_name(expected as i32)
+                    self.emit_error(f"`null` is not a value of `{fn_name}`; a function pointer that may be null is `Option[{fn_name}]` (§16.6)", node)
+                    return 0 as TypeId
             self.emit_error("null requires pointer type context", node)
             return 0 as TypeId
 

@@ -2800,7 +2800,8 @@ impl Sema:
 
     fn facade_contract_presented(ci: i32) -> bool:
         let c = &self.foreign_contracts[ci]
-        c.lend != 0 or c.rename != 0 or c.of_resource != 0 or c.buffer_ptr.len() > 0 or c.fixed_params.len() > 0 or c.ok_const != 0 or c.variadic_node != 0 or c.returns_borrow_record != 0
+        // D102: `nullable param N` presents a function-pointer parameter as `Option`.
+        c.lend != 0 or c.rename != 0 or c.of_resource != 0 or c.buffer_ptr.len() > 0 or c.fixed_params.len() > 0 or c.ok_const != 0 or c.variadic_node != 0 or c.returns_borrow_record != 0 or c.nullable_params.len() > 0
 
     // Whether parameter `pi` is a buffer, a buffer's length, or fixed.
     fn facade_contract_pairs(ci: i32, pi: i32) -> bool:
@@ -2809,6 +2810,13 @@ impl Sema:
             if c.buffer_ptr[k] == pi or c.buffer_len[k] == pi: return true
         for k in 0..c.fixed_params.len() as i32:
             if c.fixed_params[k] == pi: return true
+        false
+
+    // D102: whether `nullable param N` names `pi` (a function-pointer
+    // parameter reached through that clause, §16.2b.8).
+    fn facade_contract_nullable_param(ci: i32, pi: i32) -> bool:
+        for k in 0..self.foreign_contracts[ci].nullable_params.len() as i32:
+            if self.foreign_contracts[ci].nullable_params[k] == pi: return true
         false
 
     // Whether a callback, retention or consumption clause models `pi`.
@@ -2974,7 +2982,7 @@ impl Sema:
         // its pairing, a fixed argument through its literal.
         let out_param = self.facade_fn_out_param(fn_sym)
         for pi in 0..self.sig_get_param_count(sig):
-            if pi == out_param or self.facade_contract_pairs(ci, pi) or self.facade_contract_models_param(ci, pi):
+            if pi == out_param or self.facade_contract_pairs(ci, pi) or self.facade_contract_models_param(ci, pi) or self.facade_contract_nullable_param(ci, pi):
                 continue
             let pty = self.sig_param_type(sig, pi)
             if self.ci_type_requires_raw_contract(pty) == 0 or self.ci_type_is_const_c_string_input(pty) != 0:
@@ -3012,7 +3020,12 @@ impl Sema:
             if other.len() > 0:
                 self.emit_error(f"fn '{fname}' renders '{err}', the error type of its 'ok' projection, and {other}; the compiler never picks between two types of one name — rename one (§16.2b.4)", node)
                 return
-        if hosted or not (has_pairs or has_fixed):
+        // D102 (§16.2b.8): `nullable param N` on a function-pointer parameter
+        // presents the free operation through its bridge too.
+        var has_nullable_fn = false
+        for k in 0..self.foreign_contracts[ci].nullable_params.len() as i32:
+            if self.facade_param_is_fn_pointer(sig, self.foreign_contracts[ci].nullable_params[k]): has_nullable_fn = true
+        if hosted or not (has_pairs or has_fixed or has_nullable_fn):
             return
         // A free operation passed every check: its rendering must exist, or
         // the presented call would silently be the raw one.
@@ -4310,9 +4323,19 @@ impl Sema:
             let sig = self.get_sig(fn_sym)
             if sig < 0:
                 continue
-            let pi = self.foreign_contracts[ci].nullable_params[0]
-            let shown = self.facade_param_display(fn_sym, sig, pi)
-            self.emit_error(f"fn '{fname}': nullable {shown}; nullability is rendered for the callback of a 'callback param N userdata param M' pairing (an absent callback takes its userdata with it, §16.2b.9), and a raw pointer parameter accepts null as C declares it — a nullable C string or resource parameter is not modeled (§16.2b.8)", self.foreign_contracts[ci].node)
+            // D102 (§16.2b.8): a function-pointer parameter imports non-null;
+            // `nullable param N` widens it to `Option` of its type.
+            for k in 0..self.foreign_contracts[ci].nullable_params.len() as i32:
+                let pi = self.foreign_contracts[ci].nullable_params[k]
+                if self.facade_param_is_fn_pointer(sig, pi): continue
+                let shown = self.facade_param_display(fn_sym, sig, pi)
+                self.emit_error(f"fn '{fname}': nullable {shown}; nullability is rendered for a function-pointer parameter (§16.6) and for the callback of a 'callback param N userdata param M' pairing (an absent callback takes its userdata with it, §16.2b.9), and a raw pointer parameter accepts null as C declares it — a nullable C string or resource parameter is not modeled (§16.2b.8)", self.foreign_contracts[ci].node)
+                break
+
+    // D102: parameter `pi` of signature `sig` is a C function pointer.
+    fn facade_param_is_fn_pointer(sig: i32, pi: i32) -> bool:
+        let ptid = self.sig_param_type(sig, pi)
+        ptid != 0 and self.get_type_kind(self.resolve_alias(ptid as TypeId)) == TypeKind.TY_EXTERN_FN
 
     // Owned foreign text (ruling §42): every rendered pointer resource over
     // a C string carries `as_cstr() -> CStr` (FacadeRender.w
@@ -4652,6 +4675,8 @@ impl Sema:
             for k in 0..self.foreign_contracts[ci].nullable_params.len() as i32:
                 let npi = self.foreign_contracts[ci].nullable_params[k]
                 if npi == paired_cb and paired_cb >= 0 and ud >= 0 and not self.facade_contract_userdata_retained(ci) and not self.facade_contract_userdata_consumed(ci): nullable = 1
+                // D102: an unpaired function-pointer parameter widens on its own.
+                else if npi != paired_cb and self.facade_param_is_fn_pointer(sig, npi): continue
                 else: bad = npi
             if bad >= 0:
                 let shown = self.facade_param_display(fn_sym, sig, bad)

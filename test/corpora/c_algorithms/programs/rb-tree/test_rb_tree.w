@@ -5,6 +5,7 @@ use std.calg_testing.compare_int
 use std.calg_testing.framework
 use std.calg_testing.rb_tree
 use std.libc
+use std.option
 
 extern fn rb_tree_subtree_height(__param_node: *mut _RBTreeNode) -> c_int
 pub unsafe fn find_subtree_height(__param_node: *mut _RBTreeNode) -> c_int {
@@ -48,7 +49,7 @@ pub fn create_tree() -> *mut _RBTree writes allocation_limit, test_array {
 
     var __local_i: c_int
 
-    (__local_tree = rb_tree_new(int_compare))
+    (__local_tree = rb_tree_new(Some(int_compare)))
 
     (__local_i = ((0 as c_int)))
 
@@ -70,7 +71,7 @@ pub fn create_tree() -> *mut _RBTree writes allocation_limit, test_array {
 pub fn test_rb_tree_new() -> Unit writes allocation_limit {
     var __local_tree: *mut _RBTree
 
-    (__local_tree = rb_tree_new(int_compare))
+    (__local_tree = rb_tree_new(Some(int_compare)))
 
     if (((if not ((if __local_tree != null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_rb_tree_new".ptr, c"test-rb-tree.c".ptr, (107 as c_int), c"tree != NULL".ptr)
@@ -94,7 +95,7 @@ pub fn test_rb_tree_new() -> Unit writes allocation_limit {
 
     alloc_test_set_limit((0 as c_int))
 
-    (__local_tree = rb_tree_new(int_compare))
+    (__local_tree = rb_tree_new(Some(int_compare)))
 
     if (((if not ((if __local_tree == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_rb_tree_new".ptr, c"test-rb-tree.c".ptr, (118 as c_int), c"tree == NULL".ptr)
@@ -113,7 +114,7 @@ pub fn test_rb_tree_insert_lookup() writes allocation_limit, test_array {
 
     var __local_value: *mut c_int
 
-    (__local_tree = rb_tree_new(int_compare))
+    (__local_tree = rb_tree_new(Some(int_compare)))
 
     (__local_i = ((0 as c_int)))
 
@@ -210,7 +211,7 @@ pub fn test_rb_tree_child() writes allocation_limit {
 
     var __local_i: c_int
 
-    (__local_tree = rb_tree_new(int_compare))
+    (__local_tree = rb_tree_new(Some(int_compare)))
 
     (__local_i = ((0 as c_int)))
 
@@ -306,7 +307,7 @@ pub fn test_out_of_memory() writes allocation_limit, test_array {
 pub fn test_rb_tree_free() writes allocation_limit, test_array {
     var __local_tree: *mut _RBTree
 
-    (__local_tree = rb_tree_new(int_compare))
+    (__local_tree = rb_tree_new(Some(int_compare)))
 
     unsafe { rb_tree_free(__local_tree) }
 
@@ -480,7 +481,7 @@ pub fn test_rb_tree_to_array() writes allocation_limit {
 
     var __local_array: *mut *mut c_int
 
-    (__local_tree = rb_tree_new(int_compare))
+    (__local_tree = rb_tree_new(Some(int_compare)))
 
     (__local_i = ((0 as c_int)))
 
@@ -541,4 +542,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 }
 
-var tests: [7]extern "C" fn() -> Unit = [test_rb_tree_new, test_rb_tree_free, test_rb_tree_child, test_rb_tree_insert_lookup, test_rb_tree_lookup, test_out_of_memory, null]
+var tests: [7]Option[extern "C" fn() -> Unit] = [Some(test_rb_tree_new), Some(test_rb_tree_free), Some(test_rb_tree_child), Some(test_rb_tree_insert_lookup), Some(test_rb_tree_lookup), Some(test_out_of_memory), null]

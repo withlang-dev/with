@@ -1941,7 +1941,7 @@ pub unsafe fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param
     }
 
     '__ci_bb_200 {
-        (*(&raw const (*(*__param_cb).cx).memctl as *const pcre2_memctl)).free((__local_cranges__goto_1091_15 as *mut c_void), (*(&raw const (*(*__param_cb).cx).memctl as *const pcre2_memctl)).memory_data)
+        (*(&raw const (*(*__param_cb).cx).memctl as *const pcre2_memctl)).free.unwrap()((__local_cranges__goto_1091_15 as *mut c_void), (*(&raw const (*(*__param_cb).cx).memctl as *const pcre2_memctl)).memory_data)
         goto '__ci_bb_201
     }
 
@@ -2194,7 +2194,7 @@ pub unsafe fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param
         ((__local_code__goto_1073_14[(0 + 1)]) = ((((((__local_char_lists_size__goto_1744_12 as c_ulong) >> (1 as c_uint)) as c_uint) & (255 as c_uint)) as u8)))
         (__local_code__goto_1073_14 = __local_code__goto_1073_14 + ((2 as isize) as usize))
         ((*__param_cb).char_lists_size = ((((((__local_char_lists_size__goto_1744_12 as c_ulong) +% (((sizeof[u32]() as c_ulong) -% (1 as c_ulong)) as c_ulong)) as c_ulong) & ((~((sizeof[u32]() as c_ulong) -% (1 as c_ulong))) as c_ulong)) as c_ulong)))
-        (*(&raw const (*(*__param_cb).cx).memctl as *const pcre2_memctl)).free((__local_cranges__goto_1091_15 as *mut c_void), (*(&raw const (*(*__param_cb).cx).memctl as *const pcre2_memctl)).memory_data)
+        (*(&raw const (*(*__param_cb).cx).memctl as *const pcre2_memctl)).free.unwrap()((__local_cranges__goto_1091_15 as *mut c_void), (*(&raw const (*(*__param_cb).cx).memctl as *const pcre2_memctl)).memory_data)
         goto '__ci_bb_229
     }
 
@@ -3403,7 +3403,7 @@ unsafe fn compile_optimize_class(__param_start_ptr: *mut c_uint, __param_options
     (__local_total_size = ((((__local_range_list_size as c_ulong) +% (__ci_expr_ternary_1 as c_ulong)) as c_ulong)))
 
 
-    (__local_cranges = (((*(&raw const (*(*__param_cb).cx).memctl as *const pcre2_memctl)).malloc((((sizeof[class_ranges]() as c_ulong) +% (((__local_total_size as c_ulong) *% (sizeof[u32]() as c_ulong)) as c_ulong)) as c_ulong), (*(&raw const (*(*__param_cb).cx).memctl as *const pcre2_memctl)).memory_data) as *mut class_ranges)))
+    (__local_cranges = (((*(&raw const (*(*__param_cb).cx).memctl as *const pcre2_memctl)).malloc.unwrap()((((sizeof[class_ranges]() as c_ulong) +% (((__local_total_size as c_ulong) *% (sizeof[u32]() as c_ulong)) as c_ulong)) as c_ulong), (*(&raw const (*(*__param_cb).cx).memctl as *const pcre2_memctl)).memory_data) as *mut class_ranges)))
 
     if ((if __local_cranges == null: 1 else: 0) != 0) {
         return ((null as *mut class_ranges))

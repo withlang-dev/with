@@ -5,6 +5,7 @@ use std.calg_testing.compare_int
 use std.calg_testing.framework
 use std.calg_testing.slist
 use std.libc
+use std.option
 
 pub fn generate_list() -> *mut _SListEntry writes allocation_limit, variable1, variable2, variable3, variable4 {
     var __local_list: *mut _SListEntry = ((null as *mut _SListEntry))
@@ -473,7 +474,7 @@ pub fn test_slist_remove_data() writes allocation_limit {
 
     (__local_val = ((0 as c_int)))
 
-    if (((if not ((if unsafe { slist_remove_data((&raw mut __local_list as *mut *mut _SListEntry), int_equal, ((&raw mut __local_val as *mut c_int) as *mut c_void)) } == 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
+    if (((if not ((if unsafe { slist_remove_data((&raw mut __local_list as *mut *mut _SListEntry), Some(int_equal), ((&raw mut __local_val as *mut c_int) as *mut c_void)) } == 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_slist_remove_data".ptr, c"test-slist.c".ptr, (240 as c_int), c"slist_remove_data(&list, int_equal, &val) == 0".ptr)
     } else {
         0
@@ -481,7 +482,7 @@ pub fn test_slist_remove_data() writes allocation_limit {
 
     (__local_val = ((56 as c_int)))
 
-    if (((if not ((if unsafe { slist_remove_data((&raw mut __local_list as *mut *mut _SListEntry), int_equal, ((&raw mut __local_val as *mut c_int) as *mut c_void)) } == 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
+    if (((if not ((if unsafe { slist_remove_data((&raw mut __local_list as *mut *mut _SListEntry), Some(int_equal), ((&raw mut __local_val as *mut c_int) as *mut c_void)) } == 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_slist_remove_data".ptr, c"test-slist.c".ptr, (242 as c_int), c"slist_remove_data(&list, int_equal, &val) == 0".ptr)
     } else {
         0
@@ -489,7 +490,7 @@ pub fn test_slist_remove_data() writes allocation_limit {
 
     (__local_val = ((8 as c_int)))
 
-    if (((if not ((if unsafe { slist_remove_data((&raw mut __local_list as *mut *mut _SListEntry), int_equal, ((&raw mut __local_val as *mut c_int) as *mut c_void)) } == 1: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
+    if (((if not ((if unsafe { slist_remove_data((&raw mut __local_list as *mut *mut _SListEntry), Some(int_equal), ((&raw mut __local_val as *mut c_int) as *mut c_void)) } == 1: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_slist_remove_data".ptr, c"test-slist.c".ptr, (246 as c_int), c"slist_remove_data(&list, int_equal, &val) == 1".ptr)
     } else {
         0
@@ -503,7 +504,7 @@ pub fn test_slist_remove_data() writes allocation_limit {
 
     (__local_val = ((4 as c_int)))
 
-    if (((if not ((if unsafe { slist_remove_data((&raw mut __local_list as *mut *mut _SListEntry), int_equal, ((&raw mut __local_val as *mut c_int) as *mut c_void)) } == 4: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
+    if (((if not ((if unsafe { slist_remove_data((&raw mut __local_list as *mut *mut _SListEntry), Some(int_equal), ((&raw mut __local_val as *mut c_int) as *mut c_void)) } == 4: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_slist_remove_data".ptr, c"test-slist.c".ptr, (251 as c_int), c"slist_remove_data(&list, int_equal, &val) == 4".ptr)
     } else {
         0
@@ -517,7 +518,7 @@ pub fn test_slist_remove_data() writes allocation_limit {
 
     (__local_val = ((89 as c_int)))
 
-    if (((if not ((if unsafe { slist_remove_data((&raw mut __local_list as *mut *mut _SListEntry), int_equal, ((&raw mut __local_val as *mut c_int) as *mut c_void)) } == 1: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
+    if (((if not ((if unsafe { slist_remove_data((&raw mut __local_list as *mut *mut _SListEntry), Some(int_equal), ((&raw mut __local_val as *mut c_int) as *mut c_void)) } == 1: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_slist_remove_data".ptr, c"test-slist.c".ptr, (256 as c_int), c"slist_remove_data(&list, int_equal, &val) == 1".ptr)
     } else {
         0
@@ -557,7 +558,7 @@ pub fn test_slist_sort() -> Unit writes allocation_limit {
     }
 
 
-    unsafe { slist_sort((&raw mut __local_list as *mut *mut _SListEntry), int_compare) }
+    unsafe { slist_sort((&raw mut __local_list as *mut *mut _SListEntry), Some(int_compare)) }
 
     if (((if not ((if unsafe { slist_length(__local_list) } == __local_num_entries: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_slist_sort".ptr, c"test-slist.c".ptr, (279 as c_int), c"slist_length(list) == num_entries".ptr)
@@ -588,7 +589,7 @@ pub fn test_slist_sort() -> Unit writes allocation_limit {
 
     (__local_list = ((null as *mut _SListEntry)))
 
-    unsafe { slist_sort((&raw mut __local_list as *mut *mut _SListEntry), int_compare) }
+    unsafe { slist_sort((&raw mut __local_list as *mut *mut _SListEntry), Some(int_compare)) }
 
     if (((if not ((if __local_list == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_slist_sort".ptr, c"test-slist.c".ptr, (296 as c_int), c"list == NULL".ptr)
@@ -631,7 +632,7 @@ pub fn test_slist_find_data() writes allocation_limit {
     while ((if __local_i < __local_num_entries: 1 else: 0) != 0) {
         (__local_val = ((__local_entries[__local_i] as c_int)))
 
-        (__local_result = unsafe { slist_find_data(__local_list, int_equal, ((&raw mut __local_val as *mut c_int) as *mut c_void)) })
+        (__local_result = unsafe { slist_find_data(__local_list, Some(int_equal), ((&raw mut __local_val as *mut c_int) as *mut c_void)) })
 
         if (((if not ((if __local_result != null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
             __assert_rtn(c"test_slist_find_data".ptr, c"test-slist.c".ptr, (322 as c_int), c"result != NULL".ptr)
@@ -655,7 +656,7 @@ pub fn test_slist_find_data() writes allocation_limit {
 
     (__local_val = ((0 as c_int)))
 
-    if (((if not ((if unsafe { slist_find_data(__local_list, int_equal, ((&raw mut __local_val as *mut c_int) as *mut c_void)) } == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
+    if (((if not ((if unsafe { slist_find_data(__local_list, Some(int_equal), ((&raw mut __local_val as *mut c_int) as *mut c_void)) } == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_slist_find_data".ptr, c"test-slist.c".ptr, (330 as c_int), c"slist_find_data(list, int_equal, &val) == NULL".ptr)
     } else {
         0
@@ -663,7 +664,7 @@ pub fn test_slist_find_data() writes allocation_limit {
 
     (__local_val = ((56 as c_int)))
 
-    if (((if not ((if unsafe { slist_find_data(__local_list, int_equal, ((&raw mut __local_val as *mut c_int) as *mut c_void)) } == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
+    if (((if not ((if unsafe { slist_find_data(__local_list, Some(int_equal), ((&raw mut __local_val as *mut c_int) as *mut c_void)) } == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_slist_find_data".ptr, c"test-slist.c".ptr, (332 as c_int), c"slist_find_data(list, int_equal, &val) == NULL".ptr)
     } else {
         0
@@ -860,7 +861,7 @@ pub fn test_slist_iterate_bad_remove() writes allocation_limit {
         (__local_val = ((unsafe { slist_iter_next((&raw mut __local_iter as *mut _SListIterator)) } as *mut c_int)))
 
         if ((if ((unsafe *__local_val) % 2) == 0: 1 else: 0) != 0) {
-            if (((if not ((if unsafe { slist_remove_data((&raw mut __local_list as *mut *mut _SListEntry), int_equal, (__local_val as *mut c_void)) } != 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
+            if (((if not ((if unsafe { slist_remove_data((&raw mut __local_list as *mut *mut _SListEntry), Some(int_equal), (__local_val as *mut c_void)) } != 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
                 __assert_rtn(c"test_slist_iterate_bad_remove".ptr, c"test-slist.c".ptr, (466 as c_int), c"slist_remove_data(&list, int_equal, val) != 0".ptr)
             } else {
                 0
@@ -883,4 +884,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 }
 
-var tests: [15]extern "C" fn() -> Unit = [test_slist_append, test_slist_prepend, test_slist_free, test_slist_next, test_slist_nth_entry, test_slist_nth_data, test_slist_length, test_slist_remove_entry, test_slist_remove_data, test_slist_sort, test_slist_find_data, test_slist_to_array, test_slist_iterate, test_slist_iterate_bad_remove, null]
+var tests: [15]Option[extern "C" fn() -> Unit] = [Some(test_slist_append), Some(test_slist_prepend), Some(test_slist_free), Some(test_slist_next), Some(test_slist_nth_entry), Some(test_slist_nth_data), Some(test_slist_length), Some(test_slist_remove_entry), Some(test_slist_remove_data), Some(test_slist_sort), Some(test_slist_find_data), Some(test_slist_to_array), Some(test_slist_iterate), Some(test_slist_iterate_bad_remove), null]

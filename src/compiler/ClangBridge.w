@@ -980,6 +980,26 @@ unsafe fn type_is_unaligned_qualified(ty: CXType) -> bool:
             break
     found
 
+/// True when `ty` is a pointer to a function, through any typedef.
+unsafe fn type_is_fn_pointer(ty: CXType) -> bool:
+    let canonical = clang_getCanonicalType(ty)
+    if canonical.kind != CXType_Pointer: return false
+    let pointee = clang_getCanonicalType(clang_getPointeeType(canonical))
+    pointee.kind == CXType_FunctionProto or pointee.kind == CXType_FunctionNoProto
+
+/// D102 (§16.6): a function pointer C hands to the program — a record
+/// field, an array element, a pointee (`fn_t *out`), a return, a global —
+/// may be NULL, so it is `Option` of the non-null type there. A typedef and
+/// a parameter keep the non-null type.
+unsafe fn option_wrapped(s: *mut CImportSession, ty: CXType, inner: *mut u8) -> *mut u8:
+    if inner as i64 == 0 or not type_is_fn_pointer(ty) or c_strncmp(inner as *const u8, "__UNSUPPORTED:\0" as *const u8, 14) == 0: return inner
+    var buf: [2048]u8 = [0 as u8; 2048]
+    var pos: i64 = 0
+    buf_append_str(&raw mut buf as *mut [2048]u8 as *mut u8, &raw mut pos, 2048, "Option[\0" as *const u8)
+    buf_append_str(&raw mut buf as *mut [2048]u8 as *mut u8, &raw mut pos, 2048, inner as *const u8)
+    buf_append_str(&raw mut buf as *mut [2048]u8 as *mut u8, &raw mut pos, 2048, "]\0" as *const u8)
+    session_strdup(s, &buf as *const [2048]u8 as *const u8)
+
 unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, depth: i32, is_last_struct_field: i32, preserve_incomplete_arrays: i32) -> *mut u8:
     if depth > MAX_TYPE_DEPTH:
         return session_strdup(s, "__UNSUPPORTED:type too complex\0" as *const u8)
@@ -1074,7 +1094,7 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
             buf_append_str(&raw mut buf as *mut [64]u8 as *mut u8, &raw mut pos, 64, " c_void\0" as *const u8)
             return session_strdup(s, &buf as *const [64]u8 as *const u8)
         // General pointer
-        let inner = translate_type_recursive_mode(s, pointee, depth + 1, 0, preserve_incomplete_arrays)
+        let inner = option_wrapped(s, pointee, translate_type_recursive_mode(s, pointee, depth + 1, 0, preserve_incomplete_arrays))
         if inner as i64 == 0 or c_strncmp(inner as *const u8, "__UNSUPPORTED:\0" as *const u8, 14) == 0:
             return session_strdup(s, "*const i8\0" as *const u8)
         var buf: [2048]u8 = [0 as u8; 2048]
@@ -1088,7 +1108,7 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
     if kind == CXType_ConstantArray:
         let size = clang_getArraySize(canonical)
         let elem = clang_getArrayElementType(shape)
-        let elem_str = translate_type_recursive_mode(s, elem, depth + 1, 0, preserve_incomplete_arrays)
+        let elem_str = option_wrapped(s, elem, translate_type_recursive_mode(s, elem, depth + 1, 0, preserve_incomplete_arrays))
         if elem_str as i64 == 0 or c_strcmp(elem_str as *const u8, "c_void\0" as *const u8) == 0:
             return session_strdup(s, "c_void\0" as *const u8)
         if c_strncmp(elem_str as *const u8, "__UNSUPPORTED:\0" as *const u8, 14) == 0:
@@ -1103,7 +1123,7 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
 
     if kind == CXType_IncompleteArray:
         let elem = clang_getArrayElementType(canonical)
-        let elem_str = translate_type_recursive_mode(s, elem, depth + 1, 0, preserve_incomplete_arrays)
+        let elem_str = option_wrapped(s, elem, translate_type_recursive_mode(s, elem, depth + 1, 0, preserve_incomplete_arrays))
         if elem_str as i64 == 0 or c_strncmp(elem_str as *const u8, "__UNSUPPORTED:\0" as *const u8, 14) == 0:
             return session_strdup(s, "*const i8\0" as *const u8)
         var buf: [2048]u8 = [0 as u8; 2048]
@@ -2711,7 +2731,13 @@ pub fn with_cimport_fn_param_type_translated(session: i64, idx: i32, param: i32)
         let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
         let arg = clang_Cursor_getArgument(cursor, param as u32)
         let ty = clang_getCursorType(arg)
-        let result = translate_parameter_type(s, ty, 0)
+        var result = translate_parameter_type(s, ty, 0)
+        // D102 (§16.6): a c_import prototype's parameter is where the program
+        // hands C a function pointer, so it stays non-null. A migrated
+        // definition is C itself: its parameter is where C's callers hand it
+        // one, NULL included (`pcre2_set_callout(ctx, NULL, NULL)`), so it
+        // keeps C's nullability.
+        if (*s).migration != 0: result = option_wrapped(s, ty, result)
         if result as i64 == 0: return ""
         session_make_str(s, result as *const u8)
 
@@ -2722,7 +2748,7 @@ pub fn with_cimport_fn_return_type_translated(session: i64, idx: i32) -> str:
         let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
         let ty = clang_getCursorType(cursor)
         let ret = clang_getResultType(ty)
-        let result = translate_type_recursive(s, ret, 0, 0)
+        let result = option_wrapped(s, ret, translate_type_recursive(s, ret, 0, 0))
         if result as i64 == 0: return ""
         session_make_str(s, result as *const u8)
 
@@ -2925,7 +2951,7 @@ pub fn with_cimport_struct_field_type_translated(session: i64, idx: i32, field: 
         if field < 0 or field >= (*cache).field_count: return ""
         let fi = ((*cache).fields as i64 + field as i64 * sizeof[FieldInfo]()) as *const FieldInfo
         let is_last = if field == (*cache).field_count - 1: 1 else: 0
-        let result = translate_type_recursive(s, (*fi).clang_type, 0, is_last)
+        let result = option_wrapped(s, (*fi).clang_type, translate_type_recursive(s, (*fi).clang_type, 0, is_last))
         if result as i64 == 0: return ""
         session_make_str(s, result as *const u8)
 
@@ -3040,7 +3066,7 @@ pub fn with_cimport_var_type_translated(session: i64, idx: i32) -> str:
         if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return ""
         let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
         let ty = clang_getCursorType(cursor)
-        let result = translate_type_recursive(s, ty, 0, 0)
+        let result = option_wrapped(s, ty, translate_type_recursive(s, ty, 0, 0))
         if result as i64 == 0: return ""
         session_make_str(s, result as *const u8)
 
@@ -3050,7 +3076,7 @@ pub fn with_cimport_var_storage_type_translated(session: i64, idx: i32) -> str:
         if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return ""
         let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
         let ty = clang_getCursorType(cursor)
-        let result = translate_storage_type_recursive(s, ty, 0, 0)
+        let result = option_wrapped(s, ty, translate_storage_type_recursive(s, ty, 0, 0))
         if result as i64 == 0: return ""
         session_make_str(s, result as *const u8)
 
@@ -4252,6 +4278,13 @@ pub fn with_ci_type_translated(session: i64, type_idx: i32) -> str:
         let result = translate_type_recursive(s, ty, 0, 0)
         if result as i64 == 0: return ""
         session_make_str(s, result as *const u8)
+
+// D102: whether a session type is a function pointer (through typedefs).
+pub fn with_ci_type_is_fn_pointer(session: i64, type_idx: i32) -> bool:
+    unsafe:
+        let s = session as *mut CImportSession
+        if s as i64 == 0 or type_idx < 0 or type_idx >= (*s).type_count: return false
+        type_is_fn_pointer(*(((*s).types as i64 + type_idx as i64 * 24) as *const CXType))
 
 pub fn cimport_type_is_va_list_at(session: i64, type_idx: i32, parameter: bool) -> bool:
     unsafe:

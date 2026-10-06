@@ -10,6 +10,7 @@ use std.calg_testing.hash_pointer
 use std.calg_testing.hash_string
 use std.calg_testing.set
 use std.libc
+use std.option
 
 pub fn generate_set() -> *mut _Set writes allocation_limit {
     var __local_set: *mut _Set
@@ -20,7 +21,7 @@ pub fn generate_set() -> *mut _Set writes allocation_limit {
 
     var __local_value: *mut c_char
 
-    (__local_set = set_new(string_hash, string_equal))
+    (__local_set = set_new(Some(string_hash), Some(string_equal)))
 
     (__local_i = ((0 as c_uint)))
 
@@ -43,7 +44,7 @@ pub fn generate_set() -> *mut _Set writes allocation_limit {
     }
 
 
-    unsafe { set_register_free_function(__local_set, alloc_test_free) }
+    unsafe { set_register_free_function(__local_set, Some(alloc_test_free)) }
 
     return __local_set
 
@@ -56,9 +57,9 @@ pub fn test_set_new_free() -> Unit writes allocation_limit {
 
     var __local_value: *mut c_int
 
-    (__local_set = set_new(int_hash, int_equal))
+    (__local_set = set_new(Some(int_hash), Some(int_equal)))
 
-    unsafe { set_register_free_function(__local_set, alloc_test_free) }
+    unsafe { set_register_free_function(__local_set, Some(alloc_test_free)) }
 
     if (((if not ((if __local_set != null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_set_new_free".ptr, c"test-set.c".ptr, (74 as c_int), c"set != NULL".ptr)
@@ -85,7 +86,7 @@ pub fn test_set_new_free() -> Unit writes allocation_limit {
 
     alloc_test_set_limit((0 as c_int))
 
-    (__local_set = set_new(int_hash, int_equal))
+    (__local_set = set_new(Some(int_hash), Some(int_equal)))
 
     if (((if not ((if __local_set == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_set_new_free".ptr, c"test-set.c".ptr, (91 as c_int), c"set == NULL".ptr)
@@ -95,7 +96,7 @@ pub fn test_set_new_free() -> Unit writes allocation_limit {
 
     alloc_test_set_limit((1 as c_int))
 
-    (__local_set = set_new(int_hash, int_equal))
+    (__local_set = set_new(Some(int_hash), Some(int_equal)))
 
     if (((if not ((if __local_set == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_set_new_free".ptr, c"test-set.c".ptr, (95 as c_int), c"set == NULL".ptr)
@@ -120,7 +121,7 @@ pub fn test_set_insert() writes allocation_limit {
 
     var __local_i: c_int
 
-    (__local_set = set_new(int_hash, int_equal))
+    (__local_set = set_new(Some(int_hash), Some(int_equal)))
 
     (__local_i = ((0 as c_int)))
 
@@ -319,7 +320,7 @@ pub fn test_set_union() writes allocation_limit {
 
     var __local_allocated: c_ulong
 
-    (__local_set1 = set_new(int_hash, int_equal))
+    (__local_set1 = set_new(Some(int_hash), Some(int_equal)))
 
     (__local_i = ((0 as c_int)))
 
@@ -332,7 +333,7 @@ pub fn test_set_union() writes allocation_limit {
     }
 
 
-    (__local_set2 = set_new(int_hash, int_equal))
+    (__local_set2 = set_new(Some(int_hash), Some(int_equal)))
 
     (__local_i = ((0 as c_int)))
 
@@ -433,7 +434,7 @@ pub fn test_set_intersection() writes allocation_limit {
 
     var __local_allocated: c_ulong
 
-    (__local_set1 = set_new(int_hash, int_equal))
+    (__local_set1 = set_new(Some(int_hash), Some(int_equal)))
 
     (__local_i = ((0 as c_int)))
 
@@ -446,7 +447,7 @@ pub fn test_set_intersection() writes allocation_limit {
     }
 
 
-    (__local_set2 = set_new(int_hash, int_equal))
+    (__local_set2 = set_new(Some(int_hash), Some(int_equal)))
 
     (__local_i = ((0 as c_int)))
 
@@ -523,7 +524,7 @@ pub fn test_set_to_array() writes allocation_limit {
 
     var __local_i: c_int
 
-    (__local_set = set_new(pointer_hash, pointer_equal))
+    (__local_set = set_new(Some(pointer_hash), Some(pointer_equal)))
 
     (__local_i = ((0 as c_int)))
 
@@ -605,7 +606,7 @@ pub fn test_set_iterating() writes allocation_limit {
 
     unsafe { set_free(__local_set) }
 
-    (__local_set = set_new(int_hash, int_equal))
+    (__local_set = set_new(Some(int_hash), Some(int_equal)))
 
     unsafe { set_iterate(__local_set, (&raw mut __local_iterator as *mut _SetIterator)) }
 
@@ -701,9 +702,9 @@ pub fn test_set_free_function() -> Unit writes allocated_values, allocation_limi
 
     var __local_value: *mut c_int
 
-    (__local_set = set_new(int_hash, int_equal))
+    (__local_set = set_new(Some(int_hash), Some(int_equal)))
 
-    unsafe { set_register_free_function(__local_set, free_value) }
+    unsafe { set_register_free_function(__local_set, Some(free_value)) }
 
     (allocated_values = ((0 as c_int)))
 
@@ -753,7 +754,7 @@ pub fn test_set_out_of_memory() writes allocation_limit {
 
     var __local_i: c_uint
 
-    (__local_set = set_new(int_hash, int_equal))
+    (__local_set = set_new(Some(int_hash), Some(int_equal)))
 
     alloc_test_set_limit((0 as c_int))
 
@@ -829,4 +830,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 }
 
-var tests: [12]extern "C" fn() -> Unit = [test_set_new_free, test_set_insert, test_set_query, test_set_remove, test_set_intersection, test_set_union, test_set_iterating, test_set_iterating_remove, test_set_to_array, test_set_free_function, test_set_out_of_memory, null]
+var tests: [12]Option[extern "C" fn() -> Unit] = [Some(test_set_new_free), Some(test_set_insert), Some(test_set_query), Some(test_set_remove), Some(test_set_intersection), Some(test_set_union), Some(test_set_iterating), Some(test_set_iterating_remove), Some(test_set_to_array), Some(test_set_free_function), Some(test_set_out_of_memory), null]

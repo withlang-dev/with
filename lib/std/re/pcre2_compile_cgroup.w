@@ -329,7 +329,7 @@ pub unsafe fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut c_uint, 
 
     (__local_size = (((((((((*__param_cb).bracount as c_uint) +% (1 as c_uint)) as c_uint) +% (7 as c_uint)) as c_uint) >> (3 as c_uint)) as c_ulong)))
 
-    (__local_captures = (((*(&raw const (*(*__param_cb).cx).memctl as *const pcre2_memctl)).malloc(__local_size, (*(&raw const (*(*__param_cb).cx).memctl as *const pcre2_memctl)).memory_data) as *mut u8)))
+    (__local_captures = (((*(&raw const (*(*__param_cb).cx).memctl as *const pcre2_memctl)).malloc.unwrap()(__local_size, (*(&raw const (*(*__param_cb).cx).memctl as *const pcre2_memctl)).memory_data) as *mut u8)))
 
     if ((if __local_captures == null: 1 else: 0) != 0) {
         ((*__param_errorcodeptr) = ERR21)
@@ -483,7 +483,7 @@ pub unsafe fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut c_uint, 
 
     }
 
-    (*(&raw const (*(*__param_cb).cx).memctl as *const pcre2_memctl)).free((__local_captures as *mut c_void), (*(&raw const (*(*__param_cb).cx).memctl as *const pcre2_memctl)).memory_data)
+    (*(&raw const (*(*__param_cb).cx).memctl as *const pcre2_memctl)).free.unwrap()((__local_captures as *mut c_void), (*(&raw const (*(*__param_cb).cx).memctl as *const pcre2_memctl)).memory_data)
 
     return (((__local_pptr - ((1 as isize) as usize)) as *mut c_uint))
 
@@ -519,7 +519,7 @@ pub unsafe fn _pcre2_compile_parse_recurse_args8(__param_pptr_start: *mut c_uint
         return 0
     }
 
-    (__local_args = (((*(&raw const (*(*__param_cb).cx).memctl as *const pcre2_memctl)).malloc((((sizeof[recurse_arguments]() as c_ulong) +% (((__local_size as c_ulong) *% (sizeof[u16]() as c_ulong)) as c_ulong)) as c_ulong), (*(&raw const (*(*__param_cb).cx).memctl as *const pcre2_memctl)).memory_data) as *mut recurse_arguments)))
+    (__local_args = (((*(&raw const (*(*__param_cb).cx).memctl as *const pcre2_memctl)).malloc.unwrap()((((sizeof[recurse_arguments]() as c_ulong) +% (((__local_size as c_ulong) *% (sizeof[u16]() as c_ulong)) as c_ulong)) as c_ulong), (*(&raw const (*(*__param_cb).cx).memctl as *const pcre2_memctl)).memory_data) as *mut recurse_arguments)))
 
     if ((if __local_args == null: 1 else: 0) != 0) {
         ((*__param_errorcodeptr) = ERR21)

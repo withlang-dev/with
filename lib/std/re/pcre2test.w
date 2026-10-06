@@ -17,6 +17,7 @@ use std.re.pcre2_error
 use std.re.pcre2_maketables
 use std.re.pcre2posix
 use std.libc
+use std.option
 
 unsafe fn print_char_8(__param_f: *mut c_void, __param_ptr: *const u8, __param_utf: c_int) -> c_uint {
     var __local_c: c_uint = (((*__param_ptr) as c_uint))
@@ -8672,7 +8673,7 @@ fn show_pattern_info_8() -> c_int {
         (__ci_expr_ternary_15 = callout_enumerate_function_void_8)
     }
 
-    (__local_rc = ((unsafe { pcre2_callout_enumerate_8((compiled_code_8 as *const pcre2_real_code_8), __ci_expr_ternary_15, null) } as c_int)))
+    (__local_rc = ((unsafe { pcre2_callout_enumerate_8((compiled_code_8 as *const pcre2_real_code_8), Some(__ci_expr_ternary_15), null) } as c_int)))
 
 
     if ((if __local_rc != 0: 1 else: 0) != 0) {
@@ -10402,7 +10403,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_116 {
-        unsafe { pcre2_set_compile_recursion_guard_8(pat_context_8, stack_guard, null) }
+        unsafe { pcre2_set_compile_recursion_guard_8(pat_context_8, Some(stack_guard), null) }
         goto '__ci_bb_117
     }
 
@@ -11979,7 +11980,7 @@ unsafe fn check_match_limit_8(__param_pp: *const u8, __param_ulen: c_ulong, __pa
         if ((if __param_errnumber == -63: 1 else: 0) != 0) {
             pcre2_set_heap_limit_8(dat_context_8, __local_mid)
 
-            (*(&raw const (*match_data_8).memctl as *const pcre2_memctl)).free(((*match_data_8).heapframes as *mut c_void), (*(&raw const (*match_data_8).memctl as *const pcre2_memctl)).memory_data)
+            (*(&raw const (*match_data_8).memctl as *const pcre2_memctl)).free.unwrap()(((*match_data_8).heapframes as *mut c_void), (*(&raw const (*match_data_8).memctl as *const pcre2_memctl)).memory_data)
 
             ((*match_data_8).heapframes = ((null as *mut heapframe)))
 
@@ -16057,7 +16058,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_276 {
-        unsafe { pcre2_jit_stack_assign_8(dat_context_8, jit_callback_8, (jit_stack_8 as *mut c_void)) }
+        unsafe { pcre2_jit_stack_assign_8(dat_context_8, Some(jit_callback_8), (jit_stack_8 as *mut c_void)) }
         goto '__ci_bb_274
     }
 
@@ -16074,7 +16075,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_279 {
-        unsafe { pcre2_jit_stack_assign_8(dat_context_8, jit_callback_8, null) }
+        unsafe { pcre2_jit_stack_assign_8(dat_context_8, Some(jit_callback_8), null) }
         goto '__ci_bb_280
     }
 
@@ -16087,7 +16088,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_281 {
-        unsafe { pcre2_set_callout_8(dat_context_8, callout_function_8, (((&raw const (*(&raw const dat_datctl as *const datctl)).callout_data as *const c_int) as *mut c_int) as *mut c_void)) }
+        unsafe { pcre2_set_callout_8(dat_context_8, Some(callout_function_8), (((&raw const (*(&raw const dat_datctl as *const datctl)).callout_data as *const c_int) as *mut c_int) as *mut c_void)) }
         goto '__ci_bb_283
     }
 
@@ -16553,7 +16554,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_336 {
-        unsafe { pcre2_set_substitute_callout_8(dat_context_8, substitute_callout_function_8, null) }
+        unsafe { pcre2_set_substitute_callout_8(dat_context_8, Some(substitute_callout_function_8), null) }
         goto '__ci_bb_338
     }
 
@@ -16571,7 +16572,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_339 {
-        unsafe { pcre2_set_substitute_case_callout_8(dat_context_8, substitute_case_callout_function_8, null) }
+        unsafe { pcre2_set_substitute_case_callout_8(dat_context_8, Some(substitute_case_callout_function_8), null) }
         goto '__ci_bb_341
     }
 
@@ -16610,7 +16611,7 @@ fn process_data_8() -> c_int {
     '__ci_bb_344 {
         (__local_heapframes__goto_4831_23 = (((unsafe *match_data_8).heapframes as *mut c_void)))
         (__local_memory_data__goto_4831_23 = (unsafe *(&raw const (*match_data_8).memctl as *const pcre2_memctl)).memory_data)
-        unsafe { (*(&raw const (*match_data_8).memctl as *const pcre2_memctl)).free(__local_heapframes__goto_4831_23, __local_memory_data__goto_4831_23) }
+        unsafe { (*(&raw const (*match_data_8).memctl as *const pcre2_memctl)).free.unwrap()(__local_heapframes__goto_4831_23, __local_memory_data__goto_4831_23) }
         ((unsafe *match_data_8).heapframes = ((null as *mut heapframe)))
         ((unsafe *match_data_8).heapframes_size = ((0 as c_ulong)))
         goto '__ci_bb_345
@@ -16667,7 +16668,7 @@ fn process_data_8() -> c_int {
     '__ci_bb_353 {
         (__local_heapframes__goto_4845_7 = (((unsafe *match_data_8).heapframes as *mut c_void)))
         (__local_memory_data__goto_4845_7 = (unsafe *(&raw const (*match_data_8).memctl as *const pcre2_memctl)).memory_data)
-        unsafe { (*(&raw const (*match_data_8).memctl as *const pcre2_memctl)).free(__local_heapframes__goto_4845_7, __local_memory_data__goto_4845_7) }
+        unsafe { (*(&raw const (*match_data_8).memctl as *const pcre2_memctl)).free.unwrap()(__local_heapframes__goto_4845_7, __local_memory_data__goto_4845_7) }
         ((unsafe *match_data_8).heapframes = ((null as *mut heapframe)))
         ((unsafe *match_data_8).heapframes_size = ((0 as c_ulong)))
         goto '__ci_bb_354
@@ -17177,7 +17178,7 @@ fn process_data_8() -> c_int {
     '__ci_bb_420 {
         (__local_heapframes__goto_5025_25 = (((unsafe *match_data_8).heapframes as *mut c_void)))
         (__local_memory_data__goto_5025_25 = (unsafe *(&raw const (*match_data_8).memctl as *const pcre2_memctl)).memory_data)
-        unsafe { (*(&raw const (*match_data_8).memctl as *const pcre2_memctl)).free(__local_heapframes__goto_5025_25, __local_memory_data__goto_5025_25) }
+        unsafe { (*(&raw const (*match_data_8).memctl as *const pcre2_memctl)).free.unwrap()(__local_heapframes__goto_5025_25, __local_memory_data__goto_5025_25) }
         ((unsafe *match_data_8).heapframes = ((null as *mut heapframe)))
         ((unsafe *match_data_8).heapframes_size = ((0 as c_ulong)))
         goto '__ci_bb_421
@@ -17329,7 +17330,7 @@ fn process_data_8() -> c_int {
     '__ci_bb_443 {
         (__local_heapframes__goto_5065_9 = (((unsafe *match_data_8).heapframes as *mut c_void)))
         (__local_memory_data__goto_5065_9 = (unsafe *(&raw const (*match_data_8).memctl as *const pcre2_memctl)).memory_data)
-        unsafe { (*(&raw const (*match_data_8).memctl as *const pcre2_memctl)).free(__local_heapframes__goto_5065_9, __local_memory_data__goto_5065_9) }
+        unsafe { (*(&raw const (*match_data_8).memctl as *const pcre2_memctl)).free.unwrap()(__local_heapframes__goto_5065_9, __local_memory_data__goto_5065_9) }
         ((unsafe *match_data_8).heapframes = ((null as *mut heapframe)))
         ((unsafe *match_data_8).heapframes_size = ((0 as c_ulong)))
         goto '__ci_bb_444
@@ -18508,7 +18509,7 @@ fn process_data_8() -> c_int {
 }
 
 fn init_globals_8() -> Unit {
-    (general_context_8 = unsafe { pcre2_general_context_create_8(my_malloc, my_free, null) })
+    (general_context_8 = unsafe { pcre2_general_context_create_8(Some(my_malloc), Some(my_free), null) })
 
     (general_context_copy_8 = unsafe { pcre2_general_context_copy_8(general_context_8) })
 
@@ -19395,7 +19396,7 @@ fn unittest_8() -> Unit {
     '__ci_bb_109 {
         unsafe { pcre2_general_context_free_8(__local_test_gen_context__goto_5633_24) }
         (mallocs_until_failure = ((0 as c_int)))
-        (__local_test_gen_context__goto_5633_24 = unsafe { pcre2_general_context_create_8(my_malloc, my_free, null) })
+        (__local_test_gen_context__goto_5633_24 = unsafe { pcre2_general_context_create_8(Some(my_malloc), Some(my_free), null) })
         goto '__ci_bb_112
     }
 
@@ -19426,7 +19427,7 @@ fn unittest_8() -> Unit {
 
     '__ci_bb_114 {
         (mallocs_until_failure = ((1 as c_int)))
-        (__local_test_gen_context__goto_5633_24 = unsafe { pcre2_general_context_create_8(my_malloc, my_free, null) })
+        (__local_test_gen_context__goto_5633_24 = unsafe { pcre2_general_context_create_8(Some(my_malloc), Some(my_free), null) })
         goto '__ci_bb_117
     }
 
@@ -21534,7 +21535,7 @@ fn unittest_8() -> Unit {
 
     '__ci_bb_454 {
         (mallocs_until_failure = ((2147483647 as c_int)))
-        (__local_rc__goto_5628_5 = ((unsafe { pcre2_callout_enumerate_8((null as *const pcre2_real_code_8), callout_enumerate_function_void_8, null) } as c_int)))
+        (__local_rc__goto_5628_5 = ((unsafe { pcre2_callout_enumerate_8((null as *const pcre2_real_code_8), Some(callout_enumerate_function_void_8), null) } as c_int)))
         goto '__ci_bb_457
     }
 
@@ -21564,7 +21565,7 @@ fn unittest_8() -> Unit {
     }
 
     '__ci_bb_459 {
-        (__local_rc__goto_5628_5 = ((unsafe { pcre2_callout_enumerate_8((__local_invalid_code__goto_5664_7 as *const pcre2_real_code_8), callout_enumerate_function_void_8, null) } as c_int)))
+        (__local_rc__goto_5628_5 = ((unsafe { pcre2_callout_enumerate_8((__local_invalid_code__goto_5664_7 as *const pcre2_real_code_8), Some(callout_enumerate_function_void_8), null) } as c_int)))
         goto '__ci_bb_462
     }
 
@@ -21625,7 +21626,7 @@ fn unittest_8() -> Unit {
     }
 
     '__ci_bb_469 {
-        (__local_rc__goto_5628_5 = ((unsafe { pcre2_callout_enumerate_8((__local_test_compiled_code__goto_5638_13 as *const pcre2_real_code_8), callout_enumerate_function_void_8, ((&raw mut __local_errorcode__goto_5657_5 as *mut c_int) as *mut c_void)) } as c_int)))
+        (__local_rc__goto_5628_5 = ((unsafe { pcre2_callout_enumerate_8((__local_test_compiled_code__goto_5638_13 as *const pcre2_real_code_8), Some(callout_enumerate_function_void_8), ((&raw mut __local_errorcode__goto_5657_5 as *mut c_int) as *mut c_void)) } as c_int)))
         goto '__ci_bb_472
     }
 
@@ -21656,7 +21657,7 @@ fn unittest_8() -> Unit {
 
     '__ci_bb_474 {
         (__local_errorcode__goto_5657_5 = ((-12 as c_int)))
-        (__local_rc__goto_5628_5 = ((unsafe { pcre2_callout_enumerate_8((__local_test_compiled_code__goto_5638_13 as *const pcre2_real_code_8), callout_enumerate_function_fail_8, ((&raw mut __local_errorcode__goto_5657_5 as *mut c_int) as *mut c_void)) } as c_int)))
+        (__local_rc__goto_5628_5 = ((unsafe { pcre2_callout_enumerate_8((__local_test_compiled_code__goto_5638_13 as *const pcre2_real_code_8), Some(callout_enumerate_function_fail_8), ((&raw mut __local_errorcode__goto_5657_5 as *mut c_int) as *mut c_void)) } as c_int)))
         goto '__ci_bb_477
     }
 
@@ -21718,7 +21719,7 @@ fn unittest_8() -> Unit {
 
     '__ci_bb_484 {
         (__local_errorcode__goto_5657_5 = ((-123 as c_int)))
-        (__local_rc__goto_5628_5 = ((unsafe { pcre2_callout_enumerate_8((__local_test_compiled_code__goto_5638_13 as *const pcre2_real_code_8), callout_enumerate_function_fail_8, ((&raw mut __local_errorcode__goto_5657_5 as *mut c_int) as *mut c_void)) } as c_int)))
+        (__local_rc__goto_5628_5 = ((unsafe { pcre2_callout_enumerate_8((__local_test_compiled_code__goto_5638_13 as *const pcre2_real_code_8), Some(callout_enumerate_function_fail_8), ((&raw mut __local_errorcode__goto_5657_5 as *mut c_int) as *mut c_void)) } as c_int)))
         goto '__ci_bb_487
     }
 

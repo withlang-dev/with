@@ -955,7 +955,9 @@ fn facade_render_lend_item(pool: AstPool, intern: InternPool, ci: &Vec[i32], ite
         // A buffer pairing, a fixed argument and the status contract of a
         // copied-back length (D64) describe the lend's presented call
         // (facade_render_bridge); they make nothing stronger than a lend.
-        else if kind == FACADE_CLAUSE_BUFFER or kind == FACADE_CLAUSE_FIXED or kind == FACADE_CLAUSE_OK: li.bridged = true
+        // D102: `nullable param N` on a function-pointer parameter presents
+        // `Option` of it through the bridge (facade_render_bridge_param).
+        else if kind == FACADE_CLAUSE_BUFFER or kind == FACADE_CLAUSE_FIXED or kind == FACADE_CLAUSE_OK or kind == FACADE_CLAUSE_NULLABLE: li.bridged = true
         else if kind != FACADE_CLAUSE_LEND and kind != FACADE_CLAUSE_PRESERVES and kind != FACADE_CLAUSE_CALLBACKS_NONE: li.lends = false
     if not li.lends:
         return li
@@ -1983,6 +1985,21 @@ fn facade_render_fixed_literal(pool: AstPool, intern: InternPool, decl: i32, pi:
         return facade_render_literal(pool, pool.get_extra(ops + 1))
     ""
 
+// D102 (§16.2b.8): whether `nullable param N` names parameter `pi` of the
+// declaration, in its fn item.
+fn facade_render_param_is_nullable(pool: AstPool, intern: InternPool, decl: i32, pi: i32) -> bool:
+    let item = facade_render_fn_item(pool, intern, decl)
+    if item == 0:
+        return false
+    let cstart = pool.get_data1(item as NodeId)
+    for k in 0..pool.get_data2(item as NodeId):
+        let clause = pool.get_extra(cstart + k)
+        if pool.get_data0(clause as NodeId) != FACADE_CLAUSE_NULLABLE:
+            continue
+        if facade_render_param_ref(pool, intern, decl, pool.get_extra(pool.get_data1(clause as NodeId))) == pi:
+            return true
+    false
+
 fn facade_render_literal(pool: AstPool, node: i32) -> str:
     let kind = pool.kind(node as NodeId)
     if kind == NodeKind.NK_NULL_LIT: return "null"
@@ -2078,6 +2095,15 @@ fn facade_render_bridge_param(pool: AstPool, intern: InternPool, decl: i32, pi: 
         if handled != ptype:
             shown = handled
             arg = "transmute[" ++ facade_render_callback_raw_type(facade_render_unalias(pool, intern, ptype)) ++ "](" ++ pname ++ ")"
+        // D102 (§16.2b.8): `nullable param N` on a function-pointer
+        // parameter presents `Option` of it; the value crosses as the C
+        // pointer it is (with-abi.md §3), NULL for None.
+        else if facade_render_param_is_nullable(pool, intern, decl, pi) and facade_render_unalias(pool, intern, ptype).contains("fn("):
+            let raw = facade_render_unalias(pool, intern, ptype)
+            let local = facade_render_fresh(pname ++ "_raw", taken)
+            b.prologue = "let " ++ local ++ ": " ++ raw ++ " = unsafe { transmute[" ++ raw ++ "](" ++ pname ++ ") }\n"
+            shown = "Option[" ++ ptype ++ "]"
+            arg = local.clone()
     b.params = pname ++ ": " ++ shown
     b.args = arg.clone()
     b
@@ -3118,7 +3144,10 @@ fn facade_render_callback_ops(pool: AstPool, intern: InternPool, ci: &Vec[i32], 
             // value, NULL for None.
             let raw_cb = facade_render_callback_raw_type(facade_render_unalias(pool, intern, facade_render_param_type(pool, intern, decl, cbi.callback)))
             let ud_type = facade_render_unalias(pool, intern, facade_render_param_type(pool, intern, decl, cbi.userdata))
-            body = body ++ indent ++ "let " ++ ncb ++ ": " ++ raw_cb ++ " = match " ++ cb_name ++ ":\n" ++ indent ++ "    Some(" ++ nf ++ ") => unsafe { transmute[" ++ raw_cb ++ "](" ++ nf ++ ") }\n" ++ indent ++ "    None => null\n"
+            // D102 (with-abi.md §3): `Option[extern "C" fn]` is the nullable
+            // pointer, so the value itself crosses; a `None => null` would
+            // put a null in the non-null type.
+            body = body ++ indent ++ "let " ++ ncb ++ ": " ++ raw_cb ++ " = unsafe { transmute[" ++ raw_cb ++ "](" ++ cb_name ++ ") }\n"
             // The userdata by transmute, not `as *const U as …`: with no
             // callback `U` is Unit, and a cast to `*const Unit` traps
             // codegen (#1626), which a pointer-to-pointer transmute of the

@@ -5,6 +5,7 @@ use std.calg_testing.compare_int
 use std.calg_testing.framework
 use std.calg_testing.sortedarray
 use std.libc
+use std.option
 
 pub unsafe fn check_sorted(__param_sa: *mut _SortedArray) {
     var __local_i: c_uint
@@ -31,7 +32,7 @@ pub fn generate_sortedarray() -> *mut _SortedArray writes allocation_limit {
 
     var __local_i: c_uint
 
-    (__local_sa = sortedarray_new((0 as c_uint), int_compare))
+    (__local_sa = sortedarray_new((0 as c_uint), Some(int_compare)))
 
     (__local_i = ((0 as c_uint)))
 
@@ -57,7 +58,7 @@ pub fn test_sortedarray_new_free() writes allocation_limit {
         0
     }
 
-    (__local_sa = sortedarray_new((0 as c_uint), int_compare))
+    (__local_sa = sortedarray_new((0 as c_uint), Some(int_compare)))
 
     if (((if not ((if __local_sa != null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_sortedarray_new_free".ptr, c"test-sortedarray.c".ptr, (96 as c_int), c"sa != NULL".ptr)
@@ -71,7 +72,7 @@ pub fn test_sortedarray_new_free() writes allocation_limit {
 
     alloc_test_set_limit((0 as c_int))
 
-    (__local_sa = sortedarray_new((0 as c_uint), int_compare))
+    (__local_sa = sortedarray_new((0 as c_uint), Some(int_compare)))
 
     if (((if not ((if __local_sa == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_sortedarray_new_free".ptr, c"test-sortedarray.c".ptr, (105 as c_int), c"sa == NULL".ptr)
@@ -318,4 +319,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 var test_values: [100]c_int = [(114812 as c_int), (292972 as c_int), (15252 as c_int), (317887 as c_int), (859422 as c_int), (943227 as c_int), (173673 as c_int), (444396 as c_int), (289730 as c_int), (60903 as c_int), (706503 as c_int), (412815 as c_int), (-13616 as c_int), (464193 as c_int), (921380 as c_int), (411002 as c_int), (118983 as c_int), (908936 as c_int), (854842 as c_int), (228639 as c_int), (175174 as c_int), (976812 as c_int), (963457 as c_int), (39332 as c_int), (774021 as c_int), (588784 as c_int), (23511 as c_int), (364428 as c_int), (816641 as c_int), (66433 as c_int), (911779 as c_int), (774060 as c_int), (4340 as c_int), (-46542 as c_int), (739951 as c_int), (388501 as c_int), (710893 as c_int), (817647 as c_int), (582295 as c_int), (994147 as c_int), (741106 as c_int), (813303 as c_int), (187471 as c_int), (147041 as c_int), (933029 as c_int), (933029 as c_int), (933029 as c_int), (753121 as c_int), (469556 as c_int), (882575 as c_int), (953070 as c_int), (166462 as c_int), (-25609 as c_int), (766862 as c_int), (199480 as c_int), (269323 as c_int), (636875 as c_int), (49809 as c_int), (633426 as c_int), (153528 as c_int), (325532 as c_int), (15949 as c_int), (418818 as c_int), (541376 as c_int), (950242 as c_int), (824802 as c_int), (67683 as c_int), (583518 as c_int), (91497 as c_int), (832324 as c_int), (591778 as c_int), (296072 as c_int), (96531 as c_int), (867789 as c_int), (126879 as c_int), (716791 as c_int), (685326 as c_int), (826331 as c_int), (677729 as c_int), (496589 as c_int), (-6777 as c_int), (667244 as c_int), (446665 as c_int), (560213 as c_int), (727965 as c_int), (678769 as c_int), (428202 as c_int), (761385 as c_int), (130289 as c_int), (724727 as c_int), (300728 as c_int), (734018 as c_int), (493283 as c_int), (770024 as c_int), (472722 as c_int), (123696 as c_int), (301295 as c_int), (511707 as c_int), (383382 as c_int), (151978 as c_int)]
 var sorted_test_values: [100]c_int = [(-46542 as c_int), (-25609 as c_int), (-13616 as c_int), (-6777 as c_int), (4340 as c_int), (15252 as c_int), (15949 as c_int), (23511 as c_int), (39332 as c_int), (49809 as c_int), (60903 as c_int), (66433 as c_int), (67683 as c_int), (91497 as c_int), (96531 as c_int), (114812 as c_int), (118983 as c_int), (123696 as c_int), (126879 as c_int), (130289 as c_int), (147041 as c_int), (151978 as c_int), (153528 as c_int), (166462 as c_int), (173673 as c_int), (175174 as c_int), (187471 as c_int), (199480 as c_int), (228639 as c_int), (269323 as c_int), (289730 as c_int), (292972 as c_int), (296072 as c_int), (300728 as c_int), (301295 as c_int), (317887 as c_int), (325532 as c_int), (364428 as c_int), (383382 as c_int), (388501 as c_int), (411002 as c_int), (412815 as c_int), (418818 as c_int), (428202 as c_int), (444396 as c_int), (446665 as c_int), (464193 as c_int), (469556 as c_int), (472722 as c_int), (493283 as c_int), (496589 as c_int), (511707 as c_int), (541376 as c_int), (560213 as c_int), (582295 as c_int), (583518 as c_int), (588784 as c_int), (591778 as c_int), (633426 as c_int), (636875 as c_int), (667244 as c_int), (677729 as c_int), (678769 as c_int), (685326 as c_int), (706503 as c_int), (710893 as c_int), (716791 as c_int), (724727 as c_int), (727965 as c_int), (734018 as c_int), (739951 as c_int), (741106 as c_int), (753121 as c_int), (761385 as c_int), (766862 as c_int), (770024 as c_int), (774021 as c_int), (774060 as c_int), (813303 as c_int), (816641 as c_int), (817647 as c_int), (824802 as c_int), (826331 as c_int), (832324 as c_int), (854842 as c_int), (859422 as c_int), (867789 as c_int), (882575 as c_int), (908936 as c_int), (911779 as c_int), (921380 as c_int), (933029 as c_int), (933029 as c_int), (933029 as c_int), (943227 as c_int), (950242 as c_int), (953070 as c_int), (963457 as c_int), (976812 as c_int), (994147 as c_int)]
-var tests: [7]extern "C" fn() -> Unit = [test_sortedarray_new_free, test_sortedarray_insert, test_sortedarray_get, test_sortedarray_remove, test_sortedarray_index_of, test_sortedarray_clear, null]
+var tests: [7]Option[extern "C" fn() -> Unit] = [Some(test_sortedarray_new_free), Some(test_sortedarray_insert), Some(test_sortedarray_get), Some(test_sortedarray_remove), Some(test_sortedarray_index_of), Some(test_sortedarray_clear), null]

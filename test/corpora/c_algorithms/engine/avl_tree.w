@@ -1,8 +1,9 @@
 // Migrated from C
 use std.calg_testing.defs
 use std.calg_testing.alloc_testing
+use std.option
 
-pub fn avl_tree_new(__param_compare_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int) -> *mut _AVLTree writes allocation_limit {
+pub fn avl_tree_new(__param_compare_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int]) -> *mut _AVLTree writes allocation_limit {
     var __local_new_tree: *mut _AVLTree
 
     (__local_new_tree = ((alloc_test_malloc((sizeof[_AVLTree]() as c_ulong)) as *mut _AVLTree)))
@@ -43,7 +44,7 @@ pub unsafe fn avl_tree_insert(__param_tree: *mut _AVLTree, __param_key: *mut c_v
     while ((if (*__local_rover) != null: 1 else: 0) != 0) {
         (__local_previous_node = (*__local_rover))
 
-        if ((if (*__param_tree).compare_func(__param_key, (*(*__local_rover)).key) < 0: 1 else: 0) != 0) {
+        if ((if (*__param_tree).compare_func.unwrap()(__param_key, (*(*__local_rover)).key) < 0: 1 else: 0) != 0) {
             (__local_rover = (((&raw const (*(*__local_rover)).children[AVL_TREE_NODE_LEFT] as *const *mut _AVLTreeNode) as *mut *mut _AVLTreeNode)))
 
         } else {
@@ -159,7 +160,7 @@ pub unsafe fn avl_tree_lookup_node(__param_tree: *mut _AVLTree, __param_key: *mu
     (__local_node = (*__param_tree).root_node)
 
     while ((if __local_node != null: 1 else: 0) != 0) {
-        (__local_diff = (((*__param_tree).compare_func(__param_key, (*__local_node).key) as c_int)))
+        (__local_diff = (((*__param_tree).compare_func.unwrap()(__param_key, (*__local_node).key) as c_int)))
 
         if ((if __local_diff == 0: 1 else: 0) != 0) {
             return __local_node

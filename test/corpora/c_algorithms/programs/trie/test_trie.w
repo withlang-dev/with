@@ -4,6 +4,7 @@ use std.calg_testing.alloc_testing
 use std.calg_testing.framework
 use std.calg_testing.trie
 use std.libc
+use std.option
 
 pub fn generate_trie() -> *mut _Trie writes allocation_limit, test_array {
     var __local_trie: *mut _Trie
@@ -590,4 +591,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 }
 
-var tests: [12]extern "C" fn() -> Unit = [test_trie_new_free, test_trie_insert, test_trie_lookup, test_trie_remove, test_trie_replace, test_trie_insert_empty, test_trie_free_long, test_trie_negative_keys, test_trie_insert_binary, test_trie_insert_out_of_memory, test_trie_remove_binary, null]
+var tests: [12]Option[extern "C" fn() -> Unit] = [Some(test_trie_new_free), Some(test_trie_insert), Some(test_trie_lookup), Some(test_trie_remove), Some(test_trie_replace), Some(test_trie_insert_empty), Some(test_trie_free_long), Some(test_trie_negative_keys), Some(test_trie_insert_binary), Some(test_trie_insert_out_of_memory), Some(test_trie_remove_binary), null]

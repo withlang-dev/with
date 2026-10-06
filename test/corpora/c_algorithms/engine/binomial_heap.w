@@ -1,8 +1,9 @@
 // Migrated from C
 use std.calg_testing.defs
 use std.calg_testing.alloc_testing
+use std.option
 
-pub fn binomial_heap_new(__param_heap_type: i32, __param_compare_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int) -> *mut _BinomialHeap writes allocation_limit {
+pub fn binomial_heap_new(__param_heap_type: i32, __param_compare_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int]) -> *mut _BinomialHeap writes allocation_limit {
     var __local_new_heap: *mut _BinomialHeap
 
     (__local_new_heap = ((alloc_test_calloc((1 as c_ulong), (sizeof[_BinomialHeap]() as c_ulong)) as *mut _BinomialHeap)))
@@ -170,10 +171,10 @@ pub unsafe fn binomial_heap_num_entries(__param_heap: *mut _BinomialHeap) -> c_u
 
 unsafe fn binomial_heap_cmp(__param_heap: *mut _BinomialHeap, __param_data1: *mut c_void, __param_data2: *mut c_void) -> c_int {
     if ((if (*__param_heap).heap_type == 0: 1 else: 0) != 0) {
-        return (*__param_heap).compare_func(__param_data1, __param_data2)
+        return (*__param_heap).compare_func.unwrap()(__param_data1, __param_data2)
 
     }
-    return (0 - (*__param_heap).compare_func(__param_data1, __param_data2))
+    return (0 - (*__param_heap).compare_func.unwrap()(__param_data1, __param_data2))
 
 
 }

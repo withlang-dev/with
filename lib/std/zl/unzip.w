@@ -84,7 +84,7 @@ pub unsafe fn unzClose(__param_file: *mut c_void) -> c_int {
         unzCloseCurrentFile(__param_file)
     }
 
-    (*(&raw const (*__local_s).z_filefunc.zfile_func64 as *const zlib_filefunc64_def_s)).zclose_file((*(&raw const (*__local_s).z_filefunc.zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, (*__local_s).filestream)
+    (*(&raw const (*__local_s).z_filefunc.zfile_func64 as *const zlib_filefunc64_def_s)).zclose_file.unwrap()((*(&raw const (*__local_s).z_filefunc.zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, (*__local_s).filestream)
 
     with_free(((__local_s as *mut c_void) as *mut u8))
 
@@ -148,7 +148,7 @@ pub unsafe fn unzGetGlobalComment(__param_file: *mut c_void, __param_szComment: 
     if ((if __local_uReadThis > 0: 1 else: 0) != 0) {
         ((*__param_szComment) = ((0 as c_char)))
 
-        if ((if (*(&raw const (*__local_s).z_filefunc.zfile_func64 as *const zlib_filefunc64_def_s)).zread_file((*(&raw const (*__local_s).z_filefunc.zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, (*__local_s).filestream, (__param_szComment as *mut c_void), __local_uReadThis) != __local_uReadThis: 1 else: 0) != 0) {
+        if ((if (*(&raw const (*__local_s).z_filefunc.zfile_func64 as *const zlib_filefunc64_def_s)).zread_file.unwrap()((*(&raw const (*__local_s).z_filefunc.zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, (*__local_s).filestream, (__param_szComment as *mut c_void), __local_uReadThis) != __local_uReadThis: 1 else: 0) != 0) {
             return -1
         }
 
@@ -609,9 +609,9 @@ pub unsafe fn unzOpenCurrentFile3(__param_file: *mut c_void, __param_method: *mu
         }
 
         if (__ci_expr_logic_4 != 0) {
-            ((*__local_pfile_in_zip_read_info).stream.zalloc = ((0 as unsafe extern "C" fn(*mut c_void, c_uint, c_uint) -> *mut c_void)))
+            ((*__local_pfile_in_zip_read_info).stream.zalloc = null)
 
-            ((*__local_pfile_in_zip_read_info).stream.zfree = ((0 as unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit)))
+            ((*__local_pfile_in_zip_read_info).stream.zfree = null)
 
             ((*__local_pfile_in_zip_read_info).stream.opaque_ = ((0 as *mut c_void)))
 
@@ -660,7 +660,7 @@ pub unsafe fn unzOpenCurrentFile3(__param_file: *mut c_void, __param_method: *mu
             return -104
         }
 
-        if ((if (*(&raw const (*__local_s).z_filefunc.zfile_func64 as *const zlib_filefunc64_def_s)).zread_file((*(&raw const (*__local_s).z_filefunc.zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, (*__local_s).filestream, (&__local_source[0] as *mut c_char), (12 as c_ulong)) < 12: 1 else: 0) != 0) {
+        if ((if (*(&raw const (*__local_s).z_filefunc.zfile_func64 as *const zlib_filefunc64_def_s)).zread_file.unwrap()((*(&raw const (*__local_s).z_filefunc.zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, (*__local_s).filestream, (&__local_source[0] as *mut c_char), (12 as c_ulong)) < 12: 1 else: 0) != 0) {
             return -104
         }
 
@@ -815,7 +815,7 @@ pub unsafe fn unzReadCurrentFile(__param_file: *mut c_void, __param_buf: *mut c_
                 return -1
             }
 
-            if ((if (*(&raw const (*__local_pfile_in_zip_read_info).z_filefunc.zfile_func64 as *const zlib_filefunc64_def_s)).zread_file((*(&raw const (*__local_pfile_in_zip_read_info).z_filefunc.zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, (*__local_pfile_in_zip_read_info).filestream, ((*__local_pfile_in_zip_read_info).read_buffer as *mut c_void), (__local_uReadThis as c_ulong)) != __local_uReadThis: 1 else: 0) != 0) {
+            if ((if (*(&raw const (*__local_pfile_in_zip_read_info).z_filefunc.zfile_func64 as *const zlib_filefunc64_def_s)).zread_file.unwrap()((*(&raw const (*__local_pfile_in_zip_read_info).z_filefunc.zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, (*__local_pfile_in_zip_read_info).filestream, ((*__local_pfile_in_zip_read_info).read_buffer as *mut c_void), (__local_uReadThis as c_ulong)) != __local_uReadThis: 1 else: 0) != 0) {
                 return -1
             }
 
@@ -1100,7 +1100,7 @@ pub unsafe fn unzGetLocalExtrafield(__param_file: *mut c_void, __param_buf: *mut
         return -1
     }
 
-    if ((if (*(&raw const (*__local_pfile_in_zip_read_info).z_filefunc.zfile_func64 as *const zlib_filefunc64_def_s)).zread_file((*(&raw const (*__local_pfile_in_zip_read_info).z_filefunc.zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, (*__local_pfile_in_zip_read_info).filestream, __param_buf, (__local_read_now as c_ulong)) != __local_read_now: 1 else: 0) != 0) {
+    if ((if (*(&raw const (*__local_pfile_in_zip_read_info).z_filefunc.zfile_func64 as *const zlib_filefunc64_def_s)).zread_file.unwrap()((*(&raw const (*__local_pfile_in_zip_read_info).z_filefunc.zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, (*__local_pfile_in_zip_read_info).filestream, __param_buf, (__local_read_now as c_ulong)) != __local_read_now: 1 else: 0) != 0) {
         return -1
     }
 
@@ -1225,7 +1225,7 @@ unsafe fn init_keys(__param_passwd: *const i8, __param_pkeys: *mut c_ulong, __pa
 unsafe fn unz64local_getShort(__param_pzlib_filefunc_def: *const zlib_filefunc64_32_def_s, __param_filestream: *mut c_void, __param_pX: *mut c_ulong) -> c_int {
     var __local_c: [2]u8
 
-    var __local_err: c_int = (((*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).zread_file((*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, __param_filestream, (&__local_c[0] as *mut u8), (2 as c_ulong)) as c_int))
+    var __local_err: c_int = (((*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).zread_file.unwrap()((*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, __param_filestream, (&__local_c[0] as *mut u8), (2 as c_ulong)) as c_int))
 
     if ((if __local_err == 2: 1 else: 0) != 0) {
         ((*__param_pX) = (((((__local_c[0] as c_int) as c_ulong) | (((__local_c[1] as c_ulong) << (8 as c_uint)) as c_ulong)) as c_ulong)))
@@ -1235,7 +1235,7 @@ unsafe fn unz64local_getShort(__param_pzlib_filefunc_def: *const zlib_filefunc64
     }
     ((*__param_pX) = ((0 as c_ulong)))
 
-    if ((*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).zerror_file((*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, __param_filestream) != 0) {
+    if ((*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).zerror_file.unwrap()((*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, __param_filestream) != 0) {
         return -1
     }
     return 0
@@ -1246,7 +1246,7 @@ unsafe fn unz64local_getShort(__param_pzlib_filefunc_def: *const zlib_filefunc64
 unsafe fn unz64local_getLong(__param_pzlib_filefunc_def: *const zlib_filefunc64_32_def_s, __param_filestream: *mut c_void, __param_pX: *mut c_ulong) -> c_int {
     var __local_c: [4]u8
 
-    var __local_err: c_int = (((*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).zread_file((*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, __param_filestream, (&__local_c[0] as *mut u8), (4 as c_ulong)) as c_int))
+    var __local_err: c_int = (((*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).zread_file.unwrap()((*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, __param_filestream, (&__local_c[0] as *mut u8), (4 as c_ulong)) as c_int))
 
     if ((if __local_err == 4: 1 else: 0) != 0) {
         ((*__param_pX) = (((((((((__local_c[0] as c_int) as c_ulong) | (((__local_c[1] as c_ulong) << (8 as c_uint)) as c_ulong)) as c_ulong) | (((__local_c[2] as c_ulong) << (16 as c_uint)) as c_ulong)) as c_ulong) | (((__local_c[3] as c_ulong) << (24 as c_uint)) as c_ulong)) as c_ulong)))
@@ -1256,7 +1256,7 @@ unsafe fn unz64local_getLong(__param_pzlib_filefunc_def: *const zlib_filefunc64_
     }
     ((*__param_pX) = ((0 as c_ulong)))
 
-    if ((*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).zerror_file((*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, __param_filestream) != 0) {
+    if ((*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).zerror_file.unwrap()((*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, __param_filestream) != 0) {
         return -1
     }
     return 0
@@ -1267,7 +1267,7 @@ unsafe fn unz64local_getLong(__param_pzlib_filefunc_def: *const zlib_filefunc64_
 unsafe fn unz64local_getLong64(__param_pzlib_filefunc_def: *const zlib_filefunc64_32_def_s, __param_filestream: *mut c_void, __param_pX: *mut c_ulong) -> c_int {
     var __local_c: [8]u8
 
-    var __local_err: c_int = (((*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).zread_file((*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, __param_filestream, (&__local_c[0] as *mut u8), (8 as c_ulong)) as c_int))
+    var __local_err: c_int = (((*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).zread_file.unwrap()((*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, __param_filestream, (&__local_c[0] as *mut u8), (8 as c_ulong)) as c_int))
 
     if ((if __local_err == 8: 1 else: 0) != 0) {
         ((*__param_pX) = (((((((((((((((((__local_c[0] as c_int) as c_ulong) | (((__local_c[1] as c_ulong) << (8 as c_uint)) as c_ulong)) as c_ulong) | (((__local_c[2] as c_ulong) << (16 as c_uint)) as c_ulong)) as c_ulong) | (((__local_c[3] as c_ulong) << (24 as c_uint)) as c_ulong)) as c_ulong) | (((__local_c[4] as c_ulong) << (32 as c_uint)) as c_ulong)) as c_ulong) | (((__local_c[5] as c_ulong) << (40 as c_uint)) as c_ulong)) as c_ulong) | (((__local_c[6] as c_ulong) << (48 as c_uint)) as c_ulong)) as c_ulong) | (((__local_c[7] as c_ulong) << (56 as c_uint)) as c_ulong)) as c_ulong)))
@@ -1277,7 +1277,7 @@ unsafe fn unz64local_getLong64(__param_pzlib_filefunc_def: *const zlib_filefunc6
     }
     ((*__param_pX) = ((0 as c_ulong)))
 
-    if ((*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).zerror_file((*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, __param_filestream) != 0) {
+    if ((*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).zerror_file.unwrap()((*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, __param_filestream) != 0) {
         return -1
     }
     return 0
@@ -1411,7 +1411,7 @@ unsafe fn unz64local_SearchCentralDir(__param_pzlib_filefunc_def: *const zlib_fi
             break
         }
 
-        if ((if (*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).zread_file((*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, __param_filestream, (__local_buf as *mut c_void), __local_uReadSize) != __local_uReadSize: 1 else: 0) != 0) {
+        if ((if (*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).zread_file.unwrap()((*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, __param_filestream, (__local_buf as *mut c_void), __local_uReadSize) != __local_uReadSize: 1 else: 0) != 0) {
             break
         }
 
@@ -1529,7 +1529,7 @@ unsafe fn unz64local_SearchCentralDir64(__param_pzlib_filefunc_def: *const zlib_
             break
         }
 
-        if ((if (*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).zread_file((*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, __param_filestream, (__local_buf as *mut c_void), __local_uReadSize) != __local_uReadSize: 1 else: 0) != 0) {
+        if ((if (*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).zread_file.unwrap()((*(&raw const (*__param_pzlib_filefunc_def).zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, __param_filestream, (__local_buf as *mut c_void), __local_uReadSize) != __local_uReadSize: 1 else: 0) != 0) {
             break
         }
 
@@ -1831,7 +1831,7 @@ unsafe fn unzOpenInternal(__param_path: *const c_void, __param_pzlib_filefunc64_
 
 
     if ((if __local_err != 0: 1 else: 0) != 0) {
-        (*(&raw const __local_us.z_filefunc.zfile_func64 as *const zlib_filefunc64_def_s)).zclose_file((*(&raw const __local_us.z_filefunc.zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, (*(&raw const __local_us as *const unz64_s)).filestream)
+        (*(&raw const __local_us.z_filefunc.zfile_func64 as *const zlib_filefunc64_def_s)).zclose_file.unwrap()((*(&raw const __local_us.z_filefunc.zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, (*(&raw const __local_us as *const unz64_s)).filestream)
 
         return null
 
@@ -2008,7 +2008,7 @@ unsafe fn unz64local_GetCurrentFileInfoInternal(__param_file: *mut c_void, __par
         }
 
         if (__ci_expr_logic_1 != 0) {
-            if ((if (*(&raw const (*__local_s).z_filefunc.zfile_func64 as *const zlib_filefunc64_def_s)).zread_file((*(&raw const (*__local_s).z_filefunc.zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, (*__local_s).filestream, (__param_szFileName as *mut c_void), __local_uSizeRead) != __local_uSizeRead: 1 else: 0) != 0) {
+            if ((if (*(&raw const (*__local_s).z_filefunc.zfile_func64 as *const zlib_filefunc64_def_s)).zread_file.unwrap()((*(&raw const (*__local_s).z_filefunc.zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, (*__local_s).filestream, (__param_szFileName as *mut c_void), __local_uSizeRead) != __local_uSizeRead: 1 else: 0) != 0) {
                 (__local_err = ((-1 as c_int)))
             }
         }
@@ -2050,7 +2050,7 @@ unsafe fn unz64local_GetCurrentFileInfoInternal(__param_file: *mut c_void, __par
         }
 
         if (__ci_expr_logic_3 != 0) {
-            if ((if (*(&raw const (*__local_s).z_filefunc.zfile_func64 as *const zlib_filefunc64_def_s)).zread_file((*(&raw const (*__local_s).z_filefunc.zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, (*__local_s).filestream, __param_extraField, __local_uSizeRead_1) != __local_uSizeRead_1: 1 else: 0) != 0) {
+            if ((if (*(&raw const (*__local_s).z_filefunc.zfile_func64 as *const zlib_filefunc64_def_s)).zread_file.unwrap()((*(&raw const (*__local_s).z_filefunc.zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, (*__local_s).filestream, __param_extraField, __local_uSizeRead_1) != __local_uSizeRead_1: 1 else: 0) != 0) {
                 (__local_err = ((-1 as c_int)))
             }
         }
@@ -2173,7 +2173,7 @@ unsafe fn unz64local_GetCurrentFileInfoInternal(__param_file: *mut c_void, __par
         }
 
         if (__ci_expr_logic_6 != 0) {
-            if ((if (*(&raw const (*__local_s).z_filefunc.zfile_func64 as *const zlib_filefunc64_def_s)).zread_file((*(&raw const (*__local_s).z_filefunc.zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, (*__local_s).filestream, (__param_szComment as *mut c_void), __local_uSizeRead_2) != __local_uSizeRead_2: 1 else: 0) != 0) {
+            if ((if (*(&raw const (*__local_s).z_filefunc.zfile_func64 as *const zlib_filefunc64_def_s)).zread_file.unwrap()((*(&raw const (*__local_s).z_filefunc.zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, (*__local_s).filestream, (__param_szComment as *mut c_void), __local_uSizeRead_2) != __local_uSizeRead_2: 1 else: 0) != 0) {
                 (__local_err = ((-1 as c_int)))
             }
         }

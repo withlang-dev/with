@@ -459,7 +459,7 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
     }
 
     '__ci_bb_21 {
-        (*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).free(((*__param_match_data).subject as *mut c_void), (*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).memory_data)
+        (*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).free.unwrap()(((*__param_match_data).subject as *mut c_void), (*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).memory_data)
         ((*__param_match_data).flags = ((*__param_match_data).flags as u8) & ((~1) as u8))
         goto '__ci_bb_22
     }
@@ -954,8 +954,8 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
     }
 
     '__ci_bb_84 {
-        (*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).free(((*__param_match_data).heapframes as *mut c_void), (*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).memory_data)
-        ((*__param_match_data).heapframes = (((*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).malloc(__local_heapframes_size__goto_7017_12, (*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).memory_data) as *mut heapframe)))
+        (*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).free.unwrap()(((*__param_match_data).heapframes as *mut c_void), (*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).memory_data)
+        ((*__param_match_data).heapframes = (((*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).malloc.unwrap()(__local_heapframes_size__goto_7017_12, (*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).memory_data) as *mut heapframe)))
         if ((if (*__param_match_data).heapframes == null: 1 else: 0) != 0) {
             goto '__ci_bb_86
         } else {
@@ -2478,7 +2478,7 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
     }
 
     '__ci_bb_254 {
-        ((*__param_match_data).subject = (((*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).malloc((((__local_length as c_ulong) *% (1 as c_ulong)) as c_ulong), (*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).memory_data) as *const u8)))
+        ((*__param_match_data).subject = (((*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).malloc.unwrap()((((__local_length as c_ulong) *% (1 as c_ulong)) as c_ulong), (*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).memory_data) as *const u8)))
         if ((if (*__param_match_data).subject == null: 1 else: 0) != 0) {
             goto '__ci_bb_257
         } else {
@@ -2626,7 +2626,7 @@ unsafe fn do_callout(__param_F: *mut heapframe, __param_mb: *mut match_block_8, 
     ((__local_callout_ovector[0]) = (((__local_callout_ovector[1]) as c_ulong)))
 
 
-    (__local_rc = (((*__param_mb).callout(__local_cb, (*__param_mb).callout_data) as c_int)))
+    (__local_rc = (((*__param_mb).callout.unwrap()(__local_cb, (*__param_mb).callout_data) as c_int)))
 
     ((__local_callout_ovector[0]) = __local_save0)
 
@@ -4832,7 +4832,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_18 {
-        (__local_new__goto_763_14 = (((*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).malloc(__local_newsize__goto_764_14, (*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).memory_data) as *mut heapframe)))
+        (__local_new__goto_763_14 = (((*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).malloc.unwrap()(__local_newsize__goto_764_14, (*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).memory_data) as *mut heapframe)))
         if ((if __local_new__goto_763_14 == null: 1 else: 0) != 0) {
             goto '__ci_bb_19
         } else {
@@ -4848,7 +4848,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
         with_memcpy(((__local_new__goto_763_14 as *mut c_void) as *mut u8), (((*__param_match_data).heapframes as *const c_void) as *const u8), (__local_usedsize__goto_765_14 as i64))
         (__local_N__goto_693_12 = ((((__local_new__goto_763_14 as *mut c_char) + (__local_usedsize__goto_765_14 as usize)) as *mut heapframe)))
         (__local_F__goto_692_12 = ((((__local_N__goto_693_12 as *mut c_char) - (__param_frame_size as usize)) as *mut heapframe)))
-        (*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).free(((*__param_match_data).heapframes as *mut c_void), (*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).memory_data)
+        (*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).free.unwrap()(((*__param_match_data).heapframes as *mut c_void), (*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).memory_data)
         ((*__param_match_data).heapframes = __local_new__goto_763_14)
         ((*__param_match_data).heapframes_size = __local_newsize__goto_764_14)
         (__local_frames_top__goto_696_12 = ((((__local_new__goto_763_14 as *mut c_char) + (__local_newsize__goto_764_14 as usize)) as *mut heapframe)))

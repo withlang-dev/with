@@ -1,8 +1,9 @@
 // Migrated from C
 use std.calg_testing.defs
 use std.calg_testing.alloc_testing
+use std.option
 
-pub fn set_new(__param_hash_func: unsafe extern "C" fn(*mut c_void) -> c_uint, __param_equal_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int) -> *mut _Set writes allocation_limit {
+pub fn set_new(__param_hash_func: Option[unsafe extern "C" fn(*mut c_void) -> c_uint], __param_equal_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int]) -> *mut _Set writes allocation_limit {
     var __local_new_set: *mut _Set
 
     (__local_new_set = ((alloc_test_malloc((sizeof[_Set]() as c_ulong)) as *mut _Set)))
@@ -66,7 +67,7 @@ pub unsafe fn set_free(__param_set: *mut _Set) {
 
 }
 
-pub unsafe fn set_register_free_function(__param_set: *mut _Set, __param_free_func: unsafe extern "C" fn(*mut c_void) -> Unit) {
+pub unsafe fn set_register_free_function(__param_set: *mut _Set, __param_free_func: Option[unsafe extern "C" fn(*mut c_void) -> Unit]) {
     ((*__param_set).free_func = __param_free_func)
 
 }
@@ -86,12 +87,12 @@ pub unsafe fn set_insert(__param_set: *mut _Set, __param_data: *mut c_void) -> c
 
     }
 
-    (__local_index = (((((*__param_set).hash_func(__param_data) as c_uint) % ((*__param_set).table_size as c_uint)) as c_uint)))
+    (__local_index = (((((*__param_set).hash_func.unwrap()(__param_data) as c_uint) % ((*__param_set).table_size as c_uint)) as c_uint)))
 
     (__local_rover = ((*__param_set).table[__local_index]))
 
     while ((if __local_rover != null: 1 else: 0) != 0) {
-        if ((if (*__param_set).equal_func(__param_data, (*__local_rover).data) != 0: 1 else: 0) != 0) {
+        if ((if (*__param_set).equal_func.unwrap()(__param_data, (*__local_rover).data) != 0: 1 else: 0) != 0) {
             return 0
 
         }
@@ -126,12 +127,12 @@ pub unsafe fn set_remove(__param_set: *mut _Set, __param_data: *mut c_void) -> c
 
     var __local_index: c_uint
 
-    (__local_index = (((((*__param_set).hash_func(__param_data) as c_uint) % ((*__param_set).table_size as c_uint)) as c_uint)))
+    (__local_index = (((((*__param_set).hash_func.unwrap()(__param_data) as c_uint) % ((*__param_set).table_size as c_uint)) as c_uint)))
 
     (__local_rover = (((&raw const ((*__param_set).table[__local_index]) as *const *mut _SetEntry) as *mut *mut _SetEntry)))
 
     while ((if (*__local_rover) != null: 1 else: 0) != 0) {
-        if ((if (*__param_set).equal_func(__param_data, (*(*__local_rover)).data) != 0: 1 else: 0) != 0) {
+        if ((if (*__param_set).equal_func.unwrap()(__param_data, (*(*__local_rover)).data) != 0: 1 else: 0) != 0) {
             (__local_entry = (*__local_rover))
 
             ((*__local_rover) = (*__local_entry).next)
@@ -157,12 +158,12 @@ pub unsafe fn set_query(__param_set: *mut _Set, __param_data: *mut c_void) -> c_
 
     var __local_index: c_uint
 
-    (__local_index = (((((*__param_set).hash_func(__param_data) as c_uint) % ((*__param_set).table_size as c_uint)) as c_uint)))
+    (__local_index = (((((*__param_set).hash_func.unwrap()(__param_data) as c_uint) % ((*__param_set).table_size as c_uint)) as c_uint)))
 
     (__local_rover = ((*__param_set).table[__local_index]))
 
     while ((if __local_rover != null: 1 else: 0) != 0) {
-        if ((if (*__param_set).equal_func(__param_data, (*__local_rover).data) != 0: 1 else: 0) != 0) {
+        if ((if (*__param_set).equal_func.unwrap()(__param_data, (*__local_rover).data) != 0: 1 else: 0) != 0) {
             return 1
 
         }
@@ -403,7 +404,7 @@ unsafe fn set_allocate_table(__param_set: *mut _Set) -> c_int {
 
 unsafe fn set_free_entry(__param_set: *mut _Set, __param_entry: *mut _SetEntry) {
     if ((if (*__param_set).free_func != null: 1 else: 0) != 0) {
-        (*__param_set).free_func((*__param_entry).data)
+        (*__param_set).free_func.unwrap()((*__param_entry).data)
 
     }
 
@@ -453,7 +454,7 @@ unsafe fn set_enlarge(__param_set: *mut _Set) -> c_int {
         while ((if __local_rover != null: 1 else: 0) != 0) {
             (__local_next = (*__local_rover).next)
 
-            (__local_index = (((((*__param_set).hash_func((*__local_rover).data) as c_uint) % ((*__param_set).table_size as c_uint)) as c_uint)))
+            (__local_index = (((((*__param_set).hash_func.unwrap()((*__local_rover).data) as c_uint) % ((*__param_set).table_size as c_uint)) as c_uint)))
 
             ((*__local_rover).next = ((*__param_set).table[__local_index]))
 

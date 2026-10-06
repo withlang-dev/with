@@ -5,11 +5,12 @@ use std.calg_testing.bloom_filter
 use std.calg_testing.framework
 use std.calg_testing.hash_string
 use std.libc
+use std.option
 
 pub fn test_bloom_filter_new_free() -> Unit writes allocation_limit {
     var __local_filter: *mut _BloomFilter
 
-    (__local_filter = bloom_filter_new((128 as c_uint), string_hash, (1 as c_uint)))
+    (__local_filter = bloom_filter_new((128 as c_uint), Some(string_hash), (1 as c_uint)))
 
     if (((if not ((if __local_filter != null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_bloom_filter_new_free".ptr, c"test-bloom-filter.c".ptr, (38 as c_int), c"filter != NULL".ptr)
@@ -19,7 +20,7 @@ pub fn test_bloom_filter_new_free() -> Unit writes allocation_limit {
 
     unsafe { bloom_filter_free(__local_filter) }
 
-    (__local_filter = bloom_filter_new((128 as c_uint), string_hash, (64 as c_uint)))
+    (__local_filter = bloom_filter_new((128 as c_uint), Some(string_hash), (64 as c_uint)))
 
     if (((if not ((if __local_filter != null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_bloom_filter_new_free".ptr, c"test-bloom-filter.c".ptr, (45 as c_int), c"filter != NULL".ptr)
@@ -29,7 +30,7 @@ pub fn test_bloom_filter_new_free() -> Unit writes allocation_limit {
 
     unsafe { bloom_filter_free(__local_filter) }
 
-    (__local_filter = bloom_filter_new((128 as c_uint), string_hash, (50000 as c_uint)))
+    (__local_filter = bloom_filter_new((128 as c_uint), Some(string_hash), (50000 as c_uint)))
 
     if (((if not ((if __local_filter == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_bloom_filter_new_free".ptr, c"test-bloom-filter.c".ptr, (52 as c_int), c"filter == NULL".ptr)
@@ -39,7 +40,7 @@ pub fn test_bloom_filter_new_free() -> Unit writes allocation_limit {
 
     alloc_test_set_limit((0 as c_int))
 
-    (__local_filter = bloom_filter_new((128 as c_uint), string_hash, (1 as c_uint)))
+    (__local_filter = bloom_filter_new((128 as c_uint), Some(string_hash), (1 as c_uint)))
 
     if (((if not ((if __local_filter == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_bloom_filter_new_free".ptr, c"test-bloom-filter.c".ptr, (59 as c_int), c"filter == NULL".ptr)
@@ -49,7 +50,7 @@ pub fn test_bloom_filter_new_free() -> Unit writes allocation_limit {
 
     alloc_test_set_limit((1 as c_int))
 
-    (__local_filter = bloom_filter_new((128 as c_uint), string_hash, (1 as c_uint)))
+    (__local_filter = bloom_filter_new((128 as c_uint), Some(string_hash), (1 as c_uint)))
 
     if (((if not ((if __local_filter == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_bloom_filter_new_free".ptr, c"test-bloom-filter.c".ptr, (65 as c_int), c"filter == NULL".ptr)
@@ -62,7 +63,7 @@ pub fn test_bloom_filter_new_free() -> Unit writes allocation_limit {
 pub fn test_bloom_filter_insert_query() writes allocation_limit {
     var __local_filter: *mut _BloomFilter
 
-    (__local_filter = bloom_filter_new((128 as c_uint), string_hash, (4 as c_uint)))
+    (__local_filter = bloom_filter_new((128 as c_uint), Some(string_hash), (4 as c_uint)))
 
     if (((if not ((if unsafe { bloom_filter_query(__local_filter, ("test 1" as *mut c_void)) } == 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_bloom_filter_insert_query".ptr, c"test-bloom-filter.c".ptr, (76 as c_int), c"bloom_filter_query(filter, \"test 1\") == 0".ptr)
@@ -103,7 +104,7 @@ pub fn test_bloom_filter_read_load() writes allocation_limit {
 
     var __local_state: [16]u8
 
-    (__local_filter1 = bloom_filter_new((128 as c_uint), string_hash, (4 as c_uint)))
+    (__local_filter1 = bloom_filter_new((128 as c_uint), Some(string_hash), (4 as c_uint)))
 
     unsafe { bloom_filter_insert(__local_filter1, ("test 1" as *mut c_void)) }
 
@@ -113,7 +114,7 @@ pub fn test_bloom_filter_read_load() writes allocation_limit {
 
     unsafe { bloom_filter_free(__local_filter1) }
 
-    (__local_filter2 = bloom_filter_new((128 as c_uint), string_hash, (4 as c_uint)))
+    (__local_filter2 = bloom_filter_new((128 as c_uint), Some(string_hash), (4 as c_uint)))
 
     unsafe { bloom_filter_load(__local_filter2, (&__local_state[0] as *mut u8)) }
 
@@ -140,13 +141,13 @@ pub fn test_bloom_filter_intersection() writes allocation_limit {
 
     var __local_result: *mut _BloomFilter
 
-    (__local_filter1 = bloom_filter_new((128 as c_uint), string_hash, (4 as c_uint)))
+    (__local_filter1 = bloom_filter_new((128 as c_uint), Some(string_hash), (4 as c_uint)))
 
     unsafe { bloom_filter_insert(__local_filter1, ("test 1" as *mut c_void)) }
 
     unsafe { bloom_filter_insert(__local_filter1, ("test 2" as *mut c_void)) }
 
-    (__local_filter2 = bloom_filter_new((128 as c_uint), string_hash, (4 as c_uint)))
+    (__local_filter2 = bloom_filter_new((128 as c_uint), Some(string_hash), (4 as c_uint)))
 
     unsafe { bloom_filter_insert(__local_filter2, ("test 1" as *mut c_void)) }
 
@@ -195,11 +196,11 @@ pub fn test_bloom_filter_union() writes allocation_limit {
 
     var __local_result: *mut _BloomFilter
 
-    (__local_filter1 = bloom_filter_new((128 as c_uint), string_hash, (4 as c_uint)))
+    (__local_filter1 = bloom_filter_new((128 as c_uint), Some(string_hash), (4 as c_uint)))
 
     unsafe { bloom_filter_insert(__local_filter1, ("test 1" as *mut c_void)) }
 
-    (__local_filter2 = bloom_filter_new((128 as c_uint), string_hash, (4 as c_uint)))
+    (__local_filter2 = bloom_filter_new((128 as c_uint), Some(string_hash), (4 as c_uint)))
 
     unsafe { bloom_filter_insert(__local_filter2, ("test 2" as *mut c_void)) }
 
@@ -240,9 +241,9 @@ pub fn test_bloom_filter_mismatch() writes allocation_limit {
 
     var __local_filter2: *mut _BloomFilter
 
-    (__local_filter1 = bloom_filter_new((128 as c_uint), string_hash, (4 as c_uint)))
+    (__local_filter1 = bloom_filter_new((128 as c_uint), Some(string_hash), (4 as c_uint)))
 
-    (__local_filter2 = bloom_filter_new((64 as c_uint), string_hash, (4 as c_uint)))
+    (__local_filter2 = bloom_filter_new((64 as c_uint), Some(string_hash), (4 as c_uint)))
 
     if (((if not ((if unsafe { bloom_filter_intersection(__local_filter1, __local_filter2) } == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_bloom_filter_mismatch".ptr, c"test-bloom-filter.c".ptr, (205 as c_int), c"bloom_filter_intersection(filter1, filter2) == NULL".ptr)
@@ -258,7 +259,7 @@ pub fn test_bloom_filter_mismatch() writes allocation_limit {
 
     unsafe { bloom_filter_free(__local_filter2) }
 
-    (__local_filter2 = bloom_filter_new((128 as c_uint), string_nocase_hash, (4 as c_uint)))
+    (__local_filter2 = bloom_filter_new((128 as c_uint), Some(string_nocase_hash), (4 as c_uint)))
 
     if (((if not ((if unsafe { bloom_filter_intersection(__local_filter1, __local_filter2) } == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_bloom_filter_mismatch".ptr, c"test-bloom-filter.c".ptr, (211 as c_int), c"bloom_filter_intersection(filter1, filter2) == NULL".ptr)
@@ -274,7 +275,7 @@ pub fn test_bloom_filter_mismatch() writes allocation_limit {
 
     unsafe { bloom_filter_free(__local_filter2) }
 
-    (__local_filter2 = bloom_filter_new((128 as c_uint), string_hash, (32 as c_uint)))
+    (__local_filter2 = bloom_filter_new((128 as c_uint), Some(string_hash), (32 as c_uint)))
 
     if (((if not ((if unsafe { bloom_filter_intersection(__local_filter1, __local_filter2) } == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_bloom_filter_mismatch".ptr, c"test-bloom-filter.c".ptr, (217 as c_int), c"bloom_filter_intersection(filter1, filter2) == NULL".ptr)
@@ -301,4 +302,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 }
 
-var tests: [7]extern "C" fn() -> Unit = [test_bloom_filter_new_free, test_bloom_filter_insert_query, test_bloom_filter_read_load, test_bloom_filter_intersection, test_bloom_filter_union, test_bloom_filter_mismatch, null]
+var tests: [7]Option[extern "C" fn() -> Unit] = [Some(test_bloom_filter_new_free), Some(test_bloom_filter_insert_query), Some(test_bloom_filter_read_load), Some(test_bloom_filter_intersection), Some(test_bloom_filter_union), Some(test_bloom_filter_mismatch), null]

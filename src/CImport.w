@@ -1318,7 +1318,10 @@ fn ci_translate_anon_record_cursor(session: i64, decl_cursor: i32, synth_name: &
         if with_ci_cursor_kind(session, child) == CK_FIELD:
             let raw_name = with_ci_cursor_spelling(session, child)
             var actual_name = if raw_name.len() > 0: raw_name.clone() else: f"anon_{anon_idx}"
-            var field_ty = with_ci_type_translated(session, with_ci_cursor_type(session, child))
+            let field_cxtype = with_ci_cursor_type(session, child)
+            var field_ty = with_ci_type_translated(session, field_cxtype)
+            // D102: a function-pointer field may be NULL.
+            if with_ci_type_is_fn_pointer(session, field_cxtype): field_ty = "Option[" ++ field_ty ++ "]"
             let anon_decl = ci_field_cursor_anon_record_decl(session, child)
             if anon_decl >= 0:
                 let nested_name = if raw_name.len() > 0: synth_name ++ "_" ++ raw_name else: f"{synth_name}_anon_{anon_idx}"
@@ -1467,6 +1470,8 @@ fn ci_has_demoted_field(session: i64, idx: i32, demoted: &str) -> bool:
 // pointer is an unmodeled callback contract — emit it as `unsafe` so calling
 // the slot honestly requires an unsafe context. Value-only signatures stay safe.
 pub fn ci_unsafe_fn_ptr_type(t: &str) -> str:
+    // D102: a nullable function pointer is judged by the pointer it holds.
+    if ci_starts_with(t, "Option[") and t.ends_with("]"): return "Option[" ++ ci_unsafe_fn_ptr_type(t.slice(7, t.len() - 1)) ++ "]"
     var normalized = with_str_clone_ref(t)
     if (ci_starts_with(normalized, "unsafe extern \"C\" fn(") or ci_starts_with(normalized, "extern \"C\" fn(") or ci_starts_with(normalized, "fn(")) and normalized.ends_with("-> void"):
         normalized = normalized.slice(0, normalized.len() - 4) ++ "Unit"
@@ -1931,7 +1936,7 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: &str, demoted_ty
             return ""
         if body.len() > 0:
             with_cimport_mark_name_emitted(name)
-            if ci_starts_with(si_ret, "extern \"C\" fn(") or ci_starts_with(si_ret, "fn("):
+            if ci_starts_with(si_ret, "extern \"C\" fn(") or ci_starts_with(si_ret, "fn(") or ci_starts_with(si_ret, "Option[extern \"C\" fn(") or ci_starts_with(si_ret, "Option[fn("):
                 ci_record_omitted_symbol_cat(name, ci_get_decl_location(session, name), body_category, "inline function returning function pointer not modeled")
                 return ""
             let fn_kw = if si_raw: "unsafe fn " else: "fn "
@@ -7567,6 +7572,16 @@ fn ci_expr_is_zero_int_lit(exprs: CiExprPool, id: CiExprId) -> bool:
         return false
     exprs.get_string(exprs.get_d0(id)) == "0"
 
+// D102: a null-valued expression under C's spellings of NULL — the null
+// literal, a zero, either behind parentheses or a cast (`(void *)0`).
+fn ci_expr_is_null_like(exprs: CiExprPool, id: CiExprId) -> bool:
+    if (id as i32) == 0: return false
+    let kind = exprs.kind(id)
+    if kind == CiExprKind.CIE_NULL_PTR: return true
+    if kind == CiExprKind.CIE_PAREN: return ci_expr_is_null_like(exprs, (exprs.get_d0(id)) as CiExprId)
+    if kind == CiExprKind.CIE_CAST: return ci_expr_is_null_like(exprs, (exprs.get_d1(id)) as CiExprId)
+    ci_expr_is_zero_int_lit(exprs, id)
+
 pub fn ci_type_is_fn_ptr(types: CiTypePool, ty: CiTypeId) -> bool:
     if (ty as i32) == 0:
         return false
@@ -7578,7 +7593,19 @@ pub fn ci_type_is_fn_ptr(types: CiTypePool, ty: CiTypeId) -> bool:
     false
 
 fn ci_type_text_is_fn_ptr(text: &str) -> bool:
+    // D102: a nullable function pointer (`Option[extern "C" fn(..)]`) is one too.
+    if ci_starts_with(text, "Option[") and text.ends_with("]"): return ci_type_text_is_fn_ptr(text.slice(7, text.len() - 1))
     ci_starts_with(text, "fn(") or ci_starts_with(text, "unsafe fn(") or ci_starts_with(text, "extern \"C\" fn(") or ci_starts_with(text, "unsafe extern \"C\" fn(")
+
+// D102: `Option[<fn pointer>]` as a CiIR named type.
+fn ci_nullable_fn_type(types: CiTypePool, fnptr: CiTypeId) -> CiTypeId:
+    types.ty_named(types.add_string("Option[" ++ ci_print_type(types, fnptr) ++ "]"))
+
+// D102: the non-null type inside a nullable function-pointer type's text,
+// or "" when the text is not one.
+fn ci_nullable_fn_ptr_inner(text: &str) -> str:
+    if ci_starts_with(text, "Option[") and text.ends_with("]") and ci_type_text_is_fn_ptr(text.slice(7, text.len() - 1)): return text.slice(7, text.len() - 1)
+    ""
 
 impl CiExprPool:
     fn char_array_init_from_string_literal(types: CiTypePool, array_ty: CiTypeId, literal: &str) -> CiExprId:
@@ -7771,6 +7798,14 @@ impl CiExprPool:
             return self.null_ptr(ty_id)
         if ci_expr_is_string_lit(self.val(), value_id) and ci_starts_with(ty, "*"):
             return value_id
+        // D102: a function named into a nullable function-pointer slot is
+        // `Some` of it; a null, or an `Option` value, is already the slot's.
+        if ci_nullable_fn_ptr_inner(ty).len() > 0 and ci_expr_is_null_like(self.val(), value_id):
+            return self.null_ptr(types.type_from_translated_text(ty))
+        if ci_nullable_fn_ptr_inner(ty).len() > 0:
+            let vt = self.get_type(value_id)
+            if (vt as i32) == 0 or ci_nullable_fn_ptr_inner(ci_print_type(types, vt)).len() == 0:
+                return self.some_of(value_id, types.type_from_translated_text(ty))
         let value_kind = self.kind(value_id)
         if value_kind == CiExprKind.CIE_INIT_LIST or value_kind == CiExprKind.CIE_DESIGNATED_INIT:
             // #1653: an array initializer keeps its array type — it carries
@@ -7849,7 +7884,11 @@ fn ci_record_type_field_type(session: i64, ty: i32, field_idx: i32) -> str:
             if raw_name.len() > 0:
                 return ci_escape_reserved(parent_name ++ "_" ++ raw_name)
             return ci_escape_reserved(parent_name ++ "_anon_" ++ i64_to_string(field_idx as i64))
-    with_ci_type_translated(session, with_ci_cursor_type(session, field))
+    let field_cxtype = with_ci_cursor_type(session, field)
+    let text = with_ci_type_translated(session, field_cxtype)
+    // D102: a function-pointer field is `Option` of the pointer, as its
+    // declaration says (an initializer item coerces to it).
+    if with_ci_type_is_fn_pointer(session, field_cxtype): "Option[" ++ text ++ "]" else: text
 
 fn ci_initializer_normalize_anon_field_type(session: i64, parent_ty: &str, field_idx: i32, field_ty: &str) -> str:
     if parent_ty.len() == 0 or field_ty.len() == 0:
@@ -9478,9 +9517,38 @@ impl CiExprPool:
             call = self.unsafe_expr(call)
         call
 
+    // D102: `Some(value)` typed as the nullable function pointer `target`.
+    fn some_of(value_id: CiExprId, target_ty_id: CiTypeId) -> CiExprId:
+        let args: Vec[i32] = Vec.new()
+        args.push(value_id as i32)
+        self.build_named_call_expr_typed("Some", &args, target_ty_id)
+
+    // D102: `value.unwrap()` typed as the non-null function pointer `target`:
+    // a NULL where C would call it panics instead of C's undefined behavior.
+    fn unwrap_of(value_id: CiExprId, target_ty_id: CiTypeId) -> CiExprId:
+        let method = self.add(CiExprKind.CIE_FIELD, value_id as i32, self.add_string("unwrap"), 2, 0 as CiTypeId)
+        self.add(CiExprKind.CIE_CALL, method as i32, self.extra_len() as i32, 0, target_ty_id)
+
     fn coerce_value_expr_for_target(session: i64, target_ty_id: CiTypeId, value_cursor: i32, value_id: CiExprId, types: CiTypePool) -> CiExprId:
         if (target_ty_id as i32) == 0 or (value_id as i32) == 0:
             return value_id
+        // D102: between the nullable and the non-null function-pointer types,
+        // a plain function wraps in `Some` and an `Option` unwraps.
+        let target_text = ci_print_type(types, target_ty_id)
+        if ci_nullable_fn_ptr_inner(target_text).len() > 0:
+            if ci_expr_is_null_like(self.val(), value_id):
+                return self.null_ptr(target_ty_id)
+            let value_ty = self.get_type(value_id)
+            let value_text = if (value_ty as i32) != 0: ci_print_type(types, value_ty) else: with_ci_type_translated(session, with_ci_cursor_type(session, value_cursor))
+            if ci_nullable_fn_ptr_inner(value_text).len() > 0:
+                return value_id
+            if ci_type_text_is_fn_ptr(value_text) or ci_cursor_is_function_ref(session, value_cursor):
+                return self.some_of(value_id, target_ty_id)
+            return value_id
+        if ci_type_is_fn_ptr(types, target_ty_id):
+            let value_ty = self.get_type(value_id)
+            if (value_ty as i32) != 0 and ci_nullable_fn_ptr_inner(ci_print_type(types, value_ty)).len() > 0:
+                return self.unwrap_of(value_id, target_ty_id)
         if ci_type_is_fn_ptr(types, target_ty_id) and ci_expr_is_zero_int_lit(self.val(), value_id):
             return self.null_ptr(target_ty_id)
         if ci_type_is_fn_ptr(types, target_ty_id):
@@ -9955,6 +10023,12 @@ impl CiExprPool:
                 text = with_str_clone_ref(escaped)
             let s = self.add_string(text)
             var ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
+            // D102: a variable of function-pointer type (a global; a local
+            // or parameter the scope does not type) holds what C handed it:
+            // `Option` of the pointer. A reference to a function is the
+            // non-null pointer itself.
+            if (ty as i32) != 0 and not ci_cursor_is_function_ref(session, cursor) and with_ci_type_is_fn_pointer(session, with_ci_cursor_type(session, cursor)):
+                ty = ci_nullable_fn_type(types, ty)
             let scoped_ty = ci_scope_lookup_type(scope, escaped)
             if scoped_ty.len() > 0:
                 let scoped_ty_id = types.type_from_translated_text(scoped_ty)
@@ -11012,6 +11086,8 @@ impl CiStmtPool:
                 deref_operand = exprs.decay_deref_operand(session, operand_cursor, deref_operand, types)
                 if (deref_ty as i32) == 0 and exprs.kind(deref_operand) == CiExprKind.CIE_ARRAY_DECAY:
                     deref_ty = (exprs.get_d1(deref_operand)) as CiTypeId
+                // D102: the pointee of a `fn_t *` is `Option` of the pointer.
+                if (deref_ty as i32) != 0 and ci_type_is_fn_ptr(types, deref_ty) and ci_nullable_fn_ptr_inner(ci_print_type(types, deref_ty)).len() == 0: deref_ty = ci_nullable_fn_type(types, deref_ty)
                 let deref_id = exprs.add(CiExprKind.CIE_DEREF, deref_operand as i32, 0, 0, deref_ty)
                 return CiValueExprIR {
                     setup_stmt: operand.setup_stmt,
@@ -11181,6 +11257,10 @@ impl CiStmtPool:
                     let lhs_expr_ty = exprs.get_type(lhs.value_expr)
                     let lhs_expr_is_ptr = (lhs_expr_ty as i32) != 0 and types.kind(lhs_expr_ty) == CiTypeKind.CT_POINTER
                     if ((lhs_ty_id as i32) == 0 or types.kind(lhs_ty_id) != CiTypeKind.CT_POINTER) and lhs_expr_is_ptr:
+                        lhs_ty_id = lhs_expr_ty
+                    // D102: a nullable function-pointer place (a field, a local)
+                    // is the target the value coerces to, not its C type.
+                    if (lhs_expr_ty as i32) != 0 and types.kind(lhs_expr_ty) == CiTypeKind.CT_NAMED and ci_nullable_fn_ptr_inner(types.get_string(types.get_d0(lhs_expr_ty))).len() > 0:
                         lhs_ty_id = lhs_expr_ty
                     let lhs_is_ptr = ci_cursor_type_is_pointerish(session, lhs_cursor) or lhs_expr_is_ptr
                     let rhs_is_ptr = ci_cursor_type_is_pointerish(session, rhs_cursor) or ci_cursor_type_is_pointerish(session, rhs_peeled)
@@ -11614,12 +11694,21 @@ impl CiStmtPool:
             while j < arg_ids.len():
                 let _ = exprs.add_extra(arg_ids[j])
                 j = j + 1
-            var call_id = exprs.add(CiExprKind.CIE_CALL, callee.value_expr as i32, args_start, arg_ids.len() as i32, 0 as CiTypeId)
+            // D102: a call through a nullable function pointer (a record
+            // field, a pointee C hands over) unwraps it first, so a NULL
+            // callee panics where C's call would be undefined behavior.
+            var callee_expr = callee.value_expr
+            var callee_type = exprs.get_type(callee.value_expr)
+            let nullable_inner = if (callee_type as i32) != 0 and types.kind(callee_type) == CiTypeKind.CT_NAMED: ci_nullable_fn_ptr_inner(types.get_string(types.get_d0(callee_type))) else: ""
+            if nullable_inner.len() > 0:
+                let unwrap_method = exprs.add(CiExprKind.CIE_FIELD, callee_expr as i32, exprs.add_string("unwrap"), 2, 0 as CiTypeId)
+                callee_type = types.type_from_translated_text(nullable_inner)
+                callee_expr = exprs.add(CiExprKind.CIE_CALL, unwrap_method as i32, exprs.extra_len() as i32, 0, callee_type)
+            var call_id = exprs.add(CiExprKind.CIE_CALL, callee_expr as i32, args_start, arg_ids.len() as i32, 0 as CiTypeId)
             // A local identifier can denote a function pointer just as a field
             // can. Declaration identity distinguishes direct function references
             // from pointer values; the spelling of the expression cannot.
             let direct_function = if callee_cursor >= 0: ci_cursor_is_function_ref(session, callee_cursor) else: callee_decl_idx >= 0
-            let callee_type = exprs.get_type(callee.value_expr)
             let indirect_fn_ptr_call = ci_type_is_fn_ptr(types, callee_type) and ci_starts_with(ci_print_type(types, callee_type), "unsafe ") and not direct_function and not g_ci_migrate_in_unsafe_function_body
             if ci_migrate_call_requires_unsafe_wrapper(callee_text) or indirect_fn_ptr_call:
                 call_id = exprs.unsafe_expr(call_id)
@@ -11633,7 +11722,10 @@ impl CiStmtPool:
             let field = with_ci_member_field_name(session, cursor)
             if ci_value_ir_valid(base) and field.len() > 0:
                 let field_idx = exprs.add_string(ci_escape_reserved(field))
-                let field_ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
+                let field_cxtype = with_ci_cursor_type(session, cursor)
+                var field_ty = types.type_from_libclang(session, field_cxtype)
+                // D102: a function-pointer field is `Option` of the pointer.
+                if with_ci_type_is_fn_pointer(session, field_cxtype): field_ty = ci_nullable_fn_type(types, field_ty)
                 return CiValueExprIR {
                     setup_stmt: base.setup_stmt,
                     value_expr: exprs.add(CiExprKind.CIE_FIELD, base.value_expr as i32, field_idx, 0, field_ty),
@@ -12330,6 +12422,12 @@ impl CiStmtPool:
                     let ret_c_ty = ci_pointer_type_explicit_mut(with_ci_type_translated(session, with_ci_cursor_type(session, ret_child)))
                     if ret_c_ty.len() > 0 and ret_c_ty != "void" and ret_c_ty != "Unit":
                         let ret_ty_id = types.type_from_translated_text(ret_c_ty)
+                        // D102: a function-pointer return is `Option` of the pointer
+                        // (with_cimport_fn_return_type_translated): a returned function
+                        // wraps in `Some`, a NULL is `null`, an `Option` value passes.
+                        if (ret_ty_id as i32) != 0 and ci_type_is_fn_ptr(types, ret_ty_id) and ci_nullable_fn_ptr_inner(ret_c_ty).len() == 0:
+                            let option_ret = types.type_from_translated_text("Option[" ++ ci_unsafe_fn_ptr_type(ret_c_ty) ++ "]")
+                            ret_value = exprs.coerce_value_expr_for_target(session, option_ret, ret_child, ret_value, types)
                         // Not fn-ptr: a function-pointer return (`return &callback`
                         // -> `return callback`) is already normalized by the migrator;
                         // casting it would break that and defeats no MIR mismatch.
@@ -13265,7 +13363,13 @@ impl CiStmtPool:
                         init_setup_id = lowered_init.setup_stmt
                         init_id = lowered_init.value_expr
                 // Build structural CiTypeId for the var's libclang type.
-                let vty_id = types.type_from_libclang(session, vty)
+                var vty_id = types.type_from_libclang(session, vty)
+                // D102: a C local of function-pointer type may hold NULL (it is
+                // where the body keeps what C handed it): `Option` of the pointer.
+                if (vty_id as i32) != 0 and with_ci_type_is_fn_pointer(session, vty):
+                    vty_id = ci_nullable_fn_type(types, vty_id)
+                    // Its reads carry the `Option` (identifier typing reads the scope).
+                    new_scope = ci_scope_add_type(new_scope, escaped, ci_print_type(types, vty_id))
                 if (vty_id as i32) == 0:
                     return CiDeclLoweringIR {
                         updated_scope: scope,
@@ -13469,12 +13573,20 @@ fn ci_try_translate_fn_body_at(session: i64, decl_idx: i32, found_cursor: i32) -
             if cpname.len() > 0:
                 let sig_name = ci_param_signature_name(cpname, param_index)
                 var storage_name = with_str_clone_ref(sig_name)
-                if ci_body_assigns_to(session, body_cursor, cpname):
-                    storage_name = ci_param_local_name(cpname, param_index)
-                    param_rebinds = param_rebinds ++ f"    var {storage_name} = {sig_name}\n"
-                init_scope = ci_scope_add_mangled(init_scope, cpname, storage_name)
                 let raw_ptype = with_cimport_fn_param_type_translated(session, decl_idx, param_index)
-                let ptype = ci_pointer_type_explicit_mut(raw_ptype)
+                var ptype = ci_pointer_type_explicit_mut(raw_ptype)
+                // D102: the parameter is non-null; the body is C, which may
+                // compare its copy to NULL or assign NULL to it, so a
+                // function-pointer parameter's copy is `Option`.
+                let fn_ptr_param = ci_type_text_is_fn_ptr(ptype) and ci_nullable_fn_ptr_inner(ptype).len() == 0
+                if ci_body_assigns_to(session, body_cursor, cpname) or fn_ptr_param:
+                    storage_name = ci_param_local_name(cpname, param_index)
+                    if fn_ptr_param:
+                        ptype = "Option[" ++ ci_unsafe_fn_ptr_type(ptype) ++ "]"
+                        param_rebinds = param_rebinds ++ f"    var {storage_name}: {ptype} = Some({sig_name})\n"
+                    else:
+                        param_rebinds = param_rebinds ++ f"    var {storage_name} = {sig_name}\n"
+                init_scope = ci_scope_add_mangled(init_scope, cpname, storage_name)
                 init_scope = ci_scope_add_type(init_scope, cpname, ptype)
             param_index = param_index + 1
         cpi = cpi + 1
@@ -16323,8 +16435,12 @@ fn ci_collect_var_decls(session: i64, cursor: i32, decls_in: Vec[CiHoistedVarDec
             if with_ci_cursor_kind(session, child) == 9:  // CXK_VAR_DECL
                 let vname = ci_goto_hoisted_var_name(session, child)
                 let vty = with_ci_cursor_type(session, child)
-                let vty_id = types.type_from_libclang(session, vty)
-                let vty_str = with_ci_type_translated(session, vty)
+                var vty_id = types.type_from_libclang(session, vty)
+                var vty_str = with_ci_type_translated(session, vty)
+                // D102: a hoisted local of function-pointer type is `Option` too.
+                if (vty_id as i32) != 0 and with_ci_type_is_fn_pointer(session, vty):
+                    vty_id = ci_nullable_fn_type(types, vty_id)
+                    vty_str = ci_print_type(types, vty_id)
                 if ci_find_hoisted_var_decl_index(decls, vname) < 0:
                     decls.push(CiHoistedVarDecl { name: vname, ty: vty_id, default_text: ci_default_for_type(vty_str) })
             i = i + 1
@@ -16639,6 +16755,11 @@ impl CiGotoCfgContext:
             let ret_c_ty = ci_pointer_type_explicit_mut(with_ci_type_translated(session, with_ci_cursor_type(session, ret_child)))
             if ret_c_ty.len() > 0 and ret_c_ty != "void" and ret_c_ty != "Unit":
                 let ret_ty_id = types.type_from_translated_text(ret_c_ty)
+                // D102: a function-pointer return is `Option` of the pointer; a
+                // returned function wraps in `Some`, a NULL is `null`.
+                if (ret_ty_id as i32) != 0 and ci_type_is_fn_ptr(types, ret_ty_id) and ci_nullable_fn_ptr_inner(ret_c_ty).len() == 0:
+                    let option_ret = types.type_from_translated_text("Option[" ++ ci_unsafe_fn_ptr_type(ret_c_ty) ++ "]")
+                    ret_value = exprs.coerce_value_expr_for_target(session, option_ret, ret_child, ret_value, types)
                 // Not fn-ptr: a function-pointer return is already normalized by the
                 // migrator (`return &callback` -> `return callback`); casting it breaks
                 // that and defeats no MIR mismatch.
@@ -17759,6 +17880,12 @@ fn ci_type_field_type(session: i64, ty_name: &str, field_idx: i32) -> str:
 fn ci_coerce_init_value_for_type(value: &str, ty: &str) -> str:
     if value == "0" and (ci_starts_with(ty, "*") or ci_starts_with(ty, "Option[") or ci_type_text_is_fn_ptr(ty)):
         return "null"
+    // D102: a function named into a nullable function-pointer slot is `Some`;
+    // C's `(fn_t)0` is the null pointer.
+    if ci_nullable_fn_ptr_inner(ty).len() > 0 and ci_starts_with(value, "(0 as ") and value.ends_with(")"):
+        return "null"
+    if ci_nullable_fn_ptr_inner(ty).len() > 0 and ci_is_c_ident(value):
+        return "Some(" ++ value ++ ")"
     if ty.len() > 0 and ty[0] == 91 and (ci_is_string_literal(value) or ci_is_concatenated_string(value)):
         let rendered = ci_render_string_literal_as_byte_array(value, ty)
         if rendered.len() > 0:

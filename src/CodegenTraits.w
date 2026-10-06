@@ -1808,6 +1808,31 @@ impl Codegen:
             wl_set_linkage(bytes_global, wl_private_linkage())
         self.coerce_const_value_to_type(bytes_global, ptr_ty)
 
+    // The constant of an `Option` over a pointer-like payload (D102):
+    // `None`/`null` is the null pointer; `Some(p)` is `p` folded as the
+    // payload's pointer constant. 0 when the expression is not one of these.
+    mut fn try_eval_const_option_pointer_llvm(node: i32, option_tid: i32) -> i64:
+        let cur = self.unwrap_const_expr_node(node)
+        if cur == 0:
+            return 0
+        let ptr_ty = self.sema_type_to_llvm(self.sema.resolve_alias(option_tid as TypeId))
+        if ptr_ty == 0:
+            return 0
+        let kind = self.pool.kind(cur)
+        if kind == NodeKind.NK_NULL_LIT:
+            return wl_const_null(ptr_ty)
+        if kind == NodeKind.NK_IDENT and self.intern.resolve(self.pool.get_data0(cur)) == "None":
+            return wl_const_null(ptr_ty)
+        if kind == NodeKind.NK_CALL and self.pool.get_data2(cur) == 1:
+            let callee = self.pool.get_data0(cur)
+            if self.pool.kind(callee) == NodeKind.NK_IDENT and self.intern.resolve(self.pool.get_data0(callee)) == "Some":
+                let payload_tid = self.sema.get_generic_inst_arg(self.sema.resolve_alias(option_tid as TypeId) as i32, 0)
+                let payload = self.try_eval_const_pointer_llvm(self.pool.get_extra(self.pool.get_data1(cur)), payload_tid)
+                if payload == 0:
+                    return 0
+                return self.coerce_const_value_to_type(payload, ptr_ty)
+        0
+
     mut fn try_eval_const_pointer_llvm(node: i32, expected_tid: i32) -> i64:
         if node == 0 or expected_tid <= 0:
             return 0
@@ -2127,6 +2152,14 @@ impl Codegen:
         // (pcre2's default match context lost heap_limit → every match -63).
         if tk == TypeKind.TY_EXTERN_FN or tk == TypeKind.TY_FN:
             return self.try_eval_const_pointer_llvm(cur, resolved as i32)
+
+        // D102 (with-abi.md §3): `Option` of a pointer-like payload is the
+        // nullable pointer — `None` and `null` fold to null, `Some(p)` to
+        // `p`'s constant. Without this a `Some(fn)` in one field of a C
+        // record (a migrated `malloc: Some(default_malloc)`) demoted the
+        // whole global to runtime init, which a standalone object never ran.
+        if tk == TypeKind.TY_GENERIC_INST and self.sema.is_option_pointer_type(resolved as i32) != 0:
+            return self.try_eval_const_option_pointer_llvm(cur, resolved as i32)
 
         if tk == TypeKind.TY_INT or tk == TypeKind.TY_BOOL:
             let exact = self.exact_int_const_llvm(cur, resolved as i32)

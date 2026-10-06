@@ -5,6 +5,7 @@ use std.calg_testing.arraylist
 use std.calg_testing.compare_int
 use std.calg_testing.framework
 use std.libc
+use std.option
 
 pub fn generate_arraylist() -> *mut _ArrayList writes allocation_limit, variable1, variable2, variable3, variable4 {
     var __local_arraylist: *mut _ArrayList
@@ -768,7 +769,7 @@ pub fn test_arraylist_index_of() writes allocation_limit {
     while ((if __local_i < __local_num_entries: 1 else: 0) != 0) {
         (__local_val = ((__local_entries[__local_i] as c_int)))
 
-        (__local_index = ((unsafe { arraylist_index_of(__local_arraylist, int_equal, ((&raw mut __local_val as *mut c_int) as *mut c_void)) } as c_int)))
+        (__local_index = ((unsafe { arraylist_index_of(__local_arraylist, Some(int_equal), ((&raw mut __local_val as *mut c_int) as *mut c_void)) } as c_int)))
 
         if (((if not ((if __local_index == __local_i: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
             __assert_rtn(c"test_arraylist_index_of".ptr, c"test-arraylist.c".ptr, (320 as c_int), c"index == i".ptr)
@@ -784,7 +785,7 @@ pub fn test_arraylist_index_of() writes allocation_limit {
 
     (__local_val = ((0 as c_int)))
 
-    if (((if not ((if unsafe { arraylist_index_of(__local_arraylist, int_equal, ((&raw mut __local_val as *mut c_int) as *mut c_void)) } < 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
+    if (((if not ((if unsafe { arraylist_index_of(__local_arraylist, Some(int_equal), ((&raw mut __local_val as *mut c_int) as *mut c_void)) } < 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_index_of".ptr, c"test-arraylist.c".ptr, (325 as c_int), c"arraylist_index_of(arraylist, int_equal, &val) < 0".ptr)
     } else {
         0
@@ -792,7 +793,7 @@ pub fn test_arraylist_index_of() writes allocation_limit {
 
     (__local_val = ((57 as c_int)))
 
-    if (((if not ((if unsafe { arraylist_index_of(__local_arraylist, int_equal, ((&raw mut __local_val as *mut c_int) as *mut c_void)) } < 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
+    if (((if not ((if unsafe { arraylist_index_of(__local_arraylist, Some(int_equal), ((&raw mut __local_val as *mut c_int) as *mut c_void)) } < 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_index_of".ptr, c"test-arraylist.c".ptr, (327 as c_int), c"arraylist_index_of(arraylist, int_equal, &val) < 0".ptr)
     } else {
         0
@@ -859,7 +860,7 @@ pub fn test_arraylist_sort() writes allocation_limit {
     }
 
 
-    unsafe { arraylist_sort(__local_arraylist, int_compare) }
+    unsafe { arraylist_sort(__local_arraylist, Some(int_compare)) }
 
     if (((if not ((if (unsafe *__local_arraylist).length == __local_num_entries: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_sort".ptr, c"test-arraylist.c".ptr, (372 as c_int), c"arraylist->length == num_entries".ptr)
@@ -890,7 +891,7 @@ pub fn test_arraylist_sort() writes allocation_limit {
 
     (__local_arraylist = arraylist_new((5 as c_uint)))
 
-    unsafe { arraylist_sort(__local_arraylist, int_compare) }
+    unsafe { arraylist_sort(__local_arraylist, Some(int_compare)) }
 
     if (((if not ((if (unsafe *__local_arraylist).length == 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_sort".ptr, c"test-arraylist.c".ptr, (389 as c_int), c"arraylist->length == 0".ptr)
@@ -904,7 +905,7 @@ pub fn test_arraylist_sort() writes allocation_limit {
 
     unsafe { arraylist_prepend(__local_arraylist, (((&raw const __local_entries[0] as *const c_int) as *mut c_int) as *mut c_void)) }
 
-    unsafe { arraylist_sort(__local_arraylist, int_compare) }
+    unsafe { arraylist_sort(__local_arraylist, Some(int_compare)) }
 
     if (((if not ((if (unsafe *__local_arraylist).length == 1: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_arraylist_sort".ptr, c"test-arraylist.c".ptr, (399 as c_int), c"arraylist->length == 1".ptr)
@@ -929,4 +930,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 }
 
-var tests: [10]extern "C" fn() -> Unit = [test_arraylist_new_free, test_arraylist_append, test_arraylist_prepend, test_arraylist_insert, test_arraylist_remove, test_arraylist_remove_range, test_arraylist_index_of, test_arraylist_clear, test_arraylist_sort, null]
+var tests: [10]Option[extern "C" fn() -> Unit] = [Some(test_arraylist_new_free), Some(test_arraylist_append), Some(test_arraylist_prepend), Some(test_arraylist_insert), Some(test_arraylist_remove), Some(test_arraylist_remove_range), Some(test_arraylist_index_of), Some(test_arraylist_clear), Some(test_arraylist_sort), null]

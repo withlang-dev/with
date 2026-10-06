@@ -923,7 +923,7 @@ pub unsafe fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_
     }
 
     '__ci_bb_88 {
-        (*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).free(((*__param_match_data).subject as *mut c_void), (*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).memory_data)
+        (*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).free.unwrap()(((*__param_match_data).subject as *mut c_void), (*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).memory_data)
         ((*__param_match_data).flags = ((*__param_match_data).flags as u8) & ((~1) as u8))
         goto '__ci_bb_89
     }
@@ -1992,7 +1992,7 @@ pub unsafe fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_
     }
 
     '__ci_bb_201 {
-        ((*__param_match_data).subject = (((*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).malloc((((__local_length as c_ulong) *% (1 as c_ulong)) as c_ulong), (*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).memory_data) as *const u8)))
+        ((*__param_match_data).subject = (((*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).malloc.unwrap()((((__local_length as c_ulong) *% (1 as c_ulong)) as c_ulong), (*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).memory_data) as *const u8)))
         if ((if (*__param_match_data).subject == null: 1 else: 0) != 0) {
             goto '__ci_bb_204
         } else {
@@ -2140,7 +2140,7 @@ pub unsafe fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_
     '__ci_bb_220 {
         (__local_next__goto_4119_15 = (*__local_rws__goto_3385_13).next)
         ((*__local_rws__goto_3385_13).next = (*__local_next__goto_4119_15).next)
-        (*(&raw const (*__local_mb__goto_3377_18).memctl as *const pcre2_memctl)).free((__local_next__goto_4119_15 as *mut c_void), (*(&raw const (*__local_mb__goto_3377_18).memctl as *const pcre2_memctl)).memory_data)
+        (*(&raw const (*__local_mb__goto_3377_18).memctl as *const pcre2_memctl)).free.unwrap()((__local_next__goto_4119_15 as *mut c_void), (*(&raw const (*__local_mb__goto_3377_18).memctl as *const pcre2_memctl)).memory_data)
         goto '__ci_bb_219
     }
 
@@ -2201,7 +2201,7 @@ unsafe fn do_callout_dfa(__param_code: *const u8, __param_offsets: *mut c_ulong,
 
     }
 
-    return (*__param_mb).callout(__local_cb, (*__param_mb).callout_data)
+    return (*__param_mb).callout.unwrap()(__local_cb, (*__param_mb).callout_data)
 
 }
 
@@ -2236,7 +2236,7 @@ unsafe fn more_workspace(__param_rwsptr: *mut *mut RWS_anchor, __param_ovecsize:
             return -63
         }
 
-        (__local_new = (((*(&raw const (*__param_mb).memctl as *const pcre2_memctl)).malloc((((__local_newsize as c_ulong) *% (sizeof[c_int]() as c_ulong)) as c_ulong), (*(&raw const (*__param_mb).memctl as *const pcre2_memctl)).memory_data) as *mut RWS_anchor)))
+        (__local_new = (((*(&raw const (*__param_mb).memctl as *const pcre2_memctl)).malloc.unwrap()((((__local_newsize as c_ulong) *% (sizeof[c_int]() as c_ulong)) as c_ulong), (*(&raw const (*__param_mb).memctl as *const pcre2_memctl)).memory_data) as *mut RWS_anchor)))
 
         if ((if __local_new == null: 1 else: 0) != 0) {
             return -48

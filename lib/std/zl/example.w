@@ -13,6 +13,7 @@ use std.zl.gzclose
 use std.zl.adler32
 use std.zl.crc32
 use std.libc
+use std.option
 
 unsafe fn test_compress(__param_compr: *mut u8, __param_comprLen: c_ulong, __param_uncompr: *mut u8, __param_uncomprLen: c_ulong) -> Unit {
     var __local_err: c_int
@@ -939,5 +940,5 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
 var hello: [14]c_char = [104, 101, 108, 108, 111, 44, 32, 104, 101, 108, 108, 111, 33, 0]
 let dictionary: [6]c_char = [104, 101, 108, 108, 111, 0]
 var dictId: c_ulong = 0
-var zalloc: unsafe extern "C" fn(*mut c_void, c_uint, c_uint) -> *mut c_void = (0 as unsafe extern "C" fn(*mut c_void, c_uint, c_uint) -> *mut c_void)
-var zfree: unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit = (0 as unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit)
+var zalloc: Option[unsafe extern "C" fn(*mut c_void, c_uint, c_uint) -> *mut c_void] = (0 as unsafe extern "C" fn(*mut c_void, c_uint, c_uint) -> *mut c_void)
+var zfree: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit] = (0 as unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit)

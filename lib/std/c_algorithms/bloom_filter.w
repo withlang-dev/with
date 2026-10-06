@@ -1,7 +1,8 @@
 // Migrated from C
 use std.c_algorithms.defs
+use std.option
 
-pub fn bloom_filter_new(__param_table_size: c_uint, __param_hash_func: unsafe extern "C" fn(*mut c_void) -> c_uint, __param_num_functions: c_uint) -> *mut _BloomFilter {
+pub fn bloom_filter_new(__param_table_size: c_uint, __param_hash_func: Option[unsafe extern "C" fn(*mut c_void) -> c_uint], __param_num_functions: c_uint) -> *mut _BloomFilter {
     var __local_filter: *mut _BloomFilter
 
     if ((if __param_num_functions > (((64 * (sizeof[c_uint]() as usize)) as c_ulong) / (sizeof[c_uint]() as c_ulong)): 1 else: 0) != 0) {
@@ -53,7 +54,7 @@ pub unsafe fn bloom_filter_insert(__param_bloomfilter: *mut _BloomFilter, __para
 
     var __local_b: u8
 
-    (__local_hash = (((*__param_bloomfilter).hash_func(__param_value) as c_uint)))
+    (__local_hash = (((*__param_bloomfilter).hash_func.unwrap()(__param_value) as c_uint)))
 
     (__local_i = ((0 as c_uint)))
 
@@ -87,7 +88,7 @@ pub unsafe fn bloom_filter_query(__param_bloomfilter: *mut _BloomFilter, __param
 
     var __local_bit: c_int
 
-    (__local_hash = (((*__param_bloomfilter).hash_func(__param_value) as c_uint)))
+    (__local_hash = (((*__param_bloomfilter).hash_func.unwrap()(__param_value) as c_uint)))
 
     (__local_i = ((0 as c_uint)))
 

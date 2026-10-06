@@ -6,6 +6,7 @@ use std.calg_testing.compare_pointer
 use std.calg_testing.compare_string
 use std.calg_testing.framework
 use std.libc
+use std.option
 
 pub fn test_int_compare() -> Unit {
     var __local_a: c_int = ((4 as c_int))
@@ -251,4 +252,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 }
 
-var tests: [9]extern "C" fn() -> Unit = [test_int_compare, test_int_equal, test_pointer_compare, test_pointer_equal, test_string_compare, test_string_equal, test_string_nocase_compare, test_string_nocase_equal, null]
+var tests: [9]Option[extern "C" fn() -> Unit] = [Some(test_int_compare), Some(test_int_equal), Some(test_pointer_compare), Some(test_pointer_equal), Some(test_string_compare), Some(test_string_equal), Some(test_string_nocase_compare), Some(test_string_nocase_equal), null]

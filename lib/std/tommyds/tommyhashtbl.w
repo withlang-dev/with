@@ -2,6 +2,7 @@
 use std.tommyds.defs
 use std.tommyds.tommyhash
 use std.tommyds.tommylist
+use std.option
 
 fn tommy_ilog2_u32(__param_value: c_uint) -> c_uint {
     return (((((__param_value as u32).clz() as c_int) ^ (31 as c_int)) as c_uint))
@@ -106,7 +107,7 @@ pub unsafe fn tommy_hashtable_insert(__param_hashtable: *mut tommy_hashtable_str
 
 }
 
-pub unsafe fn tommy_hashtable_remove(__param_hashtable: *mut tommy_hashtable_struct, __param_cmp: unsafe extern "C" fn(*const c_void, *const c_void) -> c_int, __param_cmp_arg: *const c_void, __param_hash: c_ulonglong) -> *mut c_void {
+pub unsafe fn tommy_hashtable_remove(__param_hashtable: *mut tommy_hashtable_struct, __param_cmp: Option[unsafe extern "C" fn(*const c_void, *const c_void) -> c_int], __param_cmp_arg: *const c_void, __param_hash: c_ulonglong) -> *mut c_void {
     var __local_pos: c_ulonglong = ((((__param_hash as c_ulonglong) & ((*__param_hashtable).bucket_mask as c_ulonglong)) as c_ulonglong))
 
     var __local_node: *mut tommy_node_struct = ((*__param_hashtable).bucket[__local_pos])
@@ -115,7 +116,7 @@ pub unsafe fn tommy_hashtable_remove(__param_hashtable: *mut tommy_hashtable_str
         var __ci_expr_logic_0: c_int = 0
 
         if ((if (*__local_node).index == __param_hash: 1 else: 0) != 0) {
-            (__ci_expr_logic_0 = (if (if __param_cmp(__param_cmp_arg, ((*__local_node).data as *const c_void)) == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_0 = (if (if __param_cmp.unwrap()(__param_cmp_arg, ((*__local_node).data as *const c_void)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
 
         if (__ci_expr_logic_0 != 0) {
@@ -141,14 +142,14 @@ pub unsafe fn tommy_hashtable_bucket(__param_hashtable: *mut tommy_hashtable_str
 
 }
 
-pub unsafe fn tommy_hashtable_search(__param_hashtable: *mut tommy_hashtable_struct, __param_cmp: unsafe extern "C" fn(*const c_void, *const c_void) -> c_int, __param_cmp_arg: *const c_void, __param_hash: c_ulonglong) -> *mut c_void {
+pub unsafe fn tommy_hashtable_search(__param_hashtable: *mut tommy_hashtable_struct, __param_cmp: Option[unsafe extern "C" fn(*const c_void, *const c_void) -> c_int], __param_cmp_arg: *const c_void, __param_hash: c_ulonglong) -> *mut c_void {
     var __local_i: *mut tommy_node_struct = tommy_hashtable_bucket(__param_hashtable, __param_hash)
 
     while (__local_i != null) {
         var __ci_expr_logic_0: c_int = 0
 
         if ((if (*__local_i).index == __param_hash: 1 else: 0) != 0) {
-            (__ci_expr_logic_0 = (if (if __param_cmp(__param_cmp_arg, ((*__local_i).data as *const c_void)) == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_0 = (if (if __param_cmp.unwrap()(__param_cmp_arg, ((*__local_i).data as *const c_void)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
 
         if (__ci_expr_logic_0 != 0) {
@@ -175,7 +176,7 @@ pub unsafe fn tommy_hashtable_remove_existing(__param_hashtable: *mut tommy_hash
 
 }
 
-pub unsafe fn tommy_hashtable_foreach(__param_hashtable: *mut tommy_hashtable_struct, __param_func: unsafe extern "C" fn(*mut c_void) -> Unit) {
+pub unsafe fn tommy_hashtable_foreach(__param_hashtable: *mut tommy_hashtable_struct, __param_func: Option[unsafe extern "C" fn(*mut c_void) -> Unit]) {
     var __local_bucket_max: c_ulonglong = (*__param_hashtable).bucket_max
 
     var __local_bucket: *mut *mut tommy_node_struct = (*__param_hashtable).bucket
@@ -192,7 +193,7 @@ pub unsafe fn tommy_hashtable_foreach(__param_hashtable: *mut tommy_hashtable_st
 
             (__local_node = (*__local_node).next)
 
-            __param_func(__local_data)
+            __param_func.unwrap()(__local_data)
 
         }
 
@@ -204,7 +205,7 @@ pub unsafe fn tommy_hashtable_foreach(__param_hashtable: *mut tommy_hashtable_st
 
 }
 
-pub unsafe fn tommy_hashtable_foreach_arg(__param_hashtable: *mut tommy_hashtable_struct, __param_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit, __param_arg: *mut c_void) {
+pub unsafe fn tommy_hashtable_foreach_arg(__param_hashtable: *mut tommy_hashtable_struct, __param_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit], __param_arg: *mut c_void) {
     var __local_bucket_max: c_ulonglong = (*__param_hashtable).bucket_max
 
     var __local_bucket: *mut *mut tommy_node_struct = (*__param_hashtable).bucket
@@ -221,7 +222,7 @@ pub unsafe fn tommy_hashtable_foreach_arg(__param_hashtable: *mut tommy_hashtabl
 
             (__local_node = (*__local_node).next)
 
-            __param_func(__param_arg, __local_data)
+            __param_func.unwrap()(__param_arg, __local_data)
 
         }
 

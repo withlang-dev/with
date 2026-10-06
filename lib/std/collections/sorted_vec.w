@@ -23,7 +23,7 @@ extern fn with_memcpy(dst: *mut u8, src: *const u8, n: i64) -> *mut u8
 pub type SortedVec[T] { array: *mut _SortedArray }
 
 pub fn SortedVec.new[T: Ord]() -> SortedVec[T]:
-    let array = sortedarray_new(0 as c_uint, slot_compare)
+    let array = sortedarray_new(0 as c_uint, Some(slot_compare))
     assert(array as i64 != 0)
     SortedVec { array: array }
 

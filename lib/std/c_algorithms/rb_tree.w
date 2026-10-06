@@ -1,7 +1,8 @@
 // Migrated from C
 use std.c_algorithms.defs
+use std.option
 
-pub fn rb_tree_new(__param_compare_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int) -> *mut _RBTree {
+pub fn rb_tree_new(__param_compare_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int]) -> *mut _RBTree {
     var __local_new_tree: *mut _RBTree
 
     (__local_new_tree = (((unsafe { with_alloc(((sizeof[_RBTree]() as c_ulong) as i64)) } as *mut c_void) as *mut _RBTree)))
@@ -61,7 +62,7 @@ pub unsafe fn rb_tree_insert(__param_tree: *mut _RBTree, __param_key: *mut c_voi
     while ((if (*__local_rover) != null: 1 else: 0) != 0) {
         (__local_parent = (*__local_rover))
 
-        if ((if (*__param_tree).compare_func(__param_key, (*(*__local_rover)).key) < 0: 1 else: 0) != 0) {
+        if ((if (*__param_tree).compare_func.unwrap()(__param_key, (*(*__local_rover)).key) < 0: 1 else: 0) != 0) {
             (__local_side = ((0 as i32)))
 
         } else {
@@ -115,7 +116,7 @@ pub unsafe fn rb_tree_lookup_node(__param_tree: *mut _RBTree, __param_key: *mut 
     (__local_node = (*__param_tree).root_node)
 
     while ((if __local_node != null: 1 else: 0) != 0) {
-        (__local_diff = (((*__param_tree).compare_func(__param_key, (*__local_node).key) as c_int)))
+        (__local_diff = (((*__param_tree).compare_func.unwrap()(__param_key, (*__local_node).key) as c_int)))
 
         if ((if __local_diff == 0: 1 else: 0) != 0) {
             return __local_node

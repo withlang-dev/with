@@ -108,7 +108,7 @@ impl[K: Key, V] HashIndex[K, V]:
         let slot = self.probe
         unsafe { (*slot).head.compare = self.comparator() }
         unsafe { with_memcpy(&raw mut (*slot).key as *mut u8, &raw const *key as *const u8, sizeof[K]() as i64) }
-        unsafe { tommy_hashdyn_search(self.map, hash_slot_compare, slot as *const c_void, self.key_hash(key)) } as *mut HashSlot[K, V]
+        unsafe { tommy_hashdyn_search(self.map, Some(hash_slot_compare), slot as *const c_void, self.key_hash(key)) } as *mut HashSlot[K, V]
 
     /// Observes the value stored under `key`.
     pub fn get(key: &K) -> Option[&V]:

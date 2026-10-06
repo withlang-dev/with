@@ -6431,7 +6431,9 @@ impl Sema:
             return 0 as TypeId
         let resolved = self.resolve_alias(tid)
         let kind = self.get_type_kind(resolved)
-        if kind == TypeKind.TY_PTR or kind == TypeKind.TY_EXTERN_FN or self.is_option_pointer_type(resolved) != 0:
+        // D102 (§16.6): an `extern "C" fn` is never null; the nullable form is
+        // `Option` of it, which is_option_pointer_type admits.
+        if kind == TypeKind.TY_PTR or self.is_option_pointer_type(resolved) != 0:
             return resolved
         0 as TypeId
 

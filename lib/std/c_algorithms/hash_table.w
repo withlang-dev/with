@@ -1,7 +1,8 @@
 // Migrated from C
 use std.c_algorithms.defs
+use std.option
 
-pub fn hash_table_new(__param_hash_func: unsafe extern "C" fn(*mut c_void) -> c_uint, __param_equal_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int) -> *mut _HashTable {
+pub fn hash_table_new(__param_hash_func: Option[unsafe extern "C" fn(*mut c_void) -> c_uint], __param_equal_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int]) -> *mut _HashTable {
     var __local_hash_table: *mut _HashTable
 
     (__local_hash_table = (((unsafe { with_alloc(((sizeof[_HashTable]() as c_ulong) as i64)) } as *mut c_void) as *mut _HashTable)))
@@ -67,7 +68,7 @@ pub unsafe fn hash_table_free(__param_hash_table: *mut _HashTable) {
 
 }
 
-pub unsafe fn hash_table_register_free_functions(__param_hash_table: *mut _HashTable, __param_key_free_func: unsafe extern "C" fn(*mut c_void) -> Unit, __param_value_free_func: unsafe extern "C" fn(*mut c_void) -> Unit) {
+pub unsafe fn hash_table_register_free_functions(__param_hash_table: *mut _HashTable, __param_key_free_func: Option[unsafe extern "C" fn(*mut c_void) -> Unit], __param_value_free_func: Option[unsafe extern "C" fn(*mut c_void) -> Unit]) {
     ((*__param_hash_table).key_free_func = __param_key_free_func)
 
     ((*__param_hash_table).value_free_func = __param_value_free_func)
@@ -91,21 +92,21 @@ pub unsafe fn hash_table_insert(__param_hash_table: *mut _HashTable, __param_key
 
     }
 
-    (__local_index = (((((*__param_hash_table).hash_func(__param_key) as c_uint) % ((*__param_hash_table).table_size as c_uint)) as c_uint)))
+    (__local_index = (((((*__param_hash_table).hash_func.unwrap()(__param_key) as c_uint) % ((*__param_hash_table).table_size as c_uint)) as c_uint)))
 
     (__local_rover = ((*__param_hash_table).table[__local_index]))
 
     while ((if __local_rover != null: 1 else: 0) != 0) {
         (__local_pair = (((&raw const (*__local_rover).pair as *const _HashTablePair) as *mut _HashTablePair)))
 
-        if ((if (*__param_hash_table).equal_func((*__local_pair).key, __param_key) != 0: 1 else: 0) != 0) {
+        if ((if (*__param_hash_table).equal_func.unwrap()((*__local_pair).key, __param_key) != 0: 1 else: 0) != 0) {
             if ((if (*__param_hash_table).value_free_func != null: 1 else: 0) != 0) {
-                (*__param_hash_table).value_free_func((*__local_pair).value)
+                (*__param_hash_table).value_free_func.unwrap()((*__local_pair).value)
 
             }
 
             if ((if (*__param_hash_table).key_free_func != null: 1 else: 0) != 0) {
-                (*__param_hash_table).key_free_func((*__local_pair).key)
+                (*__param_hash_table).key_free_func.unwrap()((*__local_pair).key)
 
             }
 
@@ -149,14 +150,14 @@ pub unsafe fn hash_table_lookup(__param_hash_table: *mut _HashTable, __param_key
 
     var __local_index: c_uint
 
-    (__local_index = (((((*__param_hash_table).hash_func(__param_key) as c_uint) % ((*__param_hash_table).table_size as c_uint)) as c_uint)))
+    (__local_index = (((((*__param_hash_table).hash_func.unwrap()(__param_key) as c_uint) % ((*__param_hash_table).table_size as c_uint)) as c_uint)))
 
     (__local_rover = ((*__param_hash_table).table[__local_index]))
 
     while ((if __local_rover != null: 1 else: 0) != 0) {
         (__local_pair = (((&raw const (*__local_rover).pair as *const _HashTablePair) as *mut _HashTablePair)))
 
-        if ((if (*__param_hash_table).equal_func(__param_key, (*__local_pair).key) != 0: 1 else: 0) != 0) {
+        if ((if (*__param_hash_table).equal_func.unwrap()(__param_key, (*__local_pair).key) != 0: 1 else: 0) != 0) {
             return (*__local_pair).value
 
         }
@@ -180,7 +181,7 @@ pub unsafe fn hash_table_remove(__param_hash_table: *mut _HashTable, __param_key
 
     var __local_result: c_int
 
-    (__local_index = (((((*__param_hash_table).hash_func(__param_key) as c_uint) % ((*__param_hash_table).table_size as c_uint)) as c_uint)))
+    (__local_index = (((((*__param_hash_table).hash_func.unwrap()(__param_key) as c_uint) % ((*__param_hash_table).table_size as c_uint)) as c_uint)))
 
     (__local_result = ((0 as c_int)))
 
@@ -189,7 +190,7 @@ pub unsafe fn hash_table_remove(__param_hash_table: *mut _HashTable, __param_key
     while ((if (*__local_rover) != null: 1 else: 0) != 0) {
         (__local_pair = (((&raw const (*(*__local_rover)).pair as *const _HashTablePair) as *mut _HashTablePair)))
 
-        if ((if (*__param_hash_table).equal_func(__param_key, (*__local_pair).key) != 0: 1 else: 0) != 0) {
+        if ((if (*__param_hash_table).equal_func.unwrap()(__param_key, (*__local_pair).key) != 0: 1 else: 0) != 0) {
             (__local_entry = (*__local_rover))
 
             ((*__local_rover) = (*__local_entry).next)
@@ -322,12 +323,12 @@ unsafe fn hash_table_free_entry(__param_hash_table: *mut _HashTable, __param_ent
     (__local_pair = (((&raw const (*__param_entry).pair as *const _HashTablePair) as *mut _HashTablePair)))
 
     if ((if (*__param_hash_table).key_free_func != null: 1 else: 0) != 0) {
-        (*__param_hash_table).key_free_func((*__local_pair).key)
+        (*__param_hash_table).key_free_func.unwrap()((*__local_pair).key)
 
     }
 
     if ((if (*__param_hash_table).value_free_func != null: 1 else: 0) != 0) {
-        (*__param_hash_table).value_free_func((*__local_pair).value)
+        (*__param_hash_table).value_free_func.unwrap()((*__local_pair).value)
 
     }
 
@@ -381,7 +382,7 @@ unsafe fn hash_table_enlarge(__param_hash_table: *mut _HashTable) -> c_int {
 
             (__local_pair = (((&raw const (*__local_rover).pair as *const _HashTablePair) as *mut _HashTablePair)))
 
-            (__local_index = (((((*__param_hash_table).hash_func((*__local_pair).key) as c_uint) % ((*__param_hash_table).table_size as c_uint)) as c_uint)))
+            (__local_index = (((((*__param_hash_table).hash_func.unwrap()((*__local_pair).key) as c_uint) % ((*__param_hash_table).table_size as c_uint)) as c_uint)))
 
             ((*__local_rover).next = ((*__param_hash_table).table[__local_index]))
 

@@ -314,6 +314,20 @@ fn ci_migrate_insert_libc_use(output: &str) -> str:
     else:
         "use std.libc\n\n" ++ output
 
+// D102 (§16.6): a migrated module names `Option`, `Some` and `None` for its
+// nullable function pointers; a corpus module has no prelude, so it imports
+// them as std's own modules do.
+fn ci_migrate_insert_option_use(output: &str) -> str:
+    if ci_find_str(output, "Option[") < 0 and ci_find_str(output, "Some(") < 0:
+        return with_str_clone_ref(output)
+    if ci_find_str(output, "\nuse std.option\n") >= 0 or ci_starts_with(output, "use std.option\n"):
+        return with_str_clone_ref(output)
+    let header_end = ci_find_str(output, "\n\n")
+    if header_end >= 0:
+        output.slice(0, header_end as i64) ++ "\nuse std.option" ++ output.slice(header_end as i64, output.len())
+    else:
+        "use std.option\n\n" ++ output
+
 fn ci_migrate_shared_module_prefix() -> str:
     if g_migrate_shared_defs_prefix.ends_with(".defs"):
         return g_migrate_shared_defs_prefix.slice(0, g_migrate_shared_defs_prefix.len() - 5)
@@ -586,7 +600,7 @@ fn ci_migrate_write_shared_defs(output_dir: &str):
             defs.push_str("\n")
         pending_i = pending_i + 1
     let defs_path = output_dir ++ "/defs.w"
-    let rc = with_fs_write_file(defs_path, ci_migrate_publicize_shared_defs(ci_migrate_normalize_output(defs.to_str())))
+    let rc = with_fs_write_file(defs_path, ci_migrate_insert_option_use(ci_migrate_publicize_shared_defs(ci_migrate_normalize_output(defs.to_str()))))
     if rc != 0:
         eprint("migrate: failed to write shared defs: " ++ defs_path)
     else:
@@ -1342,6 +1356,7 @@ fn ci_migrate_file_body(input_path: &str, output_path: &str, project_active: boo
 
     var output = output_parts.join("")
     output = ci_migrate_insert_libc_use(output)
+    output = ci_migrate_insert_option_use(output)
 
     ci_migrate_shared_note_output_uses(output)
     output = ci_migrate_publicize_types(ci_migrate_normalize_output(output))

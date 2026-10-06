@@ -8,6 +8,7 @@ use std.calg_testing.hash_int
 use std.calg_testing.hash_string
 use std.calg_testing.hash_table
 use std.libc
+use std.option
 
 pub fn generate_hash_table() -> *mut _HashTable writes allocation_limit {
     var __local_hash_table: *mut _HashTable
@@ -18,7 +19,7 @@ pub fn generate_hash_table() -> *mut _HashTable writes allocation_limit {
 
     var __local_i: c_int
 
-    (__local_hash_table = hash_table_new(string_hash, string_equal))
+    (__local_hash_table = hash_table_new(Some(string_hash), Some(string_equal)))
 
     (__local_i = ((0 as c_int)))
 
@@ -35,7 +36,7 @@ pub fn generate_hash_table() -> *mut _HashTable writes allocation_limit {
     }
 
 
-    unsafe { hash_table_register_free_functions(__local_hash_table, null, alloc_test_free) }
+    unsafe { hash_table_register_free_functions(__local_hash_table, null, Some(alloc_test_free)) }
 
     return __local_hash_table
 
@@ -44,7 +45,7 @@ pub fn generate_hash_table() -> *mut _HashTable writes allocation_limit {
 pub fn test_hash_table_new_free() -> Unit writes allocation_limit, value1, value2, value3, value4 {
     var __local_hash_table: *mut _HashTable
 
-    (__local_hash_table = hash_table_new(int_hash, int_equal))
+    (__local_hash_table = hash_table_new(Some(int_hash), Some(int_equal)))
 
     if (((if not ((if __local_hash_table != null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_table_new_free".ptr, c"test-hash-table.c".ptr, (77 as c_int), c"hash_table != NULL".ptr)
@@ -64,7 +65,7 @@ pub fn test_hash_table_new_free() -> Unit writes allocation_limit, value1, value
 
     alloc_test_set_limit((0 as c_int))
 
-    (__local_hash_table = hash_table_new(int_hash, int_equal))
+    (__local_hash_table = hash_table_new(Some(int_hash), Some(int_equal)))
 
     if (((if not ((if __local_hash_table == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_table_new_free".ptr, c"test-hash-table.c".ptr, (91 as c_int), c"hash_table == NULL".ptr)
@@ -80,7 +81,7 @@ pub fn test_hash_table_new_free() -> Unit writes allocation_limit, value1, value
 
     alloc_test_set_limit((1 as c_int))
 
-    (__local_hash_table = hash_table_new(int_hash, int_equal))
+    (__local_hash_table = hash_table_new(Some(int_hash), Some(int_equal)))
 
     if (((if not ((if __local_hash_table == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_table_new_free".ptr, c"test-hash-table.c".ptr, (96 as c_int), c"hash_table == NULL".ptr)
@@ -251,7 +252,7 @@ pub fn test_hash_table_iterating() writes allocation_limit {
 
     unsafe { hash_table_free(__local_hash_table) }
 
-    (__local_hash_table = hash_table_new(int_hash, int_equal))
+    (__local_hash_table = hash_table_new(Some(int_hash), Some(int_equal)))
 
     unsafe { hash_table_iterate(__local_hash_table, (&raw mut __local_iterator as *mut _HashTableIterator)) }
 
@@ -404,9 +405,9 @@ pub fn test_hash_table_free_functions() -> Unit writes allocated_keys, allocated
 
     var __local_i: c_int
 
-    (__local_hash_table = hash_table_new(int_hash, int_equal))
+    (__local_hash_table = hash_table_new(Some(int_hash), Some(int_equal)))
 
-    unsafe { hash_table_register_free_functions(__local_hash_table, free_key, free_value) }
+    unsafe { hash_table_register_free_functions(__local_hash_table, Some(free_key), Some(free_value)) }
 
     (allocated_values = ((0 as c_int)))
 
@@ -506,7 +507,7 @@ pub fn test_hash_table_out_of_memory() writes allocation_limit {
 
     var __local_i: c_uint
 
-    (__local_hash_table = hash_table_new(int_hash, int_equal))
+    (__local_hash_table = hash_table_new(Some(int_hash), Some(int_equal)))
 
     alloc_test_set_limit((0 as c_int))
 
@@ -587,7 +588,7 @@ pub fn test_hash_iterator_key_pair() writes allocation_limit, value1, value2 {
     var __local_val: *mut c_int
 
 
-    (__local_hash_table = hash_table_new(int_hash, int_equal))
+    (__local_hash_table = hash_table_new(Some(int_hash), Some(int_equal)))
 
     unsafe { hash_table_insert(__local_hash_table, ((&raw mut value1 as *mut c_int) as *mut c_void), ((&raw mut value1 as *mut c_int) as *mut c_void)) }
 
@@ -621,4 +622,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 }
 
-var tests: [9]extern "C" fn() -> Unit = [test_hash_table_new_free, test_hash_table_insert_lookup, test_hash_table_remove, test_hash_table_iterating, test_hash_table_iterating_remove, test_hash_table_free_functions, test_hash_table_out_of_memory, test_hash_iterator_key_pair, null]
+var tests: [9]Option[extern "C" fn() -> Unit] = [Some(test_hash_table_new_free), Some(test_hash_table_insert_lookup), Some(test_hash_table_remove), Some(test_hash_table_iterating), Some(test_hash_table_iterating_remove), Some(test_hash_table_free_functions), Some(test_hash_table_out_of_memory), Some(test_hash_iterator_key_pair), null]

@@ -5,6 +5,7 @@ use std.calg_testing.compare_int
 use std.calg_testing.framework
 use std.calg_testing.list
 use std.libc
+use std.option
 
 pub fn generate_list() -> *mut _ListEntry writes allocation_limit, variable1, variable2, variable3, variable4 {
     var __local_list: *mut _ListEntry = ((null as *mut _ListEntry))
@@ -563,7 +564,7 @@ pub fn test_list_remove_data() writes allocation_limit {
 
     (__local_val = ((0 as c_int)))
 
-    if (((if not ((if unsafe { list_remove_data((&raw mut __local_list as *mut *mut _ListEntry), int_equal, ((&raw mut __local_val as *mut c_int) as *mut c_void)) } == 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
+    if (((if not ((if unsafe { list_remove_data((&raw mut __local_list as *mut *mut _ListEntry), Some(int_equal), ((&raw mut __local_val as *mut c_int) as *mut c_void)) } == 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_list_remove_data".ptr, c"test-list.c".ptr, (279 as c_int), c"list_remove_data(&list, int_equal, &val) == 0".ptr)
     } else {
         0
@@ -571,7 +572,7 @@ pub fn test_list_remove_data() writes allocation_limit {
 
     (__local_val = ((56 as c_int)))
 
-    if (((if not ((if unsafe { list_remove_data((&raw mut __local_list as *mut *mut _ListEntry), int_equal, ((&raw mut __local_val as *mut c_int) as *mut c_void)) } == 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
+    if (((if not ((if unsafe { list_remove_data((&raw mut __local_list as *mut *mut _ListEntry), Some(int_equal), ((&raw mut __local_val as *mut c_int) as *mut c_void)) } == 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_list_remove_data".ptr, c"test-list.c".ptr, (281 as c_int), c"list_remove_data(&list, int_equal, &val) == 0".ptr)
     } else {
         0
@@ -581,7 +582,7 @@ pub fn test_list_remove_data() writes allocation_limit {
 
     (__local_val = ((8 as c_int)))
 
-    if (((if not ((if unsafe { list_remove_data((&raw mut __local_list as *mut *mut _ListEntry), int_equal, ((&raw mut __local_val as *mut c_int) as *mut c_void)) } == 1: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
+    if (((if not ((if unsafe { list_remove_data((&raw mut __local_list as *mut *mut _ListEntry), Some(int_equal), ((&raw mut __local_val as *mut c_int) as *mut c_void)) } == 1: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_list_remove_data".ptr, c"test-list.c".ptr, (286 as c_int), c"list_remove_data(&list, int_equal, &val) == 1".ptr)
     } else {
         0
@@ -597,7 +598,7 @@ pub fn test_list_remove_data() writes allocation_limit {
 
     (__local_val = ((4 as c_int)))
 
-    if (((if not ((if unsafe { list_remove_data((&raw mut __local_list as *mut *mut _ListEntry), int_equal, ((&raw mut __local_val as *mut c_int) as *mut c_void)) } == 4: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
+    if (((if not ((if unsafe { list_remove_data((&raw mut __local_list as *mut *mut _ListEntry), Some(int_equal), ((&raw mut __local_val as *mut c_int) as *mut c_void)) } == 4: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_list_remove_data".ptr, c"test-list.c".ptr, (292 as c_int), c"list_remove_data(&list, int_equal, &val) == 4".ptr)
     } else {
         0
@@ -613,7 +614,7 @@ pub fn test_list_remove_data() writes allocation_limit {
 
     (__local_val = ((89 as c_int)))
 
-    if (((if not ((if unsafe { list_remove_data((&raw mut __local_list as *mut *mut _ListEntry), int_equal, ((&raw mut __local_val as *mut c_int) as *mut c_void)) } == 1: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
+    if (((if not ((if unsafe { list_remove_data((&raw mut __local_list as *mut *mut _ListEntry), Some(int_equal), ((&raw mut __local_val as *mut c_int) as *mut c_void)) } == 1: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_list_remove_data".ptr, c"test-list.c".ptr, (298 as c_int), c"list_remove_data(&list, int_equal, &val) == 1".ptr)
     } else {
         0
@@ -659,7 +660,7 @@ pub fn test_list_sort() -> Unit writes allocation_limit {
     }
 
 
-    unsafe { list_sort((&raw mut __local_list as *mut *mut _ListEntry), int_compare) }
+    unsafe { list_sort((&raw mut __local_list as *mut *mut _ListEntry), Some(int_compare)) }
 
     if (((if not ((if unsafe { list_length(__local_list) } == __local_num_entries: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_list_sort".ptr, c"test-list.c".ptr, (322 as c_int), c"list_length(list) == num_entries".ptr)
@@ -690,7 +691,7 @@ pub fn test_list_sort() -> Unit writes allocation_limit {
 
     (__local_list = ((null as *mut _ListEntry)))
 
-    unsafe { list_sort((&raw mut __local_list as *mut *mut _ListEntry), int_compare) }
+    unsafe { list_sort((&raw mut __local_list as *mut *mut _ListEntry), Some(int_compare)) }
 
     if (((if not ((if __local_list == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_list_sort".ptr, c"test-list.c".ptr, (339 as c_int), c"list == NULL".ptr)
@@ -737,7 +738,7 @@ pub fn test_list_find_data() writes allocation_limit {
     while ((if __local_i < __local_num_entries: 1 else: 0) != 0) {
         (__local_val = ((__local_entries[__local_i] as c_int)))
 
-        (__local_result = unsafe { list_find_data(__local_list, int_equal, ((&raw mut __local_val as *mut c_int) as *mut c_void)) })
+        (__local_result = unsafe { list_find_data(__local_list, Some(int_equal), ((&raw mut __local_val as *mut c_int) as *mut c_void)) })
 
         if (((if not ((if __local_result != null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
             __assert_rtn(c"test_list_find_data".ptr, c"test-list.c".ptr, (365 as c_int), c"result != NULL".ptr)
@@ -761,7 +762,7 @@ pub fn test_list_find_data() writes allocation_limit {
 
     (__local_val = ((0 as c_int)))
 
-    if (((if not ((if unsafe { list_find_data(__local_list, int_equal, ((&raw mut __local_val as *mut c_int) as *mut c_void)) } == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
+    if (((if not ((if unsafe { list_find_data(__local_list, Some(int_equal), ((&raw mut __local_val as *mut c_int) as *mut c_void)) } == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_list_find_data".ptr, c"test-list.c".ptr, (373 as c_int), c"list_find_data(list, int_equal, &val) == NULL".ptr)
     } else {
         0
@@ -769,7 +770,7 @@ pub fn test_list_find_data() writes allocation_limit {
 
     (__local_val = ((56 as c_int)))
 
-    if (((if not ((if unsafe { list_find_data(__local_list, int_equal, ((&raw mut __local_val as *mut c_int) as *mut c_void)) } == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
+    if (((if not ((if unsafe { list_find_data(__local_list, Some(int_equal), ((&raw mut __local_val as *mut c_int) as *mut c_void)) } == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_list_find_data".ptr, c"test-list.c".ptr, (375 as c_int), c"list_find_data(list, int_equal, &val) == NULL".ptr)
     } else {
         0
@@ -969,7 +970,7 @@ pub fn test_list_iterate_bad_remove() writes allocation_limit {
         (__local_val = ((unsafe { list_iter_next((&raw mut __local_iter as *mut _ListIterator)) } as *mut c_int)))
 
         if ((if ((unsafe *__local_val) % 2) == 0: 1 else: 0) != 0) {
-            if (((if not ((if unsafe { list_remove_data((&raw mut __local_list as *mut *mut _ListEntry), int_equal, (__local_val as *mut c_void)) } != 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
+            if (((if not ((if unsafe { list_remove_data((&raw mut __local_list as *mut *mut _ListEntry), Some(int_equal), (__local_val as *mut c_void)) } != 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
                 __assert_rtn(c"test_list_iterate_bad_remove".ptr, c"test-list.c".ptr, (500 as c_int), c"list_remove_data(&list, int_equal, val) != 0".ptr)
             } else {
                 0
@@ -992,4 +993,4 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int wri
 
 }
 
-var tests: [15]extern "C" fn() -> Unit = [test_list_append, test_list_prepend, test_list_free, test_list_next, test_list_nth_entry, test_list_nth_data, test_list_length, test_list_remove_entry, test_list_remove_data, test_list_sort, test_list_find_data, test_list_to_array, test_list_iterate, test_list_iterate_bad_remove, null]
+var tests: [15]Option[extern "C" fn() -> Unit] = [Some(test_list_append), Some(test_list_prepend), Some(test_list_free), Some(test_list_next), Some(test_list_nth_entry), Some(test_list_nth_data), Some(test_list_length), Some(test_list_remove_entry), Some(test_list_remove_data), Some(test_list_sort), Some(test_list_find_data), Some(test_list_to_array), Some(test_list_iterate), Some(test_list_iterate_bad_remove), null]

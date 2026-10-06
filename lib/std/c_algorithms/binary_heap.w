@@ -1,7 +1,8 @@
 // Migrated from C
 use std.c_algorithms.defs
+use std.option
 
-pub fn binary_heap_new(__param_heap_type: i32, __param_compare_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int) -> *mut _BinaryHeap {
+pub fn binary_heap_new(__param_heap_type: i32, __param_compare_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int]) -> *mut _BinaryHeap {
     var __local_heap: *mut _BinaryHeap
 
     (__local_heap = (((unsafe { with_alloc(((sizeof[_BinaryHeap]() as c_ulong) as i64)) } as *mut c_void) as *mut _BinaryHeap)))
@@ -179,10 +180,10 @@ pub unsafe fn binary_heap_num_entries(__param_heap: *mut _BinaryHeap) -> c_uint 
 
 unsafe fn binary_heap_cmp(__param_heap: *mut _BinaryHeap, __param_data1: *mut c_void, __param_data2: *mut c_void) -> c_int {
     if ((if (*__param_heap).heap_type == 0: 1 else: 0) != 0) {
-        return (*__param_heap).compare_func(__param_data1, __param_data2)
+        return (*__param_heap).compare_func.unwrap()(__param_data1, __param_data2)
 
     }
-    return (0 - (*__param_heap).compare_func(__param_data1, __param_data2))
+    return (0 - (*__param_heap).compare_func.unwrap()(__param_data1, __param_data2))
 
 
 }

@@ -1,4 +1,5 @@
 // std.zl.defs — shared definitions for migrated PCRE2
+use std.option
 
 pub fn is_alpha(__with_c: i32) -> bool {
     (__with_c >= 65 and __with_c <= 90) or (__with_c >= 97 and __with_c <= 122)
@@ -306,7 +307,7 @@ pub type internal_state { pub strm: *mut z_stream_s = null, pub status: c_int = 
 impl Copy for internal_state
 
 @[repr(C)]
-pub type z_stream_s { pub next_in: *mut u8 = null, pub avail_in: c_uint = 0, pub total_in: c_ulong = 0, pub next_out: *mut u8 = null, pub avail_out: c_uint = 0, pub total_out: c_ulong = 0, pub msg: *mut i8 = null, pub state: *mut internal_state = null, pub zalloc: unsafe extern "C" fn(*mut c_void, c_uint, c_uint) -> *mut c_void, pub zfree: unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit, pub opaque_: *mut c_void = null, pub data_type: c_int = 0, pub adler: c_ulong = 0, pub reserved: c_ulong = 0 }
+pub type z_stream_s { pub next_in: *mut u8 = null, pub avail_in: c_uint = 0, pub total_in: c_ulong = 0, pub next_out: *mut u8 = null, pub avail_out: c_uint = 0, pub total_out: c_ulong = 0, pub msg: *mut i8 = null, pub state: *mut internal_state = null, pub zalloc: Option[unsafe extern "C" fn(*mut c_void, c_uint, c_uint) -> *mut c_void] = null, pub zfree: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit] = null, pub opaque_: *mut c_void = null, pub data_type: c_int = 0, pub adler: c_ulong = 0, pub reserved: c_ulong = 0 }
 impl Copy for z_stream_s
 
 pub type z_stream = z_stream_s
@@ -462,7 +463,7 @@ pub let finish_done: c_int = 3
 pub type compress_func = unsafe extern "C" fn(*mut internal_state, c_int) -> i32
 
 @[repr(C)]
-pub type config_s { pub good_length: c_ushort = 0, pub max_lazy: c_ushort = 0, pub nice_length: c_ushort = 0, pub max_chain: c_ushort = 0, pub func: unsafe extern "C" fn(*mut internal_state, c_int) -> i32 }
+pub type config_s { pub good_length: c_ushort = 0, pub max_lazy: c_ushort = 0, pub nice_length: c_ushort = 0, pub max_chain: c_ushort = 0, pub func: Option[unsafe extern "C" fn(*mut internal_state, c_int) -> i32] = null }
 impl Copy for config_s
 
 pub type config = config_s
@@ -605,7 +606,7 @@ pub type tell_file_func = unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_lo
 pub type seek_file_func = unsafe extern "C" fn(*mut c_void, *mut c_void, c_ulong, c_int) -> c_long
 
 @[repr(C)]
-pub type zlib_filefunc_def_s { pub zopen_file: unsafe extern "C" fn(*mut c_void, *const i8, c_int) -> *mut c_void, pub zread_file: unsafe extern "C" fn(*mut c_void, *mut c_void, *mut c_void, c_ulong) -> c_ulong, pub zwrite_file: unsafe extern "C" fn(*mut c_void, *mut c_void, *const c_void, c_ulong) -> c_ulong, pub ztell_file: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_long, pub zseek_file: unsafe extern "C" fn(*mut c_void, *mut c_void, c_ulong, c_int) -> c_long, pub zclose_file: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int, pub zerror_file: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int, pub opaque_: *mut c_void = null }
+pub type zlib_filefunc_def_s { pub zopen_file: Option[unsafe extern "C" fn(*mut c_void, *const i8, c_int) -> *mut c_void] = null, pub zread_file: Option[unsafe extern "C" fn(*mut c_void, *mut c_void, *mut c_void, c_ulong) -> c_ulong] = null, pub zwrite_file: Option[unsafe extern "C" fn(*mut c_void, *mut c_void, *const c_void, c_ulong) -> c_ulong] = null, pub ztell_file: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_long] = null, pub zseek_file: Option[unsafe extern "C" fn(*mut c_void, *mut c_void, c_ulong, c_int) -> c_long] = null, pub zclose_file: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int] = null, pub zerror_file: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int] = null, pub opaque_: *mut c_void = null }
 impl Copy for zlib_filefunc_def_s
 
 pub type zlib_filefunc_def = zlib_filefunc_def_s
@@ -617,13 +618,13 @@ pub type seek64_file_func = unsafe extern "C" fn(*mut c_void, *mut c_void, c_ulo
 pub type open64_file_func = unsafe extern "C" fn(*mut c_void, *const c_void, c_int) -> *mut c_void
 
 @[repr(C)]
-pub type zlib_filefunc64_def_s { pub zopen64_file: unsafe extern "C" fn(*mut c_void, *const c_void, c_int) -> *mut c_void, pub zread_file: unsafe extern "C" fn(*mut c_void, *mut c_void, *mut c_void, c_ulong) -> c_ulong, pub zwrite_file: unsafe extern "C" fn(*mut c_void, *mut c_void, *const c_void, c_ulong) -> c_ulong, pub ztell64_file: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_ulong, pub zseek64_file: unsafe extern "C" fn(*mut c_void, *mut c_void, c_ulong, c_int) -> c_long, pub zclose_file: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int, pub zerror_file: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int, pub opaque_: *mut c_void = null }
+pub type zlib_filefunc64_def_s { pub zopen64_file: Option[unsafe extern "C" fn(*mut c_void, *const c_void, c_int) -> *mut c_void] = null, pub zread_file: Option[unsafe extern "C" fn(*mut c_void, *mut c_void, *mut c_void, c_ulong) -> c_ulong] = null, pub zwrite_file: Option[unsafe extern "C" fn(*mut c_void, *mut c_void, *const c_void, c_ulong) -> c_ulong] = null, pub ztell64_file: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_ulong] = null, pub zseek64_file: Option[unsafe extern "C" fn(*mut c_void, *mut c_void, c_ulong, c_int) -> c_long] = null, pub zclose_file: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int] = null, pub zerror_file: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int] = null, pub opaque_: *mut c_void = null }
 impl Copy for zlib_filefunc64_def_s
 
 pub type zlib_filefunc64_def = zlib_filefunc64_def_s
 
 @[repr(C)]
-pub type zlib_filefunc64_32_def_s { pub zfile_func64: zlib_filefunc64_def_s, pub zopen32_file: unsafe extern "C" fn(*mut c_void, *const i8, c_int) -> *mut c_void, pub ztell32_file: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_long, pub zseek32_file: unsafe extern "C" fn(*mut c_void, *mut c_void, c_ulong, c_int) -> c_long }
+pub type zlib_filefunc64_32_def_s { pub zfile_func64: zlib_filefunc64_def_s, pub zopen32_file: Option[unsafe extern "C" fn(*mut c_void, *const i8, c_int) -> *mut c_void] = null, pub ztell32_file: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_long] = null, pub zseek32_file: Option[unsafe extern "C" fn(*mut c_void, *mut c_void, c_ulong, c_int) -> c_long] = null }
 impl Copy for zlib_filefunc64_32_def_s
 
 pub type zlib_filefunc64_32_def = zlib_filefunc64_32_def_s

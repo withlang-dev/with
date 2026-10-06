@@ -1,4 +1,5 @@
 // std.calg_testing.defs — shared definitions for migrated PCRE2
+use std.option
 
 pub fn is_alpha(__with_c: i32) -> bool {
     (__with_c >= 65 and __with_c <= 90) or (__with_c >= 97 and __with_c <= 122)
@@ -313,7 +314,7 @@ pub type _AVLTreeNode { pub children: [2]*mut _AVLTreeNode = [null as *mut _AVLT
 impl Copy for _AVLTreeNode
 
 @[repr(C)]
-pub type _AVLTree { pub root_node: *mut _AVLTreeNode = null, pub compare_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int, pub num_nodes: c_uint = 0 }
+pub type _AVLTree { pub root_node: *mut _AVLTreeNode = null, pub compare_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int] = null, pub num_nodes: c_uint = 0 }
 impl Copy for _AVLTree
 
 pub let AVL_TREE_NULL: *mut c_void = null
@@ -328,7 +329,7 @@ pub type BinaryHeapCompareFunc = unsafe extern "C" fn(*mut c_void, *mut c_void) 
 pub type BinaryHeap = _BinaryHeap
 
 @[repr(C)]
-pub type _BinaryHeap { pub heap_type: i32 = 0, pub values: *mut *mut c_void = null, pub num_values: c_uint = 0, pub alloced_size: c_uint = 0, pub compare_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int }
+pub type _BinaryHeap { pub heap_type: i32 = 0, pub values: *mut *mut c_void = null, pub num_values: c_uint = 0, pub alloced_size: c_uint = 0, pub compare_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int] = null }
 impl Copy for _BinaryHeap
 
 pub let BINARY_HEAP_NULL: *mut c_void = null
@@ -349,7 +350,7 @@ pub type _BinomialTree { pub value: *mut c_void = null, pub order: c_ushort = 0,
 impl Copy for _BinomialTree
 
 @[repr(C)]
-pub type _BinomialHeap { pub heap_type: i32 = 0, pub compare_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int, pub num_values: c_uint = 0, pub roots: *mut *mut _BinomialTree = null, pub roots_length: c_uint = 0 }
+pub type _BinomialHeap { pub heap_type: i32 = 0, pub compare_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int] = null, pub num_values: c_uint = 0, pub roots: *mut *mut _BinomialTree = null, pub roots_length: c_uint = 0 }
 impl Copy for _BinomialHeap
 
 pub let BINOMIAL_HEAP_NULL: *mut c_void = null
@@ -360,7 +361,7 @@ pub type BloomFilterValue = *mut c_void
 pub type BloomFilterHashFunc = unsafe extern "C" fn(*mut c_void) -> c_uint
 
 @[repr(C)]
-pub type _BloomFilter { pub hash_func: unsafe extern "C" fn(*mut c_void) -> c_uint, pub table: *mut u8 = null, pub table_size: c_uint = 0, pub num_functions: c_uint = 0 }
+pub type _BloomFilter { pub hash_func: Option[unsafe extern "C" fn(*mut c_void) -> c_uint] = null, pub table: *mut u8 = null, pub table_size: c_uint = 0, pub num_functions: c_uint = 0 }
 impl Copy for _BloomFilter
 
 pub type UnitTestFunction = extern "C" fn() -> Unit
@@ -398,7 +399,7 @@ pub type _HashTableEntry { pub pair: _HashTablePair, pub next: *mut _HashTableEn
 impl Copy for _HashTableEntry
 
 @[repr(C)]
-pub type _HashTable { pub table: *mut *mut _HashTableEntry = null, pub table_size: c_uint = 0, pub hash_func: unsafe extern "C" fn(*mut c_void) -> c_uint, pub equal_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int, pub key_free_func: unsafe extern "C" fn(*mut c_void) -> Unit, pub value_free_func: unsafe extern "C" fn(*mut c_void) -> Unit, pub entries: c_uint = 0, pub prime_index: c_uint = 0 }
+pub type _HashTable { pub table: *mut *mut _HashTableEntry = null, pub table_size: c_uint = 0, pub hash_func: Option[unsafe extern "C" fn(*mut c_void) -> c_uint] = null, pub equal_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int] = null, pub key_free_func: Option[unsafe extern "C" fn(*mut c_void) -> Unit] = null, pub value_free_func: Option[unsafe extern "C" fn(*mut c_void) -> Unit] = null, pub entries: c_uint = 0, pub prime_index: c_uint = 0 }
 impl Copy for _HashTable
 
 pub let HASH_TABLE_KEY_NULL: *mut c_void = null
@@ -460,7 +461,7 @@ pub type _RBTreeNode { pub color: i32 = 0, pub key: *mut c_void = null, pub valu
 impl Copy for _RBTreeNode
 
 @[repr(C)]
-pub type _RBTree { pub root_node: *mut _RBTreeNode = null, pub compare_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int, pub num_nodes: c_int = 0 }
+pub type _RBTree { pub root_node: *mut _RBTreeNode = null, pub compare_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int] = null, pub num_nodes: c_int = 0 }
 impl Copy for _RBTree
 
 pub let RB_TREE_NULL: *mut c_void = null
@@ -487,7 +488,7 @@ pub type _SetEntry { pub data: *mut c_void = null, pub next: *mut _SetEntry = nu
 impl Copy for _SetEntry
 
 @[repr(C)]
-pub type _Set { pub table: *mut *mut _SetEntry = null, pub entries: c_uint = 0, pub table_size: c_uint = 0, pub prime_index: c_uint = 0, pub hash_func: unsafe extern "C" fn(*mut c_void) -> c_uint, pub equal_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int, pub free_func: unsafe extern "C" fn(*mut c_void) -> Unit }
+pub type _Set { pub table: *mut *mut _SetEntry = null, pub entries: c_uint = 0, pub table_size: c_uint = 0, pub prime_index: c_uint = 0, pub hash_func: Option[unsafe extern "C" fn(*mut c_void) -> c_uint] = null, pub equal_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int] = null, pub free_func: Option[unsafe extern "C" fn(*mut c_void) -> Unit] = null }
 impl Copy for _Set
 
 pub let SET_NULL: *mut c_void = null
@@ -517,7 +518,7 @@ pub type SortedArray = _SortedArray
 pub type SortedArrayCompareFunc = unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int
 
 @[repr(C)]
-pub type _SortedArray { pub data: *mut *mut c_void = null, pub length: c_uint = 0, pub _alloced: c_uint = 0, pub cmp_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int }
+pub type _SortedArray { pub data: *mut *mut c_void = null, pub length: c_uint = 0, pub _alloced: c_uint = 0, pub cmp_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int] = null }
 impl Copy for _SortedArray
 
 pub let SORTED_ARRAY_NULL: *mut c_void = null
