@@ -197,6 +197,19 @@ stage1: the corpus check a change needs before the battery, without the
 release build `:behavior-tests` waits for. Add a debug switch in front
 (`WITH_DEBUG_PERMUTE_TAGS=1`) to run the whole corpus under it.
 
+Pass `test/behavior/*.w`, not the directory: `test/behavior/lib/` holds
+helper modules, which fail as tests. Set `WITH_TEST_COMPILER` to the same
+stage1 for the fixtures that spawn a compiler. Eight fixtures fail under
+any stage1 (main's too, measured 2026-10-05) and pass under the release
+binary: the comptime snapshot memory limit, the rt-in-unit check lane, the
+build-action and RSS-budget fixtures and the raw-pointer effect order
+(`behav_1944_comptime_snapshot_memory`, `behav_rt_in_unit_check_lane`,
+`behav_action_absolute_paths`, `behav_action_binary_read_errors_strict`,
+`behav_action_binary_read_errors_strict_read_binary`,
+`behav_1899_build_store_undeclared_read`, `behav_build_rss_budget`,
+`behav_sema_raw_pointer_effect_order`). Compare against main's stage1 in a
+worktree before calling one of yours.
+
 ### A hot loop reloads a struct's fields after every store
 
 The compiler's own optimized IR (`WITH_DUMP_LLIR_POST=1`) says why. Two
