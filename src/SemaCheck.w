@@ -21419,6 +21419,14 @@ impl Sema:
             pos = pos + 2 + self.type_extra[(pos + 1)]
         0
 
+    // The tag of variant `index` of `enum_tid` (an enum or an instance of a
+    // generic one): what codegen stores and tests, asked here (D65).
+    pub fn enum_variant_discriminant_by_index(enum_tid: i32, index: i32) -> i64:
+        let decl = self.enum_variant_decl_type(enum_tid)
+        if decl == 0:
+            sema_phase_bug(f"BUG: codegen asked a tag of type {enum_tid}, which declares no variants")
+        self.enum_variant_discriminant_at(decl, index)
+
     fn enum_variant_discriminant_at(enum_decl: i32, index: i32) -> i64:
         let start = self.disc_value_starts.get(enum_decl)
         if start.is_some() and index >= 0 and index < self.get_type_d2(enum_decl):

@@ -3883,26 +3883,15 @@ impl Codegen:
                         pos = pos + 2 + payload_count
         0
 
+    // The tag variant `variant_idx` is stored and tested with: Sema's
+    // discriminant (D65). Codegen kept its own table for repr enums and used
+    // the index for every other enum, which WITH_DEBUG_PERMUTE_TAGS showed
+    // disagreeing with the tags Sema hands out.
     fn mir_enum_variant_discriminant(enum_sema_ty: i32, variant_idx: i32) -> i64:
         if enum_sema_ty <= 0 or variant_idx < 0:
-            return 0
-        let resolved = self.mir_display_resolved_type(enum_sema_ty)
-        let tk = self.mir_display_type_kind(resolved)
-        var enum_sym = 0
-        if tk == TypeKind.TY_ENUM:
-            enum_sym = self.mir_type_d0_at(resolved)
-        else if tk == TypeKind.TY_GENERIC_INST:
-            enum_sym = self.mir_type_d0_at(resolved)
-        let cg_sym = self.sema_sym_to_codegen_sym(enum_sym)
-        if cg_sym > 0:
-            let de_opt = self.disc_enum_type_map.get(cg_sym)
-            if de_opt.is_some():
-                let de_idx = de_opt.unwrap()
-                let v_start = self.disc_enum_variant_starts[de_idx]
-                let v_count = self.disc_enum_variant_counts[de_idx]
-                if variant_idx < v_count:
-                    return self.disc_enum_variant_values[(v_start + variant_idx)]
-        variant_idx as i64
+            sema_phase_bug(f"BUG: a tag asked of type {enum_sema_ty} variant {variant_idx}")
+        let live = self.mir_type_to_live_sema_type(enum_sema_ty)
+        self.sema.enum_variant_discriminant_by_index(if live > 0: live else: enum_sema_ty, variant_idx)
 
     fn mir_enum_tag_value(val: i64) -> i64:
         let val_ty = wl_type_of(val)
