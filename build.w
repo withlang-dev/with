@@ -1580,6 +1580,15 @@ fn green_store_install_path(ctx: &BuildCtx) -> str:
         return "$HOME/" ++ dir.slice(home.len() + 1, dir.len()) ++ "/green.tsv"
     dir ++ "/green.tsv"
 
+// A compiler's debug info is part of the link's output: the dSYM beside
+// the binary, where the SDK links dsymutil. Undeclared, a link restored
+// from the build store came back without it, and lldb on the installed
+// compiler had no source lines (2026-10-05 reseed).
+fn target_with_dsym(target: Target, ctx: &BuildCtx, binary: &str) -> Target:
+    let sdk_lib_dir = comp_llvm_prefix_for_root(ctx.project_info().project_root()) ++ "/lib"
+    if not comp_sdk_has_dsymutil(ctx.fs(), sdk_lib_dir, os()): return target
+    target.extra_output(binary ++ ".dSYM")
+
 fn install_compiler_target(name: &str, source: &str, dest: &str, dep: &str) -> Target:
     install_file_target(name, source, dest, "0755", dep).arg("verify=version")
 
@@ -3369,6 +3378,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(llvm_link_metadata)
 
     var stage1 = target_new(.Action, "stage1", "").output(bootstrap_compiler_bin("with-stage1"))
+    stage1 = target_with_dsym(move stage1, &ctx, bootstrap_compiler_bin("with-stage1"))
     stage1.action = run_with_compiler_build_action
     stage1 = stage1.compiler("seed")
     stage1 = stage1.dep("sdk-clang-main")
@@ -3425,6 +3435,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(dev)
 
     var stage2 = target_new(.Action, "stage2", "").output(stage_compiler_bin("with-stage2"))
+    stage2 = target_with_dsym(move stage2, &ctx, stage_compiler_bin("with-stage2"))
     stage2.action = run_with_compiler_build_action
     stage2 = stage2.compiler(bootstrap_compiler_bin("with-stage1"))
     stage2 = stage2.input("out/gen/main.w")
@@ -3872,6 +3883,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     // downstream `build` Action patches the version into the final binary. When
     // commit identity is the only change, this expensive compile stays cached.
     var compiler = target_new(.Action, "link-compiler", "").output(release_compiler_bin("with") ++ ".unstamped")
+    compiler = target_with_dsym(move compiler, &ctx, release_compiler_bin("with") ++ ".unstamped")
     compiler.action = run_with_compiler_build_action
     compiler = compiler.compiler(stage_compiler_bin("with-stage2"))
     compiler = compiler.input("out/gen/main.w")

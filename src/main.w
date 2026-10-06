@@ -3392,7 +3392,7 @@ fn cli_install_compiler_dsym(root: &str, target_name: &str, dest: &str) -> i32:
     let source = resolve_join(root, "out/release/bin/with.unstamped.dSYM/Contents")
     let dwarf = with_fs_read_file(source ++ "/Resources/DWARF/with.unstamped")
     if dwarf.len() == 0:
-        with_write(f"[{target_name}] no dSYM in out/release/bin (this SDK links no dsymutil): lldb on {dest} has symbols only, no source lines\n")
+        with_write(f"[{target_name}] no dSYM beside out/release/bin/with.unstamped: lldb on {dest} has symbols only, no source lines\n")
         return 0
     let tmp = dsym ++ f".install-tmp.{build_graph_rt_pid()}"
     build_graph_rt_remove_tree(tmp)
