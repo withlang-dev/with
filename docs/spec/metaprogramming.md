@@ -72,8 +72,22 @@ comptime fn build_table(keys: [str]) -> HashMap[str, usize]:
 const ROUTES = comptime build_table(["/", "/health", "/users"])
 ```
 
-Any function marked `comptime fn` can only call other `comptime`
-functions and use types that are available at compile time. It cannot
+A function is comptime-callable when nothing it calls, directly or
+through any call, does what the next paragraph forbids. `comptime fn`
+declares the property and is checked at the declaration: its body must
+resolve statically, so a call through a trait object or a function value
+is refused there. A plain function is judged by the evaluator when a
+compile-time call reaches it, where the actual callee of every indirect
+call is known. A compile-time call that reaches a forbidden operation
+reports the chain of calls from the call site to that operation; the
+chain is the diagnostic, never a bare refusal. A plain function called at
+compile time is still broken by an upstream `print` added three calls
+deep (this is Zig's model, and that is its hole); `comptime fn` is the
+spelling a library author uses to promise otherwise, and the diagnostic
+names the upstream culprit. (D104, 2026-10-07.)
+
+A comptime-callable function uses types that are available at compile
+time. It cannot
 perform ambient I/O, inspect directories, read the environment or clock,
 make network calls, spawn processes, call FFI, mint capabilities, depend
 on host-global state, call the runtime heap allocator, or carry runtime

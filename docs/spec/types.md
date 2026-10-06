@@ -1552,6 +1552,37 @@ just returns the value. No wrapping needed.
 with a named struct for readability. The compiler does not enforce
 this, but `with fmt` may suggest it.
 
+### 4.9a Value to Option
+
+**Value to Option.** Where an `Option[T]` is demanded and the expression
+has type `T`, the expression is `Some(expression)`. `None` and an
+expression already of type `Option[T]` are taken as they are. The
+conversion applies once, at the demand; it never applies where no type is
+demanded. The conversion does not participate in inference; it applies
+only once the demanded type is known.
+
+Demand propagates into the arms of an `if` and a `match` and into a
+block's tail the way demand already propagates there, so arms may mix `3`
+and `None` under an `Option[i32]` demand. An operator's operands are not
+demand sites: `opt == 3` is an error.
+
+```
+fn first(x: Option[i32]) -> i32: x.unwrap_or(0)
+first(3)                         // Some(3)
+let slot: Option[&str] = name    // Some(name)
+type Box { cb: Option[extern "C" fn(i32) -> i32] }
+Box { cb: twice }                // Some(twice)
+```
+
+*Commentary.* "Once" is the guardrail: a bare `T` offered where
+`Option[Option[T]]` is demanded becomes `Some(x): Option[T]`, which then
+mismatches and is refused, so nesting is never guessed. "Does not
+participate in inference" keeps `fn first[T](x: Option[T])` called as
+`first(3)` an error until `T` is known by other means: the conversion
+never solves a type variable (Swift lets promotion take part in solving,
+which is the source of its overload-resolution cost and surprising picks).
+(D103, 2026-10-07.)
+
 ### 4.10 Implicit Default Return
 
 When a function's return type implements the `Default` trait and the
