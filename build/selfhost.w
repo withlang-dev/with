@@ -8745,6 +8745,26 @@ fn bs_expect_bundle_omission(ctx: &ActionCtx, compiler_path: &str, case_dir: &st
     if rc != 0: return rc
     bs_assert_contains(ctx, wi_text, kept_line, "bundle omission kept the rest " ++ name)
 
+// #2219: the global form — a bundle-owned global whose initializer does not
+// fold to data is omitted (named in the .wi note and the manifest) while no
+// body in the object reads it.
+fn bs_expect_bundle_global_omission(ctx: &ActionCtx, compiler_path: &str, case_dir: &str, name: &str, omitted_global: &str, kept_line: &str) -> i32:
+    let src = bs_join(case_dir, "lib/std/" ++ name ++ ".w")
+    var rc = bs_write_fixture(ctx, src, bs_bundle_interface_fixture(ctx, "lib/std/" ++ name ++ ".w"), "bundle global omission fixture " ++ name)
+    if rc != 0: return rc
+    let out = bs_join(case_dir, "omit/" ++ name)
+    let result = bs_build_bundle(ctx, compiler_path, "bundle-omit-" ++ name, src, "std/" ++ name, out ++ ".o", out ++ ".wi", out ++ ".fp", out ++ ".manifest")
+    if result.rc != 0:
+        return bs_fail(ctx, "a bundle with an unread global that does not fold must build (the global is omitted, not refused): " ++ name ++ "\n" ++ result.stderr)
+    rc = bs_assert_contains(ctx, result.stderr, "1 global(s) without a compile-time initializer not exported at Level 0", "bundle global omission warning " ++ name)
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, ctx.fs().read_text(out ++ ".manifest"), "\nomitted <embedded-std>/std/" ++ name ++ ".w " ++ omitted_global ++ " runtime-init-global", "bundle global omission manifest line " ++ name)
+    if rc != 0: return rc
+    let wi_text = ctx.fs().read_text(out ++ ".wi")
+    rc = bs_assert_contains(ctx, wi_text, "// not exported at Level 0 (no compile-time initializer): let " ++ omitted_global ++ "\n", "bundle global omission note " ++ name)
+    if rc != 0: return rc
+    bs_assert_contains(ctx, wi_text, kept_line, "bundle global omission kept the rest " ++ name)
+
 fn bs_expect_bundle_refusal(ctx: &ActionCtx, compiler_path: &str, case_dir: &str, name: &str, needle: &str) -> i32:
     let src = bs_join(case_dir, "lib/std/" ++ name ++ ".w")
     let rc = bs_write_fixture(ctx, src, bs_bundle_interface_fixture(ctx, "lib/std/" ++ name ++ ".w"), "bundle refusal fixture " ++ name)
@@ -8962,8 +8982,16 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     // corpora export their macro helpers as generic functions).
     rc = bs_expect_bundle_omission(ctx, compiler_path, case_dir, "wi_omit_generic", "id", "pub fn plain(x: i32) -> i32")
     if rc != 0: return rc
+    // #2219: a global whose initializer does not fold to data is omitted the
+    // same way while nothing in the object reads it ...
+    rc = bs_expect_bundle_global_omission(ctx, compiler_path, case_dir, "wi_omit_global_init", "LIMITS", "pub fn plain(x: i32) -> i32")
+    if rc != 0: return rc
 
     // Refusals: each a loud error naming the declaration, no interface written.
+    // ... and a body that reads it is refused naming the global, the body and
+    // the part that did not fold — never a zeroed stand-in (#2219).
+    rc = bs_expect_bundle_refusal(ctx, compiler_path, case_dir, "wi_refuse_global_init", "global `LIMITS` is read by `limit_x`, but its initializer does not fold to data (`side()` is not a compile-time value)")
+    if rc != 0: return rc
     rc = bs_expect_bundle_refusal(ctx, compiler_path, case_dir, "wi_refuse_drop", "type Res: has a drop method")
     if rc != 0: return rc
     rc = bs_expect_bundle_refusal(ctx, compiler_path, case_dir, "wi_refuse_const", "const ORIGIN: constant does not fold to a literal")

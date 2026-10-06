@@ -400,6 +400,13 @@ pub type Codegen {
     // ("<canonical module>\t<name>"): omitted from the interface and the
     // object (CodegenTraits.gen_module_constant).
     bundle_unlowered_globals: Vec[str],
+    // #2219: why each of those did not fold — keyed by the global's name
+    // symbol, the sub-expression `try_eval_const_llvm` stopped at — so a
+    // body that reads the global is refused naming it (mir_bind_global_locals).
+    unlowered_global_reasons: HashMap[i32, str],
+    // The innermost sub-expression the last `try_eval_const_llvm` could not
+    // fold (0 when it folded); reset by gen_module_constant per global.
+    const_fold_unfolded_node: i32,
 
     // Loop stack (fixed-size arrays via Vec)
     loop_break_bbs: Vec[i64],
@@ -1238,6 +1245,8 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         bundle_prefixes: embedded_bundle_prefixes(),
         bundle_corpus: "",
         bundle_unlowered_globals: Vec.new(),
+        unlowered_global_reasons: HashMap.new(),
+        const_fold_unfolded_node: 0,
         loop_break_bbs: Vec.new(),
         loop_continue_bbs: Vec.new(),
         loop_result_allocas: Vec.new(),

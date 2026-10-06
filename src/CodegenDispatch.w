@@ -1407,6 +1407,11 @@ impl Codegen:
         if base_opt.is_some():
             cur_ptr = base_opt.unwrap() as i64
         if cur_ptr == 0:
+            // #2219: a global's storage is bound by mir_bind_global_locals or
+            // nothing; a fresh alloca here was a zeroed local standing in for
+            // a global the object never defined (a bundle consumer read 0).
+            if base_local >= 0 and base_local < body.local_is_global.len() as i32 and body.local_is_global[base_local] != 0:
+                return 0
             if create_base:
                 cur_ptr = self.mir_get_or_create_local_ptr(base_local, create_type)
                 let alloc_ty = self.mir_storage_type_for_value(create_type)
@@ -7157,6 +7162,19 @@ impl Codegen:
                 if gl_mc.is_some():
                     let global_value: i64 = gl_mc.unwrap()
                     self.mir_local_ptrs.insert(gli, global_value)
+                else if self.unlowered_global_reasons.contains(gl_name):
+                    // #2219: a bundle-owned global whose initializer did not
+                    // fold has no storage in the object and no initializer
+                    // ever runs for it; a body reading it is refused here,
+                    // naming both, instead of reading a zeroed stand-in.
+                    self.had_error = 1
+                    if self.codegen_error_detail.len() == 0:
+                        let reason = self.unlowered_global_reasons.get(gl_name).unwrap()
+                        self.codegen_error_detail = f"global `{self.intern.resolve(gl_name)}` is read by `{self.intern.resolve(self.current_function_name_sym)}`, but its initializer does not fold to data (`{reason}` is not a compile-time value) and a bundle object runs no initializer; give it a constant initializer, or compute it in a function"
+                else:
+                    self.had_error = 1
+                    if self.codegen_error_detail.len() == 0:
+                        self.codegen_error_detail = f"BUG: global `{self.intern.resolve(gl_name)}` read by `{self.intern.resolve(self.current_function_name_sym)}` has no storage in this object"
 
     // Every MIR body emitter ends with this: a switch lowering creates the
     // shared default block on demand, and it has no terminator until the body

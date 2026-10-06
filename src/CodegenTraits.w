@@ -10,6 +10,7 @@ use Overflow
 use AnalysisTypes
 use MirCore
 use MirLower
+use render
 use SemaTypes
 use std.collections.HashMap
 
@@ -2097,7 +2098,17 @@ impl Codegen:
             return const_int_fail()
         const_int_fail()
 
+    // #2219: a fold that fails leaves the innermost sub-expression it stopped
+    // at in `const_fold_unfolded_node` (the first failing leaf sets it; the
+    // enclosing levels leave it), so a refusal can name `side()` rather than
+    // the whole literal.
     mut fn try_eval_const_llvm(node: i32, expected_tid: i32) -> i64:
+        let out = self.try_eval_const_llvm_inner(node, expected_tid)
+        if out == 0 and node != 0 and self.const_fold_unfolded_node == 0:
+            self.const_fold_unfolded_node = node
+        out
+
+    mut fn try_eval_const_llvm_inner(node: i32, expected_tid: i32) -> i64:
         if node == 0 or expected_tid <= 0:
             return 0
 
@@ -2220,6 +2231,7 @@ impl Codegen:
         let name_sym = self.pool.get_data0(let_node)
         var value_node = self.pool.get_data1(let_node)
         let flags = self.pool.get_data2(let_node)
+        self.const_fold_unfolded_node = 0
         let is_mut = flags % 2
         var binding_ty = if self.sema.typed_binding_types.contains(let_node):
             self.sema.typed_binding_types.get(let_node).unwrap()
@@ -2453,6 +2465,10 @@ impl Codegen:
             // meets one only through `pub let` storage of migrated macros.)
             if self.module_object_mode != 0 and self.decl_path_is_bundle_owned(self.current_decl_source_file):
                 self.bundle_unlowered_globals.push(codegen_canonical_module_path(self.current_decl_source_file) ++ "\t" ++ self.intern.resolve(name_sym))
+                // #2219: the part that did not fold, for the refusal a body
+                // reading this global gets (mir_bind_global_locals).
+                let stopped_at = if self.const_fold_unfolded_node != 0: self.const_fold_unfolded_node else: value_node
+                self.unlowered_global_reasons.insert(name_sym, render_expr(self.pool, self.intern, stopped_at as NodeId, 0))
                 return
             // Anything else — a call, an expression over runtime values — is
             // storage the main wrapper initializes before main; an integer or
