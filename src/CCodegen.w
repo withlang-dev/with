@@ -7537,6 +7537,7 @@ impl CCodegen:
         let intrinsic = body.call_intrinsic(args_id)
         let map_ptr = "(uint8_t*)(intptr_t)(" ++ self.map_recv_text(body, args_id) ++ ")"
         var value = ""
+        var slot_guard = ""
         if intrinsic == MirIntrinsic.MAP_CAPACITY:
             value = "with_hashmap_capacity(" ++ map_ptr ++ ")"
         else:
@@ -7551,7 +7552,8 @@ impl CCodegen:
                     self.fail("emit-c: a map entry is taken into a destination")
                     return "    abort();"
                 let entry = self.place_text(body, dest_place)
-                return "    (void)with_hashmap_take_at(" ++ map_ptr ++ ", " ++ slot ++ ", (void*)&(" ++ entry ++ ").field0, (void*)&(" ++ entry ++ ").field1);\n" ++ f"    goto bb{next_bb};"
+                // D100: a dead slot writes nothing; no uninitialized entry.
+                return "    if (!with_hashmap_take_at(" ++ map_ptr ++ ", " ++ slot ++ ", (void*)&(" ++ entry ++ ").field0, (void*)&(" ++ entry ++ ").field1)) with_panic(WITH_STR_LIT(\"map slot holds no entry: slot_take moved from a removed or out-of-range slot\"), WITH_STR_LIT(\"\"), 0);\n" ++ f"    goto bb{next_bb};"
             if intrinsic == MirIntrinsic.MAP_SLOT_OCCUPIED:
                 value = "with_hashmap_slot_occupied(" ++ map_ptr ++ ", " ++ slot ++ ")"
             else:
@@ -7563,7 +7565,9 @@ impl CCodegen:
                     return "    abort();"
                 let dest_is_view = self.sema.get_type_kind(self.sema.resolve_alias(dest_tid)) == TypeKind.TY_REF
                 value = if dest_is_view: self.ref_from_slot_ptr_text(at, dest_tid) else: "(*(" ++ self.c_type(dest_tid, 0) ++ "*)" ++ at ++ ")"
-        var out = ""
+                // D100: no unchecked helpers; a dead slot has nothing to read.
+                slot_guard = "    if (!with_hashmap_slot_occupied(" ++ map_ptr ++ ", " ++ slot ++ ")) with_panic(WITH_STR_LIT(\"map slot holds no entry: slot_key/slot_value read a removed or out-of-range slot\"), WITH_STR_LIT(\"\"), 0);\n"
+        var out = slot_guard.clone()
         if has_ret != 0:
             out = "    " ++ self.place_text(body, dest_place) ++ " = " ++ value ++ ";\n"
         else:

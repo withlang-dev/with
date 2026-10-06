@@ -10085,6 +10085,16 @@ impl Codegen:
                 let at_name = if intrinsic == MirIntrinsic.MAP_KEY_AT: "with_hashmap_key_ptr_at" else: "with_hashmap_value_ptr_at"
                 let at_fn = self.ensure_hashmap_slot_runtime_fn(at_name, ptr_ty)
                 let slot_ptr = wl_build_call(self.builder, self.hashmap_slot_runtime_fn_type(ptr_ty), at_fn, vec_data_i64(&slot_args), 2)
+                // D100: no unchecked helpers. A slot that holds no entry
+                // (removed, or past the end) has no key to view: the runtime
+                // returns null, and reading through it was undefined.
+                let dead_slot = wl_build_icmp(self.builder, wl_int_eq(), slot_ptr, wl_const_null(ptr_ty))
+                let dead_bb = wl_append_bb(self.context, self.current_function, "map.slot.dead")
+                let live_bb = wl_append_bb(self.context, self.current_function, "map.slot.live")
+                wl_build_cond_br(self.builder, dead_slot, dead_bb, live_bb)
+                wl_position_at_end(self.builder, dead_bb)
+                self.emit_runtime_panic_value(self.gen_string_literal_raw("map slot holds no entry: slot_key/slot_value read a removed or out-of-range slot"), self.gen_string_literal_raw(""))
+                wl_position_at_end(self.builder, live_bb)
                 let dest_sema = self.mir_intrinsic_dest_sema_type(body, dest_place)
                 let dest_is_view = dest_sema > 0 and self.mir_type_kind_at(self.mir_resolve_alias_at(dest_sema)) == TypeKind.TY_REF
                 result = if dest_is_view: self.mir_ref_from_slot_ptr(slot_ptr, dest_sema) else: wl_build_load(self.builder, self.mir_dest_llvm_type(body, dest_place), slot_ptr)
@@ -10102,7 +10112,16 @@ impl Codegen:
             if take_fn == 0:
                 take_fn = wl_add_function(self.llmod, "with_hashmap_take_at", take_ty)
             let take_args: Vec[i64] = [map_ptr, slot, wl_build_struct_gep(self.builder, entry_ty, entry, 0), wl_build_struct_gep(self.builder, entry_ty, entry, 1)]
-            let _ = wl_build_call(self.builder, take_ty, take_fn, vec_data_i64(&take_args), 4)
+            let taken = wl_build_call(self.builder, take_ty, take_fn, vec_data_i64(&take_args), 4)
+            // D100: a dead slot wrote nothing; the entry would be an owned
+            // (K, V) made of uninitialized bytes.
+            let none_taken = wl_build_icmp(self.builder, wl_int_eq(), taken, wl_const_int(i32_ty, 0, 0))
+            let dead_bb = wl_append_bb(self.context, self.current_function, "map.take.dead")
+            let live_bb = wl_append_bb(self.context, self.current_function, "map.take.live")
+            wl_build_cond_br(self.builder, none_taken, dead_bb, live_bb)
+            wl_position_at_end(self.builder, dead_bb)
+            self.emit_runtime_panic_value(self.gen_string_literal_raw("map slot holds no entry: slot_take moved from a removed or out-of-range slot"), self.gen_string_literal_raw(""))
+            wl_position_at_end(self.builder, live_bb)
             result = wl_build_load(self.builder, entry_ty, entry)
 
         else if intrinsic == MirIntrinsic.MAP_LEN32 or intrinsic == MirIntrinsic.MAP_LEN64 or intrinsic == MirIntrinsic.MAP_ULEN32:
