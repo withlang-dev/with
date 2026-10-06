@@ -384,6 +384,8 @@ impl ResolveState:
                 let path_count = ast_pool.get_data1(decl)
                 let dotted = self.use_path_dotted(ast_pool, path_start, path_count)
                 let resolved_path = self.resolve_use_file(module_id, ast_pool, path_start, path_count)
+                let internal_refusal = if resolved_path.len() > 0: resolve_internal_import_refusal(self.module_paths[module_id], resolved_path, dotted) else: ""
+                if internal_refusal.len() > 0: self.emit_import_decl_error(module_id, start, end, internal_refusal)
                 var target_module = -1
                 if resolved_path.len() > 0:
                     target_module = self.reserve_module(resolved_path, resolve_dirname(resolved_path), -1)
@@ -1133,6 +1135,8 @@ impl ResolveState:
                 continue
             let dotted = line.slice(4, line.len()).trim()
             let resolved_path = self.resolve_use_file_dotted(module_id, dotted)
+            let internal_refusal = if resolved_path.len() > 0: resolve_internal_import_refusal(self.module_paths[module_id], resolved_path, dotted) else: ""
+            if internal_refusal.len() > 0: self.emit_import_decl_error(module_id, 0, 0, internal_refusal)
             var target_module = -1
             if resolved_path.len() > 0:
                 target_module = self.reserve_module(resolved_path, resolve_dirname(resolved_path), -1)
@@ -1392,6 +1396,30 @@ fn embedded_bundle_providing(dotted: &str) -> str:
         for path in bundle_interface_section_paths(embedded_bundle_interface_text(bi)):
             if bundle_module_dotted_name(path) == dotted: return embedded_bundle_name(bi)
     ""
+
+// §18.3 (D100): a module whose path has a segment named `internal` is
+// importable only by modules inside the tree rooted at that segment's parent.
+// Returns the refusal, or "" when `importer` may import `target`.
+fn resolve_internal_import_refusal(importer: &str, target: &str, dotted: &str) -> str:
+    let target_std = resolve_path_is_std(target)
+    let target_norm = resolve_normalize_path(target)
+    let segments = target_norm.split("/")
+    var cut = -1
+    for k in 0..segments.len() as i32:
+        let seg = segments[k]
+        if seg == "internal" or (k == segments.len() as i32 - 1 and seg == "internal.w"): cut = k
+    if cut < 0: return ""
+    // The standard library is one tree whichever spelling names it.
+    if target_std and resolve_path_is_std(importer): return ""
+    var parent = ""
+    for k in 0..cut:
+        parent = parent ++ (if k > 0: "/" else: "") ++ segments[k]
+    let importer_norm = resolve_normalize_path(importer)
+    if parent.len() == 0 or importer_norm.starts_with(parent ++ "/"): return ""
+    let owner = if target_std: "the standard library" else: "'" ++ parent ++ "'"
+    f"module '{dotted}' is internal to {owner} (§18.3): only modules inside that tree may import it"
+
+fn resolve_path_is_std(path: &str) -> bool: path.starts_with("<embedded-std>/") or path.starts_with("lib/std/") or path.contains("/lib/std/")
 
 pub fn import_not_found_message(dotted: &str) -> str:
     // A bundled corpus is in the compiler as an object and an interface,
