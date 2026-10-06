@@ -31412,6 +31412,7 @@ impl Sema:
         let mc_sig_idx_for_effect = if mc_owner_sym_for_effect != 0: self.lookup_method_sig(mc_owner_sym_for_effect, field) else: -1
         let mc_method_fn_for_resolution = if mc_owner_sym_for_effect != 0: self.lookup_method_fn(mc_owner_sym_for_effect, field) else: 0
         self.trace_method_resolution(node, obj_type as i32, mc_owner_sym_for_effect, field, mc_sig_idx_for_effect, mc_method_fn_for_resolution)
+        if mc_method_fn_for_resolution != 0: self.check_method_visible(mc_method_fn_for_resolution, node)
         let arg_types: Vec[i32] = Vec.new()
         // docs/completed/mut.md Rev 8 §15.8 — see check_call.
         let mc_iter_borrow_idxs: Vec[i32] = Vec.new()
@@ -36191,6 +36192,24 @@ impl Sema:
         self.mres_flags.push(flags)
         self.mres_cands_total.push(total)
         self.mres_cands_visible.push(visible)
+
+    // §18.3 (#2186): "Cross-module access to a non-`pub` symbol is a compile
+    // error" — a method is a function. A trait impl's method is reached
+    // through the trait, whose visibility governs it. Returns whether the
+    // call may reach `method_fn`, reporting it when not.
+    mut fn check_method_visible(method_fn: i32, node: i32) -> bool:
+        let decl: i32 = self.fn_decl_nodes.get(method_fn) ?? 0
+        if decl == 0: return true
+        let impl_node: i32 = self.method_impl_nodes.get(method_fn) ?? 0
+        if impl_node != 0 and self.ast.get_data2(impl_node) != 0: return true
+        if (self.ast.get_data2(decl) / FnFlags.PUB) % 2 == 1: return true
+        let path: str = match self.fn_decl_source_paths.get(method_fn):
+            Some(p) => p.clone()
+            None => ""
+        if self.decl_visible_from_current(path, 0) != 0: return true
+        let name: str = self.pool_resolve(method_fn)
+        self.emit_error_with_help(f"method '{name}' is private to module '{sema_module_display_name(path)}' (§18.3)", node, "mark it `pub` in its module, or call a public method")
+        false
 
     fn lookup_method_fn(type_sym: i32, method_sym: i32) -> i32:
         if type_sym <= 0 or method_sym <= 0:

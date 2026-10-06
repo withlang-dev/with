@@ -1,15 +1,3 @@
-fn private_fn -> i32:
-    1
-
-type PrivateType {
-    value: i32,
-}
-
-const PRIVATE_CONST = 2
-
-global PRIVATE_GLOBAL = 3
-
-
 // #2186 (§18.3): a public type whose methods differ in visibility. `secret`
 // is private to this module; `open` is public; `show` is reached through
 // the public trait `Show`.
