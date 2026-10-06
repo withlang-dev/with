@@ -229,6 +229,15 @@ impl Zcu:
             self.decl_source_file_ids.push(file_id)
             self.decl_is_c_import.push(0)
 
+    // D100 (§18.4): each declaration path's package, for Sema's visibility
+    // rule; computed here, where with.toml can be probed (Sema reads no
+    // files).
+    fn package_key_map() -> HashMap[str, str]:
+        var out = HashMap[str, str].new()
+        for path in self.decl_source_paths:
+            if not out.contains(path): out.insert(path.clone(), zcu_package_key(path))
+        out
+
     fn append_decl_source_paths(count: i32, path: &str, file_id: i32) -> Unit:
         for _ in 0..count:
             self.decl_source_paths.push(zcu_owned_text(path))
@@ -570,3 +579,26 @@ impl Zcu:
 
     fn render_current_diagnostics():
         self.render_all_diagnostics_frontend()
+
+// D100 (§18.4): the package a module belongs to. The standard library is
+// one package; otherwise the nearest directory holding a `with.toml`; a file
+// outside any manifest belongs to the program's package, with the modules it
+// imports from its own tree.
+fn zcu_package_key(path: &str) -> str:
+    if sema_tier_path_is_std_implementation(path) != 0: return "<std>"
+    var dir = zcu_parent_dir(path)
+    while true:
+        let manifest = if dir.len() == 0: "with.toml" else: dir ++ "/with.toml"
+        if resolve_file_exists(manifest): return if dir.len() == 0: "." else: dir.clone()
+        if dir.len() == 0 or dir == "/": break
+        dir = zcu_parent_dir(dir)
+    "<program>"
+
+// The directory of a path ("" for a bare name, "/" for a file at the root).
+fn zcu_parent_dir(path: &str) -> str:
+    var cut = -1
+    for i in 0..path.len() as i32:
+        if path[i] == '/' or path[i] == '\\': cut = i
+    if cut < 0: return ""
+    if cut == 0: return "/"
+    path.slice(0, cut)

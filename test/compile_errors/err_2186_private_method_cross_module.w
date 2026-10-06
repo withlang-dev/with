@@ -1,4 +1,4 @@
-//! expect-check-fail: method 'Gauge.secret' is private to module 'private_surface' (§18.3)
+//! expect-check-fail: method 'Gauge.secret' is private to its package
 
 // #2186: "Cross-module access to a non-`pub` symbol is a compile error;
 // this applies uniformly to functions, types, constants, and globals"

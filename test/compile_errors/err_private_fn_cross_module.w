@@ -1,4 +1,4 @@
-//! expect-check-fail: symbol 'private_fn' is private to module
+//! expect-check-fail: symbol 'private_fn' is private to its package
 
 use visibility.private_surface
 

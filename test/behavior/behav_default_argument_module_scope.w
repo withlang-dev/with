@@ -55,7 +55,7 @@ fn main:
     assert(hidden.rc != 0)
     assert(hidden.stderr.contains("not visible from this module"))
     p7_write(root, "src/private.w", "use facade\nfn main { Pads.private_default(); Pads.open(id: PRIVATE_ID) }\n")
-    let private = p7_run(root, "private", "check\0src/private.w\0")
-    assert(private.rc != 0)
-    assert(private.stderr.contains("is private to module"))
+    // D100 (§18.3): facade's PRIVATE_ID is not `pub`, and private.w is in
+    // the same package, so it is visible there.
+    p7_assert_success(p7_run(root, "private", "check\0src/private.w\0"), "a package's own modules see its private declarations")
     print("ok")

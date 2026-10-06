@@ -1,4 +1,4 @@
-//! expect-check-fail: symbol 'PRIVATE_GLOBAL' is private to module
+//! expect-check-fail: symbol 'PRIVATE_GLOBAL' is private to its package
 
 use visibility.private_surface
 

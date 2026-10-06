@@ -1654,6 +1654,7 @@ impl Compilation:
         // Clone: see run_mir_lower — bare assignments would move these tables
         // out of the Zcu and blank them for later consumers.
         sema.decl_source_paths = sema_clone_str_vec(&taken_zcu.decl_source_paths)
+        sema.package_keys = taken_zcu.package_key_map()
         sema.decl_source_file_ids = sema_clone_i32_vec(&taken_zcu.decl_source_file_ids)
         sema.decl_is_c_import = sema_clone_i32_vec(&taken_zcu.decl_is_c_import)
         sema.source_text_file_ids = sema_clone_i32_vec(&taken_zcu.source_text_file_ids)
@@ -1971,6 +1972,7 @@ impl Compilation:
             // the Zcu (single-owner Vec), and the backend's module-object pruning
             // then sees empty decl paths and emits every imported module's bodies.
             sema.decl_source_paths = sema_clone_str_vec(&self.zcu.decl_source_paths)
+            sema.package_keys = self.zcu.package_key_map()
             sema.decl_source_file_ids = sema_clone_i32_vec(&self.zcu.decl_source_file_ids)
             sema.decl_is_c_import = sema_clone_i32_vec(&self.zcu.decl_is_c_import)
             sema.source_text_file_ids = sema_clone_i32_vec(&self.zcu.source_text_file_ids)

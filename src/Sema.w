@@ -2193,6 +2193,9 @@ pub type Sema {
     // Per-module scoping: tracks which module each declaration belongs to
     // and which symbols are visible in each module context.
     decl_source_paths: Vec[str],     // one path per decl index (from Frontend)
+    // D100 (§18.4): module path -> package key, from the Zcu (it can probe
+    // for with.toml; Sema reads no files).
+    package_keys: HashMap[str, str],
     decl_source_file_ids: Vec[i32],  // one file id per decl index (from Frontend)
     module_path_by_file: HashMap[i32, str], // #1362: file id -> declaring module path (lazy)
     decl_is_c_import: Vec[i32],      // 0 unless the decl came from a c_import; then 1 + the byte offset of that `use c_import` in its module (#1221: import order)
@@ -3727,6 +3730,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         ty_usize: 0, ty_isize: 0, ty_c_va_list: 0, ty_const_i8_ptr: 0,
         ty_field_info: 0, ty_variant_info: 0,
         decl_source_paths: sema_new_vec_str(),
+        package_keys: HashMap[str, str].new(),
         decl_source_file_ids: Vec.new(),
         module_path_by_file: HashMap.new(),
         decl_is_c_import: Vec.new(),
@@ -4322,6 +4326,12 @@ impl Sema:
             i = self.decl_visibility_prev[i]
         0
 
+    // D100: a module path's package; a path the Zcu never saw is the
+    // program's (std's when it is a std path).
+    fn package_of(path: &str) -> str:
+        if self.package_keys.contains(path): return self.package_keys.get(path).unwrap().clone()
+        if sema_tier_path_is_std_implementation(path) != 0: "<std>" else: "<program>"
+
     fn decl_visible_from_current(target_path: &str, is_pub: i32) -> i32:
         if target_path.len() == 0:
             return 1
@@ -4340,7 +4350,10 @@ impl Sema:
         // `src/`. The compiler tree now conforms to §18.3 like any project.
         if sema_tier_path_is_std_implementation(self.current_module_path) != 0 and sema_tier_path_is_std_implementation(target_path) != 0:
             return 1
-        if is_pub == 0:
+        // D100 (§18.3): without `pub`, a declaration is visible throughout
+        // its package — `pub` is what other packages need. It waives `pub`,
+        // not the import: the module must still be visible from here.
+        if is_pub == 0 and self.package_of(target_path) != self.package_of(self.current_module_path):
             return 0
         self.module_is_visible_from_current(target_path)
 
@@ -4546,7 +4559,11 @@ impl Sema:
             saw_candidate = 1
             let path = self.decl_visibility_paths[i]
             let is_pub = self.decl_visibility_pub[i]
-            if self.decl_visible_from_current_gated(path, is_pub, sym) != 0:
+            // Another module's C expansion is an import, reached only by the
+            // c_import rule above, never by package-wide visibility (D100).
+            let record_di = self.find_decl_index(self.decl_visibility_nodes[i])
+            let imported_c = path != self.current_module_path and record_di >= 0 and record_di < self.decl_is_c_import.len() as i32 and self.decl_is_c_import[record_di] != 0
+            if not imported_c and self.decl_visible_from_current_gated(path, is_pub, sym) != 0:
                 return 1
             i = self.decl_visibility_prev[i]
         if saw_candidate == 0:
@@ -4690,7 +4707,7 @@ impl Sema:
             return
         let path = self.private_symbol_path_from_current(sym)
         if path.len() > 0:
-            self.emit_error("symbol '" ++ name ++ "' is private to module '" ++ path ++ "'", node)
+            self.emit_error("symbol '" ++ name ++ "' is private to its package (declared in '" ++ path ++ "', §18.3)", node)
         else:
             self.emit_error("symbol '" ++ name ++ "' is not visible from this module", node)
 
@@ -4808,7 +4825,12 @@ impl Sema:
             let candidate_tid = self.named_type_candidate_tids[i]
             let candidate_path = self.named_type_candidate_paths[i]
             let candidate_pub = self.named_type_candidate_pub[i]
-            let candidate_visible = if gated != 0: self.decl_visible_from_current_gated(candidate_path, candidate_pub, sym) else: self.decl_visible_from_current(candidate_path, candidate_pub)
+            // A C declaration another module's expansion made is an import,
+            // not that module's declaration (§18.2: imports are not
+            // transitive): it reaches this module only by the c_import rule
+            // below, never by D100's package-wide visibility.
+            let imported_c = self.named_type_candidate_ci[i] != 0 and candidate_path != self.current_module_path
+            let candidate_visible = if imported_c: 0 else if gated != 0: self.decl_visible_from_current_gated(candidate_path, candidate_pub, sym) else: self.decl_visible_from_current(candidate_path, candidate_pub)
             if candidate_path.len() == 0:
                 if global_tid == 0:
                     global_tid = candidate_tid

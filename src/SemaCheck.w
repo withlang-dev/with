@@ -1658,7 +1658,7 @@ impl Sema:
                     return 0 as TypeId
                 let path: str = with_str_clone_ref(self.module_paths[self.ns_targets[ni]])
                 if not self.named_type_visible_in(assoc_sym, path):
-                    self.emit_error(f"'{assoc_name}' is private to module '{path}'", node)
+                    self.emit_error(f"'{assoc_name}' is private to its package (declared in '{path}', §18.3)", node)
                     return 0 as TypeId
                 return ns_tid as TypeId
             // Type parameter: look up concrete type via generic substitution
@@ -24277,7 +24277,7 @@ impl Sema:
         while i >= 0:
             if self.decl_visibility_paths[i] == path:
                 if self.decl_visible_from_current(path, self.decl_visibility_pub[i]) == 0:
-                    self.emit_error(f"'{member_name}' is private to module '{path}'", node)
+                    self.emit_error(f"'{member_name}' is private to its package (declared in '{path}', §18.3)", node)
                     return -1
                 // A type keeps its short name (types are not displaced): the
                 // rewritten ident carries the module's type identity
@@ -24289,7 +24289,7 @@ impl Sema:
         while i >= 0:
             if self.displaced_fn_paths[i] == path:
                 if self.decl_visible_from_current(path, self.displaced_fn_pub[i]) == 0:
-                    self.emit_error(f"'{member_name}' is private to module '{path}'", node)
+                    self.emit_error(f"'{member_name}' is private to its package (declared in '{path}', §18.3)", node)
                     return -1
                 return self.displaced_fn_syms[i]
             i = self.displaced_fn_prev[i]
@@ -36193,10 +36193,11 @@ impl Sema:
         self.mres_cands_total.push(total)
         self.mres_cands_visible.push(visible)
 
-    // §18.3 (#2186): "Cross-module access to a non-`pub` symbol is a compile
-    // error" — a method is a function. A trait impl's method is reached
-    // through the trait, whose visibility governs it. Returns whether the
-    // call may reach `method_fn`, reporting it when not.
+    // §18.3 (D100, #2186): a method without `pub` is visible throughout its
+    // package, and a call from another package is refused, as for a free
+    // function. A trait impl's method is reached through the trait, whose
+    // visibility governs it. Returns whether the call may reach `method_fn`,
+    // reporting it when not.
     mut fn check_method_visible(method_fn: i32, node: i32) -> bool:
         let decl: i32 = self.fn_decl_nodes.get(method_fn) ?? 0
         if decl == 0: return true
@@ -36206,9 +36207,15 @@ impl Sema:
         let path: str = match self.fn_decl_source_paths.get(method_fn):
             Some(p) => p.clone()
             None => ""
-        if self.decl_visible_from_current(path, 0) != 0: return true
+        // Reached through a value, not an import: only the package decides.
+        if self.package_of(path) == self.package_of(self.current_module_path) or self.decl_visible_from_current(path, 0) != 0: return true
+        if self.suppress_errors != 0: return false
         let name: str = self.pool_resolve(method_fn)
-        self.emit_error_with_help(f"method '{name}' is private to module '{sema_module_display_name(path)}' (§18.3)", node, "mark it `pub` in its module, or call a public method")
+        var diag = Diagnostic.err(f"method '{name}' is private to its package (declared in '{path}', §18.3)", self.diagnostic_node_span(node))
+        diag.set_origin(__FILE__, __FN__, __LINE__ as i32, node)
+        diag.add_label(self.diagnostic_node_span(decl), "declared here without `pub`")
+        diag.add_help("mark it `pub` to export it from its package, or call a public method")
+        self.diags.emit(move diag)
         false
 
     fn lookup_method_fn(type_sym: i32, method_sym: i32) -> i32:
