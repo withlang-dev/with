@@ -2600,14 +2600,18 @@ impl MirBuilder:
             return result_variant
         variant_sym
 
-    fn success_variant_index() -> i32:
-        let some_sym = self.pool.intern("Some")
-        if self.sema.variant_lookup.contains(some_sym):
-            return self.variant_index(some_sym)
-        let ok_sym = self.pool.intern("Ok")
-        if self.sema.variant_lookup.contains(ok_sym):
-            return self.variant_index(ok_sym)
-        1
+    // The variant a carrier's success value is in: `Some` of an Option,
+    // `Ok` of a Result, looked up in the carrier's own type (D65). It took
+    // whichever name the program declared first; once D97 declared Option
+    // `None | Some(T)`, `?` on a Result read its Err as the success.
+    mut fn success_variant_index(carrier_place: i32) -> i32:
+        var ty = if carrier_place >= 0 and carrier_place < self.body.place_sema_types.len(): self.body.place_sema_types[carrier_place] else: 0
+        if ty == 0: ty = self.place_local_type(carrier_place)
+        let some = self.enum_variant_index_for_type(ty, self.sema.syms.some)
+        if some >= 0: return some
+        let ok = self.enum_variant_index_for_type(ty, self.sema.syms.ok)
+        if ok >= 0: return ok
+        sema_phase_bug(f"BUG: a carrier of type {ty} has neither Some nor Ok")
 
     // Whether `operand_id` moves a whole compiler temporary — a call or
     // operator result that no binding, field, or global owns. An observer of
@@ -8042,7 +8046,7 @@ impl MirBuilder:
 
         self.switch_to(after_next_bb)
         let disc = self.lower_enum_discriminant(next_place)
-        let some_idx = self.success_variant_index()
+        let some_idx = self.success_variant_index(next_place)
         let vals: Vec[i64] = Vec.new()
         vals.push(some_idx)
         let targets: Vec[i32] = Vec.new()
@@ -8920,7 +8924,7 @@ impl MirBuilder:
 
         self.switch_to(after_next_bb)
         let disc = self.lower_enum_discriminant(next_place)
-        let some_idx = self.success_variant_index()
+        let some_idx = self.success_variant_index(next_place)
         let vals: Vec[i64] = Vec.new()
         vals.push(some_idx)
         let targets: Vec[i32] = Vec.new()
@@ -13459,7 +13463,7 @@ impl MirBuilder:
 
         let disc = self.lower_enum_discriminant(value_place)
         let vals: Vec[i64] = Vec.new()
-        vals.push(self.success_variant_index())
+        vals.push(self.success_variant_index(value_place))
         let targets: Vec[i32] = Vec.new()
         targets.push(pass_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
@@ -13541,7 +13545,7 @@ impl MirBuilder:
         self.switch_to(pass_bb)
         let result_local = self.new_temp(result_ty)
         let result_place = self.place_for_local(result_local)
-        let downcast_place = self.body.new_downcast_place(value_place, self.success_variant_index())
+        let downcast_place = self.body.new_downcast_place(value_place, self.success_variant_index(value_place))
         let payload_place = self.body.new_field_place(downcast_place, 0, result_ty)
         // #2049: the pass path decomposes the carrier (retire_decomposed_carrier
         // blanks it), so its payload moves out whatever its type: a Copy
@@ -13632,7 +13636,7 @@ impl MirBuilder:
 
         let disc = self.lower_enum_discriminant(value_place)
         let vals: Vec[i64] = Vec.new()
-        vals.push(self.success_variant_index())
+        vals.push(self.success_variant_index(value_place))
         let targets: Vec[i32] = Vec.new()
         targets.push(some_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
@@ -13647,7 +13651,7 @@ impl MirBuilder:
         let result_place = self.place_for_local(result_local)
 
         self.switch_to(some_bb)
-        let downcast_place = self.body.new_downcast_place(value_place, self.success_variant_index())
+        let downcast_place = self.body.new_downcast_place(value_place, self.success_variant_index(value_place))
         let payload_place = self.body.new_field_place(downcast_place, 0, payload_ty)
         let some_op = self.lower_contextual_join_place_arm(node, D22_JOIN_ROLE_CARRIER_PAYLOAD, payload_place, self.ast.get_start(expr))
         self.assign_operand_to_place(result_place, some_op, self.ast.get_start(expr))
@@ -14705,7 +14709,7 @@ impl MirBuilder:
 
         let disc = self.lower_enum_discriminant(value_place)
         let vals: Vec[i64] = Vec.new()
-        vals.push(self.success_variant_index())
+        vals.push(self.success_variant_index(value_place))
         let targets: Vec[i32] = Vec.new()
         targets.push(some_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
@@ -14737,7 +14741,7 @@ impl MirBuilder:
         let result_place = self.place_for_local(result_local)
 
         self.switch_to(some_bb)
-        let downcast_place = self.body.new_downcast_place(value_place, self.success_variant_index())
+        let downcast_place = self.body.new_downcast_place(value_place, self.success_variant_index(value_place))
         let payload_place = self.body.new_field_place(downcast_place, 0, payload_ty)
         let some_op = self.lower_contextual_join_place_arm(node, D22_JOIN_ROLE_CARRIER_PAYLOAD, payload_place, self.ast.get_start(self_expr))
         self.assign_operand_to_place(result_place, some_op, self.ast.get_start(self_expr))
@@ -14797,14 +14801,14 @@ impl MirBuilder:
 
         let disc = self.lower_enum_discriminant(value_place)
         let vals: Vec[i64] = Vec.new()
-        vals.push(self.success_variant_index())
+        vals.push(self.success_variant_index(value_place))
         let targets: Vec[i32] = Vec.new()
         targets.push(success_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, failure_bb, 0)
 
         self.switch_to(success_bb)
-        let success_downcast = self.body.new_downcast_place(value_place, self.success_variant_index())
+        let success_downcast = self.body.new_downcast_place(value_place, self.success_variant_index(value_place))
         let success_payload_place = self.body.new_field_place(success_downcast, 0, payload_ty)
         let success_payload_op = self.lower_contextual_join_place_arm(node, D22_JOIN_ROLE_CARRIER_PAYLOAD, success_payload_place, span)
         self.assign_operand_to_place(result_place, success_payload_op, span)
@@ -15170,9 +15174,9 @@ impl MirBuilder:
 
     fn option_some_index(option_ty: i32) -> i32:
         let idx = self.enum_variant_index_for_type(option_ty, self.sema.syms.some)
-        if idx >= 0:
-            return idx
-        self.success_variant_index()
+        if idx < 0:
+            sema_phase_bug(f"BUG: type {option_ty} is used as an Option and declares no Some")
+        idx
 
     mut fn lower_optional_chain_field(result_place: i32, result_ty: i32, base_place: i32, base_ty: i32, payload_ty: i32, success_idx: i32, success_sym: i32, member_sym: i32, span: i32):
         let downcast_place = self.body.new_downcast_place(base_place, success_idx)

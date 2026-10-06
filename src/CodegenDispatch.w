@@ -10787,7 +10787,7 @@ impl Codegen:
                     let tag_ty = wl_struct_get_type_at(carrier_ty, 0)
                     let tag_ptr = wl_build_struct_gep(self.builder, carrier_ty, recv, 0)
                     let disc = wl_build_load(self.builder, tag_ty, tag_ptr)
-                    let is_ok = wl_build_icmp(self.builder, wl_int_eq(), disc, wl_const_int(tag_ty, 0, 0))
+                    let is_ok = wl_build_icmp(self.builder, wl_int_eq(), disc, wl_const_int(tag_ty, self.mir_success_variant_index(carrier_sema) as i64, 0))
                     let borrowed_panic_bb = wl_append_bb(self.context, self.current_function, "unwrap.borrowed.panic")
                     let borrowed_ok_bb = wl_append_bb(self.context, self.current_function, "unwrap.borrowed.ok")
                     wl_build_cond_br(self.builder, is_ok, borrowed_ok_bb, borrowed_panic_bb)
@@ -10822,7 +10822,7 @@ impl Codegen:
                     result = recv
             else if recv_tk == wl_struct_type_kind():
                 let disc = wl_build_extract_value(self.builder, recv, 0)
-                let is_ok = wl_build_icmp(self.builder, wl_int_eq(), disc, wl_const_int(wl_type_of(disc), 0, 0))
+                let is_ok = wl_build_icmp(self.builder, wl_int_eq(), disc, wl_const_int(wl_type_of(disc), self.mir_success_variant_index(recv_sema) as i64, 0))
                 let panic_bb = wl_append_bb(self.context, self.current_function, "unwrap.panic")
                 let ok_bb = wl_append_bb(self.context, self.current_function, "unwrap.ok")
                 wl_build_cond_br(self.builder, is_ok, ok_bb, panic_bb)
