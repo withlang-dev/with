@@ -21376,8 +21376,12 @@ impl Sema:
 
     // The tag of that variant: its discriminant, which is not its index
     // under WITH_DEBUG_PERMUTE_TAGS. -1 without an Option.
-    pub fn std_option_variant_tag(variant_sym: i32) -> i64:
-        var i = self.named_type_candidate_head(self.syms.option)
+    pub fn std_option_variant_tag(variant_sym: i32) -> i64: self.std_generic_enum_variant_tag(self.syms.option, variant_sym)
+
+    // The tag of a variant of std's generic enum `enum_sym` (Option,
+    // Result): its discriminant. -1 when the program has no such enum.
+    pub fn std_generic_enum_variant_tag(enum_sym: i32, variant_sym: i32) -> i64:
+        var i = self.named_type_candidate_head(enum_sym)
         while i >= 0:
             let tid = self.resolve_alias(self.named_type_candidate_tids[i] as TypeId) as i32
             let decl = self.type_decl_nodes_by_tid.get(tid) ?? 0

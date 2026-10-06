@@ -177,6 +177,8 @@ pub type Codegen {
     // Their tags (discriminants): what a tag is built from and tested against.
     option_some_tag: i64,
     option_none_tag: i64,
+    result_ok_tag: i64,
+    result_err_tag: i64,
     // Pre-interned symbols for O(1) dispatch (avoid string comparisons)
     sym_vec: i32,
     sym_option: i32,
@@ -661,6 +663,8 @@ fn Codegen.init_with_opt_and_intern(module_name: &str, opt_level: i32, intern: I
     cg.option_none_index = cg.sema.std_option_variant_index(cg.sema.syms.none)
     cg.option_some_tag = cg.sema.std_option_variant_tag(cg.sema.syms.some)
     cg.option_none_tag = cg.sema.std_option_variant_tag(cg.sema.syms.none)
+    cg.result_ok_tag = cg.sema.std_generic_enum_variant_tag(cg.sema.syms.result, cg.sema.syms.ok)
+    cg.result_err_tag = cg.sema.std_generic_enum_variant_tag(cg.sema.syms.result, cg.sema.syms.err)
     cg.sym_result = cg.intern.intern("Result")
     cg.sym_hashmap = cg.intern.intern("HashMap")
     cg.sym_hashset = cg.intern.intern("HashSet")
@@ -1121,7 +1125,7 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         current_drop_origin_len: 0,
         current_drop_needs_guard: true,
         member_drop_depth: 0,
-        option_some_index: -1, option_none_index: -1, option_some_tag: -1, option_none_tag: -1,
+        option_some_index: -1, option_none_index: -1, option_some_tag: -1, option_none_tag: -1, result_ok_tag: -1, result_err_tag: -1,
         sym_vec: 0, sym_option: 0, sym_result: 0, sym_hashmap: 0,
         sym_hashset: 0, sym_btreemap: 0, sym_btreeset: 0, sym_handle: 0, sym_slotmap: 0, sym_slotmapslot: 0,
         sym_vecslot: 0, sym_vecrange: 0, sym_veciterref: 0, sym_veciterplace: 0,
@@ -7673,11 +7677,18 @@ impl Codegen:
         wl_build_store(self.builder, wl_const_int(wl_i32_type(self.context), self.option_tag(false), 0), self.option_tag_ptr(opt_type, alloca))
         wl_build_load(self.builder, opt_type, alloca)
 
+    // The tag of `Ok` (true) or `Err` (false), as Sema declares Result.
+    fn result_tag(ok: bool) -> i64:
+        let tag = if ok: self.result_ok_tag else: self.result_err_tag
+        if tag < 0:
+            sema_phase_bug("BUG: codegen builds a Result, and the program declares no Result")
+        tag
+
     fn build_result_ok(val: i64, res_type: i64) -> i64:
         let alloca = self.create_entry_alloca(res_type)
         wl_build_store(self.builder, self.build_default_value(res_type), alloca)
         let tag_ptr = wl_build_struct_gep(self.builder, res_type, alloca, 0)
-        wl_build_store(self.builder, wl_const_int(wl_i32_type(self.context), 0, 0), tag_ptr)
+        wl_build_store(self.builder, wl_const_int(wl_i32_type(self.context), self.result_tag(true), 0), tag_ptr)
         let elem_count = wl_count_struct_elem_types(res_type)
         if elem_count > 1:
             let payload_ptr = wl_build_struct_gep(self.builder, res_type, alloca, 1)
@@ -7689,7 +7700,7 @@ impl Codegen:
         let alloca = self.create_entry_alloca(res_type)
         wl_build_store(self.builder, self.build_default_value(res_type), alloca)
         let tag_ptr = wl_build_struct_gep(self.builder, res_type, alloca, 0)
-        wl_build_store(self.builder, wl_const_int(wl_i32_type(self.context), 1, 0), tag_ptr)
+        wl_build_store(self.builder, wl_const_int(wl_i32_type(self.context), self.result_tag(false), 0), tag_ptr)
         let elem_count = wl_count_struct_elem_types(res_type)
         if elem_count > 1:
             let payload_ptr = wl_build_struct_gep(self.builder, res_type, alloca, 1)

@@ -5417,7 +5417,7 @@ impl MirBuilder:
 
         let disc = self.lower_enum_discriminant(branch_place)
         let vals: Vec[i64] = Vec.new()
-        vals.push(continue_idx)
+        vals.push(self.enum_variant_discriminant_for_type(branch_ty, continue_sym))
         let targets: Vec[i32] = Vec.new()
         targets.push(pass_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
@@ -15720,7 +15720,7 @@ impl MirBuilder:
 
         let disc = self.lower_enum_discriminant(base_place)
         let vals: Vec[i64] = Vec.new()
-        vals.push(success_idx)
+        vals.push(self.enum_variant_discriminant_for_type(base_ty, success_sym))
         let targets: Vec[i32] = Vec.new()
         targets.push(success_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
