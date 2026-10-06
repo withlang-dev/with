@@ -55,6 +55,7 @@ fn scores -> Result[Unit, SqliteError]:
     // What C reported, as With values: the status, and the message.
     match db.exec("SELECT * FROM nowhere"):
         Err(.Failed(status, message)) => print(f"sqlite said {status}: {message}")
+        Err(other) => print(f"sqlite failed: {other}")
         Ok(_) => print("sqlite accepted a table that does not exist")
 
 fn main:
