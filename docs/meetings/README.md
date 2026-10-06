@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D105 — `str.rfind`, `trim_start`/`trim_end` (views) and `bytes()` are stdlib methods in `std.string` (delegated)](2026-10-06-D105-str-rfind-trim-views-bytes.md)
 - [D104 — Comptime-callability is inferred (hybrid: static for `comptime fn`, evaluator for plain functions); the witness chain is the diagnostic](2026-10-07-D104-comptime-callability-inferred.md)
 - [D103 — A value converts to `Option[T]` where one is demanded: once, at the demand, never in inference](2026-10-07-D103-value-to-option.md)
 - [D102 — `extern "C" fn` is non-null; nullable C function pointers are a pointer-sized `Option`, placed by direction](2026-10-06-D102-nullable-function-pointers.md)

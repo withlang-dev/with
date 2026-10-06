@@ -222,6 +222,49 @@ impl str:
             sb.push_byte(self[i] as u8)
         sb.to_str()
 
+    /// The byte index of the last occurrence of `needle`, or -1 (#2206):
+    /// `find` from the other end. An empty needle is found at `len()`.
+    pub fn rfind(needle: &str) -> i64:
+        let n = needle.len()
+        var at = self.len() - n
+        while at >= 0:
+            if self[at..self.len()].starts_with(needle): return at
+            at -= 1
+        -1
+
+    /// The view past any leading ASCII whitespace (`' '`, `'\t'`, `'\n'`,
+    /// `'\r'`): the rest of an indented line (#2206). A view, never a copy.
+    pub fn trim_start() -> &str:
+        var start: i64 = 0
+        while start < self.len() and str_is_ascii_space(self[start]):
+            start += 1
+        self[start..self.len()]
+
+    /// The view before any trailing ASCII whitespace (#2206). A view, never
+    /// a copy.
+    pub fn trim_end() -> &str:
+        var end = self.len()
+        while end > 0 and str_is_ascii_space(self[end - 1]):
+            end -= 1
+        self[0..end]
+
+    /// The bytes, one at a time (#2206): `for b in s.bytes()`.
+    @[iter_of_self]
+    pub fn bytes() -> ByteIter: ByteIter { bytes: self.as_bytes(), at: 0 }
+
+fn str_is_ascii_space(c: i32): c == ' ' or c == '\t' or c == '\n' or c == '\r'
+
+/// `s.bytes()`: each byte of the string, in order (§15.4; `.bytes() ->
+/// ByteIter`). Borrows the string it was taken from.
+pub type ByteIter ephemeral { bytes: []u8, at: i64 }
+
+impl Iter[u8] for ByteIter:
+    mut fn next() -> Option[u8]:
+        if self.at >= self.bytes.len(): return None
+        let b = self.bytes[self.at]
+        self.at += 1
+        Some(b)
+
 /// Why a `str` could not be converted to a `CString`.
 pub enum CStringError:
     InteriorNul
