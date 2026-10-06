@@ -176,8 +176,15 @@ the representation instead of asking Sema, before reading any of it:
    differs from its normal run, or a typed-MIR ICE, is code that assumed a
    tag ("`Some` is 0", "the tag is the index"). The failing tests name the
    shapes; `--dump-mir` on one shows the switch value or downcast that
-   assumed. Found on its first run: MIR's success switch compared a
-   discriminant with an index, and codegen built Option tags from indices.
+   assumed. Its first corpus runs (2026-10-05, `test/behavior/*.w`) went
+   from 402 failures to 13 to the expected ones as each assumption was
+   fixed: MIR switches comparing a discriminant with an index (the success
+   switch, optional chains, `ControlFlow`), codegen's own tag table, Option
+   and Result tags built as indices, the niche's "null is 1". Two fixtures
+   differ under it by design, because they print the tag itself:
+   `behav_1770_payload_enum_as_int` (`r as i32`, §4.4a) and
+   `behav_comptime_type_info` (the reflected discriminant). Any other
+   difference is a bug.
 2. **`WITH_TRACE_VARIANT_FALLBACK=1`**: MirLower answering a variant lookup
    from the variant's name alone because the type does not declare it
    (`[variant-fallback] index of \`Some\` in type Result[…] fn \`total\``).
