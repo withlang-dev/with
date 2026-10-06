@@ -1,4 +1,4 @@
-//! expect-check-fail: facade states one error type 'KvError', whose status is one type, but 'kv_open' returns c_int and 'kv_flush' returns c_long
+//! expect-check-fail: facade states one error type 'KvError', whose status is one type, but 'kv_open' returns i32 and 'kv_flush' returns i64
 
 // #2179 (D97, spec §16.2b.4): `c facade kv error KvError` gives every `ok`
 // operation of the facade one error, whose `Failed(status)` holds one status

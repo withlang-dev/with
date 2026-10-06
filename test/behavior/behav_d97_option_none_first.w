@@ -1,5 +1,6 @@
 //! expect-stdout: true false true
-//! expect-stdout: some 3 none
+//! expect-stdout: some 3
+//! expect-stdout: none
 // D97: Option is declared `None | Some(T)`, and derived Ord orders variants
 // by declaration, so nothing sorts before any value. The reorder changes no
 // behavior beyond the order: matching, is_some/is_none and unwrap still see

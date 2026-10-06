@@ -165,6 +165,38 @@ both types, before any debugger session. Then
 lowered each binary operator in that function: the route it took and the
 operand types it saw (below).
 
+### A wrong variant: the wrong arm, `unwrap` of a `Some` panics, `?` takes the error
+
+A variant read through the wrong tag or index. Measure which code assumed
+the representation instead of asking Sema, before reading any of it:
+
+1. **`WITH_DEBUG_PERMUTE_TAGS=1`** on the compile (`WITH_DEBUG_PERMUTE_TAGS=1
+   with-stage1 test test/behavior`). Every plain enum takes its tags in
+   reverse declaration order; meaning is unchanged, so a program that
+   differs from its normal run, or a typed-MIR ICE, is code that assumed a
+   tag ("`Some` is 0", "the tag is the index"). The failing tests name the
+   shapes; `--dump-mir` on one shows the switch value or downcast that
+   assumed. Found on its first run: MIR's success switch compared a
+   discriminant with an index, and codegen built Option tags from indices.
+2. **`WITH_TRACE_VARIANT_FALLBACK=1`**: MirLower answering a variant lookup
+   from the variant's name alone because the type does not declare it
+   (`[variant-fallback] index of \`Some\` in type Result[…] fn \`total\``).
+   Any line is a type-blind answer: a `Result`'s `Some` took Option's index
+   and `?` treated `Err` as success (D97 reorder). Ask Sema's per-type
+   answer (`sema.enum_variant_index_for_type`) instead.
+3. The typed MIR validator's ICE names the body and the payload types
+   (`enum payload read declares ty=549 but the variant's payload is ty=554
+   in \`total\``); `--dump-mir` shows the `switchInt` value and the
+   `<as vN>` downcast it chose.
+
+### Run a corpus with the compiler you just built
+
+`out/bootstrap/bin/with-stage1 test test/behavior` (any files or
+directories) runs every fixture with its `//! expect-*` headers under
+stage1: the corpus check a change needs before the battery, without the
+release build `:behavior-tests` waits for. Add a debug switch in front
+(`WITH_DEBUG_PERMUTE_TAGS=1`) to run the whole corpus under it.
+
 ### A hot loop reloads a struct's fields after every store
 
 The compiler's own optimized IR (`WITH_DUMP_LLIR_POST=1`) says why. Two
@@ -892,6 +924,8 @@ CLI dumps (`with check <file> <flag>`):
 | Flag | Prints |
 |---|---|
 | `--dump-tokens`, `--dump-ast`, `--dump-resolved`, `--dump-typed` | the lexer's tokens, the AST, resolution, and Sema's types per node |
+| `WITH_DEBUG_PERMUTE_TAGS=1` | compiler | plain enums get reversed tags, meaning unchanged: any behavior change is code that assumed a tag (route: a wrong variant) |
+| `WITH_TRACE_VARIANT_FALLBACK=1` | compiler | each variant lookup MirLower answered by name in a type that does not declare the variant |
 | `--dump-mir`, `--dump-async-mir` | the lowered MIR bodies (synchronous, and after the async transform); also when the typed validator refused one (`internal compiler error: invalid MIR before codegen … in \`Type.fn\``): the ICE names the body, and `--dump-mir` / `--explain-mir-origin '<fn>:_N'` read the invalid statement |
 | `--dump-place-map`, `--dump-drop-state`, `--dump-drop-plan`, `--dump-abi` | see the drop-state view and `--dump-abi` above |
 | `--trace-place`, `--explain-mir-origin`, `--trace-ownership`, `--trace-cleanup-edge` | one place's history, where a MIR local came from, its ownership states, one CFG edge |

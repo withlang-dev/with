@@ -63,7 +63,10 @@ are on and run its first steps: a drop, free, or leak bug starts with the
 debug allocator, `WITH_ALLOC_NO_REUSE`, the address trap
 (`WITH_DEBUG_ALLOC_TRAP_FREE`, under lldb: outside it the address changes
 every run), and the runner's own binary — never with `grep` or a trace
-print. A wrong view origin starts with `with analyze repro.w
+print. A wrong variant (the wrong arm, `unwrap` of a `Some` panics, `?`
+takes the error) starts with `WITH_DEBUG_PERMUTE_TAGS=1 with-stage1 test
+test/behavior` and `WITH_TRACE_VARIANT_FALLBACK=1`; any corpus runs under
+stage1 with `out/bootstrap/bin/with-stage1 test <dirs>`. A wrong view origin starts with `with analyze repro.w
 'explain:origin:<fn>[:<binding>]'` (works on a failing program), then
 `WITH_DEBUG_BORROWS=1`; a
 generic-instance `BUG:` with `WITH_TRACE_INST=1`; codegen reading a value

@@ -2569,6 +2569,7 @@ impl MirBuilder:
         let index = self.sema.enum_variant_index_for_type(enum_ty, variant_sym)
         if index >= 0:
             return index
+        self.trace_variant_fallback("index", enum_ty, variant_sym)
         self.variant_index(variant_sym)
 
     // A discriminant is any i64 (`B = -3`); whether `enum_ty` declares the
@@ -2576,7 +2577,18 @@ impl MirBuilder:
     fn enum_variant_discriminant_for_type(enum_ty: i32, variant_sym: i32) -> i64:
         if self.sema.enum_variant_index_for_type(enum_ty, variant_sym) >= 0:
             return self.sema.enum_variant_discriminant_for_type(enum_ty, variant_sym)
+        self.trace_variant_fallback("discriminant", enum_ty, variant_sym)
         self.variant_index(variant_sym)
+
+    // WITH_TRACE_VARIANT_FALLBACK=1: each time a variant was looked up in a
+    // type that does not declare it and the answer came from the variant's
+    // name alone (any enum's variant of that name). Which callers rely on
+    // it, measured, before the name-only answer is removed (D65).
+    fn trace_variant_fallback(what: &str, enum_ty: i32, variant_sym: i32):
+        if with_getenv_str("WITH_TRACE_VARIANT_FALLBACK").len() == 0: return
+        let fn_name = self.sema.safe_symbol_text(self.body.fn_sym)
+        let ty_name = if enum_ty > 0: self.sema.type_name(enum_ty) else: "?"
+        eprint(f"[variant-fallback] {what} of `{self.pool.resolve(variant_sym)}` in type {ty_name} (ty={enum_ty}) fn `{fn_name}`")
 
     // Resolve variant sym from an AST node, checking sema's comprehension sidecar first.
     fn resolve_variant_sym(node: i32) -> i32:
@@ -2619,8 +2631,8 @@ impl MirBuilder:
     mut fn success_variant(carrier_place: i32) -> (i32, i32):
         var ty = if carrier_place >= 0 and carrier_place < self.body.place_sema_types.len(): self.body.place_sema_types[carrier_place] else: 0
         if ty == 0: ty = self.place_local_type(carrier_place)
-        if self.enum_variant_index_for_type(ty, self.sema.syms.some) >= 0: return (ty, self.sema.syms.some)
-        if self.enum_variant_index_for_type(ty, self.sema.syms.ok) >= 0: return (ty, self.sema.syms.ok)
+        if self.sema.enum_variant_index_for_type(ty, self.sema.syms.some) >= 0: return (ty, self.sema.syms.some)
+        if self.sema.enum_variant_index_for_type(ty, self.sema.syms.ok) >= 0: return (ty, self.sema.syms.ok)
         sema_phase_bug(f"BUG: a carrier of type {ty} has neither Some nor Ok")
 
     // Whether `operand_id` moves a whole compiler temporary — a call or
