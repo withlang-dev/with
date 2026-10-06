@@ -8201,6 +8201,15 @@ impl Codegen:
             return 0
         if self.sema_sym_to_codegen_sym(self.sema.get_generic_inst_base(resolved as i32)) == self.sym_option: self.option_some_index else: 0
 
+    // The tag of that variant: Option's Some tag, or Ok's discriminant.
+    fn mir_success_variant_tag(sema_ty: i32) -> i64:
+        let resolved = self.sema.resolve_alias(sema_ty as TypeId)
+        if self.sema.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST and self.sema_sym_to_codegen_sym(self.sema.get_generic_inst_base(resolved as i32)) == self.sym_option:
+            return self.option_tag(true)
+        if self.sema.enum_variant_index_for_type(resolved as i32, self.sema.syms.ok) >= 0:
+            return self.sema.enum_variant_discriminant_for_type(resolved as i32, self.sema.syms.ok)
+        0
+
     mut fn mir_builtin_variant_payload_llvm_type(sema_ty: i32, variant_idx: i32) -> i64:
         let payload_sema = self.mir_builtin_variant_payload_sema_type(sema_ty, variant_idx)
         if payload_sema <= 0:
@@ -10787,7 +10796,7 @@ impl Codegen:
                     let tag_ty = wl_struct_get_type_at(carrier_ty, 0)
                     let tag_ptr = wl_build_struct_gep(self.builder, carrier_ty, recv, 0)
                     let disc = wl_build_load(self.builder, tag_ty, tag_ptr)
-                    let is_ok = wl_build_icmp(self.builder, wl_int_eq(), disc, wl_const_int(tag_ty, self.mir_success_variant_index(carrier_sema) as i64, 0))
+                    let is_ok = wl_build_icmp(self.builder, wl_int_eq(), disc, wl_const_int(tag_ty, self.mir_success_variant_tag(carrier_sema), 0))
                     let borrowed_panic_bb = wl_append_bb(self.context, self.current_function, "unwrap.borrowed.panic")
                     let borrowed_ok_bb = wl_append_bb(self.context, self.current_function, "unwrap.borrowed.ok")
                     wl_build_cond_br(self.builder, is_ok, borrowed_ok_bb, borrowed_panic_bb)
@@ -10822,7 +10831,7 @@ impl Codegen:
                     result = recv
             else if recv_tk == wl_struct_type_kind():
                 let disc = wl_build_extract_value(self.builder, recv, 0)
-                let is_ok = wl_build_icmp(self.builder, wl_int_eq(), disc, wl_const_int(wl_type_of(disc), self.mir_success_variant_index(recv_sema) as i64, 0))
+                let is_ok = wl_build_icmp(self.builder, wl_int_eq(), disc, wl_const_int(wl_type_of(disc), self.mir_success_variant_tag(recv_sema), 0))
                 let panic_bb = wl_append_bb(self.context, self.current_function, "unwrap.panic")
                 let ok_bb = wl_append_bb(self.context, self.current_function, "unwrap.ok")
                 wl_build_cond_br(self.builder, is_ok, ok_bb, panic_bb)

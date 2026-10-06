@@ -2604,13 +2604,23 @@ impl MirBuilder:
     // `Ok` of a Result, looked up in the carrier's own type (D65). It took
     // whichever name the program declared first; once D97 declared Option
     // `None | Some(T)`, `?` on a Result read its Err as the success.
+    // A downcast names the variant by index; a switch on the discriminant
+    // compares tags (success_variant_tag). They differ for a repr enum and
+    // under WITH_DEBUG_PERMUTE_TAGS.
     mut fn success_variant_index(carrier_place: i32) -> i32:
+        let (ty, sym) = self.success_variant(carrier_place)
+        self.enum_variant_index_for_type(ty, sym)
+
+    mut fn success_variant_tag(carrier_place: i32) -> i64:
+        let (ty, sym) = self.success_variant(carrier_place)
+        self.enum_variant_discriminant_for_type(ty, sym)
+
+    // The carrier's type and the name of its success variant.
+    mut fn success_variant(carrier_place: i32) -> (i32, i32):
         var ty = if carrier_place >= 0 and carrier_place < self.body.place_sema_types.len(): self.body.place_sema_types[carrier_place] else: 0
         if ty == 0: ty = self.place_local_type(carrier_place)
-        let some = self.enum_variant_index_for_type(ty, self.sema.syms.some)
-        if some >= 0: return some
-        let ok = self.enum_variant_index_for_type(ty, self.sema.syms.ok)
-        if ok >= 0: return ok
+        if self.enum_variant_index_for_type(ty, self.sema.syms.some) >= 0: return (ty, self.sema.syms.some)
+        if self.enum_variant_index_for_type(ty, self.sema.syms.ok) >= 0: return (ty, self.sema.syms.ok)
         sema_phase_bug(f"BUG: a carrier of type {ty} has neither Some nor Ok")
 
     // Whether `operand_id` moves a whole compiler temporary — a call or
@@ -8048,7 +8058,7 @@ impl MirBuilder:
         let disc = self.lower_enum_discriminant(next_place)
         let some_idx = self.success_variant_index(next_place)
         let vals: Vec[i64] = Vec.new()
-        vals.push(some_idx)
+        vals.push(self.success_variant_tag(next_place))
         let targets: Vec[i32] = Vec.new()
         targets.push(body_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
@@ -8926,7 +8936,7 @@ impl MirBuilder:
         let disc = self.lower_enum_discriminant(next_place)
         let some_idx = self.success_variant_index(next_place)
         let vals: Vec[i64] = Vec.new()
-        vals.push(some_idx)
+        vals.push(self.success_variant_tag(next_place))
         let targets: Vec[i32] = Vec.new()
         targets.push(body_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
@@ -13463,7 +13473,7 @@ impl MirBuilder:
 
         let disc = self.lower_enum_discriminant(value_place)
         let vals: Vec[i64] = Vec.new()
-        vals.push(self.success_variant_index(value_place))
+        vals.push(self.success_variant_tag(value_place))
         let targets: Vec[i32] = Vec.new()
         targets.push(pass_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
@@ -13636,7 +13646,7 @@ impl MirBuilder:
 
         let disc = self.lower_enum_discriminant(value_place)
         let vals: Vec[i64] = Vec.new()
-        vals.push(self.success_variant_index(value_place))
+        vals.push(self.success_variant_tag(value_place))
         let targets: Vec[i32] = Vec.new()
         targets.push(some_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
@@ -14709,7 +14719,7 @@ impl MirBuilder:
 
         let disc = self.lower_enum_discriminant(value_place)
         let vals: Vec[i64] = Vec.new()
-        vals.push(self.success_variant_index(value_place))
+        vals.push(self.success_variant_tag(value_place))
         let targets: Vec[i32] = Vec.new()
         targets.push(some_bb as i32)
         let table = self.body.new_switch_table(vals, targets)
@@ -14801,7 +14811,7 @@ impl MirBuilder:
 
         let disc = self.lower_enum_discriminant(value_place)
         let vals: Vec[i64] = Vec.new()
-        vals.push(self.success_variant_index(value_place))
+        vals.push(self.success_variant_tag(value_place))
         let targets: Vec[i32] = Vec.new()
         targets.push(success_bb as i32)
         let table = self.body.new_switch_table(vals, targets)

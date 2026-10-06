@@ -2286,6 +2286,13 @@ pub fn sema_debug_move_enabled -> i32:
 pub fn sema_debug_borrows_enabled -> i32:
     if with_getenv_str("WITH_DEBUG_BORROWS").len() == 0: 0 else: 1
 
+// WITH_DEBUG_PERMUTE_TAGS=1: a plain enum's variants get their tags in
+// reverse declaration order (deep-debugging-tools.md, "Representation
+// assumptions"). Meaning is unchanged: matching, Ord and every lookup go
+// through the variant, so a program behaves the same, unless some code
+// assumed a tag ("Some is 0", "the tag is the index") instead of asking.
+pub fn sema_permute_tags_enabled -> bool: with_getenv_str("WITH_DEBUG_PERMUTE_TAGS").len() > 0
+
 impl Sema:
     fn debug_unknown_type(sym: i32, node: i32, context: &str):
         if sema_debug_stage1_enabled() == 0:

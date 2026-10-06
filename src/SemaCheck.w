@@ -21374,6 +21374,19 @@ impl Sema:
             i = self.named_type_candidate_next[i]
         -1
 
+    // The tag of that variant: its discriminant, which is not its index
+    // under WITH_DEBUG_PERMUTE_TAGS. -1 without an Option.
+    pub fn std_option_variant_tag(variant_sym: i32) -> i64:
+        var i = self.named_type_candidate_head(self.syms.option)
+        while i >= 0:
+            let tid = self.resolve_alias(self.named_type_candidate_tids[i] as TypeId) as i32
+            let decl = self.type_decl_nodes_by_tid.get(tid) ?? 0
+            if decl != 0 and self.type_decl_tp_count(decl) > 0 and self.get_type_kind(tid as TypeId) == TypeKind.TY_ENUM:
+                let index = self.enum_variant_index_for_type(tid, variant_sym)
+                return if index < 0: -1 else: self.enum_variant_discriminant_at(tid, index)
+            i = self.named_type_candidate_next[i]
+        -1
+
     // §4.4a: the discriminant of a variant of `enum_tid`. Every i64 is a
     // discriminant (`B = -3`), so there is no "absent" value: a caller asks
     // enum_variant_index_for_type whether the variant exists (a -1 sentinel
@@ -21410,6 +21423,8 @@ impl Sema:
         let start = self.disc_value_starts.get(enum_decl)
         if start.is_some() and index >= 0 and index < self.get_type_d2(enum_decl):
             return self.disc_value_list[start.unwrap() + index]
+        if sema_permute_tags_enabled() and index >= 0 and index < self.get_type_d2(enum_decl):
+            return (self.get_type_d2(enum_decl) - 1 - index) as i64
         index
 
     mut fn enum_accessor_return_type(enum_tid: i32, variant_sym: i32, accessor_kind: i32) -> i32:

@@ -174,6 +174,9 @@ pub type Codegen {
     // (D97: `None | Some(T)`); -1 without one (`--no-std`).
     option_some_index: i32,
     option_none_index: i32,
+    // Their tags (discriminants): what a tag is built from and tested against.
+    option_some_tag: i64,
+    option_none_tag: i64,
     // Pre-interned symbols for O(1) dispatch (avoid string comparisons)
     sym_vec: i32,
     sym_option: i32,
@@ -656,6 +659,8 @@ fn Codegen.init_with_opt_and_intern(module_name: &str, opt_level: i32, intern: I
     cg.sym_option = cg.intern.intern("Option")
     cg.option_some_index = cg.sema.std_option_variant_index(cg.sema.syms.some)
     cg.option_none_index = cg.sema.std_option_variant_index(cg.sema.syms.none)
+    cg.option_some_tag = cg.sema.std_option_variant_tag(cg.sema.syms.some)
+    cg.option_none_tag = cg.sema.std_option_variant_tag(cg.sema.syms.none)
     cg.sym_result = cg.intern.intern("Result")
     cg.sym_hashmap = cg.intern.intern("HashMap")
     cg.sym_hashset = cg.intern.intern("HashSet")
@@ -1116,7 +1121,7 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         current_drop_origin_len: 0,
         current_drop_needs_guard: true,
         member_drop_depth: 0,
-        option_some_index: -1, option_none_index: -1,
+        option_some_index: -1, option_none_index: -1, option_some_tag: -1, option_none_tag: -1,
         sym_vec: 0, sym_option: 0, sym_result: 0, sym_hashmap: 0,
         sym_hashset: 0, sym_btreemap: 0, sym_btreeset: 0, sym_handle: 0, sym_slotmap: 0, sym_slotmapslot: 0,
         sym_vecslot: 0, sym_vecrange: 0, sym_veciterref: 0, sym_veciterplace: 0,
@@ -7595,10 +7600,10 @@ impl Codegen:
     // The tag of `Some` (true) or `None` (false): Sema's declaration order,
     // never an assumed one. An Option with no declared Option is a BUG.
     fn option_tag(some: bool) -> i64:
-        let index = if some: self.option_some_index else: self.option_none_index
-        if index < 0:
+        let tag = if some: self.option_some_tag else: self.option_none_tag
+        if tag < 0:
             sema_phase_bug("BUG: codegen builds or tests an Option, and the program declares no Option")
-        index as i64
+        tag
 
     // `tag == Some` over an Option's tag value.
     fn option_tag_is_some(tag: i64) -> i64: wl_build_icmp(self.builder, wl_int_eq(), tag, wl_const_int(wl_type_of(tag), self.option_tag(true), 0))
