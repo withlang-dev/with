@@ -14,7 +14,7 @@ fn main:
     let migrated = p7_run(case_dir, "incomplete_record_migrate", "migrate\0source\0--no-c-export\0-I\0source\0--shared-defs\0probe.defs\0-o\0lib/probe\0")
     p7_assert_success(migrated, "migrate a record whose definition follows its incomplete use")
     let defs = read_file(p7_join(case_dir, "lib/probe/defs.w")).unwrap()
-    assert(defs.contains("type _Crate { value: c_int = 0 }"))
+    assert(defs.contains("type _Crate { pub value: c_int = 0 }"))
     assert(not defs.contains("__pad0"))
     p7_write(case_dir, "src/main.w", "use probe.probe\nfn main: assert(probe() == 42)\n")
     let executed = p7_run(case_dir, "incomplete_record_run", "run\0src/main.w\0")
