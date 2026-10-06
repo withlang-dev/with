@@ -11052,7 +11052,9 @@ impl CiStmtPool:
             let idx = self.lower_value_expr_ir(session, idx_cursor, exprs, types, scope)
             if ci_value_ir_valid(arr) and ci_value_ir_valid(idx):
                 let raw_ptr_index = ci_index_base_is_raw_pointer(session, arr_cursor, arr.value_expr, exprs, types)
-                let index_id = exprs.add(CiExprKind.CIE_INDEX, arr.value_expr as i32, idx.value_expr as i32, raw_ptr_index, 0 as CiTypeId)
+                // D102: an element of function-pointer type is `Option` of it.
+                let index_elem_ty = if with_ci_type_is_fn_pointer(session, with_ci_cursor_type(session, cursor)): ci_nullable_fn_type(types, types.type_from_libclang(session, with_ci_cursor_type(session, cursor))) else: 0 as CiTypeId
+                let index_id = exprs.add(CiExprKind.CIE_INDEX, arr.value_expr as i32, idx.value_expr as i32, raw_ptr_index, index_elem_ty)
                 return CiValueExprIR {
                     setup_stmt: self.merge_ir( arr.setup_stmt, idx.setup_stmt),
                     value_expr: index_id,
@@ -11744,7 +11746,7 @@ impl CiStmtPool:
                 let raw_ptr_index = ci_index_base_is_raw_pointer(session, arr_cursor, arr.value_expr, exprs, types)
                 return CiValueExprIR {
                     setup_stmt: self.merge_ir( arr.setup_stmt, idx.setup_stmt),
-                    value_expr: exprs.add(CiExprKind.CIE_INDEX, arr.value_expr as i32, idx.value_expr as i32, raw_ptr_index, 0 as CiTypeId),
+                    value_expr: exprs.add(CiExprKind.CIE_INDEX, arr.value_expr as i32, idx.value_expr as i32, raw_ptr_index, if with_ci_type_is_fn_pointer(session, with_ci_cursor_type(session, cursor)): ci_nullable_fn_type(types, types.type_from_libclang(session, with_ci_cursor_type(session, cursor))) else: 0 as CiTypeId),
                 }
             return ci_value_ir_invalid()
 

@@ -200,6 +200,10 @@ c facade sqlite error SqliteError:
         retains param 7 by param 0
         callback param xFunc argv param 2 paired with argc param 1 as &[Value]
         callback param xStep argv param 2 paired with argc param 1 as &[Value]
+        // A scalar function has no step or final (D102, §16.2b.8): sqlite
+        // takes NULL for both, and the facade says so.
+        nullable param xStep
+        nullable param xFinal
         user_data from sqlite3_user_data as &U
         ok SQLITE_OK
     // The function's context is a callback-scope handle (§44, §16.2b.9;

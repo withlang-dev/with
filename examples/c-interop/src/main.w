@@ -39,7 +39,7 @@ fn scores -> Result[Unit, SqliteError]:
     // The registration consumes the application data: SQLite owns it now,
     // and destroys it — through the callback the compiler supplies — when the
     // function is replaced or the connection closes.
-    db.create_function_v2("boosted", 1, SQLITE_UTF8, Bonus { points: 5 }, boosted, null, null)?
+    db.create_function_v2("boosted", 1, SQLITE_UTF8, Bonus { points: 5 }, boosted, None, None)?
     // A row and the end of the rows are both successes; anything else is the
     // error `?` returns.
     while ranked.step()? == SQLITE_ROW:

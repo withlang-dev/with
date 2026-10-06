@@ -66,6 +66,6 @@ fn a_with_function_reads_its_sql_arguments_and_its_data:
     // and the application data the registration boxed as `&Scale`, valid for
     // the call; the body needs no `unsafe`.
     let db = seeded()
-    db.create_function_v2("scaled", -1, SQLITE_UTF8, Scale { by: 10 }, scaled, null, null).unwrap()
+    db.create_function_v2("scaled", -1, SQLITE_UTF8, Scale { by: 10 }, scaled, None, None).unwrap()
     let rows = db.prepare("SELECT scaled(n, 2), scaled() FROM t WHERE n = 3").unwrap()
     assert(rows.step().unwrap() == SQLITE_ROW and rows.column_int(0) == 50 and rows.column_int(1) == 0)
