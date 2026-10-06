@@ -14,33 +14,33 @@ pub enum DeclKind: i32:
     type_decl = 1
 
 pub type SourceLocation {
-    file: str,
-    start: i32,
-    end: i32,
+    pub file: str,
+    pub start: i32,
+    pub end: i32,
 }
 
 pub type ModuleInfo {
-    name: str,
-    path: str,
+    pub name: str,
+    pub path: str,
 }
 
 pub type FunctionInfo {
-    module_name: str,
-    name: str,
-    public_value: bool,
-    docs_value: bool,
-    param_count: i32,
-    return_type: str,
-    source_location: SourceLocation,
+    pub module_name: str,
+    pub name: str,
+    pub public_value: bool,
+    pub docs_value: bool,
+    pub param_count: i32,
+    pub return_type: str,
+    pub source_location: SourceLocation,
 }
 
 pub type TypeInfo {
-    module_name: str,
-    name: str,
-    public_value: bool,
-    docs_value: bool,
-    kind: str,
-    source_location: SourceLocation,
+    pub module_name: str,
+    pub name: str,
+    pub public_value: bool,
+    pub docs_value: bool,
+    pub kind: str,
+    pub source_location: SourceLocation,
 }
 
 pub type ProjectInfo {

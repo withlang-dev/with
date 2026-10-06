@@ -1,7 +1,10 @@
 use std.collections
 
+// D100 (§18.3): SlotMap's handle is std's; this runtime-layout fixture reads
+// the struct's one word without naming the private field.
+fn slotmap_raw(map: &SlotMap[i32]): unsafe *(map as *const SlotMap[i32] as *const i64)
 // This runtime-layout fixture inspects capacity without adding a public API.
-fn runtime_capacity(map: &SlotMap[i32]): unsafe *((map.ptr as i64 + 32) as *const i64) as i32
+fn runtime_capacity(map: &SlotMap[i32]): unsafe *((slotmap_raw(map) + 32) as *const i64) as i32
 
 fn test_fifo_reuses_every_free_slot_before_returning_to_one:
     var map = SlotMap[i32].new()
@@ -46,7 +49,7 @@ fn test_generation_exhaustion_retires_slot:
     // would hide the property this checks. The public handle API stays intact.
     last.generation = 4294967295
     unsafe:
-        let generations = *((map.ptr as i64 + 16) as *const *mut u32)
+        let generations = *((slotmap_raw(map) + 16) as *const *mut u32)
         *generations = last.generation
     assert(map.remove(last).unwrap() == 7)
     for i in 0..64:

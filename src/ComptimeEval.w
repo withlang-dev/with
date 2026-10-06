@@ -2483,7 +2483,7 @@ impl ComptimeEvaluator:
             return comptime_control_error()
         // Vec's fields are std's (D100): the runtime hands back the first
         // element's address, bounds-checked.
-        let parts_ptr = if parts.len() == 0: 0 as *const str else: with_vec_get_ptr(&raw const parts as *mut u8, 0) as *const str
+        let parts_ptr = if parts.len() == 0: 0 as *const str else: with_vec_get_ptr(parts as *const Vec[str] as *mut u8, 0) as *const str
         comptime_control_value(comptime_value_str(with_str_concat_n(parts_ptr, parts.len())))
 
     mut fn is_string_builder_type(type_id: i32) -> bool:

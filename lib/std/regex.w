@@ -28,9 +28,9 @@ extern fn with_free(ptr: *mut u8) -> Unit
 const REGEX_FLAG_GLOBAL: i32 = 1
 
 pub type Match {
-    text: str,
-    start: i32,
-    end: i32,
+    pub text: str,
+    pub start: i32,
+    pub end: i32,
 }
 // #747: str field — owned, non-Copy now; moves/clones spell intent.
 

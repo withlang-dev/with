@@ -101,21 +101,21 @@ pub enum OverflowMode: i32:
     Saturate = 2
 
 pub type BuildOptions {
-    source_path: str,
-    output_path: str,
-    output_kind: BuildOutputKind,
-    opt_level: i32,
-    debug_info: bool,
-    no_std: bool,
-    alloc_mode: bool,
-    prelude_mode: PreludeMode,
-    overflow_mode: OverflowMode,
-    deterministic: bool,
-    target: BuildTarget,
-    include_paths: Vec[str],
-    defines: Vec[str],
-    link_libs: Vec[str],
-    compiler_hooks_enabled: bool,
+    pub source_path: str,
+    pub output_path: str,
+    pub output_kind: BuildOutputKind,
+    pub opt_level: i32,
+    pub debug_info: bool,
+    pub no_std: bool,
+    pub alloc_mode: bool,
+    pub prelude_mode: PreludeMode,
+    pub overflow_mode: OverflowMode,
+    pub deterministic: bool,
+    pub target: BuildTarget,
+    pub include_paths: Vec[str],
+    pub defines: Vec[str],
+    pub link_libs: Vec[str],
+    pub compiler_hooks_enabled: bool,
 }
 
 pub type TestOptions {
@@ -125,31 +125,31 @@ pub type TestOptions {
 }
 
 pub type BuildGraphOptions {
-    selected_target: str,
-    graph_only: bool,
-    dry_run: bool,
-    no_deps: bool,
+    pub selected_target: str,
+    pub graph_only: bool,
+    pub dry_run: bool,
+    pub no_deps: bool,
 }
 
 pub type MigrateOptions {
-    source_path: str,
-    output_path: str,
-    include_paths: Vec[str],
-    forced_includes: Vec[str],
-    defines: Vec[str],
-    exclude_basenames: Vec[str],
-    check_mode: bool,
-    diff_mode: bool,
-    stats_mode: bool,
-    no_c_export: bool,
-    c_export_functions: bool,
-    convert_goto_to_structured: bool,
-    block_style: i32,
-    width_slice: i32,
-    shared_defs: str,
-    migrate_one: str,
-    shared_fragment: str,
-    ir_roundtrip: bool,
+    pub source_path: str,
+    pub output_path: str,
+    pub include_paths: Vec[str],
+    pub forced_includes: Vec[str],
+    pub defines: Vec[str],
+    pub exclude_basenames: Vec[str],
+    pub check_mode: bool,
+    pub diff_mode: bool,
+    pub stats_mode: bool,
+    pub no_c_export: bool,
+    pub c_export_functions: bool,
+    pub convert_goto_to_structured: bool,
+    pub block_style: i32,
+    pub width_slice: i32,
+    pub shared_defs: str,
+    pub migrate_one: str,
+    pub shared_fragment: str,
+    pub ir_roundtrip: bool,
 }
 
 pub enum BuildStatus: i32:
@@ -188,11 +188,11 @@ pub type Artifact {
 }
 
 pub type BuildResult {
-    status: BuildStatus,
-    rc: i32,
-    workspace_name: str,
-    artifacts: Vec[Artifact],
-    diagnostics: Vec[DiagnosticSummary],
+    pub status: BuildStatus,
+    pub rc: i32,
+    pub workspace_name: str,
+    pub artifacts: Vec[Artifact],
+    pub diagnostics: Vec[DiagnosticSummary],
 }
 
 pub enum DeclKind: i32:
@@ -260,14 +260,14 @@ pub enum CompilerMessage:
     DebugDump(str)
 
 pub type CompilerMessageEnvelope {
-    workspace_name: str,
-    generation: i32,
-    message: CompilerMessage,
+    pub workspace_name: str,
+    pub generation: i32,
+    pub message: CompilerMessage,
 }
 
 pub type Package {
-    name: str,
-    version: str,
+    pub name: str,
+    pub version: str,
 }
 
 pub type ProjectInfo {
@@ -311,23 +311,23 @@ pub type Workspace ephemeral {
 impl Copy for Workspace
 
 pub type ProcessEnvVar {
-    name: str,
-    value: str,
+    pub name: str,
+    pub value: str,
 }
 
 pub type ProcessEnv {
-    vars: Vec[ProcessEnvVar],
+    pub vars: Vec[ProcessEnvVar],
 }
 
 pub type ProcessSpec {
-    executable: str,
-    args: Vec[str],
-    cwd: str,
-    env: ProcessEnv,
-    timeout_ms: i32,
-    stdin_path: str,
-    capture_stdout: bool,
-    capture_stderr: bool,
+    pub executable: str,
+    pub args: Vec[str],
+    pub cwd: str,
+    pub env: ProcessEnv,
+    pub timeout_ms: i32,
+    pub stdin_path: str,
+    pub capture_stdout: bool,
+    pub capture_stderr: bool,
 }
 
 pub enum ArchiveEntryKind: i32:
@@ -336,10 +336,10 @@ pub enum ArchiveEntryKind: i32:
     Symlink = 2
 
 pub type ArchiveEntry {
-    kind: ArchiveEntryKind,
-    source_path: str,
-    archive_path: str,
-    mode: i32,
+    pub kind: ArchiveEntryKind,
+    pub source_path: str,
+    pub archive_path: str,
+    pub mode: i32,
 }
 
 pub fn archive_file_entry(source_path: str, archive_path: str, mode: i32) -> ArchiveEntry:
@@ -412,10 +412,10 @@ pub fn ProcessSpec.capture(move self: Self, stdout: bool, stderr: bool) -> Proce
     owned
 
 pub type ToolProcessResult {
-    rc: i32,
-    stdout: str,
-    stderr: str,
-    timed_out: bool,
+    pub rc: i32,
+    pub stdout: str,
+    pub stderr: str,
+    pub timed_out: bool,
 }
 
 pub type BuildCtx {
@@ -447,28 +447,28 @@ fn build_noop_action(ctx: ActionCtx) -> i32:
     0
 
 pub type Target {
-    kind: BuildKind,
-    name: str,
-    entry: str,
-    output: str,
-    target_kind: BuildTarget,
-    optimize_mode: OptimizeMode,
-    system_libs: Vec[str],
-    library_paths: Vec[str],
-    rpaths: Vec[str],
-    include_paths: Vec[str],
-    defines: Vec[str],
-    inputs: Vec[str],
-    extra_outputs: Vec[str],
-    write_scopes: Vec[str],
-    deps: Vec[str],
-    args: Vec[str],
-    action: fn(ActionCtx) -> i32,
-    timeout_ms: i32,
-    cwd: str,
-    env: Vec[str],
-    network: bool,
-    parallel: bool,
+    pub kind: BuildKind,
+    pub name: str,
+    pub entry: str,
+    pub output: str,
+    pub target_kind: BuildTarget,
+    pub optimize_mode: OptimizeMode,
+    pub system_libs: Vec[str],
+    pub library_paths: Vec[str],
+    pub rpaths: Vec[str],
+    pub include_paths: Vec[str],
+    pub defines: Vec[str],
+    pub inputs: Vec[str],
+    pub extra_outputs: Vec[str],
+    pub write_scopes: Vec[str],
+    pub deps: Vec[str],
+    pub args: Vec[str],
+    pub action: fn(ActionCtx) -> i32,
+    pub timeout_ms: i32,
+    pub cwd: str,
+    pub env: Vec[str],
+    pub network: bool,
+    pub parallel: bool,
 }
 
 pub type GeneratedSource {
@@ -477,10 +477,10 @@ pub type GeneratedSource {
 }
 
 pub type Build {
-    package: Package,
-    default_target: str,
-    targets: Vec[Target],
-    generated_sources: Vec[GeneratedSource],
+    pub package: Package,
+    pub default_target: str,
+    pub targets: Vec[Target],
+    pub generated_sources: Vec[GeneratedSource],
 }
 
 fn tool_capability_valid(token: &str) -> bool:
@@ -2420,9 +2420,9 @@ pub fn Build.promote_tree_if_verified(move self: Self, name: str, source_dir: st
     out.add_target(move target)
 
 pub type Download {
-    url: str,
-    sha256: str,
-    output_path: str,
+    pub url: str,
+    pub sha256: str,
+    pub output_path: str,
 }
 
 pub fn Build.download(move self: Self, name: str, spec: Download) -> Build:

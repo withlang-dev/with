@@ -8,7 +8,9 @@
 // land on the payload's first field: `b.ptr` read `Cell.a` as an i32 and
 // trapped at run time on a local; handed straight to a `*mut Cell`
 // parameter inside `move fn drop()` it failed codegen
-// (`wrong argument type actual=i32 expected=ptr`).
+// (`wrong argument type actual=i32 expected=ptr`). D100 (§18.3) made the
+// field private to std, so the program reads the pointer through
+// `as_mut_ptr()`, in the same local, argument and drop positions.
 use std.box.Box
 
 type Cell { a: i32 }
@@ -19,14 +21,14 @@ type W { repr: Box[Cell] }
 
 impl Drop for W:
     move fn drop():
-        let p = self.repr.ptr
+        let p = self.repr.as_mut_ptr()
         print(f"drop {unsafe { (*p).a }}")
-        print(f"drop-arg {unsafe { peek(self.repr.ptr) }}")
+        print(f"drop-arg {unsafe { peek(self.repr.as_mut_ptr()) }}")
 
 fn main:
     let b = Box.new(Cell { a: 7 })
-    let p = b.ptr
+    let p = b.as_mut_ptr()
     print(f"local {unsafe { (*p).a }}")
-    print(f"arg {unsafe { peek(b.ptr) }}")
+    print(f"arg {unsafe { peek(b.as_mut_ptr()) }}")
     let w = W { repr: Box.new(Cell { a: 9 }) }
     drop(w)

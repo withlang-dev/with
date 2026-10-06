@@ -339,8 +339,8 @@ impl[T: Ord] Iterable[T] for BTreeSet[T]:
 /// Handles are Copy and carry their owner element type at compile time, so a
 /// Handle[Texture] cannot be used with a SlotMap[Mesh].
 pub type Handle[T] {
-    index: u32,
-    generation: u32,
+    pub index: u32,
+    pub generation: u32,
 }
 
 impl[T] Copy for Handle[T]

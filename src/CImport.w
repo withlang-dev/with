@@ -2467,7 +2467,7 @@ pub fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs
             let fname = with_cimport_struct_field_name(session, idx, fi)
             let synth_name = if fname.len() > 0: name ++ "_" ++ fname else: f"{name}_anon_{anon_idx2}"
             let actual_name = if fname.len() > 0: fname else: f"anon_{anon_idx2}"
-            field_str = field_str ++ ci_escape_reserved(actual_name) ++ ": " ++ ci_escape_reserved(synth_name)
+            field_str = field_str ++ "pub " ++ ci_escape_reserved(actual_name) ++ ": " ++ ci_escape_reserved(synth_name)
             anon_idx2 = anon_idx2 + 1
         else:
             field_str = field_str ++ ci_build_one_field(session, idx, fi, known_structs)
@@ -2682,7 +2682,8 @@ fn ci_build_one_field(session: i64, idx: i32, fi: i32, known_structs: &str) -> s
     let fname = with_cimport_struct_field_name(session, idx, fi)
     let ftype = with_cimport_struct_field_type_translated(session, idx, fi)
     let actual_name = if fname.len() == 0: f"unnamed_{fi}" else: fname
-    let safe_fname = ci_escape_reserved(actual_name)
+    // D100 (§18.3): every C field is public; the record leaves its package whole.
+    let safe_fname = "pub " ++ ci_escape_reserved(actual_name)
     let default_val = ci_default_for_type(ftype)
     let ftype_render = ci_unsafe_fn_ptr_type(ftype)
     if default_val.len() > 0:

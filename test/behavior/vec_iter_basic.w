@@ -16,7 +16,7 @@ fn VecIter_i32.next(mut self: VecIter_i32) -> Option[i32]:
 fn vec_iter(v: Vec[i32]) -> VecIter_i32:
     // Extract data pointer (field 0 of Vec struct is the raw pointer)
     // Vec layout: { ptr: *const T, len: i64, cap: i64, elem_size: i64 }
-    VecIter_i32{ data_ptr: v.ptr as i64, len: v.len(), idx: 0 }
+    VecIter_i32{ data_ptr: v.as_ptr() as i64, len: v.len(), idx: 0 }
 
 fn iter_sum(iter: VecIter_i32) -> i32:
     var total = 0

@@ -70,9 +70,9 @@ fn fixture() -> Vec[u8]:
 
 fn write_bytes(path: &str, bytes: &Vec[u8]):
     let cpath = path.to_cstring().unwrap()
-    let stream = fopen(cpath.ptr as *const i8, c"wb".ptr)
+    let stream = fopen(cpath.as_cstr().ptr(), c"wb".ptr())
     assert(stream != null)
-    assert(fwrite(bytes.ptr as *const c_void, 1, bytes.len() as u64, stream) == bytes.len() as u64)
+    assert(fwrite(bytes.as_ptr() as *const c_void, 1, bytes.len() as u64, stream) == bytes.len() as u64)
     assert(fclose(stream) == 0)
 
 fn text_of(bytes: &Vec[u8]) -> str:

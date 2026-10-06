@@ -71,12 +71,12 @@ pub type Finished {
     /// The exit code: 128 + the signal number when a signal ended it,
     /// 127 when the program could not be started, -1 when it could not be
     /// spawned or waited for.
-    code: i32,
+    pub code: i32,
     /// The timeout ended it; the child and its process group were killed.
-    timed_out: bool,
+    pub timed_out: bool,
     /// The child's peak resident set size in bytes, 0 where the platform
     /// reports none.
-    peak_rss: i64,
+    pub peak_rss: i64,
 }
 
 /// Run an argument vector with its stdout and stderr written to the named

@@ -1024,6 +1024,10 @@ impl Sema:
 
     mut fn record_type_decl_tid(node: i32, tid: i32):
         self.type_decl_tids.insert(node, tid)
+        // An alias names a type another declaration owns: it must not take
+        // over that type's declaring node (its fields' `pub`, its literal's
+        // field list) or its std tier.
+        if self.get_type_kind(tid as TypeId) == TypeKind.TY_ALIAS: return
         let resolved = self.resolve_alias(tid as TypeId) as i32
         self.type_decl_nodes_by_tid.insert(resolved, node)
         let is_std = if sema_tier_path_is_std_implementation(self.current_module_path) != 0: 1 else: 0

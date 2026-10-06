@@ -3,7 +3,7 @@
 use std.alloc
 
 pub type TraceId: Copy {
-    value: i64,
+    pub value: i64,
 }
 
 pub type CancellationToken: Copy {
@@ -30,10 +30,10 @@ impl Logger for NoopLogger:
         let _ = message
 
 pub type Context ephemeral {
-    temp: TempArena,
-    logger: NoopLogger,
-    cancellation: CancellationToken,
-    trace_id: TraceId,
+    pub temp: TempArena,
+    pub logger: NoopLogger,
+    pub cancellation: CancellationToken,
+    pub trace_id: TraceId,
 }
 
 pub fn default_context() -> Context:

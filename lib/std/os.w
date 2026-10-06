@@ -35,7 +35,7 @@ pub enum ArchKind: i32:
     Wasm64
 
 /// What `Target` holds.
-pub type TargetDescription { os: OsKind, arch: ArchKind }
+pub type TargetDescription { pub os: OsKind, pub arch: ArchKind }
 
 // Compile-time code that asks the runtime for the OS or the architecture is
 // answered with the `--target` value, never the host's (§17.1a: the target

@@ -16,8 +16,8 @@ use std.os.Target
 extern fn with_str_from_cstr(s: *const u8) -> str
 
 pub type rlimit {
-    rlim_cur: u64,
-    rlim_max: u64,
+    pub rlim_cur: u64,
+    pub rlim_max: u64,
 }
 
 // The stdio streams. C reaches them through a per-libc macro (Darwin
@@ -157,7 +157,7 @@ pub extern fn qsort(base: *mut c_void, count: u64, size: u64, compare: unsafe ex
 pub type kern_return_t = i32
 // C's `struct mach_timebase_info`, typedef'd `mach_timebase_info_data_t`;
 // migrated code spells the tag.
-pub type mach_timebase_info { numer: u32 = 0, denom: u32 = 0 }
+pub type mach_timebase_info { pub numer: u32 = 0, pub denom: u32 = 0 }
 impl Copy for mach_timebase_info
 pub type mach_timebase_info_data_t = mach_timebase_info
 extern fn with_libc_mach_absolute_time() -> u64

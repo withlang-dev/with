@@ -4818,7 +4818,7 @@ impl Codegen:
         let align_base = extra_start + 1 + field_count * 3
         var has_alignment = false
         for fi in 0..field_count:
-            if self.pool.get_extra(align_base + fi) != 0:
+            if field_align_value(self.pool.get_extra(align_base + fi)) != 0:
                 has_alignment = true
                 break
 
@@ -4892,7 +4892,7 @@ impl Codegen:
 
             for fi in 0..field_count:
                 let f_ty = ft_vec[fi]
-                let explicit_align = self.pool.get_extra(align_base + fi) as i64
+                let explicit_align = field_align_value(self.pool.get_extra(align_base + fi)) as i64
                 let natural_align = self.declared_align_of(f_ty)
                 var field_align = if explicit_align > 0: explicit_align else: natural_align
                 if pack_cap > 0 and field_align > pack_cap:
@@ -4935,6 +4935,14 @@ impl Codegen:
             wl_struct_set_body(st_type, vec_data_i64(&padded_types), padded_types.len() as i32, packed_flag)
             if max_align > self.abi_align_of(st_type):
                 self.struct_declared_align.insert(st_type, max_align)
+            // TypeLayout owns the record's size; the padded body must agree
+            // (an unmasked D100 pub bit once read as a 1 MiB alignment here).
+            if struct_tid > 0:
+                let model = self.sema.type_layout_size_of_frozen(struct_tid)
+                let built = self.abi_size_of(st_type)
+                if model > 0 and built != model:
+                    with_eprint(f"internal compiler error: struct '{name_str}' lowered to {built} bytes; TypeLayout places it in {model}")
+                    self.had_error = 1
         else:
             // No alignment annotations — identity mapping, direct field types.
             // D72: a Drop struct whose zero storage is a live value gets the

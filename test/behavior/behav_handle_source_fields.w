@@ -1,5 +1,9 @@
 use std.collections
 
+// D100 (§18.3): SlotMap's handle is std's; this runtime-layout fixture reads
+// the struct's one word without naming the private field.
+fn slotmap_raw(map: &SlotMap[i32]): unsafe *(map as *const SlotMap[i32] as *const i64)
+
 type Holder { handle: Handle[i32], tag: i32 }
 impl Holder:
     mut fn change_generation(value: u32): self.handle.generation = value
@@ -11,7 +15,7 @@ fn changed(handle: Handle[i32]):
 
 fn test_handle_fields_preserve_source_identity:
     var map = SlotMap[i32].new()
-    assert(map.ptr != 0)
+    assert(slotmap_raw(map) != 0)
     var handle = map.insert(7)
     let original_index = handle.index
     handle.generation = 2

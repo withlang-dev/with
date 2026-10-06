@@ -4,12 +4,7 @@ use std.alloc
 
 fn main:
     var arena = arena_new(64)
-    var xs: ArenaVec[i32] = ArenaVec {
-        arena: &raw mut arena as *mut Arena,
-        ptr: 0 as *mut i32,
-        len_value: 0,
-        cap_value: 0,
-    }
+    var xs: ArenaVec[i32] = arena_vec_new_in(&raw mut arena as *mut Arena)
     let xsp = &raw mut xs as *mut ArenaVec[i32]
     unsafe:
         arena_vec_push(xsp, 10)

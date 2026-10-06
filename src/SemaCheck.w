@@ -33281,6 +33281,12 @@ impl Sema:
     // A distinct type's `.value` is the language's unwrap, not a declared
     // field; a C type's fields are C's, which has no privacy.
     mut fn check_field_visible(owner: i32, field: i32, node: i32):
+        // A field read through a Box is its payload's field (field access
+        // looks through Box): judge the type that declares it.
+        let owner_res = self.resolve_alias(owner as TypeId) as i32
+        if self.struct_field_decl_index(owner_res, field) < 0 and self.get_type_kind(owner_res as TypeId) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_arg_count(owner_res) == 1 and self.type_symbol_is_std_box(self.get_generic_inst_base(owner_res)) != 0:
+            self.check_field_visible(self.get_generic_inst_arg(owner_res, 0), field, node)
+            return
         let decl = self.type_decl_node_of(owner)
         if decl == 0 or self.pub_field_keys.contains(sema_field_key(decl, field)): return
         let resolved = self.resolve_alias(owner as TypeId) as i32
