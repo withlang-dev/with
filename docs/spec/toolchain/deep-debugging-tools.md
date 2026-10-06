@@ -892,7 +892,7 @@ CLI dumps (`with check <file> <flag>`):
 | Flag | Prints |
 |---|---|
 | `--dump-tokens`, `--dump-ast`, `--dump-resolved`, `--dump-typed` | the lexer's tokens, the AST, resolution, and Sema's types per node |
-| `--dump-mir`, `--dump-async-mir` | the lowered MIR bodies (synchronous, and after the async transform) |
+| `--dump-mir`, `--dump-async-mir` | the lowered MIR bodies (synchronous, and after the async transform); also when the typed validator refused one (`internal compiler error: invalid MIR before codegen … in \`Type.fn\``): the ICE names the body, and `--dump-mir` / `--explain-mir-origin '<fn>:_N'` read the invalid statement |
 | `--dump-place-map`, `--dump-drop-state`, `--dump-drop-plan`, `--dump-abi` | see the drop-state view and `--dump-abi` above |
 | `--trace-place`, `--explain-mir-origin`, `--trace-ownership`, `--trace-cleanup-edge` | one place's history, where a MIR local came from, its ownership states, one CFG edge |
 | `--validate-ownership`, `--validate-all` | the MIR validators |
@@ -945,6 +945,14 @@ parameters) stops with ``error: code generation failed: BUG: <what> in
 `<function>` ``; there is no switch to turn it on (#2199 retired
 `WITH_DEBUG_FALLBACK`, which decided whether the `undef` it emitted was
 reported at all). The named function is where to start `--dump-mir`.
+
+The same holds for the typed MIR validator's ICE (`invalid MIR before
+codegen: … in \`CiGotoCfgContext.emit_switch_dispatch\``): the invalid
+module is kept for the dumps, so `--dump-mir` shows the refused statement
+(`_14 = copy _6.state`) and `--explain-mir-origin` its locals. A compiler
+that lowers its own source wrongly shows it as `check src/main.w` failing
+under stage1 while the build succeeded: the release binary is then built
+from invalid MIR, so reproduce with stage1, not the release binary.
 
 ## Verification Targets
 
