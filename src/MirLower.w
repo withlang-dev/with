@@ -15907,11 +15907,14 @@ impl MirBuilder:
         if kind == NodeKind.NK_FIELD_ACCESS:
             let fa_base = self.ast.get_data0(node)
             let fa_field = self.ast.get_data1(node)
-            // Distinct type .value access: transparent (no-op)
+            // Distinct type .value access (its one field): transparent. Only
+            // a struct's d0 is its name: a pointer's is its pointee's TypeId,
+            // which matched a distinct's name symbol once the compiler had
+            // TotalF64 (`cases.state.has_default` lowered as `cases.state`).
             let fa_base_type = self.expr_type(fa_base)
             if fa_base_type > 0:
                 let fa_base_resolved = self.sema.resolve_alias(fa_base_type)
-                let fa_base_sym = self.sema.get_type_d0(fa_base_resolved)
+                let fa_base_sym = if self.sema.get_type_kind(fa_base_resolved) == TypeKind.TY_STRUCT: self.sema.get_type_d0(fa_base_resolved) else: 0
                 if fa_base_sym > 0 and self.sema.distinct_type_names.contains(fa_base_sym):
                     // The same bytes, with Sema's type for `.value` (the inner
                     // type): a consumer that reads the operand's type (an
