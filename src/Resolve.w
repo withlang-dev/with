@@ -384,8 +384,6 @@ impl ResolveState:
                 let path_count = ast_pool.get_data1(decl)
                 let dotted = self.use_path_dotted(ast_pool, path_start, path_count)
                 let resolved_path = self.resolve_use_file(module_id, ast_pool, path_start, path_count)
-                let internal_refusal = if resolved_path.len() > 0: resolve_internal_import_refusal(self.module_paths[module_id], resolved_path, dotted) else: ""
-                if internal_refusal.len() > 0: self.emit_import_decl_error(module_id, start, end, internal_refusal)
                 var target_module = -1
                 if resolved_path.len() > 0:
                     target_module = self.reserve_module(resolved_path, resolve_dirname(resolved_path), -1)
@@ -1135,8 +1133,6 @@ impl ResolveState:
                 continue
             let dotted = line.slice(4, line.len()).trim()
             let resolved_path = self.resolve_use_file_dotted(module_id, dotted)
-            let internal_refusal = if resolved_path.len() > 0: resolve_internal_import_refusal(self.module_paths[module_id], resolved_path, dotted) else: ""
-            if internal_refusal.len() > 0: self.emit_import_decl_error(module_id, 0, 0, internal_refusal)
             var target_module = -1
             if resolved_path.len() > 0:
                 target_module = self.reserve_module(resolved_path, resolve_dirname(resolved_path), -1)
@@ -1400,7 +1396,7 @@ fn embedded_bundle_providing(dotted: &str) -> str:
 // §18.3 (D100): a module whose path has a segment named `internal` is
 // importable only by modules inside the tree rooted at that segment's parent.
 // Returns the refusal, or "" when `importer` may import `target`.
-fn resolve_internal_import_refusal(importer: &str, target: &str, dotted: &str) -> str:
+pub fn resolve_internal_import_refusal(importer: &str, target: &str, dotted: &str) -> str:
     let target_std = resolve_path_is_std(target)
     let target_norm = resolve_normalize_path(target)
     let segments = target_norm.split("/")

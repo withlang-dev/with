@@ -8255,7 +8255,7 @@ fn bs_check_pcre2_jit_no_support(ctx: &ActionCtx, compiler_path: &str, base_dir:
     let result = bs_run_cli_capture_cwd(ctx, compiler_path, "pcre2-jit-no-support", args, 120000, base_dir)
     if result.rc == 0:
         return bs_fail(ctx, "private pcre2 jit symbols were visible to external code")
-    bs_assert_contains(ctx, result.stderr, "is private to module", "pcre2_jit_no_support")
+    bs_assert_contains(ctx, result.stderr, "is private to its package", "pcre2_jit_no_support")
 
 fn bs_check_pcre2_generated_existing_main(ctx: &ActionCtx, case_dir: &str) -> i32:
     let generated_dir = bs_join(case_dir, "generated")
@@ -8890,7 +8890,7 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     if rc != 0: return rc
     let private_build = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-origin-private", bs_bundle_build_args(private_src, bundle, bs_join(case_dir, "name_private_origin"), false), 120000)
     if private_build.rc == 0: return bs_fail(ctx, "a consumer named LEVEL, which the interface declares only as an origin, without `pub`")
-    rc = bs_assert_contains(ctx, private_build.stderr, "symbol 'LEVEL' is private to module", "a private origin global stays private")
+    rc = bs_assert_contains(ctx, private_build.stderr, "symbol 'LEVEL' is private to its package", "a private origin global stays private")
     if rc != 0: return rc
 
     // §12.4 (D75): across the boundary a consuming closure may reach only a

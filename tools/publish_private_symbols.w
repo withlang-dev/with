@@ -2,7 +2,7 @@
 //
 // Sema (§18.3) owns the verdict: a saved build/check log names every
 // cross-module reference of a private declaration as
-//   error: symbol 'X' is private to module 'src/Y.w'
+//   error: symbol 'X' is private to its package (declared in 'src/Y.w', §18.3)
 // or, when the private declaration's module is not on the current module's
 // import path,
 //   error: symbol 'X' is not visible from this module
@@ -109,8 +109,8 @@ for line in log.split("\n"):
     if sym.len() == 0: sym = quoted_after(line, "names private type '")
     if sym.len() == 0: continue
     var owner = ""
-    if line.contains("' is private to module '"):
-        owner = quoted_after(line, "is private to module '")
+    if line.contains("' is private to its package (declared in '"):
+        owner = quoted_after(line, "(declared in '")
         // The runtime parsed into the unit (WITH_RT_IN_UNIT) names its modules
         // under `<embedded-rt>/`; the sources are the tree's rt/*.w.
         if owner.starts_with("<embedded-rt>/"): owner = owner.slice(14, owner.len())
