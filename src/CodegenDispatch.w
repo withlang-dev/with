@@ -2683,6 +2683,22 @@ impl Codegen:
         let ty = wl_type_of(lhs)
         if ty == 0 or ty != wl_type_of(rhs):
             return 0
+        // A scalar representation (a distinct i32, a payload-free enum's
+        // integer) orders on the int and float paths; only an aggregate or
+        // the Option niche needs a walk.
+        let repr_kind = wl_get_type_kind(ty)
+        let resolved = self.mir_eq_live_type(lhs_sema)
+        let variant_count = self.mir_enum_variant_count(resolved)
+        if repr_kind == wl_integer_type_kind() and variant_count > 0:
+            // A payload-free enum orders by declaration, not by its tags'
+            // values (a repr enum's, or permuted ones).
+            self.binop_route = "enum-order"
+            let l_index = self.mir_enum_tag_index(lhs, resolved, variant_count)
+            let r_index = self.mir_enum_tag_index(rhs, resolved, variant_count)
+            let pred = if op == BinaryOp.OP_LT: wl_int_ult() else if op == BinaryOp.OP_GT: wl_int_ugt() else if op == BinaryOp.OP_LTE: wl_int_ule() else: wl_int_uge()
+            return wl_build_icmp(self.builder, pred, l_index, r_index)
+        if repr_kind != wl_struct_type_kind() and repr_kind != wl_array_type_kind() and repr_kind != wl_pointer_type_kind():
+            return 0
         self.binop_route = "structural-order"
         let lhs_slot = self.create_entry_alloca(ty)
         let rhs_slot = self.create_entry_alloca(ty)
@@ -2743,6 +2759,9 @@ impl Codegen:
             let lv = wl_build_load(self.builder, ty, lp)
             let rv = wl_build_load(self.builder, ty, rp)
             return self.mir_three_way(wl_build_fcmp(self.builder, wl_real_olt(), lv, rv), wl_build_fcmp(self.builder, wl_real_ogt(), lv, rv))
+        if tk == TypeKind.TY_STRUCT and self.sema.distinct_type_names.contains(self.sema.get_type_d0(resolved as TypeId)):
+            // §4.5: a distinct has its inner type's representation and order.
+            return self.mir_emit_cmp_ptrs(lp, rp, ty, self.sema.type_extra[(self.sema.get_type_d1(resolved as TypeId) + 1)])
         if (tk == TypeKind.TY_TUPLE or tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ENUM or tk == TypeKind.TY_GENERIC_INST) and not self.mir_sema_type_is_std_vec(resolved):
             let walk = self.mir_cmp_fn(resolved, ty)
             if walk != 0:
@@ -4824,27 +4843,29 @@ impl Codegen:
         if rk == RvalueKind.RK_DISCRIMINANT:
             let ptr = self.mir_place_ptr(body, d0, false, 0)
             if ptr == 0:
-                return wl_get_undef(wl_i32_type(self.context))
+                return self.mir_bug_undef(f"discriminant rvalue {rval_id}: place {d0} has no address", wl_i32_type(self.context))
             if d0 < 0 or d0 >= body.place_locals.len() as i32:
-                return wl_get_undef(wl_i32_type(self.context))
+                return self.mir_bug_undef(f"discriminant rvalue {rval_id}: place {d0} out of range", wl_i32_type(self.context))
             var place_ty = self.mir_place_projected_type(body, d0)
             if place_ty == 0:
-                let local_id = body.place_locals[d0]
-                let place_ty_opt = self.mir_local_types.get(local_id)
-                if not place_ty_opt.is_some():
-                    return wl_get_undef(wl_i32_type(self.context))
-                place_ty = place_ty_opt.unwrap() as i64
+                let local_ty: i64 = (self.mir_local_types.get(body.place_locals[d0]) ?? 0) as i64
+                if local_ty == 0:
+                    return self.mir_bug_undef(f"discriminant rvalue {rval_id}: place {d0} has no type", wl_i32_type(self.context))
+                place_ty = local_ty
             if wl_get_type_kind(place_ty) == wl_struct_type_kind() and wl_count_struct_elem_types(place_ty) > 0:
                 let loaded = wl_build_load(self.builder, place_ty, ptr)
                 return wl_build_extract_value(self.builder, loaded, 0)
             if wl_get_type_kind(place_ty) == wl_pointer_type_kind():
                 let loaded_ptr = wl_build_load(self.builder, place_ty, ptr)
+                // The Option niche: null is None. Its tags are Sema's (D97
+                // declares None first), never "null is 1".
+                let i32_ty = wl_i32_type(self.context)
                 let is_none = wl_build_icmp(self.builder, wl_int_eq(), loaded_ptr, wl_const_null(place_ty))
-                return self.coerce_int(is_none, wl_i32_type(self.context))
+                return wl_build_select(self.builder, is_none, wl_const_int(i32_ty, self.option_tag(false), 0), wl_const_int(i32_ty, self.option_tag(true), 0))
             // Disc enum without payload: the value IS the discriminant
             if wl_get_type_kind(place_ty) == wl_integer_type_kind():
                 return wl_build_load(self.builder, place_ty, ptr)
-            return wl_const_int(wl_i32_type(self.context), 0, 0)
+            return self.mir_bug_undef(f"discriminant rvalue {rval_id}: place {d0} is no enum representation", wl_i32_type(self.context))
 
         if rk == RvalueKind.RK_AGGREGATE:
             // §4.3d: a vector's lanes, in order.
