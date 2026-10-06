@@ -4027,6 +4027,32 @@ fn mir_validate_aggregate_missing_borrow(mir_mod: &MirModule, body: &MirBody, en
         if arg_resolved == mir_mod.mir_resolve_alias(mir_mod.mir_get_type_d0(payload_ty)): return fi
     -1
 
+// D103 (§4.9a): an enum payload operand whose scalar type is not the
+// variant's scalar payload type. `Option[i64].Some(x)` built from an `i32`
+// operand stored four bytes into an eight-byte slot and every validator
+// passed it; the value read back right by luck. A scalar is an int, a
+// float or a bool: it has one width and one signedness, so a difference
+// is a real mismatch, never a representational one. Returns the payload
+// index, or -1.
+fn mir_validate_aggregate_scalar_mismatch(mir_mod: &MirModule, body: &MirBody, enum_ty: i32, variant_idx: i32, fields_id: i32) -> i32:
+    if fields_id < 0 or fields_id >= body.agg_field_starts.len(): return -1
+    let start = body.agg_field_starts[fields_id]
+    for fi in 0..body.agg_field_counts[fields_id]:
+        let payload_ty = mir_mod.mir_resolve_alias(mir_validate_enum_payload_type(mir_mod, enum_ty, variant_idx, fi))
+        if payload_ty <= 0 or not mir_validate_type_is_scalar(mir_mod, payload_ty): continue
+        let arg_ty = mir_validate_operand_type(mir_mod, body, body.agg_field_operands[start + fi])
+        if arg_ty <= 0: continue
+        let arg_resolved = mir_mod.mir_resolve_alias(arg_ty)
+        if not mir_validate_type_is_scalar(mir_mod, arg_resolved): continue
+        if arg_resolved == payload_ty: continue
+        if mir_mod.mir_get_type_kind(arg_resolved) != mir_mod.mir_get_type_kind(payload_ty): return fi
+        if mir_mod.mir_get_type_d0(arg_resolved) != mir_mod.mir_get_type_d0(payload_ty) or mir_mod.mir_get_type_d1(arg_resolved) != mir_mod.mir_get_type_d1(payload_ty): return fi
+    -1
+
+fn mir_validate_type_is_scalar(mir_mod: &MirModule, resolved: i32) -> bool:
+    let kind = mir_mod.mir_get_type_kind(resolved)
+    kind == TypeKind.TY_INT or kind == TypeKind.TY_FLOAT or kind == TypeKind.TY_BOOL
+
 // #2019: the eager intrinsics whose codegen loop invokes a closure argument
 // on the calling fiber once per element (and stops at an invocation that
 // left by a cancellation unwind, when MIR marks the call).
@@ -4485,6 +4511,9 @@ pub fn validate_typed_mir_body(mir_mod: &MirModule, body: &MirBody) -> MirValida
                     if rv_d2 < 0 or rv_d2 >= variant_count:
                         return mir_validation_fail(body.fn_sym, span, f"enum aggregate names variant {rv_d2} of a ty={dest_ty} enum with {variant_count} variants; an aggregate carries the variant index, not its discriminant")
                 if rv_d0 == 1:
+                    let narrow = mir_validate_aggregate_scalar_mismatch(mir_mod, body, dest_ty, rv_d2, rv_d1)
+                    if narrow >= 0:
+                        return mir_validation_fail(body.fn_sym, span, f"enum payload {narrow} is a scalar of another width, signedness or kind than the variant's payload (ty={dest_ty} variant {rv_d2}); the lowering casts the value to the payload type first")
                     let unborrowed = mir_validate_aggregate_missing_borrow(mir_mod, body, dest_ty, rv_d2, rv_d1)
                     if unborrowed >= 0:
                         return mir_validation_fail(body.fn_sym, span, f"enum payload {unborrowed} is a value where the variant's payload is a reference to it (a missing borrow)")

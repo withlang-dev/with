@@ -8951,6 +8951,10 @@ impl Sema:
         // if/match carrier too would stack a second contextual-Copy adjustment
         // on the same demand and MIR would dereference twice.
         if value_path != 0:
+            // §4.9a (D103): a leaf the return demand already converted to
+            // its Option keeps its own type; the record is the conversion.
+            if self.value_to_option_nodes.contains(node):
+                return 1
             let actual = self.recorded_expr_type_or_zero(node)
             if actual != 0 and actual != self.ty_void and actual != self.ty_never:
                 if self.expr_mutates_any_current_binding(node) != 0:
@@ -11182,7 +11186,8 @@ impl Sema:
                 return variadic_tid
             let value_tid = if fn_is_unsafe: self.unsafe_callable_type(fn_tid) else: fn_tid
             if self.has_expected_type != 0 and self.expected_expr_type != 0:
-                let expected = self.resolve_alias(self.expected_expr_type)
+                let payload = self.option_demand_payload(self.expected_expr_type)
+                let expected = self.resolve_alias(if payload != 0: payload else: self.expected_expr_type)
                 let expected_kind = self.get_type_kind(expected)
                 let matches = if expected_kind == TypeKind.TY_EXTERN_FN: self.fn_types_compatible(expected, fn_tid) != 0
                     else if expected_kind == TypeKind.TY_FN: self.fn_types_assignable(expected as i32, fn_tid) != 0
@@ -12966,7 +12971,9 @@ impl Sema:
     fn untyped_literal_context_type() -> TypeId:
         if self.has_expected_type == 0 or self.expected_expr_type == 0:
             return 0 as TypeId
-        if self.is_numeric_type(self.expected_expr_type as i32): self.expected_expr_type else: 0 as TypeId
+        let payload = self.option_demand_payload(self.expected_expr_type)
+        let demanded = if payload != 0: payload else: self.expected_expr_type
+        if self.is_numeric_type(demanded as i32): demanded else: 0 as TypeId
 
     // The integer type an enclosing context demands of an untyped operand of
     // a bitwise operator or a shift, or 0.
@@ -13132,6 +13139,10 @@ impl Sema:
         self.operator_method_reversed.remove(node)
         self.operator_method_derived.remove(node)
         let rhs_node = self.ast.get_data2(node)
+        // §4.9a (D103): an operator's operands are not demand sites; the peer
+        // type reaches an operand as a hint, never as an Option demand.
+        self.operator_operand_nodes.insert(lhs_node)
+        self.operator_operand_nodes.insert(rhs_node)
         // §4.2.1: an untyped literal operand — a bare unsuffixed literal, or
         // arithmetic of them (#1820) — takes its type from the peer operand
         // (rule 3), or, when both are untyped, from the enclosing context.
@@ -25588,7 +25599,8 @@ impl Sema:
             self.current_value_expr_root = node
             self.match_in_stmt_pos = 0
             self.stmt_pos_depth = 0
-        let out = self.check_expr(node)
+        var out = self.check_expr(node)
+        out = self.value_to_option_at_demand(node, expected, out)
         self.stmt_pos_depth = saved_stmt_depth
         self.match_in_stmt_pos = saved_match_stmt
         self.current_value_expr_root = saved_value_root
@@ -25596,6 +25608,51 @@ impl Sema:
         self.expected_expr_type = saved_expected
         self.has_expected_type = saved_has
         out
+
+    // §4.9a (D103): where an `Option[T]` is demanded and the expression has
+    // type `T`, the expression is `Some(expression)`. Once, at the demand:
+    // `None` and an expression already of an `Option` type pass as they
+    // are, so a `T` offered where `Option[Option[T]]` is demanded becomes
+    // `Some(x): Option[T]` and mismatches. Only when the demanded type is
+    // known: the conversion never solves a type variable. A pointer-like
+    // payload (`Option[*T]`, `Option[extern fn]`) needs no construction —
+    // types_compatible already admits it — so nothing is recorded for it.
+    // The record is MIR's: it builds the `Some` around the lowered value.
+    // §4.9a (D103): the demand propagates into the payload. An untyped
+    // literal or a named fn offered where a concrete `Option[T]` is demanded
+    // is checked against `T`, and the demand then wraps the result. 0 when
+    // the demand is not a concrete Option.
+    fn option_demand_payload(expected: TypeId) -> TypeId:
+        if expected == 0:
+            return 0 as TypeId
+        let exp_r = self.resolve_alias(expected)
+        if self.get_type_kind(exp_r) != TypeKind.TY_GENERIC_INST or self.get_generic_inst_base(exp_r as i32) != self.syms.option or self.get_generic_inst_arg_count(exp_r as i32) != 1:
+            return 0 as TypeId
+        if self.type_has_unresolved_parts(exp_r as i32) != 0:
+            return 0 as TypeId
+        self.get_generic_inst_arg(exp_r as i32, 0) as TypeId
+
+    mut fn value_to_option_at_demand(node: i32, expected: TypeId, actual: TypeId) -> TypeId:
+        if node == 0 or expected == 0 or actual == 0 or self.ast.kind(node) == NodeKind.NK_NULL_LIT:
+            return actual
+        if self.operator_operand_nodes.contains(node): return actual
+        let exp_r = self.resolve_alias(expected)
+        if self.get_type_kind(exp_r) != TypeKind.TY_GENERIC_INST or self.get_generic_inst_base(exp_r as i32) != self.syms.option or self.get_generic_inst_arg_count(exp_r as i32) != 1:
+            return actual
+        if self.type_has_unresolved_parts(exp_r as i32) != 0:
+            return actual
+        let act_r = self.resolve_alias(actual)
+        if self.get_type_kind(act_r) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(act_r as i32) == self.syms.option:
+            return actual
+        if self.types_compatible(expected, actual) != 0:
+            return actual
+        let payload = self.get_generic_inst_arg(exp_r as i32, 0)
+        if payload == 0 or self.types_compatible(payload as TypeId, actual) == 0:
+            return actual
+        // The node keeps its own type `T` (MIR lowers it at that type and
+        // wraps after); only the record says the demand wrapped it.
+        self.value_to_option_nodes.insert(node, expected as i32)
+        expected
 
     // Use only after the surrounding construct has independently fixed an
     // owned destination type. The checked expression keeps its exact type;

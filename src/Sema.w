@@ -1025,6 +1025,13 @@ pub type Sema {
     // §16.2b.3: the `T.zeroed()` calls on zero-valid C records; MIR
     // lowers each to the all-zero value of its type.
     zeroed_call_nodes: HashSet[i32],
+    // §4.9a (D103): expressions a demanded Option[T] converts to Some(expression);
+    // MIR builds the Some around the lowered value. Keyed by expression node,
+    // the Option type.
+    value_to_option_nodes: HashMap[i32, i32],
+    // The operand an operator is checking against its other operand's type:
+    // not a demand site (§4.9a), so no conversion fires on it.
+    operator_operand_nodes: HashSet[i32],
     type_tid_is_std: HashMap[i32, i32],
     // #751 / #1745: the template declaration (its TY_STRUCT/TY_ENUM tid) a
     // generic instance was made from — identity, not the short name, since
@@ -3159,6 +3166,8 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         type_decl_nodes_by_tid: HashMap.new(),
         pub_field_keys: HashSet[i64].new(),
         zeroed_call_nodes: HashSet[i32].new(),
+        value_to_option_nodes: HashMap.new(),
+        operator_operand_nodes: HashSet.new(),
         type_tid_is_std: HashMap.new(),
         generic_inst_templates: HashMap.new(),
         type_sym_tier_mask: HashMap.new(),

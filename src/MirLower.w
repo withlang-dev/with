@@ -15765,7 +15765,27 @@ impl MirBuilder:
     // (D65: audit:resolution judges they agree). A contextual copy is
     // Sema's own adjustment: its operand has the adjusted type.
     mut fn lower_expr(node: i32) -> i32:
-        let op = self.lower_expr_node(node)
+        var op = self.lower_expr_node(node)
+        // §4.9a (D103): Sema decided this value is `Some(value)` at its
+        // demand; the Option is built here around the lowered value.
+        if node > 0 and op >= 0 and self.sema.value_to_option_nodes.contains(node):
+            let opt_ty = self.concrete_type(self.sema.value_to_option_nodes.get(node).unwrap())
+            let span = self.ast.get_start(node)
+            // The payload is the demanded `T`; a value Sema admitted by a
+            // lossless widening (`i32` into `Option[i64]`) is cast to it, so
+            // the aggregate's field carries the variant's own type.
+            let payload = self.concrete_type(self.sema.get_generic_inst_arg(self.sema.resolve_alias(opt_ty as TypeId) as i32, 0))
+            var src_ty = self.operand_type(op)
+            if src_ty == 0 or src_ty == self.sema.ty_void as i32:
+                src_ty = self.expr_type(node)
+            if payload != 0 and src_ty != 0 and not self.sema.types_identical(src_ty, payload):
+                op = self.lower_value_cast(op, src_ty, payload, span)
+            let tmp = self.new_temp(opt_ty)
+            let place = self.place_for_local(tmp)
+            let fields: Vec[i32] = Vec.new()
+            fields.push(op)
+            self.assign_enum_variant_to_place(place, opt_ty, self.sema.syms.some, fields, self.ast.get_start(node))
+            op = if self.sema.is_copy_frozen(opt_ty) != 0: self.body.new_operand(OperandKind.OK_COPY, place) else: self.body.new_operand(OperandKind.OK_MOVE, place)
         // Grouping, a block and the other pass-through forms yield their
         // inner value: that node is judged, with any adjustment Sema made.
         let kind = if node > 0: self.ast.kind(node) else: NodeKind.NK_BLOCK

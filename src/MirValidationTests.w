@@ -1001,6 +1001,50 @@ pub fn mir_test_enum_aggregate_missing_borrow:
     assert(aggregate_borrow_verdict(false).contains("enum payload 0 is a value where the variant's payload is a reference to it"))
     assert(aggregate_borrow_verdict(true) == "")
 
+// D103 (§4.9a): an enum aggregate whose `i64` payload slot receives an
+// `i32` operand — `Option[i64].Some(narrow)` lowered the unwidened value
+// there and every validator said ok. Types: 1 `i32`, 2 `i64`, 3 an enum
+// whose one variant's payload is `i64`.
+fn aggregate_scalar_verdict(arg_is_wide: bool) -> str:
+    var mir_mod = MirModule.init()
+    for kind in [0, TypeKind.TY_INT, TypeKind.TY_INT, TypeKind.TY_ENUM]:
+        mir_mod.sema_type_kinds.push(kind)
+        mir_mod.sema_type_d0.push(0)
+        mir_mod.sema_type_d1.push(0)
+        mir_mod.sema_type_d2.push(0)
+    let i32_ty = 1
+    let i64_ty = 2
+    let enum_ty = 3
+    mir_mod.sema_type_d0[i32_ty] = 32
+    mir_mod.sema_type_d1[i32_ty] = 1
+    mir_mod.sema_type_d0[i64_ty] = 64
+    mir_mod.sema_type_d1[i64_ty] = 1
+    mir_mod.sema_type_d0[enum_ty] = 7
+    mir_mod.sema_type_d1[enum_ty] = mir_mod.sema_type_extra.len() as i32
+    mir_mod.sema_type_d2[enum_ty] = 1
+    mir_mod.sema_type_extra.push(0)
+    mir_mod.sema_type_extra.push(1)
+    mir_mod.sema_type_extra.push(i64_ty)
+    var body = MirBody.init_for_fn(1)
+    let arg_local = body.new_temp(if arg_is_wide: i64_ty else: i32_ty)
+    let arg_place = body.new_place(arg_local)
+    let dest_local = body.new_temp(enum_ty)
+    let dest = body.new_place(dest_local)
+    let entry = body.new_block()
+    let fields: Vec[i32] = Vec.new()
+    fields.push(body.new_operand(OperandKind.OK_COPY, arg_place))
+    let names: Vec[i32] = Vec.new()
+    names.push(0)
+    let field_table = body.new_agg_fields(&fields, &names)
+    let agg = body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, field_table, 0)
+    body.push_stmt(entry, StmtKind.Assign, dest, agg, 0)
+    body.set_terminator(entry, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    with_str_clone_ref(validate_typed_mir_body(mir_mod, body).message)
+
+pub fn mir_test_enum_aggregate_scalar_mismatch:
+    assert(aggregate_scalar_verdict(false).contains("enum payload 0 is a scalar of another width, signedness or kind"))
+    assert(aggregate_scalar_verdict(true) == "")
+
 // #1736: validate-all skipped a body whose lowering failed — the typed and
 // ownership validators both `continue` past it — and said ok over a
 // comprehension codegen then refused to compile. A module holding such a
