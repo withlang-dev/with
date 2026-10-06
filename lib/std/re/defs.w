@@ -294,15 +294,15 @@ pub type pcre2_jit_stack_8 = pcre2_real_jit_stack_8
 pub type pcre2_jit_callback_8 = unsafe extern "C" fn(*mut c_void) -> *mut pcre2_real_jit_stack_8
 
 @[repr(C)]
-pub type pcre2_callout_block_8 { version: c_uint = 0, callout_number: c_uint = 0, capture_top: c_uint = 0, capture_last: c_uint = 0, offset_vector: *mut c_ulong = null, mark: *const u8 = null, subject: *const u8 = null, subject_length: c_ulong = 0, start_match: c_ulong = 0, current_position: c_ulong = 0, pattern_position: c_ulong = 0, next_item_length: c_ulong = 0, callout_string_offset: c_ulong = 0, callout_string_length: c_ulong = 0, callout_string: *const u8 = null, callout_flags: c_uint = 0 }
+pub type pcre2_callout_block_8 { pub version: c_uint = 0, pub callout_number: c_uint = 0, pub capture_top: c_uint = 0, pub capture_last: c_uint = 0, pub offset_vector: *mut c_ulong = null, pub mark: *const u8 = null, pub subject: *const u8 = null, pub subject_length: c_ulong = 0, pub start_match: c_ulong = 0, pub current_position: c_ulong = 0, pub pattern_position: c_ulong = 0, pub next_item_length: c_ulong = 0, pub callout_string_offset: c_ulong = 0, pub callout_string_length: c_ulong = 0, pub callout_string: *const u8 = null, pub callout_flags: c_uint = 0 }
 impl Copy for pcre2_callout_block_8
 
 @[repr(C)]
-pub type pcre2_callout_enumerate_block_8 { version: c_uint = 0, pattern_position: c_ulong = 0, next_item_length: c_ulong = 0, callout_number: c_uint = 0, callout_string_offset: c_ulong = 0, callout_string_length: c_ulong = 0, callout_string: *const u8 = null }
+pub type pcre2_callout_enumerate_block_8 { pub version: c_uint = 0, pub pattern_position: c_ulong = 0, pub next_item_length: c_ulong = 0, pub callout_number: c_uint = 0, pub callout_string_offset: c_ulong = 0, pub callout_string_length: c_ulong = 0, pub callout_string: *const u8 = null }
 impl Copy for pcre2_callout_enumerate_block_8
 
 @[repr(C)]
-pub type pcre2_substitute_callout_block_8 { version: c_uint = 0, input: *const u8 = null, output: *const u8 = null, output_offsets: [2]c_ulong = [0 as c_ulong; 2], ovector: *mut c_ulong = null, oveccount: c_uint = 0, subscount: c_uint = 0 }
+pub type pcre2_substitute_callout_block_8 { pub version: c_uint = 0, pub input: *const u8 = null, pub output: *const u8 = null, pub output_offsets: [2]c_ulong = [0 as c_ulong; 2], pub ovector: *mut c_ulong = null, pub oveccount: c_uint = 0, pub subscount: c_uint = 0 }
 impl Copy for pcre2_substitute_callout_block_8
 
 pub let ucp_C: c_int = 0
@@ -817,112 +817,112 @@ pub let OP_NOT_UCP_WORD_BOUNDARY: c_int = 171
 pub let OP_UCP_WORD_BOUNDARY: c_int = 172
 pub let OP_TABLE_LENGTH: c_int = 173
 @[repr(C)]
-pub type pcre2_memctl { malloc: unsafe extern "C" fn(c_ulong, *mut c_void) -> *mut c_void, free: unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit, memory_data: *mut c_void = null }
+pub type pcre2_memctl { pub malloc: unsafe extern "C" fn(c_ulong, *mut c_void) -> *mut c_void, pub free: unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit, pub memory_data: *mut c_void = null }
 impl Copy for pcre2_memctl
 
 @[repr(C)]
-pub type open_capitem { next: *mut open_capitem = null, number: c_ushort = 0, assert_depth: c_ushort = 0 }
+pub type open_capitem { pub next: *mut open_capitem = null, pub number: c_ushort = 0, pub assert_depth: c_ushort = 0 }
 impl Copy for open_capitem
 
 @[repr(C)]
-pub type ucp_type_table { name_offset: c_ushort = 0, type_: c_ushort = 0, value: c_ushort = 0 }
+pub type ucp_type_table { pub name_offset: c_ushort = 0, pub type_: c_ushort = 0, pub value: c_ushort = 0 }
 impl Copy for ucp_type_table
 
 @[repr(C)]
-pub type ucd_record { script: u8 = 0, chartype: u8 = 0, gbprop: u8 = 0, caseset: u8 = 0, other_case: c_int = 0, scriptx_bidiclass: c_ushort = 0, bprops: c_ushort = 0 }
+pub type ucd_record { pub script: u8 = 0, pub chartype: u8 = 0, pub gbprop: u8 = 0, pub caseset: u8 = 0, pub other_case: c_int = 0, pub scriptx_bidiclass: c_ushort = 0, pub bprops: c_ushort = 0 }
 impl Copy for ucd_record
 
 @[repr(C)]
-pub type pcre2_serialized_data { magic: c_uint = 0, version: c_uint = 0, config: c_uint = 0, number_of_codes: c_int = 0 }
+pub type pcre2_serialized_data { pub magic: c_uint = 0, pub version: c_uint = 0, pub config: c_uint = 0, pub number_of_codes: c_int = 0 }
 impl Copy for pcre2_serialized_data
 
 @[repr(C)]
-pub type pcre2_real_general_context_8 { memctl: pcre2_memctl }
+pub type pcre2_real_general_context_8 { pub memctl: pcre2_memctl }
 impl Copy for pcre2_real_general_context_8
 
 @[repr(C)]
-pub type pcre2_real_compile_context_8 { memctl: pcre2_memctl, stack_guard: unsafe extern "C" fn(c_uint, *mut c_void) -> c_int, stack_guard_data: *mut c_void = null, tables: *const u8 = null, max_pattern_length: c_ulong = 0, max_pattern_compiled_length: c_ulong = 0, bsr_convention: c_ushort = 0, newline_convention: c_ushort = 0, parens_nest_limit: c_uint = 0, extra_options: c_uint = 0, max_varlookbehind: c_uint = 0, optimization_flags: c_uint = 0 }
+pub type pcre2_real_compile_context_8 { pub memctl: pcre2_memctl, pub stack_guard: unsafe extern "C" fn(c_uint, *mut c_void) -> c_int, pub stack_guard_data: *mut c_void = null, pub tables: *const u8 = null, pub max_pattern_length: c_ulong = 0, pub max_pattern_compiled_length: c_ulong = 0, pub bsr_convention: c_ushort = 0, pub newline_convention: c_ushort = 0, pub parens_nest_limit: c_uint = 0, pub extra_options: c_uint = 0, pub max_varlookbehind: c_uint = 0, pub optimization_flags: c_uint = 0 }
 impl Copy for pcre2_real_compile_context_8
 
 @[repr(C)]
-pub type pcre2_real_match_context_8 { memctl: pcre2_memctl, callout: unsafe extern "C" fn(*mut pcre2_callout_block_8, *mut c_void) -> c_int, callout_data: *mut c_void = null, substitute_callout: unsafe extern "C" fn(*mut pcre2_substitute_callout_block_8, *mut c_void) -> c_int, substitute_callout_data: *mut c_void = null, substitute_case_callout: unsafe extern "C" fn(*const u8, c_ulong, *mut u8, c_ulong, c_int, *mut c_void) -> c_ulong, substitute_case_callout_data: *mut c_void = null, offset_limit: c_ulong = 0, heap_limit: c_uint = 0, match_limit: c_uint = 0, depth_limit: c_uint = 0 }
+pub type pcre2_real_match_context_8 { pub memctl: pcre2_memctl, pub callout: unsafe extern "C" fn(*mut pcre2_callout_block_8, *mut c_void) -> c_int, pub callout_data: *mut c_void = null, pub substitute_callout: unsafe extern "C" fn(*mut pcre2_substitute_callout_block_8, *mut c_void) -> c_int, pub substitute_callout_data: *mut c_void = null, pub substitute_case_callout: unsafe extern "C" fn(*const u8, c_ulong, *mut u8, c_ulong, c_int, *mut c_void) -> c_ulong, pub substitute_case_callout_data: *mut c_void = null, pub offset_limit: c_ulong = 0, pub heap_limit: c_uint = 0, pub match_limit: c_uint = 0, pub depth_limit: c_uint = 0 }
 impl Copy for pcre2_real_match_context_8
 
 @[repr(C)]
-pub type pcre2_real_convert_context_8 { memctl: pcre2_memctl, glob_separator: c_uint = 0, glob_escape: c_uint = 0 }
+pub type pcre2_real_convert_context_8 { pub memctl: pcre2_memctl, pub glob_separator: c_uint = 0, pub glob_escape: c_uint = 0 }
 impl Copy for pcre2_real_convert_context_8
 
 @[repr(C)]
-pub type pcre2_real_code_8 { memctl: pcre2_memctl, tables: *const u8 = null, executable_jit: *mut c_void = null, start_bitmap: [32]u8 = [0 as u8; 32], blocksize: c_ulong = 0, code_start: c_ulong = 0, magic_number: c_uint = 0, compile_options: c_uint = 0, overall_options: c_uint = 0, extra_options: c_uint = 0, flags: c_uint = 0, limit_heap: c_uint = 0, limit_match: c_uint = 0, limit_depth: c_uint = 0, first_codeunit: c_uint = 0, last_codeunit: c_uint = 0, bsr_convention: c_ushort = 0, newline_convention: c_ushort = 0, max_lookbehind: c_ushort = 0, minlength: c_ushort = 0, top_bracket: c_ushort = 0, top_backref: c_ushort = 0, name_entry_size: c_ushort = 0, name_count: c_ushort = 0, optimization_flags: c_uint = 0 }
+pub type pcre2_real_code_8 { pub memctl: pcre2_memctl, pub tables: *const u8 = null, pub executable_jit: *mut c_void = null, pub start_bitmap: [32]u8 = [0 as u8; 32], pub blocksize: c_ulong = 0, pub code_start: c_ulong = 0, pub magic_number: c_uint = 0, pub compile_options: c_uint = 0, pub overall_options: c_uint = 0, pub extra_options: c_uint = 0, pub flags: c_uint = 0, pub limit_heap: c_uint = 0, pub limit_match: c_uint = 0, pub limit_depth: c_uint = 0, pub first_codeunit: c_uint = 0, pub last_codeunit: c_uint = 0, pub bsr_convention: c_ushort = 0, pub newline_convention: c_ushort = 0, pub max_lookbehind: c_ushort = 0, pub minlength: c_ushort = 0, pub top_bracket: c_ushort = 0, pub top_backref: c_ushort = 0, pub name_entry_size: c_ushort = 0, pub name_count: c_ushort = 0, pub optimization_flags: c_uint = 0 }
 impl Copy for pcre2_real_code_8
 
 @[repr(C)]
-pub type pcre2_real_match_data_8 { memctl: pcre2_memctl, code: *const pcre2_real_code_8 = null, subject: *const u8 = null, mark: *const u8 = null, heapframes: *mut heapframe = null, heapframes_size: c_ulong = 0, subject_length: c_ulong = 0, start_offset: c_ulong = 0, leftchar: c_ulong = 0, rightchar: c_ulong = 0, startchar: c_ulong = 0, matchedby: u8 = 0, flags: u8 = 0, oveccount: c_ushort = 0, options: c_uint = 0, rc: c_int = 0, ovector: [131072]c_ulong = [0 as c_ulong; 131072] }
+pub type pcre2_real_match_data_8 { pub memctl: pcre2_memctl, pub code: *const pcre2_real_code_8 = null, pub subject: *const u8 = null, pub mark: *const u8 = null, pub heapframes: *mut heapframe = null, pub heapframes_size: c_ulong = 0, pub subject_length: c_ulong = 0, pub start_offset: c_ulong = 0, pub leftchar: c_ulong = 0, pub rightchar: c_ulong = 0, pub startchar: c_ulong = 0, pub matchedby: u8 = 0, pub flags: u8 = 0, pub oveccount: c_ushort = 0, pub options: c_uint = 0, pub rc: c_int = 0, pub ovector: [131072]c_ulong = [0 as c_ulong; 131072] }
 impl Copy for pcre2_real_match_data_8
 
 @[repr(C)]
-pub type recurse_check { prev: *mut recurse_check = null, group: *const u8 = null }
+pub type recurse_check { pub prev: *mut recurse_check = null, pub group: *const u8 = null }
 impl Copy for recurse_check
 
 @[repr(C)]
-pub type parsed_recurse_check { prev: *mut parsed_recurse_check = null, groupptr: *mut c_uint = null }
+pub type parsed_recurse_check { pub prev: *mut parsed_recurse_check = null, pub groupptr: *mut c_uint = null }
 impl Copy for parsed_recurse_check
 
 @[repr(C)]
-pub type recurse_cache { group: *const u8 = null, groupnumber: c_int = 0 }
+pub type recurse_cache { pub group: *const u8 = null, pub groupnumber: c_int = 0 }
 impl Copy for recurse_cache
 
 @[repr(C)]
-pub type branch_chain_8 { outer: *mut branch_chain_8 = null, current_branch: *mut u8 = null }
+pub type branch_chain_8 { pub outer: *mut branch_chain_8 = null, pub current_branch: *mut u8 = null }
 impl Copy for branch_chain_8
 
 @[repr(C)]
-pub type named_group_8 { name: *const u8 = null, number: c_uint = 0, length: c_ushort = 0, hash_dup: c_ushort = 0 }
+pub type named_group_8 { pub name: *const u8 = null, pub number: c_uint = 0, pub length: c_ushort = 0, pub hash_dup: c_ushort = 0 }
 impl Copy for named_group_8
 
 @[repr(C)]
-pub type compile_data { next: *mut compile_data = null }
+pub type compile_data { pub next: *mut compile_data = null }
 impl Copy for compile_data
 
 @[repr(C)]
-pub type class_ranges { header: compile_data, char_lists_size: c_ulong = 0, char_lists_start: c_ulong = 0, range_list_size: c_ushort = 0, char_lists_types: c_ushort = 0 }
+pub type class_ranges { pub header: compile_data, pub char_lists_size: c_ulong = 0, pub char_lists_start: c_ulong = 0, pub range_list_size: c_ushort = 0, pub char_lists_types: c_ushort = 0 }
 impl Copy for class_ranges
 
 @[repr(C)]
-pub type recurse_arguments { header: compile_data, size: c_ulong = 0, skip_size: c_ulong = 0 }
+pub type recurse_arguments { pub header: compile_data, pub size: c_ulong = 0, pub skip_size: c_ulong = 0 }
 impl Copy for recurse_arguments
 
-pub type class_bits_storage = union { classbits: [32]u8 = [0 as u8; 32], classwords: [8]c_uint = [0 as c_uint; 8] }
+pub type class_bits_storage = union { pub classbits: [32]u8 = [0 as u8; 32], pub classwords: [8]c_uint = [0 as c_uint; 8] }
 impl Copy for class_bits_storage
 
 @[repr(C)]
-pub type compile_block_8 { cx: *mut pcre2_real_compile_context_8 = null, lcc: *const u8 = null, fcc: *const u8 = null, cbits: *const u8 = null, ctypes: *const u8 = null, start_workspace: *mut u8 = null, start_code: *mut u8 = null, start_pattern: *const u8 = null, end_pattern: *const u8 = null, name_table: *mut u8 = null, workspace_size: c_ulong = 0, small_ref_offset: [10]c_ulong = [0 as c_ulong; 10], erroroffset: c_ulong = 0, classbits: class_bits_storage, names_found: c_ushort = 0, name_entry_size: c_ushort = 0, parens_depth: c_ushort = 0, assert_depth: c_ushort = 0, named_groups: *mut named_group_8 = null, named_group_list_size: c_uint = 0, external_options: c_uint = 0, external_flags: c_uint = 0, bracount: c_uint = 0, lastcapture: c_uint = 0, parsed_pattern: *mut c_uint = null, parsed_pattern_end: *mut c_uint = null, groupinfo: *mut c_uint = null, top_backref: c_uint = 0, backref_map: c_uint = 0, nltype: c_uint = 0, nllen: c_uint = 0, nl: [4]u8 = [0 as u8; 4], class_op_used: [15]u8 = [0 as u8; 15], req_varyopt: c_uint = 0, max_varlookbehind: c_uint = 0, max_lookbehind: c_int = 0, had_accept: c_int = 0, had_pruneorskip: c_int = 0, had_recurse: c_int = 0, dupnames: c_int = 0, first_data: *mut compile_data = null, last_data: *mut compile_data = null, char_lists_size: c_ulong = 0 }
+pub type compile_block_8 { pub cx: *mut pcre2_real_compile_context_8 = null, pub lcc: *const u8 = null, pub fcc: *const u8 = null, pub cbits: *const u8 = null, pub ctypes: *const u8 = null, pub start_workspace: *mut u8 = null, pub start_code: *mut u8 = null, pub start_pattern: *const u8 = null, pub end_pattern: *const u8 = null, pub name_table: *mut u8 = null, pub workspace_size: c_ulong = 0, pub small_ref_offset: [10]c_ulong = [0 as c_ulong; 10], pub erroroffset: c_ulong = 0, pub classbits: class_bits_storage, pub names_found: c_ushort = 0, pub name_entry_size: c_ushort = 0, pub parens_depth: c_ushort = 0, pub assert_depth: c_ushort = 0, pub named_groups: *mut named_group_8 = null, pub named_group_list_size: c_uint = 0, pub external_options: c_uint = 0, pub external_flags: c_uint = 0, pub bracount: c_uint = 0, pub lastcapture: c_uint = 0, pub parsed_pattern: *mut c_uint = null, pub parsed_pattern_end: *mut c_uint = null, pub groupinfo: *mut c_uint = null, pub top_backref: c_uint = 0, pub backref_map: c_uint = 0, pub nltype: c_uint = 0, pub nllen: c_uint = 0, pub nl: [4]u8 = [0 as u8; 4], pub class_op_used: [15]u8 = [0 as u8; 15], pub req_varyopt: c_uint = 0, pub max_varlookbehind: c_uint = 0, pub max_lookbehind: c_int = 0, pub had_accept: c_int = 0, pub had_pruneorskip: c_int = 0, pub had_recurse: c_int = 0, pub dupnames: c_int = 0, pub first_data: *mut compile_data = null, pub last_data: *mut compile_data = null, pub char_lists_size: c_ulong = 0 }
 impl Copy for compile_block_8
 
 @[repr(C)]
-pub type pcre2_real_jit_stack_8 { memctl: pcre2_memctl, stack: *mut c_void = null }
+pub type pcre2_real_jit_stack_8 { pub memctl: pcre2_memctl, pub stack: *mut c_void = null }
 impl Copy for pcre2_real_jit_stack_8
 
 @[repr(C)]
-pub type dfa_recursion_info { prevrec: *mut dfa_recursion_info = null, subject_position: *const u8 = null, last_used_ptr: *const u8 = null, group_num: c_uint = 0 }
+pub type dfa_recursion_info { pub prevrec: *mut dfa_recursion_info = null, pub subject_position: *const u8 = null, pub last_used_ptr: *const u8 = null, pub group_num: c_uint = 0 }
 impl Copy for dfa_recursion_info
 
 @[repr(C)]
-pub type heapframe { ecode: *const u8 = null, temp_sptr: [2]*const u8 = [null as *const u8; 2], length: c_ulong = 0, back_frame: c_ulong = 0, temp_size: c_ulong = 0, rdepth: c_uint = 0, group_frame_type: c_uint = 0, temp_32: [4]c_uint = [0 as c_uint; 4], return_id: u8 = 0, op: u8 = 0, occu: [6]u8 = [0 as u8; 6], eptr: *const u8 = null, start_match: *const u8 = null, mark: *const u8 = null, recurse_last_used: *const u8 = null, current_recurse: c_uint = 0, capture_last: c_uint = 0, last_group_offset: c_ulong = 0, offset_top: c_ulong = 0, ovector: [131072]c_ulong = [0 as c_ulong; 131072] }
+pub type heapframe { pub ecode: *const u8 = null, pub temp_sptr: [2]*const u8 = [null as *const u8; 2], pub length: c_ulong = 0, pub back_frame: c_ulong = 0, pub temp_size: c_ulong = 0, pub rdepth: c_uint = 0, pub group_frame_type: c_uint = 0, pub temp_32: [4]c_uint = [0 as c_uint; 4], pub return_id: u8 = 0, pub op: u8 = 0, pub occu: [6]u8 = [0 as u8; 6], pub eptr: *const u8 = null, pub start_match: *const u8 = null, pub mark: *const u8 = null, pub recurse_last_used: *const u8 = null, pub current_recurse: c_uint = 0, pub capture_last: c_uint = 0, pub last_group_offset: c_ulong = 0, pub offset_top: c_ulong = 0, pub ovector: [131072]c_ulong = [0 as c_ulong; 131072] }
 impl Copy for heapframe
 
 pub type static_assertion_heapframe_size = [1]c_int
 
 @[repr(C)]
-pub type heapframe_align { unalign: c_char = 0, frame: heapframe }
+pub type heapframe_align { pub unalign: c_char = 0, pub frame: heapframe }
 impl Copy for heapframe_align
 
 @[repr(C)]
-pub type match_block_8 { memctl: pcre2_memctl, heap_limit: c_uint = 0, match_limit: c_uint = 0, match_limit_depth: c_uint = 0, match_call_count: c_uint = 0, hitend: c_int = 0, hasthen: c_int = 0, hasbsk: c_int = 0, allowemptypartial: c_int = 0, allowlookaroundbsk: c_int = 0, lcc: *const u8 = null, fcc: *const u8 = null, ctypes: *const u8 = null, start_offset: c_ulong = 0, end_offset_top: c_ulong = 0, partial: c_ushort = 0, bsr_convention: c_ushort = 0, name_count: c_ushort = 0, name_entry_size: c_ushort = 0, name_table: *const u8 = null, start_code: *const u8 = null, start_subject: *const u8 = null, check_subject: *const u8 = null, end_subject: *const u8 = null, true_end_subject: *const u8 = null, end_match_ptr: *const u8 = null, start_used_ptr: *const u8 = null, last_used_ptr: *const u8 = null, mark: *const u8 = null, nomatch_mark: *const u8 = null, verb_ecode_ptr: *const u8 = null, verb_skip_ptr: *const u8 = null, verb_current_recurse: c_uint = 0, moptions: c_uint = 0, poptions: c_uint = 0, skip_arg_count: c_uint = 0, ignore_skip_arg: c_uint = 0, nltype: c_uint = 0, nllen: c_uint = 0, nl: [4]u8 = [0 as u8; 4], cb: *mut pcre2_callout_block_8 = null, callout_data: *mut c_void = null, callout: unsafe extern "C" fn(*mut pcre2_callout_block_8, *mut c_void) -> c_int }
+pub type match_block_8 { pub memctl: pcre2_memctl, pub heap_limit: c_uint = 0, pub match_limit: c_uint = 0, pub match_limit_depth: c_uint = 0, pub match_call_count: c_uint = 0, pub hitend: c_int = 0, pub hasthen: c_int = 0, pub hasbsk: c_int = 0, pub allowemptypartial: c_int = 0, pub allowlookaroundbsk: c_int = 0, pub lcc: *const u8 = null, pub fcc: *const u8 = null, pub ctypes: *const u8 = null, pub start_offset: c_ulong = 0, pub end_offset_top: c_ulong = 0, pub partial: c_ushort = 0, pub bsr_convention: c_ushort = 0, pub name_count: c_ushort = 0, pub name_entry_size: c_ushort = 0, pub name_table: *const u8 = null, pub start_code: *const u8 = null, pub start_subject: *const u8 = null, pub check_subject: *const u8 = null, pub end_subject: *const u8 = null, pub true_end_subject: *const u8 = null, pub end_match_ptr: *const u8 = null, pub start_used_ptr: *const u8 = null, pub last_used_ptr: *const u8 = null, pub mark: *const u8 = null, pub nomatch_mark: *const u8 = null, pub verb_ecode_ptr: *const u8 = null, pub verb_skip_ptr: *const u8 = null, pub verb_current_recurse: c_uint = 0, pub moptions: c_uint = 0, pub poptions: c_uint = 0, pub skip_arg_count: c_uint = 0, pub ignore_skip_arg: c_uint = 0, pub nltype: c_uint = 0, pub nllen: c_uint = 0, pub nl: [4]u8 = [0 as u8; 4], pub cb: *mut pcre2_callout_block_8 = null, pub callout_data: *mut c_void = null, pub callout: unsafe extern "C" fn(*mut pcre2_callout_block_8, *mut c_void) -> c_int }
 impl Copy for match_block_8
 
 @[repr(C)]
-pub type dfa_match_block_8 { memctl: pcre2_memctl, start_code: *const u8 = null, start_subject: *const u8 = null, end_subject: *const u8 = null, start_used_ptr: *const u8 = null, last_used_ptr: *const u8 = null, tables: *const u8 = null, start_offset: c_ulong = 0, heap_limit: c_uint = 0, heap_used: c_ulong = 0, match_limit: c_uint = 0, match_limit_depth: c_uint = 0, match_call_count: c_uint = 0, moptions: c_uint = 0, poptions: c_uint = 0, nltype: c_uint = 0, nllen: c_uint = 0, allowemptypartial: c_int = 0, nl: [4]u8 = [0 as u8; 4], bsr_convention: c_ushort = 0, cb: *mut pcre2_callout_block_8 = null, callout_data: *mut c_void = null, callout: unsafe extern "C" fn(*mut pcre2_callout_block_8, *mut c_void) -> c_int, recursive: *mut dfa_recursion_info = null }
+pub type dfa_match_block_8 { pub memctl: pcre2_memctl, pub start_code: *const u8 = null, pub start_subject: *const u8 = null, pub end_subject: *const u8 = null, pub start_used_ptr: *const u8 = null, pub last_used_ptr: *const u8 = null, pub tables: *const u8 = null, pub start_offset: c_ulong = 0, pub heap_limit: c_uint = 0, pub heap_used: c_ulong = 0, pub match_limit: c_uint = 0, pub match_limit_depth: c_uint = 0, pub match_call_count: c_uint = 0, pub moptions: c_uint = 0, pub poptions: c_uint = 0, pub nltype: c_uint = 0, pub nllen: c_uint = 0, pub allowemptypartial: c_int = 0, pub nl: [4]u8 = [0 as u8; 4], pub bsr_convention: c_ushort = 0, pub cb: *mut pcre2_callout_block_8 = null, pub callout_data: *mut c_void = null, pub callout: unsafe extern "C" fn(*mut pcre2_callout_block_8, *mut c_void) -> c_int, pub recursive: *mut dfa_recursion_info = null }
 impl Copy for dfa_match_block_8
 
 pub let WITH_PCRE2_CONFIG_H: c_int = 1
@@ -1749,7 +1749,7 @@ pub let POSIX_CLASS_NOT_STARTED: c_int = 3
 pub let POSIX_CLASS_STARTING: c_int = 4
 pub let POSIX_CLASS_STARTED: c_int = 5
 @[repr(C)]
-pub type pcre2_output_context { output: *mut u8 = null, output_end: *const u8 = null, output_size: c_ulong = 0, out_str: [8]u8 = [0 as u8; 8] }
+pub type pcre2_output_context { pub output: *mut u8 = null, pub output_end: *const u8 = null, pub output_size: c_ulong = 0, pub out_str: [8]u8 = [0 as u8; 8] }
 impl Copy for pcre2_output_context
 
 pub let TYPE_OPTIONS: c_int = 28
@@ -1880,7 +1880,7 @@ pub let ERR118: c_int = 218
 pub let ERR119: c_int = 219
 pub let ERR120: c_int = 220
 @[repr(C)]
-pub type eclass_op_info { code_start: *mut u8 = null, length: c_ulong = 0, op_single_type: u8 = 0, bits: class_bits_storage }
+pub type eclass_op_info { pub code_start: *mut u8 = null, pub length: c_ulong = 0, pub op_single_type: u8 = 0, pub bits: class_bits_storage }
 impl Copy for eclass_op_info
 
 pub let META_END: c_uint = 0x80000000
@@ -1984,7 +1984,7 @@ pub let PC_XDIGIT: c_int = 13
 pub let NAMED_GROUP_HASH_MASK: c_ushort = ((0x7fff as u16) as c_ushort)
 pub let NAMED_GROUP_IS_DUPNAME: c_ushort = ((0x8000 as u16) as c_ushort)
 @[repr(C)]
-pub type eclass_context { options: c_uint = 0, xoptions: c_uint = 0, errorcodeptr: *mut c_int = null, cb: *mut compile_block_8 = null, needs_bitmap: c_int = 0 }
+pub type eclass_context { pub options: c_uint = 0, pub xoptions: c_uint = 0, pub errorcodeptr: *mut c_int = null, pub cb: *mut compile_block_8 = null, pub needs_bitmap: c_int = 0 }
 impl Copy for eclass_context
 
 pub let PARSE_CLASS_UTF: c_int = 0x1
@@ -2002,11 +2002,11 @@ pub let PSKIP_ALT: c_int = 0
 pub let PSKIP_CLASS: c_int = 1
 pub let PSKIP_KET: c_int = 2
 @[repr(C)]
-pub type verbitem { len: c_uint = 0, meta: c_uint = 0, has_arg: c_int = 0 }
+pub type verbitem { pub len: c_uint = 0, pub meta: c_uint = 0, pub has_arg: c_int = 0 }
 impl Copy for verbitem
 
 @[repr(C)]
-pub type alasitem { len: c_uint = 0, meta: c_uint = 0 }
+pub type alasitem { pub len: c_uint = 0, pub meta: c_uint = 0 }
 impl Copy for alasitem
 
 pub let PSO_OPT: c_int = 0
@@ -2019,13 +2019,13 @@ pub let PSO_LIMM: c_int = 6
 pub let PSO_LIMD: c_int = 7
 pub let PSO_OPTMZ: c_int = 8
 @[repr(C)]
-pub type pso { name: *const i8 = null, length: c_ushort = 0, type_: c_ushort = 0, value: c_uint = 0 }
+pub type pso { pub name: *const i8 = null, pub length: c_ushort = 0, pub type_: c_ushort = 0, pub value: c_uint = 0 }
 impl Copy for pso
 
 pub type static_assertion_opcode_possessify = [1]c_int
 
 @[repr(C)]
-pub type nest_save { nest_depth: c_ushort = 0, reset_group: c_ushort = 0, max_group: c_ushort = 0, flags: c_ushort = 0, options: c_uint = 0, xoptions: c_uint = 0 }
+pub type nest_save { pub nest_depth: c_ushort = 0, pub reset_group: c_ushort = 0, pub max_group: c_ushort = 0, pub flags: c_ushort = 0, pub options: c_uint = 0, pub xoptions: c_uint = 0 }
 impl Copy for nest_save
 
 pub let RANGE_NO: c_int = 0
@@ -2085,11 +2085,11 @@ pub type static_assertion_coptable = [1]c_int
 pub type static_assertion_poptable = [1]c_int
 
 @[repr(C)]
-pub type stateblock { offset: c_int = 0, count: c_int = 0, data: c_int = 0 }
+pub type stateblock { pub offset: c_int = 0, pub count: c_int = 0, pub data: c_int = 0 }
 impl Copy for stateblock
 
 @[repr(C)]
-pub type RWS_anchor { next: *mut RWS_anchor = null, size: c_uint = 0, free: c_uint = 0 }
+pub type RWS_anchor { pub next: *mut RWS_anchor = null, pub size: c_uint = 0, pub free: c_uint = 0 }
 impl Copy for RWS_anchor
 
 pub let PUBLIC_DFA_MATCH_OPTIONS: c_int = 1610629375
@@ -2201,7 +2201,7 @@ pub fn GF_DATAMASK[T](a: T) -> T {
 }
 pub let SERIALIZED_DATA_MAGIC: c_uint = 0x50523253
 @[repr(C)]
-pub type case_state { to_case: c_int = 0, single_char: c_int = 0 }
+pub type case_state { pub to_case: c_int = 0, pub single_char: c_int = 0 }
 impl Copy for case_state
 
 pub let PTR_STACK_SIZE: c_int = 20
@@ -2244,13 +2244,13 @@ pub let REG_ESUBREG: c_int = 15
 pub let REG_INVARG: c_int = 16
 pub let REG_NOMATCH: c_int = 17
 @[repr(C)]
-pub type regex_t { re_pcre2_code: *mut c_void = null, re_match_data: *mut c_void = null, re_endp: *const i8 = null, re_nsub: c_ulong = 0, re_erroffset: c_ulong = 0, re_cflags: c_int = 0 }
+pub type regex_t { pub re_pcre2_code: *mut c_void = null, pub re_match_data: *mut c_void = null, pub re_endp: *const i8 = null, pub re_nsub: c_ulong = 0, pub re_erroffset: c_ulong = 0, pub re_cflags: c_int = 0 }
 impl Copy for regex_t
 
 pub type regoff_t = c_int
 
 @[repr(C)]
-pub type regmatch_t { rm_so: c_int = 0, rm_eo: c_int = 0 }
+pub type regmatch_t { pub rm_so: c_int = 0, pub rm_eo: c_int = 0 }
 impl Copy for regmatch_t
 
 pub let REG_ICASE: c_int = 0x0001
@@ -2279,7 +2279,7 @@ pub type static_assertion_OP_names = [1]c_int
 pub type static_assertion_OP_lengths_8 = [1]c_int
 
 @[repr(C)]
-pub type cmdstruct { name: *const i8 = null, value: c_int = 0 }
+pub type cmdstruct { pub name: *const i8 = null, pub value: c_int = 0 }
 impl Copy for cmdstruct
 
 pub let CMD_ENDIF: c_int = 0
@@ -2296,7 +2296,7 @@ pub let CMD_SAVE: c_int = 10
 pub let CMD_SUBJECT: c_int = 11
 pub let CMD_UNKNOWN: c_int = 12
 @[repr(C)]
-pub type convertstruct { name: *const i8 = null, option: c_uint = 0 }
+pub type convertstruct { pub name: *const i8 = null, pub option: c_uint = 0 }
 impl Copy for convertstruct
 
 pub let MOD_CTC: c_int = 0
@@ -2324,11 +2324,11 @@ pub let MOD_OPTMZ: c_int = 21
 pub let MOD_SIZ: c_int = 22
 pub let MOD_STR: c_int = 23
 @[repr(C)]
-pub type patctl { options: c_uint = 0, control: c_uint = 0, control2: c_uint = 0, jitstack: c_uint = 0, replacement: [101]u8 = [0 as u8; 101], substitute_skip: c_uint = 0, substitute_stop: c_uint = 0, jit: c_uint = 0, stackguard_test: c_uint = 0, tables_id: c_uint = 0, convert_type: c_uint = 0, convert_length: c_uint = 0, convert_glob_escape: c_uint = 0, convert_glob_separator: c_uint = 0, regerror_buffsize: c_int = 0, locale: [33]u8 = [0 as u8; 33] }
+pub type patctl { pub options: c_uint = 0, pub control: c_uint = 0, pub control2: c_uint = 0, pub jitstack: c_uint = 0, pub replacement: [101]u8 = [0 as u8; 101], pub substitute_skip: c_uint = 0, pub substitute_stop: c_uint = 0, pub jit: c_uint = 0, pub stackguard_test: c_uint = 0, pub tables_id: c_uint = 0, pub convert_type: c_uint = 0, pub convert_length: c_uint = 0, pub convert_glob_escape: c_uint = 0, pub convert_glob_separator: c_uint = 0, pub regerror_buffsize: c_int = 0, pub locale: [33]u8 = [0 as u8; 33] }
 impl Copy for patctl
 
 @[repr(C)]
-pub type datctl { options: c_uint = 0, control: c_uint = 0, control2: c_uint = 0, jitstack: c_uint = 0, replacement: [101]u8 = [0 as u8; 101], substitute_skip: c_uint = 0, substitute_stop: c_uint = 0, substitute_subject: [101]u8 = [0 as u8; 101], startend: [2]c_uint = [0 as c_uint; 2], cerror: [2]c_uint = [0 as c_uint; 2], cfail: [2]c_uint = [0 as c_uint; 2], callout_data: c_int = 0, copy_numbers: [10]c_int = [0 as c_int; 10], get_numbers: [10]c_int = [0 as c_int; 10], oveccount: c_uint = 0, offset: c_ulong = 0, copy_names: [64]u8 = [0 as u8; 64], get_names: [64]u8 = [0 as u8; 64] }
+pub type datctl { pub options: c_uint = 0, pub control: c_uint = 0, pub control2: c_uint = 0, pub jitstack: c_uint = 0, pub replacement: [101]u8 = [0 as u8; 101], pub substitute_skip: c_uint = 0, pub substitute_stop: c_uint = 0, pub substitute_subject: [101]u8 = [0 as u8; 101], pub startend: [2]c_uint = [0 as c_uint; 2], pub cerror: [2]c_uint = [0 as c_uint; 2], pub cfail: [2]c_uint = [0 as c_uint; 2], pub callout_data: c_int = 0, pub copy_numbers: [10]c_int = [0 as c_int; 10], pub get_numbers: [10]c_int = [0 as c_int; 10], pub oveccount: c_uint = 0, pub offset: c_ulong = 0, pub copy_names: [64]u8 = [0 as u8; 64], pub get_names: [64]u8 = [0 as u8; 64] }
 impl Copy for datctl
 
 pub let CTX_PAT: c_int = 0
@@ -2351,15 +2351,15 @@ pub type static_assertion_substitute_skip_mismatch = [1]c_int
 pub type static_assertion_substitute_stop_mismatch = [1]c_int
 
 @[repr(C)]
-pub type modstruct { name: *const i8 = null, which: c_ushort = 0, type_: c_ushort = 0, value: c_uint = 0, offset: c_ulong = 0 }
+pub type modstruct { pub name: *const i8 = null, pub which: c_ushort = 0, pub type_: c_ushort = 0, pub value: c_uint = 0, pub offset: c_ulong = 0 }
 impl Copy for modstruct
 
 @[repr(C)]
-pub type c1modstruct { fullname: *const i8 = null, onechar: c_uint = 0, index: c_int = 0 }
+pub type c1modstruct { pub fullname: *const i8 = null, pub onechar: c_uint = 0, pub index: c_int = 0 }
 impl Copy for c1modstruct
 
 @[repr(C)]
-pub type coptstruct { name: *const i8 = null, type_: c_uint = 0, value: c_uint = 0 }
+pub type coptstruct { pub name: *const i8 = null, pub type_: c_uint = 0, pub value: c_uint = 0 }
 impl Copy for coptstruct
 
 pub let CONF_BSR: c_int = 0

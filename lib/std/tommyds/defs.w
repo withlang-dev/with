@@ -292,7 +292,7 @@ pub type tommy_key_t = c_ulonglong
 pub type tommy_hash_t = c_ulonglong
 
 @[repr(C)]
-pub type tommy_node_struct { next: *mut tommy_node_struct = null, prev: *mut tommy_node_struct = null, data: *mut c_void = null, index: c_ulonglong = 0 }
+pub type tommy_node_struct { pub next: *mut tommy_node_struct = null, pub prev: *mut tommy_node_struct = null, pub data: *mut c_void = null, pub index: c_ulonglong = 0 }
 impl Copy for tommy_node_struct
 
 pub type tommy_node = tommy_node_struct
@@ -306,37 +306,37 @@ pub type tommy_foreach_func = unsafe extern "C" fn(*mut c_void) -> Unit
 pub type tommy_foreach_arg_func = unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit
 
 @[repr(C)]
-pub type tommy_allocator_entry_struct { next: *mut tommy_allocator_entry_struct = null }
+pub type tommy_allocator_entry_struct { pub next: *mut tommy_allocator_entry_struct = null }
 impl Copy for tommy_allocator_entry_struct
 
 pub type tommy_allocator_entry = tommy_allocator_entry_struct
 
 @[repr(C)]
-pub type tommy_allocator_struct { free_block: *mut tommy_allocator_entry_struct = null, used_segment: *mut tommy_allocator_entry_struct = null, block_size: c_ulonglong = 0, align_size: c_ulonglong = 0, count: c_ulonglong = 0 }
+pub type tommy_allocator_struct { pub free_block: *mut tommy_allocator_entry_struct = null, pub used_segment: *mut tommy_allocator_entry_struct = null, pub block_size: c_ulonglong = 0, pub align_size: c_ulonglong = 0, pub count: c_ulonglong = 0 }
 impl Copy for tommy_allocator_struct
 
 pub type tommy_allocator = tommy_allocator_struct
 
 @[repr(C)]
-pub type tommy_array_struct { bucket: [64]*mut *mut c_void = [null as *mut *mut c_void; 64], bucket_max: c_ulonglong = 0, count: c_ulonglong = 0, bucket_bit: c_uint = 0 }
+pub type tommy_array_struct { pub bucket: [64]*mut *mut c_void = [null as *mut *mut c_void; 64], pub bucket_max: c_ulonglong = 0, pub count: c_ulonglong = 0, pub bucket_bit: c_uint = 0 }
 impl Copy for tommy_array_struct
 
 pub type tommy_array = tommy_array_struct
 
 @[repr(C)]
-pub type tommy_arrayof_struct { bucket: [64]*mut c_void = [null as *mut c_void; 64], element_size: c_ulonglong = 0, bucket_max: c_ulonglong = 0, count: c_ulonglong = 0, bucket_bit: c_uint = 0 }
+pub type tommy_arrayof_struct { pub bucket: [64]*mut c_void = [null as *mut c_void; 64], pub element_size: c_ulonglong = 0, pub bucket_max: c_ulonglong = 0, pub count: c_ulonglong = 0, pub bucket_bit: c_uint = 0 }
 impl Copy for tommy_arrayof_struct
 
 pub type tommy_arrayof = tommy_arrayof_struct
 
 @[repr(C)]
-pub type tommy_arrayblk_struct { block: tommy_array_struct, count: c_ulonglong = 0 }
+pub type tommy_arrayblk_struct { pub block: tommy_array_struct, pub count: c_ulonglong = 0 }
 impl Copy for tommy_arrayblk_struct
 
 pub type tommy_arrayblk = tommy_arrayblk_struct
 
 @[repr(C)]
-pub type tommy_arrayblkof_struct { block: tommy_array_struct, element_size: c_ulonglong = 0, count: c_ulonglong = 0 }
+pub type tommy_arrayblkof_struct { pub block: tommy_array_struct, pub element_size: c_ulonglong = 0, pub count: c_ulonglong = 0 }
 impl Copy for tommy_arrayblkof_struct
 
 pub type tommy_arrayblkof = tommy_arrayblkof_struct
@@ -346,7 +346,7 @@ pub type tommy_list = *mut tommy_node_struct
 pub type tommy_tree_node = tommy_node_struct
 
 @[repr(C)]
-pub type tommy_tree_struct { root: *mut tommy_node_struct = null, cmp: unsafe extern "C" fn(*const c_void, *const c_void) -> c_int, count: c_ulonglong = 0 }
+pub type tommy_tree_struct { pub root: *mut tommy_node_struct = null, pub cmp: unsafe extern "C" fn(*const c_void, *const c_void) -> c_int, pub count: c_ulonglong = 0 }
 impl Copy for tommy_tree_struct
 
 pub type tommy_tree = tommy_tree_struct
@@ -354,19 +354,19 @@ pub type tommy_tree = tommy_tree_struct
 pub type tommy_trie_node = tommy_node_struct
 
 @[repr(C)]
-pub type tommy_trie_struct { bucket: [32]*mut tommy_node_struct = [null as *mut tommy_node_struct; 32], count: c_ulonglong = 0, node_count: c_ulonglong = 0, alloc: *mut tommy_allocator_struct = null }
+pub type tommy_trie_struct { pub bucket: [32]*mut tommy_node_struct = [null as *mut tommy_node_struct; 32], pub count: c_ulonglong = 0, pub node_count: c_ulonglong = 0, pub alloc: *mut tommy_allocator_struct = null }
 impl Copy for tommy_trie_struct
 
 pub type tommy_trie = tommy_trie_struct
 
 @[repr(C)]
-pub type tommy_trie_inplace_node_struct { next: *mut tommy_trie_inplace_node_struct = null, prev: *mut tommy_trie_inplace_node_struct = null, data: *mut c_void = null, map: [4]*mut tommy_trie_inplace_node_struct = [null as *mut tommy_trie_inplace_node_struct; 4], key: c_ulonglong = 0 }
+pub type tommy_trie_inplace_node_struct { pub next: *mut tommy_trie_inplace_node_struct = null, pub prev: *mut tommy_trie_inplace_node_struct = null, pub data: *mut c_void = null, pub map: [4]*mut tommy_trie_inplace_node_struct = [null as *mut tommy_trie_inplace_node_struct; 4], pub key: c_ulonglong = 0 }
 impl Copy for tommy_trie_inplace_node_struct
 
 pub type tommy_trie_inplace_node = tommy_trie_inplace_node_struct
 
 @[repr(C)]
-pub type tommy_trie_inplace_struct { bucket: [64]*mut tommy_trie_inplace_node_struct = [null as *mut tommy_trie_inplace_node_struct; 64], count: c_ulonglong = 0 }
+pub type tommy_trie_inplace_struct { pub bucket: [64]*mut tommy_trie_inplace_node_struct = [null as *mut tommy_trie_inplace_node_struct; 64], pub count: c_ulonglong = 0 }
 impl Copy for tommy_trie_inplace_struct
 
 pub type tommy_trie_inplace = tommy_trie_inplace_struct
@@ -374,7 +374,7 @@ pub type tommy_trie_inplace = tommy_trie_inplace_struct
 pub type tommy_hashtable_node = tommy_node_struct
 
 @[repr(C)]
-pub type tommy_hashtable_struct { bucket: *mut *mut tommy_node_struct = null, bucket_max: c_ulonglong = 0, bucket_mask: c_ulonglong = 0, count: c_ulonglong = 0 }
+pub type tommy_hashtable_struct { pub bucket: *mut *mut tommy_node_struct = null, pub bucket_max: c_ulonglong = 0, pub bucket_mask: c_ulonglong = 0, pub count: c_ulonglong = 0 }
 impl Copy for tommy_hashtable_struct
 
 pub type tommy_hashtable = tommy_hashtable_struct
@@ -382,7 +382,7 @@ pub type tommy_hashtable = tommy_hashtable_struct
 pub type tommy_hashdyn_node = tommy_node_struct
 
 @[repr(C)]
-pub type tommy_hashdyn_struct { bucket: *mut *mut tommy_node_struct = null, bucket_max: c_ulonglong = 0, bucket_mask: c_ulonglong = 0, count: c_ulonglong = 0, bucket_bit: c_uint = 0 }
+pub type tommy_hashdyn_struct { pub bucket: *mut *mut tommy_node_struct = null, pub bucket_max: c_ulonglong = 0, pub bucket_mask: c_ulonglong = 0, pub count: c_ulonglong = 0, pub bucket_bit: c_uint = 0 }
 impl Copy for tommy_hashdyn_struct
 
 pub type tommy_hashdyn = tommy_hashdyn_struct
@@ -390,53 +390,53 @@ pub type tommy_hashdyn = tommy_hashdyn_struct
 pub type tommy_hashlin_node = tommy_node_struct
 
 @[repr(C)]
-pub type tommy_hashlin_struct { bucket: [64]*mut *mut tommy_node_struct = [null as *mut *mut tommy_node_struct; 64], bucket_max: c_ulonglong = 0, bucket_mask: c_ulonglong = 0, low_max: c_ulonglong = 0, low_mask: c_ulonglong = 0, split: c_ulonglong = 0, count: c_ulonglong = 0, bucket_bit: c_uint = 0, state: c_uint = 0 }
+pub type tommy_hashlin_struct { pub bucket: [64]*mut *mut tommy_node_struct = [null as *mut *mut tommy_node_struct; 64], pub bucket_max: c_ulonglong = 0, pub bucket_mask: c_ulonglong = 0, pub low_max: c_ulonglong = 0, pub low_mask: c_ulonglong = 0, pub split: c_ulonglong = 0, pub count: c_ulonglong = 0, pub bucket_bit: c_uint = 0, pub state: c_uint = 0 }
 impl Copy for tommy_hashlin_struct
 
 pub type tommy_hashlin = tommy_hashlin_struct
 
 @[repr(C)]
-pub type object { value: c_int = 0, node: tommy_node_struct, payload: [16]c_char = [0 as c_char; 16] }
+pub type object { pub value: c_int = 0, pub node: tommy_node_struct, pub payload: [16]c_char = [0 as c_char; 16] }
 impl Copy for object
 
 @[repr(C)]
-pub type object_vector { value: c_int = 0, payload: [16]c_char = [0 as c_char; 16] }
+pub type object_vector { pub value: c_int = 0, pub payload: [16]c_char = [0 as c_char; 16] }
 impl Copy for object_vector
 
 @[repr(C)]
-pub type object_hash { value: c_int = 0, node: tommy_node_struct, payload: [16]c_char = [0 as c_char; 16] }
+pub type object_hash { pub value: c_int = 0, pub node: tommy_node_struct, pub payload: [16]c_char = [0 as c_char; 16] }
 impl Copy for object_hash
 
 @[repr(C)]
-pub type object_tree { value: c_int = 0, node: tommy_node_struct, payload: [16]c_char = [0 as c_char; 16] }
+pub type object_tree { pub value: c_int = 0, pub node: tommy_node_struct, pub payload: [16]c_char = [0 as c_char; 16] }
 impl Copy for object_tree
 
 @[repr(C)]
-pub type object_trie { value: c_int = 0, node: tommy_node_struct, payload: [16]c_char = [0 as c_char; 16] }
+pub type object_trie { pub value: c_int = 0, pub node: tommy_node_struct, pub payload: [16]c_char = [0 as c_char; 16] }
 impl Copy for object_trie
 
 @[repr(C)]
-pub type object_trie_inplace { value: c_int = 0, node: tommy_trie_inplace_node_struct, payload: [16]c_char = [0 as c_char; 16] }
+pub type object_trie_inplace { pub value: c_int = 0, pub node: tommy_trie_inplace_node_struct, pub payload: [16]c_char = [0 as c_char; 16] }
 impl Copy for object_trie_inplace
 
 @[repr(C)]
-pub type hash32_test { data: *mut i8 = null, len: c_uint = 0, hash: c_uint = 0 }
+pub type hash32_test { pub data: *mut i8 = null, pub len: c_uint = 0, pub hash: c_uint = 0 }
 impl Copy for hash32_test
 
 @[repr(C)]
-pub type strhash32_test { data: *mut i8 = null, hash: c_uint = 0 }
+pub type strhash32_test { pub data: *mut i8 = null, pub hash: c_uint = 0 }
 impl Copy for strhash32_test
 
 @[repr(C)]
-pub type hash64_test { data: *mut i8 = null, len: c_uint = 0, hash: c_ulonglong = 0 }
+pub type hash64_test { pub data: *mut i8 = null, pub len: c_uint = 0, pub hash: c_ulonglong = 0 }
 impl Copy for hash64_test
 
 @[repr(C)]
-pub type inthash32_test { value: c_uint = 0, hash: c_uint = 0 }
+pub type inthash32_test { pub value: c_uint = 0, pub hash: c_uint = 0 }
 impl Copy for inthash32_test
 
 @[repr(C)]
-pub type inthash64_test { value: c_ulonglong = 0, hash: c_ulonglong = 0 }
+pub type inthash64_test { pub value: c_ulonglong = 0, pub hash: c_ulonglong = 0 }
 impl Copy for inthash64_test
 
 pub var compare_counter: c_uint = 0
@@ -499,13 +499,13 @@ pub let TOMMY_HASHLIN_STATE_STABLE: c_int = 0
 pub let TOMMY_HASHLIN_STATE_GROW: c_int = 1
 pub let TOMMY_HASHLIN_STATE_SHRINK: c_int = 2
 @[repr(C)]
-pub type tommy_chain_struct { head: *mut tommy_node_struct = null, tail: *mut tommy_node_struct = null }
+pub type tommy_chain_struct { pub head: *mut tommy_node_struct = null, pub tail: *mut tommy_node_struct = null }
 impl Copy for tommy_chain_struct
 
 pub type tommy_chain = tommy_chain_struct
 
 @[repr(C)]
-pub type tommy_trie_tree_struct { map: [8]*mut tommy_node_struct = [null as *mut tommy_node_struct; 8] }
+pub type tommy_trie_tree_struct { pub map: [8]*mut tommy_node_struct = [null as *mut tommy_node_struct; 8] }
 impl Copy for tommy_trie_tree_struct
 
 pub type tommy_trie_tree = tommy_trie_tree_struct
