@@ -107,7 +107,9 @@ override it from syntax or representation: no LLVM-type → passing-mode
 inference, no MIR-local-lookup → name-meaning inference, no
 AST-spelling → callee inference after Sema. MIR that finds Sema's
 constraints unrealizable on a path reports the contradiction; it never
-picks a different meaning. Post-Sema invalid MIR is a compiler bug.
+picks a different meaning. Post-Sema invalid MIR is a compiler bug: its
+ICE names the body, and `--dump-mir` / `--explain-mir-origin` read the
+refused statement.
 When you fix a bug, move its answer to the owner — never add a second
 derivation. `with analyze … audit:resolution` (#1647) is the mechanical
 check; the smell test: if deleting a downstream heuristic could change
