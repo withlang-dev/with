@@ -448,6 +448,17 @@ resource Copy: moving `Texture` moves ownership of one GPU object.
 An in-place resource has explicit states — storage allocated but not live,
 live after a successful `init`, dead after destruction. Its storage begins as
 `Representation.zeroed()` unless the facade names a `preinit` operation.
+
+`T.zeroed()` is the C record whose bytes are all zero (C's `struct T x =
+{0};` and `memset(&x, 0, sizeof x)`). It is safe, and it exists exactly on
+a *zero-valid* C record — one declared by `c_import` or `@[repr(C)]` — and
+on any other record it is an error naming the field that is not zero-valid.
+Zero-validity is structural: integers, floats, `bool`, raw pointers and
+nullable function pointers are zero-valid; an enum is zero-valid when 0 is
+one of its declared discriminants; unions, arrays and records are
+zero-valid when everything inside them is. A non-null function pointer, a
+reference, a slice, a `str`, and any field a facade maps to a non-null
+With type are not.
 `Drop` is armed only when initialization establishes production; storage
 existence alone never arms foreign destruction.
 

@@ -33310,6 +33310,57 @@ impl Sema:
         if self.get_type_kind(resolved as TypeId) == TypeKind.TY_GENERIC_INST: return self.generic_inst_decl_node(resolved)
         self.type_decl_nodes_by_tid.get(resolved) ?? 0
 
+    // A record with C's layout: declared by a c_import, or `@[repr(C)]`
+    // (a migrated or hand-written mirror).
+    fn type_is_c_record(tid: i32) -> bool:
+        let resolved = self.resolve_alias(tid as TypeId) as i32
+        if self.get_type_kind(resolved as TypeId) != TypeKind.TY_STRUCT: return false
+        let decl = self.type_decl_node_of(resolved)
+        if decl == 0: return false
+        if type_decl_is_repr_c(self.ast.get_data2(decl)) != 0: return true
+        let di = self.find_decl_index(decl)
+        di >= 0 and di < self.decl_is_c_import.len() as i32 and self.decl_is_c_import[di] != 0
+
+    // §16.2b.3: `Representation.zeroed()` is the C record whose bytes are all
+    // zero. It is safe exactly when all-zero bits are a value of every
+    // field's With type; on any other record it is refused, naming the field.
+    mut fn check_zeroed_call(obj_type: i32, arg_count: i32, node: i32) -> i32:
+        if arg_count != 0:
+            self.emit_error("type.zeroed() takes no arguments", node)
+            return -1
+        let culprit = self.zero_invalid_part(obj_type, "")
+        if culprit.len() > 0:
+            self.emit_error(f"'{self.type_name(obj_type)}.zeroed()' is not available: {culprit} has no all-zero value (§16.2b.3)", node)
+            return -1
+        self.zeroed_call_nodes.insert(node)
+        self.typed_expr_types.insert(node, obj_type)
+        obj_type
+
+    // "" when all-zero bits are a value of `tid`; otherwise the part that
+    // has none, spelled from `path` (a field path inside the record).
+    // Integers, floats, bool and raw pointers are zero-valid; an enum is when
+    // it has no payload and 0 is a declared discriminant; an Option is when
+    // its None is tag 0; arrays, unions and records are when everything in
+    // them is. References, slices, str, non-null fn pointers and everything
+    // else are not.
+    mut fn zero_invalid_part(tid: i32, path: &str) -> str:
+        let resolved = self.resolve_alias(tid as TypeId) as i32
+        let tk = self.get_type_kind(resolved as TypeId)
+        let here = if path.len() == 0: f"type '{self.type_name(tid)}'" else: f"field '{path}' ({self.type_name(tid)})"
+        if tk == TypeKind.TY_INT or tk == TypeKind.TY_FLOAT or tk == TypeKind.TY_BOOL or tk == TypeKind.TY_PTR or tk == TypeKind.TY_VECTOR or tk == TypeKind.TY_VA_LIST: return ""
+        if tk == TypeKind.TY_ENUM: return if self.enum_variant_sym_for_discriminant(resolved, 0) != 0: "" else: here
+        if tk == TypeKind.TY_ARRAY: return self.zero_invalid_part(self.get_type_d0(resolved as TypeId), path ++ "[]")
+        if tk == TypeKind.TY_GENERIC_INST:
+            if self.get_generic_inst_base(resolved) == self.syms.option and self.std_option_variant_tag(self.syms.none) == 0: return ""
+            return here
+        if tk != TypeKind.TY_STRUCT: return here
+        let te_start = self.get_type_d1(resolved as TypeId)
+        for fi in 0..self.get_type_d2(resolved as TypeId):
+            let fname: str = self.pool_resolve(self.type_extra[(te_start + fi * 3)])
+            let inner = self.zero_invalid_part(self.type_extra[(te_start + fi * 3 + 1)], if path.len() == 0: fname else: path ++ "." ++ fname)
+            if inner.len() > 0: return inner
+        ""
+
     // §18.3 (D100): a field without `pub` is visible throughout its package.
     // A distinct type's `.value` is the language's unwrap, not a declared
     // field; a C type's fields are C's, which has no privacy.
@@ -33506,6 +33557,8 @@ impl Sema:
         self.type_extra[(pos + 2 + payload_index)]
 
     mut fn check_static_type_method_call(obj_type: i32, field: i32, extra_start: i32, arg_count: i32, node: i32) -> i32:
+        if field == self.syms.zeroed and self.type_is_c_record(obj_type):
+            return self.check_zeroed_call(obj_type, arg_count, node)
         let is_type_method =
             field == self.syms.fields or
             field == self.syms.variants or

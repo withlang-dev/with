@@ -8,7 +8,7 @@
 
 // D51 §16.2b.3/§16.2b.4 stage 4b: an in-place resource (a by-value C struct
 // with `init`) is rendered as ordinary With — a pinned cell holding
-// `z_stream {}` (D54), the C initializer over its address, Drop passing that
+// `z_stream.zeroed()` (D54, §16.2b.3), the C initializer over its address, Drop passing that
 // address to the facade's `drop` — and the destructor runs exactly once on
 // every path: scope exit,
 // early return, moved into a function, moved out and returned, held in a

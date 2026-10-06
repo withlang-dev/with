@@ -1540,7 +1540,8 @@ fn facade_render_init(pool: AstPool, intern: InternPool, name: &str, repr_text: 
         return ""
     let (iparams, iargs) = facade_render_params(pool, intern, init_fn, 1)
     var params = iparams
-    var storage = repr_text ++ " {}"
+    // §16.2b.3: in-place storage begins as `Representation.zeroed()`.
+    var storage = repr_text ++ ".zeroed()"
     if preinit_fn != 0:
         let (pparams, pargs) = facade_render_params(pool, intern, preinit_fn, 0)
         if pparams.len() > 0:

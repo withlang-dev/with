@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D101 — `T.zeroed()` is safe on zero-valid C records; facade in-place storage uses it](2026-10-06-D101-c-record-zeroed.md)
 - [D100 — Visibility is package-wide: `pub` leaves the package; `internal` paths stay inside](2026-10-05-D100-package-wide-visibility.md)
 - [D99 — `TotalF64` lives in `std.traits` and is imported (delegated)](2026-10-05-D99-totalf64-lives-in-std-traits.md)
 - [D98 — Delegated decisions: an agent implements its prediction and Eric vetoes afterwards](2026-10-05-D98-delegated-decisions.md)

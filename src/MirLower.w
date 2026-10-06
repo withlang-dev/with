@@ -12712,6 +12712,8 @@ impl MirBuilder:
         self.unit_operand()
 
     mut fn lower_method_call(self_expr: i32, method_sym0: i32, arg_start: i32, arg_count: i32, node: i32) -> i32:
+        // §16.2b.3: Sema decided this `T.zeroed()` is the all-zero C record.
+        if self.sema.zeroed_call_nodes.contains(node): return self.body.gen_zero_operand(self.expr_type(node))
         // D65 phase 5 (#2043): the method Sema resolved the call to when it
         // is not the one the spelling names (method_call_fields).
         let method_sym: i32 = self.sema.method_call_fields.get(node) ?? method_sym0

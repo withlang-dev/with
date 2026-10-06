@@ -318,6 +318,7 @@ type SemaBuiltinSymbols {
     align: i32,
     implements: i32,
     is_copy: i32,
+    zeroed: i32,
 }
 
 type SemaMethodLookup {
@@ -1021,6 +1022,9 @@ pub type Sema {
     // D100 (§18.3): the `pub` fields, keyed by (type declaration node, field
     // name); a field not here is private to its package (sema_field_key).
     pub_field_keys: HashSet[i64],
+    // §16.2b.3: the `T.zeroed()` calls on zero-valid C records; MIR
+    // lowers each to the all-zero value of its type.
+    zeroed_call_nodes: HashSet[i32],
     type_tid_is_std: HashMap[i32, i32],
     // #751 / #1745: the template declaration (its TY_STRUCT/TY_ENUM tid) a
     // generic instance was made from — identity, not the short name, since
@@ -2871,6 +2875,7 @@ fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
         align: 0,
         implements: 0,
         is_copy: 0,
+        zeroed: 0,
     }
 
 fn sema_method_lookup_new -> SemaMethodLookup:
@@ -3153,6 +3158,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         impl_extra_is_std: Vec.new(),
         type_decl_nodes_by_tid: HashMap.new(),
         pub_field_keys: HashSet[i64].new(),
+        zeroed_call_nodes: HashSet[i32].new(),
         type_tid_is_std: HashMap.new(),
         generic_inst_templates: HashMap.new(),
         type_sym_tier_mask: HashMap.new(),
@@ -5113,6 +5119,7 @@ impl Sema:
         self.syms.align = self.pool_intern("align")
         self.syms.implements = self.pool_intern("implements")
         self.syms.is_copy = self.pool_intern("is_copy")
+        self.syms.zeroed = self.pool_intern("zeroed")
         // Language-level traits: these affect codegen semantics (copy vs move,
         // destruction, thread safety). Always recognized regardless of prelude.
         self.lang_trait_syms.insert(self.syms.copy_trait, 1)
