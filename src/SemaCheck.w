@@ -21359,6 +21359,21 @@ impl Sema:
             pos = pos + 2 + payload_count
         -1
 
+    // The index of `variant_sym` (`Some`, `None`) in the generic `Option`
+    // declaration, or -1 when the program has none (`--no-std`). D97
+    // declares it `None | Some(T)`; codegen, which builds and tests Options
+    // knowing only their LLVM type, asks here instead of assuming an order.
+    // Option is not a repr enum: a variant's discriminant is its index.
+    pub fn std_option_variant_index(variant_sym: i32) -> i32:
+        var i = self.named_type_candidate_head(self.syms.option)
+        while i >= 0:
+            let tid = self.resolve_alias(self.named_type_candidate_tids[i] as TypeId) as i32
+            let decl = self.type_decl_nodes_by_tid.get(tid) ?? 0
+            if decl != 0 and self.type_decl_tp_count(decl) > 0 and self.get_type_kind(tid as TypeId) == TypeKind.TY_ENUM:
+                return self.enum_variant_index_for_type(tid, variant_sym)
+            i = self.named_type_candidate_next[i]
+        -1
+
     // §4.4a: the discriminant of a variant of `enum_tid`. Every i64 is a
     // discriminant (`B = -3`), so there is no "absent" value: a caller asks
     // enum_variant_index_for_type whether the variant exists (a -1 sentinel

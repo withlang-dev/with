@@ -7605,7 +7605,7 @@ impl Codegen:
     // out of the slot — a null address is never dereferenced.
     mut fn mir_option_ref_from_slot_ptr(slot_ptr: i64, opt_sema_ty: i32) -> i64:
         let opt_ty = self.mir_sema_type_to_llvm(opt_sema_ty)
-        let view_ty = self.mir_builtin_variant_payload_llvm_type(opt_sema_ty, 0)
+        let view_ty = self.mir_builtin_variant_payload_llvm_type(opt_sema_ty, self.mir_success_variant_index(opt_sema_ty))
         self.option_ref_from_slot_ptr(slot_ptr, opt_ty, view_ty)
 
     // `view_ty` is the Some payload's LLVM type (from Sema: the Option's
@@ -7892,7 +7892,7 @@ impl Codegen:
             let live_base_sym = self.sema_sym_to_codegen_sym(self.sema.get_generic_inst_base(live_resolved as i32))
             let live_arg_count = self.sema.get_generic_inst_arg_count(live_resolved as i32)
             if live_base_sym == self.sym_option:
-                if variant_idx == 0 and live_arg_count > 0:
+                if variant_idx == self.option_some_index and live_arg_count > 0:
                     return self.sema.get_generic_inst_arg(live_resolved as i32, 0)
                 return 0
             if live_base_sym == self.sym_result:
@@ -7909,7 +7909,7 @@ impl Codegen:
         let arg_count = self.mir_type_d2_at(resolved)
         let args_start = self.mir_type_d1_at(resolved)
         if base_sym == self.sym_option:
-            if variant_idx == 0 and arg_count > 0:
+            if variant_idx == self.option_some_index and arg_count > 0:
                 return self.mir_type_extra_at(args_start)
             return 0
         if base_sym == self.sym_result:
@@ -7918,6 +7918,14 @@ impl Codegen:
             if variant_idx == 1 and arg_count > 1:
                 return self.mir_type_extra_at(args_start + 1)
         0
+
+    // The variant that carries a carrier's success value: `Some` where Sema
+    // declares it in Option (D97: after `None`), `Ok` (first) otherwise.
+    fn mir_success_variant_index(sema_ty: i32) -> i32:
+        let resolved = self.sema.resolve_alias(sema_ty as TypeId)
+        if self.sema.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
+            return 0
+        if self.sema_sym_to_codegen_sym(self.sema.get_generic_inst_base(resolved as i32)) == self.sym_option: self.option_some_index else: 0
 
     mut fn mir_builtin_variant_payload_llvm_type(sema_ty: i32, variant_idx: i32) -> i64:
         let payload_sema = self.mir_builtin_variant_payload_sema_type(sema_ty, variant_idx)
@@ -10444,9 +10452,7 @@ impl Codegen:
             let recv = self.mir_intrinsic_arg(body, args_id, 0)
             let recv_tk = wl_get_type_kind(wl_type_of(recv))
             if recv_tk == wl_struct_type_kind():
-                let disc = self.option_tag_value(recv)
-                // Some = tag 0, None = tag 1. is_some → tag == 0.
-                result = wl_build_icmp(self.builder, wl_int_eq(), disc, wl_const_int(wl_type_of(disc), 0, 0))
+                result = self.option_tag_is_some(self.option_tag_value(recv))
             else if recv_tk == wl_pointer_type_kind():
                 result = wl_build_icmp(self.builder, wl_int_ne(), recv, wl_const_null(wl_type_of(recv)))
             else:
@@ -10482,7 +10488,7 @@ impl Codegen:
             if borrowed_carrier:
                 let carrier_ty = self.mir_sema_type_to_llvm(carrier_sema)
                 let carrier_tk = if carrier_ty != 0: wl_get_type_kind(carrier_ty) else: 0
-                let payload_sema = self.mir_builtin_variant_payload_sema_type(carrier_sema, 0)
+                let payload_sema = self.mir_builtin_variant_payload_sema_type(carrier_sema, self.mir_success_variant_index(carrier_sema))
                 let payload_resolved = if payload_sema > 0: self.mir_resolve_alias_at(payload_sema) else: 0
                 if carrier_tk == wl_pointer_type_kind():
                     // Option[&T] and other pointer-shaped options use null as
@@ -10570,9 +10576,9 @@ impl Codegen:
                     let dest_sema = self.mir_intrinsic_dest_sema_type(body, dest_place)
                     var payload_ty = self.mir_sema_type_to_llvm(dest_sema)
                     if payload_ty == 0:
-                        payload_ty = self.mir_builtin_variant_payload_llvm_type(recv_sema, 0)
+                        payload_ty = self.mir_builtin_variant_payload_llvm_type(recv_sema, self.mir_success_variant_index(recv_sema))
                     if payload_ty == 0:
-                        let res_ok_sema = self.mir_builtin_variant_payload_sema_type(recv_sema, 0)
+                        let res_ok_sema = self.mir_builtin_variant_payload_sema_type(recv_sema, self.mir_success_variant_index(recv_sema))
                         if res_ok_sema > 0:
                             payload_ty = self.mir_sema_type_to_llvm(res_ok_sema)
                     result = self.extract_result_payload(recv, payload_ty)
@@ -10581,7 +10587,7 @@ impl Codegen:
                     // (the Option's body does not name it, #1958).
                     var payload_ty = self.mir_sema_type_to_llvm(self.mir_intrinsic_dest_sema_type(body, dest_place))
                     if payload_ty == 0:
-                        payload_ty = self.mir_builtin_variant_payload_llvm_type(carrier_sema, 0)
+                        payload_ty = self.mir_builtin_variant_payload_llvm_type(carrier_sema, self.mir_success_variant_index(carrier_sema))
                     if payload_ty == 0:
                         sema_phase_bug(f"BUG: unwrap of Option type {recv_sema} has no payload type")
                     result = self.option_payload_value(recv, payload_ty)
@@ -11805,8 +11811,7 @@ impl Codegen:
             let tk = wl_get_type_kind(wl_type_of(recv))
             if tk == wl_struct_type_kind():
                 let disc = self.option_tag_value(recv)
-                // None = tag 1. is_none → tag != 0.
-                result = wl_build_icmp(self.builder, wl_int_ne(), disc, wl_const_int(wl_type_of(disc), 0, 0))
+                result = wl_build_icmp(self.builder, wl_int_eq(), disc, wl_const_int(wl_type_of(disc), self.option_tag(false), 0))
             else if tk == wl_pointer_type_kind():
                 result = wl_build_icmp(self.builder, wl_int_eq(), recv, wl_const_null(wl_type_of(recv)))
             else:
@@ -12629,8 +12634,8 @@ impl Codegen:
             cra.push(recv_payload_ptr)
             let recv_status = wl_build_call(self.builder, crft2, cr_fn, vec_data_i64(&cra), 2)
             if wl_get_type_kind(recv_opt_ty) == wl_struct_type_kind():
-                var recv_some_disc: i64 = 0
-                var recv_none_disc: i64 = 1
+                var recv_some_disc = self.option_tag(true)
+                var recv_none_disc = self.option_tag(false)
                 if recv_opt_sema > 0:
                     if self.sema.enum_variant_index_for_type(recv_opt_sema, self.sema.syms.some) >= 0:
                         recv_some_disc = self.sema.enum_variant_discriminant_for_type(recv_opt_sema, self.sema.syms.some)
@@ -12955,15 +12960,14 @@ impl Codegen:
             let arg_start_of = body.call_arg_starts[args_id]
             let recv_op_id = body.call_arg_operands[arg_start_of]
             let recv_sema = self.mir_operand_sema_type(body, recv_op_id)
-            payload_ty = self.mir_builtin_variant_payload_llvm_type(recv_sema, 0)
+            payload_ty = self.mir_builtin_variant_payload_llvm_type(recv_sema, self.mir_success_variant_index(recv_sema))
             if payload_ty == 0:
                 sema_phase_bug(f"BUG: Option.filter receiver type {recv_sema} has no payload type")
         let elem_ty = payload_ty
         let is_some = if recv_tk == wl_pointer_type_kind():
             wl_build_icmp(self.builder, wl_int_ne(), recv, wl_const_null(obj_ty))
         else:
-            let disc = self.option_tag_value(recv)
-            wl_build_icmp(self.builder, wl_int_eq(), disc, wl_const_int(wl_type_of(disc), 0, 0))
+            self.option_tag_is_some(self.option_tag_value(recv))
         let fn_val = self.mir_intrinsic_arg(body, args_id, 1)
         let cty = wl_type_of(fn_val)
         var fn_ptr = fn_val
@@ -13114,8 +13118,7 @@ impl Codegen:
         let opt_ty = wl_type_of(opt_val)
         if wl_get_type_kind(opt_ty) == wl_pointer_type_kind():
             return wl_build_icmp(self.builder, wl_int_ne(), opt_val, wl_const_null(opt_ty))
-        let tag = self.option_tag_value(opt_val)
-        wl_build_icmp(self.builder, wl_int_eq(), tag, wl_const_int(wl_type_of(tag), 0, 0))
+        self.option_tag_is_some(self.option_tag_value(opt_val))
 
     mut fn mir_call_fn_value(fn_val: i64, ret_ty: i64, args: &Vec[i64], arg_count: i32) -> i64:
         let ptr_ty = wl_ptr_type(self.context)

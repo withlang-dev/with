@@ -170,6 +170,10 @@ pub type Codegen {
     // guards the whole value; their own member recursion re-raises it).
     member_drop_depth: i32,
 
+    // Where `Some` and `None` sit in std's Option, as Sema declares it
+    // (D97: `None | Some(T)`); -1 without one (`--no-std`).
+    option_some_index: i32,
+    option_none_index: i32,
     // Pre-interned symbols for O(1) dispatch (avoid string comparisons)
     sym_vec: i32,
     sym_option: i32,
@@ -650,6 +654,8 @@ fn Codegen.init_with_opt_and_intern(module_name: &str, opt_level: i32, intern: I
     // Pre-intern dispatch symbols for O(1) comparisons
     cg.sym_vec = cg.intern.intern("Vec")
     cg.sym_option = cg.intern.intern("Option")
+    cg.option_some_index = cg.sema.std_option_variant_index(cg.sema.syms.some)
+    cg.option_none_index = cg.sema.std_option_variant_index(cg.sema.syms.none)
     cg.sym_result = cg.intern.intern("Result")
     cg.sym_hashmap = cg.intern.intern("HashMap")
     cg.sym_hashset = cg.intern.intern("HashSet")
@@ -1110,6 +1116,7 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         current_drop_origin_len: 0,
         current_drop_needs_guard: true,
         member_drop_depth: 0,
+        option_some_index: -1, option_none_index: -1,
         sym_vec: 0, sym_option: 0, sym_result: 0, sym_hashmap: 0,
         sym_hashset: 0, sym_btreemap: 0, sym_btreeset: 0, sym_handle: 0, sym_slotmap: 0, sym_slotmapslot: 0,
         sym_vecslot: 0, sym_vecrange: 0, sym_veciterref: 0, sym_veciterplace: 0,
@@ -7580,10 +7587,21 @@ impl Codegen:
     fn option_tag_ptr(opt_type: i64, opt_ptr: i64) -> i64:
         wl_build_struct_gep(self.builder, opt_type, opt_ptr, 0)
 
-    // The tag of an Option value: Some = 0, None = 1 (a nullable Option
-    // has no tag; callers test the pointer).
+    // The tag of an Option value (a nullable Option has no tag; callers
+    // test the pointer). Its values are option_tag(true/false).
     fn option_tag_value(opt_val: i64) -> i64:
         wl_build_extract_value(self.builder, opt_val, 0)
+
+    // The tag of `Some` (true) or `None` (false): Sema's declaration order,
+    // never an assumed one. An Option with no declared Option is a BUG.
+    fn option_tag(some: bool) -> i64:
+        let index = if some: self.option_some_index else: self.option_none_index
+        if index < 0:
+            sema_phase_bug("BUG: codegen builds or tests an Option, and the program declares no Option")
+        index as i64
+
+    // `tag == Some` over an Option's tag value.
+    fn option_tag_is_some(tag: i64) -> i64: wl_build_icmp(self.builder, wl_int_eq(), tag, wl_const_int(wl_type_of(tag), self.option_tag(true), 0))
 
     // The payload area's address, as an untyped pointer: the payload's own
     // type is loaded and stored there. An Option with no payload area
@@ -7638,7 +7656,7 @@ impl Codegen:
         let alloca = self.create_entry_alloca(opt_type)
         // Fully initialize to avoid undef/poison in padding bytes.
         wl_build_store(self.builder, self.build_default_value(opt_type), alloca)
-        wl_build_store(self.builder, wl_const_int(wl_i32_type(self.context), 0, 0), self.option_tag_ptr(opt_type, alloca))
+        wl_build_store(self.builder, wl_const_int(wl_i32_type(self.context), self.option_tag(true), 0), self.option_tag_ptr(opt_type, alloca))
         self.option_payload_store(opt_type, alloca, payload)
         wl_build_load(self.builder, opt_type, alloca)
 
@@ -7647,7 +7665,7 @@ impl Codegen:
             return wl_const_null(opt_type)
         let alloca = self.create_entry_alloca(opt_type)
         wl_build_store(self.builder, self.build_default_value(opt_type), alloca)
-        wl_build_store(self.builder, wl_const_int(wl_i32_type(self.context), 1, 0), self.option_tag_ptr(opt_type, alloca))
+        wl_build_store(self.builder, wl_const_int(wl_i32_type(self.context), self.option_tag(false), 0), self.option_tag_ptr(opt_type, alloca))
         wl_build_load(self.builder, opt_type, alloca)
 
     fn build_result_ok(val: i64, res_type: i64) -> i64:

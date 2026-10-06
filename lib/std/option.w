@@ -17,7 +17,9 @@
 /// `Option[&T] where T: Clone`. All eliminators preserve view origins until an
 /// explicit ownership boundary; do not implement these as conditional unwrap
 /// return types.
-pub enum Option[T] { Some(T) | None }
+// `None` is declared first (D97): derived Ord orders variants by declaration,
+// so nothing sorts before any value.
+pub enum Option[T] { None | Some(T) }
 
 // An Option carries no ownership beyond its payload. Copy payloads therefore
 // make the whole wrapper Copy; non-Copy payloads remain single-owner values.
