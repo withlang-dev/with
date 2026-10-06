@@ -14,6 +14,7 @@ decision supersedes an earlier one, say so in both.
 
 - [D104 — Comptime-callability is inferred (hybrid: static for `comptime fn`, evaluator for plain functions); the witness chain is the diagnostic](2026-10-07-D104-comptime-callability-inferred.md)
 - [D103 — A value converts to `Option[T]` where one is demanded: once, at the demand, never in inference](2026-10-07-D103-value-to-option.md)
+- [D102 — `extern "C" fn` is non-null; nullable C function pointers are a pointer-sized `Option`, placed by direction](2026-10-06-D102-nullable-function-pointers.md)
 - [D101 — `T.zeroed()` is safe on zero-valid C records; facade in-place storage uses it](2026-10-06-D101-c-record-zeroed.md)
 - [D100 — Visibility is package-wide: `pub` leaves the package; `internal` paths stay inside](2026-10-05-D100-package-wide-visibility.md)
 - [D99 — `TotalF64` lives in `std.traits` and is imported (delegated)](2026-10-05-D99-totalf64-lives-in-std-traits.md)

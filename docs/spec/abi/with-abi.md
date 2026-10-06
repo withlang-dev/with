@@ -94,6 +94,14 @@ tagged enums, and a lookup that finds a str slot builds `Some` from the
 view read out of the slot. Every other `Option[T]` and every
 `Result[T, E]` is an ordinary tagged enum under §2.
 
+**Guarantee (D102).** `Option[extern "C" fn(...) -> R]`,
+`Option[unsafe extern "C" fn(...) -> R]` (for every parameter and return
+type) and `Option[&T]` have exactly the size and alignment of a pointer,
+`None` is the null pointer, and `Some(p)` is `p`'s address. This is a
+guarantee of the language, not an optimization a later layout may drop: C
+records that hold a callback depend on it (spec §16.6), and changing it
+breaks every one of them.
+
 ## 4. Function calls
 
 The substrate is LLVM's C calling convention for the target. On top of it

@@ -887,6 +887,13 @@ unknown nullability is represented as nullable or otherwise restricted; it
 never silently becomes non-null. Out-resource production keeps its own
 NULL-inspect rule.
 
+A function-pointer parameter imports as the non-null type (§16.6): passing
+NULL is a capability the program does not have until the facade grants it.
+`nullable param N` states that the C contract accepts NULL there, and the
+presented parameter becomes `Option[...]` of its type (`sqlite3_exec`'s
+callback: `nullable param 2`). The clause is the facade's claim, never
+inferred from a name, and applies to any pointer-shaped parameter.
+
 #### 16.2b.9 Callbacks
 
 A value C passes into a With callback is borrowed for the callback's scope;
