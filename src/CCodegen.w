@@ -3303,6 +3303,11 @@ impl CCodegen:
                     current_tid = 0
                     continue
                 let field_name = cc_intern_resolve(self.intern, pd)
+                // A distinct type is its inner type in C (`typedef double
+                // TotalF64`): `.value` is the same object, no member.
+                if tk == TypeKind.TY_STRUCT and field_name == "value" and self.type_is_distinct(resolved as i32) != 0:
+                    current_tid = self.struct_field_tid(resolved as i32, pd)
+                    continue
                 out = out ++ "." ++ field_name
                 if tk == TypeKind.TY_STRUCT:
                     let ft_raw = self.struct_field_tid(resolved as i32, pd)
