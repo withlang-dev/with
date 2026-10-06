@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.26
+# The With Programming Language — Specification v7.27
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,14 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.27:** visibility, 2026-10-05 (D100). §18.3: a declaration
+without `pub` is visible throughout its package, and `pub` means it leaves
+the package (it was private to its file); the rule covers methods and
+fields too. A module under an `internal` path segment is importable only
+from inside its parent's tree. §18.4: a package is a directory with
+`with.toml`; a file run outside one is its own package; the standard
+library is one package. The implementation is NON-COMPLIANT until it
+catches up.
 **Changelog v7.26:** three rulings, 2026-10-05 (D97). §11.7: `std.TotalF64`
 (and `TotalF32`) is a float key: NaN equals NaN and sorts last, `-0.0` equals
 `0.0` (#2182). §11.8: derived `Ord` orders an enum's variants by

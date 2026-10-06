@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D100 — Visibility is package-wide: `pub` leaves the package; `internal` paths stay inside](2026-10-05-D100-package-wide-visibility.md)
 - [D99 — `TotalF64` lives in `std.traits` and is imported (delegated)](2026-10-05-D99-totalf64-lives-in-std-traits.md)
 - [D98 — Delegated decisions: an agent implements its prediction and Eric vetoes afterwards](2026-10-05-D98-delegated-decisions.md)
 - [D97 — `TotalF64` is a numeric float key; `None` sorts first by declaration order; a facade may state one error type](2026-10-05-D97-totalf64-none-first-one-facade-error-type.md)

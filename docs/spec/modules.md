@@ -133,13 +133,25 @@ for item in rx:          // drains remaining items
 
 ### 18.3 Visibility
 
-`pub` exports names. No `pub` = module-private. Cross-module access
-to a non-`pub` symbol is a compile error; this applies uniformly to
-functions, types, constants, and globals.
+A declaration without `pub` is visible throughout its package (§18.4):
+every module of the package may name it, and nothing outside the package
+can. `pub` means one thing: the declaration leaves the package. Access from
+another package to a declaration that is not `pub` is a compile error. The
+rule is the same for functions, methods, types, fields, constants, and
+globals; there is no per-file or per-type privacy.
+
+A module whose path has a segment named `internal` can be imported only by
+modules inside the tree rooted at that segment's parent. `std/internal/zl`
+is importable from anywhere in `std` and from nowhere else, whatever its
+declarations say.
 
 ### 18.4 Packages
 
-Directory with `with.toml`. Single-file programs need no manifest.
+A package is a directory with `with.toml` and the modules beneath it. A
+file run outside any `with.toml` is its own package, together with the
+modules it imports from its own directory tree; a single-file program needs
+no manifest. The standard library is one package. Test files inside a
+package are part of it and see every declaration it has.
 Dependencies hash-pinned in lockfile.
 
 *§18.5 Toolchain moved to `docs/spec/toolchain/toolchain.md`.*
