@@ -261,8 +261,7 @@ impl CString:
         unsafe { (self as *const CString as *const CStr) as &CStr }
 
     /// Byte length of the owned C string, excluding the terminator.
-    pub fn len() -> i64:
-        self.len
+    pub fn len(): self.len
 
 /// Compare two strings for equality. Returns true if equal.
 pub fn string_eq(a: &str, b: &str) -> bool:

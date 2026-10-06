@@ -99,7 +99,7 @@ fn interface_name_token(line: &str, start: i64) -> str:
     frontend_owned_text(line.slice(start, end))
 
 fn frontend_new_vec_str -> Vec[str]:
-    let out: Vec[str] = Vec{ ptr: 0, len: 0, cap: 0, elem_size: 16 }
+    let out: Vec[str] = Vec.new()
     out
 
 fn frontend_normalize_source_text(text: &str) -> str:

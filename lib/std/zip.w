@@ -16,8 +16,8 @@ const ZIP_CHUNK: i32 = 65536
 const ZIP_HOST_UNIX: i64 = 3
 
 pub type ZipError {
-    code: i32,
-    message: str,
+    pub code: i32,
+    pub message: str,
 }
 
 fn zip_error(code: i32, message: str): ZipError { code: code, message: message }

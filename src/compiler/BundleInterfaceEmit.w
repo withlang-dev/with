@@ -1072,6 +1072,10 @@ impl BundleEmitter:
                     fields = fields ++ ", "
                 if f_align > 0:
                     fields = fields ++ f"@[align({f_align})] "
+                // D100 (§18.3): an exported field stays exported to the
+                // bundle's consumers.
+                if sema.pub_field_keys.contains(sema_field_key(node, sema.type_extra[(te_start + fi * 3)])):
+                    fields = fields ++ "pub "
                 fields = fields ++ f_name ++ ": " ++ f_spelling
                 if f_default_text.len() > 0:
                     fields = fields ++ " = " ++ f_default_text

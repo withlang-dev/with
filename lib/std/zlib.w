@@ -12,8 +12,8 @@ const ZLIB_DEFAULT_MAX_OUTPUT: i64 = 64 * 1024 * 1024
 const ZLIB_MAX_CHUNK = (0 as c_uint) -% 1
 
 pub type ZlibError {
-    code: i32,
-    message: str,
+    pub code: i32,
+    pub message: str,
 }
 
 fn zlib_error(code: i32, message: str) -> ZlibError:

@@ -773,6 +773,14 @@ impl Sema:
             if not self.decl_index_by_node.contains(node):
                 self.decl_index_by_node.insert(node, di)
 
+    // D100 (§18.3): a `pub` field's alignment slot carries
+    // FIELD_PUB_ALIGN_FLAG; Sema keeps the `pub` ones by (declaration, field
+    // name).
+    mut fn record_pub_fields(node: i32, extra_start: i32, field_count: i32, field_names: &Vec[i32]):
+        let align_base = extra_start + 1 + field_count * 3
+        for fi in 0..field_count:
+            if field_slot_is_pub(self.ast.get_extra(align_base + fi)): self.pub_field_keys.insert(sema_field_key(node, field_names[fi]))
+
     fn find_decl_index(node: i32) -> i32:
         if self.decl_index_by_node.contains(node):
             return self.decl_index_by_node.get(node).unwrap()
@@ -1094,10 +1102,11 @@ impl Sema:
             // Alignment array: stored after field triples in AST
             let align_base = extra_start + 1 + field_count * 3
             for fi in 0..field_count:
-                self.type_extra.push(self.ast.get_extra(align_base + fi))
+                self.type_extra.push(field_align_value(self.ast.get_extra(align_base + fi)))
             let tid = self.add_type(TypeKind.TY_STRUCT, name, te_start, field_count)
             self.record_named_type_with_pub(name, tid as i32, decl_is_pub, node)
             self.record_type_decl_tid(node, tid as i32)
+            self.record_pub_fields(node, extra_start, field_count, &field_names)
             if type_decl_is_bitpacked(packed_kind) != 0:
                 self.bitpacked_types.insert(tid as i32, 1)
             if type_decl_is_packed(packed_kind) != 0:
@@ -1114,7 +1123,7 @@ impl Sema:
                 self.repr_c_types.insert(tid as i32, 1)
             // §16.4 @[align(N)] validation: power of two, ≤ 65536, ≥ natural.
             for fi in 0..field_count:
-                let f_align = self.ast.get_extra(align_base + fi)
+                let f_align = field_align_value(self.ast.get_extra(align_base + fi))
                 if f_align != 0:
                     let f_loc_node = self.ast.get_extra(extra_start + 1 + fi * 3 + 1)
                     if f_align < 0 or (f_align & (f_align - 1)) != 0:
@@ -1352,10 +1361,11 @@ impl Sema:
             // Alignment array for unions
             let align_base = extra_start + 1 + field_count * 3
             for fi in 0..field_count:
-                self.type_extra.push(self.ast.get_extra(align_base + fi))
+                self.type_extra.push(field_align_value(self.ast.get_extra(align_base + fi)))
             let tid = self.add_type(TypeKind.TY_STRUCT, name, te_start, field_count)
             self.record_named_type_with_pub(name, tid as i32, decl_is_pub, node)
             self.record_type_decl_tid(node, tid as i32)
+            self.record_pub_fields(node, extra_start, field_count, &field_names)
 
         if self.ast.is_must_use_type_node(node) != 0:
             self.must_use_types.insert(name, 1)

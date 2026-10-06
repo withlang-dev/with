@@ -88,6 +88,9 @@ fn render_decl(pool: AstPool, intern: InternPool, node: NodeId, indent: i32) -> 
                 let field_type = pool.get_extra(ep + 1)
                 let field_default = pool.get_extra(ep + 2)
                 ep = ep + 3
+                // D100: a `pub` field's alignment slot carries FIELD_PUB_ALIGN_FLAG.
+                if field_slot_is_pub(pool.get_extra(extra_start + 1 + field_count * 3 + fi)):
+                    out.push_str("pub ")
                 out.push_str(field_name ++ ": " ++ render_type_expr(pool, intern, (field_type) as NodeId))
                 if field_default != 0:
                     out.push_str(" = " ++ render_expr(pool, intern, (field_default) as NodeId, 0))

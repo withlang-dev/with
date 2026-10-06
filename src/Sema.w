@@ -1018,6 +1018,9 @@ pub type Sema {
     // All queries stay on the flat path unless the mask reads 3 (shadowed).
     impl_extra_is_std: Vec[i32],
     type_decl_nodes_by_tid: HashMap[i32, i32],
+    // D100 (§18.3): the `pub` fields, keyed by (type declaration node, field
+    // name); a field not here is private to its package (sema_field_key).
+    pub_field_keys: HashSet[i64],
     type_tid_is_std: HashMap[i32, i32],
     // #751 / #1745: the template declaration (its TY_STRUCT/TY_ENUM tid) a
     // generic instance was made from — identity, not the short name, since
@@ -2567,7 +2570,7 @@ pub fn sema_new_map_i64_i32 -> HashMap[i64, i32]:
     HashMap.new()
 
 pub fn sema_new_vec_str -> Vec[str]:
-    let out: Vec[str] = Vec{ ptr: 0, len: 0, cap: 0, elem_size: 16 }
+    let out: Vec[str] = Vec.new()
     out
 
 pub fn sema_new_vec_i32 -> Vec[i32]:
@@ -3149,6 +3152,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         impl_extra: Vec.new(),
         impl_extra_is_std: Vec.new(),
         type_decl_nodes_by_tid: HashMap.new(),
+        pub_field_keys: HashSet[i64].new(),
         type_tid_is_std: HashMap.new(),
         generic_inst_templates: HashMap.new(),
         type_sym_tier_mask: HashMap.new(),
@@ -7993,7 +7997,7 @@ impl Sema:
         let extra_start = self.ast.get_data1(decl)
         let field_count = self.ast.get_extra(extra_start)
         for fi in 0..field_count:
-            if self.ast.get_extra(extra_start + 1 + field_count * 3 + fi) != 0:
+            if field_align_value(self.ast.get_extra(extra_start + 1 + field_count * 3 + fi)) != 0:
                 return 0
             if self.type_node_zero_is_sentinel(self.ast.get_extra(extra_start + 1 + fi * 3 + 1), decl) != 0:
                 return 0
@@ -10411,3 +10415,5 @@ impl Sema:
             if self.interface_global_alt_binds[ai] == idx:
                 return " (a bundle interface global)"
         " (bound earlier in this scope)"
+
+pub fn sema_field_key(decl_node: i32, field: i32) -> i64: (decl_node as i64) * 4294967296 + field as i64

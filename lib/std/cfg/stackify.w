@@ -42,69 +42,69 @@ enum StackifyProcessKind: i32:
     DoSelect = 8
 
 pub type StackifyTarget {
-    block: i32,
-    args_start: i32,
-    args_count: i32,
+    pub block: i32,
+    pub args_start: i32,
+    pub args_count: i32,
 }
 impl Copy for StackifyTarget
 
 pub type StackifyBlock {
-    desc: str,
-    params_start: i32,
-    params_count: i32,
-    succs_start: i32,
-    succs_count: i32,
-    term_kind: i32,
-    cond_value: i32,
-    selector_value: i32,
-    targets_start: i32,
-    targets_count: i32,
-    default_target: i32,
-    return_values_start: i32,
-    return_values_count: i32,
+    pub desc: str,
+    pub params_start: i32,
+    pub params_count: i32,
+    pub succs_start: i32,
+    pub succs_count: i32,
+    pub term_kind: i32,
+    pub cond_value: i32,
+    pub selector_value: i32,
+    pub targets_start: i32,
+    pub targets_count: i32,
+    pub default_target: i32,
+    pub return_values_start: i32,
+    pub return_values_count: i32,
 }
 
 pub type StackifyGraph {
-    entry: i32,
-    blocks: Vec[StackifyBlock],
-    block_params: Vec[i32],
-    succs: Vec[i32],
-    targets: Vec[StackifyTarget],
-    target_args: Vec[i32],
-    return_values: Vec[i32],
+    pub entry: i32,
+    pub blocks: Vec[StackifyBlock],
+    pub block_params: Vec[i32],
+    pub succs: Vec[i32],
+    pub targets: Vec[StackifyTarget],
+    pub target_args: Vec[i32],
+    pub return_values: Vec[i32],
 }
 
 pub type StackifyNode {
-    kind: i32,
-    block: i32,
-    label: i32,
-    value: i32,
-    first_child_start: i32,
-    first_child_count: i32,
-    second_child_start: i32,
-    second_child_count: i32,
-    values_start: i32,
-    values_count: i32,
-    labels_start: i32,
-    labels_count: i32,
-    default_label: i32,
-    to_values_start: i32,
-    to_values_count: i32,
+    pub kind: i32,
+    pub block: i32,
+    pub label: i32,
+    pub value: i32,
+    pub first_child_start: i32,
+    pub first_child_count: i32,
+    pub second_child_start: i32,
+    pub second_child_count: i32,
+    pub values_start: i32,
+    pub values_count: i32,
+    pub labels_start: i32,
+    pub labels_count: i32,
+    pub default_label: i32,
+    pub to_values_start: i32,
+    pub to_values_count: i32,
 }
 
 pub type StackifyTree {
-    roots_start: i32,
-    roots_count: i32,
-    nodes: Vec[StackifyNode],
-    children: Vec[i32],
-    values: Vec[i32],
-    labels: Vec[i32],
+    pub roots_start: i32,
+    pub roots_count: i32,
+    pub nodes: Vec[StackifyNode],
+    pub children: Vec[i32],
+    pub values: Vec[i32],
+    pub labels: Vec[i32],
 }
 
 pub type StackifyResult {
-    ok: bool,
-    message: str,
-    tree: StackifyTree,
+    pub ok: bool,
+    pub message: str,
+    pub tree: StackifyTree,
 }
 
 type StackifyPreds {

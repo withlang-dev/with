@@ -14,7 +14,7 @@ extern fn with_str_clone_ref(s: &str) -> str
 extern fn str_from_byte(b: i32) -> str
 
 fn ct_new_vec_str -> Vec[str]:
-    let out: Vec[str] = Vec{ ptr: 0, len: 0, cap: 0, elem_size: 16 }
+    let out: Vec[str] = Vec.new()
     out
 
 impl Sema:

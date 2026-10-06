@@ -422,6 +422,13 @@ impl[T] Iterable[T] for Vec[T]:
 
 /// Each element with its index (§13.5): `for (i, x) in xs.enumerate():`.
 impl[T] Vec[T]:
+    // D100 (§18.3): Vec's fields are private to std. The buffer's address,
+    // for a C call or a runtime helper; reading through it is `unsafe`.
+    pub fn as_ptr() -> *const T: self.ptr
+    pub fn as_mut_ptr() -> *mut T: self.ptr as *mut T
+    // How many elements the buffer holds before it grows.
+    pub fn capacity() -> i64: self.cap
+
     // The result type is the body's: over elements that own something
     // `iter()` yields views (#2145), so the pairs hold `&T`.
     fn enumerate(): self.iter() |> enumerate()

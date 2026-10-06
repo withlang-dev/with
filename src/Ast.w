@@ -349,6 +349,12 @@ pub const FACADE_PROFILE_AMBIGUOUS: i32 = 1   // several candidates; nothing con
 pub const FACADE_PROFILE_SHADOWED: i32 = 2    // an explicit clause states the fact; the profile's is not (ruling §7.2)
 pub const FACADE_PROFILE_NONE: i32 = 3        // no candidate
 pub const TDK_FLAG_REPR_C: i32 = 256
+// D100 (§18.3): a struct field's alignment slot carries this bit when the
+// field is `pub` (alignments are 0 or a power of two up to 65536). Sema
+// strips it when it copies the alignments (field_align_value).
+pub const FIELD_PUB_ALIGN_FLAG: i32 = 1048576
+pub fn field_align_value(slot: i32) -> i32: slot % FIELD_PUB_ALIGN_FLAG
+pub fn field_slot_is_pub(slot: i32) -> bool: slot >= FIELD_PUB_ALIGN_FLAG
 // @[flags] on a discriminant enum (§4.4a): auto-increment doubles.
 pub const TDK_FLAG_FLAGS: i32 = 512
 

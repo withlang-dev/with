@@ -35,9 +35,9 @@ pub type Match {
 // #747: str field — owned, non-Copy now; moves/clones spell intent.
 
 pub type RegexError {
-    code: i32,
-    offset: i32,
-    message: str,
+    pub code: i32,
+    pub offset: i32,
+    pub message: str,
 }
 
 pub type RegexFlags {

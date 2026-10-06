@@ -18489,6 +18489,7 @@ impl Sema:
                 self.emit_error("unknown field '" ++ self.pool_resolve(field) ++ "' for type '" ++ self.type_name(field_base as i32) ++ "'", node)
             self.note_view_field_projection(node, obj_type as i32, field_ty)
             self.note_field_access_decl(node, field_base as i32, field)
+            self.check_field_visible(field_base as i32, field, node)
             return field_ty
 
         if ftk == TypeKind.TY_GENERIC_INST:
@@ -18501,6 +18502,7 @@ impl Sema:
                 self.emit_error("unknown field '" ++ self.pool_resolve(field) ++ "' for type '" ++ self.type_name(field_base as i32) ++ "'", node)
             self.note_view_field_projection(node, obj_type as i32, field_ty2)
             self.note_field_access_decl(node, field_base as i32, field)
+            self.check_field_visible(field_base as i32, field, node)
             return field_ty2
 
         if ftk == TypeKind.TY_TUPLE:
@@ -19450,6 +19452,11 @@ impl Sema:
             return 0
         if self.reject_facade_type_construction_if_needed(tid as i32, node):
             return 0
+        if tid != 0:
+            // D100 (§18.3): naming a field in a literal reaches it.
+            for lfi in 0..field_count:
+                let lit_field = self.ast.get_extra(extra_start + lfi * 2)
+                if lit_field != 0: self.check_field_visible(tid as i32, lit_field, node)
         if tid != 0:
             let resolved = self.resolve_alias(tid as TypeId)
             if self.get_type_kind(resolved) == TypeKind.TY_STRUCT:
@@ -33262,6 +33269,31 @@ impl Sema:
     fn field_access_type_in_body(instance_sym: i32, node: i32): self.field_access_types.get(sema_pair_key(instance_sym, node)) ?? 0
 
     fn field_access_owner_in_body(instance_sym: i32, node: i32): self.field_access_owners.get(sema_pair_key(instance_sym, node)) ?? 0
+
+    // The declaration node of a struct type or a generic instance's
+    // template, or 0.
+    fn type_decl_node_of(tid: i32) -> i32:
+        let resolved = self.resolve_alias(tid as TypeId) as i32
+        if self.get_type_kind(resolved as TypeId) == TypeKind.TY_GENERIC_INST: return self.generic_inst_decl_node(resolved)
+        self.type_decl_nodes_by_tid.get(resolved) ?? 0
+
+    // §18.3 (D100): a field without `pub` is visible throughout its package.
+    // A distinct type's `.value` is the language's unwrap, not a declared
+    // field; a C type's fields are C's, which has no privacy.
+    mut fn check_field_visible(owner: i32, field: i32, node: i32):
+        let decl = self.type_decl_node_of(owner)
+        if decl == 0 or self.pub_field_keys.contains(sema_field_key(decl, field)): return
+        let resolved = self.resolve_alias(owner as TypeId) as i32
+        if self.get_type_kind(resolved as TypeId) == TypeKind.TY_STRUCT and self.distinct_type_names.contains(self.get_type_d0(resolved as TypeId)): return
+        let di = self.find_decl_index(decl)
+        if di < 0 or di >= self.decl_source_paths.len() as i32: return
+        if di < self.decl_is_c_import.len() as i32 and self.decl_is_c_import[di] != 0: return
+        let path = self.decl_source_paths[di].clone()
+        if self.package_of(path) == self.package_of(self.current_module_path): return
+        if self.suppress_errors != 0: return
+        let type_name: str = self.type_name(owner)
+        let field_name: str = self.pool_resolve(field)
+        self.emit_error_with_help(f"field '{type_name}.{field_name}' is private to its package (declared in '{path}', §18.3)", node, "mark the field `pub` to export it from its package")
 
     mut fn note_field_access_decl(node: i32, owner: i32, field: i32):
         let index = self.struct_field_decl_index(owner, field)

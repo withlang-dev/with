@@ -25,6 +25,7 @@
 // lowering, rather than escaping through verbatim raw-string nodes.
 
 extern fn with_eprint(s: &str) -> Unit
+extern fn with_vec_free(v: *mut u8) -> Unit
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_alloc(size: i64) -> *mut u8
 extern fn with_free(ptr: *mut u8) -> Unit
@@ -39,13 +40,9 @@ pub fn ci_ir_owned_text(text: &str) -> str:
         return ""
     with_str_clone_ref(text)
 
-fn ci_ir_free_vec_i32(v: &Vec[i32]):
-    if v.cap > 0 and v.ptr as i64 != 0:
-        with_free(v.ptr as *mut u8)
+fn ci_ir_free_vec_i32(v: &Vec[i32]): with_vec_free(v as *const Vec[i32] as *mut u8)
 
-fn ci_ir_free_vec_str(v: &Vec[str]):
-    if v.cap > 0 and v.ptr as i64 != 0:
-        with_free(v.ptr as *mut u8)
+fn ci_ir_free_vec_str(v: &Vec[str]): with_vec_free(v as *const Vec[str] as *mut u8)
 
 // ── CiType ────────────────────────────────────────────────────
 

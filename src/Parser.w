@@ -2227,6 +2227,10 @@ impl Parser:
                 else:
                     self.pos = saved
 
+            var field_pub = 0
+            if self.peek() == TokenKind.TK_KW_PUB:
+                field_pub = 1
+                self.advance()
             let field_name = self.expect_ident()
             if field_name == 0:
                 break
@@ -2237,7 +2241,7 @@ impl Parser:
             fields.push(field_name)
             fields.push(field_type as i32)
             fields.push(field_default as i32)
-            aligns.push(field_align)
+            aligns.push(field_align + field_pub * FIELD_PUB_ALIGN_FLAG)
             field_count = field_count + 1
 
             self.skip_newlines()
@@ -2291,6 +2295,10 @@ impl Parser:
                         self.pos = saved
                 else:
                     self.pos = saved
+            var field_pub = 0
+            if self.peek() == TokenKind.TK_KW_PUB:
+                field_pub = 1
+                self.advance()
             if self.peek() != TokenKind.TK_IDENT:
                 break
             let field_name = self.expect_ident()
@@ -2301,7 +2309,7 @@ impl Parser:
             fields.push(field_name)
             fields.push(field_type as i32)
             fields.push(field_default as i32)
-            aligns.push(field_align)
+            aligns.push(field_align + field_pub * FIELD_PUB_ALIGN_FLAG)
             field_count = field_count + 1
 
             self.skip_newlines()

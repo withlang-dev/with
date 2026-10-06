@@ -20,6 +20,7 @@ use MirLower
 use SemaTypes
 
 extern fn with_str_clone_ref(s: &str) -> str
+extern fn with_vec_get_ptr(v: *mut u8, idx: i64) -> *mut u8
 extern fn with_fs_read_file(path: &str) -> str
 extern fn with_i64_to_str(n: i64) -> str
 extern fn str_from_byte(b: i32) -> str
@@ -476,12 +477,11 @@ impl CCodegen:
     // `self`; nothing mutates `mir_mod` during emission, so a raw element
     // handle is sound (same shape as Codegen.mir_body_at). The raw pointer
     // must be copied into a local first: deriving the reference straight
-    // from `self.mir_mod.bodies.ptr` still reads a self-rooted place and
+    // from the bodies' buffer still reads a self-rooted place and
     // the view checker pins `self` through it.
     fn mir_body_at(i: i64) -> &MirBody:
         assert(i >= 0 and i < self.mir_mod.bodies.len())
-        let base = self.mir_mod.bodies.ptr
-        unsafe { (base + (i as usize)) as &MirBody }
+        unsafe { with_vec_get_ptr(&raw const self.mir_mod.bodies as *mut u8, i) as &MirBody }
 
 fn cc_is_ident_start(ch: i32) -> i32:
     if ch == 95:

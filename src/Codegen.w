@@ -27,6 +27,7 @@ use SemaTypes
 use std.collections.HashMap
 
 extern fn exit(code: i32) -> Unit
+extern fn with_vec_get_ptr(v: *mut u8, idx: i64) -> *mut u8
 extern fn with_fs_read_file(path: &str) -> str
 extern fn with_vec_free(v: *mut u8) -> Unit
 extern fn with_hashmap_free(map: *mut u8) -> Unit
@@ -1842,7 +1843,7 @@ impl Codegen:
         let mir = self.mir_ptr as *const MirModule
         let body_count = unsafe { (*mir).bodies.len() }
         assert(i >= 0 and i < body_count)
-        unsafe { ((*mir).bodies.ptr + (i as usize)) as &MirBody }
+        unsafe { with_vec_get_ptr(&raw const (*mir).bodies as *mut u8, i) as &MirBody }
     fn mir_fn_syms_len() -> i64: unsafe { (*(self.mir_ptr as *const MirModule)).body_fn_syms.len() }
     fn mir_fn_sym_at(i: i64) -> i32: unsafe { (*(self.mir_ptr as *const MirModule)).body_fn_syms[i] }
     fn mir_find_body_idx(sym: i32) -> i32: unsafe { (*(self.mir_ptr as *const MirModule)).find_body(sym) }

@@ -29,7 +29,7 @@ fn resolve_owned_text(text: &str) -> str:
     runtime_str_clone(text)
 
 fn resolve_new_vec_str -> Vec[str]:
-    let out: Vec[str] = Vec{ ptr: 0, len: 0, cap: 0, elem_size: 16 }
+    let out: Vec[str] = Vec.new()
     out
 
 enum ImportKind: i32:
