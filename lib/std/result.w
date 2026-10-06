@@ -19,8 +19,8 @@ pub error BuilderError =
 
 /// An error with a message and an underlying source error.
 pub type ContextError[E]  {
-    message: str
-    source: E
+    pub message: str
+    pub source: E
 }
 
 impl[E: Error] Error for ContextError[E]:

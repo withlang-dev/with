@@ -7,7 +7,7 @@ pub type TraceId: Copy {
 }
 
 pub type CancellationToken: Copy {
-    cancelled: bool,
+    pub cancelled: bool,
 }
 
 pub trait Logger:

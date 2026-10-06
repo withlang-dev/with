@@ -11,10 +11,10 @@ extern fn with_fs_write_file(path: &str, data: &str) -> i32
 pub type HttpUrl { host: str, path: str, port: i32 }
 
 pub type HttpResponse {
-    status: i32,
-    headers: str,
-    body: str,
-    location: str,
+    pub status: i32,
+    pub headers: str,
+    pub body: str,
+    pub location: str,
 }
 
 fn http_empty_response(status: i32) -> HttpResponse:

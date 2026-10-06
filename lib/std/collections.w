@@ -705,13 +705,13 @@ impl[I, T] Iter[T] for StepByIter[I, T]:
 /// Index specification for multi-dimensional indexing.
 /// Used by the MultiIndex trait. kind: 0=scalar, 1=slice, 2=ellipsis, 3=newaxis.
 pub type IndexSpec {
-    kind: i32,
-    start: i64,
-    stop: i64,
-    step: i64,
-    has_start: bool,
-    has_stop: bool,
-    has_step: bool,
+    pub kind: i32,
+    pub start: i64,
+    pub stop: i64,
+    pub step: i64,
+    pub has_start: bool,
+    pub has_stop: bool,
+    pub has_step: bool,
 }
 
 // §13.3 (#1746): `it.collect[Vec]()` on any Iter[T] implementor, the one

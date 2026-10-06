@@ -25,7 +25,7 @@
 // lowering, rather than escaping through verbatim raw-string nodes.
 
 extern fn with_eprint(s: &str) -> Unit
-extern fn with_vec_free(v: *mut u8) -> Unit
+extern fn with_vec_free(v: *mut u8)
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_alloc(size: i64) -> *mut u8
 extern fn with_free(ptr: *mut u8) -> Unit
