@@ -1,4 +1,4 @@
-//! expect-check-fail: fn 'db_name': nullable param 1: *const i8 s; nullability is rendered for the callback of a 'callback param N userdata param M' pairing
+//! expect-check-fail: fn 'db_name': nullable param 1: *const i8 s; nullability is rendered for a function-pointer parameter (§16.6) and for the callback of a 'callback param N userdata param M' pairing
 
 // D51 stage 12b (#1618; ruling §43, spec §16.2b.8): `nullable param N` is
 // rendered for one shape — the callback of a userdata pairing, whose

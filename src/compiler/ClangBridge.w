@@ -103,6 +103,7 @@ extern fn clang_getCursorSpelling(cursor: CXCursor) -> CXString
 extern fn clang_getCursorType(cursor: CXCursor) -> CXType
 extern fn clang_getCursorLocation(cursor: CXCursor) -> CXSourceLocation
 extern fn clang_Location_isFromMainFile(location: CXSourceLocation) -> i32
+extern fn clang_Location_isInSystemHeader(location: CXSourceLocation) -> i32
 extern fn clang_getCursorLinkage(cursor: CXCursor) -> i32
 extern fn clang_Cursor_getStorageClass(cursor: CXCursor) -> i32
 extern fn clang_Cursor_getVarDeclInitializer(cursor: CXCursor) -> CXCursor
@@ -2737,7 +2738,11 @@ pub fn with_cimport_fn_param_type_translated(session: i64, idx: i32, param: i32)
         // definition is C itself: its parameter is where C's callers hand it
         // one, NULL included (`pcre2_set_callout(ctx, NULL, NULL)`), so it
         // keeps C's nullability.
-        if (*s).migration != 0: result = option_wrapped(s, ty, result)
+        // A system header's prototype (libc's qsort) is not migrated: its
+        // With counterpart keeps the non-null parameter. A function the
+        // project declares is migrated somewhere in the corpus, so every unit
+        // sees the same `Option` parameter, defined here or not.
+        if (*s).migration != 0 and clang_Location_isInSystemHeader(clang_getCursorLocation(cursor)) == 0: result = option_wrapped(s, ty, result)
         if result as i64 == 0: return ""
         session_make_str(s, result as *const u8)
 

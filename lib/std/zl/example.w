@@ -940,5 +940,5 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
 var hello: [14]c_char = [104, 101, 108, 108, 111, 44, 32, 104, 101, 108, 108, 111, 33, 0]
 let dictionary: [6]c_char = [104, 101, 108, 108, 111, 0]
 var dictId: c_ulong = 0
-var zalloc: Option[unsafe extern "C" fn(*mut c_void, c_uint, c_uint) -> *mut c_void] = (0 as unsafe extern "C" fn(*mut c_void, c_uint, c_uint) -> *mut c_void)
-var zfree: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit] = (0 as unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit)
+var zalloc: Option[unsafe extern "C" fn(*mut c_void, c_uint, c_uint) -> *mut c_void] = null
+var zfree: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit] = null

@@ -1,11 +1,13 @@
-//! expect-check-fail: 'stream.zeroed()' is not available: field 'notify' (
+//! expect-check-fail: 'Stream.zeroed()' is not available: field 'notify' (
 
-// §16.2b.3: `zeroed()` is safe only when all-zero bits are a value of every
-// field's With type. A C function-pointer field imports as a non-null
-// `extern "C" fn`, which has no all-zero value, so the record has no
+// §16.2b.3 (D101): `zeroed()` is safe only when all-zero bits are a value of
+// every field's With type. A non-null `extern "C" fn` has no all-zero value
+// (D102: a C import's function-pointer field is `Option`, which does; this
+// hand-written C mirror keeps the non-null type), so the record has no
 // `zeroed()`; the refusal names the field.
-use c_import("struct stream { int state; void (*notify)(int); };")
+@[repr(C)]
+type Stream { state: i32, notify: extern "C" fn(i32) -> Unit }
 
 fn main:
-    let s = stream.zeroed()
+    let s = Stream.zeroed()
     print(s.state)

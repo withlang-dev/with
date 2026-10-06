@@ -613,7 +613,7 @@ pub fn test_list() writes SEED, compare_counter {
 
     unsafe { start(c"C qsort random".ptr) }
 
-    qsort((__local_VECTOR as *mut c_void), (1000000 as c_ulong), (sizeof[object_vector]() as c_ulong), Some(compare_vector))
+    qsort((__local_VECTOR as *mut c_void), (1000000 as c_ulong), (sizeof[object_vector]() as c_ulong), compare_vector)
 
     stop()
 
@@ -652,7 +652,7 @@ pub fn test_list() writes SEED, compare_counter {
 
     unsafe { start(c"C qsort partially ordered".ptr) }
 
-    qsort((__local_VECTOR as *mut c_void), (1000000 as c_ulong), (sizeof[object_vector]() as c_ulong), Some(compare_vector))
+    qsort((__local_VECTOR as *mut c_void), (1000000 as c_ulong), (sizeof[object_vector]() as c_ulong), compare_vector)
 
     stop()
 
@@ -684,7 +684,7 @@ pub fn test_list() writes SEED, compare_counter {
 
     unsafe { start(c"C qsort forward".ptr) }
 
-    qsort((__local_VECTOR as *mut c_void), (1000000 as c_ulong), (sizeof[object_vector]() as c_ulong), Some(compare_vector))
+    qsort((__local_VECTOR as *mut c_void), (1000000 as c_ulong), (sizeof[object_vector]() as c_ulong), compare_vector)
 
     stop()
 
@@ -716,7 +716,7 @@ pub fn test_list() writes SEED, compare_counter {
 
     unsafe { start(c"C qsort backward".ptr) }
 
-    qsort((__local_VECTOR as *mut c_void), (1000000 as c_ulong), (sizeof[object_vector]() as c_ulong), Some(compare_vector))
+    qsort((__local_VECTOR as *mut c_void), (1000000 as c_ulong), (sizeof[object_vector]() as c_ulong), compare_vector)
 
     stop()
 
@@ -748,7 +748,7 @@ pub fn test_list() writes SEED, compare_counter {
 
     unsafe { start(c"C qsort random duplicate".ptr) }
 
-    qsort((__local_VECTOR as *mut c_void), (1000000 as c_ulong), (sizeof[object_vector]() as c_ulong), Some(compare_vector))
+    qsort((__local_VECTOR as *mut c_void), (1000000 as c_ulong), (sizeof[object_vector]() as c_ulong), compare_vector)
 
     stop()
 

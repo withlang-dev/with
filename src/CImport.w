@@ -1470,8 +1470,14 @@ fn ci_has_demoted_field(session: i64, idx: i32, demoted: &str) -> bool:
 // pointer is an unmodeled callback contract — emit it as `unsafe` so calling
 // the slot honestly requires an unsafe context. Value-only signatures stay safe.
 pub fn ci_unsafe_fn_ptr_type(t: &str) -> str:
-    // D102: a nullable function pointer is judged by the pointer it holds.
+    // D102: a nullable function pointer is judged by the pointer it holds;
+    // an array of function pointers by its element (the declared type and
+    // the call through an element must agree on `unsafe`).
     if ci_starts_with(t, "Option[") and t.ends_with("]"): return "Option[" ++ ci_unsafe_fn_ptr_type(t.slice(7, t.len() - 1)) ++ "]"
+    if t.len() > 2 and t[0] == '[':
+        var close = 1
+        while close < t.len() as i32 and t[close] != ']': close = close + 1
+        if close < t.len() as i32: return t.slice(0, close + 1) ++ ci_unsafe_fn_ptr_type(t.slice(close + 1, t.len()))
     var normalized = with_str_clone_ref(t)
     if (ci_starts_with(normalized, "unsafe extern \"C\" fn(") or ci_starts_with(normalized, "extern \"C\" fn(") or ci_starts_with(normalized, "fn(")) and normalized.ends_with("-> void"):
         normalized = normalized.slice(0, normalized.len() - 4) ++ "Unit"
@@ -12753,6 +12759,24 @@ fn ci_initializer_text_has_macro_reference(session: i64, text: &str) -> bool:
         i = i + 1
     false
 
+// D102: a global of nullable function-pointer type (or an array of them)
+// initialized by a function name, `(fn_t)0` or `0`: `Some(name)` and
+// `null`, per element for an array. Any other text is returned as it is.
+fn ci_option_fn_init_fixup(text: &str, ty: &str) -> str:
+    if ci_nullable_fn_ptr_inner(ty).len() > 0:
+        return ci_coerce_init_value_for_type(text, ty)
+    if ty.len() > 0 and ty[0] == '[' and text.len() > 1 and text[0] == '[' and text.ends_with("]"):
+        let elem_ty = ci_array_element_type(ty)
+        if ci_nullable_fn_ptr_inner(elem_ty).len() == 0:
+            return with_str_clone_ref(text)
+        let items = ci_split_top_level_items(text.slice(1, text.len() - 1))
+        var out = "["
+        for i in 0..items.len() as i32:
+            if i > 0: out = out ++ ", "
+            out = out ++ ci_coerce_init_value_for_type(ci_trim(items[i]), elem_ty)
+        return out ++ "]"
+    with_str_clone_ref(text)
+
 pub fn ci_try_eval_var_init_for_type(session: i64, idx: i32, target_type: &str) -> str:
     // Evaluate a variable initializer using the actual declaration cursor,
     // not a name-based re-lookup that may bind a forward declaration.
@@ -12770,22 +12794,22 @@ pub fn ci_try_eval_var_init_for_type(session: i64, idx: i32, target_type: &str) 
                 if init_src.len() > 0 and ci_initializer_text_has_macro_reference(session, init_src):
                     let from_decl_source = ci_var_init_expr_from_decl_source_for_type(session, var_cursor, init_type)
                     if from_decl_source.len() > 0:
-                        return from_decl_source
+                        return ci_option_fn_init_fixup(from_decl_source, init_type)
                 if init_child_count > 512:
                     let from_decl_source = ci_var_init_expr_from_decl_source_for_type(session, var_cursor, init_type)
                     if from_decl_source.len() > 0:
-                        return from_decl_source
+                        return ci_option_fn_init_fixup(from_decl_source, init_type)
                 let from_ast = ci_var_init_expr_for_type(session, var_cursor, CiScope.new(""), init_type)
                 if from_ast.len() > 0:
-                    return from_ast
+                    return ci_option_fn_init_fixup(from_ast, init_type)
                 let from_decl_source = ci_var_init_expr_from_decl_source_for_type(session, var_cursor, init_type)
                 if from_decl_source.len() > 0:
-                    return from_decl_source
+                    return ci_option_fn_init_fixup(from_decl_source, init_type)
             if with_ci_eval_int_valid(session, init_cursor) != 0:
-                return ci_eval_int_text(session, init_cursor)
+                return ci_option_fn_init_fixup(ci_eval_int_text(session, init_cursor), init_type)
         let expr = ci_var_init_expr_for_type(session, var_cursor, CiScope.new(""), init_type)
         if expr.len() > 0:
-            return expr
+            return ci_option_fn_init_fixup(expr, init_type)
     ""
 
 pub fn ci_str_compare(a: &str, b: &str) -> i32:
@@ -17884,7 +17908,7 @@ fn ci_coerce_init_value_for_type(value: &str, ty: &str) -> str:
         return "null"
     // D102: a function named into a nullable function-pointer slot is `Some`;
     // C's `(fn_t)0` is the null pointer.
-    if ci_nullable_fn_ptr_inner(ty).len() > 0 and ci_starts_with(value, "(0 as ") and value.ends_with(")"):
+    if ci_nullable_fn_ptr_inner(ty).len() > 0 and (value == "null" or value == "(null)" or (ci_starts_with(value, "(0 as ") and value.ends_with(")"))):
         return "null"
     if ci_nullable_fn_ptr_inner(ty).len() > 0 and ci_is_c_ident(value):
         return "Some(" ++ value ++ ")"

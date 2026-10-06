@@ -5653,8 +5653,9 @@ fn bs_check_migrate_noop_pointer_casts(ctx: &ActionCtx, compiler_path: &str, cas
     required |> push("var __local_local: *mut ctx = ((&raw mut g as *mut ctx))")
     required |> push("(&raw mut g as *mut ctx)")
     required |> push("type callback_fn = unsafe extern \"C\" fn(*mut c_void) -> Unit")
-    required |> push("fn ret_callback() -> unsafe extern \"C\" fn(*mut c_void) -> Unit:")
-    required |> push("return callback")
+    // D102: a function-pointer return is Option of the pointer.
+    required |> push("fn ret_callback() -> Option[unsafe extern \"C\" fn(*mut c_void) -> Unit]:")
+    required |> push("return Some(callback)")
     for i in 0..required.len() as i32:
         rc = bs_assert_contains(ctx, out_text, required[i], "noop_pointer_cast_exprs")
         if rc != 0: return rc

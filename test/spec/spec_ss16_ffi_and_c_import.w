@@ -50,8 +50,9 @@ fn test_c_import_constants_available:
     assert(INT_MAX == 2147483647)
 
 fn test_c_import_callback_field_uses_extern_fn_pointer:
-    let holder = With299Holder { cb: value => value + 1 }
-    assert(holder.cb(41) == 42)
+    // D102 (§16.6): a C record's function-pointer field is `Option` of it.
+    let holder = With299Holder { cb: Some(value => value + 1) }
+    assert(holder.cb.unwrap()(41) == 42)
 
 fn test_c_import_escapes_with_keyword_fields:
     let fields = WithKeywordFields { opaque_: 10, no_suspend_: 20, c_import_: 30, null_: 40 }

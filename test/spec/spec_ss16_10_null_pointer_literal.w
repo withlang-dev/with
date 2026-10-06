@@ -26,11 +26,13 @@ fn main:
     assert(optional.is_none())
     assert(takes_optional_ptr(null))
 
-    let no_callback: extern "C" fn(i32) -> i32 = null
+    // D102 (§16.6): `extern "C" fn` is never null; the nullable form is
+    // `Option` of it, whose `None` is the null pointer.
+    let no_callback: Option[extern "C" fn(i32) -> i32] = null
     assert(no_callback == null)
+    assert(no_callback.is_none())
 
     let callback: extern "C" fn(i32) -> i32 = add_one
-    assert(callback != null)
     assert(callback(41) == 42)
 
     print("ok")

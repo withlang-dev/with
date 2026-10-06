@@ -62,6 +62,8 @@ c facade engines:
         consumes param ud destroyed_by param destroy
         retains param step by param 0
         retains param fin by param 0
+        // D102 (§16.2b.8): C takes NULL for `fin`; the facade says so.
+        nullable param fin
         callback param step argv param 2 paired with argc param 1 as &[Arg]
         user_data from ctx_user_data as &U
     fn eng_run
@@ -88,9 +90,9 @@ fn fin(t: Tally, s: &Scale):
 
 fn main:
     let e = Engine.new().unwrap()
-    print(f"registered {e.register(Scale { k: 2, label: "doubling" }, step, fin)}")
+    print(f"registered {e.register(Scale { k: 2, label: "doubling" }, step, Some(fin))}")
     print(f"run returned {e.run()}")
     // The second registration replaces the first, whose data C destroys.
-    print(f"registered {e.register(Scale { k: 3, label: "tripling" }, step, null)}")
+    print(f"registered {e.register(Scale { k: 3, label: "tripling" }, step, None)}")
     print(f"run returned {e.run()}")
     print("ok")

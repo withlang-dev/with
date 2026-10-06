@@ -9,7 +9,9 @@ unsafe fn handler(p: *mut i32) -> i32:
     *p
 
 fn main:
-    var c = Cb { cb: handler }
+    // D102: the field is `Option` of the unsafe pointer; the call through
+    // it still needs the unsafe context.
+    var c = Cb { cb: Some(handler) }
     var x: i32 = 0
-    let r = c.cb(&raw mut x)
+    let r = c.cb.unwrap()(&raw mut x)
     print("x")
