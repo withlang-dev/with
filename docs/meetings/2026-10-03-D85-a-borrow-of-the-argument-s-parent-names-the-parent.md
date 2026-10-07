@@ -1,5 +1,7 @@
 # D85 — A facade operation that hands out a borrow of its argument's parent names it: `returns borrow T from parent T of param N`
 
+**Laws:** 6, 4 (docs/mission.md).
+
 **Date:** 2026-10-03. **Status:** BDFL ruling (Eric: "rule the explicit
 clause now", then "blessed" on the words). Spec v7.17: ffi.md §16.2b.6.
 Extends D51 (the canonical ruling is not edited; this clause is a later

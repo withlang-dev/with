@@ -1,5 +1,7 @@
 # D52 — A global is never moved out of; a `const` is a value, not a place
 
+**Laws:** 5 (docs/mission.md).
+
 **Date:** 2026-09-21. **Status:** ruled — the §9.1c sentence below was
 blessed verbatim the same day ("blessed") and landed (#1245); the compiler
 enforces it (#1242).

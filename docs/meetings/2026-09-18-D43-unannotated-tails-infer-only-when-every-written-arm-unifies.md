@@ -1,5 +1,7 @@
 # D43 — Unannotated tails infer only when every written arm unifies; a missing arm forces `Unit`; a mixed join of written arms is a failure to infer, not a `Unit` function and not an illegal `if`
 
+**Laws:** 2, 7 (docs/mission.md).
+
 **Date:** 2026-09-18. **Status:** ruled (Eric, "make it so"), implemented.
 Specification §9.1 (inferred returns, assignment's type) and the §3.8
 cross-reference were blessed verbatim by Eric the same day. Reopen if a real corpus shows the `-> Unit`

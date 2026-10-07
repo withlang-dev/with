@@ -1,5 +1,7 @@
 # D20 — The spec leads; spec changes are solemn
 
+**Laws:** 10 (docs/mission.md).
+
 **Date:** 2026-07-22
 **Status:** Accepted.
 **Deciders:** Eric (BDFL)

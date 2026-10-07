@@ -1,5 +1,7 @@
 # D10 — Channel termination: recv() -> Option[T]; None means closed and drained; Receiver is for-iterable
 
+**Laws:** 1, 7 (docs/mission.md).
+
 **Date:** 2026-07-16
 **Status:** Accepted — BDFL ruling. **Deciders:** Eric (BDFL)
 

@@ -1,5 +1,7 @@
 # D32 — STRICT field moves: implicit is an error everywhere; explicit `move place.field` through a mutable path is the one vacate
 
+**Laws:** 5, 7 (docs/mission.md).
+
 **Date:** 2026-08-30
 **Status:** Ruled by Eric ("I rule for STRICT") on the #782 receiver-arm
 brief and its three-option cost comparison (MOJO / STRICT / VALE).

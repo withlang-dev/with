@@ -1,5 +1,7 @@
 # D59 — `ok` projects a producer to `Result[R, RError]`; the generated error owns a failed-but-produced resource
 
+**Laws:** 6, 7 (docs/mission.md).
+
 **Date:** 2026-09-23. **Status:** BDFL ruling (Eric: 1(a), 2(A), 3 yes,
 4 yes, with the refinements below; spec wording "blessed"); §16.2b.4 carries
 the blessed text. Ruling §15–§19 (D51) left the projection's surface open:

@@ -1,5 +1,7 @@
 # D102 — `extern "C" fn` is non-null; a nullable C function pointer is a pointer-sized `Option`, placed by direction
 
+**Laws:** 4, 6 (docs/mission.md).
+
 Ruled by Eric, 2026-10-06 (#2215, #2216).
 
 ## Context

@@ -1,5 +1,7 @@
 # D2 — #625: containers of ephemerals use a viral-ESCAPE model, not an annotation ban
 
+**Laws:** 5, 4 (docs/mission.md).
+
 **Date:** 2026-07-04
 **Status:** Accepted (supersedes the "ban outright" framing of the D-day
 soundness ruling and the §5.2 narrowing in commit 6f9160e3)

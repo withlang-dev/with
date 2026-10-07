@@ -1,5 +1,7 @@
 # D92 — Modeled-C Amendment 3: `ok` on a status-returning operation, the failure's text, two presentations of one function
 
+**Laws:** 6, 4 (docs/mission.md).
+
 **Date:** 2026-10-04. **Status:** BDFL ruling (Eric: "amendment 3
 blessed"). The words are Amendment 3 of
 `Ruling-modeled-C-ownership-effects-conventions-and-foreign-lifetimes.md`;

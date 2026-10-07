@@ -1,5 +1,7 @@
 # D16 — `move x` is rvalue-uniform: it always moves, callee-independent
 
+**Laws:** 6, 1 (docs/mission.md).
+
 **Date:** 2026-07-21
 **Status:** Accepted; D21 relies on this statement-temporary rule and does not
 change explicit `move` semantics.

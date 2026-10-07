@@ -1,5 +1,7 @@
 # D21 — Unit-returning mutator pipelines thread the receiver place; `mut fn` cannot duplicate receiver ownership
 
+**Laws:** 5, 6 (docs/mission.md).
+
 **Date:** 2026-07-22
 **Status:** Accepted — BDFL ruling; implementation is NON-COMPLIANT pending the
 compiler/stdlib follow-up.

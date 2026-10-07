@@ -1,5 +1,7 @@
 # D40 — Seed/release version numbering: `y` is a bootstrap-compatibility group; a bootstrap breakage bumps `y` and resets `z`
 
+**Laws:** 8 (docs/mission.md).
+
 **Date:** 2026-09-04 (granted 2026-09-05)
 **Status:** Accepted (Eric, 2026-09-05). The convention below is now the rule:
 `Y` is a bootstrap-compatibility group; a bootstrap breakage bumps `Y` and

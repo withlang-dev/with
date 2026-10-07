@@ -1,5 +1,7 @@
 # D45 — A copy is never implicit unless it is O(1); an allocating copy is spelled
 
+**Laws:** 5, 1 (docs/mission.md).
+
 **Date:** 2026-09-19. **Status:** ruled (Eric: "unless copy is O(1) we
 should[n't] even consider doing it by default"; "yes for now option A … that
 lands regardless of what happens to str later"). Specification §13.6's

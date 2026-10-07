@@ -1,5 +1,7 @@
 # D15 — One loop back-edge carried-move predicate; `break` is a separate edge
 
+**Laws:** 3 (docs/mission.md).
+
 **Date:** 2026-07-20
 **Status:** Accepted.
 **Deciders:** Eric (BDFL)

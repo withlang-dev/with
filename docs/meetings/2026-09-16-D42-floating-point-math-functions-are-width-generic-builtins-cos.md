@@ -1,5 +1,7 @@
 # D42 — Floating-point math functions are width-generic builtins: `cos(x)` and `x.cos()` for f32 and f64, no width suffix
 
+**Laws:** 1, 9 (docs/mission.md).
+
 **Date:** 2026-09-16. **Status:** ruled (Eric), implemented.
 
 **Ruling.** `cos(x)` and `x.cos()` work for `f32` and `f64` with no width in

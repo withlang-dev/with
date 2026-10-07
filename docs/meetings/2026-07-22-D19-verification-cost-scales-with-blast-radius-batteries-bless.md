@@ -1,5 +1,7 @@
 # D19 — Verification cost scales with blast radius; batteries bless batches
 
+**Laws:** 10 (docs/mission.md).
+
 **Date:** 2026-07-22
 **Status:** Accepted.
 **Deciders:** Eric (BDFL)

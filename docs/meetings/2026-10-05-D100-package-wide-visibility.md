@@ -1,5 +1,7 @@
 # D100 — Visibility is package-wide: `pub` leaves the package; `internal` paths stay inside
 
+**Laws:** 6 (docs/mission.md).
+
 **Date:** 2026-10-05. **Status:** ruled by Eric. **Issues:** #2186.
 **Supersedes:** §18.3's "No `pub` = module-private" (initial spec,
 2026-02-19; the cross-module error sentence, v7.0, 2026-06-10).

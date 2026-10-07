@@ -1,5 +1,7 @@
 # D24 — Independent builds never share an address space
 
+**Laws:** 8 (docs/mission.md).
+
 **Date:** 2026-07-26
 **Status:** Accepted — BDFL ruling.
 **Deciders:** Eric (BDFL)

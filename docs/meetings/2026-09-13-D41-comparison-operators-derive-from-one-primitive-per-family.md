@@ -1,5 +1,7 @@
 # D41 — Comparison operators derive from one primitive per family: `Ord.cmp(&self, &other)` backs `<`/`<=`/`>`/`>=`, `Eq.eq(&self, &other)` backs `==`/`!=`; fixed-name methods are overrides
 
+**Laws:** 3, 9 (docs/mission.md).
+
 **Date:** 2026-09-13
 **Status:** Ruled by Eric (verbatim: "I rule for one Ord.cmp(self: &Self,
 other: &Self) -> i32 backing all four ordered operators (and Eq.eq(other:

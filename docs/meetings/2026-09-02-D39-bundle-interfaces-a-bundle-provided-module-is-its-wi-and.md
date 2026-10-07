@@ -1,5 +1,7 @@
 # D39 — Bundle interfaces: a bundle-provided module is its `.wi`, and callable semantics are the declaration
 
+**Laws:** 6 (docs/mission.md).
+
 **Date:** 2026-09-02
 **Status:** Ruled by Eric. Verbatim:
 

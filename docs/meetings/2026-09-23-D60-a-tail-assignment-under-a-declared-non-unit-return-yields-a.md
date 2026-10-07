@@ -1,5 +1,7 @@
 # D60 — A tail assignment under a declared non-`Unit` return yields a read of its place; the implicit default applies only to a `Unit` tail
 
+**Laws:** 5 (docs/mission.md).
+
 **Date:** 2026-09-23. **Status:** BDFL ruling (Eric: option (a), with the
 §4.10 narrowing and a wording change to §9.1; "blessed"). §9.1 and §4.10
 carry the blessed text.

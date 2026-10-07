@@ -1,5 +1,7 @@
 # D82 — A destructor runs after an explicit field vacate; the vacated field is its empty value; the storage sentinel is not a disarm
 
+**Laws:** 5 (docs/mission.md).
+
 **Date:** 2026-10-01. **Status:** BDFL ruling (Eric: "Approved." on the
 brief). No normative spec text changes: §2.2 (D32), §2.5.1 and D72 already
 rule it; the implementation was non-compliant. Issue #1944 (the hunt that

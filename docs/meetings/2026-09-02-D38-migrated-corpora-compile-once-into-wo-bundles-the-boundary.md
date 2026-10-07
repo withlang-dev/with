@@ -1,5 +1,7 @@
 # D38 — Migrated corpora compile once into `.wo` bundles; the boundary is a versioned With ABI, never a C ABI
 
+**Laws:** 8, 9 (docs/mission.md).
+
 **Date:** 2026-09-02
 **Status:** Ruled by Eric. Verbatim: "I do not wanna compile the migrated
 code over and over when there's no changes to it. I wanna compile the

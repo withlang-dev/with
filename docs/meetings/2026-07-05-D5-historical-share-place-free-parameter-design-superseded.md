@@ -1,5 +1,7 @@
 # D5 — Historical SHARE-PLACE free-parameter design — SUPERSEDED
 
+**Laws:** 9 (docs/mission.md).
+
 **Date:** 2026-07-05
 **Status:** Superseded. The current BDFL ruling is specification §3.8:
 `&T` borrows and plain `T` consumes; the signature states the mode.

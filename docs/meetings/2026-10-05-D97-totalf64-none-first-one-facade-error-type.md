@@ -1,5 +1,7 @@
 # D97 — `TotalF64` is a numeric float key; `None` sorts first by declaration order; a facade may state one error type
 
+**Laws:** 6, 1 (docs/mission.md).
+
 **Date:** 2026-10-05. **Status:** ruled (Eric); spec v7.26. **Issues:** #2182,
 #2179.
 

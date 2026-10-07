@@ -1,5 +1,7 @@
 # D34 — String accumulation without ceremony: `++` gets the builder's efficiency; demand-site finalization for wrapper types
 
+**Laws:** 1, 2 (docs/mission.md).
+
 **Date:** 2026-09-02
 **Status:** Ruled by Eric on the `to_str()`-ceremony brief (the trigger:
 a declared `-> str` return forced an explicit `.to_str()` on a

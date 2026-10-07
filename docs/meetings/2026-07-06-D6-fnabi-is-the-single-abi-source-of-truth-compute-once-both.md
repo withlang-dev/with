@@ -1,5 +1,7 @@
 # D6 — `FnAbi` is the single ABI source of truth: compute once, both sides read it, never re-derive per call path
 
+**Laws:** 3 (docs/mission.md).
+
 **Date:** 2026-07-06
 **Status:** Accepted — CANONICAL standard for all call-ABI lowering
 **Design:** `docs/fn_abi_descriptor_design.md` · **Deciders:** Eric (BDFL)

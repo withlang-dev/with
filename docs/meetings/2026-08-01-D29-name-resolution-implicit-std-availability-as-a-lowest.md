@@ -1,5 +1,7 @@
 # D29 — Name resolution: implicit std availability as a lowest-priority fallback tier; #750 resolved by staged conformance
 
+**Laws:** 1, 9 (docs/mission.md).
+
 **Date:** 2026-08-01
 **Status:** Ruled by Eric ("BDFL has spoken."), verbatim directive below.
 Normative from the spec update landing with this entry (§18.2). The spec is

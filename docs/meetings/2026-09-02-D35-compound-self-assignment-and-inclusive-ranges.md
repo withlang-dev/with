@@ -1,5 +1,7 @@
 # D35 — Compound self-assignment `.=` and inclusive ranges `..=`
 
+**Laws:** 1 (docs/mission.md).
+
 **Date:** 2026-09-02
 **Status:** Ruled by Eric in the D34 follow-on conversation. Verbatim:
 `.=` — "line = line.replace(...) becomes line.=replace(...)" (wanted);

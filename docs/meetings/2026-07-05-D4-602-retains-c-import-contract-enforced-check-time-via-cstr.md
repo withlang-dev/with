@@ -1,5 +1,7 @@
 # D4 — #602: `retains:` c_import contract, enforced check-time via cstr_in modeling
 
+**Laws:** 6, 4 (docs/mission.md).
+
 **Date:** 2026-07-05
 **Status:** Accepted
 **Issue:** #602 · **Spec:** §16.3c · **Deciders:** Eric (BDFL)

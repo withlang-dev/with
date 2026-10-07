@@ -1,5 +1,7 @@
 # D36 — Build graph producer edges are inferred from consumed outputs, never demanded
 
+**Laws:** 1, 8 (docs/mission.md).
+
 **Date:** 2026-09-01
 **Status:** Implemented (29212f97, #700). Agent judgment call under the
 no-ceremony rule; reopen only if an inferred edge is ever wrong.

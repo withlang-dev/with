@@ -1,5 +1,7 @@
 # D86 — `assert`, `require`, `check` are compiler-known forms; the message operand is evaluated only on failure, under `??`'s right-operand rules
 
+**Laws:** 1 (docs/mission.md).
+
 **Date:** 2026-10-03. **Status:** BDFL ruling (Eric: "lazy, with the
 mechanism stated", then "blessed" on the words). Spec v7.17: modules.md
 §18.2, after the prelude list (the spec has no separate preconditions

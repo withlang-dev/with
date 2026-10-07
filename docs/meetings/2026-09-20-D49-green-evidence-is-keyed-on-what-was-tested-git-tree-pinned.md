@@ -1,5 +1,7 @@
 # D49 — Green evidence is keyed on what was tested: git tree, pinned seed, host
 
+**Laws:** 10, 8 (docs/mission.md).
+
 *Amended 2026-09-20 (D50 applied):* the identity keys on the battery's
 inputs, not the whole tree — `git ls-tree HEAD` without the `docs` entry and
 without top-level `*.md`, as the object name `git hash-object` gives that

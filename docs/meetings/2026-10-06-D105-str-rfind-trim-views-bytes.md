@@ -1,5 +1,7 @@
 # D105 — `str.rfind`, `trim_start`/`trim_end` (views) and `bytes()` are stdlib methods in `std.string` (delegated)
 
+**Laws:** 5, 1 (docs/mission.md).
+
 **Date:** 2026-10-06. **Status:** delegated (D98): implemented on the
 agent's prediction; Eric vetoes by revert. **Issue:** #2206.
 

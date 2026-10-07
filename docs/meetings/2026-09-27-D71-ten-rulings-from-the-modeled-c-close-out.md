@@ -1,5 +1,7 @@
 # D71 — Ten rulings from the modeled-C close-out
 
+**Laws:** 1, 5, 6 (docs/mission.md).
+
 **Date:** 2026-09-27. **Status:** BDFL ruling (Eric: "predicted", accepting
 the predictions of the close-out brief as written).
 

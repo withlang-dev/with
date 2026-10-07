@@ -1,5 +1,7 @@
 # D81 — Zero dependencies: the compiler carries its SDK per platform; applications bring their own dependencies
 
+**Laws:** 8 (docs/mission.md).
+
 **Date:** 2026-09-29. **Status:** BDFL ruling (Eric, in conversation;
 "blessed" on the §16.1 words). Spec v7.15: §16.1. Issues #1915, #1826,
 #1914.

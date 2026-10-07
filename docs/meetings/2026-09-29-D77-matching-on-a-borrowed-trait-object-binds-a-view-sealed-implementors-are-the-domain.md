@@ -1,5 +1,7 @@
 # D77 — Matching on a borrowed trait object: `name: C` binds `&C`; sealed implementors are the domain
 
+**Laws:** 5 (docs/mission.md).
+
 **Date:** 2026-09-28 (design, option (a)); 2026-09-29 (wording: "blessed").
 **Status:** BDFL ruling. Spec v7.10: §9.7 "Trait-object downcast patterns",
 §11.3 by-value `dyn` refusal, grammar `TYPED_BIND_PAT`. Issues #1860, #1852.

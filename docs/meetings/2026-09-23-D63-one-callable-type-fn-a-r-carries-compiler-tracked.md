@@ -1,5 +1,7 @@
 # D63 — One callable type: `fn(A) -> R` carries compiler-tracked environment ownership; not `Copy`
 
+**Laws:** 9, 5 (docs/mission.md).
+
 **Date:** 2026-09-23. **Status:** BDFL ruling (Eric: "Rule (A) … environment
 ownership is one more such property"). §12.4 "The callable type" carries the
 text. Resolves the type question D62 left open (#1567).

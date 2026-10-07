@@ -1,5 +1,7 @@
 # D106 — Law 2 has an order: a demand binds the signature's unknowns first, conversions bind nothing, and an expression's own operands bind before the outer demand
 
+**Laws:** 2 (docs/mission.md).
+
 **Date:** 2026-10-06. **Status:** Eric's ruling on the law-2 tension the
 Laws pass surfaced (2026-10-06); mission.md law 2 and §4.9a carry the
 words. **Pins:** `test/behavior/behav_law2_demand_order.w`,

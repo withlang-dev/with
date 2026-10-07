@@ -1,5 +1,7 @@
 # D8 — Stores through raw pointers do not drop the old pointee
 
+**Laws:** 5 (docs/mission.md).
+
 **Date:** 2026-07-12
 **Status:** Accepted
 

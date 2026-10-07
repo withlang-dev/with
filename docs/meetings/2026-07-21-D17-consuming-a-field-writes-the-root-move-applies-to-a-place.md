@@ -1,5 +1,7 @@
 # D17 — Consuming a field writes the root; `move` applies to a place
 
+**Laws:** 5 (docs/mission.md).
+
 **Date:** 2026-07-21
 **Status:** Accepted for projection transfers. D21 supersedes any
 receiver-returning extrapolation from this rule.

@@ -1,5 +1,7 @@
 # D96 — A key is any structurally comparable value; a custom equality is a key projection; maps are seeded and iterate in insertion order
 
+**Laws:** 5, 1 (docs/mission.md).
+
 **Date:** 2026-10-05. **Status:** BDFL ruling (Eric; the reasons below are
 his). Spec v7.25: §11.7, §11.8, §4.3c, collection operations. Issues #2161,
 #2180. **The compiler, the runtime and std are NON-COMPLIANT until they

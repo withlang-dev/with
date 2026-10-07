@@ -1,5 +1,7 @@
 # D27 — Element access observes; bindings name, annotations demand; JsonView is a Copy token
 
+**Laws:** 5, 2 (docs/mission.md).
+
 **Date:** 2026-07-30
 **Status:** Ruled by Eric ("My will be done. Enshrine the doctrine. Purge any
 dissent.") on the three-brief presentation of the parked questions from #715/

@@ -1,5 +1,7 @@
 # D50 — The build keys work on what it is made from: content of inputs and the producing tool, never a commit, a checkout or the build driver
 
+**Laws:** 8 (docs/mission.md).
+
 **Date:** 2026-09-20. **Status:** ruled (Eric: "our entire build process is absolutely addicted to re-doing things it's already done"; after the survey and the reference comparison, "correct. please implement it").
 
 **Context.** A survey of one battery (build 274 s, fixpoint 107 s, test 836 s) and the cache code found the redo had one shape: identity standing in for content. `:fixpoint` recompiled what `build` had just compiled; every action's key carried the orchestrating binary; the compiler named its checkout in DWARF, in module link-name hashes and in the linker's debug map, so nothing built in one worktree was usable in another; green evidence named a commit (D49).

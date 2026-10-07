@@ -1,5 +1,7 @@
 # D47 — Lending is not receiving: a `c_import`ed `const char *` parameter accepts a `str`; an application developer never writes `unsafe`
 
+**Laws:** 5, 1 (docs/mission.md).
+
 **Date:** 2026-09-20. **Status:** ruled (Eric: "there is no way this should
 have to be declared unsafe. This flies in the face of the mission"; "no UAT
 code should have `unsafe` in it … if 'normal' users are using unsafe - WE

@@ -1,5 +1,7 @@
 # D91 — `Target.os` and `Target.arch` are compile-time constants; a per-target value is an exhaustive `comptime match`
 
+**Laws:** 8, 1 (docs/mission.md).
+
 **Date:** 2026-10-04. **Status:** BDFL ruling (Eric: option B, with three
 adjustments, which are his). Spec v7.21: §17.1a, §17.5. Issues #2060,
 #2070 (D90's per-target constants). **The implementation is NON-COMPLIANT

@@ -1,5 +1,7 @@
 # D14 — Verification tiering: iterate on one stage; battery gates commit batches
 
+**Laws:** 10 (docs/mission.md).
+
 **Date:** 2026-07-17
 **Status:** Accepted — maintainer-directed ("fix this issue deeply").
 **Deciders:** Eric (BDFL)

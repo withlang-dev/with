@@ -1,5 +1,7 @@
 # D56 — CI is not a merge signal; the seed-driven battery on the maintainer machine is
 
+**Laws:** 10, 8 (docs/mission.md).
+
 **Date:** 2026-09-22. **Status:** ruled by Eric ("we either reduce it to 20
 minutes or we ignore it as any kind of signal. You decide."); the choice
 below is the agent's, from the measurements.

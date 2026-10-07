@@ -1,5 +1,7 @@
 # D79 — A bundle function's global writes are a declared, checked `writes` clause, never an inferred interface fact
 
+**Laws:** 6, 4 (docs/mission.md).
+
 **Date:** 2026-09-29. **Status:** BDFL ruling (Eric: "B", the spelling
 "Option 1", then "blessed" on the words). Spec v7.13:
 toolchain/wo_bundles.md "Global writes are the declaration", grammar

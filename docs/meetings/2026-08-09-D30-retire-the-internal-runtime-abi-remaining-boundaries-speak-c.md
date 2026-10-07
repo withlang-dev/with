@@ -1,5 +1,7 @@
 # D30 — Retire the internal runtime ABI; remaining boundaries speak C; §16.3c call-site coercion is the ergonomic dual
 
+**Laws:** 9, 8 (docs/mission.md).
+
 **Date:** 2026-08-09
 **Status:** Ruled by Eric ("approved, blessed, condoned, and ratified") on the
 #761 brief. Normative from the §16.3e spec sentence landing with this entry.

@@ -1,5 +1,7 @@
 # D51 — Modeled C: ownership, effects, conventions and foreign lifetimes live in a checked facade; one canonical ruling
 
+**Laws:** 4, 6 (docs/mission.md).
+
 **Date:** 2026-09-20. **Status:** ruled; specification projections blessed
 the same day ("Canonized into law") and landed as §16.2b plus the
 replacements in §16.2a, §16.3c, §15.3, §16.3d, §18.5 and §18.8

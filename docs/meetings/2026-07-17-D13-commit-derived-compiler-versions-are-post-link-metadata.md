@@ -1,5 +1,7 @@
 # D13 — Commit-derived compiler versions are post-link metadata, never compiled inputs
 
+**Laws:** 8 (docs/mission.md).
+
 **Date:** 2026-07-17
 **Status:** Accepted — implementation tracked by #650. **Deciders:** Eric (BDFL)
 

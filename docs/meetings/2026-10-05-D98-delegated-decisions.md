@@ -1,5 +1,7 @@
 # D98 — Delegated decisions: an agent implements its prediction and Eric vetoes afterwards
 
+**Laws:** 10 (docs/mission.md).
+
 **Date:** 2026-10-05. **Status:** ruled (Eric).
 
 **Ruling.** A design question goes ahead without waiting for Eric when it is

@@ -1,5 +1,7 @@
 # D89 — A field with a default may omit its type; an unsuffixed numeric default takes the type its uses demand
 
+**Laws:** 2, 1 (docs/mission.md).
+
 **Date:** 2026-10-04. **Status:** BDFL ruling (Eric: "spec words blessed").
 Spec v7.20: types.md §4.3 (Default field values), grammar.md `FIELD`.
 Issue #2097. **The compiler is NON-COMPLIANT**: `type T { ticks = 0 }`

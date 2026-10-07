@@ -1,5 +1,7 @@
 # D94 — A corpus is migrated against every target's C, and the results are merged per declaration
 
+**Laws:** 8 (docs/mission.md).
+
 **Date:** 2026-10-05. **Status:** BDFL ruling (Eric: "Rule A", with the six
 points below, which are his). Issues #2060, #2070, #2176. Amends D90 (the
 one-C-model choice of #2064, and point 4's note on `long`).

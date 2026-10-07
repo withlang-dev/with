@@ -1,5 +1,7 @@
 # D72 — A `Drop` type whose all-zero storage is a live value gets a hidden liveness byte
 
+**Laws:** 7, 5 (docs/mission.md).
+
 **Date:** 2026-09-27. **Status:** BDFL ruling (Eric: "Problem 1: option 1").
 
 #1431: the reset sentinel is zeroed storage (§2.5.1), so a live `Drop` value

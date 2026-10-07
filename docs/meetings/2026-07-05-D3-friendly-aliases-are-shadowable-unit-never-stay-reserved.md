@@ -1,5 +1,7 @@
 # D3 — Friendly aliases are shadowable; `Unit`/`Never` stay reserved (split of option D)
 
+**Laws:** 1 (docs/mission.md).
+
 **Date:** 2026-07-05
 **Status:** Accepted
 **Issue:** #627 (substrate) · **Spec:** §4.1, §29.8 · **Deciders:** Eric (BDFL)

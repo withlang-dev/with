@@ -1,5 +1,7 @@
 # D37 — Stdlib containers and algorithms come from C corpora migrated whole; `with migrate` is raw, the With-ness lives in the facade
 
+**Laws:** 8, 9 (docs/mission.md).
+
 **Date:** 2026-09-01
 **Status:** Ruled by Eric. Verbatim: "we dont 'selectively migrate' — but
 we do 'selectively facade'"; "with migrate should be raw / the Withyness

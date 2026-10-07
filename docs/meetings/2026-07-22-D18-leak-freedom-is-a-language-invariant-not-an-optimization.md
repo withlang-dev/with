@@ -1,5 +1,7 @@
 # D18 — Leak-freedom is a language invariant, not an optimization target
 
+**Laws:** 10, 5 (docs/mission.md).
+
 **Date:** 2026-07-22
 **Status:** Accepted (mission-level ruling; mission.md amended).
 **Deciders:** Eric (BDFL)

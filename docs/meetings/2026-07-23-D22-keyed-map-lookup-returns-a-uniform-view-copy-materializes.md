@@ -1,5 +1,7 @@
 # D22 — Keyed-map lookup returns a uniform view; Copy materializes only under owned demand
 
+**Laws:** 5, 2 (docs/mission.md).
+
 **Date:** 2026-07-23
 **Status:** Accepted — BDFL ruling. A new decision has been made, but
 implementation is still in progress; the compiler/stdlib are NON-COMPLIANT

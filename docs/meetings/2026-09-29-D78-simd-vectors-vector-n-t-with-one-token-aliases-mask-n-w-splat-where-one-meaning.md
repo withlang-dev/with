@@ -1,5 +1,7 @@
 # D78 — SIMD vectors: `Vector[N, T]` with one-token aliases, `Mask[N, W]`, splat only where one meaning is forced
 
+**Laws:** 1, 2 (docs/mission.md).
+
 **Date:** 2026-09-29. **Status:** BDFL ruling (Eric: "implement it
 properly", then the design paste, then "blessed" on the words). Spec
 v7.11: §4.3d Vector Types, §16.1 C vector types. Issues #1874, #1872.

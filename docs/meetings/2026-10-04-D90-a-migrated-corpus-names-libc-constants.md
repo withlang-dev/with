@@ -1,5 +1,7 @@
 # D90 — A migrated corpus names its libc constants; a constant and the function that consumes it come from one table
 
+**Laws:** 3, 8 (docs/mission.md).
+
 **Date:** 2026-10-04. **Status:** BDFL ruling (Eric: "Rule A", with the
 five points below, which are his). Issues #2060, #2070, #2071; PR #2064.
 **Amended by [D94](2026-10-05-D94-a-corpus-is-migrated-against-every-target-and-merged.md)**:

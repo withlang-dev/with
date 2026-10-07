@@ -1,5 +1,7 @@
 # D55 — Six rulings of 2026-09-22: destructors are skipped only at the type's boundary; facade destroyers; examples track the spec; `Sender` is `Clone`; `print` over `Display`
 
+**Laws:** 5, 10, 6 (docs/mission.md).
+
 **Date:** 2026-09-22. **Status:** BDFL rulings (Eric); spec sentences in
 §2.5.1, §9.7, §14.15, §16.2b.3, §18.2; examples policy in CLAUDE.md/AGENTS.md.
 

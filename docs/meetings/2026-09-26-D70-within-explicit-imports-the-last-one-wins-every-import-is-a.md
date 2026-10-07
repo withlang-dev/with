@@ -1,5 +1,7 @@
 # D70 — Within explicit imports, the last one wins; every import is a namespace
 
+**Laws:** 1, 9 (docs/mission.md).
+
 **Date:** 2026-09-26. **Status:** BDFL ruling (Eric: "Easy. which comes
 last shadows the others." — "BUT there still should be *some* way to get
 to the shadowed one, through namespaces." — "default namespace for that,

@@ -1,5 +1,7 @@
 # D84 — A returned view's origins include every global it views; a global origin is part of the interface and widens D79's writes clause
 
+**Laws:** 6, 3 (docs/mission.md).
+
 **Date:** 2026-10-03. **Status:** BDFL ruling (Eric: direction "B", then
 "blessed" on the words; approved the D79 consequence). Spec v7.17:
 borrow-checker-rules.md §21.1 rule 6; toolchain/wo_bundles.md "Global

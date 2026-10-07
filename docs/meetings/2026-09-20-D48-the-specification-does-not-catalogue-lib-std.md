@@ -1,5 +1,7 @@
 # D48 — The specification does not catalogue `lib/std`
 
+**Laws:** 3 (docs/mission.md).
+
 **Date:** 2026-09-20. **Status:** ruled (Eric: "I do not want the language
 spec to care what we do in lib/std"). §18.6's Module Map table and the
 `std.internal` paragraph removed; the `spec-inventory-check` stdlib arm

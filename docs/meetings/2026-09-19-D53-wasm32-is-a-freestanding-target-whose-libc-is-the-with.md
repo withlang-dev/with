@@ -1,5 +1,7 @@
 # D53 — wasm32 is a freestanding target whose "libc" is the With runtime over WASI preview1, with an emitted JS host
 
+**Laws:** 8 (docs/mission.md).
+
 **Date:** 2026-09-19. **Status:** implemented on the `wasm-target` branch
 (fork); not yet a BDFL ruling. Design note: `docs/wasm-target.md`.
 

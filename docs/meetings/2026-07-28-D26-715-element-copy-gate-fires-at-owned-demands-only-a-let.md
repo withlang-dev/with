@@ -1,5 +1,7 @@
 # D26 — #715 element-copy gate fires at owned demands only; a let binding is not an owned demand
 
+**Laws:** 5, 2 (docs/mission.md).
+
 **Date:** 2026-07-28
 **Status:** Done as an interim projection, then superseded in implementation by
 D27's uniform element-view campaign (#740).

@@ -1,5 +1,7 @@
 # D12 — `mut fn` mutates in place on every owner type; receiver MODE decides by-place semantics (primitives and str included)
 
+**Laws:** 6, 5 (docs/mission.md).
+
 **Date:** 2026-07-17
 **Status:** Accepted — BDFL ruling. **Deciders:** Eric (BDFL)
 

@@ -1,5 +1,7 @@
 # D83 — In an instance method declared in its type's own module, receiver fields are in scope by bare name; every collision is a shadowing error
 
+**Laws:** 1 (docs/mission.md).
+
 **Date:** 2026-10-03. **Status:** BDFL ruling (Eric: direction "C" scoped
 to the type's own module, then "blessed" on the words). Spec v7.17:
 functions.md §9.5. Extends D7. Issue #1930. **The compiler is

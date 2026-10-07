@@ -1,5 +1,7 @@
 # D75 — `once` parameters, fills, distinct casts, payload discriminants, variadic definitions
 
+**Laws:** 6, 5 (docs/mission.md).
+
 **Date:** 2026-09-28. **Status:** BDFL ruling (Eric, on the exact words:
 "1. approved … 5. approved"; 6 was agreed on 2026-09-27, "fair. I agree.").
 

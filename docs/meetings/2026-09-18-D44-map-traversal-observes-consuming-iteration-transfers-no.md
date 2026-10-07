@@ -1,5 +1,7 @@
 # D44 — Map traversal observes; consuming iteration transfers; no operation on a map makes a second owner
 
+**Laws:** 5 (docs/mission.md).
+
 **Date:** 2026-09-18. **Status:** ruled (Eric, "make it canon"); specification
 §2.3, §13.3, §13.5, §4 (the iteration example) and §22.1 rule 7 blessed
 verbatim the same day. The compiler is NON-COMPLIANT until the

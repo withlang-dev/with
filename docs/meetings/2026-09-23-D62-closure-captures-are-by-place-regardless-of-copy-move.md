@@ -1,5 +1,7 @@
 # D62 — Closure captures are by place regardless of `Copy`; `move ||` closures own their environment
 
+**Laws:** 5 (docs/mission.md).
+
 **Date:** 2026-09-23. **Status:** BDFL ruling (Eric, on #1586 and #1567:
 "Copy captures are by place, always. Not only when the body writes" and
 "`move ||` closures own their environment"). §12.4 carries the text.

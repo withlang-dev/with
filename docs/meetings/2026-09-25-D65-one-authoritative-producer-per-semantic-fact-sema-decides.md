@@ -1,5 +1,7 @@
 # D65 — One authoritative producer per semantic fact: Sema decides what, MIR decides where and when, codegen decides how; no stage re-derives another's answer
 
+**Laws:** 3 (docs/mission.md).
+
 **Date:** 2026-09-25. **Status:** architecture decision (Eric, endorsing the
 boundary proposal with the amendments below; "adopt it"). Executable half:
 `with analyze audit:resolution` (#1647). Rule text also in CLAUDE.md /

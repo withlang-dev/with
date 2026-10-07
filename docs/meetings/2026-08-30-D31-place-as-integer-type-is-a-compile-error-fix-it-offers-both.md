@@ -1,5 +1,7 @@
 # D31 — `&place as <integer-type>` is a compile error; fix-it offers both intents
 
+**Laws:** 7 (docs/mission.md).
+
 **Date:** 2026-08-30
 **Status:** Ruled by Eric ("I bless the decision") on the #888 brief.
 Normative from the §16.11 spec sentence landing with this entry. Carves out

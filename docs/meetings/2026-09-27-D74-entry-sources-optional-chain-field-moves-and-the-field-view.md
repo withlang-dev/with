@@ -1,5 +1,7 @@
 # D74 — Entry sources, optional-chain field moves, and the field-view examples
 
+**Laws:** 5 (docs/mission.md).
+
 **Date:** 2026-09-27. **Status:** BDFL ruling (Eric: "1) yes … 3) yes", then
 "yes" to the entry-source sentence).
 

@@ -1,5 +1,7 @@
 # D93 — A collection literal's binding takes its type from its uses
 
+**Laws:** 2 (docs/mission.md).
+
 **Date:** 2026-10-05. **Status:** BDFL ruling; the words are Eric's (his
 review of the draft in #2148). Spec v7.23 §4.3c rule 1. **The
 implementation is NON-COMPLIANT until it catches up** (#2144; the

@@ -1,5 +1,7 @@
 # D76 — Modeled-C Amendment 2: effects without views; callback arguments and user data
 
+**Laws:** 6, 4 (docs/mission.md).
+
 **Date:** 2026-09-28. **Status:** BDFL ruling (Eric: "yes to both", after a
 plain-language explanation of each). Recorded in the ruling document as
 Amendment 2.

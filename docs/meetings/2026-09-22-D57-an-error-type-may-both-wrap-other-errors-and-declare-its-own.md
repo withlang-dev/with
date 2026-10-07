@@ -1,5 +1,7 @@
 # D57 — An error type may both wrap other errors and declare its own variants
 
+**Laws:** 1 (docs/mission.md).
+
 **Date:** 2026-09-22. **Status:** BDFL ruling (Eric); §10.9 carries the
 blessed sentence.
 

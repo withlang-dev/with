@@ -1,5 +1,7 @@
 # D80 — SIMD masks and lane selection: `m.select(a, b)`, broadcast on every lane-wise operator, mask operators, `W = 128`
 
+**Laws:** 1, 2 (docs/mission.md).
+
 **Date:** 2026-09-29. **Status:** BDFL ruling (Eric, on the four
 questions the #1874 implementation raised; "blessed" on the words).
 Spec v7.14: §4.3d. Amends D78. Issue #1874.

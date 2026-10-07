@@ -1,5 +1,7 @@
 # D64 — Facade buffer pairing (`buffer param P len|capacity param L [inout]`) and fixed arguments (`param N fixed <literal>`)
 
+**Laws:** 6 (docs/mission.md).
+
 **Date:** 2026-09-24. **Status:** BDFL ruling (Eric: "Yes to buffer pairing.
 Yes to fixed/hidden facade arguments. But don't conflate those approvals
 with caller-visible slice-length mutation."). §16.2b.8 "Buffers" and

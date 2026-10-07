@@ -1,5 +1,7 @@
 # D69 — Generators are push-based: a `gen fn` calls the consumer's loop body at each `yield`
 
+**Laws:** 9, 1 (docs/mission.md).
+
 **Date:** 2026-09-26. **Status:** BDFL ruling (Eric: "blessed. proceed",
 after the Go/Rust comparison and the mission reading below).
 

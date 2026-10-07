@@ -1,5 +1,7 @@
 # D9 — E0921 concurrency evidence for async fns is usage-based (call/reference sites), not declaration-based
 
+**Laws:** 4 (docs/mission.md).
+
 **Date:** 2026-07-15
 **Status:** Accepted
 

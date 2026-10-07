@@ -1,5 +1,7 @@
 # D54 — In-place foreign resources are pinned by default; `movable` is the facade's claim; a heap cell, never an immovable type
 
+**Laws:** 4, 6 (docs/mission.md).
+
 **Date:** 2026-09-22. **Status:** BDFL ruling (Eric); spec §16.2b.3 carries
 the normative sentences. Extends D51; the D51 ruling document is not
 amended (it is silent on address stability).

@@ -1,5 +1,7 @@
 # D101 — `T.zeroed()` is safe on zero-valid C records; the facade's in-place storage uses it
 
+**Laws:** 4, 1 (docs/mission.md).
+
 Ruled by Eric, 2026-10-06.
 
 ## Context

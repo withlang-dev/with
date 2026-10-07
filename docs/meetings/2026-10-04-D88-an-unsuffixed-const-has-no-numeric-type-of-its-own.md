@@ -1,5 +1,7 @@
 # D88 — A `const` of unsuffixed numeric literals has no numeric type of its own; each use types it
 
+**Laws:** 2 (docs/mission.md).
+
 **Date:** 2026-10-04. **Status:** BDFL ruling (Eric: "spec words blessed").
 Spec v7.20: types.md §4.2.1. Issue #2096. **The compiler is
 NON-COMPLIANT**: `const B = 12.0` is `f64`, and `let z: f32 = B` is

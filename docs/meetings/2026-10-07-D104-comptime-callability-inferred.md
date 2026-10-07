@@ -1,5 +1,7 @@
 # D104 — Comptime-callability is inferred; `comptime fn` is a checked promise
 
+**Laws:** 4, 1 (docs/mission.md).
+
 Ruled by Eric, 2026-10-07 (#2213).
 
 ## Ruling

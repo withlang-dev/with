@@ -1,5 +1,7 @@
 # D61 — Debug (`:?`) is recursive, quoted and escaped; an explicit `impl Debug` is honored at every depth; maps print sorted
 
+**Laws:** 1 (docs/mission.md).
+
 **Date:** 2026-09-23. **Status:** BDFL ruling (Eric: option (a), "bless the
 second as written, with one addition" — sort map keys — and the derive
 question decided by the existing "Available for all types"). §15.4.7 and

@@ -1,5 +1,7 @@
 # D33 — Consuming iteration: §13's `into_iter()` reaffirmed as the surface; observe-by-default stands; the iterator owns the tail
 
+**Laws:** 5 (docs/mission.md).
+
 **Date:** 2026-08-31
 **Status:** Ruled by Eric on the #724 brief. Satisfies D23's deferral
 ("#724 needs its own design ruling") — the ruling is that §13 (normative

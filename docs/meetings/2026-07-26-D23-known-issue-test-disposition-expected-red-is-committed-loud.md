@@ -1,5 +1,7 @@
 # D23 — Known-issue test disposition: expected-red is committed, loud, and bidirectional
 
+**Laws:** 7, 10 (docs/mission.md).
+
 **Date:** 2026-07-26
 **Status:** Accepted — BDFL ruling.
 **Deciders:** Eric (BDFL)

@@ -1,5 +1,7 @@
 # D68 — Float display follows C general formatting
 
+**Laws:** 1 (docs/mission.md).
+
 **Date:** 2026-09-25. **Status:** BDFL ruling (Eric: "we need to match what C
 does", resolving #1649's default-display question).
 

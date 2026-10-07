@@ -1,5 +1,7 @@
 # D103 — A value converts to `Option[T]` where one is demanded
 
+**Laws:** 2, 1 (docs/mission.md).
+
 Ruled by Eric, 2026-10-07 (#2217; deferred from D102).
 
 ## Ruling

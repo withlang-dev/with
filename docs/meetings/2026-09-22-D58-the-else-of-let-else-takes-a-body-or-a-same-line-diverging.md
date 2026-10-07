@@ -1,5 +1,7 @@
 # D58 — The `else` of `let ... else` takes a body or a same-line diverging expression
 
+**Laws:** 1 (docs/mission.md).
+
 **Date:** 2026-09-22. **Status:** BDFL ruling (Eric: "b", then "blessed,
 same-line only. if they want next line they MUST use colon."); §9.7,
 §29.13 and §30.4 carry the blessed text.

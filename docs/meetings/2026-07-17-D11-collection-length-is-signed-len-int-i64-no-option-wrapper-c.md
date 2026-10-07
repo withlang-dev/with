@@ -1,5 +1,7 @@
 # D11 — Collection length is signed: len() -> Int (i64); no Option wrapper; C's -1 conventions stay at the binding layer
 
+**Laws:** 1 (docs/mission.md).
+
 **Date:** 2026-07-17
 **Status:** Accepted — BDFL ruling. **Deciders:** Eric (BDFL)
 

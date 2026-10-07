@@ -1,5 +1,7 @@
 # D7 — Eliminate `self`: the receiver mode is a `fn` prefix keyword; `self` and its type are never written (Swift-style)
 
+**Laws:** 1 (docs/mission.md).
+
 **Date:** 2026-07-07
 **Status:** Accepted — BDFL ruling. Plan: `docs/eliminate-self.md`. Spec: §2.4, §9.5. **Deciders:** Eric (BDFL)
 

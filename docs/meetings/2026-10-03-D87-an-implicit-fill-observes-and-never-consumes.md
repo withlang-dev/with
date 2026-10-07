@@ -1,5 +1,7 @@
 # D87 — An implicit fill observes the binding and never consumes it; `std.context` APIs take `implicit &Context`
 
+**Laws:** 5 (docs/mission.md).
+
 **Date:** 2026-10-03. **Status:** BDFL ruling (Eric: "blessed. approved."
 on the words and on the arena fix). Spec v7.19: with-scoped-access.md
 §7.3a. Issue #2049. **The compiler is NON-COMPLIANT**: an implicit fill

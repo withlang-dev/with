@@ -1,5 +1,7 @@
 # D107 — A migrated definition's function-pointer parameter is `Option` by evidence (body test, NULL caller, nullable sink), computed as a corpus fixed point; system prototypes stay under D102
 
+**Laws:** 4, 3, 9 (docs/mission.md).
+
 **Date:** 2026-10-06. **Status:** Eric's ruling, verbatim below; the
 compiler's migrator is NON-COMPLIANT until it conforms (it wraps every
 migrated definition's and project prototype's function-pointer parameter

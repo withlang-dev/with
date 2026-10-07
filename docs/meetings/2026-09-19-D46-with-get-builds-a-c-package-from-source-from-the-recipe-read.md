@@ -1,5 +1,7 @@
 # D46 — `with get` builds a C package from source from the recipe read as data; no per-package files; `with cc` is clang inside the binary
 
+**Laws:** 8 (docs/mission.md).
+
 **Date:** 2026-09-19. **Status:** ruled (Eric: "with get must build c when
 there's no binary for the package"; "we cant be writing special case code
 for every conan package"; prerequisites "we need to expose them to the

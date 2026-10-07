@@ -1,5 +1,7 @@
 # D28 — str flips owned+Drop; view tokens lose Copy interim; ephemeral view-structs are the token shape; roundtrip migrate pins its cap until the flip
 
+**Laws:** 5, 9 (docs/mission.md).
+
 **Date:** 2026-07-31
 **Status:** Ruled by Eric ("your predictions are both correct. Proceed with my
 blessing.") on the two-ruling #744 brief. Answers D27's reopen clause and the

@@ -1,5 +1,7 @@
 # D67 — `with uat`: acceptance scenarios are a toolchain feature every project has; `with init` scaffolds one
 
+**Laws:** 10, 8 (docs/mission.md).
+
 **Date:** 2026-09-25. **Status:** BDFL ruling (Eric: "blessed" on the §18.5
 line, the §18.8 `with init` row and §18.5d, after "make sure it's written
 in a way that users can use too … `with init` should set up their project

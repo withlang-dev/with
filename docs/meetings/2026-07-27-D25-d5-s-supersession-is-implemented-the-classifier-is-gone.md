@@ -1,5 +1,7 @@
 # D25 — D5's supersession is implemented: the classifier is gone
 
+**Laws:** 9 (docs/mission.md).
+
 **Date:** 2026-07-27
 **Status:** Done — executes Eric's D5-overruled ruling; supersedes D5's
 implementation notes wherever they described the effects sweep.

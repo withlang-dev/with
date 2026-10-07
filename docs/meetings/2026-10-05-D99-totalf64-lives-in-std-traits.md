@@ -1,5 +1,7 @@
 # D99 — `TotalF64` lives in `std.traits` and is imported (delegated)
 
+**Laws:** 1 (docs/mission.md).
+
 **Date:** 2026-10-05. **Status:** delegated (D98): implemented on the
 agent's prediction; Eric vetoes by revert. **Issue:** #2182.
 

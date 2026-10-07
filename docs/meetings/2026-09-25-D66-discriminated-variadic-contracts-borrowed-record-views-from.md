@@ -1,5 +1,7 @@
 # D66 — Discriminated variadic contracts; borrowed record views from a resource or domain; `static` stays the strongest case
 
+**Laws:** 6, 4 (docs/mission.md).
+
 **Date:** 2026-09-25. **Status:** BDFL ruling (Eric, on the libcurl brief:
 "(a) yes, existing law; (b) yes, with tighter semantics; (c) not `returns
 static Record` as proposed"). §16.2b.5 "Discriminated variadic contracts"

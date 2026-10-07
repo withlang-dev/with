@@ -1,5 +1,7 @@
 # D73 — An assignment's value is a read of the place after the store (C's rule under With's view semantics)
 
+**Laws:** 5 (docs/mission.md).
+
 **Date:** 2026-09-27. **Status:** BDFL ruling (Eric: "yeah I can see that.
 Make it so. problem 2, C's rule under With's view semantics").
 

@@ -1,5 +1,7 @@
 # D95 — Five rulings: `let _` drops, `pub const` takes its value's type, `??` binds below `|>`, structural types derive, the SQLite fixture
 
+**Laws:** 1, 2, 10 (docs/mission.md).
+
 **Date:** 2026-10-05. **Status:** BDFL rulings (Eric, all five; the reasons
 below are his). Spec v7.24. Issues #2074, #2101, #2133, #2142, #2161. **The
 implementation is NON-COMPLIANT until it catches up.**
