@@ -6774,7 +6774,12 @@ impl CiExprPool:
     // NULL) is vacuous — `assert(cb != NULL)` and `if (cb)` hold by the
     // type — and lowers to its constant (`1`/`0`, C's comparison value),
     // never to `null` where no null exists. 0 when nothing folds.
-    fn fold_nonnull_fn_null_compare(types: CiTypePool, lhs_id: CiExprId, rhs_id: CiExprId, is_eq: bool) -> CiExprId:
+    // `as_bool`: the result is a bool (an `if (p)` condition), not C's
+    // comparison int.
+    fn fold_nonnull_fn_null_compare(session: i64, types: CiTypePool, lhs_id: CiExprId, rhs_id: CiExprId, is_eq: bool, as_bool: bool = false) -> CiExprId:
+        // D107 governs corpus definitions; a c_import session keeps D102,
+        // where a facade may present the parameter nullable (never fold).
+        if with_cimport_session_is_migration(session) == 0: return 0 as CiExprId
         let lhs_null = ci_expr_is_null_like(self.val(), lhs_id)
         let rhs_null = ci_expr_is_null_like(self.val(), rhs_id)
         if lhs_null == rhs_null: return 0 as CiExprId
@@ -6785,6 +6790,7 @@ impl CiExprPool:
         if (other_ty as i32) == 0: return 0 as CiExprId
         let other_text = ci_print_type(types, other_ty)
         if not ci_type_text_is_fn_ptr(other_text) or ci_nullable_fn_ptr_inner(other_text).len() > 0: return 0 as CiExprId
+        if as_bool: return self.bool_lit(if is_eq: 0 else: 1, 0 as CiTypeId)
         let folded = self.add_string(if is_eq: "0" else: "1")
         self.int_lit(folded, 0 as CiTypeId)
 
@@ -6795,7 +6801,7 @@ impl CiExprPool:
             return value_id
         if with_ci_type_is_pointer(session, cursor) != 0:
             let null_e = self.null_ptr(0 as CiTypeId)
-            let folded = self.fold_nonnull_fn_null_compare(types, value_id, null_e, false)
+            let folded = self.fold_nonnull_fn_null_compare(session, types, value_id, null_e, false, true)
             if (folded as i32) != 0: return folded
             return self.binary(CiBinOp.CIBO_NEQ, value_id, null_e, 0 as CiTypeId)
         if with_ci_type_is_float(session, cursor) != 0:
@@ -9109,7 +9115,7 @@ impl CiExprPool:
 
         let is_unsigned = with_ci_type_is_unsigned(session, cursor)
         if op == BO_EQ or op == BO_NE:
-            let folded = self.fold_nonnull_fn_null_compare(types, lhs_id, rhs_id, op == BO_EQ)
+            let folded = self.fold_nonnull_fn_null_compare(session, types, lhs_id, rhs_id, op == BO_EQ)
             if (folded as i32) != 0: return folded
         var ci_cmp_op: i32 = 0
         if op == BO_EQ: ci_cmp_op = CiBinOp.CIBO_EQ
@@ -9411,7 +9417,7 @@ impl CiExprPool:
             if (inner_id as i32) == 0:
                 return 0 as CiExprId
             let null_e = self.null_ptr(0 as CiTypeId)
-            let folded = self.fold_nonnull_fn_null_compare(types, inner_id, null_e, false)
+            let folded = self.fold_nonnull_fn_null_compare(session, types, inner_id, null_e, false, true)
             if (folded as i32) != 0: return folded
             return self.binary(CiBinOp.CIBO_NEQ, inner_id, null_e, 0 as CiTypeId)
 
@@ -10455,7 +10461,7 @@ impl CiExprPool:
             if self.kind(rhs_cmp) == CiExprKind.CIE_CAST:
                 rhs_cmp = self.add(CiExprKind.CIE_PAREN, rhs_cmp as i32, 0, 0, 0 as CiTypeId)
             if op == BO_EQ or op == BO_NE:
-                let folded = self.fold_nonnull_fn_null_compare(types, lhs_cmp, rhs_cmp, op == BO_EQ)
+                let folded = self.fold_nonnull_fn_null_compare(session, types, lhs_cmp, rhs_cmp, op == BO_EQ)
                 if (folded as i32) != 0: return folded
             let cond_id = self.binary(ci_cmp_op, lhs_cmp, rhs_cmp, 0 as CiTypeId)
             let one_idx = self.add_string("1")
@@ -13746,9 +13752,12 @@ fn ci_try_translate_fn_body_at(session: i64, decl_idx: i32, found_cursor: i32) -
                 // parameter's copy is `Option` only when the body assigns to
                 // it (it may store NULL there); an untouched one keeps the
                 // non-null type and calls through it without ceremony.
+                // In a c_import session (D102) the copy is always Option: a
+                // facade may present the parameter nullable, and the inline
+                // body may test it.
                 let assigned = ci_body_assigns_to(session, body_cursor, cpname)
-                let fn_ptr_param = assigned and ci_type_text_is_fn_ptr(ptype) and ci_nullable_fn_ptr_inner(ptype).len() == 0
-                if assigned:
+                let fn_ptr_param = (assigned or with_cimport_session_is_migration(session) == 0) and ci_type_text_is_fn_ptr(ptype) and ci_nullable_fn_ptr_inner(ptype).len() == 0
+                if assigned or fn_ptr_param:
                     storage_name = ci_param_local_name(cpname, param_index)
                     if fn_ptr_param:
                         ptype = "Option[" ++ ci_unsafe_fn_ptr_type(ptype) ++ "]"

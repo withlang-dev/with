@@ -2289,6 +2289,13 @@ pub fn with_cimport_session_set_migration(session: i64) -> Unit:
         let s = session as *mut CImportSession
         if s as i64 != 0: (*s).migration = 1
 
+/// Whether `session` migrates C (D107's evidence rules apply) rather than
+/// imports it (D102's declaration rules apply).
+pub fn with_cimport_session_is_migration(session: i64) -> i32:
+    unsafe:
+        let s = session as *mut CImportSession
+        if s as i64 == 0: 0 else: (*s).migration
+
 pub fn with_cimport_parse_generation() -> i64:
     g_cimport_parse_counter
 
