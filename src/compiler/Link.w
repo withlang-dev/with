@@ -1717,6 +1717,9 @@ fn link_stage_select_embedded_bundles(undef: &str) -> Vec[str]:
     for bi in 0..count:
         if not embedded_bundle_present(bi):
             continue
+        // #2131: a slot carried for another target is not this link's.
+        if not embedded_bundle_for_this_target(bi):
+            continue
         let manifest = link_stage_embedded_obj_slice(embedded_bundle_manifest_start(bi) as *const u8, embedded_bundle_manifest_end(bi) as *const u8)
         if link_stage_bundle_provided_explicitly(manifest) or not link_stage_bundle_needed(manifest, undef):
             continue

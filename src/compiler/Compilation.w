@@ -617,6 +617,10 @@ impl Compilation:
         for bi in 0..embedded_bundle_count():
             if not embedded_bundle_present(bi):
                 continue
+            // #2131: a bundle's interface is its target's (D39: layouts are
+            // the target's); a slot for another target is not registered.
+            if not embedded_bundle_for_this_target(bi):
+                continue
             let name = embedded_bundle_name(bi)
             let manifest = embedded_bundle_manifest_text(bi)
             if self.bundle_corpus.len() > 0 and self.manifest_lies_under_bundle_corpus(manifest):

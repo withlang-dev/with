@@ -342,7 +342,7 @@ fn add_cross_rt_targets(out0: Build, ctx: &BuildCtx, tag: &str, p: &str, group_n
 // link; out/bootstrap-lib is the seed's generation and serves stage1 only.
 // Group `stage1-runtime`, part of `:dev` so stage1 run by hand links through
 // it (Link.w's <compiler_dir>/../lib candidate).
-fn add_stage1_runtime_targets(out0: Build, host_runtime: &HostRuntimeSpec, corpus_plans: &Vec[WoBundle]) -> Build:
+fn add_stage1_runtime_targets(out0: Build, host_runtime: &HostRuntimeSpec, corpus_plans: &Vec[WoBundle], wasm_plans: &Vec[WoBundle]) -> Build:
     var out = out0
     let dir = "out/bootstrap/lib"
     let stage1 = bootstrap_compiler_bin("with-stage1")
@@ -427,8 +427,11 @@ fn add_stage1_runtime_targets(out0: Build, host_runtime: &HostRuntimeSpec, corpu
             embedded = embedded.arg(build_owned_text(esym))
     for oi in 0..objects.len() as i32:
         embedded = embedded.dep(build_owned_text(objects[oi]))
-    for pi in 0..corpus_plans.len() as i32:
+    for pi in 0..corpus_plans.len():
         embedded = target_with_wo_blobs(move embedded, corpus_plans[pi])
+    // #2131: the wasm32 bundles beside the host's, under their own symbols.
+    for pi in 0..wasm_plans.len():
+        embedded = target_with_wo_blobs_as(move embedded, wasm_plans[pi], wasm_plans[pi].name ++ "_wasm32")
     embedded = target_with_darwin_sysroot_blob(move embedded)
     let embedded_obj = embedded_objects_object("stage-embedded-objects-object", &embedded, "")
     out = out.add_target(embedded)
@@ -742,12 +745,18 @@ fn target_with_empty_wo_blobs(target: Target, prefix: &str, dir: &str, name: &st
 // The tree's bundle (out/wo/<name>.{o,manifest,wi}, build/wo.w) as the
 // blobs of an embed target.
 fn target_with_wo_blobs(target: Target, plan: &WoBundle) -> Target:
+    target_with_wo_blobs_as(target, plan, plan.name)
+
+// The plan's blobs under the symbol base `wo_<symbol>_<kind>`: the plan's
+// own name for a compiler's own bundles, `<name>_<target>` for a second
+// target's bundles carried beside them (#2131).
+fn target_with_wo_blobs_as(target: Target, plan: &WoBundle, symbol: &str) -> Target:
     var out = target
     let kinds = wo_blob_kinds()
-    for ki in 0..kinds.len() as i32:
+    for ki in 0..kinds.len():
         let kind = kinds[ki]
         out = out.input(wo_prefix(plan) ++ "." ++ kind)
-        out = out.arg("wo_" ++ plan.name ++ "_" ++ kind)
+        out = out.arg("wo_" ++ symbol ++ "_" ++ kind)
     // #1157: the bundle's build, not its group. The group carries the store
     // installs, and a dependency that re-ran makes this target stale.
     out.dep(wo_build_target_name(plan))
@@ -2942,6 +2951,10 @@ pub fn build(ctx: BuildCtx) -> Build:
     // out/wo/<name> and the release binary embeds them all. Every site below
     // iterates this list, so a corpus is wired everywhere by construction.
     let corpus_plans = corpora_bundle_plans(ctx)
+    // #2131: the same corpora for wasm32, carried by the native compiler
+    // beside its own (there is no wasm32 cross compiler); the index names
+    // each as `<name>@wasm32` and its blobs are `wo_<name>_wasm32_*`.
+    let corpus_plans_wasm32 = cross_wo_plans(ctx, &corpus_plans, "wasm32")
 
     var compat_runtime = target_new(.Action, "compat-runtime-source", "").output("out/gen/compat_runtime.w")
     compat_runtime = compat_runtime.extra_output("out/gen/compiler/EmbeddedStdlibData.w")
@@ -2950,8 +2963,10 @@ pub fn build(ctx: BuildCtx) -> Build:
     // an arg here and carried as blobs by the embedded-objects targets (an
     // unfilled slot carries zero-length blobs).
     compat_runtime = compat_runtime.extra_output("out/gen/compiler/EmbeddedBundlesData.w")
-    for pi in 0..corpus_plans.len() as i32:
+    for pi in 0..corpus_plans.len():
         compat_runtime = compat_runtime.arg(build_owned_text(corpus_plans[pi].name))
+    for pi in 0..corpus_plans_wasm32.len():
+        compat_runtime = compat_runtime.arg(corpus_plans_wasm32[pi].name ++ "@wasm32")
     // ...and the corpus directories the embedded stdlib leaves out.
     compat_runtime = corpora_exclude_args(move compat_runtime)
     compat_runtime = compat_runtime.input(build_owned_text(host_runtime.compat_source))
@@ -3298,9 +3313,14 @@ pub fn build(ctx: BuildCtx) -> Build:
             bootstrap_embedded_objects = bootstrap_embedded_objects.dep(empty_platform_blob_target("bootstrap-empty-", bsym3))
     // Stage1 precedes the tree's bundle, so only its embedding keeps empty
     // slots. The populated stage object has its own producer and output.
-    for pi in 0..corpus_plans.len() as i32:
+    for pi in 0..corpus_plans.len():
         out = add_empty_wo_blob_targets(move out, "bootstrap-", "out/bootstrap-lib", corpus_plans[pi].name)
         bootstrap_embedded_objects = target_with_empty_wo_blobs(move bootstrap_embedded_objects, "bootstrap-", "out/bootstrap-lib", corpus_plans[pi].name)
+    // #2131: the wasm32 slots the index names, empty in stage1 as the host's are.
+    for pi in 0..corpus_plans_wasm32.len():
+        let slot = corpus_plans_wasm32[pi].name ++ "_wasm32"
+        out = add_empty_wo_blob_targets(move out, "bootstrap-", "out/bootstrap-lib", slot)
+        bootstrap_embedded_objects = target_with_empty_wo_blobs(move bootstrap_embedded_objects, "bootstrap-", "out/bootstrap-lib", slot)
     // stage1 links programs (the stage1 tests, `:dev`): it carries the sysroot.
     bootstrap_embedded_objects = target_with_darwin_sysroot_blob(move bootstrap_embedded_objects)
     let bootstrap_embedded_objects_obj = embedded_objects_object("bootstrap-embedded-objects-object", &bootstrap_embedded_objects, "")
@@ -3422,7 +3442,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     // out/bootstrap/lib beside it. stage2 links them (stage1 compiled its
     // code), stage2 and stage3 embed them, and stage1 run by hand finds them
     // as <compiler_dir>/../lib — its own embedded runtime is the seed's.
-    out = add_stage1_runtime_targets(move out, &host_runtime, &corpus_plans)
+    out = add_stage1_runtime_targets(move out, &host_runtime, &corpus_plans, &corpus_plans_wasm32)
 
     for pi in 0..corpus_plans.len() as i32:
         out = wo_bundle_targets(move out, ctx, corpus_plans[pi], bootstrap_compiler_bin("with-stage1"), "stage1")
@@ -3665,9 +3685,12 @@ pub fn build(ctx: BuildCtx) -> Build:
         if esym2 != host_runtime.platform_symbol:
             embedded_objects = embedded_objects.input(empty_platform_blob_path("out/lib", esym2))
             embedded_objects = embedded_objects.arg(build_owned_text(esym2))
-    // The release binary embeds the tree's bundles (D38).
-    for pi in 0..corpus_plans.len() as i32:
+    // The release binary embeds the tree's bundles (D38), and the wasm32
+    // ones beside them under their own symbols (#2131).
+    for pi in 0..corpus_plans.len():
         embedded_objects = target_with_wo_blobs(move embedded_objects, corpus_plans[pi])
+    for pi in 0..corpus_plans_wasm32.len():
+        embedded_objects = target_with_wo_blobs_as(move embedded_objects, corpus_plans_wasm32[pi], corpus_plans_wasm32[pi].name ++ "_wasm32")
     embedded_objects = target_with_darwin_sysroot_blob(move embedded_objects)
     // Every consumed object's producer, declared (#680 edge audit).
     embedded_objects = embedded_objects.dep("cimport-stubs-object")
@@ -3727,7 +3750,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     // with the release), into out/wo/wasm32/ and the store, so the native
     // compiler can carry them beside its own and a `--target wasm32` link
     // finds a bundle of its target.
-    let corpus_plans_wasm32 = cross_wo_plans(ctx, &corpus_plans, "wasm32")
     for pi in 0..corpus_plans_wasm32.len():
         out = wo_bundle_targets(move out, ctx, corpus_plans_wasm32[pi], bootstrap_compiler_bin("with-stage1"), "stage1")
     out = add_cross_wasm_rt_targets(move out, "wasm32", "cross-wasm-", "cross-rt-wasm", &corpus_plans_wasm32)

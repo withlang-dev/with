@@ -13,6 +13,7 @@
 // is a slot this binary does not fill (stage1 is linked before the tree's
 // bundle exists): it is not present, and nothing consults it.
 use compiler.EmbeddedBundlesData
+use TargetSpec
 extern fn with_str_clone_ref(s: &str) -> str
 
 pub fn embedded_bundle_count() -> i32:
@@ -20,6 +21,14 @@ pub fn embedded_bundle_count() -> i32:
 
 pub fn embedded_bundle_name(index: i32) -> str:
     embedded_bundles_name_data(index)
+// The target a slot's bundle was built for: "" is this compiler's own, a
+// platform name (`wasm32`) is a second target this binary carries beside
+// it (#2131). A bundle is consulted only for the target being compiled.
+pub fn embedded_bundle_target(index: i32) -> str:
+    embedded_bundles_target_data(index)
+pub fn embedded_bundle_for_this_target(index: i32) -> bool:
+    let target = embedded_bundle_target(index)
+    if target.len() == 0: target_spec_is_native() else: target == target_spec_resolved_name()
 
 // A str view over an embedded blob (no copy): the {ptr, len} pair written
 // directly, the way the link stage views embedded runtime objects.

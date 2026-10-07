@@ -1388,7 +1388,7 @@ fn resolve_header_namespace(header: &str) -> str:
 // The embedded bundle whose interface names module `dotted`, or "".
 fn embedded_bundle_providing(dotted: &str) -> str:
     for bi in 0..embedded_bundle_count():
-        if not embedded_bundle_present(bi): continue
+        if not embedded_bundle_present(bi) or not embedded_bundle_for_this_target(bi): continue
         for path in bundle_interface_section_paths(embedded_bundle_interface_text(bi)):
             if bundle_module_dotted_name(path) == dotted: return embedded_bundle_name(bi)
     ""

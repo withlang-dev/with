@@ -1396,6 +1396,40 @@ pub fn memmove(dst: *mut u8, src: *const u8, n: i32) -> *mut u8:
 pub fn memset(dst: *mut u8, c: i32, n: i32) -> *mut u8:
     with_memset(dst, c, n as i64)
 
+// ── C ctype and memchr for the migrated corpora (#2131) ──────────────────
+// A corpus migrated from C declares these as externs (lib/std/re/defs.w);
+// wasm32 has no libc, so the runtime is their one definition, in the C
+// locale: ASCII only, which is what pcre2's tables are built from. A value
+// outside 0..255 (C's EOF) is in no class.
+
+fn is_ascii_digit(c: i32): c >= '0' and c <= '9'
+fn is_ascii_upper(c: i32): c >= 'A' and c <= 'Z'
+fn is_ascii_lower(c: i32): c >= 'a' and c <= 'z'
+fn c_bool(b: bool): if b: 1 else: 0
+
+pub fn isupper(c: i32): c_bool(is_ascii_upper(c))
+pub fn islower(c: i32): c_bool(is_ascii_lower(c))
+pub fn isalpha(c: i32): c_bool(is_ascii_upper(c) or is_ascii_lower(c))
+pub fn isalnum(c: i32): c_bool(is_ascii_upper(c) or is_ascii_lower(c) or is_ascii_digit(c))
+pub fn isxdigit(c: i32): c_bool(is_ascii_digit(c) or (c >= 'a' and c <= 'f') or (c >= 'A' and c <= 'F'))
+pub fn isspace(c: i32): c_bool(c == ' ' or (c >= '\t' and c <= '\r'))
+pub fn iscntrl(c: i32): c_bool((c >= 0 and c < ' ') or c == 127)
+pub fn isprint(c: i32): c_bool(c >= ' ' and c < 127)
+pub fn isgraph(c: i32): c_bool(c > ' ' and c < 127)
+pub fn ispunct(c: i32): c_bool(isgraph(c) != 0 and isalnum(c) == 0)
+pub fn tolower(c: i32): if is_ascii_upper(c): c + 32 else: c
+pub fn toupper(c: i32): if is_ascii_lower(c): c - 32 else: c
+
+pub fn memchr(s: *const u8, c: i32, n: i64) -> *mut u8:
+    let base = s as i64
+    let want = c & 255
+    var i: i64 = 0
+    while i < n:
+        if wasm_load_u8(base, i) == want:
+            return (base + i) as *mut u8
+        i = i + 1
+    0 as *mut u8
+
 // ── Foreign-state domain rows (ruling §52, spec §16.2b.14) ────────────────
 // Every WASI import above is described here; the `runtime-domain-audit`
 // lane (build/compiler.w) refuses a foreign extern without a row. WASI is

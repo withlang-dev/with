@@ -217,8 +217,13 @@ pub fn codegen_is_wasm_libc_provider_symbol(base_name: &str) -> bool:
     base_name == "_exit" or base_name == "abort" or
         base_name == "malloc" or base_name == "free" or
         base_name == "memcpy" or base_name == "memmove" or base_name == "memset" or
-        base_name == "memcmp" or base_name == "bcmp" or
-        base_name == "__multi3"
+        base_name == "memcmp" or base_name == "bcmp" or base_name == "memchr" or
+        base_name == "__multi3" or
+        // #2131: the C ctype family a migrated corpus declares as externs.
+        base_name == "isalnum" or base_name == "isalpha" or base_name == "iscntrl" or
+        base_name == "isgraph" or base_name == "islower" or base_name == "isprint" or
+        base_name == "ispunct" or base_name == "isspace" or base_name == "isupper" or
+        base_name == "isxdigit" or base_name == "tolower" or base_name == "toupper"
 
 pub fn codegen_preserve_runtime_link_name(source_path: &str, base_name: &str) -> bool:
     codegen_is_runtime_source_file(source_path) and (codegen_is_runtime_abi_symbol(base_name) or codegen_is_wasm_libc_provider_symbol(base_name))
