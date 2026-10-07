@@ -135,6 +135,7 @@ let CXK_BINARY_OP: i32 = 114
 let CXK_COMPOUND_ASSIGN_OP: i32 = 115
 let CXK_COND_OP: i32 = 116
 let CXK_CSTYLE_CAST: i32 = 117
+let CXK_CONDITIONAL_OP: i32 = 116   // CXCursor_ConditionalOperator (`c ? a : b`)
 let CXK_IMPLICIT_CAST: i32 = 124
 let CXK_DECL_REF: i32 = 101
 let CXK_MEMBER_REF: i32 = 102
@@ -1888,7 +1889,7 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: &str, demoted_ty
             if spi > 0:
                 si_params = si_params ++ ", "
             let spname = with_cimport_fn_param_name(session, idx, spi)
-            let sptype = with_cimport_fn_param_type_translated(session, idx, spi)
+            let sptype = ci_migrated_param_type(session, idx, spi)
             if ci_cimport_param_type_requires_raw_abi(sptype):
                 si_raw = true
             let actual_pname = ci_param_signature_name(ci_escape_reserved(spname), spi)
@@ -1985,7 +1986,7 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: &str, demoted_ty
         if pi > 0:
             params = params ++ ", "
         let pname = with_cimport_fn_param_name(session, idx, pi)
-        let raw_ptype = with_cimport_fn_param_type_translated(session, idx, pi)
+        let raw_ptype = ci_migrated_param_type(session, idx, pi)
         let is_restrict = with_cimport_param_is_restrict(session, idx, pi)
         var ptype = ci_pointer_type_explicit_mut(raw_ptype)
         if ci_cimport_param_type_requires_raw_abi(ptype):
@@ -6768,6 +6769,25 @@ impl CiStmtPool:
         self.merge3_ir( flag_decl, loop_id, continue_if)
 
 impl CiExprPool:
+    // D107: a NULL comparison on a non-null function pointer (the corpus
+    // decided the parameter non-null: its only test aborts, nobody passes
+    // NULL) is vacuous — `assert(cb != NULL)` and `if (cb)` hold by the
+    // type — and lowers to its constant (`1`/`0`, C's comparison value),
+    // never to `null` where no null exists. 0 when nothing folds.
+    fn fold_nonnull_fn_null_compare(types: CiTypePool, lhs_id: CiExprId, rhs_id: CiExprId, is_eq: bool) -> CiExprId:
+        let lhs_null = ci_expr_is_null_like(self.val(), lhs_id)
+        let rhs_null = ci_expr_is_null_like(self.val(), rhs_id)
+        if lhs_null == rhs_null: return 0 as CiExprId
+        let other = if lhs_null: rhs_id else: lhs_id
+        let other_ty = self.get_type(other)
+        if with_getenv_str("WITH_DEBUG_MIGRATE_NULLABLE").len() > 0:
+            eprint("[migrate-nullable] null-compare: other kind " ++ f"{self.kind(other) as i32} ty {other_ty as i32} " ++ (if (other_ty as i32) != 0: ci_print_type(types, other_ty) else: "<untyped>"))
+        if (other_ty as i32) == 0: return 0 as CiExprId
+        let other_text = ci_print_type(types, other_ty)
+        if not ci_type_text_is_fn_ptr(other_text) or ci_nullable_fn_ptr_inner(other_text).len() > 0: return 0 as CiExprId
+        let folded = self.add_string(if is_eq: "0" else: "1")
+        self.int_lit(folded, 0 as CiTypeId)
+
     fn bool_expr_from_value_ir(session: i64, cursor: i32, value_id: CiExprId, types: CiTypePool) -> CiExprId:
         if (value_id as i32) == 0:
             return 0 as CiExprId
@@ -6775,6 +6795,8 @@ impl CiExprPool:
             return value_id
         if with_ci_type_is_pointer(session, cursor) != 0:
             let null_e = self.null_ptr(0 as CiTypeId)
+            let folded = self.fold_nonnull_fn_null_compare(types, value_id, null_e, false)
+            if (folded as i32) != 0: return folded
             return self.binary(CiBinOp.CIBO_NEQ, value_id, null_e, 0 as CiTypeId)
         if with_ci_type_is_float(session, cursor) != 0:
             let zero_idx = self.add_string("0.0")
@@ -7606,7 +7628,22 @@ pub fn ci_type_is_fn_ptr(types: CiTypePool, ty: CiTypeId) -> bool:
         return ci_type_text_is_fn_ptr(text)
     false
 
-fn ci_type_text_is_fn_ptr(text: &str) -> bool:
+// D107 (#2240): the presented type of parameter `pi` of function `idx` in a
+// migration — the bridge's non-null type, wrapped in `Option` when the
+// corpus's evidence verdict (ci_migrate_fn_param_nullable) says so. The
+// one place the verdict reaches a rendered type: the signature, the body
+// copy and every prototype of the function read it, so all units agree.
+pub fn ci_migrated_param_type(session: i64, idx: i32, pi: i32) -> str:
+    let raw = with_cimport_fn_param_type_translated(session, idx, pi)
+    if not ci_type_text_is_fn_ptr(raw) or ci_nullable_fn_ptr_inner(raw).len() > 0: return raw
+    let verdict = ci_migrate_fn_param_nullable(with_cimport_decl_name(session, idx), pi)
+    if with_getenv_str("WITH_DEBUG_MIGRATE_NULLABLE").len() > 0:
+        eprint("[migrate-nullable] " ++ with_cimport_decl_name(session, idx) ++ f" param {pi}: verdict {verdict} raw " ++ raw)
+    if verdict == 1:
+        return "Option[" ++ ci_unsafe_fn_ptr_type(raw) ++ "]"
+    raw
+
+pub fn ci_type_text_is_fn_ptr(text: &str) -> bool:
     // D102: a nullable function pointer (`Option[extern "C" fn(..)]`) is one too.
     if ci_starts_with(text, "Option[") and text.ends_with("]"): return ci_type_text_is_fn_ptr(text.slice(7, text.len() - 1))
     ci_starts_with(text, "fn(") or ci_starts_with(text, "unsafe fn(") or ci_starts_with(text, "extern \"C\" fn(") or ci_starts_with(text, "unsafe extern \"C\" fn(")
@@ -9071,6 +9108,9 @@ impl CiExprPool:
             return 0 as CiExprId
 
         let is_unsigned = with_ci_type_is_unsigned(session, cursor)
+        if op == BO_EQ or op == BO_NE:
+            let folded = self.fold_nonnull_fn_null_compare(types, lhs_id, rhs_id, op == BO_EQ)
+            if (folded as i32) != 0: return folded
         var ci_cmp_op: i32 = 0
         if op == BO_EQ: ci_cmp_op = CiBinOp.CIBO_EQ
         if op == BO_NE: ci_cmp_op = CiBinOp.CIBO_NEQ
@@ -9371,6 +9411,8 @@ impl CiExprPool:
             if (inner_id as i32) == 0:
                 return 0 as CiExprId
             let null_e = self.null_ptr(0 as CiTypeId)
+            let folded = self.fold_nonnull_fn_null_compare(types, inner_id, null_e, false)
+            if (folded as i32) != 0: return folded
             return self.binary(CiBinOp.CIBO_NEQ, inner_id, null_e, 0 as CiTypeId)
 
         if cast_kind == CI_CAST_FLOAT_TO_BOOL:
@@ -10412,6 +10454,9 @@ impl CiExprPool:
                 lhs_cmp = self.add(CiExprKind.CIE_PAREN, lhs_cmp as i32, 0, 0, 0 as CiTypeId)
             if self.kind(rhs_cmp) == CiExprKind.CIE_CAST:
                 rhs_cmp = self.add(CiExprKind.CIE_PAREN, rhs_cmp as i32, 0, 0, 0 as CiTypeId)
+            if op == BO_EQ or op == BO_NE:
+                let folded = self.fold_nonnull_fn_null_compare(types, lhs_cmp, rhs_cmp, op == BO_EQ)
+                if (folded as i32) != 0: return folded
             let cond_id = self.binary(ci_cmp_op, lhs_cmp, rhs_cmp, 0 as CiTypeId)
             let one_idx = self.add_string("1")
             let zero_idx = self.add_string("0")
@@ -11767,7 +11812,8 @@ impl CiStmtPool:
                         if cimport_type_is_va_list_at(session, parameter, true): types.ty_named(types.add_string("c_va_list"))
                         else: types.type_from_libclang(session, parameter)
                     else:
-                        let raw_param_ty = with_cimport_fn_param_type_translated(session, callee_decl_idx, param_index)
+                        // D107: the callee's parameter as the corpus presents it.
+                        let raw_param_ty = ci_migrated_param_type(session, callee_decl_idx, param_index)
                         types.type_from_translated_text(ci_pointer_type_explicit_mut(raw_param_ty))
                     if (target_ty as i32) != 0:
                         arg_id = exprs.coerce_value_expr_for_target(session, target_ty, arg_cursor, arg_id, types)
@@ -13693,13 +13739,16 @@ fn ci_try_translate_fn_body_at(session: i64, decl_idx: i32, found_cursor: i32) -
             if cpname.len() > 0:
                 let sig_name = ci_param_signature_name(cpname, param_index)
                 var storage_name = with_str_clone_ref(sig_name)
-                let raw_ptype = with_cimport_fn_param_type_translated(session, decl_idx, param_index)
+                let raw_ptype = ci_migrated_param_type(session, decl_idx, param_index)
                 var ptype = ci_pointer_type_explicit_mut(raw_ptype)
-                // D102: the parameter is non-null; the body is C, which may
-                // compare its copy to NULL or assign NULL to it, so a
-                // function-pointer parameter's copy is `Option`.
-                let fn_ptr_param = ci_type_text_is_fn_ptr(ptype) and ci_nullable_fn_ptr_inner(ptype).len() == 0
-                if ci_body_assigns_to(session, body_cursor, cpname) or fn_ptr_param:
+                // D107: the parameter's nullability is the corpus's verdict
+                // (ci_migrated_param_type). A non-null function-pointer
+                // parameter's copy is `Option` only when the body assigns to
+                // it (it may store NULL there); an untouched one keeps the
+                // non-null type and calls through it without ceremony.
+                let assigned = ci_body_assigns_to(session, body_cursor, cpname)
+                let fn_ptr_param = assigned and ci_type_text_is_fn_ptr(ptype) and ci_nullable_fn_ptr_inner(ptype).len() == 0
+                if assigned:
                     storage_name = ci_param_local_name(cpname, param_index)
                     if fn_ptr_param:
                         ptype = "Option[" ++ ci_unsafe_fn_ptr_type(ptype) ++ "]"
@@ -16448,6 +16497,137 @@ fn ci_lvalue_names(session: i64, cursor: i32, name: &str) -> bool:
         return false
     let spelled = with_ci_cursor_spelling(session, c)
     spelled == name or ci_escape_reserved(spelled) == name
+
+// ── D107 (#2240): nullability evidence for function-pointer parameters ──
+//
+// A migrated definition's function-pointer parameter is `Option` by
+// evidence, never by declaration site. These walkers gather the evidence
+// one body gives; CiProject draws the corpus-wide verdict.
+
+// Whether the expression at `cursor`, through parentheses and casts, is C's
+// NULL: the literal 0 or a cast of it (`((void *)0)`).
+pub fn ci_cursor_is_null_like(session: i64, cursor: i32) -> bool:
+    let peeled = ci_peel_transparent_and_cstyle(session, cursor)
+    if with_ci_cursor_kind(session, peeled) != CXK_INT_LITERAL: return false
+    with_ci_eval_int_valid(session, peeled) != 0 and ci_eval_int_text(session, peeled) == "0"
+
+// Whether `cursor`, through parentheses and implicit casts, is a reference
+// spelled `name`.
+fn ci_cursor_names(session: i64, cursor: i32, name: &str) -> bool: ci_lvalue_names(session, ci_peel_transparent(session, cursor), name)
+
+// Calls whose return the program never sees: a NULL branch that ends in one
+// is a contract violation, not a handled case (D107: `assert(p)`).
+fn ci_call_is_abort(session: i64, cursor: i32) -> bool:
+    if with_ci_cursor_kind(session, cursor) != CXK_CALL_EXPR: return false
+    let callee = with_ci_cursor_spelling(session, cursor)
+    callee == "abort" or callee == "exit" or callee == "_exit" or callee == "_Exit" or callee == "quick_exit" or callee == "__builtin_trap" or callee == "__builtin_unreachable" or callee == "__assert_rtn" or callee == "__assert_fail" or callee == "__assert" or callee == "__assert_func" or callee == "_assert" or callee == "__assert2" or callee == "__wassert" or callee == "_wassert"
+
+fn ci_subtree_aborts(session: i64, cursor: i32) -> bool:
+    if ci_call_is_abort(session, cursor): return true
+    let nc = with_ci_num_children(session, cursor)
+    var i = 0
+    while i < nc:
+        if ci_subtree_aborts(session, with_ci_child(session, cursor, i)): return true
+        i = i + 1
+    false
+
+// How a condition tests `name` for NULL: 1 when its truth means the
+// pointer is NULL (`p == NULL`, `!p`), 2 when its truth means non-NULL
+// (`p != NULL`, `p`), 0 when it does not test `name`. `&&`/`||` report the
+// first operand that tests it; the NULL branch is then only approximately
+// known, which errs toward "tested" (Option), the safe direction.
+fn ci_condition_null_sense(session: i64, cursor: i32, name: &str) -> i32:
+    let c = ci_peel_transparent(session, cursor)
+    let kind = with_ci_cursor_kind(session, c)
+    if kind == CXK_DECL_REF:
+        return if ci_cursor_names(session, c, name): 2 else: 0
+    if kind == CXK_UNARY_OP and with_ci_num_children(session, c) == 1:
+        if with_ci_unary_op(session, c) == UO_LNOT:
+            let inner = ci_condition_null_sense(session, with_ci_child(session, c, 0), name)
+            return if inner == 1: 2 else if inner == 2: 1 else: 0
+        return 0
+    if kind == CXK_BINARY_OP and with_ci_num_children(session, c) == 2:
+        let op = with_ci_binary_op(session, c)
+        let lhs = with_ci_child(session, c, 0)
+        let rhs = with_ci_child(session, c, 1)
+        if op == BO_EQ or op == BO_NE:
+            let names_lhs = ci_cursor_names(session, lhs, name) and ci_cursor_is_null_like(session, rhs)
+            let names_rhs = ci_cursor_names(session, rhs, name) and ci_cursor_is_null_like(session, lhs)
+            if names_lhs or names_rhs: return if op == BO_EQ: 1 else: 2
+            return 0
+        if op == BO_LAND or op == BO_LOR:
+            let l = ci_condition_null_sense(session, lhs, name)
+            return if l != 0: l else: ci_condition_null_sense(session, rhs, name)
+    0
+
+// The NULL evidence a definition's body gives for parameter `name`:
+// 1 when a test's NULL branch continues (handled: Option), -1 when every
+// test's NULL branch aborts (a contract: non-null), 0 when untested.
+// `if`/`?:` are the tests; an `if` without `else` whose truth means
+// non-NULL continues past it, which is a handled NULL.
+pub fn ci_body_null_test_evidence(session: i64, cursor: i32, name: &str) -> i32:
+    var verdict = 0
+    let kind = with_ci_cursor_kind(session, cursor)
+    let nc = with_ci_num_children(session, cursor)
+    if (kind == CXK_IF_STMT or kind == CXK_CONDITIONAL_OP) and nc >= 2:
+        let sense = ci_condition_null_sense(session, with_ci_child(session, cursor, 0), name)
+        if sense != 0:
+            // The branch taken when the pointer is NULL.
+            let null_branch = if sense == 1: with_ci_child(session, cursor, 1) else if nc >= 3: with_ci_child(session, cursor, 2) else: -1
+            let aborts = null_branch >= 0 and ci_subtree_aborts(session, null_branch)
+            if aborts:
+                if verdict == 0: verdict = -1
+            else:
+                verdict = 1
+    var i = 0
+    while i < nc:
+        let inner = ci_body_null_test_evidence(session, with_ci_child(session, cursor, i), name)
+        if inner == 1: verdict = 1
+        else if inner == -1 and verdict == 0: verdict = -1
+        i = i + 1
+    verdict
+
+// The call and store evidence one body gives, one record per line:
+//   `null:<callee>:<index>`        a NULL literal passed at that position
+//   `sink:<callee>:<index>:<param>` parameter `param` passed at that position
+//   `field:<param>`                parameter stored into a record field
+//   `global:<param>`               parameter assigned to something not a parameter
+// `params` are the enclosing definition's parameter names.
+pub fn ci_body_call_evidence(session: i64, cursor: i32, params: &Vec[str]) -> str:
+    var out = ""
+    let kind = with_ci_cursor_kind(session, cursor)
+    let nc = with_ci_num_children(session, cursor)
+    if kind == CXK_CALL_EXPR and nc >= 1:
+        let callee = with_ci_cursor_spelling(session, cursor)
+        if callee.len() > 0:
+            var ai = 1
+            while ai < nc:
+                let arg = with_ci_child(session, cursor, ai)
+                let index = ai - 1
+                if ci_cursor_is_null_like(session, arg):
+                    out = out ++ f"null:{callee}:{index}\n"
+                for pi in 0..params.len() as i32:
+                    if ci_cursor_names(session, arg, params[pi]):
+                        out = out ++ f"sink:{callee}:{index}:" ++ params[pi] ++ "\n"
+                ai = ai + 1
+    if kind == CXK_BINARY_OP and nc == 2 and with_ci_binary_op(session, cursor) == BO_ASSIGN:
+        let lhs = with_ci_child(session, cursor, 0)
+        let rhs = with_ci_child(session, cursor, 1)
+        for pi in 0..params.len() as i32:
+            if ci_cursor_names(session, rhs, params[pi]):
+                let l = ci_peel_transparent(session, lhs)
+                if with_ci_cursor_kind(session, l) == CXK_MEMBER_REF:
+                    out = out ++ "field:" ++ params[pi] ++ "\n"
+                else if with_ci_cursor_kind(session, l) == CXK_DECL_REF:
+                    var is_param = false
+                    for pj in 0..params.len() as i32:
+                        if ci_cursor_names(session, l, params[pj]): is_param = true
+                    if not is_param: out = out ++ "global:" ++ params[pi] ++ "\n"
+    var i = 0
+    while i < nc:
+        out = out ++ ci_body_call_evidence(session, with_ci_child(session, cursor, i), params)
+        i = i + 1
+    out
 
 fn ci_body_assigns_to(session: i64, cursor: i32, name: &str) -> bool:
     let kind = with_ci_cursor_kind(session, cursor)

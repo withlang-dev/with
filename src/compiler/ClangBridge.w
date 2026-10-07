@@ -2733,16 +2733,12 @@ pub fn with_cimport_fn_param_type_translated(session: i64, idx: i32, param: i32)
         let arg = clang_Cursor_getArgument(cursor, param as u32)
         let ty = clang_getCursorType(arg)
         var result = translate_parameter_type(s, ty, 0)
-        // D102 (§16.6): a c_import prototype's parameter is where the program
-        // hands C a function pointer, so it stays non-null. A migrated
-        // definition is C itself: its parameter is where C's callers hand it
-        // one, NULL included (`pcre2_set_callout(ctx, NULL, NULL)`), so it
-        // keeps C's nullability.
-        // A system header's prototype (libc's qsort) is not migrated: its
-        // With counterpart keeps the non-null parameter. A function the
-        // project declares is migrated somewhere in the corpus, so every unit
-        // sees the same `Option` parameter, defined here or not.
-        if (*s).migration != 0 and clang_Location_isInSystemHeader(clang_getCursorLocation(cursor)) == 0: result = option_wrapped(s, ty, result)
+        // D102 (§16.6): a function-pointer parameter is non-null. D107: in a
+        // migration, a corpus definition's parameter is `Option` by evidence
+        // (a continuing NULL test, a corpus caller passing NULL, a nullable
+        // sink), decided once by CiProject over the whole corpus; the
+        // migrator presents the verdict (ci_migrate_fn_param_nullable). The
+        // bridge never wraps a parameter from its declaration site.
         if result as i64 == 0: return ""
         session_make_str(s, result as *const u8)
 

@@ -847,6 +847,27 @@ type CiProjectSymbol {
     consumers: str,
     owner_rank: i32,
     owner_definition_kind: i32,
+    // D107 (#2240), CIPS_FN only: per parameter, the evidence the corpus
+    // gives about a function-pointer parameter's nullability, and the
+    // verdict the fixed point draws from it. `param_fn_ptr[i]` is 1 when
+    // parameter i is a function pointer; `param_tested[i]` 1 when the
+    // body tests it for NULL and the NULL branch continues;
+    // `param_aborting[i]` 1 when every test's NULL branch aborts;
+    // `param_null_caller[i]` names the first corpus caller passing NULL;
+    // `param_sinks[i]` lists `callee:index`, `field` and `global` sinks
+    // the body passes it to; `param_nullable[i]` is the verdict (1 Option)
+    // and `param_reason[i]` its one-line reason. `has_definition` is 1 when
+    // a corpus unit defines the function; `unanalyzable` 1 when a body
+    // could not be walked.
+    param_fn_ptr: Vec[i32],
+    param_tested: Vec[i32],
+    param_aborting: Vec[i32],
+    param_null_caller: Vec[str],
+    param_sinks: Vec[str],
+    param_nullable: Vec[i32],
+    param_reason: Vec[str],
+    has_definition: i32,
+    unanalyzable: i32,
 }
 // #747: str field — owned, non-Copy now; moves/clones spell intent.
 
@@ -860,6 +881,15 @@ fn CiProjectSymbol.new(name: &str, kind: i32) -> CiProjectSymbol:
         consumers: "",
         owner_rank: -1,
         owner_definition_kind: 0,
+        param_fn_ptr: Vec.new(),
+        param_tested: Vec.new(),
+        param_aborting: Vec.new(),
+        param_null_caller: Vec.new(),
+        param_sinks: Vec.new(),
+        param_nullable: Vec.new(),
+        param_reason: Vec.new(),
+        has_definition: 0,
+        unanalyzable: 0,
     }
 
 fn ci_pipe_i32_contains(items: &str, want: i32) -> bool:
@@ -881,6 +911,16 @@ impl CiProjectSymbol:
             return
         self.consumers = self.consumers ++ "|" ++ i64_to_string(module_id as i64) ++ "|"
 
+    // D107: size every per-parameter vector to at least `n` entries.
+    mut fn grow_params(n: i32):
+        while self.param_fn_ptr.len() as i32 < n: self.param_fn_ptr.push(0)
+        while self.param_tested.len() as i32 < n: self.param_tested.push(0)
+        while self.param_aborting.len() as i32 < n: self.param_aborting.push(0)
+        while self.param_null_caller.len() as i32 < n: self.param_null_caller.push("")
+        while self.param_sinks.len() as i32 < n: self.param_sinks.push("")
+        while self.param_nullable.len() as i32 < n: self.param_nullable.push(0)
+        while self.param_reason.len() as i32 < n: self.param_reason.push("")
+
     fn owned_copy() -> CiProjectSymbol:
         CiProjectSymbol {
             name: ci_ir_owned_text(self.name),
@@ -891,6 +931,15 @@ impl CiProjectSymbol:
             consumers: ci_ir_owned_text(self.consumers),
             owner_rank: self.owner_rank,
             owner_definition_kind: self.owner_definition_kind,
+            param_fn_ptr: self.param_fn_ptr.clone(),
+            param_tested: self.param_tested.clone(),
+            param_aborting: self.param_aborting.clone(),
+            param_null_caller: self.param_null_caller.clone(),
+            param_sinks: self.param_sinks.clone(),
+            param_nullable: self.param_nullable.clone(),
+            param_reason: self.param_reason.clone(),
+            has_definition: self.has_definition,
+            unanalyzable: self.unanalyzable,
         }
 
 fn ci_project_symbol_key(kind: i32, name: &str) -> str:

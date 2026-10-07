@@ -1148,6 +1148,10 @@ impl CiProject:
                         self.symbols[symbol_id].owner_module = header_owner
                         self.symbols[symbol_id].owner_rank = 1
                         self.symbols[symbol_id].owner_definition_kind = 1
+                        // D107: a header-owned inline definition is a corpus
+                        // definition; its evidence counts once.
+                        if self.symbols[symbol_id].has_definition == 0:
+                            self.record_fn_evidence(session, i, cursor, symbol_id)
                     i = i + 1
                     continue
                 let symbol_id = self.ensure_symbol(CiProjectSymbolKind.CIPS_FN, name)
@@ -1163,6 +1167,8 @@ impl CiProject:
                 self.symbols[symbol_id].owner_module = module_id
                 self.symbols[symbol_id].owner_rank = 1
                 self.symbols[symbol_id].owner_definition_kind = 1
+                // D107: the evidence this definition's body gives.
+                self.record_fn_evidence(session, i, cursor, symbol_id)
             i = i + 1
 
         with_cimport_dispose(session)
@@ -1386,6 +1392,14 @@ pub fn migrate_c_file(input_path_arg: &str, output_path_arg: &str) -> i32:
     let output_path = ci_migrate_fs_path(output_path_arg)
     var project = CiProject.new()
     ci_migrate_writes_reset()
+    // D107: a lone unit is its own corpus — its definitions' body evidence
+    // and NULL callers decide their function-pointer parameters.
+    var one: Vec[str] = Vec.new()
+    one.push(input_path.clone())
+    project.register_modules(&one)
+    if project.migrate_scan_file(input_path) != 0: return 1
+    project.resolve_fn_ptr_nullability()
+    project.export_fn_ptr_nullability(true)
     let rc = ci_migrate_file_inner(input_path, output_path, false, &project)
     if rc != 0: return rc
     ci_migrate_apply_writes_clauses()
@@ -1570,6 +1584,191 @@ fn ci_migrate_collect_c_files(input_dir: &str, exclude_basenames: &str) -> Vec[s
         pos = line_end + 1
     files
 
+// ── D107 (#2240): nullable-by-evidence function-pointer parameters ──────
+//
+// The verdicts the last `resolve_fn_ptr_nullability` drew, exported for
+// CImport: one entry per corpus function, `bits` holding one char per
+// parameter ('1' Option, '0' non-null, '?' not a function pointer) and
+// `reasons` the one-line reason per parameter, `|`-separated.
+var g_migrate_fn_nullable_names: Vec[str] = Vec.new()
+var g_migrate_fn_nullable_bits: Vec[str] = Vec.new()
+var g_migrate_fn_nullable_reasons: Vec[str] = Vec.new()
+
+fn ci_migrate_fn_nullable_index(name: &str) -> i32:
+    for i in 0..g_migrate_fn_nullable_names.len() as i32:
+        if g_migrate_fn_nullable_names[i] == name: return i
+    -1
+
+/// D107: 1 when parameter `index` of corpus function `name` is `Option`,
+/// 0 when the corpus decided it non-null, -1 when the corpus has no
+/// verdict (not a corpus definition: D102's declaration rules apply).
+pub fn ci_migrate_fn_param_nullable(name: &str, index: i32) -> i32:
+    let i = ci_migrate_fn_nullable_index(name)
+    if i < 0: return -1
+    let bits = g_migrate_fn_nullable_bits[i]
+    if index < 0 or index >= bits.len() as i32: return -1
+    let c = bits[index]
+    if c == '1': 1 else if c == '0': 0 else: -1
+
+/// The reason behind `ci_migrate_fn_param_nullable`'s verdict, or "".
+pub fn ci_migrate_fn_param_reason(name: &str, index: i32) -> str:
+    let i = ci_migrate_fn_nullable_index(name)
+    if i < 0: return ""
+    let parts = g_migrate_fn_nullable_reasons[i].split("|")
+    if index < 0 or index >= parts.len() as i32: return ""
+    parts[index].to_owned()
+
+impl CiProject:
+    // The evidence definition `decl_idx` (cursor `cursor`) gives: which
+    // parameters are function pointers, whether the body tests each for
+    // NULL (and how), the NULL literals it passes to corpus callees, and
+    // where it passes or stores its own parameters.
+    mut fn record_fn_evidence(session: i64, decl_idx: i32, cursor: i32, symbol_id: i32):
+        let count = with_cimport_fn_param_count(session, decl_idx)
+        var names: Vec[str] = Vec.new()
+        for pi in 0..count:
+            names.push(ci_escape_reserved(with_cimport_fn_param_name(session, decl_idx, pi)))
+        self.symbols[symbol_id].grow_params(count)
+        self.symbols[symbol_id].has_definition = 1
+        for pi in 0..count:
+            let ptype = with_cimport_fn_param_type_translated(session, decl_idx, pi)
+            if not ci_type_text_is_fn_ptr(ptype): continue
+            self.symbols[symbol_id].param_fn_ptr[pi] = 1
+            if names[pi].len() == 0:
+                self.symbols[symbol_id].unanalyzable = 1
+                continue
+            let test = ci_body_null_test_evidence(session, cursor, names[pi])
+            if test == 1: self.symbols[symbol_id].param_tested[pi] = 1
+            else if test == -1: self.symbols[symbol_id].param_aborting[pi] = 1
+        let fname = with_str_clone_ref(self.symbols[symbol_id].name)
+        for line in ci_body_call_evidence(session, cursor, &names).split("\n"):
+            if line.len() == 0: continue
+            let parts = line.split(":")
+            if parts[0] == "null" and parts.len() == 3:
+                let callee = self.ensure_symbol(CiProjectSymbolKind.CIPS_FN, parts[1])
+                let index = parse(parts[2])
+                self.symbols[callee].grow_params(index + 1)
+                if self.symbols[callee].param_null_caller[index].len() == 0:
+                    self.symbols[callee].param_null_caller[index] = fname.clone()
+            else if parts[0] == "sink" and parts.len() == 4:
+                let pi = ci_index_of_name(&names, parts[3])
+                if pi >= 0: self.symbols[symbol_id].param_sinks[pi] = self.symbols[symbol_id].param_sinks[pi] ++ parts[1] ++ ":" ++ parts[2] ++ ";"
+            else if (parts[0] == "field" or parts[0] == "global") and parts.len() == 2:
+                let pi = ci_index_of_name(&names, parts[1])
+                if pi >= 0: self.symbols[symbol_id].param_sinks[pi] = self.symbols[symbol_id].param_sinks[pi] ++ parts[0] ++ ";"
+
+    // The least fixed point over the corpus (D107): a parameter is Option
+    // when its body tests it with a continuing NULL branch, a corpus caller
+    // passes NULL, it is stored into a field or a global, it is passed to a
+    // corpus parameter that is Option, or it is passed to a corpus function
+    // with no definition here (an unresolved dependency); a cycle of
+    // sinks with no other evidence is Option for every member. The order
+    // of units never enters: the result is a function of the evidence.
+    mut fn resolve_fn_ptr_nullability():
+        let n = self.symbols.len() as i32
+        for si in 0..n:
+            if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN: continue
+            let count = self.symbols[si].param_fn_ptr.len() as i32
+            self.symbols[si].grow_params(count)
+            for pi in 0..count:
+                if self.symbols[si].param_fn_ptr[pi] == 0: continue
+                if self.symbols[si].unanalyzable != 0:
+                    self.symbols[si].param_nullable[pi] = 1
+                    self.symbols[si].param_reason[pi] = "Option: body not analyzable"
+                else if self.symbols[si].param_tested[pi] != 0:
+                    self.symbols[si].param_nullable[pi] = 1
+                    self.symbols[si].param_reason[pi] = "Option: body tests it for NULL and continues"
+                else if self.symbols[si].param_null_caller[pi].len() > 0:
+                    self.symbols[si].param_nullable[pi] = 1
+                    self.symbols[si].param_reason[pi] = "Option: caller " ++ self.symbols[si].param_null_caller[pi] ++ " passes NULL"
+                else if self.symbols[si].param_sinks[pi].contains("field;"):
+                    self.symbols[si].param_nullable[pi] = 1
+                    self.symbols[si].param_reason[pi] = "Option: stored into a record field"
+                else if self.symbols[si].param_sinks[pi].contains("global;"):
+                    self.symbols[si].param_nullable[pi] = 1
+                    self.symbols[si].param_reason[pi] = "Option: assigned to a global"
+        // Propagate through sinks to closure.
+        var changed = true
+        while changed:
+            changed = false
+            for si in 0..n:
+                if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN: continue
+                let count = self.symbols[si].param_fn_ptr.len() as i32
+                for pi in 0..count:
+                    if self.symbols[si].param_fn_ptr[pi] == 0 or self.symbols[si].param_nullable[pi] != 0: continue
+                    for sink in self.symbols[si].param_sinks[pi].split(";"):
+                        if not sink.contains(":"): continue
+                        let kv = sink.split(":")
+                        let callee = self.find_symbol(CiProjectSymbolKind.CIPS_FN, kv[0])
+                        let index = parse(kv[1])
+                        if callee < 0: continue   // not declared by the project: a system prototype, D102 non-null
+                        if self.symbols[callee].has_definition == 0:
+                            self.symbols[si].param_nullable[pi] = 1
+                            self.symbols[si].param_reason[pi] = "Option: passed to " ++ kv[0] ++ ", defined outside the corpus"
+                            changed = true
+                            break
+                        if index < self.symbols[callee].param_nullable.len() as i32 and self.symbols[callee].param_nullable[index] != 0:
+                            self.symbols[si].param_nullable[pi] = 1
+                            self.symbols[si].param_reason[pi] = "Option: passed to " ++ kv[0] ++ f" param {index}, which is Option"
+                            changed = true
+                            break
+        // A cycle with no other evidence: Option for every member. A
+        // parameter still non-null whose sink chain reaches itself is one.
+        for si in 0..n:
+            if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN: continue
+            let count = self.symbols[si].param_fn_ptr.len() as i32
+            for pi in 0..count:
+                if self.symbols[si].param_fn_ptr[pi] == 0 or self.symbols[si].param_nullable[pi] != 0: continue
+                if self.sink_chain_reaches(si, pi, si, pi, 0):
+                    self.symbols[si].param_nullable[pi] = 1
+                    self.symbols[si].param_reason[pi] = "Option: part of a cycle of forwarded parameters"
+        for si in 0..n:
+            if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN: continue
+            let count = self.symbols[si].param_fn_ptr.len() as i32
+            for pi in 0..count:
+                if self.symbols[si].param_fn_ptr[pi] != 0 and self.symbols[si].param_nullable[pi] == 0:
+                    self.symbols[si].param_reason[pi] = if self.symbols[si].param_aborting[pi] != 0: "non-null: the NULL branch aborts (a contract), no NULL callers" else: "non-null: called unconditionally, no NULL callers"
+
+    fn sink_chain_reaches(from_si: i32, from_pi: i32, target_si: i32, target_pi: i32, depth: i32) -> bool:
+        if depth > 64: return false
+        for sink in self.symbols[from_si].param_sinks[from_pi].split(";"):
+            if not sink.contains(":"): continue
+            let kv = sink.split(":")
+            let callee = self.find_symbol(CiProjectSymbolKind.CIPS_FN, kv[0])
+            if callee < 0: continue
+            let index = parse(kv[1])
+            if index >= self.symbols[callee].param_fn_ptr.len() as i32: continue
+            if callee == target_si and index == target_pi: return true
+            if self.sink_chain_reaches(callee, index, target_si, target_pi, depth + 1): return true
+        false
+
+    // Export the verdicts for CImport and say each one once.
+    fn export_fn_ptr_nullability(verbose: bool):
+        g_migrate_fn_nullable_names = Vec.new()
+        g_migrate_fn_nullable_bits = Vec.new()
+        g_migrate_fn_nullable_reasons = Vec.new()
+        for si in 0..self.symbols.len() as i32:
+            if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or self.symbols[si].has_definition == 0: continue
+            var bits = ""
+            var reasons = ""
+            let count = self.symbols[si].param_fn_ptr.len() as i32
+            for pi in 0..count:
+                if pi > 0: reasons = reasons ++ "|"
+                if self.symbols[si].param_fn_ptr[pi] == 0:
+                    bits = bits ++ "?"
+                    continue
+                bits = bits ++ (if self.symbols[si].param_nullable[pi] != 0: "1" else: "0")
+                reasons = reasons ++ self.symbols[si].param_reason[pi]
+                if verbose: eprint("migrate: " ++ self.symbols[si].name ++ f" param {pi}: " ++ self.symbols[si].param_reason[pi])
+            g_migrate_fn_nullable_names.push(self.symbols[si].name.clone())
+            g_migrate_fn_nullable_bits.push(bits)
+            g_migrate_fn_nullable_reasons.push(reasons)
+
+fn ci_index_of_name(names: &Vec[str], name: &str) -> i32:
+    for i in 0..names.len() as i32:
+        if names[i] == name: return i
+    -1
+
 fn ci_migrate_directory_filewise(input_dir: &str, output_dir: &str, files: &Vec[str]) -> i32:
     let fragments: Vec[str] = Vec.new()
     with_fs_mkdir_p(output_dir)
@@ -1593,6 +1792,10 @@ fn ci_migrate_directory_filewise(input_dir: &str, output_dir: &str, files: &Vec[
                 return 1
             scan_i = scan_i + 1
 
+        // D107: the corpus-wide nullability verdicts, drawn once the whole
+        // project is scanned; said once per directory.
+        project.resolve_fn_ptr_nullability()
+        project.export_fn_ptr_nullability(i == 0)
         let rc = ci_migrate_file_inner(file_path, out_path, true, &project)
         if rc != 0:
             eprint(f"migrate: failed while migrating {base}")
@@ -1636,6 +1839,9 @@ pub fn migrate_c_directory(input_dir_arg: &str, output_dir_arg: &str, exclude_ba
         if project.migrate_scan_file(sorted_files[scan_i]) != 0:
             return 1
         scan_i = scan_i + 1
+    // D107: the corpus-wide nullability verdicts, drawn once, said once.
+    project.resolve_fn_ptr_nullability()
+    project.export_fn_ptr_nullability(true)
 
     var fi = 0
     let total_files = sorted_files.len() as i32
@@ -1913,7 +2119,7 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: &str, pr
     for pi in 0..param_count:
         if pi > 0:
             params = params ++ ", "
-        let raw_ptype = with_cimport_fn_param_type_translated(session, idx, pi)
+        let raw_ptype = ci_migrated_param_type(session, idx, pi)   // D107: the corpus verdict
         var ptype = ci_pointer_type_explicit_mut(raw_ptype)
 
         if ci_starts_with(ptype, "__UNSUPPORTED:"):

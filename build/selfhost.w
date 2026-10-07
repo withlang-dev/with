@@ -4185,6 +4185,53 @@ fn bs_migrate_expect_success(ctx: &ActionCtx, compiler_path: &str, case_dir: &st
 // D101 (#2214): C's `{0}` on a record and `memset(&x, 0, sizeof x)` (also
 // through a pointer, `sizeof *p` and `sizeof(T)`) are `T.zeroed()`; a fill
 // of another byte, another size, or a non-record stays `with_memset`.
+// D107 (#2240): a migrated definition's function-pointer parameter is
+// `Option` by evidence — a continuing NULL test, a corpus caller passing
+// NULL, a store into a field, or a forward to a parameter that is Option —
+// and non-null when its only test aborts (`assert`) and nobody passes
+// NULL; callers wrap `Some` only where the callee is `Option`, and a NULL
+// comparison on a non-null parameter folds to its constant.
+fn bs_check_migrate_nullable_by_evidence(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "evidence.c")
+    let out_w = bs_join(case_dir, "evidence.w")
+    var rc = bs_write_fixture(ctx, src, "#include <assert.h>\n#include <stdlib.h>\ntypedef int (*cb_t)(int);\nstruct holder { cb_t stored; };\nstatic struct holder g;\nint handled(cb_t cb, int x) { if (cb == NULL) return -1; return cb(x); }\nint contract(cb_t cb, int x) { assert(cb != NULL); return cb(x); }\nint direct(cb_t cb, int x) { return cb(x); }\nint forwarded(cb_t cb, int x) { return direct(cb, x); }\nint stored(cb_t cb) { g.stored = cb; return 0; }\nint via_handled(cb_t cb, int x) { return handled(cb, x); }\nint caller(int x) { return direct(NULL, x); }\nint add1(int x) { return x + 1; }\nint run(void) { return handled(add1, 1) + contract(add1, 2) + direct(add1, 3) + forwarded(add1, 4) + via_handled(add1, 5); }\n", "nullable by evidence fixture")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("--prefer-brace")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-nullable-by-evidence", args)
+    if result.rc != 0: return result.rc
+    rc = bs_assert_contains(ctx, result.stderr, "handled param 0: Option: body tests it for NULL and continues", "evidence reason: handled test")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, result.stderr, "contract param 0: non-null: the NULL branch aborts (a contract), no NULL callers", "evidence reason: assert")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, result.stderr, "direct param 0: Option: caller caller passes NULL", "evidence reason: NULL caller")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, result.stderr, "stored param 0: Option: stored into a record field", "evidence reason: field store")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, result.stderr, "forwarded param 0: Option: passed to direct param 0, which is Option", "evidence reason: forwarded")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, out_w, "pub fn handled(__param_cb: Option[extern \"C\" fn(c_int) -> c_int]", "evidence: handled is Option")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, out_w, "pub fn contract(__param_cb: extern \"C\" fn(c_int) -> c_int", "evidence: contract is non-null")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, out_w, "direct(null, __param_x)", "evidence: NULL caller passes null")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, out_w, "handled(Some(add1)", "evidence: caller wraps Some for an Option callee")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, out_w, "contract(add1,", "evidence: caller passes a bare fn to a non-null callee")
+    if rc != 0: return rc
+    var check_args: Vec[str] = Vec.new()
+    check_args |> push("check")
+    check_args |> push(bs_abs(root, out_w))
+    let checked = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-nullable-by-evidence", check_args)
+    checked.rc
+
 fn bs_check_migrate_zeroed_records(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "zeroed.c")
@@ -5091,6 +5138,8 @@ pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     var rc = bs_check_migrate_global_init_list(ctx, compiler_path, bs_join(output_dir, "global_init_list"))
     if rc != 0: return rc
     rc = bs_check_migrate_zeroed_records(ctx, compiler_path, bs_join(output_dir, "zeroed_records"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_nullable_by_evidence(ctx, compiler_path, bs_join(output_dir, "nullable_by_evidence"))
     if rc != 0: return rc
     rc = bs_check_migrate_nullable_fn_pointer(ctx, compiler_path, bs_join(output_dir, "nullable_fn_pointer"))
     if rc != 0: return rc
