@@ -153,7 +153,7 @@ fn blocks_of(path: &str, text: &str) -> Vec[Source]:
                 inside = false
             else:
                 inside = true
-                let info = line.slice(3, line.len()).trim()
+                let info = line.slice(3, line.len()).trim().to_owned()
                 audited = info.len() == 0 or info == "with"
                 start = number + 1
                 body = Vec.new()
