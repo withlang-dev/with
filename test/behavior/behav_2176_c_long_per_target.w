@@ -5,6 +5,7 @@
 // AArch64 Linux; the With side (`c_long`, `sizeof[S]()`) and the C side
 // (`sizeof(struct S)`, parsed by clang for the same target) agree on every
 // host this runs on.
+use std.os.Target
 use std.sysinfo
 use c_import("struct S { long a; long b; };
 static inline unsigned long s_size(void) { return sizeof(struct S); }
