@@ -589,8 +589,11 @@ impl Sema:
         0
 
     mut fn ct_eval_truthy(source_ast: AstPool, node: i32) -> i32:
-        let value = unsafe { comptime_try_eval_expr(self as *mut Sema, source_ast, self.pool, node) }
+        self.comptime_truthy_error = ""
+        var evald = unsafe { comptime_try_eval_expr_result(self as *mut Sema, source_ast, self.pool, node) }
+        let value = move evald.value
         if comptime_value_is_valid(value) == 0:
+            self.comptime_truthy_error = move evald.error_msg
             return -1
         let truthy = comptime_value_truthy(value)
         if truthy >= 0:

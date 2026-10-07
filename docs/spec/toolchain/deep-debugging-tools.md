@@ -659,6 +659,19 @@ a corpus and the release never does; #2249 was a bridge that required an
 engine twin to be ambient after the corpus boundary made no corpus ambient.
 A rule toggled and rebuilt to see what changes is the bisect this replaces.
 
+**A name accepted in one spelling and refused in another.** Write the
+name three ways in one program — a runtime use (`let t = X`), a comptime
+subject (`comptime match X` or `comptime if X.is_copy()`), a type position
+(`let v: X`) — and run `explain:visible:X`. The verdict is Sema's gate; a
+spelling that disagrees with it did not ask the gate. #2248's second half
+was two of them: the evaluator found every module's `let` by name
+(`ComptimeEval.find_module_let_decl`) and read the flat type table
+(`static_type_expr`), so `comptime match HIDDEN` through a module never
+imported printed a value while `print(HIDDEN)` beside it was refused, on
+every generation. The fix routes the lookup through the gate
+(`decl_node_visible_from_current`, `lookup_named_type_visible`); the
+fixtures are `test/compile_errors/err_2248_comptime_*_not_transitive.w`.
+
 ```
 explain:visible is_alnum
   from module test/behavior/behav_1362_std_helper_resolves_unimported.w (package <program>)

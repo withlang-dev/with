@@ -1807,7 +1807,10 @@ impl Sema:
             // #2011: an unimported std type (§18.1) is the same error here as in
             // an annotation; left silent, `Vec[Task[i32]].new()` without `use
             // std.task.Task` passed Sema and failed MIR lowering.
-            if named == 0 and (self.private_symbol_path_from_current(sym).len() > 0 or self.std_gated_import_note(sym).len() > 0):
+            // #2248: a `pub` type some unimported module declares is as
+            // unresolved here as a private one; left silent, a comptime
+            // condition over it reported only "not comptime-evaluable".
+            if named == 0 and (self.named_type_candidate_head(sym) >= 0 or self.private_symbol_path_from_current(sym).len() > 0 or self.std_gated_import_note(sym).len() > 0):
                 self.emit_private_symbol_error(sym, node)
             return named
         if kind == NodeKind.NK_TYPE_GENERIC:
@@ -23371,7 +23374,10 @@ impl Sema:
             let cond = self.ast.get_data0(current)
             let truthy = self.eval_comptime_if_condition_truthy(cond)
             if truthy < 0:
-                self.emit_error("comptime if condition is not comptime-evaluable", cond)
+                // #2248: the evaluator's reason, when it gave one.
+                let reason = self.comptime_truthy_error.clone()
+                if reason.len() > 0: self.emit_error(reason, cond)
+                else: self.emit_error("comptime if condition is not comptime-evaluable", cond)
                 return -1
             let selected = if truthy != 0: self.ast.get_data1(current) else: self.ast.get_data2(current)
             if truthy != 0:

@@ -64,12 +64,12 @@ unsafe fn AesGcm.new(key: *const u8, iv: *const u8, iv_len: i32) -> AesGcm:
     let aes_ctx = Aes128.new(key)
     var h: [u8; 16] = [0 as u8; 16]
     let hp = &raw mut h[0] as *mut u8
-    unsafe { Aes128.encrypt_block(&aes_ctx as *const Aes128, hp) }
+    Aes128.encrypt_block(&aes_ctx as *const Aes128, hp)
 
     var j0: [u8; 16] = [0 as u8; 16]
     if iv_len == 12:
         for i in 0..12:
-            j0[i] = unsafe *(iv + i as u64)
+            j0[i] = *(iv + i as u64)
         j0[15] = 1 as u8
 
     var counter: [u8; 16] = [0 as u8; 16]

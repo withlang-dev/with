@@ -2286,6 +2286,22 @@ impl ComptimeEvaluator:
             i = i - 1
         -1
 
+    // #2248: a module-level `let` the evaluator reaches is Sema's to admit.
+    // find_module_let_decl scans every module's declarations by name, so a
+    // comptime subject read what a runtime use of the same name was refused
+    // (`comptime match HIDDEN` through a module the current one never
+    // imports; `comptime match Target.os` through a corpus-private std.os on
+    // one compiler generation and not the other). Sema's gate decides, from
+    // the module being evaluated, and the message is the runtime use's.
+    fn module_let_visible(decl: i32) -> i32: self.sema.decl_node_visible_from_current(decl)
+
+    fn invisible_name_message(sym: i32) -> str:
+        let name = self.pool.resolve(sym)
+        let sema_sym = self.sema.pool_lookup_symbol(name)
+        let note = if sema_sym != 0: self.sema.std_gated_import_note(sema_sym) else: "".to_owned()
+        if note.len() > 0: return "'" ++ name ++ "' requires an explicit import (§18.1)" ++ note
+        "symbol '" ++ name ++ "' is not visible from this module"
+
     mut fn lookup_value(sym: i32, node: i32) -> ComptimeControl:
         let idx = self.lookup_slot_index(sym)
         if idx >= 0:
@@ -2293,6 +2309,8 @@ impl ComptimeEvaluator:
         let decl = self.find_module_let_decl(sym)
         if decl == 0:
             return self.fail(node, "runtime value is not available at comptime")
+        if self.module_let_visible(decl) == 0:
+            return self.fail(node, self.invisible_name_message(sym))
         if self.ast.get_data2(decl) % 2 != 0:
             return self.fail(node, "mutable global access is not allowed in comptime")
         self.eval_module_let_decl(decl, node)
@@ -2906,9 +2924,9 @@ impl ComptimeEvaluator:
             let subst = self.sema.lookup_generic_subst(sym)
             if subst != 0:
                 return subst
-            if self.sema.named_types.contains(sym):
-                return self.sema.named_types.get(sym).unwrap()
-            return 0
+            // #2248: the visible candidate, as an annotation resolves it;
+            // the flat named_types table named every module's type.
+            return self.sema.lookup_named_type_visible(sym)
         if kind == NodeKind.NK_INDEX:
             let base = self.ast.get_data0(node)
             let base_sym =
@@ -6698,6 +6716,8 @@ impl ComptimeEvaluator:
                 return self.eval_expr(self.sema.binding_value_nodes.get(sym).unwrap())
         let decl = self.find_module_let_decl(sym)
         if decl != 0:
+            if self.module_let_visible(decl) == 0:
+                return self.fail(node, self.invisible_name_message(sym))
             if self.ast.get_data2(decl) % 2 != 0:
                 return self.fail(node, "mutable global access is not allowed in comptime")
             return self.eval_module_let_decl(decl, node)
@@ -6705,6 +6725,11 @@ impl ComptimeEvaluator:
             return self.eval_disc_variant_sym(sym, node)
         if self.find_fn_decl_node(sym) != 0:
             return comptime_control_value(comptime_value_fn(self.node_type_or(node, 0), sym))
+        // #2248: a type some module declares and this one cannot see
+        // (`HiddenT.is_copy()` through a module never imported here).
+        let sema_sym = self.sema.pool_lookup_symbol(self.pool.resolve(sym))
+        if sema_sym != 0 and self.sema.named_type_candidate_head(sema_sym) >= 0 and self.sema.lookup_named_type_visible(sema_sym) == 0:
+            return self.fail(node, self.invisible_name_message(sym))
         self.fail(node, "runtime value is not available at comptime")
 
     mut fn eval_field_access(node: i32) -> ComptimeControl:
@@ -6717,8 +6742,9 @@ impl ComptimeEvaluator:
             // looked tables up with AST-pool syms and silently missed).
             let base_sema_sym = self.sema.pool_lookup_symbol(self.pool.resolve(base_sym))
             let field_sema_sym = self.sema.pool_lookup_symbol(self.pool.resolve(field))
-            if base_sema_sym != 0 and self.sema.named_types.contains(base_sema_sym):
-                let base_tid: i32 = self.sema.named_types.get(base_sema_sym).unwrap()
+            // #2248: the enum must be visible from here, as a type name is.
+            let base_tid: i32 = if base_sema_sym != 0: self.sema.lookup_named_type_visible(base_sema_sym) else: 0
+            if base_tid != 0:
                 let base_resolved = self.sema.resolve_alias(base_tid as TypeId)
                 if self.sema.get_type_kind(base_resolved) == TypeKind.TY_ENUM and field_sema_sym != 0 and self.sema.enum_has_variant(base_resolved as i32, field_sema_sym) != 0:
                     let qual_name = self.pool.resolve(base_sym) ++ "." ++ self.pool.resolve(field)

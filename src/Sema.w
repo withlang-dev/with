@@ -2284,6 +2284,10 @@ pub type Sema {
     // every rule a verdict passed through, when on.
     visibility_explain_on: i32,
     visibility_explain_log: Vec[str],
+    // #2248: the evaluator's own message for the last `comptime if`
+    // condition that did not evaluate, so the report names the cause (an
+    // unimported type) instead of "not comptime-evaluable".
+    comptime_truthy_error: str,
     decl_visibility_node_index: HashMap[i32, i32], // declaration node → its record
     // #1350: fns the flat merge displaced to a module-qualified identity
     // (`name$in$<module>`), chained per short name like decl_visibility.
@@ -3826,6 +3830,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         decl_visibility_index: sema_new_map_i32_i32(),
         visibility_explain_on: 0,
         visibility_explain_log: sema_new_vec_str(),
+        comptime_truthy_error: "",
         decl_visibility_prev: Vec.new(),
         decl_visibility_node_index: sema_new_map_i32_i32(),
         displaced_fn_index: sema_new_map_i32_i32(),

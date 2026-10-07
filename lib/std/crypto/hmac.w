@@ -18,7 +18,7 @@ unsafe fn HmacSha256.new(key: *const u8, key_len: i32) -> HmacSha256:
             padded_key[i] = key_hash[i]
     else:
         for i in 0..key_len:
-            padded_key[i] = unsafe *(key + i as u64)
+            padded_key[i] = *(key + i as u64)
 
     var ipad_key: [u8; 64] = [0 as u8; 64]
     var outer_key: [u8; 64] = [0 as u8; 64]
