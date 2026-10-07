@@ -228,9 +228,23 @@ sites, three rebuilds, and the failure was not in the text). The order:
    build/corpus.w). Compare the sha with a second run: a different binary
    from identical sources is a build defect (the native runner's partial
    attempt before a 97 fallback, a stale bundle), not a migration defect.
-2. **What the migrator changed.** `diff -rq out/<stem>_migrated lib/std/<dir>`
-   lists the files; a migration differential that names the rule behind
-   each site and diffs the MIR facts of each changed function is #2230.
+2. **What the migrator changed, as MIR.** The migration differential:
+
+   ```sh
+   with run tools/migrate_diff.w lib/std/re out/pcre2_migrated pcre2test.w re
+   ```
+
+   lays each side out as `lib/std/<subdir>/` under `out/tmp/migrate-diff/`,
+   checks `<main.w>` with `--dump-mir`, splits the dump per function and
+   compares the statements with every id normalized (`symN`, `_N`, `bbN`,
+   `tyN`, `.fN` are positions, not meaning). It names each function whose
+   lowering differs and prints the statements present on one side only;
+   exit 1 when any differ. On #2214 it reported four functions, each with
+   exactly `aggregate(... const 0 ...)` → `const zst(ty)` or a `with_memset`
+   call → `_.* = const zst(ty)`: the rewrite and nothing else, which points
+   the hunt at the build. A difference it shows that is not the intended
+   rewrite is the bug's function. (Naming the migrator rule behind each
+   site is the open half of #2230.)
 3. **The compiler alone.** Run the corpus test on the checked-in corpus
    with the new compiler (facade-one-owner's `with build :pcre2-test`
    shape): a failure there is the compiler's, not the output's.
