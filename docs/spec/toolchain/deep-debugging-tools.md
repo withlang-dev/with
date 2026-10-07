@@ -672,6 +672,17 @@ every generation. The fix routes the lookup through the gate
 (`decl_node_visible_from_current`, `lookup_named_type_visible`); the
 fixtures are `test/compile_errors/err_2248_comptime_*_not_transitive.w`.
 
+**The evaluator refuses a type Sema would give.** Top-level folding runs
+before Sema (`comptime_transform_module`), so `typed_expr_types` is empty
+for everything being folded and `node_type_or` falls to its fallback.
+`WITH_TRACE_COMPTIME=1` prints, at each static constructor,
+`[ct] static_new node=… recv='Vec' result='Vec[i32]' from=sema|demand|receiver`:
+`from=receiver` with a generic base is the class (#2220: `Vec.new()` under
+`var v: Vec[i32] =` saw only `Vec`). The evaluator carries a demand stack
+(`expected_types`, Law 2's demand) that a `let` annotation pushes; a site
+that needs an instance reads it. A `from=receiver` where Sema would have
+typed the node is a missing demand source, not a missing type.
+
 ```
 explain:visible is_alnum
   from module test/behavior/behav_1362_std_helper_resolves_unimported.w (package <program>)
