@@ -37,7 +37,7 @@ impl[T: Ord] SortedVec[T]:
     pub fn len() -> i32: unsafe { sortedarray_length(self.array) } as i32
     pub fn is_empty() -> bool: self.len() == 0
 
-    fn slot_at(index: i32) -> *mut Slot[T]:
+    unsafe fn slot_at(index: i32) -> *mut Slot[T]:
         assert(index >= 0 and index < self.len())
         unsafe { sortedarray_get(self.array, index as c_uint) } as *mut Slot[T]
 
@@ -49,11 +49,11 @@ impl[T: Ord] SortedVec[T]:
 
     /// Observes the value at `index`; panics out of range (D27).
     pub fn get(index: i32) -> &T:
-        unsafe { &(*self.slot_at(index)).value }
+        unsafe { &(*unsafe { self.slot_at(index) }).value }
 
     /// Transfers the value at `index` out; panics out of range.
     pub mut fn remove(index: i32) -> T:
-        var slot = self.slot_at(index)
+        var slot = unsafe { self.slot_at(index) }
         assert(unsafe { sortedarray_remove(self.array, index as c_uint) } != 0)
         let value: T = unsafe { move slot.value }
         unsafe { with_free(slot as *mut u8) }
@@ -76,7 +76,7 @@ impl[T: Ord] SortedVec[T]:
     /// Drops every value and empties the collection.
     pub mut fn clear() -> Unit:
         for index in 0..self.len():
-            var slot = self.slot_at(index)
+            var slot = unsafe { self.slot_at(index) }
             let value: T = unsafe { move slot.value }
             drop(value)
             unsafe { with_free(slot as *mut u8) }

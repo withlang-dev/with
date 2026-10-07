@@ -70,11 +70,11 @@ fn _measure_bandwidth() -> f64:
     let buf = with_alloc(size)
     if buf as i64 == 0: return 0.0
 
-    _write_pass(buf, size)
-    _read_pass(buf, size)
+    unsafe { _write_pass(buf, size) }
+    unsafe { _read_pass(buf, size) }
 
     let start = with_clock_nanos()
-    _read_pass(buf, size)
+    unsafe { _read_pass(buf, size) }
     let elapsed = with_clock_nanos() - start
 
     with_free(buf)
@@ -84,7 +84,7 @@ fn _measure_bandwidth() -> f64:
     (size as f64) / (elapsed as f64)
 
 @[noinline]
-fn _read_pass(buf: *mut u8, size: i64):
+unsafe fn _read_pass(buf: *mut u8, size: i64):
     var sink: i64 = 0
     var i: i64 = 0
     while i < size:
@@ -96,7 +96,7 @@ fn _read_pass(buf: *mut u8, size: i64):
     unsafe { asm volatile("" : sink("+r") :: "memory") }
 
 @[noinline]
-fn _write_pass(buf: *mut u8, size: i64):
+unsafe fn _write_pass(buf: *mut u8, size: i64):
     // Write varying values — prevents LLVM from constant-folding the
     // subsequent read pass.
     var i: i64 = 0

@@ -25,19 +25,19 @@ pub fn Trie.new[V]() -> Trie[V]:
     assert(trie as i64 != 0)
     Trie { trie: trie }
 
-fn trie_key_bytes(key: &str) -> *mut u8:
+unsafe fn trie_key_bytes(key: &str) -> *mut u8:
     unsafe { *(key as *const str as *const *mut u8) }
 
 impl[V] Trie[V]:
     pub fn len() -> i64: unsafe { trie_num_entries(self.trie) } as i64
     pub fn is_empty() -> bool: self.len() == 0
 
-    fn lookup(key: &str) -> *mut Slot[V]:
+    unsafe fn lookup(key: &str) -> *mut Slot[V]:
         unsafe { trie_lookup_binary(self.trie, trie_key_bytes(key), key.len() as c_int) } as *mut Slot[V]
 
     /// Stores `value` under `key`; returns the previous value, if any.
     pub mut fn insert(key: &str, value: V) -> Option[V]:
-        var previous = self.lookup(key)
+        var previous = unsafe { self.lookup(key) }
         let slot = unsafe { with_alloc(sizeof[Slot[V]]() as i64) } as *mut Slot[V]
         unsafe { *slot = Slot { compare: slot_unordered, value: value } }
         assert(unsafe { trie_insert_binary(self.trie, trie_key_bytes(key), key.len() as c_int, slot as *mut c_void) } != 0)
@@ -48,15 +48,15 @@ impl[V] Trie[V]:
 
     /// Observes the value under `key`.
     pub fn get(key: &str) -> Option[&V]:
-        let slot = self.lookup(key)
+        let slot = unsafe { self.lookup(key) }
         if slot as i64 == 0: return None
         Some(unsafe { &(*slot).value })
 
-    pub fn contains(key: &str) -> bool: self.lookup(key) as i64 != 0
+    pub fn contains(key: &str) -> bool: unsafe { self.lookup(key) } as i64 != 0
 
     /// Transfers the value under `key` out.
     pub mut fn remove(key: &str) -> Option[V]:
-        var slot = self.lookup(key)
+        var slot = unsafe { self.lookup(key) }
         if slot as i64 == 0: return None
         assert(unsafe { trie_remove_binary(self.trie, trie_key_bytes(key), key.len() as c_int) } != 0)
         let value: V = unsafe { move slot.value }
@@ -64,7 +64,7 @@ impl[V] Trie[V]:
         Some(value)
 
     /// The node at the end of `prefix`, or null when no key starts with it.
-    fn prefix_node(prefix: &str) -> *mut _TrieNode:
+    unsafe fn prefix_node(prefix: &str) -> *mut _TrieNode:
         var node = unsafe { (*self.trie).root_node }
         let bytes = trie_key_bytes(prefix)
         var i: i64 = 0
@@ -77,7 +77,7 @@ impl[V] Trie[V]:
     /// keys (an empty prefix visits the whole trie).
     pub fn iter_prefix(prefix: &str) -> TrieValues[V]:
         var values: TrieValues[V] = TrieValues { nodes: Vec.new(), children: Vec.new() }
-        let start = self.prefix_node(prefix)
+        let start = unsafe { self.prefix_node(prefix) }
         if start as i64 != 0:
             values.nodes.push(start as i64)
             values.children.push(-1)

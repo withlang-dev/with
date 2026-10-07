@@ -9,7 +9,7 @@ type HmacSha256  {
     outer_key: [u8; 64],
 }
 
-fn HmacSha256.new(key: *const u8, key_len: i32) -> HmacSha256:
+unsafe fn HmacSha256.new(key: *const u8, key_len: i32) -> HmacSha256:
     var padded_key: [u8; 64] = [0 as u8; 64]
     if key_len > 64:
         var key_hash: [u8; 32] = [0 as u8; 32]
@@ -59,7 +59,7 @@ unsafe fn hmac_finish(ctx: *mut HmacSha256, out: *mut u8):
     sha256_update(op, idp as *const u8, 32)
     sha256_finish(op, out)
 
-fn hmac_sha256(key: *const u8, key_len: i32, data: *const u8, data_len: i32, out: *mut u8):
+unsafe fn hmac_sha256(key: *const u8, key_len: i32, data: *const u8, data_len: i32, out: *mut u8):
     var ctx = HmacSha256.new(key, key_len)
     let p = &raw mut ctx as *mut HmacSha256
     unsafe { hmac_update(p, data, data_len) }

@@ -427,7 +427,7 @@ pub fn json_find(js: &str, tokens: *const JsonToken, parent: i32, key: &str) -> 
         if k == key:
             return idx + 1
         // Skip over the value (and any nested tokens)
-        idx = json_skip(tokens, idx + 1)
+        idx = unsafe { json_skip(tokens, idx + 1) }
         i = i + 1
     -1
 
@@ -564,7 +564,7 @@ impl Deserialize for bool:
         false
 
 // Skip over a token and all its nested children. Returns the next token index.
-fn json_skip(tokens: *const JsonToken, idx: i32) -> i32:
+unsafe fn json_skip(tokens: *const JsonToken, idx: i32) -> i32:
     var tok_type: i32 = 0
     var size: i32 = 0
     unsafe:

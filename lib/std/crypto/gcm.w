@@ -60,7 +60,7 @@ unsafe fn increment_counter(ctr: *mut u8):
             return
         i = i - 1
 
-fn AesGcm.new(key: *const u8, iv: *const u8, iv_len: i32) -> AesGcm:
+unsafe fn AesGcm.new(key: *const u8, iv: *const u8, iv_len: i32) -> AesGcm:
     let aes_ctx = Aes128.new(key)
     var h: [u8; 16] = [0 as u8; 16]
     let hp = &raw mut h[0] as *mut u8
@@ -233,7 +233,7 @@ pub fn aes128_gcm_kat() -> i32:
     var pt: [u8; 16] = [0u8; 16]
     var ct: [u8; 16] = [0u8; 16]
     var tag: [u8; 16] = [0u8; 16]
-    var g = AesGcm.new(&key[0] as *const u8, &iv[0] as *const u8, 12)
+    var g = unsafe { AesGcm.new(&key[0] as *const u8, &iv[0] as *const u8, 12) }
     unsafe:
         aesgcm_encrypt(&raw mut g as *mut AesGcm, &pt[0] as *const u8, &raw mut ct[0] as *mut u8, 16)
         aesgcm_tag(&raw mut g as *mut AesGcm, &raw mut tag[0] as *mut u8)

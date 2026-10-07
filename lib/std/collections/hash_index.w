@@ -104,7 +104,7 @@ impl[K: Key, V] HashIndex[K, V]:
     fn key_hash(key: &K) -> c_ulonglong: hash_of(key) as c_ulonglong
 
     /// The slot holding `key`, or null (the probe's key is a byte image).
-    fn find(key: &K) -> *mut HashSlot[K, V]:
+    unsafe fn find(key: &K) -> *mut HashSlot[K, V]:
         let slot = self.probe
         unsafe { (*slot).head.compare = self.comparator() }
         unsafe { with_memcpy(&raw mut (*slot).key as *mut u8, &raw const *key as *const u8, sizeof[K]() as i64) }
@@ -112,10 +112,10 @@ impl[K: Key, V] HashIndex[K, V]:
 
     /// Observes the value stored under `key`.
     pub fn get(key: &K) -> Option[&V]:
-        let slot = self.find(key)
+        let slot = unsafe { self.find(key) }
         if slot as i64 == 0: None else: Some(unsafe { &(*slot).value })
 
-    pub fn contains(key: &K) -> bool: self.find(key) as i64 != 0
+    pub fn contains(key: &K) -> bool: unsafe { self.find(key) } as i64 != 0
 
     /// Stores `value` under `key`; an existing entry with an equal key is
     /// replaced and its value transferred back.
@@ -130,7 +130,7 @@ impl[K: Key, V] HashIndex[K, V]:
 
     /// Transfers the value stored under `key` out; the key is dropped.
     pub mut fn remove(key: &K) -> Option[V]:
-        var slot = self.find(key)
+        var slot = unsafe { self.find(key) }
         if slot as i64 == 0: return None
         unsafe { tommy_hashdyn_remove_existing(self.map, &raw mut (*slot).head.node) }
         let stored_key: K = unsafe { move slot.key }

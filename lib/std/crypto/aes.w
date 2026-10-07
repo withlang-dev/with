@@ -71,7 +71,7 @@ unsafe fn aes128_init(ctx: *mut Aes128, key: *const u8):
         for j in 4..16:
             *(rk + (cur_off + j) as u64) = *(rk + (prev_off + j) as u64) ^ *(rk + (cur_off + j - 4) as u64)
 
-fn Aes128.new(key: *const u8) -> Aes128:
+unsafe fn Aes128.new(key: *const u8) -> Aes128:
     var ctx = Aes128 { round_keys: [0 as u8; 176] }
     unsafe { aes128_init(&raw mut ctx as *mut Aes128, key) }
     ctx

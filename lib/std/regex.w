@@ -87,7 +87,7 @@ fn regex_general_context(what: &str) -> *mut pcre2_real_general_context_8:
         with_panic(what ++ ": general context creation failed", "", 0)
     gcontext
 
-fn regex_match_data(code: *const i8, gcontext: *mut pcre2_real_general_context_8, what: &str) -> *mut pcre2_real_match_data_8:
+unsafe fn regex_match_data(code: *const i8, gcontext: *mut pcre2_real_general_context_8, what: &str) -> *mut pcre2_real_match_data_8:
     let match_data = unsafe { pcre2_match_data_create_from_pattern_8(code as *const pcre2_real_code_8, gcontext) }
     if match_data as i64 == 0:
         unsafe { pcre2_general_context_free_8(gcontext) }
@@ -166,24 +166,24 @@ unsafe fn regex_compile_code(pattern: &str, options: i32, err_code: *mut i32, er
         *err_offset = raw_err_offset as i32
     owned as *const i8
 
-fn regex_copy_code(code: *const i8, what: &str):
+unsafe fn regex_copy_code(code: *const i8, what: &str):
     let copied = unsafe { pcre2_code_copy_8(code as *const pcre2_real_code_8) }
     if copied == null:
         with_panic(what ++ ": pattern copy failed", "", 0)
     copied as *const i8
 
-fn regex_pattern_info(code: *const i8, what: c_int, where_: *mut c_void, label: &str):
+unsafe fn regex_pattern_info(code: *const i8, what: c_int, where_: *mut c_void, label: &str):
     let rc = unsafe { pcre2_pattern_info_8(code as *const pcre2_real_code_8, what as c_uint, where_) }
     if rc < 0:
         with_panic("Regex." ++ label ++ ": pattern info failed", "", 0)
 
-fn regex_pattern_info_count(code: *const i8, what: c_int, label: &str) -> i32:
+unsafe fn regex_pattern_info_count(code: *const i8, what: c_int, label: &str) -> i32:
     var count: c_uint = 0
     regex_pattern_info(code, what, (&raw mut count) as *mut c_void, label)
     count as i32
 
 // The match ovector as [start, end] pairs; empty when nothing matched.
-fn regex_match_spans_at(code: *const i8, text: &str, start_offset: i32) -> Vec[i32]:
+unsafe fn regex_match_spans_at(code: *const i8, text: &str, start_offset: i32) -> Vec[i32]:
     let spans: Vec[i32] = Vec.new()
     if code as i64 == 0 or start_offset < 0 or start_offset as i64 > text.len():
         return spans
@@ -208,7 +208,7 @@ fn regex_match_spans_at(code: *const i8, text: &str, start_offset: i32) -> Vec[i
     unsafe { pcre2_general_context_free_8(gcontext) }
     spans
 
-fn regex_group_index(code: *const i8, name: &str) -> i32:
+unsafe fn regex_group_index(code: *const i8, name: &str) -> i32:
     if code as i64 == 0:
         return -1
     let cname = regex_cstr(name)
@@ -216,7 +216,7 @@ fn regex_group_index(code: *const i8, name: &str) -> i32:
     with_free(cname as *mut u8)
     if number < 0: -1 else: number
 
-fn regex_substitute_into(code: *const i8, text: &str, c_repl: *const u8, repl_len: i64, options: c_uint, match_data: *mut pcre2_real_match_data_8, out_bytes: *mut u8, out_len: *mut c_ulong) -> c_int:
+unsafe fn regex_substitute_into(code: *const i8, text: &str, c_repl: *const u8, repl_len: i64, options: c_uint, match_data: *mut pcre2_real_match_data_8, out_bytes: *mut u8, out_len: *mut c_ulong) -> c_int:
     unsafe { pcre2_substitute_8(
         code as *const pcre2_real_code_8,
         regex_str_data(text),
@@ -235,19 +235,19 @@ fn regex_substitute(code: *const i8, text: &str, repl: &str, replace_all: bool) 
     if code as i64 == 0:
         return with_str_clone_ref(text)
     let gcontext = regex_general_context("Regex.replace")
-    let match_data = regex_match_data(code, gcontext, "Regex.replace")
+    let match_data = unsafe { regex_match_data(code, gcontext, "Regex.replace") }
     let c_repl = regex_cstr(repl)
     var options: c_uint = PCRE2_SUBSTITUTE_UNSET_EMPTY | PCRE2_SUBSTITUTE_OVERFLOW_LENGTH
     if replace_all:
         options = options | PCRE2_SUBSTITUTE_GLOBAL
     var out_len: c_ulong = (text.len() + repl.len() + 64) as c_ulong
     var out_bytes = with_alloc(out_len as i64 + 1)
-    var rc = regex_substitute_into(code, text, c_repl, repl.len(), options, match_data, out_bytes, &raw mut out_len)
+    var rc = unsafe { regex_substitute_into(code, text, c_repl, repl.len(), options, match_data, out_bytes, &raw mut out_len) }
     if rc == PCRE2_ERROR_NOMEMORY:
         // The engine reported the length it needs (PCRE2_SUBSTITUTE_OVERFLOW_LENGTH).
         with_free(out_bytes)
         out_bytes = with_alloc(out_len as i64 + 1)
-        rc = regex_substitute_into(code, text, c_repl, repl.len(), options, match_data, out_bytes, &raw mut out_len)
+        rc = unsafe { regex_substitute_into(code, text, c_repl, repl.len(), options, match_data, out_bytes, &raw mut out_len) }
     if rc < 0:
         let msg = "Regex.replace: " ++ regex_error_message(rc as i32)
         with_free(c_repl as *mut u8)
@@ -297,7 +297,7 @@ fn regex_compile_flags(flags: &str) -> Result[RegexFlags, RegexError]:
 impl Regex:
     pub fn clone() -> Self:
         Regex {
-            ptr: regex_copy_code(self.ptr, "Regex.clone"),
+            ptr: unsafe { regex_copy_code(self.ptr, "Regex.clone") },
             pattern_text: with_str_clone_ref(self.pattern_text),
             flags_text: with_str_clone_ref(self.flags_text),
             options: self.options,
@@ -402,7 +402,7 @@ pub unsafe fn Regex.__literal_free_all():
 pub fn Regex.__capture_count(code: *const i8) -> i32:
     if code as i64 == 0:
         return 0
-    regex_pattern_info_count(code, PCRE2_INFO_CAPTURECOUNT, "num_captures")
+    unsafe { regex_pattern_info_count(code, PCRE2_INFO_CAPTURECOUNT, "num_captures") }
 
 impl Regex:
     pub fn pattern() -> str:
@@ -412,7 +412,7 @@ impl Regex:
         self.capture_count
 
     pub fn capture_index(name: &str) -> Option[i32]:
-        let number = regex_group_index(self.ptr, name)
+        let number = unsafe { regex_group_index(self.ptr, name) }
         if number < 0:
             return None
         Some(number)
@@ -421,12 +421,12 @@ impl Regex:
         let out: Vec[str] = Vec.new()
         if self.ptr as i64 == 0:
             return out
-        let count = regex_pattern_info_count(self.ptr, PCRE2_INFO_NAMECOUNT, "capture_names")
+        let count = unsafe { regex_pattern_info_count(self.ptr, PCRE2_INFO_NAMECOUNT, "capture_names") }
         if count == 0:
             return out
-        let entry_size = regex_pattern_info_count(self.ptr, PCRE2_INFO_NAMEENTRYSIZE, "capture_names")
+        let entry_size = unsafe { regex_pattern_info_count(self.ptr, PCRE2_INFO_NAMEENTRYSIZE, "capture_names") }
         var table: *const u8 = null
-        regex_pattern_info(self.ptr, PCRE2_INFO_NAMETABLE, (&raw mut table) as *mut c_void, "capture_names")
+        unsafe { regex_pattern_info(self.ptr, PCRE2_INFO_NAMETABLE, (&raw mut table) as *mut c_void, "capture_names") }
         // Each entry: a two-byte group number, then the NUL-terminated name.
         for i in 0..count:
             out.push(unsafe { regex_owned_cstr((table as i64 + i as i64 * entry_size as i64 + 2) as *const u8) })
@@ -436,13 +436,13 @@ impl Regex:
         self.captures_at(text, 0)
 
     pub fn captures_at(text: &str, start_offset: i32) -> Option[Captures]:
-        let spans = regex_match_spans_at(self.ptr, text, start_offset)
+        let spans = unsafe { regex_match_spans_at(self.ptr, text, start_offset) }
         if spans.len() == 0:
             return None
         // Captures is owned output: named lookup must remain valid after
         // the Regex dies, including when it was a temporary (#1098).
         Some(Captures {
-            regex_ptr: regex_copy_code(self.ptr, "Regex.captures"),
+            regex_ptr: unsafe { regex_copy_code(self.ptr, "Regex.captures") },
             subject: with_str_clone_ref(text),
             spans: spans,
         })
@@ -732,7 +732,7 @@ impl Captures:
         (self.spans.len() as i32) / 2
 
     pub fn by_name(name: &str) -> Option[Match]:
-        let number = regex_group_index(self.regex_ptr, name)
+        let number = unsafe { regex_group_index(self.regex_ptr, name) }
         if number < 0:
             return None
         self.get(number)
