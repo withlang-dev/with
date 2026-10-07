@@ -894,6 +894,20 @@ presented parameter becomes `Option[...]` of its type (`sqlite3_exec`'s
 callback: `nullable param 2`). The clause is the facade's claim, never
 inferred from a name, and applies to any pointer-shaped parameter.
 
+A *migrated definition* is C itself, and its function-pointer parameter
+is nullable by evidence, never by declaration site (D107): it migrates as
+`Option[...]` when the body tests the pointer for NULL and the NULL branch
+continues, when a call site in the corpus passes NULL there, or when the
+body passes it where a nullable is demanded — a nullable parameter of
+another corpus definition, a record field, a nullable global; a test whose
+NULL branch aborts (`assert(p)`) is evidence of non-null. The verdicts
+form a least fixed point over the corpus: a dependency outside the corpus
+or an unanalyzable body is `Option`, a cycle is `Option` for every
+member, and every unit renders the same type for the parameter. The
+migrator states each verdict's reason. The rule governs corpus
+definitions and the project prototypes that declare them; a prototype
+from a system header keeps the paragraph above.
+
 #### 16.2b.9 Callbacks
 
 A value C passes into a With callback is borrowed for the callback's scope;
