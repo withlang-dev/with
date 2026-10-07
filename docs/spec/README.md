@@ -11,6 +11,12 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.28:** the width of a length, 2026-10-07 (D108). §18.6:
+`len()`, `count()` and `position()` return `isize`, the signed
+pointer-width integer; `Int` stays the fixed 64-bit alias. §4.2: `usize`
+and `isize` are pointer-width, 32 bits on wasm32 (the previous sentence
+predated that target). The implementation is NON-COMPLIANT until #2262
+catches up.
 **Changelog v7.27:** visibility, 2026-10-05 (D100). §18.3: a declaration
 without `pub` is visible throughout its package, and `pub` means it leaves
 the package (it was private to its file); the rule covers methods and

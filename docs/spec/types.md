@@ -4,7 +4,8 @@
 
 Signed integers: `i8`, `i16`, `i32`, `i64`
 Unsigned integers: `u8`, `u16`, `u32`, `u64`
-Pointer-sized integers: `usize`, `isize` (64-bit on all supported targets)
+Pointer-sized integers: `usize`, `isize` (pointer-width: 64 bits on every
+supported target but wasm32, where they are 32)
 Floating point: `f32`, `f64`
 Boolean: `bool`
 Unit: `Unit` (zero-sized)
