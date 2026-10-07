@@ -11130,6 +11130,8 @@ impl Sema:
             // materializes it, so it is never moved out of (#1242).
             if not is_local and self.global_value_decl_kind(sym) != 0 and not self.const_global_syms.contains(sym):
                 self.global_value_ident_nodes.insert(node, sym)
+            if not is_local and self.global_value_decl_kind(sym) != 0:
+                self.record_name_use(node, "global", self.decl_path_of_symbol(sym), self.pool_resolve(sym))
             if sym != self.assign_target_revive_sym:
                 self.record_global_data_race_access(sym, node, GLOBAL_RACE_ACCESS_READ)
             if self.in_comptime_fn != 0 and self.is_mutable_global(sym) != 0:
@@ -11220,6 +11222,7 @@ impl Sema:
             // D75: a variadic definition's value would be a function pointer
             // whose calls pass no variable arguments and need no `unsafe`;
             // With has no variadic function-pointer type to give it.
+            self.record_name_use(node, "fn-value", self.fn_symbol_source_path(sym), self.pool_resolve(sym))
             if self.fn_decl_is_variadic_definition(self.fn_symbol_decl_node(sym)):
                 self.emit_error("`" ++ self.pool_resolve(sym) ++ "` is defined with `...`: it is called directly (under `unsafe`), never used as a value", node)
                 return 0

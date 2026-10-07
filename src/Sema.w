@@ -1505,6 +1505,14 @@ pub type Sema {
     // For-comprehension resolved variants: node → resolved variant sym.
     // Maps _Payload/_Empty marker nodes to Some/None or Ok/Err.
     comp_resolved: HashMap[i32, i32],
+    // #2211: resolved name uses (node, kind, declaring module path, name) for
+    // the analyzer's `reference` facts: a global read, a function taken as a
+    // value, a type name — calls and methods have their own facts.
+    name_use_nodes: Vec[i32],
+    name_use_kinds: Vec[str],
+    name_use_paths: Vec[str],
+    name_use_names: Vec[str],
+    name_use_from: Vec[str],
     // Surviving generic comptime-if wrapper node → selected branch node.
     comptime_selected_branches: HashMap[i32, i32],
     // Pipeline method calls: NK_PIPELINE node → method-name symbol. D21 keeps
@@ -3431,6 +3439,11 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         no_await_guard_scope_depth: 0,
         no_suspend_scope_depth: 0,
         comp_resolved: sema_new_map_i32_i32(),
+        name_use_nodes: sema_new_vec_i32(),
+        name_use_kinds: sema_new_vec_str(),
+        name_use_paths: sema_new_vec_str(),
+        name_use_names: sema_new_vec_str(),
+        name_use_from: sema_new_vec_str(),
         comptime_selected_branches: sema_new_map_i32_i32(),
         pipeline_method_calls: sema_new_map_i32_i32(),
         pipeline_call_return_types: sema_new_map_i32_i32(),
@@ -4443,6 +4456,22 @@ impl Sema:
                         importers = importers ++ (if importers.len() > 0: ", " else: "") ++ self.module_paths[from]
             out = out ++ f"  [{mi}] " ++ path ++ " package=" ++ self.package_of(path) ++ f" engine={self.engine_corpus_id(path)} prelude-closure={self.module_in_prelude_closure(path)} corpus-private={if self.corpus_private_modules.contains(path): 1 else: 0}" ++ (if importers.len() > 0: " imported-by: " ++ importers else: " imported-by: (root)") ++ "\n"
         out
+    // #2211: one resolved name use, for the analyzer's `reference` facts. The
+    // referencing module is the current one; `node` is 0 for a type name
+    // (resolved without a node).
+    fn record_name_use(node: i32, kind: &str, path: &str, name: &str):
+        if path.len() == 0: return
+        self.name_use_nodes.push(node)
+        self.name_use_kinds.push(with_str_clone_ref(kind))
+        self.name_use_paths.push(with_str_clone_ref(path))
+        self.name_use_names.push(with_str_clone_ref(name))
+        self.name_use_from.push(with_str_clone_ref(self.current_module_path))
+
+    // The module path of the newest declaration of `sym`, "" when unknown.
+    fn decl_path_of_symbol(sym: i32) -> str:
+        match self.decl_visibility_index.get(sym):
+            Some(i) => with_str_clone_ref(self.decl_visibility_paths[*i])
+            None => ""
 
     fn package_of(path: &str) -> str:
         if self.package_keys.contains(path): return self.package_keys.get(path).unwrap().clone()
@@ -5043,6 +5072,7 @@ impl Sema:
                 if global_tid == 0:
                     global_tid = candidate_tid
             else if candidate_visible != 0:
+                self.record_name_use(0, "type", candidate_path, self.pool_resolve(sym))
                 return candidate_tid
             i = self.named_type_candidate_next[i]
         // A module that uses c_import shares the program's C declarations,

@@ -48,6 +48,9 @@ pub enum AnalysisFactKind: i32:
     // took (int, float, str, key-projection, structural, view, pointer, …)
     // and the operand types it saw.
     Operator = 27
+    // #2211: a resolved name use — a global, a function as a value, a type
+    // name — with the referencing module and the declaration's module.
+    Reference = 28
 
 // Stable analysis-domain receiver modes. Keep tools on this public schema rather
 // than exposing Sema's internal ReceiverMode representation.
@@ -266,6 +269,7 @@ fn analysis_kind_name(kind: AnalysisFactKind) -> str:
     if kind == AnalysisFactKind.AstNode: return "ast-node"
     if kind == AnalysisFactKind.MethodRegistration: return "method-registration"
     if kind == AnalysisFactKind.MethodResolution: return "method-resolution"
+    if kind == AnalysisFactKind.Reference: return "reference"
     if kind == AnalysisFactKind.ForeignContract: return "foreign-contract"
     if kind == AnalysisFactKind.GlobalEffect: return "global-effect"
     if kind == AnalysisFactKind.Operator: return "operator"
