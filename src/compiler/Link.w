@@ -41,6 +41,19 @@ extern let with_embedded_rt_windows_x86_64_o_start: u8
 extern let with_embedded_rt_windows_x86_64_o_end: u8
 extern let with_embedded_rt_windows_aarch64_o_start: u8
 extern let with_embedded_rt_windows_aarch64_o_end: u8
+// #2131: the wasm32 program runtime a native compiler carries, so
+// `--target wasm32` links outside the repository (empty in a compiler that
+// carries none: stage1, the cross compilers).
+extern let with_embedded_wasm32_rt_core_o_start: u8
+extern let with_embedded_wasm32_rt_core_o_end: u8
+extern let with_embedded_wasm32_rt_wasm_o_start: u8
+extern let with_embedded_wasm32_rt_wasm_o_end: u8
+extern let with_embedded_wasm32_compat_runtime_o_start: u8
+extern let with_embedded_wasm32_compat_runtime_o_end: u8
+extern let with_embedded_wasm32_panic_runtime_o_start: u8
+extern let with_embedded_wasm32_panic_runtime_o_end: u8
+extern let with_embedded_wasm32_fiber_stubs_o_start: u8
+extern let with_embedded_wasm32_fiber_stubs_o_end: u8
 
 // D30 R2c: set by Compilation when THIS compile emitted the runtime
 // in-unit (WITH_RT_IN_UNIT lane, prelude on) — the .w-derived rt objects
@@ -1157,6 +1170,17 @@ fn link_stage_embedded_runtime_object(name: &str) -> str:
         return link_stage_embedded_obj_slice(&with_embedded_rt_windows_x86_64_o_start as *const u8, &with_embedded_rt_windows_x86_64_o_end as *const u8)
     if name == "rt_windows_aarch64.o":
         return link_stage_embedded_obj_slice(&with_embedded_rt_windows_aarch64_o_start as *const u8, &with_embedded_rt_windows_aarch64_o_end as *const u8)
+    // #2131: the wasm32 runtime, named by its cross path.
+    if name == "cross/wasm32/rt_core.o":
+        return link_stage_embedded_obj_slice(&with_embedded_wasm32_rt_core_o_start as *const u8, &with_embedded_wasm32_rt_core_o_end as *const u8)
+    if name == "cross/wasm32/rt_wasm.o":
+        return link_stage_embedded_obj_slice(&with_embedded_wasm32_rt_wasm_o_start as *const u8, &with_embedded_wasm32_rt_wasm_o_end as *const u8)
+    if name == "cross/wasm32/compat_runtime.o":
+        return link_stage_embedded_obj_slice(&with_embedded_wasm32_compat_runtime_o_start as *const u8, &with_embedded_wasm32_compat_runtime_o_end as *const u8)
+    if name == "cross/wasm32/panic_runtime.o":
+        return link_stage_embedded_obj_slice(&with_embedded_wasm32_panic_runtime_o_start as *const u8, &with_embedded_wasm32_panic_runtime_o_end as *const u8)
+    if name == "cross/wasm32/fiber_stubs.o":
+        return link_stage_embedded_obj_slice(&with_embedded_wasm32_fiber_stubs_o_start as *const u8, &with_embedded_wasm32_fiber_stubs_o_end as *const u8)
     ""
 
 fn link_stage_extract_runtime_obj(name: &str, path: &str) -> i32:
@@ -1926,7 +1950,19 @@ fn link_stage_find_runtime_object_path(name: &str) -> str:
         let cross_path = root ++ "/cross/" ++ target_spec_name() ++ "/" ++ name
         if runtime_read_file(cross_path).len() > 0:
             return cross_path
-        with_eprint("error: missing " ++ target_spec_name() ++ " runtime object: " ++ cross_path ++ " (run `with build :cross-rt` first)")
+        // #2131: a native compiler carries the wasm32 runtime it was built
+        // with; outside a tree that holds the objects, extract them, under
+        // the same generation check as the native fallback.
+        if target_spec_is_wasm():
+            let embedded_name = "cross/" ++ target_spec_name() ++ "/" ++ name
+            if link_stage_embedded_runtime_object(embedded_name).len() > 0 and link_stage_embedded_runtime_is_this_generation():
+                let tmp_dir = link_stage_artifact_root() ++ "/tmp/with_runtime/cross/" ++ target_spec_name()
+                if runtime_mkdir_p(tmp_dir) != 0:
+                    return ""
+                let tmp_path = tmp_dir ++ "/" ++ name
+                if link_stage_extract_runtime_obj(embedded_name, tmp_path) == 0:
+                    return tmp_path
+        with_eprint("error: missing " ++ target_spec_name() ++ " runtime object: " ++ cross_path ++ " (run `with build :cross-rt-wasm` first, or use a release compiler, which carries it)")
         return ""
     let p = root ++ "/" ++ name
     // The fallback root (compiler_dir/runtime) was not a candidate that

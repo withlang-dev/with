@@ -138,15 +138,95 @@ fn cross_platform_symbol(tag: &str) -> str:
 // No fiber core (no stack switching in WebAssembly), no cimport stubs (no
 // libc), no compiler link inputs (the compiler itself is not a wasm
 // target). `with build :cross-rt-wasm` populates out/lib/cross/wasm32/.
+// The five objects of the wasm32 program runtime: rt_core, the platform,
+// compat, panic and the fiber stubs. Three parallel lists (target name
+// suffix, source, object name), read by every producer and every embed
+// (#2131). Parallel lists built with push rather than tuples or literals:
+// the build layer runs on the pinned seed, whose evaluator predates
+// destructuring in a `for` and `len()` on a collection literal (#1122).
+fn wasm32_runtime_suffixes() -> Vec[str]:
+    let out: Vec[str] = Vec.new()
+    out.push("rt-core-object")
+    out.push("rt-platform-object")
+    out.push("compat-runtime-object")
+    out.push("panic-runtime-object")
+    out.push("fiber-stubs-object")
+    out
+
+fn wasm32_runtime_sources() -> Vec[str]:
+    let out: Vec[str] = Vec.new()
+    out.push("rt/rt_core.w")
+    out.push("rt/wasm.w")
+    out.push("out/gen/compat_runtime.w")
+    out.push("rt/panic_runtime.w")
+    out.push("rt/fiber_stubs.w")
+    out
+
+fn wasm32_runtime_obj_names() -> Vec[str]:
+    let out: Vec[str] = Vec.new()
+    out.push("rt_core.o")
+    out.push("rt_wasm.o")
+    out.push("compat_runtime.o")
+    out.push("panic_runtime.o")
+    out.push("fiber_stubs.o")
+    out
+
+// The blob symbol a wasm32 runtime object is embedded under:
+// `with_embedded_wasm32_<stem>_o` (src/compiler/Link.w).
+fn wasm32_runtime_blob_symbol(obj_name: &str) -> str:
+    "wasm32_" ++ obj_name.slice(0, obj_name.len() - 2) ++ "_o"
+
+// Registers the five wasm32 runtime objects compiled by `compiler` into
+// `dir`, named `<p><suffix>`; the compat object depends on its generated
+// source.
+fn add_wasm32_runtime_object_targets(out0: Build, p: &str, dir: &str, compiler: &str, dep: &str) -> Build:
+    var out = out0
+    let suffixes = wasm32_runtime_suffixes()
+    let sources = wasm32_runtime_sources()
+    let names = wasm32_runtime_obj_names()
+    for i in 0..suffixes.len():
+        var target = cross_object_target_with("wasm32", p ++ suffixes[i], sources[i], dir ++ "/" ++ names[i], "-O1", compiler, dep)
+        if sources[i] == "out/gen/compat_runtime.w": target = target.dep("compat-runtime-source")
+        out = out.add_target(target)
+    out
+
+// An embed carries the wasm32 runtime objects under `dir` as
+// `wasm32_<stem>_o` blobs, produced by the `<p><suffix>` targets.
+fn target_with_wasm32_runtime_blobs(target: Target, p: &str, dir: &str) -> Target:
+    var out = target
+    let suffixes = wasm32_runtime_suffixes()
+    let names = wasm32_runtime_obj_names()
+    for i in 0..suffixes.len():
+        out = out.input(dir ++ "/" ++ names[i])
+        out = out.arg(wasm32_runtime_blob_symbol(names[i]))
+        out = out.dep(p ++ suffixes[i])
+    out
+
+// A compiler that carries no wasm32 runtime (stage1, the cross compilers)
+// still defines the symbols the link stage names: empty blobs.
+fn add_empty_wasm32_runtime_blob_targets(out0: Build, prefix: &str, dir: &str) -> Build:
+    var out = out0
+    let names = wasm32_runtime_obj_names()
+    for i in 0..names.len():
+        let sym = wasm32_runtime_blob_symbol(names[i])
+        out = out.add_target(empty_file_target(empty_platform_blob_target(prefix, sym), empty_platform_blob_path(dir, sym)))
+    out
+
+fn target_with_empty_wasm32_runtime_blobs(target: Target, prefix: &str, dir: &str) -> Target:
+    var out = target
+    let names = wasm32_runtime_obj_names()
+    for i in 0..names.len():
+        let sym = wasm32_runtime_blob_symbol(names[i])
+        out = out.input(empty_platform_blob_path(dir, sym))
+        out = out.dep(empty_platform_blob_target(prefix, sym))
+        out = out.arg(sym)
+    out
+
 fn add_cross_wasm_rt_targets(out0: Build, tag: &str, p: &str, group_name: &str, plans: &Vec[WoBundle]) -> Build:
     var out = out0
-    out = out.add_target(cross_object_target(tag, p ++ "rt-core-object", "rt/rt_core.w", "-O1"))
-    out = out.add_target(cross_object_target_named(tag, p ++ "rt-platform-object", "rt/wasm.w", "rt_wasm.o", "-O1"))
-    var cross_compat = cross_object_target_named(tag, p ++ "compat-runtime-object", "out/gen/compat_runtime.w", "compat_runtime.o", "-O1")
-    cross_compat = cross_compat.dep("compat-runtime-source")
-    out = out.add_target(cross_compat)
-    out = out.add_target(cross_object_target(tag, p ++ "panic-runtime-object", "rt/panic_runtime.w", "-O1"))
-    out = out.add_target(cross_object_target(tag, p ++ "fiber-stubs-object", "rt/fiber_stubs.w", "-O1"))
+    // Compiled by stage2 (not the release) so the release binary can embed
+    // them: the release's own native runtime objects are stage2's too.
+    out = add_wasm32_runtime_object_targets(move out, p, cross_dir(tag), stage_compiler_bin("with-stage2"), "stage2")
     var cross_rt = target_new(.Group, build_owned_text(group_name), "")
     cross_rt = cross_rt.dep(p ++ "rt-core-object")
     cross_rt = cross_rt.dep(p ++ "rt-platform-object")
@@ -180,7 +260,13 @@ fn cross_llvm_prefix(tag: &str) -> str:
 // A runtime/bridge object compiled FOR the cross tag by the freshly
 // built native compiler (dep "build"), landing in cross_dir(tag).
 fn cross_object_target_named(tag: &str, name: &str, source: &str, obj_name: &str, opt: &str) -> Target:
-    var target = with_object_target(name, release_compiler_bin("with"), source, cross_dir(tag) ++ "/" ++ obj_name, opt, "build")
+    cross_object_target_with(tag, name, source, cross_dir(tag) ++ "/" ++ obj_name, opt, release_compiler_bin("with"), "build")
+
+// The same object compiled FOR the cross tag by a named compiler into a
+// named path: stage1 and stage2 compile the wasm32 runtime the stage and
+// release binaries embed (#2131), as they compile the native one.
+fn cross_object_target_with(tag: &str, name: &str, source: &str, output: &str, opt: &str, compiler: &str, dep: &str) -> Target:
+    var target = with_object_target(name, compiler, source, output, opt, dep)
     target = target.arg("--target=" ++ cross_triple(tag))
     target
 
@@ -252,9 +338,12 @@ fn add_cross_rt_targets(out0: Build, ctx: &BuildCtx, tag: &str, p: &str, group_n
     cross_embedded = cross_embedded.dep(p ++ "rt-platform-object")
     // Each cross compiler embeds every corpus bundle compiled for its own
     // target by the release compiler (#946).
-    for pi in 0..plans.len() as i32:
+    for pi in 0..plans.len():
         out = cross_wo_bundle_targets(move out, ctx, plans[pi])
         cross_embedded = target_with_wo_blobs(move cross_embedded, plans[pi])
+    // A cross compiler carries no wasm32 runtime yet (#2131: empty slots).
+    out = add_empty_wasm32_runtime_blob_targets(move out, p ++ "empty-", dir)
+    cross_embedded = target_with_empty_wasm32_runtime_blobs(move cross_embedded, p ++ "empty-", dir)
     out = add_empty_darwin_sysroot_blob_target(move out, p, dir)
     // #1915 (D81): the target's sysroot, compiler-rt and libc++ (a pack the
     // cross compiler embeds, and an unpacked copy the cross links read) and
@@ -429,9 +518,12 @@ fn add_stage1_runtime_targets(out0: Build, host_runtime: &HostRuntimeSpec, corpu
         embedded = embedded.dep(build_owned_text(objects[oi]))
     for pi in 0..corpus_plans.len():
         embedded = target_with_wo_blobs(move embedded, corpus_plans[pi])
-    // #2131: the wasm32 bundles beside the host's, under their own symbols.
+    // #2131: the wasm32 bundles beside the host's, under their own symbols,
+    // and the wasm32 runtime objects stage1 compiles beside the native ones.
     for pi in 0..wasm_plans.len():
         embedded = target_with_wo_blobs_as(move embedded, wasm_plans[pi], wasm_plans[pi].name ++ "_wasm32")
+    out = add_wasm32_runtime_object_targets(move out, "stage1-wasm32-", dir ++ "/cross/wasm32", stage1, "stage1")
+    embedded = target_with_wasm32_runtime_blobs(move embedded, "stage1-wasm32-", dir ++ "/cross/wasm32")
     embedded = target_with_darwin_sysroot_blob(move embedded)
     let embedded_obj = embedded_objects_object("stage-embedded-objects-object", &embedded, "")
     out = out.add_target(embedded)
@@ -3321,6 +3413,8 @@ pub fn build(ctx: BuildCtx) -> Build:
         let slot = corpus_plans_wasm32[pi].name ++ "_wasm32"
         out = add_empty_wo_blob_targets(move out, "bootstrap-", "out/bootstrap-lib", slot)
         bootstrap_embedded_objects = target_with_empty_wo_blobs(move bootstrap_embedded_objects, "bootstrap-", "out/bootstrap-lib", slot)
+    out = add_empty_wasm32_runtime_blob_targets(move out, "bootstrap-empty-", "out/bootstrap-lib")
+    bootstrap_embedded_objects = target_with_empty_wasm32_runtime_blobs(move bootstrap_embedded_objects, "bootstrap-empty-", "out/bootstrap-lib")
     // stage1 links programs (the stage1 tests, `:dev`): it carries the sysroot.
     bootstrap_embedded_objects = target_with_darwin_sysroot_blob(move bootstrap_embedded_objects)
     let bootstrap_embedded_objects_obj = embedded_objects_object("bootstrap-embedded-objects-object", &bootstrap_embedded_objects, "")
@@ -3691,6 +3785,9 @@ pub fn build(ctx: BuildCtx) -> Build:
         embedded_objects = target_with_wo_blobs(move embedded_objects, corpus_plans[pi])
     for pi in 0..corpus_plans_wasm32.len():
         embedded_objects = target_with_wo_blobs_as(move embedded_objects, corpus_plans_wasm32[pi], corpus_plans_wasm32[pi].name ++ "_wasm32")
+    // ...and the wasm32 runtime objects (`:cross-rt-wasm`, compiled by
+    // stage2), so `--target wasm32` links outside the repository (#2131).
+    embedded_objects = target_with_wasm32_runtime_blobs(move embedded_objects, "cross-wasm-", cross_dir("wasm32"))
     embedded_objects = target_with_darwin_sysroot_blob(move embedded_objects)
     // Every consumed object's producer, declared (#680 edge audit).
     embedded_objects = embedded_objects.dep("cimport-stubs-object")
@@ -3810,9 +3907,11 @@ pub fn build(ctx: BuildCtx) -> Build:
     cross_win_embedded = cross_win_embedded.dep("cross-win-rt-core-object")
     cross_win_embedded = cross_win_embedded.dep("cross-win-rt-platform-object")
     let corpus_plans_windows_x86_64 = cross_wo_plans(ctx, &corpus_plans, "windows_x86_64")
-    for pi in 0..corpus_plans_windows_x86_64.len() as i32:
+    for pi in 0..corpus_plans_windows_x86_64.len():
         out = cross_wo_bundle_targets(move out, ctx, corpus_plans_windows_x86_64[pi])
         cross_win_embedded = target_with_wo_blobs(move cross_win_embedded, corpus_plans_windows_x86_64[pi])
+    out = add_empty_wasm32_runtime_blob_targets(move out, "cross-win-empty-", cross_windows_dir())
+    cross_win_embedded = target_with_empty_wasm32_runtime_blobs(move cross_win_embedded, "cross-win-empty-", cross_windows_dir())
     out = add_empty_darwin_sysroot_blob_target(move out, "cross-win-", cross_windows_dir())
     cross_win_embedded = target_with_empty_darwin_sysroot_blob(move cross_win_embedded, "cross-win-", cross_windows_dir())
     let cross_win_embedded_obj = embedded_objects_object("cross-win-embedded-objects-object", &cross_win_embedded, cross_windows_triple())
@@ -3889,9 +3988,11 @@ pub fn build(ctx: BuildCtx) -> Build:
     cross_winarm_embedded = cross_winarm_embedded.dep("cross-winarm-rt-core-object")
     cross_winarm_embedded = cross_winarm_embedded.dep("cross-winarm-rt-platform-object")
     let corpus_plans_windows_aarch64 = cross_wo_plans(ctx, &corpus_plans, "windows_aarch64")
-    for pi in 0..corpus_plans_windows_aarch64.len() as i32:
+    for pi in 0..corpus_plans_windows_aarch64.len():
         out = cross_wo_bundle_targets(move out, ctx, corpus_plans_windows_aarch64[pi])
         cross_winarm_embedded = target_with_wo_blobs(move cross_winarm_embedded, corpus_plans_windows_aarch64[pi])
+    out = add_empty_wasm32_runtime_blob_targets(move out, "cross-winarm-empty-", cross_windows_aarch64_dir())
+    cross_winarm_embedded = target_with_empty_wasm32_runtime_blobs(move cross_winarm_embedded, "cross-winarm-empty-", cross_windows_aarch64_dir())
     out = add_empty_darwin_sysroot_blob_target(move out, "cross-winarm-", cross_windows_aarch64_dir())
     cross_winarm_embedded = target_with_empty_darwin_sysroot_blob(move cross_winarm_embedded, "cross-winarm-", cross_windows_aarch64_dir())
     let cross_winarm_embedded_obj = embedded_objects_object("cross-winarm-embedded-objects-object", &cross_winarm_embedded, cross_windows_aarch64_triple())
