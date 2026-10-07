@@ -2417,6 +2417,62 @@ impl Sema:
                             self.update_module_context(di)
                             self.resolve_declared_global_writes(decl, false)
                             self.check_fn_body_at(decl, di)
+                        else:
+                            self.update_module_context(di)
+                            self.check_template_unsafe_calls(decl, fn_name_str)
+                    else:
+                        self.update_module_context(di)
+                        self.check_template_unsafe_calls(decl, "")
+
+    // #2235: whether a call needs an unsafe context is a property of the
+    // spelling, not of `T`, so a generic template body is checked for it
+    // once, at its declaration — the body is otherwise checked per
+    // instantiation (check_fn_body_concrete), and a library whose generic
+    // impl calls an `unsafe fn` bare passed `with check` until a consumer
+    // instantiated it. Resolvable at the declaration: a free function named
+    // by an identifier, and the owner's own method through `self.m(...)`;
+    // a call that depends on `T` waits for the instantiation. An `unsafe fn`
+    // template is its own context.
+    mut fn check_template_unsafe_calls(decl: i32, owner_dotted: &str):
+        if self.fn_decl_is_unsafe(decl) != 0: return
+        let body = self.ast.get_data1(decl)
+        if body == 0: return
+        let body_start = self.ast.get_start(body)
+        let body_end = self.ast.get_end(body)
+        let body_file = self.ast.file(decl as NodeId)
+        let owner = if owner_dotted.contains("."): owner_dotted[0..owner_dotted.find(".")].to_owned() else: "".to_owned()
+        var blocks: Vec[i32] = Vec.new()
+        for n in 1..self.ast.node_count():
+            if self.ast.kind(n) != NodeKind.NK_UNSAFE_BLOCK or self.ast.file(n as NodeId) != body_file: continue
+            if self.ast.get_start(n) < body_start or self.ast.get_end(n) > body_end: continue
+            blocks.push(n)
+        let meta = self.ast.find_fn_meta(decl)
+        for n in 1..self.ast.node_count():
+            if self.ast.kind(n) != NodeKind.NK_CALL or self.ast.file(n as NodeId) != body_file: continue
+            if self.ast.get_start(n) < body_start or self.ast.get_end(n) > body_end: continue
+            let callee = self.ast.get_data0(n)
+            var target = 0
+            if self.ast.kind(callee) == NodeKind.NK_IDENT:
+                let sym = self.ast.get_data0(callee)
+                // A parameter or local of that name is a function value, not
+                // the free function (its unsafety is the value's type's).
+                var shadowed = false
+                if meta >= 0:
+                    for pi in 0..self.ast.fn_meta_param_count(meta):
+                        if self.ast.fn_param_name(self.ast.fn_meta_param_start(meta), pi) == sym: shadowed = true
+                if not shadowed:
+                    target = self.fn_symbol_decl_node(sym)
+            else if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS and owner.len() > 0:
+                let recv = self.ast.get_data0(callee)
+                if self.ast.kind(recv) == NodeKind.NK_IDENT and self.pool_resolve(self.ast.get_data0(recv)) == "self":
+                    let method_sym = self.pool_intern(owner ++ "." ++ self.pool_resolve(self.ast.get_data1(callee)))
+                    target = self.fn_symbol_decl_node(method_sym)
+            if target == 0 or self.fn_decl_is_unsafe(target) == 0: continue
+            var covered = false
+            for b in blocks:
+                if self.ast.get_start(b) <= self.ast.get_start(n) and self.ast.get_end(n) <= self.ast.get_end(b): covered = true
+            if covered: continue
+            self.emit_error("unsafe function call requires unsafe context", n)
 
     mut fn record_global_concurrency_evidence(node: i32, reason: &str):
         if node == 0:
@@ -4089,6 +4145,11 @@ impl Sema:
         if self.ast.fn_decl_body_is_interface(node):
             sema_phase_bug("BUG: interface body reached body check (D39: check_bodies applies the declared effects and skips it)")
         if sig_idx < 0:
+            // A generic owner's method has no signature until an
+            // instantiation; its body is checked then (check_fn_body_concrete).
+            // #2235: what needs an unsafe context is decided by the spelling,
+            // so that much is checked here, once.
+            self.check_template_unsafe_calls(node, self.pool_resolve(fn_name))
             return
         // §16.4 union last-written tracking is per-function-body.
         self.union_last_written = sema_new_map_i32_i32()
