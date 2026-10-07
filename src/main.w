@@ -1965,10 +1965,29 @@ fn run_build_action_runner_process(runner_path: &str, target: &BuildGraphTarget,
 // action through the evaluator worker (and records the fallback for future
 // runs); success validates declared outputs and records the cache verdict
 // with the effect records the runner emitted.
+// #2230: the native attempt ran the action's With code up to the call that
+// needs the evaluator; every file it wrote before that is still there. The
+// evaluator's run starts from the target's declared outputs removed, and
+// the log names each one, so a half-written output never reaches a
+// dependent (pcre2's heap-8 test once ran a pcre2test from such a state).
+fn build_runner_discard_partial_outputs(root: &str, target: &BuildGraphTarget):
+    var paths: Vec[str] = Vec.new()
+    if target.output.len() > 0: paths.push(target.output.clone())
+    for oi in 0..target.extra_outputs.len() as i32: paths.push(target.extra_outputs[oi].clone())
+    for pi in 0..paths.len() as i32:
+        let path = build_graph_resolve_project_path(root, paths[pi])
+        if with_fs_file_exists(path) == 0: continue
+        let rc = if with_fs_is_dir(path) != 0: with_fs_remove_tree(path) else: with_fs_remove_file(path)
+        if rc != 0:
+            with_eprint("[build] '" ++ target.name ++ "': could not discard the native attempt's partial output " ++ path)
+        else:
+            with_eprint("[build] '" ++ target.name ++ "': discarded the native attempt's partial output " ++ path)
+
 fn build_runner_postprocess(root: &str, target: &BuildGraphTarget, raw_rc: i32, effects_path: &str, options: &BuildCommandOptions) -> i32:
     if raw_rc == 97:
         build_runner_note_fallback(root, target.name)
         with_eprint("[build] '" ++ target.name ++ "' needs the comptime evaluator; re-running (recorded for future runs)")
+        build_runner_discard_partial_outputs(root, target)
         let rc = run_build_action_worker_process(target, options)
         if rc == 0:
             build_cache_forget_fingerprints()
