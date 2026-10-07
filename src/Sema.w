@@ -558,6 +558,7 @@ pub type ForeignContract {
     callback_userdata_of: Vec[i32],    // … and the userdata parameter M it receives (parallel)
     valid_on_failed: i32,              // `valid on failed`: presented on the failed-state resource too (§16.2b.4)
     nullable_params: Vec[i32],         // `nullable param N`: the facade establishes the parameter accepts NULL (§16.2b.8)
+    bridged: i32,                      // #2223: a clause makes the function render through a bridge (Ast.facade_clause_bridges) — the one owner the renderer's lend item and facade_contract_presented read
     buffer_ptr: Vec[i32],              // D64 §16.2b.8: each `buffer param P …` pairing's pointer parameter …
     buffer_len: Vec[i32],              // … its length parameter (parallel) …
     buffer_inout: Vec[i32],            // … and 1 for `capacity param L inout`, 0 for `len param L` (parallel)

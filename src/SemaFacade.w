@@ -1044,7 +1044,7 @@ impl Sema:
                 return
             self.emit_error(f"fn '{fname}' is described by two facade blocks with different clauses; one function has one contract — restate it word for word or describe it once (§16.2b)", item)
             return
-        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: Vec.new(), consumes_destroyed_by: Vec.new(), retains: Vec.new(), retains_by: Vec.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_domain: 0, returns_borrow_parent: 0, returns_static_tid: 0, preserves_params: Vec.new(), preserves_domains: Vec.new(), of_resource: 0, rename: 0, callback_thread_any: 0, callbacks_none: 0, callback_consumes: Vec.new(), callback_userdata_cb: Vec.new(), callback_userdata_of: Vec.new(), valid_on_failed: 0, nullable_params: Vec.new(), buffer_ptr: Vec.new(), buffer_len: Vec.new(), buffer_inout: Vec.new(), buffer_elements: Vec.new(), fixed_params: Vec.new(), fixed_literals: Vec.new(), ok_const: 0, ok_count: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: Vec.new(), variadic_case_values: Vec.new(), variadic_case_tids: Vec.new(), variadic_case_kinds: Vec.new(), variadic_slots: Vec.new(), returns_borrow_record: 0, argv_cb: Vec.new(), argv_index: Vec.new(), argc_index: Vec.new(), argv_handle: Vec.new(), argv_nodes: Vec.new(), user_data_fn: 0, user_data_handle: -1, user_data_node: 0 }
+        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: Vec.new(), consumes_destroyed_by: Vec.new(), retains: Vec.new(), retains_by: Vec.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_domain: 0, returns_borrow_parent: 0, returns_static_tid: 0, preserves_params: Vec.new(), preserves_domains: Vec.new(), of_resource: 0, rename: 0, callback_thread_any: 0, callbacks_none: 0, callback_consumes: Vec.new(), callback_userdata_cb: Vec.new(), callback_userdata_of: Vec.new(), valid_on_failed: 0, nullable_params: Vec.new(), bridged: 0, buffer_ptr: Vec.new(), buffer_len: Vec.new(), buffer_inout: Vec.new(), buffer_elements: Vec.new(), fixed_params: Vec.new(), fixed_literals: Vec.new(), ok_const: 0, ok_count: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: Vec.new(), variadic_case_values: Vec.new(), variadic_case_tids: Vec.new(), variadic_case_kinds: Vec.new(), variadic_slots: Vec.new(), returns_borrow_record: 0, argv_cb: Vec.new(), argv_index: Vec.new(), argc_index: Vec.new(), argv_handle: Vec.new(), argv_nodes: Vec.new(), user_data_fn: 0, user_data_handle: -1, user_data_node: 0 }
         let extra_start = self.ast.get_data1(item)
         let clause_count = self.ast.get_data2(item)
         for ci in 0..clause_count:
@@ -1205,6 +1205,9 @@ impl Sema:
         let fn_sym = c.fn_sym
         let kind = self.ast.get_data0(clause)
         let ops = self.ast.get_data1(clause)
+        // #2223: the one decision whether this function renders through a
+        // bridge; the renderer's lend item reads the same predicate.
+        if facade_clause_bridges(kind): c.bridged = 1
         if kind == FACADE_CLAUSE_LEND:
             c.lend = 1
             return c
@@ -2800,8 +2803,11 @@ impl Sema:
 
     fn facade_contract_presented(ci: i32) -> bool:
         let c = &self.foreign_contracts[ci]
-        // D102: `nullable param N` presents a function-pointer parameter as `Option`.
-        c.lend != 0 or c.rename != 0 or c.of_resource != 0 or c.buffer_ptr.len() > 0 or c.fixed_params.len() > 0 or c.ok_const != 0 or c.variadic_node != 0 or c.returns_borrow_record != 0 or c.nullable_params.len() > 0
+        // #2223: a bridged function (a buffer pairing, a fixed argument, an
+        // `ok` contract, `nullable param N`) is `c.bridged`, decided once at
+        // collect_fn_clause by Ast.facade_clause_bridges — never re-derived
+        // from the fields here.
+        c.lend != 0 or c.rename != 0 or c.of_resource != 0 or c.bridged != 0 or c.variadic_node != 0 or c.returns_borrow_record != 0
 
     // Whether parameter `pi` is a buffer, a buffer's length, or fixed.
     fn facade_contract_pairs(ci: i32, pi: i32) -> bool:
@@ -3020,12 +3026,11 @@ impl Sema:
             if other.len() > 0:
                 self.emit_error(f"fn '{fname}' renders '{err}', the error type of its 'ok' projection, and {other}; the compiler never picks between two types of one name — rename one (§16.2b.4)", node)
                 return
-        // D102 (§16.2b.8): `nullable param N` on a function-pointer parameter
-        // presents the free operation through its bridge too.
-        var has_nullable_fn = false
-        for k in 0..self.foreign_contracts[ci].nullable_params.len() as i32:
-            if self.facade_param_is_fn_pointer(sig, self.foreign_contracts[ci].nullable_params[k]): has_nullable_fn = true
-        if hosted or not (has_pairs or has_fixed or has_nullable_fn):
+        // #2223: whether the free operation presents through a bridge is the
+        // contract's one `bridged` fact (collect_fn_clause), the same one the
+        // renderer's lend item reads — a buffer pairing, a fixed argument, an
+        // `ok` contract or `nullable param N` (D102, §16.2b.8).
+        if hosted or self.foreign_contracts[ci].bridged == 0:
             return
         // A free operation passed every check: its rendering must exist, or
         // the presented call would silently be the raw one.
@@ -3932,7 +3937,7 @@ impl Sema:
         if self.facade_bridge_of.contains(fname):
             let bridge: str = self.facade_bridge_of.get(fname).unwrap()
             names.push(bridge)
-        else if rename != 0 and (self.foreign_contracts[ci].returns_borrow_record != 0 or self.foreign_contracts[ci].buffer_ptr.len() > 0 or self.foreign_contracts[ci].fixed_params.len() > 0):
+        else if rename != 0 and (self.foreign_contracts[ci].returns_borrow_record != 0 or self.foreign_contracts[ci].bridged != 0):
             names.push(rename_text.clone())
         if self.foreign_contracts[ci].variadic_node != 0:
             let base = if rename != 0: rename_text.clone() else: facade_render_bridge_name(fname)

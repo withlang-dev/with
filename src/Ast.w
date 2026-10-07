@@ -285,6 +285,14 @@ pub const FACADE_CLAUSE_VARIADIC: i32 = 26         // [vararg_ref, selector_ref,
 pub const FACADE_CLAUSE_VARIADIC_CASE: i32 = 27    // [selector_sym, type(node), callback_ref|0, userdata_selector_ref|0, retainer_ref|0]
 pub const FACADE_CLAUSE_CALLBACKS_NONE: i32 = 28  // [] trusted no-invocation guarantee (§16.2b.9)
 pub const FACADE_CLAUSE_ABANDON: i32 = 29          // [fn_sym] resource-only: the `callbacks none` operation run before the destroyer on a drop path not proven callback-free (§16.2b.9)
+
+// #2223 (Law 3, one owner): whether a clause makes its free function render
+// through a bridge — a presented call the facade redirects to. A buffer
+// pairing, a fixed argument, an `ok` status contract (D64) and `nullable
+// param N` (D102) do; the one list Sema's contract (`bridged`) and the
+// renderer's lend item read, so neither recomputes it from the clauses.
+pub fn facade_clause_bridges(kind: i32) -> bool:
+    kind == FACADE_CLAUSE_BUFFER or kind == FACADE_CLAUSE_FIXED or kind == FACADE_CLAUSE_OK or kind == FACADE_CLAUSE_NULLABLE
 pub const FACADE_CLAUSE_HANDLE: i32 = 30           // [] the parser's marker on the NK_FACADE_RESOURCE a `handle Name wraps *mut T` item makes: a callback-scope handle (§16.2b.9), never written as a clause
 pub const FACADE_CLAUSE_CALLBACK_ARGV: i32 = 31    // [callback_ref, argv_ref, argc_ref, type(node)]  (`callback param N argv param A paired with argc param C as &[H]`: A and C index the callback's own parameters, §16.2b.9, D76)
 pub const FACADE_CLAUSE_USER_DATA: i32 = 32        // [accessor_sym, type(node)]  (`user_data from <fn> as &U`: the registered userdata the facade boxed, read back through <fn>, §16.2b.9, D76)

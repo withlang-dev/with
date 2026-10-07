@@ -957,7 +957,7 @@ fn facade_render_lend_item(pool: AstPool, intern: InternPool, ci: &Vec[i32], ite
         // (facade_render_bridge); they make nothing stronger than a lend.
         // D102: `nullable param N` on a function-pointer parameter presents
         // `Option` of it through the bridge (facade_render_bridge_param).
-        else if kind == FACADE_CLAUSE_BUFFER or kind == FACADE_CLAUSE_FIXED or kind == FACADE_CLAUSE_OK or kind == FACADE_CLAUSE_NULLABLE: li.bridged = true
+        else if facade_clause_bridges(kind): li.bridged = true
         else if kind != FACADE_CLAUSE_LEND and kind != FACADE_CLAUSE_PRESERVES and kind != FACADE_CLAUSE_CALLBACKS_NONE: li.lends = false
     if not li.lends:
         return li
