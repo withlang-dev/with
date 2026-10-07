@@ -2780,7 +2780,8 @@ fn bs_check_build_effects_audit(ctx: &ActionCtx, compiler_path: &str, case_dir: 
     let strict_env = bs_run_cli_capture_cwd(ctx, compiler_path, "effects-strict-env", strict_env_args, 120000, strict_env_dir)
     if strict_env.rc == 0:
         return bs_fail(ctx, "strict env effects build unexpectedly succeeded")
-    bs_assert_contains(ctx, strict_env.stderr, "comptime can only call comptime functions", "effects_strict_env")
+    // D104: the refusal names the chain to the extern the build body reaches.
+    bs_assert_contains(ctx, strict_env.stderr, "is not comptime-callable: it reaches env -> with_getenv_str (an extern)", "effects_strict_env")
 
 pub fn run_cli_selfhost_project_action(ctx: ActionCtx) -> i32:
     if os() == "Windows":
