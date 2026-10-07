@@ -36,9 +36,7 @@ fn normalize(line: &str) -> str:
     out = /\bbb[0-9]+/g.replace(out, "bb")
     out = /\bty[0-9]+/g.replace(out, "ty")
     out = /\.f[0-9]+/g.replace(out, ".f")
-    // A regex literal cannot open a tail expression (#2233), hence the let.
-    let locals_free = /_[0-9]+/g.replace(out, "_")
-    locals_free
+    /_[0-9]+/g.replace(out, "_")
 
 // name → normalized body lines, from one `--dump-mir` text, in name order.
 fn split_bodies(dump: &str) -> BTreeMap[str, Vec[str]]:
