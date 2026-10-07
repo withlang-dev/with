@@ -1127,9 +1127,17 @@ impl CiProject:
                     continue
                 if with_cimport_fn_storage_class(session, i) == CX_SC_STATIC:
                     // D107: a static definition's NULL arguments are corpus
-                    // caller evidence even though it is no project symbol.
+                    // caller evidence even though it is no project symbol,
+                    // and its own body is the evidence for ITS fn-pointer
+                    // parameters (a static callee passed NULL by its unit
+                    // was rendered non-null and its NULL test folded, #2230
+                    // smoke). The table is name-keyed: a second static of the
+                    // same name in another unit keeps the first's evidence.
                     if cursor >= 0 and with_ci_cursor_is_definition(session, cursor) != 0:
                         self.record_call_evidence(session, cursor, name)
+                        let static_symbol = self.ensure_symbol(CiProjectSymbolKind.CIPS_FN, name)
+                        if self.symbols[static_symbol].has_definition == 0:
+                            self.record_fn_evidence(session, i, cursor, static_symbol)
                     // A `static inline` function DEFINED in a header is the
                     // header's API: every includer compiles a private copy,
                     // and the unit of the same name (tommyhashdyn.c for
@@ -1889,6 +1897,11 @@ pub fn migrate_c_directory(input_dir_arg: &str, output_dir_arg: &str, exclude_ba
         eprint(f"migrate: {files_migrated}/{files_scanned} files, {g_migrate_fn_translated_total}/{fn_total} functions translated{file_note}")
         return 1
     eprint(f"migrate: {files_migrated}/{files_scanned} files, {fn_total} functions translated from {input_dir} -> {output_dir}")
+    // #2230: the rewrite rules applied, by function, for migrate_diff.
+    let rules = ci_take_rule_sites()
+    if files_migrated > 0 and with_fs_write_file(output_dir ++ "/rules.tsv", rules) != 0:
+        eprint("migrate: could not write " ++ output_dir ++ "/rules.tsv")
+        return 1
     if files_migrated == 0: 1 else: ci_migrate_apply_writes_clauses()
 
 // ── `writes` clauses (§21.1 rule 1, Eric 2026-09-29) ────────────

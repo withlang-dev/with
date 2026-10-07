@@ -93,10 +93,46 @@ fn only_in(a: &Vec[str], b: &Vec[str]) -> Vec[str]:
         else: out.push(l.clone())
     out
 
+// #2230: the rules a migration applied, by function (`rules.tsv` beside
+// the migrator's output: `rule<TAB>function<TAB>detail`); "" when the side
+// has none (a promoted corpus carries only its .w files).
+fn rules_by_function(dir: &str) -> HashMap[str, Vec[str]]:
+    var out: HashMap[str, Vec[str]] = HashMap.new()
+    let text = match read_file(dir ++ "/rules.tsv"):
+        Ok(t) => t
+        Err(_) => "".to_owned()
+    for line in text.split("\n"):
+        let parts = line.split("\t")
+        if parts.len() != 3: continue
+        let entry = parts[0] ++ ": " ++ parts[2]
+        match out.get(parts[1]):
+            Some(existing) =>
+                var v = existing.clone()
+                v.push(entry)
+                out.insert(parts[1].to_owned(), move v)
+            None => out.insert(parts[1].to_owned(), [entry])
+    out
+
 let argv = args()
 if argv.len() != 5: fail("usage: with run tools/migrate_diff.w <old-dir> <new-dir> <main.w> <lib-subdir>")
 let old_bodies = split_bodies(dump_side("old", argv[1], argv[3], argv[4]))
 let new_bodies = split_bodies(dump_side("new", argv[2], argv[3], argv[4]))
+let old_rules = rules_by_function(argv[1])
+let new_rules = rules_by_function(argv[2])
+// The rules the new migration applied to `name` (and the old one's it no
+// longer applies): a difference beyond these is not a rewrite's.
+fn print_rules(name: &str, old_rules: &HashMap[str, Vec[str]], new_rules: &HashMap[str, Vec[str]]):
+    let applied: Vec[str] = match new_rules.get(name):
+        Some(v) => v.clone()
+        None => Vec.new()
+    for r in applied: print("    rule " ++ r)
+    let before: Vec[str] = match old_rules.get(name):
+        Some(v) => v.clone()
+        None => Vec.new()
+    for r in before:
+        if not applied.contains(r): print("    rule (old side only) " ++ r)
+    if applied.len() == 0 and before.len() == 0 and (new_rules.len() > 0 or old_rules.len() > 0):
+        print("    rule: none recorded for this function — the difference is not a migrator rewrite")
 var differing = 0
 for name in old_bodies.keys():
     if not new_bodies.contains(name):
@@ -110,6 +146,7 @@ for name in old_bodies.keys():
     if removed.len() == 0 and added.len() == 0: continue
     differing += 1
     print(f"~ {name}: MIR differs (-{removed.len()} +{added.len()} lines)")
+    print_rules(name, &old_rules, &new_rules)
     var shown = 0
     for l in removed:
         if shown >= 8: break

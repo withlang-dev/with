@@ -243,7 +243,13 @@ sites, three rebuilds, and the failure was not in the text). The order:
    compares the statements with every id normalized (`symN`, `_N`, `bbN`,
    `tyN`, `.fN` are positions, not meaning). It names each function whose
    lowering differs and prints the statements present on one side only;
-   exit 1 when any differ. On #2214 it reported four functions, each with
+   exit 1 when any differ. Under each differing function it names the
+   migrator rules applied to it: a directory migration writes `rules.tsv`
+   beside its output (`rule<TAB>function<TAB>detail`, one line per
+   distinct site — D101's `T.zeroed()` rewrites, D107's nullable-by-evidence
+   parameters and the NULL-compare folds they license; never promoted into
+   a corpus), and a function that differs with no rule recorded is a
+   difference that is not a migrator rewrite (#2230). On #2214 it reported four functions, each with
    exactly `aggregate(... const 0 ...)` → `const zst(ty)` or a `with_memset`
    call → `_.* = const zst(ty)`: the rewrite and nothing else, which points
    the hunt at the build. A difference it shows that is not the intended

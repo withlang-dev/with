@@ -4196,7 +4196,7 @@ fn bs_check_migrate_nullable_by_evidence(ctx: &ActionCtx, compiler_path: &str, c
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "evidence.c")
     let out_w = bs_join(case_dir, "evidence.w")
-    var rc = bs_write_fixture(ctx, src, "#include <assert.h>\n#include <stdlib.h>\ntypedef int (*cb_t)(int);\nstruct holder { cb_t stored; };\nstatic struct holder g;\nint handled(cb_t cb, int x) { if (cb == NULL) return -1; return cb(x); }\nint contract(cb_t cb, int x) { assert(cb != NULL); return cb(x); }\nint direct(cb_t cb, int x) { return cb(x); }\nint forwarded(cb_t cb, int x) { return direct(cb, x); }\nint stored(cb_t cb) { g.stored = cb; return 0; }\nint via_handled(cb_t cb, int x) { return handled(cb, x); }\nint caller(int x) { return direct(NULL, x); }\nint add1(int x) { return x + 1; }\nint run(void) { return handled(add1, 1) + contract(add1, 2) + direct(add1, 3) + forwarded(add1, 4) + via_handled(add1, 5); }\n", "nullable by evidence fixture")
+    var rc = bs_write_fixture(ctx, src, "#include <assert.h>\n#include <stdlib.h>\ntypedef int (*cb_t)(int);\nstruct holder { cb_t stored; };\nstatic struct holder g;\nstatic int hidden(cb_t cb, int x) { if (cb == NULL) return -2; return cb(x); }\nint via_hidden(int x) { return hidden(NULL, x); }\nint handled(cb_t cb, int x) { if (cb == NULL) return -1; return cb(x); }\nint contract(cb_t cb, int x) { assert(cb != NULL); return cb(x); }\nint direct(cb_t cb, int x) { return cb(x); }\nint forwarded(cb_t cb, int x) { return direct(cb, x); }\nint stored(cb_t cb) { g.stored = cb; return 0; }\nint via_handled(cb_t cb, int x) { return handled(cb, x); }\nint caller(int x) { return direct(NULL, x); }\nint add1(int x) { return x + 1; }\nint run(void) { return handled(add1, 1) + contract(add1, 2) + direct(add1, 3) + forwarded(add1, 4) + via_handled(add1, 5); }\n", "nullable by evidence fixture")
     if rc != 0: return rc
     var args: Vec[str] = Vec.new()
     args |> push("migrate")
@@ -4208,6 +4208,11 @@ fn bs_check_migrate_nullable_by_evidence(ctx: &ActionCtx, compiler_path: &str, c
     let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-nullable-by-evidence", args)
     if result.rc != 0: return result.rc
     rc = bs_assert_contains(ctx, result.stderr, "handled param 0: Option: body tests it for NULL and continues", "evidence reason: handled test")
+    if rc != 0: return rc
+    // A static definition's own body is evidence for its parameters too.
+    rc = bs_assert_contains(ctx, result.stderr, "hidden param 0: Option: body tests it for NULL and continues", "evidence reason: static callee test")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, out_w, "fn hidden(__param_cb: Option[extern \"C\" fn(c_int) -> c_int]", "evidence: static hidden is Option")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, result.stderr, "contract param 0: non-null: the NULL branch aborts (a contract), no NULL callers", "evidence reason: assert")
     if rc != 0: return rc

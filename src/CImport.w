@@ -518,6 +518,30 @@ pub fn ci_c_type_aliases(triple: &str) -> str:
 pub fn ci_c_long_double_representable(triple: &str) -> bool:
     ci_str_contains(ci_c_type_aliases(triple), "c_longdouble")
 
+// #2230: every rewrite rule the migrator applies is tagged with the
+// function it rewrote, so `tools/migrate_diff.w` names the rule behind a
+// function whose lowering changed between two migrations. One line per
+// site, `rule<TAB>function<TAB>detail`; a directory migration writes them
+// as `rules.tsv` beside its output (never promoted into a corpus).
+var g_ci_rule_sites: Vec[str] = Vec.new()
+var g_ci_rule_fn: str = ""
+
+pub fn ci_set_rule_fn(name: &str): g_ci_rule_fn = with_str_clone_ref(name)
+
+pub fn ci_note_rule(rule: &str, detail: &str): ci_note_rule_for(g_ci_rule_fn, rule, detail)
+
+// A rule applied to a declaration (its signature renders outside any
+// body); one line per distinct site, however often the signature renders.
+pub fn ci_note_rule_for(fn_name: &str, rule: &str, detail: &str):
+    let line = rule ++ "\t" ++ fn_name ++ "\t" ++ detail
+    if not g_ci_rule_sites.contains(line): g_ci_rule_sites.push(line)
+
+pub fn ci_take_rule_sites() -> str:
+    var out = ""
+    for line in g_ci_rule_sites: out = out ++ line ++ "\n"
+    g_ci_rule_sites = Vec.new()
+    out
+
 fn ci_record_omitted_symbol_cat(name: &str, location: &str, category: &str, reason: &str):
     if name.len() == 0:
         return
@@ -6810,6 +6834,7 @@ impl CiExprPool:
         if (other_ty as i32) == 0: return 0 as CiExprId
         let other_text = ci_print_type(types, other_ty)
         if not ci_type_text_is_fn_ptr(other_text) or ci_nullable_fn_ptr_inner(other_text).len() > 0: return 0 as CiExprId
+        ci_note_rule("D107 a non-null fn-pointer parameter compared with NULL folds", other_text)
         if as_bool: return self.bool_lit(if is_eq: 0 else: 1, 0 as CiTypeId)
         let folded = self.add_string(if is_eq: "0" else: "1")
         self.int_lit(folded, 0 as CiTypeId)
@@ -7666,6 +7691,7 @@ pub fn ci_migrated_param_type(session: i64, idx: i32, pi: i32) -> str:
     if with_getenv_str("WITH_DEBUG_MIGRATE_NULLABLE").len() > 0:
         eprint("[migrate-nullable] " ++ with_cimport_decl_name(session, idx) ++ f" param {pi}: verdict {verdict} raw " ++ raw)
     if verdict == 1:
+        ci_note_rule_for(with_cimport_decl_name(session, idx), "D107 nullable-by-evidence fn-pointer parameter", f"param {pi}: " ++ ci_migrate_fn_param_reason(with_cimport_decl_name(session, idx), pi))
         return "Option[" ++ ci_unsafe_fn_ptr_type(raw) ++ "]"
     raw
 
@@ -8276,6 +8302,7 @@ impl CiExprPool:
                     g_ci_bail_message = "`{0}` initializer of '" ++ ty_str ++ "' has no `zeroed()`: " ++ invalid ++ " is not zero-valid (D101)"
                     g_ci_bail_location = with_ci_cursor_location(session, cursor)
                 return 0 as CiExprId
+            ci_note_rule("D101 a {0} record initializer is T.zeroed()", ty_str)
             let zero_start = self.extra_len() as i32
             ci_trace_port("STRUCTURAL[b11.11.init_list]")
             return self.designated_init(zero_start, 0, init_ty_id)
@@ -10952,6 +10979,7 @@ impl CiExprPool:
                 g_ci_bail_location = with_ci_cursor_location(session, cursor)
             return 0 as CiExprId
         let none: Vec[i32] = Vec.new()
+        ci_note_rule("D101 memset-to-zero of a record is T.zeroed()", record_text)
         let zeroed = self.build_named_call_expr_typed(record_text ++ ".zeroed", &none, record_ty)
         self.add(CiExprKind.CIE_ASSIGN, place as i32, zeroed as i32, 0, record_ty)
 
@@ -13714,6 +13742,7 @@ fn ci_try_translate_fn_body_at(session: i64, decl_idx: i32, found_cursor: i32) -
     g_ci_body_hoisted_decls = ""
     g_ci_body_tail_unit = false
     ci_clear_bail_location()
+    ci_set_rule_fn(with_cimport_decl_name(session, decl_idx))
     // B9: fresh per-function temp counter. This path is called
     // from ci_translate_function's static-inline branch — which
     // already resets — but also from other call sites for header
