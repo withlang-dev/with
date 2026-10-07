@@ -65,6 +65,52 @@ a step.
   a region captured is owned by the region's task until it completes.
   `Arena` is a library allocator over one placed `Buffer`, and its reset is
   ordinary.
+- **Cancellation, stated honestly.** Regions inside an async scope cancel
+  as a unit when a sibling fails or the scope is dropped (§14.22), which
+  is what a speculative-decode pipeline or a two-GPU stage needs and what
+  no vendor runtime offers. What cancellation means on a device: queued
+  launches are never submitted, nothing is awaited, and the buffers a
+  cancelled region captured are released only after the device has
+  drained the work already running. No runtime stops a running kernel,
+  and the plan does not claim to.
+- **Kernels as values.** A region instantiated for a processor is a
+  symbol in the device unit; a `Kernel` value naming it can be stored,
+  passed and chosen among (`[Kernel]` a scheduler picks from by
+  `Processor.Current`), with its footprint and placement already
+  admitted. Driver-side compilation of source text at run time is the
+  exception a program must spell, never the default.
+- **Advisory facts, after traffic.** `with analyze 'roofline:<region>'`
+  divides the region's counted traffic by the machine's declared
+  bandwidths and reports arithmetic intensity against the ridge point,
+  per machine, from source: "memory-bound at 11% of HBM peak on
+  h100_sxm". Two caveats are part of the fact: traffic counts touches, not
+  footprint, so the intensity is a bound; and bandwidth is a `spec:` or
+  `measured:` figure, so the number is advisory and never a gate (§4).
+  `with analyze 'suggest:placement'` reads the same facts and says where a
+  buffer should have been placed ("`weights` is read by three regions on
+  gpu[0] and never by the host; placing it in HBM at declaration removes
+  two transfers"). The transfer stays written (Law 5); the compiler says
+  where. Vx refuses; With advises.
+- **The kernel migrator, after the Crux six.** `with migrate` for CUDA C
+  and MSL kernels, the C migrator's method applied to device code:
+  `__global__` to `on gpu:`, `__shared__ float t[N]` to a scratchpad
+  `Buffer`, `threadIdx`/`blockIdx`/`blockDim` to `parallel[workgroup]`
+  and `parallel[grid]` bindings, `__syncthreads()` to `barrier()`, warp
+  shuffles and atomics to their std forms, `cudaMemcpy` to `transfer`
+  with the route derived, device pointer parameters to `in S` with
+  nullability by evidence. Its product is the migration diff: every
+  latent "this faults on a smaller card" in a real library (ggml,
+  flash-attention, the simpler CUTLASS layers) reported as a refusal with
+  a fix-it. Its failure mode is Law 7's exact trap: a construct it cannot
+  lower is a loud refusal naming the kernel and the line, never a
+  plausible approximation of a barrier or an atomic. It needs a device to
+  validate its output, so it is dispatch work; what the checker plan owes
+  it now is a spelling in IV.5a for every construct it will meet.
+- **The probe's device half.** `with machine probe` measures bandwidth
+  (a copy loop per edge), peer rates and contention ratios, writes them
+  as `measured:` figures beside the `spec:` ones, and refuses any figure
+  that cannot physically be true. This closes the loop Vx left open: the
+  thing that verifies the model ships with it.
 - **Region traffic** (`traffic` facts, `vx.md` §10): bytes a region reads
   and writes per placed buffer, per launch, counted from MIR; one
   uncountable access makes the region's figure absent with a reason.
@@ -148,8 +194,14 @@ cache and the inference engine, with none of Part 4's "is UB".
 1. CUDA on `eric-5090`: the facade, the nvptx unit, address spaces, real
    transfers, `Buffer` drops through `cuMemFree`, `:placement-native` for
    the CUDA twins, the Crux six on the device.
-2. The measurement comparison and the first `measured:` figures.
-3. Real overlap for `async on` and `async transfer`.
+2. The measurement comparison, the probe's device half, and the first
+   `measured:` figures.
+3. Real overlap for `async on` and `async transfer`, with cancellation as
+   stated above; kernels as values.
 4. Metal, per the answer to the question above.
-5. Region traffic.
-6. User-written lowerings, if ever.
+5. Region traffic, then the advisory facts (`roofline`, `suggest`).
+6. The kernel migrator, with a real library as its acceptance.
+7. User-written lowerings, if ever.
+
+What comes after both proposals, and what each needs before it is
+briefed, is `vx-frontier.md`.

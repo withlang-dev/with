@@ -316,6 +316,16 @@ the dynamic case; the rule for it is decided before step 3 (Part IX), not
 after. Until then a size the compiler cannot establish is reported as
 unverified, never silently admitted.
 
+**A footprint is a signature fact at a published boundary.** Inside a
+package the per-function summary is inferred, as the fold needs it. A
+`pub` kernel declares what it places, the way it declares its processor:
+`pub fn attention(q: &[f16] in HBM, ...) on gpu places SMEM <= 48 KiB:`.
+The body is checked against the declaration; a caller trusts it; the fold
+composes it. A kernel library's types then carry what fits on which card,
+and swapping `h100_sxm.w` for `rtx5090_x2.w` refuses the kernels that do
+not fit before anyone benchmarks. Law 6, applied to capacity; the spelling
+is a Part IX item.
+
 *Laws:* 4 (being wrong rejects a valid program or lets one run out of memory
 at runtime; neither is unsafety); 3 (the live set has one owner); 7.
 
@@ -465,6 +475,18 @@ Rules:
   error, as in Vx (`arch.rs:117`). Peer edges between devices are ordinary.
 - The host is `host`: its spaces (`host.DRAM`) come from the `--target`
   machine, which is the host file. A host declares no capacity.
+- A space need not be silicon. A machine file may declare NVMe, a CXL
+  pool, or another node's memory over a fabric as a space with capacity,
+  bandwidth and edges, and the checker treats it like any other: a tiered
+  KV cache is then a program whose moves between tiers are explicit and
+  whose admission is checked across the whole hierarchy. The grammar
+  admits it now; what a transfer over a file-backed or network edge means
+  (its failure modes, its asynchrony) is `vx-frontier.md`'s, and host DRAM
+  stays uncapacity-checked.
+- A phone's NPU with 8 MiB of SRAM is a processor with a `sees` set and a
+  capacity: `with check --machine pixel_npu.w` says whether the model fits
+  before it ships. Same checker, no new language; that is why machines are
+  data.
 - Coherence checks on the file alone, before any program: `within` acyclic;
   child capacity ≤ parent; scope narrows downward; every figure positive;
   every processor sees its own `memory`; `sees` names declared spaces; no
@@ -526,6 +548,13 @@ extern fn cublas_sgemm(a: *const f32 in rtx.HBM[0], ...)
   write through it is a type error, not Crux's `BroadcastWriteViolation`
   at dispatch and not UB inside a kernel.
 - Element types a processor cannot represent are refused at the placement.
+- A device arena is a library type over one placed buffer, used as a
+  `with` scope: `with Arena.new[rtx.HBM[0]](2 GiB) as scratch:` then
+  `scratch.alloc[f16](n)` for buffers that die with the scope, one free at
+  block end by the drop plan. Allocations are admitted against the arena's
+  static size as a sub-space; per-request inference scratch with no reset
+  call and nothing to misuse. Nothing in the compiler; the arena's
+  capacity is a declared fact the checker reads.
 
 ### IV.4 Transfer
 
@@ -831,7 +860,15 @@ Each step is one stack with one battery, buildable by the pinned seed.
 1. **Machine files and facts.** Parser, loader, `SemaMachine`, coherence
    checks, `--machine`, detection printed on every build, the `with.toml`
    pin, `lib/std/machine/m4_uma.w` and `rtx5090_x2.w` with cited figures,
-   `explain:machine`, `:machine-check`. No codegen change.
+   `explain:machine`, `:machine-check`. No codegen change. Also the host
+   half of the probe: `with machine probe` enumerates devices and reads
+   what the host can learn without a launch (memory sizes, device
+   properties through the driver, NUMA layout) and writes a machine file
+   whose figures carry `measured:` trailers naming the instrument, with a
+   diff against the shipped `spec:` figures. Its own validator is Vx's
+   lesson: a figure that cannot physically be true is refused (a composite
+   faster than its slowest leg, traffic above the part's peak). Bandwidth
+   needs a launch and is the dispatch proposal's half.
 2. **Placement, transfer, regions, visibility, host-lowered.** `TY_SPACE`,
    the space slot on pointer, reference and slice types, `Buffer[T, S]`,
    `transfer`, `on` and `async on`, per-processor instantiation, the
@@ -844,10 +881,25 @@ Each step is one stack with one battery, buildable by the pinned seed.
 3. **Capacity from MIR.** The Part IX dynamic-size ruling first, then
    `MirCapacity`, the fold, `capacity` facts, the over-capacity pairs.
 
+**A checker-only follow-on, after step 3: sharded buffers.** The eight-GPU
+box is the reason for the plan, and a tensor split across devices is its
+first shape. `Sharded[T, [gpu[0].HBM, gpu[1].HBM], axis 0]` is a buffer
+whose shards are placed one per space; `on gpu[*]:` instantiates one
+region body per shard (§3's instantiation over a set of processors);
+`all_gather`, `reduce_scatter` and `all_reduce` are transfers routed over
+the declared peer edges with their traffic counted; admission is per
+shard. "This model does not fit two 5090s at this batch" is then a
+refusal from `with check`, not a failed allocation on the second card.
+None of it needs a device: the host lowering runs the shards in sequence.
+Spellings are a Part IX item.
+
 That is this plan. Dispatch (device codegen units, the Metal and CUDA
 facades, the native half of the suite, the measurement comparison, real
 overlap for `async on`, region traffic, user-written lowerings) is
-`vx-dispatch.md`, briefed separately after step 3.
+`vx-dispatch.md`, briefed separately after step 3. What both make possible
+and neither carries (static search over kernel variants, confidential
+placement, storage tiers with semantics, a fleet of machine files checked
+in one run) is `vx-frontier.md`, each entry with what it waits on.
 
 ## Part VII — Where With departs from Vx
 
@@ -909,5 +961,12 @@ overlap for `async on`, region traffic, user-written lowerings) is
   `in S` as the spelling on views and pointers.
 - Consuming iteration (the `into_iter` ruling), since a transfer of a
   collection's elements between spaces is the same shape.
+- The footprint clause on a `pub` kernel (§6): `places SMEM <= 48 KiB` is
+  the proposed spelling; whether a size may name a comptime expression
+  (`places SMEM <= TILE * TILE * 4 B`) and whether an unstated footprint
+  on a `pub` kernel is inferred (Law 6 says no: declared at the boundary).
+- The sharded surface: `Sharded[T, spaces, axis]`, `on gpu[*]`, the
+  collective names, and whether a collective is a `transfer` or its own
+  verb.
 - Who measures the shipped descriptions' figures, and when the `policy:`
   figures in `rtx5090_x2.w` become `measured:`.
