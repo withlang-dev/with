@@ -13,6 +13,18 @@ owns, and it decides scope questions no comparison with another language
 can: an eight-GPU box makes peer transfers between `gpu[0]` and `gpu[1]`
 early scope, not a refinement.
 
+The first customer is Crux (`docs/demo_plans/ml/crux/crux-design.md`), the
+compute foundation that will be rewritten from scratch once this plan and
+dispatch exist. Its substrate (Parts 2 to 4 and 7: opaque `Memory`,
+`free_after`, three happens-before rules, aliasing rules that end in "is
+UB", a `DeviceInfo` queried at run time, a twenty-method backend trait)
+is what the checker makes static; its execution-space model (Part 5) is
+the kernel-authoring half this plan adopts inside regions; its library
+layers (Part 8) stay Crux's; and its six validation programs (Part 10:
+elementwise add, matmul, softmax, flash attention, quantized matmul, KV
+cache update) are this plan's acceptance set, written on the surface
+below and run host-lowered before any GPU.
+
 Vx (github.com/vx-lang/Vx, by Aditya Kumar) is the reference for the idea
 that *where a value lives* and *where code runs* are type facts checked
 against a declared machine. It is read for what it establishes and where it
@@ -191,6 +203,12 @@ disagree, this document follows the code. Paths written `Vx …` are under
 - **One ABI source.** `src/FnAbi.w:26` (`PassMode`, computed once). A pointer
   into another space is a pointer type with a space argument; its passing
   mode is whatever `compute_fn_abi` says for a pointer, and nothing per path.
+- **Crux's substrate, already covered.** Crux's `free`/`free_after` are the
+  drop plan; its stream and event rules are regions and tasks; its
+  `In`/`Out`/`InOut`/`Scratch` modes are `&`, `&mut` and a scratchpad
+  local; its `memory_ptr` "CPU-accessible only" is visibility; its
+  `GridExceedsDevice` is a static check when the grid is static. What it
+  had that this plan lacked is in IV.5a.
 - **The machines.** The Mac is one unified space with a CPU and a GPU that
   address it, plus threadgroup memory as a true scratchpad; the Linux box
   (`eric-5090`) has discrete GPUs with host-unreadable memory and peer
@@ -384,11 +402,15 @@ machine m4_uma:
         arch aarch64
         memory Unified
         sees Unified
+        subgroup 4                 // Vector lanes the host lowering uses
     processor gpu:
         arch metal
         memory Unified
         sees Unified, Threadgroup
         dtypes f32, f16, bf16, i32, i16, i8, u32, u16, u8
+        subgroup 32                spec: Metal feature set tables
+        workgroup max 1024
+        grid max 2^31, 65535, 65535
     transfer Unified -> Threadgroup
 ```
 
@@ -411,6 +433,9 @@ machine rtx5090_x2:
         memory HBM[0]
         sees HBM[0], SMEM[0]
         dtypes f32, f16, bf16, fp8, i32, i8
+        subgroup 32                spec: warp
+        workgroup max 1024
+        grid max 2^31, 65535, 65535
     processor gpu[1]: as gpu[0], memory HBM[1], sees HBM[1], SMEM[1]
     transfer host.DRAM -> HBM[0]: 63 GB/s copy_engine    spec: PCIe Gen5 x16
     transfer HBM[0] -> host.DRAM: 63 GB/s copy_engine
@@ -429,7 +454,12 @@ Rules:
   may carry a provenance trailer: `spec: <text>`, `measured: <text>`,
   `policy: <text>`; the trailer is a fact, and `with analyze` reports it.
 - `processor NAME[index]:` items are `arch`, `memory` (its default space),
-  `sees` (the visible set), `dtypes`, and `as OTHER`.
+  `sees` (the visible set), `dtypes`, `subgroup N` (the lockstep width),
+  `workgroup max N`, `grid max X, Y, Z`, and `as OTHER`. These are what
+  Crux's `DeviceInfo` queried at run time; declared, they are checked
+  (a static grid over `grid max` is a compile error, `subgroup` is a
+  comptime constant). What is only knowable at run time (free memory,
+  elapsed time) stays a facade call and is not a machine fact.
 - `transfer A -> B[: rate] [copy_engine] [relaxed]`. One cost per edge: a
   declared rate on an edge whose endpoints both declare bandwidths is an
   error, as in Vx (`arch.rs:117`). Peer edges between devices are ordinary.
@@ -489,6 +519,12 @@ extern fn cublas_sgemm(a: *const f32 in rtx.HBM[0], ...)
   same type as `&[f32]`, so every existing signature is a host signature.
 - `Buffer[T, S]` is never `Copy`, and a view into it is a view like any
   other (D22/D27: observing is not owning).
+- A strided view (Crux's `View { memory, offset, shape, strides }`) is a
+  library value type over a buffer view, not a language type; shapes in
+  types stay a separate decision. One rule is the language's: a view with
+  a zero stride (a broadcast) is a `&` view and can never be `&mut`, so a
+  write through it is a type error, not Crux's `BroadcastWriteViolation`
+  at dispatch and not UB inside a kernel.
 - Element types a processor cannot represent are refused at the placement.
 
 ### IV.4 Transfer
@@ -546,6 +582,70 @@ comptime match Processor.Current.arch:  // inside a region; selected before anal
   compile error naming the construct, never a host fallback. In this plan
   every processor lowers on the host, so the check is exercised by a test
   machine whose processor declares an arch the host backend refuses.
+- A region is one in-order queue. Launches inside it never interleave;
+  program order is the ordering (Crux's stream rule 1). Ordering across
+  regions is tasks and `.await` (its rules 2 and 3). There is no fourth
+  rule and nothing is "otherwise a data race".
+
+### IV.5a Kernels inside a region
+
+The execution-space model is Crux's Part 5, as With syntax inside a region
+rather than a separate program language with its own IR. Pending a
+ruling on the spellings:
+
+```
+on rtx.gpu[0]:
+    let tile_a = Buffer.uninit[f32, Machine.SMEM[0]](TILE * TILE)   // Crux `local`: a scratchpad buffer
+    let tile_b = Buffer.uninit[f32, Machine.SMEM[0]](TILE * TILE)   // capacity admission checks it
+    parallel[grid] bi in 0..m / TILE:
+        parallel[grid] bj in 0..n / TILE:
+            var acc: [f32; TILE * TILE] = [0.0; TILE * TILE]        // Crux `private`: an ordinary local
+            for bk in 0..k / TILE:
+                parallel[workgroup] ti in 0..TILE:
+                    parallel[workgroup] tj in 0..TILE:
+                        tile_a[ti * TILE + tj] = a[(bi * TILE + ti) * k + bk * TILE + tj]
+                        tile_b[ti * TILE + tj] = b[(bk * TILE + ti) * n + bj * TILE + tj]
+                barrier()
+                ...
+    let total = reduce[sum] i in 0..n: x[i] * y[i]
+    parallel[subgroup] lane in 0..Processor.Current.subgroup_size:
+        ...
+```
+
+- `parallel[grid|workgroup|subgroup] i in range:` maps an iteration to a
+  workgroup, a thread, or a lane; bare `parallel` is mapped by the
+  outermost-large / inner / innermost-small heuristic, and
+  `explain:instances` reports the mapping chosen. Nesting order is
+  checked: grid outside workgroup outside subgroup.
+- `reduce[sum|max|min|prod] i in range: expr` is a reduction with a
+  named identity; the backend picks the strategy. Any other reduction is
+  a sequential loop with an accumulator.
+- `barrier()` is a workgroup barrier and is legal only as a statement
+  directly in a workgroup body, never under a conditional or a loop the
+  checker cannot prove every thread reaches.
+- `Processor.Current.subgroup_size`, `workgroup_max` and `grid_max` are
+  comptime constants from the machine file. `parallel[subgroup] lane in
+  0..32` is a compile error on a machine whose subgroup is not 32, which
+  is Crux's portability rule enforced instead of documented.
+- A scratchpad local is a `Buffer` in the processor's scratchpad space;
+  its placement is capacity-checked like any other. A private local is a
+  local.
+- The host lowering, which is this plan's only lowering, is Crux's CPU
+  backend: `grid` to the fiber pool, `workgroup` sequential within the
+  task, `subgroup` to `Vector[N, T]` with `N` the host's `subgroup`.
+
+**Parallel writes must be disjoint, and the checker owns it.** The common
+kernel writes one `&mut` buffer from every iteration: `out[i]` under
+`parallel i`. The buffer is one capture, so borrow rules say nothing about
+two iterations; disjointness is per index. Crux left this as "UB unless
+provably disjoint". Here it is a rule: a write under `parallel i` is
+admitted when the written index is `i` or an injective function of the
+enclosing parallel bindings (five of Crux's six programs); otherwise it is
+refused, and the programmer writes either a run-time disjointness check
+or an explicit unchecked spelling. The sixth program is the fixture: the
+KV cache update writes `key_cache[b, h, pos, d]` with `pos` loaded from
+`positions[b]`, which two batches can share. The spellings for the two
+escape routes are a Part IX decision before step 2.
 
 ### IV.6 Verdicts
 
@@ -704,6 +804,12 @@ without a GPU.
 - The `async on` drop test: a task from `async on` dropped un-awaited is
   cancelled (§14.22) and its placed result never exists; a behavior test
   pins it in step 2, since the plan depends on it.
+- **The Crux six**, `test/placement/crux/`: elementwise add, matmul (naive
+  and tiled with a scratchpad), softmax, flash attention, quantized
+  matmul, KV cache update, written on IV.3 to IV.5a and run host-lowered
+  against the two test machines with checked outputs. They are the
+  acceptance test of the checker and the first item of the dispatch
+  brief. The KV cache update is also the disjointness fixture.
 - `with build :machine-check` validates every shipped description's
   coherence and provenance trailers (every figure has one); it joins
   `spec-inventory-check` in the gate.
@@ -731,7 +837,10 @@ Each step is one stack with one battery, buildable by the pinned seed.
    `transfer`, `on` and `async on`, per-processor instantiation, the
    visibility and call checks, routing including peer edges, the
    diagnostics of IV.7, `placement` and `route` facts, the two test
-   machines, the `async on` drop test.
+   machines, the `async on` drop test. Then the kernel surface of IV.5a
+   with its host lowering and the disjointness rule, and the Crux six
+   running host-lowered. The Part IX disjointness spellings are decided
+   before this step's second half.
 3. **Capacity from MIR.** The Part IX dynamic-size ruling first, then
    `MirCapacity`, the fold, `capacity` facts, the over-capacity pairs.
 
@@ -784,6 +893,18 @@ overlap for `async on`, region traffic, user-written lowerings) is
   the programmer cannot discharge is ceremony (Law 1) and a silent overflow
   is the wrong plausible thing (Law 7); the run-time check is the compiler
   doing the work it could not do statically.
+- **Disjoint parallel writes, decided before step 2's kernel half.** The
+  rule in IV.5a admits an index that is the parallel binding or an
+  injective function of the enclosing bindings. The two escape routes
+  need spellings: a run-time check (the launch asserts the written indices
+  of one dispatch are distinct, which for the KV cache update is a check
+  on `positions` before the launch) and an explicit unchecked write for a
+  kernel the programmer knows is disjoint. Prediction: both, with the
+  unchecked form library-maintainer tier (it is `unsafe` in all but name,
+  and a user program never writes it).
+- The spellings of IV.5a: `parallel[level]`, `reduce[op]`, `barrier()`,
+  and whether a scratchpad local is spelled as a `Buffer` in the
+  scratchpad space (as written) or by a keyword.
 - `Buffer[T, S]` as a new type versus a placement slot on existing owners;
   `in S` as the spelling on views and pointers.
 - Consuming iteration (the `into_iter` ruling), since a transfer of a
