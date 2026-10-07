@@ -7528,7 +7528,10 @@ impl ComptimeEvaluator:
         let binding = self.ast.get_data0(node)
         let body = self.ast.get_data2(node)
         var count = 0
-        if iterable_signal.value.kind == ComptimeValueKind.CV_ARRAY or iterable_signal.value.kind == ComptimeValueKind.CV_TUPLE or iterable_signal.value.kind == ComptimeValueKind.CV_VEC:
+        // #2220: a map iterates its entries as (key, value) tuples, D44's
+        // `for (k, v) in map`; the entries sit in extra_values as pairs.
+        let is_map = iterable_signal.value.kind == ComptimeValueKind.CV_MAP
+        if iterable_signal.value.kind == ComptimeValueKind.CV_ARRAY or iterable_signal.value.kind == ComptimeValueKind.CV_TUPLE or iterable_signal.value.kind == ComptimeValueKind.CV_VEC or is_map:
             count = iterable_signal.value.extra_count
         else if iterable_signal.value.kind == ComptimeValueKind.CV_RANGE:
             let start_value = iterable_signal.value.data0
@@ -7537,8 +7540,10 @@ impl ComptimeEvaluator:
             if count < 0:
                 count = 0
         else:
-            return self.fail(node, "comptime for requires an array, tuple, vec, or range")
+            return self.fail(node, "comptime for requires an array, tuple, vec, map, or range")
 
+        // `for (k, v) in …`: the binding is a pattern the parser marked.
+        let binds_pattern = self.ast.has_pattern_binding(node as NodeId, binding)
         let for_meta = self.ast.find_for_meta(node)
         let index_binding = if for_meta >= 0: self.ast.for_meta_index_binding(for_meta) else: 0
         let loop_label = if for_meta >= 0: self.ast.for_meta_label(for_meta) else: 0
@@ -7549,8 +7554,14 @@ impl ComptimeEvaluator:
                 let step_value = iterable_signal.value.data0 + i as i64
                 self.bind_value(binding, comptime_value_int(self.sema.ty_i64 as i32, step_value), 0)
             else:
-                let elem = self.extra_value_at((iterable_signal.value.extra_start + i) as i64)
-                self.bind_value(binding, elem, 0)
+                let elem = if is_map: comptime_value_tuple(0, iterable_signal.value.extra_start + i * 2, 2) else: self.extra_value_at((iterable_signal.value.extra_start + i) as i64)
+                if binds_pattern:
+                    if self.match_pattern(binding, elem, node) == 0:
+                        self.pop_scope()
+                        self.loop_labels.pop()
+                        return self.fail(node, "comptime for pattern does not match the element")
+                else:
+                    self.bind_value(binding, elem, 0)
             if index_binding != 0:
                 self.bind_value(index_binding, comptime_value_int(self.sema.ty_i64 as i32, i as i64), 0)
             let body_signal = self.eval_expr(body)
