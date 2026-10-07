@@ -526,6 +526,8 @@ pub fn run_pcre2_test_action(ctx: ActionCtx) -> i32:
     if not fs.is_dir(ref_dir):
         return pcre2_fail(ctx, "reference path is not a directory: " ++ ref_dir)
     let run_dir = pcre2_join(output_dir, "current")
+    // #2230: name what runs before it runs.
+    if corpus_provenance(ctx, output_dir, pcre2test_path) != 0: return 1
     if fs.exists(run_dir) and fs.remove_tree(run_dir) != 0:
         return pcre2_fail(ctx, "could not remove previous pcre2-test output: " ++ run_dir)
     if fs.mkdir_all(run_dir) != 0:

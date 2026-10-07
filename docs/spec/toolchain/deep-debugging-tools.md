@@ -217,6 +217,24 @@ build-action and RSS-budget fixtures and the raw-pointer effect order
 `behav_sema_raw_pointer_effect_order`). Compare against main's stage1 in a
 worktree before calling one of yours.
 
+### A re-migrated corpus fails its own test suite
+
+Never a file-by-file bisect of the fresh output (#2230: six files, fifteen
+sites, three rebuilds, and the failure was not in the text). The order:
+
+1. **What ran.** Every corpus test action prints `<target> ran <sha256>
+   <path>` for each binary before it runs it and appends the same lines to
+   `out/corpus/<stem>-test/provenance.txt` (`corpus_provenance`,
+   build/corpus.w). Compare the sha with a second run: a different binary
+   from identical sources is a build defect (the native runner's partial
+   attempt before a 97 fallback, a stale bundle), not a migration defect.
+2. **What the migrator changed.** `diff -rq out/<stem>_migrated lib/std/<dir>`
+   lists the files; a migration differential that names the rule behind
+   each site and diffs the MIR facts of each changed function is #2230.
+3. **The compiler alone.** Run the corpus test on the checked-in corpus
+   with the new compiler (facade-one-owner's `with build :pcre2-test`
+   shape): a failure there is the compiler's, not the output's.
+
 ### A hot loop reloads a struct's fields after every store
 
 The compiler's own optimized IR (`WITH_DUMP_LLIR_POST=1`) says why. Two

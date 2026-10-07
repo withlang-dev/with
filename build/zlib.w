@@ -108,6 +108,9 @@ pub fn run_zlib_test_action(ctx: ActionCtx) -> i32:
     let minigzip_bin = inputs[2]
     if not fs.exists(example_bin): return corpus_fail(ctx, "missing zlib example binary: " ++ example_bin)
     if not fs.exists(minigzip_bin): return corpus_fail(ctx, "missing minigzip binary: " ++ minigzip_bin)
+    // #2230: name what runs before it runs.
+    if corpus_provenance(ctx, output, example_bin) != 0: return 1
+    if corpus_provenance(ctx, output, minigzip_bin) != 0: return 1
     let run_dir = output ++ "/current"
     if corpus_reset_dir(ctx, run_dir) != 0: return 1
     var example_args: Vec[str] = Vec.new()

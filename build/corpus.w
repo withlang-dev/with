@@ -114,6 +114,21 @@ pub fn corpus_abs(ctx: &ActionCtx, path: &str) -> str:
 
 pub fn corpus_scratch(ctx: &ActionCtx) -> str: "out/tmp/action-scratch/" ++ ctx.target_name()
 
+/// #2230: the provenance of what a corpus test ran. One line per binary —
+/// `<sha256>  <path>` (the shasum format) — printed to the log and appended
+/// to `<output>/provenance.txt`, so a stale or half-built binary (the
+/// native runner's partial attempt before a 97 fallback, a bundle from an
+/// older migration) is visible at the first failure, not after a bisect.
+pub fn corpus_provenance(ctx: &ActionCtx, output: &str, path: &str) -> i32:
+    let fs = ctx.fs()
+    let abs = corpus_abs(ctx, path)
+    // Build-layer code runs on the pinned seed: only the seed's str surface.
+    let line = fs.sha256_file(abs) ++ "  " ++ path
+    print(ctx.target_name() ++ " ran " ++ line)
+    let record = output ++ "/provenance.txt"
+    if fs.write_text(record, fs.read_text(record) ++ line ++ "\n") != 0: return corpus_fail(ctx, "could not write " ++ record)
+    0
+
 pub fn corpus_basename(path: &str) -> str:
     let parts = path.split("/")
     parts[parts.len() - 1].clone()

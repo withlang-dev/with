@@ -68,6 +68,9 @@ pub fn run_tommy_test_action(ctx: ActionCtx) -> i32:
     compile_args.push(corpus_abs(ctx, binary))
     let compiled = ctx.process_runner().run_capture(compile_args, corpus_abs(ctx, binary ++ ".compile.stdout"), corpus_abs(ctx, binary ++ ".compile.stderr"), 600000)
     if compiled.rc != 0: return corpus_fail(ctx, f"compile tommycheck exited {compiled.rc}\n" ++ fs.read_text(binary ++ ".compile.stderr"))
+    // #2230: name what runs before it runs — the compiler and the binary.
+    if corpus_provenance(ctx, output, ctx.inputs()[0]) != 0: return 1
+    if corpus_provenance(ctx, output, binary) != 0: return 1
     var argv: Vec[str] = Vec.new()
     argv.push(corpus_abs(ctx, binary))
     let result = ctx.process_runner().run_capture(argv, corpus_abs(ctx, binary ++ ".stdout"), corpus_abs(ctx, binary ++ ".stderr"), 600000)
