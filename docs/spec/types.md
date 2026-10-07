@@ -1566,6 +1566,14 @@ block's tail the way demand already propagates there, so arms may mix `3`
 and `None` under an `Option[i32]` demand. An operator's operands are not
 demand sites: `opt == 3` is an error.
 
+The conversion is the second of a demand's two phases (mission.md, law
+2): a demand first binds the unknowns the expression's own signature
+leaves open, then the conversion applies between two known types and
+binds nothing; and an expression's own operands bind before the outer
+demand fills what remains. `let x: Option[i32] = ident(3)` with
+`fn ident[T](t: T) -> T` is `Some(ident(3))` at `T := i32`, never
+`ident(Some(3))`.
+
 ```
 fn first(x: Option[i32]) -> i32: x.unwrap_or(0)
 first(3)                         // Some(3)
