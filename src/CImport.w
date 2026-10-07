@@ -16539,6 +16539,9 @@ fn ci_subtree_aborts(session: i64, cursor: i32) -> bool:
 fn ci_condition_null_sense(session: i64, cursor: i32, name: &str) -> i32:
     let c = ci_peel_transparent(session, cursor)
     let kind = with_ci_cursor_kind(session, c)
+    // `assert` expands its test through `__builtin_expect(test, 0)`.
+    if kind == CXK_CALL_EXPR and with_ci_cursor_spelling(session, c) == "__builtin_expect" and with_ci_num_children(session, c) >= 2:
+        return ci_condition_null_sense(session, with_ci_child(session, c, 1), name)
     if kind == CXK_DECL_REF:
         return if ci_cursor_names(session, c, name): 2 else: 0
     if kind == CXK_UNARY_OP and with_ci_num_children(session, c) == 1:

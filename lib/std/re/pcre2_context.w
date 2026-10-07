@@ -463,7 +463,7 @@ pub unsafe fn pcre2_set_recursion_limit_8(__param_mcontext: *mut pcre2_real_matc
 
 }
 
-pub unsafe fn pcre2_set_recursion_memory_management_8(__param_mcontext: *mut pcre2_real_match_context_8, __param_mymalloc: Option[unsafe extern "C" fn(c_ulong, *mut c_void) -> *mut c_void], __param_myfree: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit], __param_mydata: *mut c_void) -> c_int {
+pub unsafe fn pcre2_set_recursion_memory_management_8(__param_mcontext: *mut pcre2_real_match_context_8, __param_mymalloc: unsafe extern "C" fn(c_ulong, *mut c_void) -> *mut c_void, __param_myfree: unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit, __param_mydata: *mut c_void) -> c_int {
 
 
 

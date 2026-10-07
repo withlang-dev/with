@@ -29,7 +29,6 @@ use std.re.pcre2_study
 use std.re.pcre2_valid_utf
 use std.re.pcre2_xclass
 use std.libc
-use std.option
 
 pub unsafe fn pcre2_pattern_info_8(__param_code: *const pcre2_real_code_8, __param_what: c_uint, __param_where_: *mut c_void) -> c_int {
     var __local_re: *const pcre2_real_code_8 = __param_code
@@ -298,7 +297,7 @@ pub unsafe fn pcre2_pattern_info_8(__param_code: *const pcre2_real_code_8, __par
 
 }
 
-pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, __param_callback: Option[unsafe extern "C" fn(*mut pcre2_callout_enumerate_block_8, *mut c_void) -> c_int], __param_callout_data: *mut c_void) -> c_int {
+pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, __param_callback: unsafe extern "C" fn(*mut pcre2_callout_enumerate_block_8, *mut c_void) -> c_int, __param_callout_data: *mut c_void) -> c_int {
     var __local_re: *const pcre2_real_code_8 = __param_code
 
     var __local_cb: pcre2_callout_enumerate_block_8
@@ -1428,7 +1427,7 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     (__local_cb.callout_string = ((null as *const u8)))
 
-                    (__local_rc = ((__param_callback.unwrap()((&raw mut __local_cb as *mut pcre2_callout_enumerate_block_8), __param_callout_data) as c_int)))
+                    (__local_rc = ((__param_callback((&raw mut __local_cb as *mut pcre2_callout_enumerate_block_8), __param_callout_data) as c_int)))
 
                     if ((if __local_rc != 0: 1 else: 0) != 0) {
                         return __local_rc
@@ -1450,7 +1449,7 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     (__local_cb.callout_string = (__local_cc + (((1 + (4 * 2)) as isize) as usize)) + ((1 as isize) as usize))
 
-                    (__local_rc = ((__param_callback.unwrap()((&raw mut __local_cb as *mut pcre2_callout_enumerate_block_8), __param_callout_data) as c_int)))
+                    (__local_rc = ((__param_callback((&raw mut __local_cb as *mut pcre2_callout_enumerate_block_8), __param_callout_data) as c_int)))
 
                     if ((if __local_rc != 0: 1 else: 0) != 0) {
                         return __local_rc

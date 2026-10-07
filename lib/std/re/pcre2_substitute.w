@@ -2915,7 +2915,7 @@ pub unsafe fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param
 
     '__ci_bb_367 {
         (__local_chkcc_length__goto_1500_11 = __local_chars_outstanding__goto_1500_11)
-        (__local_chkcc_rc__goto_1500_11 = ((do_case_copy((__param_buffer + (__local_buff_offset__goto_760_12 as usize)), __local_chkcc_length__goto_1500_11, __local_lengthleft__goto_760_38, (&raw mut __local_forcecase__goto_962_14 as *mut case_state), __local_utf__goto_753_6, __local_substitute_case_callout__goto_765_14, __local_substitute_case_callout_data__goto_767_7) as c_ulong)))
+        (__local_chkcc_rc__goto_1500_11 = ((do_case_copy((__param_buffer + (__local_buff_offset__goto_760_12 as usize)), __local_chkcc_length__goto_1500_11, __local_lengthleft__goto_760_38, (&raw mut __local_forcecase__goto_962_14 as *mut case_state), __local_utf__goto_753_6, __local_substitute_case_callout__goto_765_14.unwrap(), __local_substitute_case_callout_data__goto_767_7) as c_ulong)))
         if ((if __local_chkcc_rc__goto_1500_11 == (~(0 as c_ulong)): 1 else: 0) != 0) {
             goto '__ci_bb_370
         } else {
@@ -3697,7 +3697,7 @@ pub unsafe fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param
 
     '__ci_bb_490 {
         (__local_chkcc_length__goto_1609_5 = __local_chars_outstanding__goto_1609_5)
-        (__local_chkcc_rc__goto_1609_5 = ((do_case_copy((__param_buffer + (__local_buff_offset__goto_760_12 as usize)), __local_chkcc_length__goto_1609_5, __local_lengthleft__goto_760_38, (&raw mut __local_forcecase__goto_962_14 as *mut case_state), __local_utf__goto_753_6, __local_substitute_case_callout__goto_765_14, __local_substitute_case_callout_data__goto_767_7) as c_ulong)))
+        (__local_chkcc_rc__goto_1609_5 = ((do_case_copy((__param_buffer + (__local_buff_offset__goto_760_12 as usize)), __local_chkcc_length__goto_1609_5, __local_lengthleft__goto_760_38, (&raw mut __local_forcecase__goto_962_14 as *mut case_state), __local_utf__goto_753_6, __local_substitute_case_callout__goto_765_14.unwrap(), __local_substitute_case_callout_data__goto_767_7) as c_ulong)))
         if ((if __local_chkcc_rc__goto_1609_5 == (~(0 as c_ulong)): 1 else: 0) != 0) {
             goto '__ci_bb_493
         } else {
@@ -5076,7 +5076,7 @@ unsafe fn default_substitute_case_callout(__param_input: *const u8, __param_inpu
 
 }
 
-unsafe fn do_case_copy(__param_input_output: *mut u8, __param_input_len: c_ulong, __param_output_cap: c_ulong, __param_state: *mut case_state, __param_utf: c_int, __param_substitute_case_callout: Option[unsafe extern "C" fn(*const u8, c_ulong, *mut u8, c_ulong, c_int, *mut c_void) -> c_ulong], __param_substitute_case_callout_data: *mut c_void) -> c_ulong {
+unsafe fn do_case_copy(__param_input_output: *mut u8, __param_input_len: c_ulong, __param_output_cap: c_ulong, __param_state: *mut case_state, __param_utf: c_int, __param_substitute_case_callout: unsafe extern "C" fn(*const u8, c_ulong, *mut u8, c_ulong, c_int, *mut c_void) -> c_ulong, __param_substitute_case_callout_data: *mut c_void) -> c_ulong {
     var __local_input: *const u8 = __param_input_output
 
     var __local_output: *mut u8 = __param_input_output
@@ -5112,7 +5112,7 @@ unsafe fn do_case_copy(__param_input_output: *mut u8, __param_input_len: c_ulong
         match (*__param_state).to_case {
             1 => {
                 if ((if (*__param_state).single_char == 0: 1 else: 0) != 0) {
-                    (__local_rc = ((__param_substitute_case_callout.unwrap()(__local_input, __param_input_len, __local_output, __param_output_cap, (*__param_state).to_case, __param_substitute_case_callout_data) as c_ulong)))
+                    (__local_rc = ((__param_substitute_case_callout(__local_input, __param_input_len, __local_output, __param_output_cap, (*__param_state).to_case, __param_substitute_case_callout_data) as c_ulong)))
 
                     if ((if (*__param_state).to_case == 3: 1 else: 0) != 0) {
                         ((*__param_state).to_case = ((1 as c_int)))
@@ -5129,7 +5129,7 @@ unsafe fn do_case_copy(__param_input_output: *mut u8, __param_input_len: c_ulong
             },
             2 => {
                 if ((if (*__param_state).single_char == 0: 1 else: 0) != 0) {
-                    (__local_rc = ((__param_substitute_case_callout.unwrap()(__local_input, __param_input_len, __local_output, __param_output_cap, (*__param_state).to_case, __param_substitute_case_callout_data) as c_ulong)))
+                    (__local_rc = ((__param_substitute_case_callout(__local_input, __param_input_len, __local_output, __param_output_cap, (*__param_state).to_case, __param_substitute_case_callout_data) as c_ulong)))
 
                     if ((if (*__param_state).to_case == 3: 1 else: 0) != 0) {
                         ((*__param_state).to_case = ((1 as c_int)))
@@ -5146,7 +5146,7 @@ unsafe fn do_case_copy(__param_input_output: *mut u8, __param_input_len: c_ulong
             },
             3 => {
                 if ((if (*__param_state).single_char == 0: 1 else: 0) != 0) {
-                    (__local_rc = ((__param_substitute_case_callout.unwrap()(__local_input, __param_input_len, __local_output, __param_output_cap, (*__param_state).to_case, __param_substitute_case_callout_data) as c_ulong)))
+                    (__local_rc = ((__param_substitute_case_callout(__local_input, __param_input_len, __local_output, __param_output_cap, (*__param_state).to_case, __param_substitute_case_callout_data) as c_ulong)))
 
                     if ((if (*__param_state).to_case == 3: 1 else: 0) != 0) {
                         ((*__param_state).to_case = ((1 as c_int)))
@@ -5275,7 +5275,7 @@ unsafe fn do_case_copy(__param_input_output: *mut u8, __param_input_len: c_ulong
     (__local_max_ch1_cap = ((((__param_output_cap as c_ulong) -% (__local_rest_len as c_ulong)) as c_ulong)))
 
     while (1 != 0) {
-        (__local_rc = ((__param_substitute_case_callout.unwrap()((&__local_ch1[0] as *mut u8), __local_ch1_len, __local_output, __local_ch1_cap, __local_ch1_to_case, __param_substitute_case_callout_data) as c_ulong)))
+        (__local_rc = ((__param_substitute_case_callout((&__local_ch1[0] as *mut u8), __local_ch1_len, __local_output, __local_ch1_cap, __local_ch1_to_case, __param_substitute_case_callout_data) as c_ulong)))
 
         if ((if __local_rc == (~(0 as c_ulong)): 1 else: 0) != 0) {
             return __local_rc
@@ -5337,7 +5337,7 @@ unsafe fn do_case_copy(__param_input_output: *mut u8, __param_input_len: c_ulong
             (__ci_expr_ternary_5 = ((((__param_output_cap as c_ulong) -% (__local_rc as c_ulong)) as c_ulong)))
         }
 
-        (__local_rc2 = ((__param_substitute_case_callout.unwrap()(__local_rest, __local_rest_len, __ci_expr_ternary_4, __ci_expr_ternary_5, __local_rest_to_case, __param_substitute_case_callout_data) as c_ulong)))
+        (__local_rc2 = ((__param_substitute_case_callout(__local_rest, __local_rest_len, __ci_expr_ternary_4, __ci_expr_ternary_5, __local_rest_to_case, __param_substitute_case_callout_data) as c_ulong)))
 
 
         if ((if __local_rc2 == (~(0 as c_ulong)): 1 else: 0) != 0) {

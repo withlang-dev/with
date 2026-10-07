@@ -567,7 +567,7 @@ pub fn test_list() writes SEED, compare_counter {
 
     unsafe { tommy_list_init((&raw mut __local_list as *mut *mut tommy_node_struct)) }
 
-    unsafe { tommy_list_sort((&raw mut __local_list as *mut *mut tommy_node_struct), Some(compare)) }
+    unsafe { tommy_list_sort((&raw mut __local_list as *mut *mut tommy_node_struct), compare) }
 
     if ((if not (unsafe { tommy_list_empty((&raw mut __local_list as *mut *mut tommy_node_struct)) } != 0): 1 else: 0) != 0) {
         abort()
@@ -607,7 +607,7 @@ pub fn test_list() writes SEED, compare_counter {
 
     unsafe { start(c"sort random".ptr) }
 
-    unsafe { tommy_list_sort((&raw mut __local_list as *mut *mut tommy_node_struct), Some(compare)) }
+    unsafe { tommy_list_sort((&raw mut __local_list as *mut *mut tommy_node_struct), compare) }
 
     stop()
 
@@ -646,7 +646,7 @@ pub fn test_list() writes SEED, compare_counter {
 
     unsafe { start(c"sort partially ordered".ptr) }
 
-    unsafe { tommy_list_sort((&raw mut __local_list as *mut *mut tommy_node_struct), Some(compare)) }
+    unsafe { tommy_list_sort((&raw mut __local_list as *mut *mut tommy_node_struct), compare) }
 
     stop()
 
@@ -678,7 +678,7 @@ pub fn test_list() writes SEED, compare_counter {
 
     unsafe { start(c"sort forward".ptr) }
 
-    unsafe { tommy_list_sort((&raw mut __local_list as *mut *mut tommy_node_struct), Some(compare)) }
+    unsafe { tommy_list_sort((&raw mut __local_list as *mut *mut tommy_node_struct), compare) }
 
     stop()
 
@@ -710,7 +710,7 @@ pub fn test_list() writes SEED, compare_counter {
 
     unsafe { start(c"sort backward".ptr) }
 
-    unsafe { tommy_list_sort((&raw mut __local_list as *mut *mut tommy_node_struct), Some(compare)) }
+    unsafe { tommy_list_sort((&raw mut __local_list as *mut *mut tommy_node_struct), compare) }
 
     stop()
 
@@ -742,7 +742,7 @@ pub fn test_list() writes SEED, compare_counter {
 
     unsafe { start(c"sort random duplicate".ptr) }
 
-    unsafe { tommy_list_sort((&raw mut __local_list as *mut *mut tommy_node_struct), Some(compare)) }
+    unsafe { tommy_list_sort((&raw mut __local_list as *mut *mut tommy_node_struct), compare) }
 
     stop()
 
@@ -807,7 +807,7 @@ pub fn test_tree() writes compare_counter {
 
     (the_count = ((0 as c_uint)))
 
-    unsafe { tommy_tree_foreach((&raw mut __local_tree as *mut tommy_tree_struct), Some(count_callback)) }
+    unsafe { tommy_tree_foreach((&raw mut __local_tree as *mut tommy_tree_struct), count_callback) }
 
     if ((if the_count != 250000: 1 else: 0) != 0) {
         abort()
@@ -815,7 +815,7 @@ pub fn test_tree() writes compare_counter {
 
     (the_count = ((0 as c_uint)))
 
-    unsafe { tommy_tree_foreach_arg((&raw mut __local_tree as *mut tommy_tree_struct), Some(count_arg_callback), ((&raw mut the_count as *mut c_uint) as *mut c_void)) }
+    unsafe { tommy_tree_foreach_arg((&raw mut __local_tree as *mut tommy_tree_struct), count_arg_callback, ((&raw mut the_count as *mut c_uint) as *mut c_void)) }
 
     if ((if the_count != 250000: 1 else: 0) != 0) {
         abort()
@@ -828,7 +828,7 @@ pub fn test_tree() writes compare_counter {
             abort()
         }
 
-        if ((if unsafe { tommy_tree_search_compare((&raw mut __local_tree as *mut tommy_tree_struct), Some(compare), (((&raw const (__local_OBJ[__local_i]) as *const object_tree) as *mut object_tree) as *mut c_void)) } == 0: 1 else: 0) != 0) {
+        if ((if unsafe { tommy_tree_search_compare((&raw mut __local_tree as *mut tommy_tree_struct), compare, (((&raw const (__local_OBJ[__local_i]) as *const object_tree) as *mut object_tree) as *mut c_void)) } == 0: 1 else: 0) != 0) {
             abort()
         }
 
@@ -884,7 +884,7 @@ pub fn test_tree() writes compare_counter {
             abort()
         }
 
-        if ((if unsafe { tommy_tree_search_compare((&raw mut __local_tree as *mut tommy_tree_struct), Some(compare), (((&raw const (__local_OBJ[__local_i]) as *const object_tree) as *mut object_tree) as *mut c_void)) } != 0: 1 else: 0) != 0) {
+        if ((if unsafe { tommy_tree_search_compare((&raw mut __local_tree as *mut tommy_tree_struct), compare, (((&raw const (__local_OBJ[__local_i]) as *const object_tree) as *mut object_tree) as *mut c_void)) } != 0: 1 else: 0) != 0) {
             abort()
         }
 
@@ -1340,7 +1340,7 @@ pub fn test_hashtable() writes compare_counter {
 
         (the_count = ((0 as c_uint)))
 
-        unsafe { tommy_hashtable_foreach((&raw mut __local_hashtable as *mut tommy_hashtable_struct), Some(count_callback)) }
+        unsafe { tommy_hashtable_foreach((&raw mut __local_hashtable as *mut tommy_hashtable_struct), count_callback) }
 
         if ((if the_count != __local_n: 1 else: 0) != 0) {
             abort()
@@ -1359,7 +1359,7 @@ pub fn test_hashtable() writes compare_counter {
         (__local_i = ((0 as c_uint)))
 
         while ((if __local_i < ((__local_n as c_uint) / (2 as c_uint)): 1 else: 0) != 0) {
-            if ((if unsafe { tommy_hashtable_remove((&raw mut __local_hashtable as *mut tommy_hashtable_struct), Some(search_callback), (((&raw const (__local_HASH[((((__local_n as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]) as *const object_hash) as *mut object_hash) as *const c_void), ((__local_HASH[((((__local_n as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]).value as c_ulonglong)) } != 0: 1 else: 0) != 0) {
+            if ((if unsafe { tommy_hashtable_remove((&raw mut __local_hashtable as *mut tommy_hashtable_struct), search_callback, (((&raw const (__local_HASH[((((__local_n as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]) as *const object_hash) as *mut object_hash) as *const c_void), ((__local_HASH[((((__local_n as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]).value as c_ulonglong)) } != 0: 1 else: 0) != 0) {
                 abort()
             }
 
@@ -1371,7 +1371,7 @@ pub fn test_hashtable() writes compare_counter {
         (__local_i = ((0 as c_uint)))
 
         while ((if __local_i < ((__local_n as c_uint) / (2 as c_uint)): 1 else: 0) != 0) {
-            if ((if unsafe { tommy_hashtable_remove((&raw mut __local_hashtable as *mut tommy_hashtable_struct), Some(search_callback), (((&raw const (__local_HASH[((((((__local_n as c_uint) / (2 as c_uint)) as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]) as *const object_hash) as *mut object_hash) as *const c_void), ((__local_HASH[((((((__local_n as c_uint) / (2 as c_uint)) as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]).value as c_ulonglong)) } == 0: 1 else: 0) != 0) {
+            if ((if unsafe { tommy_hashtable_remove((&raw mut __local_hashtable as *mut tommy_hashtable_struct), search_callback, (((&raw const (__local_HASH[((((((__local_n as c_uint) / (2 as c_uint)) as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]) as *const object_hash) as *mut object_hash) as *const c_void), ((__local_HASH[((((((__local_n as c_uint) / (2 as c_uint)) as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]).value as c_ulonglong)) } == 0: 1 else: 0) != 0) {
                 abort()
             }
 
@@ -1421,7 +1421,7 @@ pub fn test_hashtable() writes compare_counter {
 
         (the_count = ((0 as c_uint)))
 
-        unsafe { tommy_hashtable_foreach_arg((&raw mut __local_hashtable as *mut tommy_hashtable_struct), Some(count_arg_callback), ((&raw mut the_count as *mut c_uint) as *mut c_void)) }
+        unsafe { tommy_hashtable_foreach_arg((&raw mut __local_hashtable as *mut tommy_hashtable_struct), count_arg_callback, ((&raw mut the_count as *mut c_uint) as *mut c_void)) }
 
         if ((if the_count != __local_n: 1 else: 0) != 0) {
             abort()
@@ -1441,7 +1441,7 @@ pub fn test_hashtable() writes compare_counter {
         }
 
         while ((if __local_j < 1000000: 1 else: 0) != 0) {
-            if ((if unsafe { tommy_hashtable_remove((&raw mut __local_hashtable as *mut tommy_hashtable_struct), Some(search_callback), (((&raw const (__local_HASH[__local_j]) as *const object_hash) as *mut object_hash) as *const c_void), ((__local_HASH[__local_j]).value as c_ulonglong)) } == 0: 1 else: 0) != 0) {
+            if ((if unsafe { tommy_hashtable_remove((&raw mut __local_hashtable as *mut tommy_hashtable_struct), search_callback, (((&raw const (__local_HASH[__local_j]) as *const object_hash) as *mut object_hash) as *const c_void), ((__local_HASH[__local_j]).value as c_ulonglong)) } == 0: 1 else: 0) != 0) {
                 abort()
             }
 
@@ -1527,7 +1527,7 @@ pub fn test_hashdyn() writes compare_counter {
 
         (the_count = ((0 as c_uint)))
 
-        unsafe { tommy_hashdyn_foreach((&raw mut __local_hashdyn as *mut tommy_hashdyn_struct), Some(count_callback)) }
+        unsafe { tommy_hashdyn_foreach((&raw mut __local_hashdyn as *mut tommy_hashdyn_struct), count_callback) }
 
         if ((if the_count != __local_n: 1 else: 0) != 0) {
             abort()
@@ -1546,7 +1546,7 @@ pub fn test_hashdyn() writes compare_counter {
         (__local_i = ((0 as c_uint)))
 
         while ((if __local_i < ((__local_n as c_uint) / (2 as c_uint)): 1 else: 0) != 0) {
-            if ((if unsafe { tommy_hashdyn_remove((&raw mut __local_hashdyn as *mut tommy_hashdyn_struct), Some(search_callback), (((&raw const (__local_HASH[((((__local_n as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]) as *const object_hash) as *mut object_hash) as *const c_void), ((__local_HASH[((((__local_n as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]).value as c_ulonglong)) } != 0: 1 else: 0) != 0) {
+            if ((if unsafe { tommy_hashdyn_remove((&raw mut __local_hashdyn as *mut tommy_hashdyn_struct), search_callback, (((&raw const (__local_HASH[((((__local_n as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]) as *const object_hash) as *mut object_hash) as *const c_void), ((__local_HASH[((((__local_n as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]).value as c_ulonglong)) } != 0: 1 else: 0) != 0) {
                 abort()
             }
 
@@ -1558,7 +1558,7 @@ pub fn test_hashdyn() writes compare_counter {
         (__local_i = ((0 as c_uint)))
 
         while ((if __local_i < ((__local_n as c_uint) / (2 as c_uint)): 1 else: 0) != 0) {
-            if ((if unsafe { tommy_hashdyn_remove((&raw mut __local_hashdyn as *mut tommy_hashdyn_struct), Some(search_callback), (((&raw const (__local_HASH[((((((__local_n as c_uint) / (2 as c_uint)) as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]) as *const object_hash) as *mut object_hash) as *const c_void), ((__local_HASH[((((((__local_n as c_uint) / (2 as c_uint)) as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]).value as c_ulonglong)) } == 0: 1 else: 0) != 0) {
+            if ((if unsafe { tommy_hashdyn_remove((&raw mut __local_hashdyn as *mut tommy_hashdyn_struct), search_callback, (((&raw const (__local_HASH[((((((__local_n as c_uint) / (2 as c_uint)) as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]) as *const object_hash) as *mut object_hash) as *const c_void), ((__local_HASH[((((((__local_n as c_uint) / (2 as c_uint)) as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]).value as c_ulonglong)) } == 0: 1 else: 0) != 0) {
                 abort()
             }
 
@@ -1608,7 +1608,7 @@ pub fn test_hashdyn() writes compare_counter {
 
         (the_count = ((0 as c_uint)))
 
-        unsafe { tommy_hashdyn_foreach_arg((&raw mut __local_hashdyn as *mut tommy_hashdyn_struct), Some(count_arg_callback), ((&raw mut the_count as *mut c_uint) as *mut c_void)) }
+        unsafe { tommy_hashdyn_foreach_arg((&raw mut __local_hashdyn as *mut tommy_hashdyn_struct), count_arg_callback, ((&raw mut the_count as *mut c_uint) as *mut c_void)) }
 
         if ((if the_count != __local_n: 1 else: 0) != 0) {
             abort()
@@ -1628,7 +1628,7 @@ pub fn test_hashdyn() writes compare_counter {
         }
 
         while ((if __local_j < 1000000: 1 else: 0) != 0) {
-            if ((if unsafe { tommy_hashdyn_remove((&raw mut __local_hashdyn as *mut tommy_hashdyn_struct), Some(search_callback), (((&raw const (__local_HASH[__local_j]) as *const object_hash) as *mut object_hash) as *const c_void), ((__local_HASH[__local_j]).value as c_ulonglong)) } == 0: 1 else: 0) != 0) {
+            if ((if unsafe { tommy_hashdyn_remove((&raw mut __local_hashdyn as *mut tommy_hashdyn_struct), search_callback, (((&raw const (__local_HASH[__local_j]) as *const object_hash) as *mut object_hash) as *const c_void), ((__local_HASH[__local_j]).value as c_ulonglong)) } == 0: 1 else: 0) != 0) {
                 abort()
             }
 
@@ -1736,7 +1736,7 @@ pub fn test_hashlin() writes compare_counter {
 
         (the_count = ((0 as c_uint)))
 
-        unsafe { tommy_hashlin_foreach((&raw mut __local_hashlin as *mut tommy_hashlin_struct), Some(count_callback)) }
+        unsafe { tommy_hashlin_foreach((&raw mut __local_hashlin as *mut tommy_hashlin_struct), count_callback) }
 
         if ((if the_count != __local_n: 1 else: 0) != 0) {
             abort()
@@ -1755,7 +1755,7 @@ pub fn test_hashlin() writes compare_counter {
         (__local_i = ((0 as c_uint)))
 
         while ((if __local_i < ((__local_n as c_uint) / (2 as c_uint)): 1 else: 0) != 0) {
-            if ((if unsafe { tommy_hashlin_remove((&raw mut __local_hashlin as *mut tommy_hashlin_struct), Some(search_callback), (((&raw const (__local_HASH[((((__local_n as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]) as *const object_hash) as *mut object_hash) as *const c_void), ((__local_HASH[((((__local_n as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]).value as c_ulonglong)) } != 0: 1 else: 0) != 0) {
+            if ((if unsafe { tommy_hashlin_remove((&raw mut __local_hashlin as *mut tommy_hashlin_struct), search_callback, (((&raw const (__local_HASH[((((__local_n as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]) as *const object_hash) as *mut object_hash) as *const c_void), ((__local_HASH[((((__local_n as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]).value as c_ulonglong)) } != 0: 1 else: 0) != 0) {
                 abort()
             }
 
@@ -1767,7 +1767,7 @@ pub fn test_hashlin() writes compare_counter {
         (__local_i = ((0 as c_uint)))
 
         while ((if __local_i < ((__local_n as c_uint) / (2 as c_uint)): 1 else: 0) != 0) {
-            if ((if unsafe { tommy_hashlin_remove((&raw mut __local_hashlin as *mut tommy_hashlin_struct), Some(search_callback), (((&raw const (__local_HASH[((((((__local_n as c_uint) / (2 as c_uint)) as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]) as *const object_hash) as *mut object_hash) as *const c_void), ((__local_HASH[((((((__local_n as c_uint) / (2 as c_uint)) as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]).value as c_ulonglong)) } == 0: 1 else: 0) != 0) {
+            if ((if unsafe { tommy_hashlin_remove((&raw mut __local_hashlin as *mut tommy_hashlin_struct), search_callback, (((&raw const (__local_HASH[((((((__local_n as c_uint) / (2 as c_uint)) as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]) as *const object_hash) as *mut object_hash) as *const c_void), ((__local_HASH[((((((__local_n as c_uint) / (2 as c_uint)) as c_uint) -% (__local_i as c_uint)) as c_uint) -% (1 as c_uint))]).value as c_ulonglong)) } == 0: 1 else: 0) != 0) {
                 abort()
             }
 
@@ -1817,7 +1817,7 @@ pub fn test_hashlin() writes compare_counter {
 
         (the_count = ((0 as c_uint)))
 
-        unsafe { tommy_hashlin_foreach_arg((&raw mut __local_hashlin as *mut tommy_hashlin_struct), Some(count_arg_callback), ((&raw mut the_count as *mut c_uint) as *mut c_void)) }
+        unsafe { tommy_hashlin_foreach_arg((&raw mut __local_hashlin as *mut tommy_hashlin_struct), count_arg_callback, ((&raw mut the_count as *mut c_uint) as *mut c_void)) }
 
         if ((if the_count != __local_n: 1 else: 0) != 0) {
             abort()
@@ -1837,7 +1837,7 @@ pub fn test_hashlin() writes compare_counter {
         }
 
         while ((if __local_j < 1000000: 1 else: 0) != 0) {
-            if ((if unsafe { tommy_hashlin_remove((&raw mut __local_hashlin as *mut tommy_hashlin_struct), Some(search_callback), (((&raw const (__local_HASH[__local_j]) as *const object_hash) as *mut object_hash) as *const c_void), ((__local_HASH[__local_j]).value as c_ulonglong)) } == 0: 1 else: 0) != 0) {
+            if ((if unsafe { tommy_hashlin_remove((&raw mut __local_hashlin as *mut tommy_hashlin_struct), search_callback, (((&raw const (__local_HASH[__local_j]) as *const object_hash) as *mut object_hash) as *const c_void), ((__local_HASH[__local_j]).value as c_ulonglong)) } == 0: 1 else: 0) != 0) {
                 abort()
             }
 

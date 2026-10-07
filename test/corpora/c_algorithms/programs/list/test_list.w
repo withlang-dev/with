@@ -660,7 +660,7 @@ pub fn test_list_sort() -> Unit writes allocation_limit {
     }
 
 
-    unsafe { list_sort((&raw mut __local_list as *mut *mut _ListEntry), Some(int_compare)) }
+    unsafe { list_sort((&raw mut __local_list as *mut *mut _ListEntry), int_compare) }
 
     if (((if not ((if unsafe { list_length(__local_list) } == __local_num_entries: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_list_sort".ptr, c"test-list.c".ptr, (322 as c_int), c"list_length(list) == num_entries".ptr)
@@ -691,7 +691,7 @@ pub fn test_list_sort() -> Unit writes allocation_limit {
 
     (__local_list = ((null as *mut _ListEntry)))
 
-    unsafe { list_sort((&raw mut __local_list as *mut *mut _ListEntry), Some(int_compare)) }
+    unsafe { list_sort((&raw mut __local_list as *mut *mut _ListEntry), int_compare) }
 
     if (((if not ((if __local_list == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_list_sort".ptr, c"test-list.c".ptr, (339 as c_int), c"list == NULL".ptr)
@@ -738,7 +738,7 @@ pub fn test_list_find_data() writes allocation_limit {
     while ((if __local_i < __local_num_entries: 1 else: 0) != 0) {
         (__local_val = ((__local_entries[__local_i] as c_int)))
 
-        (__local_result = unsafe { list_find_data(__local_list, Some(int_equal), ((&raw mut __local_val as *mut c_int) as *mut c_void)) })
+        (__local_result = unsafe { list_find_data(__local_list, int_equal, ((&raw mut __local_val as *mut c_int) as *mut c_void)) })
 
         if (((if not ((if __local_result != null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
             __assert_rtn(c"test_list_find_data".ptr, c"test-list.c".ptr, (365 as c_int), c"result != NULL".ptr)
@@ -762,7 +762,7 @@ pub fn test_list_find_data() writes allocation_limit {
 
     (__local_val = ((0 as c_int)))
 
-    if (((if not ((if unsafe { list_find_data(__local_list, Some(int_equal), ((&raw mut __local_val as *mut c_int) as *mut c_void)) } == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
+    if (((if not ((if unsafe { list_find_data(__local_list, int_equal, ((&raw mut __local_val as *mut c_int) as *mut c_void)) } == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_list_find_data".ptr, c"test-list.c".ptr, (373 as c_int), c"list_find_data(list, int_equal, &val) == NULL".ptr)
     } else {
         0
@@ -770,7 +770,7 @@ pub fn test_list_find_data() writes allocation_limit {
 
     (__local_val = ((56 as c_int)))
 
-    if (((if not ((if unsafe { list_find_data(__local_list, Some(int_equal), ((&raw mut __local_val as *mut c_int) as *mut c_void)) } == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
+    if (((if not ((if unsafe { list_find_data(__local_list, int_equal, ((&raw mut __local_val as *mut c_int) as *mut c_void)) } == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_list_find_data".ptr, c"test-list.c".ptr, (375 as c_int), c"list_find_data(list, int_equal, &val) == NULL".ptr)
     } else {
         0

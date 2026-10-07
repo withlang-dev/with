@@ -10,7 +10,7 @@ pub unsafe fn run_tests(__param_tests: *mut Option[extern "C" fn() -> Unit]) wri
     (__local_i = ((0 as c_int)))
 
     while ((if (__param_tests[__local_i]) != null: 1 else: 0) != 0) {
-        run_test((__param_tests[__local_i]))
+        run_test((__param_tests[__local_i]).unwrap())
 
 
         (__local_i = __local_i + 1)
@@ -20,10 +20,10 @@ pub unsafe fn run_tests(__param_tests: *mut Option[extern "C" fn() -> Unit]) wri
 
 }
 
-fn run_test(__param_test: Option[extern "C" fn() -> Unit]) -> Unit {
+fn run_test(__param_test: extern "C" fn() -> Unit) -> Unit {
     alloc_test_set_limit((-1 as c_int))
 
-    __param_test.unwrap()()
+    __param_test()
 
     if (((if not ((if alloc_test_get_allocated() == 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"run_test".ptr, c"framework.c".ptr, (41 as c_int), c"alloc_test_get_allocated() == 0".ptr)

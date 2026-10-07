@@ -8673,7 +8673,7 @@ fn show_pattern_info_8() -> c_int {
         (__ci_expr_ternary_15 = callout_enumerate_function_void_8)
     }
 
-    (__local_rc = ((unsafe { pcre2_callout_enumerate_8((compiled_code_8 as *const pcre2_real_code_8), Some(__ci_expr_ternary_15), null) } as c_int)))
+    (__local_rc = ((unsafe { pcre2_callout_enumerate_8((compiled_code_8 as *const pcre2_real_code_8), __ci_expr_ternary_15, null) } as c_int)))
 
 
     if ((if __local_rc != 0: 1 else: 0) != 0) {
@@ -16058,7 +16058,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_276 {
-        unsafe { pcre2_jit_stack_assign_8(dat_context_8, Some(jit_callback_8), (jit_stack_8 as *mut c_void)) }
+        unsafe { pcre2_jit_stack_assign_8(dat_context_8, jit_callback_8, (jit_stack_8 as *mut c_void)) }
         goto '__ci_bb_274
     }
 
@@ -16075,7 +16075,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_279 {
-        unsafe { pcre2_jit_stack_assign_8(dat_context_8, Some(jit_callback_8), null) }
+        unsafe { pcre2_jit_stack_assign_8(dat_context_8, jit_callback_8, null) }
         goto '__ci_bb_280
     }
 
@@ -21535,7 +21535,7 @@ fn unittest_8() -> Unit {
 
     '__ci_bb_454 {
         (mallocs_until_failure = ((2147483647 as c_int)))
-        (__local_rc__goto_5628_5 = ((unsafe { pcre2_callout_enumerate_8((null as *const pcre2_real_code_8), Some(callout_enumerate_function_void_8), null) } as c_int)))
+        (__local_rc__goto_5628_5 = ((unsafe { pcre2_callout_enumerate_8((null as *const pcre2_real_code_8), callout_enumerate_function_void_8, null) } as c_int)))
         goto '__ci_bb_457
     }
 
@@ -21565,7 +21565,7 @@ fn unittest_8() -> Unit {
     }
 
     '__ci_bb_459 {
-        (__local_rc__goto_5628_5 = ((unsafe { pcre2_callout_enumerate_8((__local_invalid_code__goto_5664_7 as *const pcre2_real_code_8), Some(callout_enumerate_function_void_8), null) } as c_int)))
+        (__local_rc__goto_5628_5 = ((unsafe { pcre2_callout_enumerate_8((__local_invalid_code__goto_5664_7 as *const pcre2_real_code_8), callout_enumerate_function_void_8, null) } as c_int)))
         goto '__ci_bb_462
     }
 
@@ -21626,7 +21626,7 @@ fn unittest_8() -> Unit {
     }
 
     '__ci_bb_469 {
-        (__local_rc__goto_5628_5 = ((unsafe { pcre2_callout_enumerate_8((__local_test_compiled_code__goto_5638_13 as *const pcre2_real_code_8), Some(callout_enumerate_function_void_8), ((&raw mut __local_errorcode__goto_5657_5 as *mut c_int) as *mut c_void)) } as c_int)))
+        (__local_rc__goto_5628_5 = ((unsafe { pcre2_callout_enumerate_8((__local_test_compiled_code__goto_5638_13 as *const pcre2_real_code_8), callout_enumerate_function_void_8, ((&raw mut __local_errorcode__goto_5657_5 as *mut c_int) as *mut c_void)) } as c_int)))
         goto '__ci_bb_472
     }
 
@@ -21657,7 +21657,7 @@ fn unittest_8() -> Unit {
 
     '__ci_bb_474 {
         (__local_errorcode__goto_5657_5 = ((-12 as c_int)))
-        (__local_rc__goto_5628_5 = ((unsafe { pcre2_callout_enumerate_8((__local_test_compiled_code__goto_5638_13 as *const pcre2_real_code_8), Some(callout_enumerate_function_fail_8), ((&raw mut __local_errorcode__goto_5657_5 as *mut c_int) as *mut c_void)) } as c_int)))
+        (__local_rc__goto_5628_5 = ((unsafe { pcre2_callout_enumerate_8((__local_test_compiled_code__goto_5638_13 as *const pcre2_real_code_8), callout_enumerate_function_fail_8, ((&raw mut __local_errorcode__goto_5657_5 as *mut c_int) as *mut c_void)) } as c_int)))
         goto '__ci_bb_477
     }
 
@@ -21719,7 +21719,7 @@ fn unittest_8() -> Unit {
 
     '__ci_bb_484 {
         (__local_errorcode__goto_5657_5 = ((-123 as c_int)))
-        (__local_rc__goto_5628_5 = ((unsafe { pcre2_callout_enumerate_8((__local_test_compiled_code__goto_5638_13 as *const pcre2_real_code_8), Some(callout_enumerate_function_fail_8), ((&raw mut __local_errorcode__goto_5657_5 as *mut c_int) as *mut c_void)) } as c_int)))
+        (__local_rc__goto_5628_5 = ((unsafe { pcre2_callout_enumerate_8((__local_test_compiled_code__goto_5638_13 as *const pcre2_real_code_8), callout_enumerate_function_fail_8, ((&raw mut __local_errorcode__goto_5657_5 as *mut c_int) as *mut c_void)) } as c_int)))
         goto '__ci_bb_487
     }
 
