@@ -5926,6 +5926,10 @@ impl Codegen:
                     wl_set_call_conv(function, cc_id)
 
         // Apply attributes
+        // #2249: keep the frame-pointer chain in every function, so a panic's
+        // in-process backtrace (libSystem backtrace, which follows frame
+        // pointers) names the call chain; the cost is one register.
+        wl_add_fn_string_attr(self.context, function, "frame-pointer", "all")
         if (flags / FnFlags.INLINE) % 2 == 1:
             wl_add_fn_attr(self.context, function, "alwaysinline")
         if (flags / FnFlags.NOINLINE) % 2 == 1:

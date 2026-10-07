@@ -9,6 +9,7 @@ extern fn with_fiber_in_fiber() -> i32
 extern fn with_fiber_panic_capture(msg: *const u8, msg_len: i32) -> Unit
 @[link_name("_exit")]
 extern fn rt_libc_exit(code: i32) -> Never
+extern fn rt_backtrace_print() -> Unit
 
 pub fn str_data(s: &str) -> *const u8:
     unsafe *(s as *const str as *const *const u8)
@@ -30,6 +31,8 @@ pub fn with_panic_ref(msg: &str, file: &str, line: i32) -> Never:
         rt_libc_exit(134)
     with_ewrite(rendered)
     with_ewrite("\n")
+    // #2249: the chain, in-process, where the backend can walk it.
+    rt_backtrace_print()
     rt_libc_exit(134)
 
 // ── Foreign-state domain rows (ruling §52, spec §16.2b.14) ────────────────

@@ -556,6 +556,10 @@ pub fn build_graph_run_corpus_test(root: &str, target: &BuildGraphTarget) -> i32
     for ai in 0..target.args.len() as i32:
         argv = build_graph_argv_append(argv, target.args[ai])
     let timeout_ms = 300000
+    // Compile provenance (#2249): the binary a corpus test ran, in the log.
+    var prov_args = ""
+    for pai in 0..target.args.len() as i32: prov_args = prov_args ++ " " ++ target.args[pai]
+    build_graph_rt_eprint("[compile] " ++ target.name ++ " ran " ++ runner_path ++ prov_args)
     let rc = build_graph_rt_exec_argv_capture(argv, stdout_path, stderr_path, timeout_ms)
     if rc == 124:
         build_graph_rt_eprint("error: run_corpus_test target '" ++ target.name ++ f"' timed out after {timeout_ms}ms; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
@@ -598,6 +602,10 @@ pub fn build_graph_run_command(root: &str, target: &BuildGraphTarget) -> i32:
     for ai in 0..target.args.len() as i32:
         argv = build_graph_argv_append(argv, target.args[ai])
     let timeout_ms = 300000
+    // Compile provenance (#2249): the binary a corpus test ran, in the log.
+    var prov_args = ""
+    for pai in 0..target.args.len() as i32: prov_args = prov_args ++ " " ++ target.args[pai]
+    build_graph_rt_eprint("[compile] " ++ target.name ++ " ran " ++ runner_path ++ prov_args)
     let rc = build_graph_rt_exec_argv_capture(argv, stdout_path, stderr_path, timeout_ms)
     if rc == 124:
         build_graph_rt_eprint("error: command target '" ++ target.name ++ f"' timed out after {timeout_ms}ms; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)

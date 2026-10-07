@@ -1929,7 +1929,32 @@ fn tool_effect_env_text(process_env: &ProcessEnv) -> str:
         out.push_str(tool_sha256_text(item.value))
     out.to_str()
 
+// Compile provenance (#2249): every compiler a build action spawns is named
+// in the action log with its digest and argv, so "which binary compiled
+// this" is read, never inferred (the pcre2 cohesive check read the
+// embedded interface and the zlib harness was built by the seed, and
+// nothing said so). Hashed once per binary per driver run.
+var g_compile_provenance_digests: HashMap[str, str] = HashMap.new()
+
+fn tool_compile_provenance(target: &str, parts: &Vec[str]):
+    if parts.len() == 0: return
+    let exe = parts[0].clone()
+    var base = exe.clone()
+    let slash = exe.rfind("/")
+    if slash >= 0: base = exe[slash + 1..exe.len()].to_owned()
+    if base != "with" and base != "with-stage1" and base != "with-stage2" and base != "with.unstamped" and base != "main": return
+    var digest = ""
+    match g_compile_provenance_digests.get(exe):
+        Some(d) => digest = d.clone()
+        None =>
+            digest = tool_sha256_text(with_fs_read_file(exe))
+            g_compile_provenance_digests.insert(exe.clone(), digest.clone())
+    var argv = ""
+    for i in 1..parts.len() as i32: argv = argv ++ " " ++ parts[i]
+    print("[compile] " ++ target ++ " ran " ++ digest[0..12] ++ " " ++ exe ++ argv)
+
 fn ProcessRunner.record_process_effect(self: &Self, method: &str, parts: &Vec[str], cwd: &str, timeout_ms: i32, stdin_path: &str, stdout_path: &str, stderr_path: &str, env_text: &str):
+    tool_compile_provenance(if self.target_name.len() > 0: self.target_name.clone() else: "<build>".to_owned(), parts)
     if with_getenv_str("WITH_BUILD_EFFECTS_OUT").len() == 0:
         return
     let target = if self.target_name.len() > 0: self.target_name.clone() else: "<build>"
@@ -3279,6 +3304,20 @@ fn ws_artifact_kind_for_output(output_kind: i32) -> ArtifactKind:
 
 fn ws_run_compile_child(id: i32, plan: &WorkspaceCompilePlan) -> BuildResult:
     let compiler = with_getenv_str("WITH_BUILD_COMPILER")
+    // #2249: a Workspace compile runs under WITH_BUILD_COMPILER — the DRIVER,
+    // the pinned seed when the battery drives — never a compiler the tree
+    // built. Say so in the log, and refuse a std corpus or its harness: those
+    // are compiled by the compiler under test as a subprocess with
+    // --bundle-corpus (corpus_compile_binary, corpus_check_every_module),
+    // or a migration the seed can no longer type fails here for no reason
+    // the sources show (zlib, #2247).
+    var ws_files = ""
+    for sp in plan.source_paths:
+        ws_files = ws_files ++ " " ++ sp
+        if sp.contains("/lib/std/") or sp.starts_with("lib/std/"):
+            with_eprint("error: Workspace.compile: " ++ sp ++ " is a std corpus module or its harness; the driver (" ++ compiler ++ ") is the pinned seed, so it is compiled by the compiler under test as a subprocess with --bundle-corpus, never through a Workspace\n")
+            exit(1)
+    print("[driver-compile] " ++ plan.name ++ " compiler=" ++ compiler ++ " files=" ++ ws_files)
     if compiler.len() == 0:
         ws_needs_evaluator("compile (no WITH_BUILD_COMPILER)")
     let plan_path = ws_dir(id) ++ "/plan.txt"
