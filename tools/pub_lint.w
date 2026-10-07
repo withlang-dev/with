@@ -67,6 +67,14 @@ for row in facts(root, "select:stage=ast,kind=declaration"):
     let name = column(row, 19)
     if name.contains("$in$"): continue
     decls.push(Decl { path, name, start: parse(column(row, 14)), kind: "fn" })
+// Declared types (struct, enum, alias) carry their declaration's module and
+// start byte in the type facts.
+for row in facts(root, "select:stage=sema,kind=type"):
+    let path = column(row, 18)
+    if path.len() == 0 or package_of(path) != "<program>" or path.starts_with("<c_import"): continue
+    let name = column(row, 19)
+    if name.contains("$in$") or name.contains("[") or column(row, 14).len() == 0: continue
+    decls.push(Decl { path, name, start: parse(column(row, 14)), kind: "type" })
 
 // Names referenced from another package than the declaration's: calls
 // (by callee name — the sig's declaration is in the same program), method

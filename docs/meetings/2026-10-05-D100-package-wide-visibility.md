@@ -57,3 +57,9 @@ nothing outside the package uses.
 **Reopen if** a package grows large enough that its own modules need
 protection from each other in practice. `internal` is the first tool for
 that; a file-private level would be a new ruling.
+
+## Implementation note (2026-10-07, #2211)
+
+`tools/pub_lint.w <root.w> [--apply]` reports every `pub` declaration of the program's package that no call, method resolution or name reference from another package names — from the analyzer's facts (`reference` facts carry both packages), never from the text — and `--apply` removes exactly that `pub ` token. A library whose consumers are outside the compilation keeps its `pub`: run it from a program that uses the library.
+
+Run over the compiler (`src/main.w`) it reports 1507 `pub` declarations used by nothing outside the compiler's package. They are not removed yet: the pinned seed still enforces per-module privacy (`symbol 'helper' is private to module 'Helper.w'`, probed 2026-10-07), so a tree without them is unbuildable by the seed. The apply lands after a seed that implements D100 is published and pinned, the way every build-layer change that needs a newer seed does.

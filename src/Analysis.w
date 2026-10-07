@@ -303,6 +303,17 @@ fn analysis_collect_types(report: &AnalysisReport, sema: &Sema):
         fact.symbol = if kind == TypeKind.TY_STRUCT or kind == TypeKind.TY_ENUM or kind == TypeKind.TY_ALIAS: d0 else: 0
         fact.name = with_str_clone_ref(type_name)
         fact.detail = f"kind={kind} d0={d0} d1={d1} d2={d2}"
+        // #2211: a declared type names its declaration node, module and start
+        // byte, as a function declaration fact does, so a tool can find the
+        // declaration (pub_lint reads its `pub`).
+        if fact.symbol != 0 and sema.type_decl_nodes.contains(fact.symbol):
+            let decl_node: i32 = sema.type_decl_nodes.get(fact.symbol).unwrap()
+            fact.node = decl_node
+            fact.start = sema.ast.get_start(decl_node)
+            fact.end = sema.ast.get_end(decl_node)
+            if sema.decl_visibility_node_index.contains(decl_node):
+                let record: i32 = sema.decl_visibility_node_index.get(decl_node).unwrap()
+                fact.path = with_str_clone_ref(sema.decl_visibility_paths[record])
         report.add(move fact)
 
         if kind != TypeKind.TY_STRUCT:
