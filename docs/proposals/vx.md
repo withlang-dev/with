@@ -1,25 +1,46 @@
 # vx.md — placement, machines and regions in With
 
-Vx (github.com/vx-lang/Vx, by Aditya Kumar) is a systems language whose one
-idea is that *where a value lives* and *where code runs* belong in the type
-system, checked against a declared description of the machine. This is the
-plan for bringing that idea into With: what Vx's code establishes, with the
-file and line that establishes it; what With already has, with the file and
-line that has it; the principles, each under the law it instantiates; the
-proposed With spellings; how each piece lands in With's architecture; the
-order of work; and what is left out. Syntax is a proposal, not a ruling.
-Where Vx's code and Vx's prose disagree, this document follows the code.
+## Why
 
-Nothing is copied from the Vx repository: no code, no text, no machine
-description, no test. Citations below are to read, not to reuse. What crosses
-is ideas, and With writes every line that realizes them.
+Eric runs a serving stack and a kernel library on his own machines: 3090s, a
+5090, a Mac. He wants to write that layer in With, with the placement bugs
+refused at compile time: a host read of device memory, a buffer whose copy
+has not landed, a scratchpad that overflows, a working set that fits in
+every function and not across the call, a pointer into the wrong memory
+handed to a vendor call. That is a mission reason (close to the machine,
+exactly as safe, the suffering removed), it is testable on hardware he
+owns, and it decides scope questions no comparison with another language
+can: an eight-GPU box makes peer transfers between `gpu[0]` and `gpu[1]`
+early scope, not a refinement.
 
-The standard for inclusion: an idea is here if, once With has it, nobody would
-choose Vx over With for that idea. The standard for exclusion: an idea is left
-out if it is not part of Vx's thesis, or if With's laws already do it better.
+Vx (github.com/vx-lang/Vx, by Aditya Kumar) is the reference for the idea
+that *where a value lives* and *where code runs* are type facts checked
+against a declared machine. It is read for what it establishes and where it
+fell short. Nothing is copied from its repository: no code, no text, no
+machine description, no test. What crosses is ideas, and With writes every
+line that realizes them.
 
-Paths written `Vx …` are under `.reference/Vx`; bare paths are this
-repository. Line numbers are as of 2026-10-07.
+## Scope
+
+**This plan is the checker: steps 1 to 3 of Part VI.** Machine files,
+placement in types, transfer, regions, visibility, routing and capacity,
+all lowered on the host against a declared test machine. It needs no GPU,
+no second codegen unit and no vendor facade, it is bounded, and it stands on
+its own: a program that typechecks against a declared H100 is useful before
+any kernel runs on one.
+
+**Dispatch is a separate proposal** (`vx-dispatch.md`): device codegen
+units, the Metal and CUDA facades, hardware batteries on two boxes. That is
+where the cost changes kind, from a campaign into a standing tax on every
+later language change, and it gets its own brief once the Metal question is
+answered and the checker has shown what it is worth on real With programs.
+The ruling that approves this plan approves the checker and asks for that
+brief; it does not approve dispatch.
+
+Syntax below is a proposal, not a ruling. Where Vx's code and Vx's prose
+disagree, this document follows the code. Paths written `Vx …` are under
+`.reference/Vx`; bare paths are this repository; line numbers are as of
+2026-10-07.
 
 ---
 
@@ -98,7 +119,10 @@ repository. Line numbers are as of 2026-10-07.
   (no latency term, so a 4 KiB transfer is mispredicted by 98%; the
   composition law for a multi-hop route is unsettled; contention is
   recorded but not priced; five instrument defects, all caught by "a number
-  that cannot physically be true").
+  that cannot physically be true"). Its strongest validation is a predicted
+  versus measured ratio on a real two-socket box; that shape of evidence,
+  not only refusal fixtures, is what makes admission figures trustworthy
+  (§11).
 
 ### Prose, or surface only
 
@@ -134,7 +158,9 @@ repository. Line numbers are as of 2026-10-07.
   §14.22): an `async:` block captures under closure rules, its `Task` is
   ephemeral when it captures a view, and dropping an un-awaited task cancels
   it. `src/AsyncLower.w:62` (`lower_async_module`) is how such a block
-  becomes an outlined body. A region is that block with a processor.
+  becomes an outlined body. A region is that block with a processor. This
+  plan depends on the cancel-on-drop rule being enforced, and step 2 tests
+  it (V.8).
 - **Target-conditional compilation.** `docs/spec/metaprogramming.md:349-395`
   (§17.5, D91): `comptime match Target.os`, exhaustive, the untaken branch
   parsed and not compiled; `src/SemaCheck.w:23153` (`select_comptime_if_branch`)
@@ -146,6 +172,10 @@ repository. Line numbers are as of 2026-10-07.
   key (`src/compiler/TrackedInputs.w`); `src/compiler/DriverOptions.w:41-42`
   holds the target kind and whether it was explicit; `src/main.w:1140`
   applies `--target` to `check`. A machine lands beside the target here.
+- **Instantiation per parameter.** A generic body is checked once and
+  compiled per instantiation (`src/Sema.w` specializations, the
+  `specialization` facts). A body that runs on more than one processor is
+  the same mechanism over the processor (§3).
 - **One fact database.** `src/AnalysisTypes.w:17` (`AnalysisFactKind`, 28
   kinds today), `src/Analysis.w:93-780` (one collector per kind),
   `with analyze … select:kind=…` and the `lldb:` and `path:call` requests
@@ -153,18 +183,18 @@ repository. Line numbers are as of 2026-10-07.
   become kinds 29-32; there is no second schema to version.
 - **Modeled C.** `docs/spec/ffi.md:351-375` (§16.2b, the `c facade` block:
   `resource X wraps *mut T`, producers `from`, `drop`, `destroys`, `ok`);
-  `src/SemaFacade.w`. The dispatch runtime is facades over the driver APIs,
-  in With, not Vx's twenty C++ files under `Vx runtime/`.
+  `src/SemaFacade.w`. When dispatch comes, the runtime is facades over the
+  driver APIs, in With, not Vx's twenty C++ files under `Vx runtime/`.
 - **Types instead of a solver.** `lib/std/task.w:20` (`Task[T]`) is the
   completion obligation: an asynchronous transfer is a task that becomes the
   placed value when awaited.
 - **One ABI source.** `src/FnAbi.w:26` (`PassMode`, computed once). A pointer
   into another space is a pointer type with a space argument; its passing
   mode is whatever `compute_fn_abi` says for a pointer, and nothing per path.
-- **A real multi-space machine to test on.** The Mac is one unified space
-  with a CPU and a GPU that address it, plus threadgroup memory as a true
-  scratchpad; the Linux host (`eric-5090`) has a discrete GPU with
-  host-unreadable memory. Both are Eric's (CLAUDE.md §Other hosts).
+- **The machines.** The Mac is one unified space with a CPU and a GPU that
+  address it, plus threadgroup memory as a true scratchpad; the Linux box
+  (`eric-5090`) has discrete GPUs with host-unreadable memory and peer
+  edges between them. Descriptions of both are the first shipped ones.
 
 ## Part III — Principles
 
@@ -179,6 +209,13 @@ is noise). Two values that differ only in where their bytes live are not
 interchangeable. The host is the default *representation*: a program that
 never names a space is a host program, unchanged, and its types intern to
 the same ids they do today.
+
+This is broader than Vx, which places tensors and pointers only, and the
+breadth is a feature rather than a cost: a host function taking `&[T]`
+takes a host slice, which is correct because a host function cannot read
+HBM anyway. There is no space-generic code to write, because where code
+runs already determines what it can see; a function that must run in two
+places is instantiated per processor (§3), not abstracted over spaces.
 
 *Laws:* 4 (which spaces exist and who can see them is declared, never
 inferred from a name); 1 (the placement is carried once; no wrapper restates
@@ -200,11 +237,19 @@ transfer would pick a meaning).
 A region runs on a declared processor. Everything it touches must live in a
 space that processor sees. A violation names the value, its space, the
 visible set, and the transfer that fixes it (the shape of
-`Vx src/hir/check/access.rs:202-214`, which is the one diagnostic worth
-reproducing in spirit exactly). A region the compiler cannot lower for its
-processor is an error, never a silent fallback onto the host. Where a
-function runs is a signature fact across a published boundary and an
-inferred fact inside one, the same shape as comptime-callability (D104).
+`Vx src/hir/check/access.rs:202-214`). A region the compiler cannot lower
+for its processor is an error, never a silent fallback onto the host.
+
+Where a function runs is a signature fact across a published boundary and
+an inferred fact inside one, the same shape as comptime-callability (D104).
+**Inside a package, a function is instantiated per processor it is called
+from**: a helper called from host code and from an `on gpu` region is two
+bodies, checked once and compiled twice, exactly as a generic is
+instantiated per type argument. The consequences are part of the rule, not
+a discovery: two bodies in the facts and in the dumps, two codegen units
+once dispatch exists, and a diagnostic at the call site when the body is
+fine on one processor and unlowerable on the other, naming the construct
+and the processor. A `pub` function states its processor and has one body.
 
 *Laws:* 4; 6 (declared where promised to a reader who cannot see the body,
 inferred where not); 7 (no plausible wrong fallback).
@@ -229,7 +274,9 @@ edges that exist. When a path exists the compiler picks the cheapest legal
 one over the declared edges, lowers it as hops, and reports it with its
 per-edge cost. Routing through a declared intermediate space is the
 machine's fact; a route through a host the description never mentioned is
-refused.
+refused. Peer edges between two devices' spaces (`gpu[0].HBM -> gpu[1].HBM`)
+are ordinary edges from the first description on, because the eight-GPU
+box is the target.
 
 *Laws:* 7; 3 (placement decided in one stage, routing in the next, dispatch
 in the last; none reconstructs another's fact).
@@ -241,10 +288,15 @@ rounding, against one replica, folded across calls as Part I describes,
 recursion into a bounded space refused. A placement that does not fit is
 refused with required, available and margin. A programmer who knows the
 buffers do not coexist says so on the space, and the refusal becomes a
-warning. A size the compiler cannot establish is reported as unverified,
-never silently admitted. With reads the working set off MIR's live placed
-owners. Host memory is not capacity-checked. This is the one check with no
-equivalent in any other language, and the one most worth having.
+warning. With reads the working set off MIR's live placed owners. Host
+memory is not capacity-checked. This is the one check with no equivalent in
+any other language, and the one most worth having.
+
+Static sizes only, in this plan. Real kernels size shared memory by the
+launch configuration, not by a constant, so the first real kernel will hit
+the dynamic case; the rule for it is decided before step 3 (Part IX), not
+after. Until then a size the compiler cannot establish is reported as
+unverified, never silently admitted.
 
 *Laws:* 4 (being wrong rejects a valid program or lets one run out of memory
 at runtime; neither is unsafety); 3 (the live set has one owner); 7.
@@ -261,7 +313,9 @@ value only once awaited. Nothing here is an open ruling (§14.22).
 
 With already calls every leak a defect. A space the host may not read is
 freed through the device API, which is a destruction contract the facade
-states (D51 §65: no safe constructor without one), never a name.
+states (D51 §65: no safe constructor without one), never a name. In this
+plan the test machine's second space is backed by host memory and freed by
+the ordinary allocator; the contract shape is the same.
 
 *Laws:* the `with`-scope paragraph of the mission; 4.
 
@@ -281,13 +335,20 @@ is absent with a reason, never partial and never zero.
 
 *Laws:* 3; 7; 10.
 
-### 11. The differential suite
+### 11. The differential suite, and one measurement
 
 For each check, a pair: the same mistake in With and in CUDA or Metal, where
 With refuses at compile time what the native toolchain reports at
 synchronization, at allocation, or as a fault. New work, not a port. The With
 side runs on the Mac against a declared machine lowered on the host; the
-native side runs where the hardware is.
+native side runs where the hardware is, under the dispatch proposal.
+
+Refusals alone do not make the admission figures trustworthy. The suite
+also carries at least one model-versus-measurement comparison, as a ratio:
+a working set the checker admits at a stated margin against a scratchpad,
+run on the 5090 under the dispatch proposal, with the measured peak beside
+the predicted one. The checker's number is only worth its margin if that
+ratio is published.
 
 *Laws:* 10.
 
@@ -332,47 +393,46 @@ machine m4_uma:
 ```
 
 ```
-// lib/std/machine/h100_sxm.w (figures illustrative; the real file cites each)
-machine h100_sxm:
-    memory HBM3e:
-        capacity 80 GiB            spec: <vendor datasheet, date>
-        bandwidth 3.35 TB/s        spec: <vendor datasheet, date>
+// lib/std/machine/rtx5090_x2.w (shape only; the real file cites each figure)
+machine rtx5090_x2:
+    memory HBM[0]:
+        capacity 32 GiB            spec: <vendor datasheet, date>
         managed explicit           // the host never reads it
-    memory L2:
-        within HBM3e
-        capacity 50 MiB            spec: <architecture whitepaper>
-        bandwidth 5.5 TB/s         policy: 2x HBM until measured
-    memory SMEM:
-        within L2
+    memory HBM[1]: as HBM[0]
+    memory SMEM[0]:
+        within HBM[0]
         capacity 228 KiB
         scope sm
         granule 16 KiB
-        replicas 132               measured: <probe, boxes, date>
+        replicas 170               measured: <probe, date>
+    memory SMEM[1]: as SMEM[0], within HBM[1]
     processor gpu[0]:
-        arch nvptx sm_90
-        memory HBM3e
-        sees HBM3e, L2, SMEM
+        arch nvptx sm_120
+        memory HBM[0]
+        sees HBM[0], SMEM[0]
         dtypes f32, f16, bf16, fp8, i32, i8
-    transfer host.DRAM -> HBM3e: 63 GB/s copy_engine     spec: PCIe Gen5 x16
-    transfer HBM3e -> host.DRAM: 63 GB/s copy_engine
-    transfer HBM3e -> L2
-    transfer L2 -> SMEM copy_engine
+    processor gpu[1]: as gpu[0], memory HBM[1], sees HBM[1], SMEM[1]
+    transfer host.DRAM -> HBM[0]: 63 GB/s copy_engine    spec: PCIe Gen5 x16
+    transfer HBM[0] -> host.DRAM: 63 GB/s copy_engine
+    transfer HBM[0] -> HBM[1]: 63 GB/s                  policy: via host until measured
+    transfer HBM[1] -> HBM[0]: 63 GB/s
+    transfer HBM[0] -> SMEM[0] copy_engine
 ```
 
 Rules:
 
-- `memory NAME:` items are `capacity`, `bandwidth`, `clock`, `within`,
-  `managed explicit|cached`, `scope`, `granule`, `replicas`, `overcommit`.
-  Units are exact: `KiB MiB GiB` binary, `KB MB GB TB` decimal, `B/s`,
-  `B/cyc` (with `clock` required to compare against `B/s`). A figure may
-  carry a provenance trailer: `spec: <text>`, `measured: <text>`,
-  `policy: <text>`; the trailer is a fact, not a comment, and `with analyze`
-  reports it.
+- `memory NAME[index]:` items are `capacity`, `bandwidth`, `clock`,
+  `within`, `managed explicit|cached`, `scope`, `granule`, `replicas`,
+  `overcommit`; `as OTHER` copies another space's items and the rest
+  override. Units are exact: `KiB MiB GiB` binary, `KB MB GB TB` decimal,
+  `B/s`, `B/cyc` (with `clock` required to compare against `B/s`). A figure
+  may carry a provenance trailer: `spec: <text>`, `measured: <text>`,
+  `policy: <text>`; the trailer is a fact, and `with analyze` reports it.
 - `processor NAME[index]:` items are `arch`, `memory` (its default space),
-  `sees` (the visible set), `dtypes`.
+  `sees` (the visible set), `dtypes`, and `as OTHER`.
 - `transfer A -> B[: rate] [copy_engine] [relaxed]`. One cost per edge: a
   declared rate on an edge whose endpoints both declare bandwidths is an
-  error, as in Vx (`arch.rs:117`).
+  error, as in Vx (`arch.rs:117`). Peer edges between devices are ordinary.
 - The host is `host`: its spaces (`host.DRAM`) come from the `--target`
   machine, which is the host file. A host declares no capacity.
 - Coherence checks on the file alone, before any program: `within` acyclic;
@@ -382,62 +442,69 @@ Rules:
   through `host` requires the host to be declared, which `--target` always
   is.
 
-### IV.2 Selecting the machine
+### IV.2 Selecting the machine: visible, and pinnable
 
 ```
-with build                          # detects: the Mac is m4_uma, unambiguous
-with build --machine h100_sxm       # pins a shipped description
+with build                          # [machine] detected m4_uma (unambiguous)
+with build --machine rtx5090_x2     # pins a shipped description
 with build --machine ./fleet/box.w  # pins a project file
-with check prog.w --machine h100_sxm --target x86_64-linux
+with check prog.w --machine rtx5090_x2 --target x86_64-linux
 ```
 
-`--target` stays what it is: the host, its triple and its spaces.
-`--machine` adds the offload processors. The machine's `arch` and the target
-must be a pair the toolchain can emit for (`metal` with a Darwin target,
-`nvptx` with Linux or Windows); a mismatch is a diagnostic. Detection must be
-able to say "I cannot tell" and then refuses rather than guesses (a Linux box
-with no GPU detects `host only`; a box with two different GPUs refuses
-without `--machine`). In `with.toml`, `machine = "h100_sxm"` pins it for the
-project (`src/compiler/ProjectConfig.w:131`).
+- `--target` stays what it is: the host, its triple and its spaces.
+  `--machine` adds the offload processors. The machine's `arch` and the
+  target must be a pair the toolchain can emit for; a mismatch is a
+  diagnostic.
+- **Detection is visible.** Every build prints the machine it detected
+  (`[machine] detected m4_uma`) or pinned (`[machine] rtx5090_x2 (with.toml)`),
+  the way it prints the compiler it ran, so two laptops never differ
+  silently. Detection must be able to say "I cannot tell" and then refuses
+  rather than guesses: a Linux box with no GPU detects `host only`; a box
+  with two different GPUs refuses without `--machine`.
+- **Anything shipped pins.** `machine = "rtx5090_x2"` in `with.toml`
+  (`src/compiler/ProjectConfig.w:131`) is the pin; a project that places
+  buffers and has no pin gets a warning naming the detected machine and the
+  line to add. The pinned machine is a tracked input of the build key
+  (§17.1a), so a changed description rebuilds.
 
 ### IV.3 Placement in types
 
 ```
-let w: Buffer[f32, h100.HBM3e] = Buffer.zeroed(n)   // the demand binds the space (Law 2)
+let w: Buffer[f32, rtx.HBM[0]] = Buffer.zeroed(n)   // the demand binds the space (Law 2)
 let x = Buffer.zeroed[f32](n)                        // host: the default representation
-let y = Buffer.uninit[f32, h100.SMEM](tile)          // explicit, when nothing demands it
-let s: &[f32] in h100.SMEM = y[0..tile]              // a view carries the buffer's space
-extern fn cublas_sgemm(a: *const f32 in h100.HBM3e, ...)
+let y = Buffer.uninit[f32, rtx.SMEM[0]](tile)        // explicit, when nothing demands it
+let s: &[f32] in rtx.SMEM[0] = y[0..tile]            // a view carries the buffer's space
+extern fn cublas_sgemm(a: *const f32 in rtx.HBM[0], ...)
 ```
 
 - `Buffer[T, S]` is a fixed-length owned allocation in space `S`; `Buffer[T]`
   is `Buffer[T, host.DRAM]`. `Vec[T]` stays host-only; growth is a host
   operation. Whatever tensor type With later rules on carries the same slot.
 - A space is a type-level constant of the pinned machine, spelled
-  `<machine>.<space>` (`h100.HBM3e`), or `Machine.<space>` for the pinned one
+  `<machine>.<space>` (`rtx.HBM[0]`), or `Machine.<space>` for the pinned one
   without naming it. There are no ids, no hashing; a space no processor
   holds is a name-resolution error.
 - `&T in S`, `&mut T in S`, `&[T] in S`, `*const T in S`, `*mut T in S`: the
   pointee's space, `host.DRAM` when absent. `&[f32] in host.DRAM` is the
-  same type as `&[f32]`.
+  same type as `&[f32]`, so every existing signature is a host signature.
 - `Buffer[T, S]` is never `Copy`, and a view into it is a view like any
   other (D22/D27: observing is not owning).
-- Element types a processor cannot represent are refused at the placement
-  (`Buffer[fp8, m4.Unified]` on a machine whose GPU declares no `fp8`).
+- Element types a processor cannot represent are refused at the placement.
 
 ### IV.4 Transfer
 
 ```
-let d = transfer(w, h100.HBM3e)            // consumes w; d: Buffer[f32, h100.HBM3e]
-let d2 = transfer(w.clone(), h100.HBM3e)   // keep the host copy: say so
-let t = async transfer(w, h100.HBM3e)      // Task[Buffer[f32, h100.HBM3e]]
+let d = transfer(w, rtx.HBM[0])            // consumes w; d: Buffer[f32, rtx.HBM[0]]
+let d2 = transfer(w.clone(), rtx.HBM[0])   // keep the host copy: say so
+let p = transfer(d, rtx.HBM[1])            // a peer edge, if declared; else routed through host
+let t = async transfer(w, rtx.HBM[0])      // Task[Buffer[f32, rtx.HBM[0]]]
 let d3 = t.await                           // only now is there a placed value
 ```
 
 - `transfer` is a `std` generic, `fn transfer[T, A, B](b: Buffer[T, A]) -> Buffer[T, B]`,
   with `B` bound by the argument or the demand. It consumes.
-- The route is derived over declared edges and lowered as hops; each hop is
-  the facade's copy for that edge's processors. No path is an error naming
+- The route is derived over declared edges and lowered as hops; in this plan
+  each hop is a host copy in the test runtime. No path is an error naming
   the spaces and the edges that exist; a route through an undeclared host
   is refused.
 - `async transfer` is the `async` form of the same call, under §14.22. A
@@ -447,16 +514,16 @@ let d3 = t.await                           // only now is there a placed value
 ### IV.5 Regions
 
 ```
-on h100.gpu[0]:                          // sequential meaning; the runtime may overlap as-if
+on rtx.gpu[0]:                           // sequential meaning; the runtime may overlap as-if
     for i in 0..n: d[i] = d[i] * 2.0
 
-let t = async on h100.gpu[0]:            // Task[T]; §14.22 capture rules
+let t = async on rtx.gpu[0]:             // Task[T]; §14.22 capture rules; drop cancels
     reduce(d)
 
-pub fn softmax(x: &[f32] in h100.HBM3e) on h100.gpu:   // a published boundary declares (Law 6)
+pub fn softmax(x: &[f32] in rtx.HBM[0]) on rtx.gpu:    // a published boundary declares (Law 6)
     ...
 
-fn helper(x: &[f32] in Machine.HBM3e):                  // inside the package: inferred per call
+fn helper(x: &[f32] in Machine.HBM[0]):                 // package-local: instantiated per caller's processor
     ...
 
 comptime match Processor.Current.arch:  // inside a region; selected before analysis (D91)
@@ -467,26 +534,29 @@ comptime match Processor.Current.arch:  // inside a region; selected before anal
 - `on <processor>:` is a block statement or expression; its value is the
   block's value, not placed. `async on` yields a `Task`.
 - Inside the block every place read or written must be in a space the
-  processor `sees`. The error: `'d' lives in host.DRAM, but h100.gpu[0]
-  sees only [HBM3e, L2, SMEM]; transfer it first: let d = transfer(d,
-  h100.HBM3e)`.
-- A call from a region to a function whose processor is declared otherwise
-  is an error; a call to an undeclared package-local function is checked
-  per call site, as a comptime call is (D104).
+  processor `sees`. The error: `'d' lives in host.DRAM, but rtx.gpu[0] sees
+  only [HBM[0], SMEM[0]]; transfer it first: let d = transfer(d, rtx.HBM[0])`.
+- A call from a region to a `pub` function declared for another processor
+  is an error. A call to a package-local function instantiates it for the
+  region's processor (§3); if that instance cannot be lowered, the error is
+  at the call, naming the construct and the processor.
 - `Processor.Current` is the region's processor, a compile-time constant;
   outside any region it is the host's CPU.
 - A region whose body the backend cannot lower for the processor is a
-  compile error naming the construct, never a host fallback.
+  compile error naming the construct, never a host fallback. In this plan
+  every processor lowers on the host, so the check is exercised by a test
+  machine whose processor declares an arch the host backend refuses.
 
 ### IV.6 Verdicts
 
 ```
 with analyze prog.w 'select:kind=placement'  // owner, space, bytes, provenance of the size
 with analyze prog.w 'select:kind=route'      // transfer site, path, per-edge cost, unit, source
-with analyze prog.w 'select:kind=capacity'   // function, space, required, available, margin, overcommit
+with analyze prog.w 'select:kind=capacity'   // function, processor instance, space, required, available, margin
 with analyze prog.w 'select:kind=traffic'    // region, buffer, bytes read, bytes written, or absent: <reason>
 with analyze prog.w 'explain:machine'        // the pinned machine, every figure with its provenance
 with analyze prog.w 'explain:route:<site>'   // why this route and not another
+with analyze prog.w 'explain:instances:<fn>' // the processors a package-local function is compiled for, and why
 ```
 
 ### IV.7 Diagnostics
@@ -496,39 +566,42 @@ One family, each with a fix-it where one exists:
 | situation | message shape |
 |---|---|
 | read outside visibility | `'d' lives in host.DRAM, but gpu[0] sees only […]; transfer it first` |
-| no path | `no transfer path from SMEM to host.DRAM on h100_sxm; declared edges: …` |
-| undeclared host on a staged route | `the route host.DRAM -> HBM3e stages through the host, and --target names none` |
-| over capacity, one buffer | `'tile' needs 262144 B in SMEM, which holds 233472 B (margin -28672 B)` |
-| over capacity, working set | `… places 3 buffers, 294912 B after 16 KiB granules, in SMEM (233472 B)` |
-| over capacity across calls | `… holds 'tile' (…) across the call to f, whose own peak in SMEM is …` |
-| recursion into a bounded space | `f places into SMEM and calls itself; the peak is unbounded` |
-| element type | `fp8 is not an element type h100.gpu[0] declares` |
-| pointer space at a call | `expected *const f32 in HBM3e, found *const f32 (host.DRAM)` |
-| not lowerable | `this region runs on gpu[0], and the Metal backend has no lowering for …` |
-| unverified size | warning: `'buf' has no static size; its placement in SMEM is unverified` |
-| incoherent machine | `machine h100_sxm: SMEM (228 KiB) is larger than its parent L2 (…)` |
+| no path | `no transfer path from SMEM[0] to host.DRAM on rtx5090_x2; declared edges: …` |
+| undeclared host on a staged route | `the route host.DRAM -> HBM[0] stages through the host, and --target names none` |
+| over capacity, one buffer | `'tile' needs 262144 B in SMEM[0], which holds 233472 B (margin -28672 B)` |
+| over capacity, working set | `… places 3 buffers, 294912 B after 16 KiB granules, in SMEM[0] (233472 B)` |
+| over capacity across calls | `… holds 'tile' (…) across the call to f, whose own peak in SMEM[0] is …` |
+| recursion into a bounded space | `f places into SMEM[0] and calls itself; the peak is unbounded` |
+| element type | `fp8 is not an element type m4.gpu declares` |
+| pointer space at a call | `expected *const f32 in HBM[0], found *const f32 (host.DRAM)` |
+| not lowerable, this processor | `helper is called from gpu[0], and … has no lowering there (fine on cpu)` |
+| unverified size | warning: `'buf' has no static size; its placement in SMEM[0] is unverified` |
+| no pin | warning: `this program places buffers; pin the machine: machine = "m4_uma" in with.toml` |
+| incoherent machine | `machine rtx5090_x2: SMEM[0] (228 KiB) is larger than its parent …` |
 
 ## Part V — Architecture: where each piece lands
 
 The pipeline is Parse → Sema (what) → MIR (where and when) → codegen (how),
 with the build layer around it. Each row names the owner of the new fact
-(Law 3) and the files it touches.
+(Law 3) and the files it touches. Everything below is the checker; nothing
+here needs a device backend.
 
 ### V.1 Machine files
 
 - **Parser** (`src/Parser.w`, `src/Ast.w`): new declaration kinds
   `NK_MACHINE`, `NK_MEMORY_DECL`, `NK_PROCESSOR_DECL`, `NK_TRANSFER_DECL`,
-  with a size/rate literal grammar (`80 GiB`, `3.35 TB/s`, `128 B/cyc`) and
-  the provenance trailer as a token sequence on the item.
+  a size/rate literal grammar (`80 GiB`, `3.35 TB/s`, `128 B/cyc`), the
+  `as OTHER` copy, and the provenance trailer as a token sequence on the
+  item.
 - **Loading** (`src/compiler/DriverOptions.w`, `src/main.w`,
   `src/compiler/Frontend.w:2587`, `src/compiler/Zcu.w:220`): `--machine`
   resolves a name under the embedded `lib/std/machine/` or a path, and the
   file enters the compilation as a peer module the way the prelude does. It
-  is a tracked input (`src/compiler/TrackedInputs.w`), so it is part of the
-  build key and the bundle fingerprint, and `with.toml` may pin it
+  is a tracked input (`src/compiler/TrackedInputs.w`), part of the build key
+  and the bundle fingerprint; `with.toml` pins it
   (`src/compiler/ProjectConfig.w`). Detection lives beside
-  `target_spec_host_kind` (`src/TargetSpec.w:50`) and answers a machine name
-  or "cannot tell".
+  `target_spec_host_kind` (`src/TargetSpec.w:50`), answers a name or
+  "cannot tell", and is printed on every build.
 - **Sema** (new `src/SemaMachine.w`): one `MachineModel` per compilation:
   spaces, processors, edges, the containment tree, the all-pairs route
   table computed once, and the coherence checks run on the model before any
@@ -549,23 +622,26 @@ with the build layer around it. Each row names the owner of the new fact
 - **Checking** (`src/SemaCheck.w`): a `current_processor` stack set by `on`
   blocks and by an `on` clause on a signature; every place read or write
   and every call argument asks `MachineModel.sees(current_processor,
-  space_of(type))`; the call-site rule for undeclared package-local
-  functions reuses the D104 comptime-callability walk. Element-type
-  admission at every placement site.
-- **Codegen** (`src/Codegen.w`, `src/compiler/LlvmBridge.w:737`): a pointer
-  into a non-host space is an LLVM pointer in that processor's address space
-  (`addrspace(1)` global, `(3)` shared, for nvptx); the bridge gains a
-  pointer-type-in-address-space constructor. `FnAbi` is unchanged: a pointer
-  with a space is still a pointer (D6).
+  space_of(type))`. Element-type admission at every placement site.
+- **Instantiation** (`src/Sema.w` specializations): a package-local function
+  reached from a region is specialized on the processor as on a type
+  argument; the instance is keyed `(fn, processor)`, appears in the
+  `specialization` facts and in `explain:instances`, and is checked once
+  per processor so a construct unlowerable on one is reported at that
+  caller. A `pub` function with an `on` clause has one instance.
+- **Codegen** (`src/Codegen.w`): in this plan every instance compiles in the
+  host unit; the instance key reaches the symbol name so two bodies never
+  collide. Address spaces in the LLVM bridge belong to the dispatch
+  proposal.
 
 ### V.3 Transfer and routing
 
 - **std** (`lib/std/buffer.w`, new): `Buffer[T, S]` with `zeroed`, `uninit`,
   `len`, indexing, views, `Drop`; `transfer[T, A, B]`. Allocation, free and
-  copy are selected by `comptime match` on the processor owning `S` and go
-  to the facade for that arch (V.5). On a `managed cached` machine with one
-  space (the Mac), a transfer to the same space is the identity and the
-  checker still records the route.
+  copy are selected by `comptime match` on the processor owning `S`; in
+  this plan every arm is the host allocator and a host copy, with the
+  `managed explicit` test space tagged so a host read of it is refused by
+  the checker and trapped by the debug allocator if it ever happens.
 - **Sema**: at each `transfer` call, `MachineModel.route(A, B)`; no route is
   the diagnostic; the route is recorded as a `route` fact with per-hop cost
   (derived from bandwidths or the declared rate, with unit and source).
@@ -580,59 +656,54 @@ with the build layer around it. Each row names the owner of the new fact
 - **MIR/async** (`src/AsyncLower.w:62`): a region body is outlined into its
   own body tagged with its processor, the way an async block is; the
   sequential form is the same outlining followed by an immediate await. The
-  tag is a MIR fact that codegen reads.
-- **Codegen units** (`src/compiler/CodegenUnits.w`, `src/TargetSpec.w:115`):
-  bodies tagged with a non-host processor compile in a second unit for that
-  arch's triple (`nvptx64-nvidia-cuda`, or Metal through its own path); the
-  host unit holds the launch stub. A body the device backend refuses is a
-  `BUG:`-class error at that site (Law 7), never a host fallback.
-- **Runtime**: launch, wait and free are facade calls (V.5); fibers
-  (`rt/fiber_runtime.w`) already give `async on` its task.
+  tag is a MIR fact that the dispatch proposal's codegen units will read;
+  in this plan it selects nothing and is reported.
 
-### V.5 Dispatch through modeled C
-
-- `lib/std/device/metal.w`: `c facade metal:` over the Metal C surface
-  (device, command queue, buffer, library, pipeline state), resources with
-  `drop` contracts. `lib/std/device/cuda.w`: `c facade cuda:` over the CUDA
-  driver API (`cuMemAlloc` producer, `cuMemFree` destroyer, `cuMemcpyHtoD`,
-  `cuLaunchKernel`, streams and events), `ok CUDA_SUCCESS`. These are
-  ordinary facades under D51: ownership and destruction come from the
-  clause, never from a name; `c_import` of the vendor header is the
-  evidence.
-- `Buffer[T, S].drop` calls the facade destroyer for the processor that
-  owns `S`. That is the leak rule, unchanged (§8).
-
-### V.6 Capacity
+### V.5 Capacity
 
 - **MIR pass** (new `src/MirCapacity.w`, reading `src/MirCore.w:1649`): per
-  body, per space, the maximum over program points of the granule-rounded
-  sum of live placed locals whose size is static; the per-body summary also
-  records, for each call, what is live across it. Sizes are exact integers
-  from the type and the constant length; a non-constant length makes the
-  owner "unverified" and the function's verdict a warning.
+  body instance, per space, the maximum over program points of the
+  granule-rounded sum of live placed locals whose size is static; the
+  summary also records, for each call, what is live across it. Sizes are
+  exact integers from the type and the constant length; a non-constant
+  length makes the owner "unverified" and the function's verdict a warning,
+  pending the Part IX decision.
 - **Fold** over the live MIR call graph (`with analyze`'s `path:call` data,
   `src/Analysis.w:707`): sequential calls by max, held-across by plus,
   strongly connected components refused when they place into a bounded
   space; `overcommit` on the space turns the refusal into a warning.
 - **Facts**: `capacity` rows with required, available, margin, buffers.
 
-### V.7 Facts and tools
+### V.6 Facts and tools
 
 - `src/AnalysisTypes.w`: `Placement = 29`, `Route = 30`, `Capacity = 31`,
   `Traffic = 32`. Collectors beside `analysis_collect_types`
-  (`src/Analysis.w:292`). `explain:machine`, `explain:route:<site>` dispatched
-  in `src/compiler/Compilation.w` with the other explainers.
+  (`src/Analysis.w:292`). `explain:machine`, `explain:route:<site>`,
+  `explain:instances:<fn>` dispatched in `src/compiler/Compilation.w` with
+  the other explainers.
 - `docs/spec/toolchain/deep-debugging-tools.md`: a placement route (the
   hunt for "why was this refused" is one `explain:route` run).
 
+### V.7 The test machine
+
+`test/placement/machines/two_space.w` declares a host and one `managed
+explicit` device space with a scratchpad under it, a processor whose arch
+is `test` (lowered on the host), and the edges; a second file declares two
+such devices with a peer edge, for the routing pairs. The test runtime
+backs both device spaces with host memory the checker refuses to read
+directly. Every check in this plan is exercised against these two files
+without a GPU.
+
 ### V.8 Tests and gates
 
-- `test/placement/`: the differential pairs, one With fixture per check
-  with `//! expect-error:` headers, each beside its CUDA or Metal twin and a
-  one-line claim of the native failure mode. `:placement-tests` joins the
-  gate's fixed list; `:placement-native` runs the twins where the hardware
-  is (the Mac for Metal, `eric-5090` for CUDA) and is a battery target, not
-  a gate.
+- `test/placement/`: one With fixture per check with `//! expect-error:`
+  headers; each refusal fixture names its CUDA or Metal twin and the
+  native failure mode in one line, and the twins live beside them for the
+  dispatch proposal's `:placement-native` target. `:placement-tests` joins
+  the gate's fixed list.
+- The `async on` drop test: a task from `async on` dropped un-awaited is
+  cancelled (§14.22) and its placed result never exists; a behavior test
+  pins it in step 2, since the plan depends on it.
 - `with build :machine-check` validates every shipped description's
   coherence and provenance trailers (every figure has one); it joins
   `spec-inventory-check` in the gate.
@@ -642,52 +713,49 @@ with the build layer around it. Each row names the owner of the new fact
 ### V.9 Spec
 
 New chapter `docs/spec/placement.md` (§23: machines, spaces, placement,
-transfer, regions, capacity), with projections into §4 (types), §14
-(regions as async blocks), §16.2b (device facades), §17.5 (`Processor.Current`),
-§18.5 (`--machine`). Only Eric's words land there.
+transfer, regions, per-processor instantiation, capacity), with
+projections into §4 (types), §14 (regions as async blocks), §17.5
+(`Processor.Current`), §18.5 (`--machine`, detection, the pin). Only Eric's
+words land there.
 
 ## Part VI — Order of work
 
 Each step is one stack with one battery, buildable by the pinned seed.
 
 1. **Machine files and facts.** Parser, loader, `SemaMachine`, coherence
-   checks, `--machine`, detection on the Mac, `lib/std/machine/m4_uma.w`
-   and a host-only description, `explain:machine`, `:machine-check`. No
-   codegen change.
+   checks, `--machine`, detection printed on every build, the `with.toml`
+   pin, `lib/std/machine/m4_uma.w` and `rtx5090_x2.w` with cited figures,
+   `explain:machine`, `:machine-check`. No codegen change.
 2. **Placement, transfer, regions, visibility, host-lowered.** `TY_SPACE`,
    the space slot on pointer, reference and slice types, `Buffer[T, S]`,
-   `transfer`, `on` and `async on`, the visibility and call checks, routing,
-   the diagnostics of IV.7, `placement` and `route` facts. Every region
-   lowers on the host against a declared two-space test machine
-   (`test/placement/machines/two_space.w`: `managed explicit` second space
-   backed by host memory in the test runtime), so the whole suite runs
-   without a GPU.
-3. **Capacity from MIR.** `MirCapacity`, the fold, `capacity` facts, the
-   over-capacity pairs.
-4. **Dispatch.** The Metal facade and codegen unit on the Mac; the CUDA
-   facade and nvptx unit on Linux; host-unreadable memory becomes real;
-   `:placement-native`.
-5. **Asynchronous transfer and regions as tasks** with real overlap, once
-   the backends can wait on completion; the sequential forms stay correct
-   while they block.
-6. **Region traffic** (`traffic` facts) and, if ever, user-written transfer
-   lowerings in indexed primitives, library-maintainer tier.
+   `transfer`, `on` and `async on`, per-processor instantiation, the
+   visibility and call checks, routing including peer edges, the
+   diagnostics of IV.7, `placement` and `route` facts, the two test
+   machines, the `async on` drop test.
+3. **Capacity from MIR.** The Part IX dynamic-size ruling first, then
+   `MirCapacity`, the fold, `capacity` facts, the over-capacity pairs.
+
+That is this plan. Dispatch (device codegen units, the Metal and CUDA
+facades, the native half of the suite, the measurement comparison, real
+overlap for `async on`, region traffic, user-written lowerings) is
+`vx-dispatch.md`, briefed separately after step 3.
 
 ## Part VII — Where With departs from Vx
 
 - **Detection.** Vx holds the programmer to the machine they named, never
-  the one plugged in. With detects when the answer is unambiguous and takes
-  a declared description otherwise (Law 1 to detect, Law 8 to pin).
+  the one plugged in. With detects when the answer is unambiguous, prints
+  what it detected, and takes a pinned description otherwise (Law 1 to
+  detect, Law 8 to pin).
 - **The host.** Vx removed `--target` and made the host a file. With keeps
   `--target` as the host and adds `--machine` beside it; the two must agree.
 - **Ceremony.** No wrappers that restate placement, no `self` on every
   method, no explicit returns of nothing (Laws 1 and 9).
-- **Where code runs.** Inferred inside a package, declared at a published
-  boundary (Law 6).
+- **Where code runs.** Inferred inside a package and instantiated per
+  processor; declared at a published boundary (Law 6).
 - **Transfer.** Consumes (§2).
 - **Proof.** A type fact, not a solver (§7).
 - **Placement everywhere bytes are.** Every owner and view, not only a
-  tensor and a pointer.
+  tensor and a pointer; host signatures are host signatures.
 - **Acceptance.** Exact facts only; cost is advisory (§4).
 
 ## Part VIII — What is not taken
@@ -699,21 +767,26 @@ Each step is one stack with one battery, buildable by the pinned seed.
   seam prover.
 - Autodiff and the MLIR pipeline.
 - Shapes in types: a separate decision.
+- NUMA nodes as spaces: out of this plan; the two-socket box is the
+  measurement story, not the checker's first target.
 - Vx's base-language choices (explicit numeric conversions both ways,
   mandatory return types, provenance-based view detection, no supertraits,
   no `if let`): With has ruled each its own way.
 
-## Part IX — Open questions this depends on
+## Part IX — Open questions this plan depends on
 
+- **Dynamic sizes, decided before step 3.** Real kernels size shared memory
+  by the launch configuration. Options: (a) a placement with a non-static
+  size is an unverified warning (v1 as written); (b) the launch stub checks
+  the size against the declared capacity at run time and panics with the
+  same figures the compiler would have printed; (c) both, with the runtime
+  check only where the warning fires. Prediction: (c), because a warning
+  the programmer cannot discharge is ceremony (Law 1) and a silent overflow
+  is the wrong plausible thing (Law 7); the run-time check is the compiler
+  doing the work it could not do statically.
 - `Buffer[T, S]` as a new type versus a placement slot on existing owners;
   `in S` as the spelling on views and pointers.
-- Whether a placement whose size is not static gets a runtime admission
-  check or stays an unverified warning.
 - Consuming iteration (the `into_iter` ruling), since a transfer of a
   collection's elements between spaces is the same shape.
-- The first shipped descriptions: `m4_uma`, a host-only Linux description,
-  the 5090, an H100; who measures what.
-- How the Metal backend is reached: Metal Shading Language through the
-  Metal compiler is a host-toolchain dependency (Law 8); the alternative is
-  AIR through LLVM, which the SDK could carry. This is the hardest
-  dependency question in the plan and is asked before step 4.
+- Who measures the shipped descriptions' figures, and when the `policy:`
+  figures in `rtx5090_x2.w` become `measured:`.
