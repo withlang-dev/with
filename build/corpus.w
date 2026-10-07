@@ -324,14 +324,30 @@ pub fn corpus_migrate_directory(ctx: &ActionCtx, corpus: &Corpus, source: &str, 
     corpus_run_migration(ctx, corpus.stem ++ "-corpus", corpus_migrate_options(corpus, source, generated))
 
 /// Compiles one With source to a binary with the driver's compiler.
-pub fn corpus_compile_binary(ctx: &ActionCtx, label: &str, source: &str, output: &str) -> i32:
-    let workspace = ctx.create_workspace(label)
-    workspace.add_file(source)
-    var options = workspace.options()
-    options.output_path = corpus_owned_text(output)
-    workspace.set_options(options)
-    let result = workspace.compile()
-    if result.rc != 0: return corpus_fail(ctx, label ++ f" exited {result.rc}")
+/// A corpus harness binary, built by the compiler under test as a
+/// subprocess with the corpus on its source and the prelude off — the way
+/// the bundle build and corpus_check_every_module compile it. Through the
+/// Workspace API the DRIVER compiled it: the pinned seed, with the seed's
+/// embedded bundle interface standing in for the corpus, so a corpus the
+/// seed could no longer type (zlib's Option callbacks) failed here while
+/// every fresh compiler accepted it, and a migration that changed a
+/// signature could not pass (the pcre2 cohesive check had the same defect).
+pub fn corpus_compile_binary(ctx: &ActionCtx, corpus: &Corpus, compiler: &str, label: &str, source: &str, output: &str) -> i32:
+    var argv: Vec[str] = Vec.new()
+    argv.push(corpus_abs(ctx, compiler))
+    argv.push("build")
+    argv.push(corpus_abs(ctx, source))
+    argv.push("--bundle-corpus")
+    argv.push(corpus.corpus_rel.clone())
+    argv.push("--no-prelude")
+    argv.push("-o")
+    argv.push(corpus_abs(ctx, output))
+    let stdout = corpus_abs(ctx, output ++ ".build.stdout")
+    let stderr = corpus_abs(ctx, output ++ ".build.stderr")
+    let built = ctx.process_runner().run_capture_cwd(argv, stdout, stderr.clone(), 900000, corpus_abs(ctx, "."))
+    if built.rc != 0:
+        eprint(ctx.fs().read_text(stderr))
+        return corpus_fail(ctx, label ++ f" exited {built.rc}; see " ++ stderr)
     if not ctx.fs().exists(output): return corpus_fail(ctx, label ++ " did not produce " ++ output)
     0
 

@@ -83,7 +83,12 @@ fn zlib_migrate(ctx: &ActionCtx, corpus: &Corpus, source: &str, generated: &str)
 
 pub fn run_zlib_build_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
-    let migrated = ctx.inputs()[0]
+    let inputs = ctx.inputs()
+    if inputs.len() < 2: return corpus_fail(ctx, "requires migrated-dir and compiler inputs")
+    let migrated = inputs[0]
+    let compiler = inputs[1]
+    let owned = zlib_corpus()
+    let corpus = &owned
     let output = ctx.output()
     if not fs.is_dir(migrated): return corpus_fail(ctx, "missing migrated zlib directory: " ++ migrated ++ " - run zlib-migrate deliberately")
     let tmp = corpus_scratch(ctx) ++ "/build"
@@ -92,8 +97,8 @@ pub fn run_zlib_build_action(ctx: ActionCtx) -> i32:
     if corpus_reset_dir(ctx, tmp) != 0: return 1
     if fs.mkdir_all(zl) != 0 or fs.mkdir_all(bin) != 0: return corpus_fail(ctx, "could not create temp build directories under " ++ tmp)
     if corpus_copy_w_files(ctx, migrated, zl) != 0: return 1
-    if corpus_compile_binary(ctx, "zlib-build-example", zl ++ "/example.w", bin ++ "/zlib_example") != 0: return 1
-    if corpus_compile_binary(ctx, "zlib-build-minigzip", zl ++ "/minigzip.w", bin ++ "/minigzip") != 0: return 1
+    if corpus_compile_binary(ctx, corpus, compiler, "zlib-build-example", zl ++ "/example.w", bin ++ "/zlib_example") != 0: return 1
+    if corpus_compile_binary(ctx, corpus, compiler, "zlib-build-minigzip", zl ++ "/minigzip.w", bin ++ "/minigzip") != 0: return 1
     if fs.exists(output) and fs.remove_tree(output) != 0: return corpus_fail(ctx, "cannot replace " ++ output)
     if fs.rename(tmp, output) != 0: return corpus_fail(ctx, "could not move temp tree to " ++ output)
     print("built migrated zlib tests: " ++ corpus_abs(ctx, output ++ "/bin/zlib_example"))
@@ -142,7 +147,7 @@ fn zlib_lanes(out: Build, ctx: &BuildCtx, corpus: &Corpus, release_compiler: &st
     var build = target_new(.Action, "zlib-build", "").output("out/zlib_build")
     build.action = run_zlib_build_action
     build = build.write_scope("out/tmp/action-scratch/zlib-build")
-    build = build.input("out/zlib_migrated").dep("build").dep("zlib-migrate")
+    build = build.input("out/zlib_migrated").input(release_compiler.clone()).dep("build").dep("zlib-migrate")
     graph = graph.add_target(build)
     var test = target_new(.Action, "zlib-test", "").output("out/corpus/zlib-test")
     test.action = run_zlib_test_action
