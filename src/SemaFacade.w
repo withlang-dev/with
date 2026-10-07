@@ -1788,6 +1788,10 @@ impl Sema:
     mut fn facade_fn_sig(sym: i32, at: i32) -> i32:
         let sig = self.get_sig(sym)
         if sig < 0:
+            // #2244: a facade over a function c_import omitted names the
+            // omission and its reason, not a missing declaration.
+            if self.emit_ci_omitted_symbol_error(sym, at):
+                return sig
             let n: str = self.pool_resolve(sym)
             self.emit_error(f"'{n}' is not a declaration in scope: a facade describes imported declarations (§16.2b.13)", at)
         sig

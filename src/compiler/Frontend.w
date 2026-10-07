@@ -527,6 +527,15 @@ impl Zcu:
             if synthetic.len() == 0:
                 continue
             self.c_import_record_omissions_frontend(synthetic)
+            // #2244: a name the translator recorded as omitted must not also
+            // be declared in the translation. A declaration without the body
+            // the translator gave up on links to nothing and traps at the
+            // call (a facade over it was accepted silently): the
+            // contradiction is a hard error naming the function and the
+            // reason, never a stub.
+            for contradiction in c_import_declared_and_omitted(synthetic):
+                let span = Span { file: 0, start: out.get_start(decl), end: out.get_end(decl) }
+                self.diagnostics.emit(Diagnostic.err("c_import: '" ++ contradiction ++ "' is declared by the translation and recorded as omitted (" ++ self.c_import_omitted_reason_frontend(contradiction) ++ "); a translation that gave up on a body produces no declaration for it", span))
 
             let before = out.decl_count()
             // The translation is a source of its own: a diagnostic inside it
@@ -1029,7 +1038,39 @@ fn c_import_fs_cache_store(cache_key: &str, value: &str, warnings: &str):
     runtime_write_file(c_import_fs_cache_entry_path(cache_key, ".warnings"), warnings)
     runtime_write_file(c_import_fs_cache_entry_path(cache_key, ".w"), value)
 
+// #2244: the names a translation records as omitted (`@with-cimport-omitted`
+// manifest lines) that the same translation also declares (`fn name(`,
+// `unsafe fn name(`, `extern fn name(`, with or without `pub`). A declared
+// omission is a stub: the body was given up on, yet a declaration binds the
+// name and a call reaches nothing.
+fn c_import_declared_and_omitted(synthetic: &str) -> Vec[str]:
+    var out: Vec[str] = Vec.new()
+    let prefix = "// @with-cimport-omitted|"
+    for line in synthetic.split("\n"):
+        if not c_import_starts_with(line, prefix): continue
+        let rest = line.slice(prefix.len(), line.len())
+        let sep = rest.find("|")
+        let name = if sep > 0: rest.slice(0, sep as i64) else: with_str_clone_ref(rest)
+        if name.len() == 0 or out.contains(name): continue
+        let needle = "fn " ++ name ++ "("
+        for decl_line in synthetic.split("\n"):
+            if c_import_starts_with(decl_line, "//"): continue
+            let at = decl_line.find(needle)
+            if at < 0: continue
+            // A declaration starts the line (any `pub`/`unsafe`/`extern`
+            // prefix), never a call inside a body.
+            let head = decl_line.slice(0, at as i64)
+            if head.len() == 0 or head == "pub " or head == "unsafe " or head == "pub unsafe " or head == "extern " or head == "pub extern " or c_import_starts_with(head, "extern \"C\" ") or c_import_starts_with(head, "pub extern \"C\" "):
+                out.push(name.clone())
+                break
+    out
+
 impl Zcu:
+    fn c_import_omitted_reason_frontend(name: &str) -> str:
+        match self.c_import_omitted_symbols.get(name):
+            Some(reason) => with_str_clone_ref(reason)
+            None => "untranslated C construct"
+
     fn c_import_record_omissions_frontend(synthetic: &str):
         let prefix = "// @with-cimport-omitted|"
         var pos = 0
