@@ -392,9 +392,9 @@ extern fn rt_libc_pthread_join(thread: i64, retval: *mut *mut u8) -> i32
 // nameless panic in one compiler generation ("interior NUL byte", stage2
 // only) cost an lldb session to turn into a function; it now prints one.
 extern fn backtrace(buffer: *mut *mut u8, size: i32) -> i32
-extern fn backtrace_symbols_fd(buffer: *mut *mut u8, size: i32, fd: i32) -> Unit
+extern fn backtrace_symbols_fd(buffer: *mut *mut u8, size: i32, fd: i32)
 
-pub fn rt_backtrace_print() -> Unit:
+pub fn rt_backtrace_print():
     var frames: [64]*mut u8 = [0 as *mut u8; 64]
     let n = backtrace(&raw mut frames as *mut [64]*mut u8 as *mut *mut u8, 64)
     if n <= 0:

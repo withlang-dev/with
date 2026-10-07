@@ -9,7 +9,7 @@ extern fn with_fiber_in_fiber() -> i32
 extern fn with_fiber_panic_capture(msg: *const u8, msg_len: i32) -> Unit
 @[link_name("_exit")]
 extern fn rt_libc_exit(code: i32) -> Never
-extern fn rt_backtrace_print() -> Unit
+extern fn rt_backtrace_print()
 
 pub fn str_data(s: &str) -> *const u8:
     unsafe *(s as *const str as *const *const u8)
