@@ -15049,6 +15049,70 @@ impl Sema:
             self.typed_expr_types.insert(node, result_type as i32)
         result_type as i32
 
+    // D104 (§17.1): whether `fn_sym` may be called from a `comptime fn`
+    // body, judged statically at the declaration: "" when callable, else
+    // the chain of calls from it to the first forbidden operation
+    // (`helper -> print (an extern)`). A `comptime fn`, an allow-listed
+    // std helper, and the two target-reading externs are callable; an
+    // extern, a runtime intrinsic, a call through a function value or a
+    // trait object (no static callee), and a function with no body are
+    // not; a plain function is callable when every call in its body is.
+    // Recursion is callable (the cycle adds nothing); the verdict is
+    // memoized per symbol.
+    mut fn comptime_callable_chain(fn_sym: i32) -> str:
+        if fn_sym == 0: return ""
+        if self.comptime_callable_memo.contains(fn_sym):
+            return if self.comptime_callable_memo.get(fn_sym).unwrap() != 0: "" else: self.comptime_callable_chain.get(fn_sym).unwrap().clone()
+        if self.comptime_callable_visiting.contains(fn_sym): return ""
+        let name: str = self.pool_resolve(fn_sym)
+        if self.extern_fn_names.contains(fn_sym):
+            return if name == "with_sysinfo_os" or name == "with_sysinfo_arch": "" else: name ++ " (an extern)"
+        if self.is_intrinsic_fn_sym(fn_sym) != 0:
+            return if fn_sym == self.syms.src or fn_sym == self.syms.embed_file: "" else: name ++ " (a runtime intrinsic)"
+        if self.fn_symbol_is_comptime(fn_sym) != 0 or self.fn_symbol_is_tool_comptime_allowed(fn_sym) != 0 or self.fn_symbol_is_std_string_builder_comptime_allowed(fn_sym) != 0 or self.fn_symbol_is_std_str_comptime_allowed(fn_sym) != 0 or self.fn_symbol_is_builtin_vec_comptime_allowed(fn_sym) != 0:
+            return ""
+        let fn_node = self.fn_symbol_decl_node(fn_sym)
+        if fn_node == 0: return name ++ " (no With body)"
+        self.comptime_callable_visiting.insert(fn_sym)
+        var chain = ""
+        let body_start = self.ast.get_start(fn_node)
+        let body_end = self.ast.get_end(fn_node)
+        // Every call node inside the declaration's span: the AST stores
+        // nodes with positions, and a body's calls are the ones within it.
+        let body_file = self.ast.file(fn_node as NodeId)
+        for n in 1..self.ast.node_count():
+            if chain.len() > 0: break
+            if self.ast.kind(n) != NodeKind.NK_CALL: continue
+            if self.ast.file(n as NodeId) != body_file: continue
+            if self.ast.get_start(n) < body_start or self.ast.get_end(n) > body_end: continue
+            if self.call_callable_types.contains(n):
+                chain = name ++ " (a call through a function value: no static callee)"
+                break
+            // A concrete callee through its signature; a generic callee
+            // through the declaration selected at this call.
+            var callee: i32 = 0
+            if self.resolved_call_sigs.contains(n):
+                let sig = self.resolved_call_sigs.get(n).unwrap()
+                if sig >= 0 and sig < self.sig_names.len() as i32: callee = self.sig_names[sig]
+            if callee == 0 and self.resolved_generic_call_nodes.contains(n):
+                let decl = self.resolved_generic_call_nodes.get(n).unwrap()
+                if decl != 0: callee = self.ast.get_data0(decl)
+            // An extern or an intrinsic has no signature record here; the
+            // callee is the name the call spells.
+            if callee == 0:
+                let callee_node = self.ast.get_data0(n)
+                if callee_node != 0 and self.ast.kind(callee_node) == NodeKind.NK_IDENT:
+                    let spelled = self.ast.get_data0(callee_node)
+                    if self.extern_fn_names.contains(spelled) or self.is_intrinsic_fn_sym(spelled) != 0: callee = spelled
+            if callee == 0: continue
+            if callee == fn_sym: continue
+            let inner = self.comptime_callable_chain(callee)
+            if inner.len() > 0: chain = name ++ " -> " ++ inner
+        self.comptime_callable_visiting.remove(fn_sym)
+        self.comptime_callable_memo.insert(fn_sym, if chain.len() == 0: 1 else: 0)
+        self.comptime_callable_chain.insert(fn_sym, chain.clone())
+        chain
+
     fn fn_symbol_is_comptime(fn_sym: i32) -> i32:
         let fn_node = self.fn_symbol_decl_node(fn_sym)
         if fn_node == 0:
@@ -15156,9 +15220,13 @@ impl Sema:
                 return 0
             if self.fn_symbol_is_builtin_vec_comptime_allowed(fn_sym) != 0:
                 return 0
-            if self.fn_symbol_is_comptime(fn_sym) == 0:
+            // D104: a `comptime fn` body is checked statically; a plain
+            // callee is fine when everything it reaches is, and the
+            // refusal names the chain to the first forbidden operation.
+            let chain = self.comptime_callable_chain(fn_sym)
+            if chain.len() > 0:
                 let cc_name: str = self.pool_resolve(fn_sym)
-                self.emit_error(f"comptime can only call comptime functions ('{cc_name}')", node)
+                self.emit_error(f"'{cc_name}' is not comptime-callable: it reaches " ++ chain ++ " (§17.1); a comptime fn may call only what runs at compile time", node)
                 return 1
         0
 

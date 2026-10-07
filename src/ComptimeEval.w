@@ -1721,11 +1721,28 @@ impl ComptimeEvaluator:
             return comptime_value_invalid()
         comptime_value_invalid()
 
-    mut fn fail(node: i32, msg: &str) -> ComptimeControl:
+    // D104: the chain of calls the evaluation is inside, outermost first
+    // (`fib -> helper`), or "" at the top level. It is what makes a refusal
+    // three calls deep a one-line diagnosis instead of a re-derivation.
+    fn witness_chain() -> str:
+        var chain = ""
+        var last = 0
+        for i in 0..self.active_fn_syms.len() as i32:
+            let sym: i32 = self.active_fn_syms[i]
+            if sym == last: continue   // recursion reads as one frame
+            if chain.len() > 0: chain = chain ++ " -> "
+            chain = chain ++ self.pool.resolve(sym)
+            last = sym
+        chain
+
+    mut fn fail(node: i32, msg_in: &str) -> ComptimeControl:
         // The message names its source line: the build driver prints
         // error_msg alone (the pending diagnostic is not rendered there), and
         // "generic comptime function expects 1 type argument(s)" over a
-        // 300-line action named nothing (#1866, #1804).
+        // 300-line action named nothing (#1866, #1804). Inside a call, the
+        // witness chain follows (D104).
+        let chain = self.witness_chain()
+        let msg = if chain.len() > 0: msg_in ++ "; reached through " ++ chain else: msg_in.to_owned()
         self.last_error_msg = self.node_location(node) ++ msg
         if self.had_error == 0 and self.require_success != 0 and self.sema.suppress_errors == 0:
             let start = self.ast.get_start(node)
@@ -8058,10 +8075,17 @@ impl ComptimeEvaluator:
             let runtime_signal = self.eval_allowed_runtime_call(fn_sym, arg_values, node)
             if runtime_signal.kind != ComptimeControlKind.CTL_ERROR or self.had_error != 0:
                 return runtime_signal
-        if self.allow_runtime_calls == 0 and self.fn_decl_node_is_comptime(fn_node) == 0:
-            return self.fail(node, f"comptime can only call comptime functions ('{fn_name}')")
+        // D104 (§17.1): a plain function is judged here, when a compile-time
+        // call reaches it — its body is evaluated and a forbidden operation
+        // inside is refused with the chain of calls that led there. Only a
+        // callee with no With body (an extern, a runtime-only intrinsic) is
+        // refused at the call.
         if fn_node == 0:
-            return self.fail(node, "callee '" ++ self.pool.resolve(fn_sym) ++ "' is not a comptime function body")
+            return self.fail(node, "'" ++ self.pool.resolve(fn_sym) ++ "' has no With body to evaluate at compile time (an extern or a runtime intrinsic)")
+        // D104: a `comptime fn` is a checked promise, kept by Sema at the
+        // declaration (check_comptime_call_restriction over its body); the
+        // evaluator only runs bodies and reports what it meets, with the
+        // chain.
         if self.active_fn_syms.len() as i32 >= self.recursion_limit:
             return self.fail(node, "comptime recursion limit exceeded")
 

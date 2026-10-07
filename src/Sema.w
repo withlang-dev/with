@@ -1026,6 +1026,14 @@ pub type Sema {
     // §16.2b.3: the `T.zeroed()` calls on zero-valid C records; MIR
     // lowers each to the all-zero value of its type.
     zeroed_call_nodes: HashSet[i32],
+    // D104 (§17.1): the static comptime-callability verdict per function
+    // symbol, for `comptime fn` bodies (checked at the declaration): 1
+    // callable, 0 not; and for a refusal, the chain of calls to the first
+    // forbidden operation (`helper -> print (I/O)`). Plain functions called
+    // at compile time are judged by the evaluator instead.
+    comptime_callable_memo: HashMap[i32, i32],
+    comptime_callable_chain: HashMap[i32, str],
+    comptime_callable_visiting: HashSet[i32],
     // §4.9a (D103): expressions a demanded Option[T] converts to Some(expression);
     // MIR builds the Some around the lowered value. Keyed by expression node,
     // the Option type.
@@ -3167,6 +3175,9 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         type_decl_nodes_by_tid: HashMap.new(),
         pub_field_keys: HashSet[i64].new(),
         zeroed_call_nodes: HashSet[i32].new(),
+        comptime_callable_memo: HashMap.new(),
+        comptime_callable_chain: HashMap.new(),
+        comptime_callable_visiting: HashSet[i32].new(),
         value_to_option_nodes: HashMap.new(),
         operator_operand_nodes: HashSet.new(),
         type_tid_is_std: HashMap.new(),

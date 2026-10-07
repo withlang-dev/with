@@ -43,3 +43,22 @@ With the heap allocator forbidden, the set of comptime-callable plain
 functions is smaller than it sounds (anything touching a `Vec` is out).
 Correct as the initial ruling; a comptime allocator (Zig has one) is filed
 as the next request rather than awaited as a complaint.
+
+## Implementation (2026-10-07, #2213)
+
+The evaluator runs any function with a With body when a compile-time call
+reaches it and refuses only a callee with no body (an extern, a runtime
+intrinsic) — with the witness chain, outermost call first, recursion
+collapsed to one frame (`ComptimeEval.witness_chain`, appended to every
+evaluator refusal: `… ; reached through fib -> helper`). A `comptime fn`
+body is checked at its declaration by Sema: `check_comptime_call_restriction`
+asks `comptime_callable_chain` for each plain callee, which walks the
+callee's body (the call nodes in its file span, resolved through the
+signature, the generic selection, or the spelled extern/intrinsic name)
+to the first forbidden operation and names the chain
+(`'helper' is not comptime-callable: it reaches helper -> getpid (an
+extern)`); a call through a function value has no static callee and is
+refused as such. Pins: `behav_d104_plain_fn_at_comptime.w` (`fib` at both
+times), `err_d104_witness_chain.w`, `err_d104_comptime_fn_static_chain.w`,
+`err_comptime_runtime_call.w`. `print` is allow-listed for build tools, so
+the fixtures reach an extern, the operation §17.1 forbids outright.
