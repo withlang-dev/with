@@ -138,7 +138,7 @@ fn cross_platform_symbol(tag: &str) -> str:
 // No fiber core (no stack switching in WebAssembly), no cimport stubs (no
 // libc), no compiler link inputs (the compiler itself is not a wasm
 // target). `with build :cross-rt-wasm` populates out/lib/cross/wasm32/.
-fn add_cross_wasm_rt_targets(out0: Build, tag: &str, p: &str, group_name: &str) -> Build:
+fn add_cross_wasm_rt_targets(out0: Build, tag: &str, p: &str, group_name: &str, plans: &Vec[WoBundle]) -> Build:
     var out = out0
     out = out.add_target(cross_object_target(tag, p ++ "rt-core-object", "rt/rt_core.w", "-O1"))
     out = out.add_target(cross_object_target_named(tag, p ++ "rt-platform-object", "rt/wasm.w", "rt_wasm.o", "-O1"))
@@ -153,6 +153,9 @@ fn add_cross_wasm_rt_targets(out0: Build, tag: &str, p: &str, group_name: &str) 
     cross_rt = cross_rt.dep(p ++ "compat-runtime-object")
     cross_rt = cross_rt.dep(p ++ "panic-runtime-object")
     cross_rt = cross_rt.dep(p ++ "fiber-stubs-object")
+    // #2131: the target's bundles (out/wo/<tag>/<name>.{o,wi,manifest}).
+    for pi in 0..plans.len():
+        cross_rt = cross_rt.dep(wo_build_target_name(plans[pi]))
     out.add_target(cross_rt)
 
 // The target that generates an architecture's linux sysroot on this host:
@@ -3719,7 +3722,15 @@ pub fn build(ctx: BuildCtx) -> Build:
     // ── Cross-target runtime (wasm32) ───────────────────────────────
     // `with build :cross-rt-wasm` builds the wasm32 program runtime into
     // out/lib/cross/wasm32/ for `with build --target=wasm32 prog.w`.
-    out = add_cross_wasm_rt_targets(move out, "wasm32", "cross-wasm-", "cross-rt-wasm")
+    // #2131: every corpus bundle compiled for wasm32 too, by stage1 as the
+    // host's bundles are (there is no wasm32 cross compiler to build them
+    // with the release), into out/wo/wasm32/ and the store, so the native
+    // compiler can carry them beside its own and a `--target wasm32` link
+    // finds a bundle of its target.
+    let corpus_plans_wasm32 = cross_wo_plans(ctx, &corpus_plans, "wasm32")
+    for pi in 0..corpus_plans_wasm32.len():
+        out = wo_bundle_targets(move out, ctx, corpus_plans_wasm32[pi], bootstrap_compiler_bin("with-stage1"), "stage1")
+    out = add_cross_wasm_rt_targets(move out, "wasm32", "cross-wasm-", "cross-rt-wasm", &corpus_plans_wasm32)
 
     // ── Cross-target runtime (windows_x86_64) ───────────────────────
     // `with build :cross-rt-windows` builds the full windows_x86_64
