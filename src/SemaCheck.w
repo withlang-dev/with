@@ -2418,10 +2418,11 @@ impl Sema:
                             self.resolve_declared_global_writes(decl, false)
                             self.check_fn_body_at(decl, di)
                         else:
-                            self.update_module_context(di)
+                            // No update_module_context here: this decl may be
+                            // reached callee-first from inside another body,
+                            // and the context is not restored on this path.
                             self.check_template_unsafe_calls(decl, fn_name_str)
                     else:
-                        self.update_module_context(di)
                         self.check_template_unsafe_calls(decl, "")
 
     // #2235: whether a call needs an unsafe context is a property of the

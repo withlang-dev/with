@@ -1737,6 +1737,7 @@ impl CiProject:
             let count = self.symbols[si].param_fn_ptr.len() as i32
             for pi in 0..count:
                 if self.symbols[si].param_fn_ptr[pi] == 0 or self.symbols[si].param_nullable[pi] != 0: continue
+                self.sink_seen = HashMap.new()
                 if self.sink_chain_reaches(si, pi, si, pi, 0):
                     self.symbols[si].param_nullable[pi] = 1
                     self.symbols[si].param_reason[pi] = "Option: part of a cycle of forwarded parameters"
@@ -1747,8 +1748,16 @@ impl CiProject:
                 if self.symbols[si].param_fn_ptr[pi] != 0 and self.symbols[si].param_nullable[pi] == 0:
                     self.symbols[si].param_reason[pi] = if self.symbols[si].param_aborting[pi] != 0: "non-null: the NULL branch aborts (a contract), no NULL callers" else: "non-null: called unconditionally, no NULL callers"
 
-    fn sink_chain_reaches(from_si: i32, from_pi: i32, target_si: i32, target_pi: i32, depth: i32) -> bool:
+    // Whether `from`'s parameter forwards, through any chain of sinks, into
+    // `target`'s. Each (symbol, parameter) is entered once per walk
+    // (`sink_seen`, cleared by the caller): without that the walk was
+    // exponential over helpers that forward one callback to several, and a
+    // tommyds migration ran past 20 minutes (#2230 smoke).
+    mut fn sink_chain_reaches(from_si: i32, from_pi: i32, target_si: i32, target_pi: i32, depth: i32) -> bool:
         if depth > 64: return false
+        let mark = f"{from_si}:{from_pi}"
+        if self.sink_seen.contains(mark): return false
+        self.sink_seen.insert(mark, 1)
         for sink in self.symbols[from_si].param_sinks[from_pi].split(";"):
             if not sink.contains(":"): continue
             let kv = sink.split(":")

@@ -1,3 +1,4 @@
+use std.collections.HashMap
 // CiIR — IR for the C-to-With migrator (`with migrate`).
 //
 // Pipeline:
@@ -955,6 +956,12 @@ pub type CiProject {
     module_paths: Vec[str],
     symbols: Vec[CiProjectSymbol],
     types: CiTypePool,
+    // key (ci_project_symbol_key) → index into `symbols`: the lookup every
+    // evidence line and sink walk makes, once linear over thousands of
+    // symbols (a tommyds migration ran past 20 minutes, #2230).
+    symbol_index: HashMap[str, i32],
+    // The (symbol, parameter) pairs one sink-chain walk has entered.
+    sink_seen: HashMap[str, i32],
 }
 
 fn CiProject.new -> CiProject:
@@ -962,6 +969,8 @@ fn CiProject.new -> CiProject:
         module_paths: Vec.new(),
         symbols: Vec.new(),
         types: CiTypePool.new(),
+        symbol_index: HashMap.new(),
+        sink_seen: HashMap.new(),
     }
 
 impl CiProject:
@@ -976,14 +985,9 @@ impl CiProject:
         id
 
     fn find_symbol(kind: i32, name: &str) -> i32:
-        let key = ci_project_symbol_key(kind, name)
-        var i = self.symbols.len() as i32 - 1
-        while i >= 0:
-            let symbol = self.symbols[i]
-            if ci_project_symbol_key(symbol.kind, symbol.name) == key:
-                return i
-            i = i - 1
-        -1
+        match self.symbol_index.get(ci_project_symbol_key(kind, name)):
+            Some(i) => *i
+            None => -1
 
     mut fn ensure_symbol(kind: i32, name: &str) -> i32:
         let existing = self.find_symbol(kind, name)
@@ -991,6 +995,7 @@ impl CiProject:
             return existing
         let id = self.symbols.len() as i32
         self.symbols.push(CiProjectSymbol.new(name, kind))
+        self.symbol_index.insert(ci_project_symbol_key(kind, name), id)
         id
 
     fn owner_module_path(symbol_id: i32) -> str:
