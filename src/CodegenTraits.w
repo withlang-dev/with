@@ -2120,6 +2120,14 @@ impl Codegen:
         let resolved = self.sema.resolve_alias(expected_tid as TypeId)
         let tk = self.sema.get_type_kind(resolved)
 
+        // D101 (#2214): `T.zeroed()` is the zero of its type, as data — a
+        // migrated `static struct P g = {0}` is initialized storage, never
+        // a runtime init (which a bundle object would refuse, #2219).
+        if self.sema.zeroed_call_nodes.contains(cur):
+            let zero_ty = self.sema_type_to_llvm(resolved)
+            if zero_ty != 0:
+                return self.build_default_value(zero_ty)
+
         if self.pool.kind(cur) == NodeKind.NK_IDENT:
             let value_node = self.module_const_value_node(self.pool.get_data0(cur))
             if value_node != 0 and value_node != cur:

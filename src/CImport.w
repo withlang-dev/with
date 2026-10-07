@@ -7588,6 +7588,14 @@ fn ci_expr_is_null_like(exprs: CiExprPool, id: CiExprId) -> bool:
     if kind == CiExprKind.CIE_CAST: return ci_expr_is_null_like(exprs, (exprs.get_d1(id)) as CiExprId)
     ci_expr_is_zero_int_lit(exprs, id)
 
+// The expression under any parentheses and casts (`(void *)&x`).
+fn ci_expr_peel_paren_cast(exprs: CiExprPool, id: CiExprId) -> CiExprId:
+    if (id as i32) == 0: return id
+    let kind = exprs.kind(id)
+    if kind == CiExprKind.CIE_PAREN: return ci_expr_peel_paren_cast(exprs, (exprs.get_d0(id)) as CiExprId)
+    if kind == CiExprKind.CIE_CAST: return ci_expr_peel_paren_cast(exprs, (exprs.get_d1(id)) as CiExprId)
+    id
+
 pub fn ci_type_is_fn_ptr(types: CiTypePool, ty: CiTypeId) -> bool:
     if (ty as i32) == 0:
         return false
@@ -7971,6 +7979,32 @@ fn ci_record_field_cache_store(key: &str, name: &str, ty: &str) -> Unit:
     g_ci_record_field_name_cache_values.push(with_str_clone_ref(name))
     g_ci_record_field_type_cache_values.push(with_str_clone_ref(ty))
 
+// D101 (#2214): the first part of a migrated record that is not zero-valid
+// (`"field (type)"`), or "" when `T.zeroed()` is its `{0}`. Mirrors Sema's
+// zero_invalid_part over the translated field texts: integers, floats,
+// bool, raw pointers, `Option[…]` (None is tag 0) and arrays of those are
+// zero-valid; a reference, a slice, `str` and a non-null function pointer
+// are not; a nested record is when everything in it is. Recursion is
+// bounded by the record nesting C allows (no record contains itself).
+fn ci_record_zero_invalid_field(session: i64, ty_text: &str, ty: i32) -> str:
+    let count = ci_init_list_record_field_count(session, ty_text, ty)
+    var fi = 0
+    while fi < count:
+        let fname = ci_init_list_record_field_name(session, ty_text, ty, fi)
+        let ftext = ci_init_list_record_field_type(session, ty_text, ty, fi)
+        var elem = with_str_clone_ref(ftext)
+        while ci_starts_with(elem, "[") and not ci_starts_with(elem, "[]"):
+            elem = ci_array_element_type(elem)
+        if ci_starts_with(elem, "&") or ci_starts_with(elem, "[]") or elem == "str" or (ci_type_text_is_fn_ptr(elem) and not ci_starts_with(elem, "Option[")):
+            return fname ++ " (" ++ ftext ++ ")"
+        let fcx = ci_init_list_record_field_cxtype(session, ty_text, ty, fi)
+        if fcx >= 0 and ci_init_list_record_field_count(session, elem, fcx) > 0:
+            let inner = ci_record_zero_invalid_field(session, elem, fcx)
+            if inner.len() > 0:
+                return fname ++ "." ++ inner
+        fi = fi + 1
+    ""
+
 fn ci_init_list_record_field_count(session: i64, ty_text: &str, ty: i32) -> i32:
     let ty_key = ci_record_cache_type_text(session, ty_text, ty)
     let key = ci_record_count_cache_key(session, ty_key)
@@ -8170,7 +8204,15 @@ impl CiExprPool:
     fn lower_record_init_ir(session: i64, cursor: i32, nc: i32, ty_str: &str, init_ty_id: CiTypeId, field_count: i32, types: CiTypePool, scope: CiScope) -> CiExprId:
         if nc == 0 or ci_init_children_all_zero_ints(session, cursor, nc):
             // Whole-record zero: a zero-pair designated init is the marker
-            // the assignment printer renders as with_memset.
+            // the printers render as `T.zeroed()` (D101, #2214) — refused
+            // here, naming the field, when the record is not zero-valid,
+            // never a partial literal.
+            let invalid = ci_record_zero_invalid_field(session, ty_str, with_ci_cursor_type(session, cursor))
+            if invalid.len() > 0:
+                if g_ci_bail_message.len() == 0:
+                    g_ci_bail_message = "`{0}` initializer of '" ++ ty_str ++ "' has no `zeroed()`: " ++ invalid ++ " is not zero-valid (D101)"
+                    g_ci_bail_location = with_ci_cursor_location(session, cursor)
+                return 0 as CiExprId
             let zero_start = self.extra_len() as i32
             ci_trace_port("STRUCTURAL[b11.11.init_list]")
             return self.designated_init(zero_start, 0, init_ty_id)
@@ -10797,6 +10839,51 @@ impl CiExprPool:
         let call = self.build_named_call_expr_typed(helper, &args, types.named_type_from_text("bool"))
         self.unsafe_expr(call)
 
+    // D101 (#2214): `memset(p, 0, n)` where `p` is `&x` or a pointer to a
+    // record `T` and `n` is `sizeof x` / `sizeof *p` / `sizeof(T)` of that
+    // record is the assignment `x = T.zeroed()` (through `*p` for a
+    // pointer). The record must be zero-valid (bails naming the field); a
+    // fill of anything else, a non-zero byte or another size is left to
+    // `with_memset`. Returns 0 when the call is not that shape.
+    fn memset_record_zero_assign(session: i64, cursor: i32, arg_ids: &Vec[i32], types: CiTypePool) -> CiExprId:
+        if not ci_expr_is_null_like(self.val(), (arg_ids[1]) as CiExprId):
+            return 0 as CiExprId
+        let dst = ci_expr_peel_paren_cast(self.val(), (arg_ids[0]) as CiExprId)
+        var place: CiExprId = 0 as CiExprId
+        var record_ty: CiTypeId = 0 as CiTypeId
+        if self.kind(dst) == CiExprKind.CIE_ADDR_OF:
+            place = (self.get_d0(dst)) as CiExprId
+            record_ty = self.get_type(place)
+        else:
+            let ptr_ty = self.get_type(dst)
+            if (ptr_ty as i32) != 0 and types.kind(ptr_ty) == CiTypeKind.CT_POINTER:
+                record_ty = (types.get_d0(ptr_ty)) as CiTypeId
+                place = self.add(CiExprKind.CIE_DEREF, dst as i32, 0, 0, record_ty)
+        if (place as i32) == 0 or (record_ty as i32) == 0:
+            return 0 as CiExprId
+        let record_text = ci_print_type(types, record_ty)
+        if record_text.len() == 0 or ci_starts_with(record_text, "*") or ci_starts_with(record_text, "[") or ci_init_list_record_field_count(session, record_text, -1) <= 0:
+            return 0 as CiExprId
+        let size = ci_expr_peel_paren_cast(self.val(), (arg_ids[2]) as CiExprId)
+        var size_text = ""
+        if self.kind(size) == CiExprKind.CIE_SIZEOF_TYPE:
+            size_text = ci_print_type(types, (self.get_d0(size)) as CiTypeId)
+        else if self.kind(size) == CiExprKind.CIE_SIZEOF_EXPR:
+            let measured = self.get_type((self.get_d0(size)) as CiExprId)
+            if (measured as i32) != 0:
+                size_text = ci_print_type(types, measured)
+        if size_text != record_text:
+            return 0 as CiExprId
+        let invalid = ci_record_zero_invalid_field(session, record_text, -1)
+        if invalid.len() > 0:
+            if g_ci_bail_message.len() == 0:
+                g_ci_bail_message = "memset to zero of '" ++ record_text ++ "' has no `zeroed()`: " ++ invalid ++ " is not zero-valid (D101)"
+                g_ci_bail_location = with_ci_cursor_location(session, cursor)
+            return 0 as CiExprId
+        let none: Vec[i32] = Vec.new()
+        let zeroed = self.build_named_call_expr_typed(record_text ++ ".zeroed", &none, record_ty)
+        self.add(CiExprKind.CIE_ASSIGN, place as i32, zeroed as i32, 0, record_ty)
+
     fn build_libc_call_value_expr(session: i64, cursor: i32, callee_text: &str, arg_ids: &Vec[i32], types: CiTypePool) -> CiExprId:
         // The shared preamble declares a size as i64, as with_memcpy's is;
         // C passes size_t, which does not convert implicitly (#1803).
@@ -10898,6 +10985,13 @@ impl CiExprPool:
             return self.build_named_call_expr(if callee_text == "memcpy" or callee_text == "with_memcpy": "with_memcpy" else: "with_memmove", &cast_args)
         if callee_text == "memset" or callee_text == "with_memset":
             if arg_ids.len() != 3 or (i64_ty as i32) == 0 or (mut_ptr_ty as i32) == 0:
+                return 0 as CiExprId
+            // D101 (#2214): `memset(&x, 0, sizeof x)` on a record is
+            // `x = T.zeroed()`; anything else stays the byte fill.
+            let zeroed = self.memset_record_zero_assign(session, cursor, arg_ids, types)
+            if (zeroed as i32) != 0:
+                return zeroed
+            if g_ci_bail_message.len() > 0:
                 return 0 as CiExprId
             let cast_args: Vec[i32] = Vec.new()
             cast_args.push((self.cast(mut_ptr_ty, (arg_ids[0]) as CiExprId)) as i32)

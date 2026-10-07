@@ -594,11 +594,12 @@ fn ci_print_memcpy_assignment(indent: &str, exprs: CiExprPool, types: CiTypePool
     // semantics: zero the destination, then store the mentioned fields.
     // This never depends on the With type having field defaults (partial
     // carrier inits, struct-typed union arms, with_str fields), and a
-    // zero-pair init (C's `{0}`) is just the memset alone. A one-pair
+    // zero-pair init (C's `{0}`) is just the zeroing alone. A one-pair
     // nested init (the anonymous-member union arm) flattens to a member
-    // store.
+    // store. The zeroing is `T.zeroed()` (D101, #2214): the lowering
+    // refused any record that is not zero-valid.
     if exprs.kind(rhs) == CiExprKind.CIE_DESIGNATED_INIT:
-        var out = ci_print_unsafe_stmt(indent, "with_memset((&raw mut " ++ lhs_str ++ " as " ++ ci_rt_ptr_mut() ++ "), 0, sizeof[" ++ ty_text ++ "]())")
+        var out = indent ++ lhs_str ++ " = " ++ ci_print_type(types, ty) ++ ".zeroed()\n"
         let start = exprs.get_d0(rhs)
         let count = exprs.get_d1(rhs)
         var i = 0
@@ -912,6 +913,10 @@ pub fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_
             i = i + 1
         let ty_text = ci_print_type(types, ty_id)
         if ty_text.len() > 0 and ty_text != "i32" and not ci_starts_with_str(ty_text, "__UNSUPPORTED"):
+            // D101 (#2214): a whole-record zero (C's `{0}`) is `T.zeroed()`;
+            // the lowering refused any record that is not zero-valid.
+            if count == 0:
+                return ty_text ++ ".zeroed()"
             return ty_text ++ " { " ++ fields ++ " }"
         return "{ " ++ fields ++ " }"
     if kind == CiExprKind.CIE_UNSAFE:

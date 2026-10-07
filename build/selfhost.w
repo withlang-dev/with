@@ -4182,6 +4182,42 @@ fn bs_migrate_expect_success(ctx: &ActionCtx, compiler_path: &str, case_dir: &st
         ctx.diagnostics().error(ctx.target_name() ++ ": migrator selfhost case '" ++ label ++ f"' failed with exit code {result.rc}")
     result
 
+// D101 (#2214): C's `{0}` on a record and `memset(&x, 0, sizeof x)` (also
+// through a pointer, `sizeof *p` and `sizeof(T)`) are `T.zeroed()`; a fill
+// of another byte, another size, or a non-record stays `with_memset`.
+fn bs_check_migrate_zeroed_records(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "zeroed.c")
+    let out_w = bs_join(case_dir, "zeroed.w")
+    var rc = bs_write_fixture(ctx, src, "#include <string.h>\nstruct P { int x; int y; const char *name; };\nstatic struct P g = {0};\nint f(void) {\n    struct P a = {0};\n    struct P b;\n    memset(&b, 0, sizeof b);\n    struct P *q = &a;\n    memset(q, 0, sizeof(*q));\n    memset(q, 0, sizeof(struct P));\n    unsigned char bits[32];\n    memset(bits, 0, sizeof bits);\n    memset(&b, 255, sizeof b);\n    return a.x + b.y + g.x;\n}\n", "zeroed records fixture")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("--prefer-brace")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-zeroed-records", args)
+    if result.rc != 0: return result.rc
+    rc = bs_file_contains(ctx, out_w, "var g: P = P.zeroed()", "zeroed_records global")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, out_w, "var __local_a: P = P.zeroed()", "zeroed_records local init")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, out_w, "__local_b = P.zeroed()", "zeroed_records memset of a place")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, out_w, "(unsafe *__local_q) = P.zeroed()", "zeroed_records memset through a pointer")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, out_w, "with_memset(((&__local_bits[0] as *mut u8)", "zeroed_records byte array keeps memset")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, out_w, "(255 as c_int)", "zeroed_records non-zero fill keeps memset")
+    if rc != 0: return rc
+    var check_args: Vec[str] = Vec.new()
+    check_args |> push("check")
+    check_args |> push(bs_abs(root, out_w))
+    let checked = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-zeroed-records", check_args)
+    checked.rc
+
 fn bs_check_migrate_global_init_list(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "initlist.c")
@@ -5053,6 +5089,8 @@ pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     let compiler_path = bs_abs(ctx.project_info().project_root(), compiler_input)
 
     var rc = bs_check_migrate_global_init_list(ctx, compiler_path, bs_join(output_dir, "global_init_list"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_zeroed_records(ctx, compiler_path, bs_join(output_dir, "zeroed_records"))
     if rc != 0: return rc
     rc = bs_check_migrate_nullable_fn_pointer(ctx, compiler_path, bs_join(output_dir, "nullable_fn_pointer"))
     if rc != 0: return rc
