@@ -757,16 +757,8 @@ fn ci_migrate_preamble_text() -> str:
         // semantics).
         p = p ++ "extern fn abort() -> Never\n"
         p = p ++ "fn __ci_unreachable() -> Never: abort()\n"
-    p = p ++ "\ntype c_char = i8\n"
-    p = p ++ "type c_short = i16\n"
-    p = p ++ "type c_ushort = u16\n"
-    p = p ++ "type c_int = i32\n"
-    p = p ++ "type c_uint = u32\n"
-    p = p ++ "type c_long = i64\n"
-    p = p ++ "type c_ulong = u64\n"
-    p = p ++ "type c_longlong = i64\n"
-    p = p ++ "type c_ulonglong = u64\n"
-    p = p ++ "type c_longdouble = f64\n"
+    // #2176: the C model's aliases (`--c-target`), the host's when none is named.
+    p = p ++ "\n" ++ ci_c_type_aliases(with_cimport_target_triple())
     // Clang's overflow builtins both store the wrapped result and report the
     // overflow bit. Keep both effects: the structural call lowerer selects
     // the helper from the result-pointer type and rejects mixed types loudly.

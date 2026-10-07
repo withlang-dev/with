@@ -419,6 +419,11 @@ impl Zcu:
         // WITH_WINDOWS_*_INCDIR dirs; both are no-ops off Windows.
         if link_stage_windows_c_target_uses_sdk_libc():
             ci_set_windows_target(link_stage_windows_c_target(), link_stage_windows_libc_root())
+        else if target_spec_active_kind() != 0 and target_spec_active_kind() != target_spec_host_kind():
+            // #2176 (§16.1): a cross target parses the header as that
+            // target — its `long`, its `char`, its layouts — never as the
+            // host's; the With-side aliases read the same triple.
+            ci_set_windows_target(target_spec_llvm_triple(), "")
         else:
             ci_set_windows_target("", "")
             ci_add_windows_system_includes()

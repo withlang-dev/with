@@ -2122,6 +2122,14 @@ fn with_cimport_add_windows_incdir(var_name: &str) -> i32:
 // `triple` "" clears it (not a Windows target). `sysroot` "" with a triple
 // means the SDK carries no libc: the parse then finds no system header, and
 // with_cimport_windows_libc_missing names the cause.
+// The triple this parse targets ("" when the parse is for the host): the
+// Windows selection or a named C model (#2060), read by the C type aliases
+// (#2176) so `long` and `char` are the parsed target's.
+pub fn with_cimport_target_triple() -> str:
+    unsafe:
+        if g_cimport_target_buf[0] == 0: return ""
+        make_str(&g_cimport_target_buf as *const [128]u8 as *const u8)
+
 pub fn with_cimport_set_windows_target(triple: &str, sysroot: &str):
     // A named C model (#2060) is the parse's target for the whole process:
     // the frontend's per-compile Windows selection never replaces it.
