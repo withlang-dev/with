@@ -126,7 +126,9 @@ pub fn corpus_provenance(ctx: &ActionCtx, output: &str, path: &str) -> i32:
     let line = fs.sha256_file(abs) ++ "  " ++ path
     print(ctx.target_name() ++ " ran " ++ line)
     let record = output ++ "/provenance.txt"
-    if fs.write_text(record, fs.read_text(record) ++ line ++ "\n") != 0: return corpus_fail(ctx, "could not write " ++ record)
+    if fs.mkdir_all(output) != 0: return corpus_fail(ctx, "could not create " ++ output)
+    let earlier = if fs.exists(record): fs.read_text(record) else: ""
+    if fs.write_text(record, earlier ++ line ++ "\n") != 0: return corpus_fail(ctx, "could not write " ++ record)
     0
 
 pub fn corpus_basename(path: &str) -> str:
