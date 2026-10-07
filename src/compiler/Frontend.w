@@ -3361,7 +3361,7 @@ impl Zcu:
                 let line = lines[i]
                 if not line.starts_with("use "):
                     continue
-                let upname = line.slice(4, line.len()).trim()
+                let upname = line.slice(4, line.len()).trim().to_owned()
                 let memo_key = upname ++ "|" ++ dir
                 var upfpath = ""
                 if self.import_path_memo.contains(memo_key):

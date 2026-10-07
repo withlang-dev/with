@@ -5321,7 +5321,7 @@ fn doc_extract_comment(text: &str, decl_start: i32) -> str:
         var line_start = pos
         while line_start > 0 and text[(line_start - 1)] != 10:
             line_start = line_start - 1
-        let line = text.slice(line_start as i64, (pos + 1) as i64).trim()
+        let line = text.slice(line_start as i64, (pos + 1) as i64).trim().to_owned()
         if not line.starts_with("///"):
             break
         lines.push(line.slice(3, line.len()).trim().to_owned())

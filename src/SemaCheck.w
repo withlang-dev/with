@@ -16455,6 +16455,20 @@ impl Sema:
                     // parameter views (the signature's through mask, from
                     // the callee's body; unproven is storage).
                     let views_storage = sema_param_origin_mask_contains(param_through_mask, origin_pi) == 0
+                    // #962 for a callee (#2225): the result views an
+                    // argument that is a statement temporary owning storage
+                    // (`s.slice(a, b).trim()`: the slice's owned str dies
+                    // when the statement ends, the trim view pointed into
+                    // it and a binding of it read freed memory in the
+                    // compiler itself), or a carrier of one. Remember it:
+                    // a binding or a return of this result is rejected.
+                    if views_storage and self.typed_expr_types.contains(origin_arg):
+                        let arg_ty: i32 = self.typed_expr_types.get(origin_arg).unwrap()
+                        if arg_ty != 0 and unpack_place_kind(self.classify_place(origin_arg)) == PlaceKind.PK_NotPlace and self.type_needs_drop(arg_ty) != 0 and self.type_is_view_handle(arg_ty) == 0:
+                            self.expr_view_into_temporary.insert(call_node, arg_ty)
+                    let carried_temp = self.view_into_temporary_type(origin_arg)
+                    if carried_temp != 0:
+                        self.expr_view_into_temporary.insert(call_node, carried_temp)
                     union_mask = union_mask | self.compute_expr_view_origin_mask(origin_arg)
                     storage_mask = storage_mask | (if views_storage: self.arg_storage_origin_mask(origin_arg, is_recv) else: self.arg_viewed_storage_origin_mask(origin_arg, is_recv))
                     let dep_len_before = concrete_deps.len() as i32

@@ -41,7 +41,7 @@ pub fn conan_data_source(data: &str, version: &str) -> ConanSource:
     var in_url_list = false
     for line in cr_version_block(data, "sources", version):
         if line.starts_with("url:"):
-            let rest = line.slice(4, line.len()).trim()
+            let rest = line.slice(4, line.len()).trim().to_owned()
             in_url_list = rest.len() == 0
             if rest.len() > 0: urls.push(cr_unquote(rest))
         else if line.starts_with("sha256:"):

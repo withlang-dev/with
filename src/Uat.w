@@ -345,7 +345,7 @@ fn uat_unmet(req: &str, scratch: &str) -> str:
         if host == "darwin" and uat_darwin_screen_locked(scratch): return "requires " ++ req ++ ": the screen is locked"
         return ""
     if req.starts_with("lib "):
-        let name = req.slice(4, req.len()).trim()
+        let name = req.slice(4, req.len()).trim().to_owned()
         var argv: Vec[str] = Vec.new()
         argv.push("pkg-config")
         argv.push("--exists")
@@ -355,14 +355,14 @@ fn uat_unmet(req: &str, scratch: &str) -> str:
             if with_fs_file_exists(dir ++ "/" ++ name ++ ".h") != 0 or with_fs_file_exists(dir ++ "/" ++ name ++ "/" ++ name ++ ".h") != 0: return ""
         return "requires lib " ++ name ++ ": not found"
     if req.starts_with("tool "):
-        let name = req.slice(5, req.len()).trim()
+        let name = req.slice(5, req.len()).trim().to_owned()
         var argv: Vec[str] = Vec.new()
         argv.push(if uat_host_platform() == "windows": "where" else: "which")
         argv.push(name.clone())
         if uat_probe_capture(argv, scratch) == 0: return ""
         return "requires tool " ++ name ++ ": not on PATH"
     if req.starts_with("env "):
-        let name = req.slice(4, req.len()).trim()
+        let name = req.slice(4, req.len()).trim().to_owned()
         if env(name).len() > 0: return ""
         return "requires env " ++ name ++ ": unset"
     "unknown requirement '" ++ req ++ "'"

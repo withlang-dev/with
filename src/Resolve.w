@@ -1131,7 +1131,7 @@ impl ResolveState:
             let line = lines[i]
             if not line.starts_with("use "):
                 continue
-            let dotted = line.slice(4, line.len()).trim()
+            let dotted = line.slice(4, line.len()).trim().to_owned()
             let resolved_path = self.resolve_use_file_dotted(module_id, dotted)
             var target_module = -1
             if resolved_path.len() > 0:
