@@ -2,16 +2,24 @@
 
 ## Why
 
-Eric runs a serving stack and a kernel library on his own machines: 3090s, a
-5090, a Mac. He wants to write that layer in With, with the placement bugs
-refused at compile time: a host read of device memory, a buffer whose copy
-has not landed, a scratchpad that overflows, a working set that fits in
-every function and not across the call, a pointer into the wrong memory
-handed to a vendor call. That is a mission reason (close to the machine,
-exactly as safe, the suffering removed), it is testable on hardware he
-owns, and it decides scope questions no comparison with another language
-can: an eight-GPU box makes peer transfers between `gpu[0]` and `gpu[1]`
-early scope, not a refinement.
+Eric runs a serving stack and a kernel library on the machines he has: a
+box with several discrete GPUs, a unified-memory laptop. He wants to write
+that layer in With, with the placement bugs refused at compile time: a
+host read of device memory, a buffer whose copy has not landed, a
+scratchpad that overflows, a working set that fits in every function and
+not across the call, a pointer into the wrong memory handed to a vendor
+call. That is a mission reason (close to the machine, exactly as safe, the
+suffering removed), it is testable on hardware at hand, and it decides
+scope questions no comparison with another language can: a multi-GPU box
+makes transfers between `gpu[0]` and `gpu[1]` early scope, not a
+refinement.
+
+The hardware at hand is where the plan is first tested, not what it is
+for. Nothing in the language, the checker or the compiler names a vendor:
+every vendor fact lives in a machine file or a facade, every device arch
+is one entry in an open list, and a new vendor is a machine file, a
+facade and an arch entry. The examples below use one vendor's figures
+where an example needs figures; the rules never do.
 
 The first customer is Crux (`docs/demo_plans/ml/crux/crux-design.md`), the
 compute foundation that will be rewritten from scratch once this plan and
@@ -38,13 +46,13 @@ line that realizes them.
 placement in types, transfer, regions, visibility, routing and capacity,
 all lowered on the host against a declared test machine. It needs no GPU,
 no second codegen unit and no vendor facade, it is bounded, and it stands on
-its own: a program that typechecks against a declared H100 is useful before
+its own: a program that typechecks against a declared machine the build host does not have is useful before
 any kernel runs on one.
 
 **Dispatch is a separate proposal** (`vx-dispatch.md`): device codegen
-units, the Metal and CUDA facades, hardware batteries on two boxes. That is
+units, the facades over the vendors' driver APIs, hardware batteries on two boxes. That is
 where the cost changes kind, from a campaign into a standing tax on every
-later language change, and it gets its own brief once the Metal question is
+later language change, and it gets its own brief once the run-time compiler question is
 answered and the checker has shown what it is worth on real With programs.
 The ruling that approves this plan approves the checker and asks for that
 brief; it does not approve dispatch.
@@ -209,10 +217,13 @@ disagree, this document follows the code. Paths written `Vx …` are under
   local; its `memory_ptr` "CPU-accessible only" is visibility; its
   `GridExceedsDevice` is a static check when the grid is static. What it
   had that this plan lacked is in IV.5a.
-- **The machines.** The Mac is one unified space with a CPU and a GPU that
-  address it, plus threadgroup memory as a true scratchpad; the Linux box
-  (`eric-5090`) has discrete GPUs with host-unreadable memory and peer
-  edges between them. Descriptions of both are the first shipped ones.
+- **Two kinds of machine at hand.** A unified-memory system on a chip (one
+  space the CPU and the GPU both address, plus a workgroup scratchpad)
+  and a box with discrete GPUs (host-unreadable device memory, a
+  scratchpad per device, and whatever links the box and its driver
+  provide between devices). Every accelerator the plan will meet is one
+  of these two shapes or a mix, and both kinds are described and tested
+  from the start so neither shapes the rules.
 
 ## Part III — Principles
 
@@ -319,10 +330,10 @@ unverified, never silently admitted.
 **A footprint is a signature fact at a published boundary.** Inside a
 package the per-function summary is inferred, as the fold needs it. A
 `pub` kernel declares what it places, the way it declares its processor:
-`pub fn attention(q: &[f16] in HBM, ...) on gpu places SMEM <= 48 KiB:`.
+`pub fn attention(q: &[f16] in HBM, ...) on gpu places Scratch <= 48 KiB:`.
 The body is checked against the declaration; a caller trusts it; the fold
 composes it. A kernel library's types then carry what fits on which card,
-and swapping `h100_sxm.w` for `rtx5090_x2.w` refuses the kernels that do
+and swapping one machine description for another refuses the kernels that do
 not fit before anyone benchmarks. Law 6, applied to capacity; the spelling
 is a Part IX item.
 
@@ -365,7 +376,7 @@ is absent with a reason, never partial and never zero.
 
 ### 11. The differential suite, and one measurement
 
-For each check, a pair: the same mistake in With and in CUDA or Metal, where
+For each check, a pair: the same mistake in With and in the vendor's native toolchain, where
 With refuses at compile time what the native toolchain reports at
 synchronization, at allocation, or as a fault. New work, not a port. The With
 side runs on the Mac against a declared machine lowered on the host; the
@@ -374,7 +385,7 @@ native side runs where the hardware is, under the dispatch proposal.
 Refusals alone do not make the admission figures trustworthy. The suite
 also carries at least one model-versus-measurement comparison, as a ratio:
 a working set the checker admits at a stated margin against a scratchpad,
-run on the 5090 under the dispatch proposal, with the measured peak beside
+run on a device under the dispatch proposal, with the measured peak beside
 the predicted one. The checker's number is only worth its margin if that
 ratio is published.
 
@@ -396,17 +407,20 @@ makes cost advisory.
 A machine is a With source file of `machine` declarations, shipped under
 `lib/std/machine/` and selectable by name, or written by the project.
 
+Two shapes, with figures from whichever part is at hand; the shapes are
+the point, the figures are examples.
+
 ```
-// lib/std/machine/m4_uma.w
-machine m4_uma:
+// lib/std/machine/uma_soc.w — a unified-memory system on a chip
+machine uma_soc:
     memory Unified:
-        capacity 32 GiB            measured: sysctl hw.memsize, this host
-        bandwidth 120 GB/s         spec: Apple M4 product page
+        capacity 32 GiB            measured: <os query>, this host
+        bandwidth 120 GB/s         spec: <vendor product page, date>
         managed cached             // the CPU reads it; so does the GPU
-    memory Threadgroup:
+    memory Workgroup:
         within Unified
-        capacity 32 KiB            spec: Metal feature set tables
-        scope threadgroup
+        capacity 32 KiB            spec: <vendor feature table, date>
+        scope workgroup
         replicas 10                // GPU cores
     processor cpu:
         arch aarch64
@@ -414,46 +428,48 @@ machine m4_uma:
         sees Unified
         subgroup 4                 // Vector lanes the host lowering uses
     processor gpu:
-        arch metal
+        arch <the part's arch>     // metal, amdgcn, spirv, …: one entry of an open list
         memory Unified
-        sees Unified, Threadgroup
+        sees Unified, Workgroup
         dtypes f32, f16, bf16, i32, i16, i8, u32, u16, u8
-        subgroup 32                spec: Metal feature set tables
+        subgroup 32                spec: <vendor feature table, date>
         workgroup max 1024
         grid max 2^31, 65535, 65535
-    transfer Unified -> Threadgroup
+    transfer Unified -> Workgroup
 ```
 
 ```
-// lib/std/machine/rtx5090_x2.w (shape only; the real file cites each figure)
-machine rtx5090_x2:
+// lib/std/machine/two_gpu_box.w — discrete devices on a host (shape only)
+machine two_gpu_box:
     memory HBM[0]:
         capacity 32 GiB            spec: <vendor datasheet, date>
         managed explicit           // the host never reads it
     memory HBM[1]: as HBM[0]
-    memory SMEM[0]:
+    memory Scratch[0]:
         within HBM[0]
         capacity 228 KiB
-        scope sm
+        scope workgroup
         granule 16 KiB
         replicas 170               measured: <probe, date>
-    memory SMEM[1]: as SMEM[0], within HBM[1]
+    memory Scratch[1]: as Scratch[0], within HBM[1]
     processor gpu[0]:
-        arch nvptx sm_120
+        arch <the part's arch>     // nvptx, amdgcn, spirv, …
         memory HBM[0]
-        sees HBM[0], SMEM[0]
+        sees HBM[0], Scratch[0]
         dtypes f32, f16, bf16, fp8, i32, i8
-        subgroup 32                spec: warp
+        subgroup 32                spec: <vendor datasheet>: warp, wavefront, SIMD group
         workgroup max 1024
         grid max 2^31, 65535, 65535
-    processor gpu[1]: as gpu[0], memory HBM[1], sees HBM[1], SMEM[1]
-    transfer host.DRAM -> HBM[0]: 63 GB/s copy_engine    spec: PCIe Gen5 x16
+    processor gpu[1]: as gpu[0], memory HBM[1], sees HBM[1], Scratch[1]
+    transfer host.DRAM -> HBM[0]: 63 GB/s copy_engine    spec: <bus generation and width>
     transfer HBM[0] -> host.DRAM: 63 GB/s copy_engine
-    // No HBM[0] -> HBM[1] edge: a 5090 pair has no NVLink, and peer access
-    // over PCIe is a driver fact. The router derives HBM[0] -> host.DRAM
-    // -> HBM[1]; the probe adds a direct edge the day it measures one.
-    // `policy:` is for a figure, never for a topology (Laws 4 and 7).
-    transfer HBM[0] -> SMEM[0] copy_engine
+    // No HBM[0] -> HBM[1] edge in the shipped description: whether two
+    // devices have a direct link is a fact of the box and its driver, not
+    // of the part. The router derives HBM[0] -> host.DRAM -> HBM[1]; a
+    // measured description written by the probe adds the direct edge it
+    // measured, and may add `peers` (below). `policy:` is for a figure,
+    // never for a topology (Laws 4 and 7).
+    transfer HBM[0] -> Scratch[0] copy_engine
 ```
 
 Rules:
@@ -466,15 +482,35 @@ Rules:
   may carry a provenance trailer: `spec: <text>`, `measured: <text>`,
   `policy: <text>`; the trailer is a fact, and `with analyze` reports it.
 - `processor NAME[index]:` items are `arch`, `memory` (its default space),
-  `sees` (the visible set), `dtypes`, `subgroup N` (the lockstep width),
-  `workgroup max N`, `grid max X, Y, Z`, and `as OTHER`. These are what
+  `sees` (the visible set), `peers` (below), `dtypes`, `subgroup N` (the
+  lockstep width, whatever the vendor calls it), `workgroup max N`,
+  `grid max X, Y, Z`, and `as OTHER`. `arch` names an entry of an open
+  list the compiler can emit for (an LLVM target such as `nvptx`,
+  `amdgcn` or `spirv`, or a platform with its own path such as `metal`);
+  no entry is privileged, and adding one is an arch entry, a facade and a
+  machine file, never a change to a rule. These are what
   Crux's `DeviceInfo` queried at run time; declared, they are checked
   (a static grid over `grid max` is a compile error, `subgroup` is a
   comptime constant). What is only knowable at run time (free memory,
   elapsed time) stays a facade call and is not a machine fact.
 - `transfer A -> B[: rate] [copy_engine] [relaxed]`. One cost per edge: a
   declared rate on an edge whose endpoints both declare bandwidths is an
-  error, as in Vx (`arch.rs:117`). Peer edges between devices are ordinary.
+  error, as in Vx (`arch.rs:117`). Edges between devices are ordinary.
+- **Seeing through a link.** Some boxes let one device load and store
+  another's memory directly, at the link's bandwidth, when the driver
+  maps it; others only copy. `peers HBM[1] over <edge>` on a processor says
+  the former: a region on `gpu[0]` may read `HBM[1]` in place, the checker
+  admits it, and the roofline fact prices the access at the link, not at
+  HBM. Without `peers`, the only way across is a `transfer`. Whether a box
+  has it is a driver fact the probe reads from the platform's own
+  topology report, never assumed from the part.
+- **Prerequisites.** A measured description may state the host
+  configuration its figures depend on (a resizable device aperture, an
+  IOMMU mode, huge pages), because a box without them produces figures
+  that are wrong by an order of magnitude while every copy still works. A
+  build pinned to such a description on a box that lacks a prerequisite
+  is refused with the reason, not run slowly. The probe records them and
+  the shipped descriptions never require them.
 - The host is `host`: its spaces (`host.DRAM`) come from the `--target`
   machine, which is the host file. A host declares no capacity.
 - A space need not be silicon. A machine file may declare NVMe, a CXL
@@ -499,10 +535,10 @@ Rules:
 ### IV.2 Selecting the machine: visible, and pinnable
 
 ```
-with build                          # [machine] detected m4_uma (unambiguous)
-with build --machine rtx5090_x2     # pins a shipped description
+with build                          # [machine] detected uma_soc (unambiguous)
+with build --machine two_gpu_box     # pins a shipped description
 with build --machine ./fleet/box.w  # pins a project file
-with check prog.w --machine rtx5090_x2 --target x86_64-linux
+with check prog.w --machine two_gpu_box --target x86_64-linux
 ```
 
 - `--target` stays what it is: the host, its triple and its spaces.
@@ -510,12 +546,12 @@ with check prog.w --machine rtx5090_x2 --target x86_64-linux
   target must be a pair the toolchain can emit for; a mismatch is a
   diagnostic.
 - **Detection is visible.** Every build prints the machine it detected
-  (`[machine] detected m4_uma`) or pinned (`[machine] rtx5090_x2 (with.toml)`),
+  (`[machine] detected uma_soc`) or pinned (`[machine] two_gpu_box (with.toml)`),
   the way it prints the compiler it ran, so two laptops never differ
   silently. Detection must be able to say "I cannot tell" and then refuses
   rather than guesses: a Linux box with no GPU detects `host only`; a box
   with two different GPUs refuses without `--machine`.
-- **Anything shipped pins.** `machine = "rtx5090_x2"` in `with.toml`
+- **Anything shipped pins.** `machine = "two_gpu_box"` in `with.toml`
   (`src/compiler/ProjectConfig.w:131`) is the pin; a project that places
   buffers and has no pin gets a warning naming the detected machine and the
   line to add. The pinned machine is a tracked input of the build key
@@ -524,18 +560,18 @@ with check prog.w --machine rtx5090_x2 --target x86_64-linux
 ### IV.3 Placement in types
 
 ```
-let w: Buffer[f32, rtx.HBM[0]] = Buffer.zeroed(n)   // the demand binds the space (Law 2)
+let w: Buffer[f32, box.HBM[0]] = Buffer.zeroed(n)   // the demand binds the space (Law 2)
 let x = Buffer.zeroed[f32](n)                        // host: the default representation
-let y = Buffer.uninit[f32, rtx.SMEM[0]](tile)        // explicit, when nothing demands it
-let s: &[f32] in rtx.SMEM[0] = y[0..tile]            // a view carries the buffer's space
-extern fn cublas_sgemm(a: *const f32 in rtx.HBM[0], ...)
+let y = Buffer.uninit[f32, box.Scratch[0]](tile)        // explicit, when nothing demands it
+let s: &[f32] in box.Scratch[0] = y[0..tile]            // a view carries the buffer's space
+extern fn vendor_gemm(a: *const f32 in box.HBM[0], ...)   // a vendor library's call, through its facade
 ```
 
 - `Buffer[T, S]` is a fixed-length owned allocation in space `S`; `Buffer[T]`
   is `Buffer[T, host.DRAM]`. `Vec[T]` stays host-only; growth is a host
   operation. Whatever tensor type With later rules on carries the same slot.
 - A space is a type-level constant of the pinned machine, spelled
-  `<machine>.<space>` (`rtx.HBM[0]`), or `Machine.<space>` for the pinned one
+  `<machine>.<space>` (`box.HBM[0]`), or `Machine.<space>` for the pinned one
   without naming it. There are no ids, no hashing; a space no processor
   holds is a name-resolution error.
 - `&T in S`, `&mut T in S`, `&[T] in S`, `*const T in S`, `*mut T in S`: the
@@ -551,7 +587,7 @@ extern fn cublas_sgemm(a: *const f32 in rtx.HBM[0], ...)
   at dispatch and not UB inside a kernel.
 - Element types a processor cannot represent are refused at the placement.
 - A device arena is a library type over one placed buffer, used as a
-  `with` scope: `with Arena.new[rtx.HBM[0]](2 GiB) as scratch:` then
+  `with` scope: `with Arena.new[box.HBM[0]](2 GiB) as scratch:` then
   `scratch.alloc[f16](n)` for buffers that die with the scope, one free at
   block end by the drop plan. Allocations are admitted against the arena's
   static size as a sub-space; per-request inference scratch with no reset
@@ -561,10 +597,10 @@ extern fn cublas_sgemm(a: *const f32 in rtx.HBM[0], ...)
 ### IV.4 Transfer
 
 ```
-let d = transfer(w, rtx.HBM[0])            // consumes w; d: Buffer[f32, rtx.HBM[0]]
-let d2 = transfer(w.clone(), rtx.HBM[0])   // keep the host copy: say so
-let p = transfer(d, rtx.HBM[1])            // a peer edge, if declared; else routed through host
-let t = async transfer(w, rtx.HBM[0])      // Task[Buffer[f32, rtx.HBM[0]]]
+let d = transfer(w, box.HBM[0])            // consumes w; d: Buffer[f32, box.HBM[0]]
+let d2 = transfer(w.clone(), box.HBM[0])   // keep the host copy: say so
+let p = transfer(d, box.HBM[1])            // a peer edge, if declared; else routed through host
+let t = async transfer(w, box.HBM[0])      // Task[Buffer[f32, box.HBM[0]]]
 let d3 = t.await                           // only now is there a placed value
 ```
 
@@ -581,28 +617,30 @@ let d3 = t.await                           // only now is there a placed value
 ### IV.5 Regions
 
 ```
-on rtx.gpu[0]:                           // sequential meaning; the runtime may overlap as-if
+on box.gpu[0]:                           // sequential meaning; the runtime may overlap as-if
     for i in 0..n: d[i] = d[i] * 2.0
 
-let t = async on rtx.gpu[0]:             // Task[T]; §14.22 capture rules; drop cancels
+let t = async on box.gpu[0]:             // Task[T]; §14.22 capture rules; drop cancels
     reduce(d)
 
-pub fn softmax(x: &[f32] in rtx.HBM[0]) on rtx.gpu:    // a published boundary declares (Law 6)
+pub fn softmax(x: &[f32] in box.HBM[0]) on box.gpu:    // a published boundary declares (Law 6)
     ...
 
 fn helper(x: &[f32] in Machine.HBM[0]):                 // package-local: instantiated per caller's processor
     ...
 
 comptime match Processor.Current.arch:  // inside a region; selected before analysis (D91)
-    .Metal => threadgroup_reduce(d)
+    .Metal => simdgroup_reduce(d)
     .Nvptx => warp_reduce(d)
+    .Amdgcn => wavefront_reduce(d)      // exhaustive over the open list, as every match is
+    _ => generic_reduce(d)
 ```
 
 - `on <processor>:` is a block statement or expression; its value is the
   block's value, not placed. `async on` yields a `Task`.
 - Inside the block every place read or written must be in a space the
-  processor `sees`. The error: `'d' lives in host.DRAM, but rtx.gpu[0] sees
-  only [HBM[0], SMEM[0]]; transfer it first: let d = transfer(d, rtx.HBM[0])`.
+  processor `sees`. The error: `'d' lives in host.DRAM, but box.gpu[0] sees
+  only [HBM[0], Scratch[0]]; transfer it first: let d = transfer(d, box.HBM[0])`.
 - A call from a region to a `pub` function declared for another processor
   is an error. A call to a package-local function instantiates it for the
   region's processor (§3); if that instance cannot be lowered, the error is
@@ -625,9 +663,9 @@ rather than a separate program language with its own IR. Pending a
 ruling on the spellings:
 
 ```
-on rtx.gpu[0]:
-    let tile_a = Buffer.uninit[f32, Machine.SMEM[0]](TILE * TILE)   // Crux `local`: a scratchpad buffer
-    let tile_b = Buffer.uninit[f32, Machine.SMEM[0]](TILE * TILE)   // capacity admission checks it
+on box.gpu[0]:
+    let tile_a = Buffer.uninit[f32, Machine.Scratch[0]](TILE * TILE)   // Crux `local`: a scratchpad buffer
+    let tile_b = Buffer.uninit[f32, Machine.Scratch[0]](TILE * TILE)   // capacity admission checks it
     parallel[grid] bi in 0..m / TILE:
         parallel[grid] bj in 0..n / TILE:
             var acc: [f32; TILE * TILE] = [0.0; TILE * TILE]        // accessed only at [ti*TILE+tj]: per-thread storage (below)
@@ -738,18 +776,18 @@ One family, each with a fix-it where one exists:
 | situation | message shape |
 |---|---|
 | read outside visibility | `'d' lives in host.DRAM, but gpu[0] sees only […]; transfer it first` |
-| no path | `no transfer path from SMEM[0] to host.DRAM on rtx5090_x2; declared edges: …` |
+| no path | `no transfer path from Scratch[0] to host.DRAM on two_gpu_box; declared edges: …` |
 | undeclared host on a staged route | `the route host.DRAM -> HBM[0] stages through the host, and --target names none` |
-| over capacity, one buffer | `'tile' needs 262144 B in SMEM[0], which holds 233472 B (margin -28672 B)` |
-| over capacity, working set | `… places 3 buffers, 294912 B after 16 KiB granules, in SMEM[0] (233472 B)` |
-| over capacity across calls | `… holds 'tile' (…) across the call to f, whose own peak in SMEM[0] is …` |
-| recursion into a bounded space | `f places into SMEM[0] and calls itself; the peak is unbounded` |
+| over capacity, one buffer | `'tile' needs 262144 B in Scratch[0], which holds 233472 B (margin -28672 B)` |
+| over capacity, working set | `… places 3 buffers, 294912 B after 16 KiB granules, in Scratch[0] (233472 B)` |
+| over capacity across calls | `… holds 'tile' (…) across the call to f, whose own peak in Scratch[0] is …` |
+| recursion into a bounded space | `f places into Scratch[0] and calls itself; the peak is unbounded` |
 | element type | `fp8 is not an element type m4.gpu declares` |
 | pointer space at a call | `expected *const f32 in HBM[0], found *const f32 (host.DRAM)` |
 | not lowerable, this processor | `helper is called from gpu[0], and … has no lowering there (fine on cpu)` |
-| unverified size | warning: `'buf' has no static size; its placement in SMEM[0] is unverified` |
-| no pin | warning: `this program places buffers; pin the machine: machine = "m4_uma" in with.toml` |
-| incoherent machine | `machine rtx5090_x2: SMEM[0] (228 KiB) is larger than its parent …` |
+| unverified size | warning: `'buf' has no static size; its placement in Scratch[0] is unverified` |
+| no pin | warning: `this program places buffers; pin the machine: machine = "uma_soc" in with.toml` |
+| incoherent machine | `machine two_gpu_box: Scratch[0] (228 KiB) is larger than its parent …` |
 
 ## Part V — Architecture: where each piece lands
 
@@ -869,7 +907,7 @@ without a GPU.
 ### V.8 Tests and gates
 
 - `test/placement/`: one With fixture per check with `//! expect-error:`
-  headers; each refusal fixture names its CUDA or Metal twin and the
+  headers; each refusal fixture names its native twin and the
   native failure mode in one line, and the twins live beside them for the
   dispatch proposal's `:placement-native` target. `:placement-tests` joins
   the gate's fixed list.
@@ -903,7 +941,7 @@ Each step is one stack with one battery, buildable by the pinned seed.
 
 1. **Machine files and facts.** Parser, loader, `SemaMachine`, coherence
    checks, `--machine`, detection printed on every build, the `with.toml`
-   pin, `lib/std/machine/m4_uma.w` and `rtx5090_x2.w` with cited figures,
+   pin, `lib/std/machine/uma_soc.w` and `two_gpu_box.w` with cited figures,
    `explain:machine`, `:machine-check`. No codegen change. Also the host
    half of the probe: `with machine probe` enumerates devices and reads
    what the host can learn without a launch (memory sizes, device
@@ -931,14 +969,17 @@ first shape. `Sharded[T, [gpu[0].HBM, gpu[1].HBM], axis 0]` is a buffer
 whose shards are placed one per space; `on gpu[*]:` instantiates one
 region body per shard (§3's instantiation over a set of processors);
 `all_gather`, `reduce_scatter` and `all_reduce` are transfers routed over
-the declared peer edges with their traffic counted; admission is per
-shard. "This model does not fit two 5090s at this batch" is then a
+the declared edges between devices (direct where the box has one, through
+the host where it does not) with their traffic counted; admission is per
+shard. A collective is With's own over the declared edges by default; a
+vendor collective library is a facade a program may choose, never the
+compiler's assumption. "This model does not fit two devices at this batch" is then a
 refusal from `with check`, not a failed allocation on the second card.
 None of it needs a device: the host lowering runs the shards in sequence.
 Spellings are a Part IX item.
 
-That is this plan. Dispatch (device codegen units, the Metal and CUDA
-facades, the native half of the suite, the measurement comparison, real
+That is this plan. Dispatch (device codegen units, the facades over the
+vendors' driver APIs, the native half of the suite, the measurement comparison, real
 overlap for `async on`, region traffic, user-written lowerings) is
 `vx-dispatch.md`, briefed separately after step 3. What both make possible
 and neither carries (static search over kernel variants, confidential
@@ -1005,9 +1046,9 @@ in one run) is `vx-frontier.md`, each entry with what it waits on.
   `in S` as the spelling on views and pointers.
 - Consuming iteration (the `into_iter` ruling), since a transfer of a
   collection's elements between spaces is the same shape.
-- The footprint clause on a `pub` kernel (§6): `places SMEM <= 48 KiB` is
+- The footprint clause on a `pub` kernel (§6): `places Scratch <= 48 KiB` is
   the proposed spelling. A size may name a comptime expression
-  (`places SMEM <= TILE * TILE * 4 B`), evaluated at the instantiation,
+  (`places Scratch <= TILE * TILE * 4 B`), evaluated at the instantiation,
   since a tile-generic kernel can state its footprint no other way. An
   unstated footprint on a `pub` kernel is not inferred (Law 6: declared
   at the boundary).
@@ -1015,4 +1056,4 @@ in one run) is `vx-frontier.md`, each entry with what it waits on.
   collective names, and whether a collective is a `transfer` or its own
   verb.
 - Who measures the shipped descriptions' figures, and when the `policy:`
-  figures in `rtx5090_x2.w` become `measured:`.
+  figures in `two_gpu_box.w` become `measured:`.

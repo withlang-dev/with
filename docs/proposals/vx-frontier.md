@@ -111,7 +111,8 @@ With. This is a customer's project, not the toolchain's.
 ## 5. Kernel generation as the default, vendor libraries as the exception
 
 **What.** tinygrad's bet is that generated kernels beat hand-written ones
-for most shapes; the pragmatic truth is that cuBLAS wins at some. With can
+for most shapes; the pragmatic truth is that a vendor's tuned library wins
+at some. With can
 hold both: regions generate, and a `c facade` over the vendor library is
 called where it wins, with the compiler refusing a host pointer where a
 device pointer is demanded (`vx.md` IV.7) and the facade's ownership
