@@ -449,8 +449,10 @@ machine rtx5090_x2:
     processor gpu[1]: as gpu[0], memory HBM[1], sees HBM[1], SMEM[1]
     transfer host.DRAM -> HBM[0]: 63 GB/s copy_engine    spec: PCIe Gen5 x16
     transfer HBM[0] -> host.DRAM: 63 GB/s copy_engine
-    transfer HBM[0] -> HBM[1]: 63 GB/s                  policy: via host until measured
-    transfer HBM[1] -> HBM[0]: 63 GB/s
+    // No HBM[0] -> HBM[1] edge: a 5090 pair has no NVLink, and peer access
+    // over PCIe is a driver fact. The router derives HBM[0] -> host.DRAM
+    // -> HBM[1]; the probe adds a direct edge the day it measures one.
+    // `policy:` is for a figure, never for a topology (Laws 4 and 7).
     transfer HBM[0] -> SMEM[0] copy_engine
 ```
 
@@ -628,14 +630,21 @@ on rtx.gpu[0]:
     let tile_b = Buffer.uninit[f32, Machine.SMEM[0]](TILE * TILE)   // capacity admission checks it
     parallel[grid] bi in 0..m / TILE:
         parallel[grid] bj in 0..n / TILE:
-            var acc: [f32; TILE * TILE] = [0.0; TILE * TILE]        // Crux `private`: an ordinary local
+            var acc: [f32; TILE * TILE] = [0.0; TILE * TILE]        // accessed only at [ti*TILE+tj]: per-thread storage (below)
             for bk in 0..k / TILE:
                 parallel[workgroup] ti in 0..TILE:
                     parallel[workgroup] tj in 0..TILE:
                         tile_a[ti * TILE + tj] = a[(bi * TILE + ti) * k + bk * TILE + tj]
                         tile_b[ti * TILE + tj] = b[(bk * TILE + ti) * n + bj * TILE + tj]
-                barrier()
-                ...
+                barrier()                                             // publishes tile_a, tile_b to every thread
+                parallel[workgroup] ti in 0..TILE:
+                    parallel[workgroup] tj in 0..TILE:
+                        for tk in 0..TILE:
+                            acc[ti * TILE + tj] = fma(tile_a[ti * TILE + tk], tile_b[tk * TILE + tj], acc[ti * TILE + tj])
+                barrier()                                             // the next phase overwrites the tiles
+            parallel[workgroup] ti in 0..TILE:
+                parallel[workgroup] tj in 0..TILE:
+                    out[(bi * TILE + ti) * n + bj * TILE + tj] = acc[ti * TILE + tj]
     let total = reduce[sum] i in 0..n: x[i] * y[i]
     parallel[subgroup] lane in 0..Processor.Current.subgroup_size:
         ...
@@ -649,32 +658,66 @@ on rtx.gpu[0]:
 - `reduce[sum|max|min|prod] i in range: expr` is a reduction with a
   named identity; the backend picks the strategy. Any other reduction is
   a sequential loop with an accumulator.
-- `barrier()` is a workgroup barrier and is legal only as a statement
-  directly in a workgroup body, never under a conditional or a loop the
-  checker cannot prove every thread reaches.
+- `barrier()` is a workgroup barrier, legal wherever every thread of the
+  workgroup provably reaches it: in a grid body between workgroup
+  parallels (where the example's sit), in a loop whose bounds are uniform
+  across the workgroup. Under a thread-divergent condition or a loop
+  whose trip count depends on a thread's own index it is refused. The
+  rule is uniform control flow, not a syntactic position.
 - `Processor.Current.subgroup_size`, `workgroup_max` and `grid_max` are
   comptime constants from the machine file. `parallel[subgroup] lane in
   0..32` is a compile error on a machine whose subgroup is not 32, which
   is Crux's portability rule enforced instead of documented.
 - A scratchpad local is a `Buffer` in the processor's scratchpad space;
-  its placement is capacity-checked like any other. A private local is a
-  local.
+  its placement is capacity-checked like any other.
+- **Thread identity is stable, and storage is classified by access.** The
+  lowering assigns the same thread to the same workgroup bindings across
+  every workgroup parallel under one enclosing loop (the thread persists;
+  the loop is inside it, as in the hardware). A local declared outside a
+  workgroup parallel whose every access inside one is at an index affine
+  in the workgroup bindings and injective under their ranges is
+  **per-thread storage**: register-allocated, not placed, not admitted;
+  the example's `acc` is one cell per thread. A local accessed at any
+  other index pattern inside a workgroup parallel is **workgroup
+  storage**: placed in the processor's scratchpad, admitted against it,
+  and refused on a processor that has none. A local declared inside a
+  workgroup parallel is private by construction. This is the rule the
+  migrator needs for every kernel with a per-thread accumulator array.
 - The host lowering, which is this plan's only lowering, is Crux's CPU
   backend: `grid` to the fiber pool, `workgroup` sequential within the
   task, `subgroup` to `Vector[N, T]` with `N` the host's `subgroup`.
 
-**Parallel writes must be disjoint, and the checker owns it.** The common
+**Shared buffers are raced by phase, and the checker owns it.** The common
 kernel writes one `&mut` buffer from every iteration: `out[i]` under
 `parallel i`. The buffer is one capture, so borrow rules say nothing about
-two iterations; disjointness is per index. Crux left this as "UB unless
-provably disjoint". Here it is a rule: a write under `parallel i` is
-admitted when the written index is `i` or an injective function of the
-enclosing parallel bindings (five of Crux's six programs); otherwise it is
-refused, and the programmer writes either a run-time disjointness check
-or an explicit unchecked spelling. The sixth program is the fixture: the
-KV cache update writes `key_cache[b, h, pos, d]` with `pos` loaded from
-`positions[b]`, which two batches can share. The spellings for the two
-escape routes are a Part IX decision before step 2.
+two iterations; the race is per index and per phase. Crux left this as
+"UB unless provably disjoint". Here it is a rule, in three parts:
+
+- **A phase** is the code between two barriers (or a barrier and the
+  region's start or end) at one workgroup level. Within a phase, a shared
+  buffer (a captured `&mut`, a scratchpad `Buffer`, workgroup storage)
+  may be written only at indices disjoint across threads and read only
+  at indices the same thread wrote in this phase or that were published
+  by an earlier barrier. `out[i] = out[i-1] + x` has disjoint writes and
+  is refused: the read is another thread's index in the same phase.
+- **A barrier publishes** everything written in the previous phase to
+  every thread; after it, any thread may read any index. The tiled
+  matmul writes `tile_a[ti, tj]` per thread, barriers, then every thread
+  reads the whole tile: admitted by the barrier, refused without it.
+- **Disjoint** means decidable, not proven: an index is admitted when it
+  is affine in the enclosing parallel bindings with constant
+  coefficients and injective under their declared ranges (`bi * TILE +
+  ti` only because `ti < TILE`), a bounded polyhedral check. `reduce[op]`
+  is the one cross-thread combination that needs no barrier, which is
+  what admits softmax.
+
+Any other write or read is refused, and the programmer writes either a
+run-time disjointness check or an explicit unchecked spelling. The
+fixtures: the KV cache update for the write half (it writes
+`key_cache[b, h, pos, d]` with `pos` loaded from `positions[b]`, which two
+batches can share) and flash attention for the read half (every thread
+reads the whole `k_tile` after the barrier that published it). The
+spellings for the two escape routes are a Part IX decision before step 2.
 
 ### IV.6 Verdicts
 
@@ -838,7 +881,8 @@ without a GPU.
   matmul, KV cache update, written on IV.3 to IV.5a and run host-lowered
   against the two test machines with checked outputs. They are the
   acceptance test of the checker and the first item of the dispatch
-  brief. The KV cache update is also the disjointness fixture.
+  brief. The KV cache update is the phase rule's write fixture and flash
+  attention its read fixture; the tiled matmul pins per-thread storage.
 - `with build :machine-check` validates every shipped description's
   coherence and provenance trailers (every figure has one); it joins
   `spec-inventory-check` in the gate.
@@ -945,9 +989,9 @@ in one run) is `vx-frontier.md`, each entry with what it waits on.
   the programmer cannot discharge is ceremony (Law 1) and a silent overflow
   is the wrong plausible thing (Law 7); the run-time check is the compiler
   doing the work it could not do statically.
-- **Disjoint parallel writes, decided before step 2's kernel half.** The
-  rule in IV.5a admits an index that is the parallel binding or an
-  injective function of the enclosing bindings. The two escape routes
+- **The escape routes from the phase rule, decided before step 2's kernel
+  half.** IV.5a admits an index affine in the parallel bindings and
+  injective under their ranges, within a phase. The two escape routes
   need spellings: a run-time check (the launch asserts the written indices
   of one dispatch are distinct, which for the KV cache update is a check
   on `positions` before the launch) and an explicit unchecked write for a
@@ -962,9 +1006,11 @@ in one run) is `vx-frontier.md`, each entry with what it waits on.
 - Consuming iteration (the `into_iter` ruling), since a transfer of a
   collection's elements between spaces is the same shape.
 - The footprint clause on a `pub` kernel (§6): `places SMEM <= 48 KiB` is
-  the proposed spelling; whether a size may name a comptime expression
-  (`places SMEM <= TILE * TILE * 4 B`) and whether an unstated footprint
-  on a `pub` kernel is inferred (Law 6 says no: declared at the boundary).
+  the proposed spelling. A size may name a comptime expression
+  (`places SMEM <= TILE * TILE * 4 B`), evaluated at the instantiation,
+  since a tile-generic kernel can state its footprint no other way. An
+  unstated footprint on a `pub` kernel is not inferred (Law 6: declared
+  at the boundary).
 - The sharded surface: `Sharded[T, spaces, axis]`, `on gpu[*]`, the
   collective names, and whether a collective is a `transfer` or its own
   verb.

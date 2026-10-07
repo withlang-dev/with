@@ -146,9 +146,10 @@ dispatch work starts:
   compiler emits MSL text for a region at build time, and the program
   hands it to the OS's Metal framework at start-up, once per kernel and
   device. The compiler is part of macOS, not of Xcode, so the build reads
-  only our SDK and the program needs only the OS: Law 8 holds. CUDA has
-  the same shape through the driver's run-time compiler on a host that has
-  the toolkit, which the Linux host-library rule already permits.
+  only our SDK and the program needs only the OS: Law 8 holds. Linux is
+  strictly cleaner: With emits PTX directly, and the driver's PTX-to-SASS
+  compiler is always present with the driver. NVRTC (CUDA C to PTX) is
+  part of the toolkit and is not needed.
 - **AIR through LLVM** means the SDK carries what it needs, but the AIR
   format is not a public contract and may change under the toolchain.
 - **CUDA only, Mac as host-only** means the Mac checks and never runs placed
