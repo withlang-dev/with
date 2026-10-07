@@ -2245,6 +2245,7 @@ pub type Sema {
     bundle_corpus: str,              // D39: the --bundle-corpus root, "" outside a bundle lane
     global_visible_module_paths: HashMap[str, i32], // prelude-visible modules
     engine_module_corpus: HashMap[str, i32], // #1362: engine corpus module path -> corpus id
+    corpus_private_modules: HashMap[str, i32], // #2248: std modules loaded only through a corpus's own imports
     module_visibility_cache: HashMap[str, i32], // "from->to" -> visibility
     named_type_candidate_syms: Vec[i32],       // every registered named type symbol
     named_type_candidate_tids: Vec[i32],       // parallel type id for candidate
@@ -3787,6 +3788,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         bundle_corpus: "",
         global_visible_module_paths: sema_new_map_str_i32(),
         engine_module_corpus: sema_new_map_str_i32(),
+        corpus_private_modules: sema_new_map_str_i32(),
         module_visibility_cache: sema_new_map_str_i32(),
         named_type_candidate_syms: Vec.new(),
         named_type_candidate_tids: Vec.new(),
@@ -4381,6 +4383,10 @@ impl Sema:
         // `src/`. The compiler tree now conforms to §18.3 like any project.
         if sema_tier_path_is_std_implementation(self.current_module_path) != 0 and sema_tier_path_is_std_implementation(target_path) != 0:
             return 1
+        // #2248: a std module loaded only for a corpus's sake is not part of
+        // any program's namespace (record_engine_corpora).
+        if self.corpus_private_modules.contains(target_path):
+            return 0
         // D100 (§18.3): without `pub`, a declaration is visible throughout
         // its package — `pub` is what other packages need. It waives `pub`,
         // not the import: the module must still be visible from here.
@@ -4499,6 +4505,39 @@ impl Sema:
             let id: i32 = corpus_ids.get(dir).unwrap()
             if id != 0:
                 self.engine_module_corpus.insert(sema_owned_text(path), id)
+        // #2248 (D39 §3.4): a corpus presents its surface, never its
+        // body-only imports. A std module that only corpus modules (or
+        // other such modules) import is loaded for the corpus's sake —
+        // stage1 compiles the corpus from source and loads std.re's
+        // std.libc and its std.os; the release compiler, serving the corpus
+        // as an interface, loads neither — and is private to it: never
+        // visible to user code, so both generations resolve the same names.
+        // A fixpoint: a module is private when every importer is an engine
+        // or private module; one the user (or the prelude closure) imports
+        // is not.
+        self.corpus_private_modules = sema_new_map_str_i32()
+        let count = self.module_paths.len() as i32
+        var changed = true
+        while changed:
+            changed = false
+            for mi in 0..count:
+                let path = sema_owned_text(self.module_paths[mi])
+                if self.corpus_private_modules.contains(path) or self.engine_corpus_id(path) != 0: continue
+                if sema_tier_path_is_std_implementation(path) == 0 or self.global_visible_module_paths.contains(path): continue
+                var importers = 0
+                var all_corpus = true
+                for from in 0..count:
+                    if from >= self.module_import_starts.len() as i32: continue
+                    let start = self.module_import_starts[from]
+                    for ei in 0..self.module_import_counts[from]:
+                        if self.module_import_targets[start + ei] != mi: continue
+                        importers = importers + 1
+                        let from_path = sema_owned_text(self.module_paths[from])
+                        if self.engine_corpus_id(from_path) == 0 and not self.corpus_private_modules.contains(from_path):
+                            all_corpus = false
+                if importers > 0 and all_corpus:
+                    self.corpus_private_modules.insert(path, 1)
+                    changed = true
 
     // Reachability over explicit import edges only: the synthetic prelude
     // edge and the global prelude-closure shortcut are excluded, so this
@@ -4564,7 +4603,16 @@ impl Sema:
                             continue
                         if current_engine >= 0 and target >= 0 and target < self.module_paths.len() as i32:
                             let target_engine = self.engine_corpus_id(self.module_paths[target])
-                            if target_engine != 0 and target_engine != current_engine:
+                            // D39 §3.4: a corpus presents its surface — its
+                            // siblings — and never its body-only imports,
+                            // whether it came as an interface (which never
+                            // loads them) or from source (stage1 has no
+                            // bundle slot). From inside a corpus the walk
+                            // continues only within it: std.re's std.libc
+                            // import pulled std.os into every program's bare
+                            // names on stage1 and not on the release compiler
+                            // (#2248).
+                            if target_engine != current_engine:
                                 continue
                         stack.push(target)
         self.module_visibility_cache.insert(sema_owned_text(cache_key), 0)
@@ -4787,7 +4835,17 @@ impl Sema:
                     // std declaration is the lowest resolution tier (§18.2 tier 5,
                     // #752), so what std.build imports is reachable from build.w.
                     if current == start_idx or sema_tier_path_is_std_implementation(self.module_paths[current]) != 0:
-                        stack.push(self.module_import_targets[(edge_start + ei)])
+                        let target = self.module_import_targets[(edge_start + ei)]
+                        // D39 §3.4: a corpus presents its surface, never its
+                        // body-only imports — from inside a corpus the walk
+                        // stays within it, and it never enters one from
+                        // outside, the same whether the corpus came as an
+                        // interface or from source (#2248: on stage1 std.re's
+                        // std.libc import reached std.os for every program).
+                        if current != start_idx and target >= 0 and target < self.module_paths.len() as i32:
+                            if self.engine_corpus_id(self.module_paths[target]) != self.engine_corpus_id(self.module_paths[current]):
+                                continue
+                        stack.push(target)
         self.module_visibility_cache.insert(sema_owned_text(cache_key), 0)
         0
 
