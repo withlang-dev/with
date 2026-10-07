@@ -1,5 +1,5 @@
 //! args: --dump-typed
-//! expect-check-stdout: typed contextual-copy-adjustments=12
+//! expect-check-stdout: typed contextual-copy-adjustments=13
 //! expect-check-stdout: bind view: &i32
 //! expect-check-stdout: bind snapshot: i32
 //! expect-check-stdout: exact=&i32 owned=i32 target=i32 post=identity
