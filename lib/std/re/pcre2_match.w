@@ -95,7 +95,7 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
 
     var __local_heapframes_size__goto_7017_12: c_ulong = 0
 
-    var __local_cb__goto_7022_21: pcre2_callout_block_8 = pcre2_callout_block_8 {  }
+    var __local_cb__goto_7022_21: pcre2_callout_block_8 = pcre2_callout_block_8.zeroed()
 
     var __local_actual_match_block__goto_7023_13: match_block_8
 

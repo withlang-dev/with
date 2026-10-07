@@ -77,7 +77,7 @@ pub unsafe fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_
 
     var __local_start_bits__goto_3370_16: *const u8 = null
 
-    var __local_cb__goto_3375_21: pcre2_callout_block_8 = pcre2_callout_block_8 {  }
+    var __local_cb__goto_3375_21: pcre2_callout_block_8 = pcre2_callout_block_8.zeroed()
 
     var __local_actual_match_block__goto_3376_17: dfa_match_block_8
 
@@ -2286,7 +2286,7 @@ unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_st
 
     var __local_end_code__goto_546_12: *const u8 = null
 
-    var __local_new_recursive__goto_547_20: dfa_recursion_info = dfa_recursion_info {  }
+    var __local_new_recursive__goto_547_20: dfa_recursion_info = dfa_recursion_info.zeroed()
 
     var __local_active_count__goto_548_5: c_int = 0
 

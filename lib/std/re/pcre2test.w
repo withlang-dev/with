@@ -3138,7 +3138,7 @@ pub unsafe fn valid_utf(__param_string: *const u8, __param_length: c_ulong, __pa
 }
 
 unsafe fn patctl_zero(__param_p: *mut patctl) {
-    with_memset(((__param_p as *mut c_void) as *mut u8), (0 as c_int), ((sizeof[patctl]() as c_ulong) as i64))
+    (*__param_p) = patctl.zeroed()
 
     ((*__param_p).replacement[0] = ((255 as u8)))
 
@@ -3153,7 +3153,7 @@ unsafe fn patctl_zero(__param_p: *mut patctl) {
 }
 
 unsafe fn datctl_zero(__param_d: *mut datctl) {
-    with_memset(((__param_d as *mut c_void) as *mut u8), (0 as c_int), ((sizeof[datctl]() as c_ulong) as i64))
+    (*__param_d) = datctl.zeroed()
 
     ((*__param_d).replacement[0] = ((255 as u8)))
 
@@ -13599,7 +13599,7 @@ fn process_data_8() -> c_int {
 
     var __local_pmatch__goto_4394_15: *mut regmatch_t = null
 
-    var __local_startend_buf__goto_4395_14: regmatch_t = regmatch_t {  }
+    var __local_startend_buf__goto_4395_14: regmatch_t = regmatch_t.zeroed()
 
     var __local_msg__goto_4396_15: *const c_char = null
 
@@ -18639,7 +18639,7 @@ fn unittest_8() -> Unit {
 
     var __local_errorbuffer8__goto_5661_6: [256]c_char
 
-    var __local_test_preg__goto_5662_9: regex_t = regex_t {  }
+    var __local_test_preg__goto_5662_9: regex_t = regex_t.zeroed()
 
     var __local_invalid_code__goto_5664_7: *mut c_void = null
 
@@ -18732,7 +18732,7 @@ fn unittest_8() -> Unit {
         (__local_invalid_code__goto_5664_7 = null)
         (__local_test_tables__goto_5665_16 = ((null as *const u8)))
         (__local_subs_other_code__goto_5670_13 = ((null as *mut pcre2_real_code_8)))
-        unsafe { with_memset((((&raw mut __local_test_preg__goto_5662_9 as *mut regex_t) as *mut c_void) as *mut u8), (0 as c_int), ((sizeof[regex_t]() as c_ulong) as i64)) }
+        __local_test_preg__goto_5662_9 = regex_t.zeroed()
         (__local_rc__goto_5628_5 = ((unsafe { pcre2_config_8((0 as c_uint), null) } as c_int)))
         goto '__ci_bb_1
     }

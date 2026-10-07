@@ -1394,7 +1394,7 @@ pub unsafe fn deflateCopy(__param_dest: *mut z_stream_s, __param_source: *mut z_
         return -4
     }
 
-    with_memset(((__local_ds as *mut c_void) as *mut u8), (0 as c_int), ((sizeof[internal_state]() as c_ulong) as i64))
+    (*__local_ds) = internal_state.zeroed()
 
     ((*__param_dest).state = __local_ds)
 
@@ -2145,7 +2145,7 @@ pub unsafe fn deflateInit2_(__param_strm: *mut z_stream_s, __param_level: c_int,
         return -4
     }
 
-    with_memset(((__local_s as *mut c_void) as *mut u8), (0 as c_int), ((sizeof[internal_state]() as c_ulong) as i64))
+    (*__local_s) = internal_state.zeroed()
 
     ((*__param_strm).state = __local_s)
 

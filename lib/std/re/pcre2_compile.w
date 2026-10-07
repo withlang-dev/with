@@ -5247,7 +5247,7 @@ unsafe fn get_branchlength(__param_pptrptr: *mut *mut c_uint, __param_minptr: *m
 
     var __local_offset__goto_9586_12: c_ulong = 0
 
-    var __local_this_recurse__goto_9587_22: parsed_recurse_check = parsed_recurse_check {  }
+    var __local_this_recurse__goto_9587_22: parsed_recurse_check = parsed_recurse_check.zeroed()
 
     var __local_r__goto_9603_25: *mut parsed_recurse_check = null
 

@@ -38,9 +38,9 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
 
     var __local_from__goto_483_24: *mut u8 = null
 
-    var __local_here__goto_484_10: code = code {  }
+    var __local_here__goto_484_10: code = code.zeroed()
 
-    var __local_last__goto_485_10: code = code {  }
+    var __local_last__goto_485_10: code = code.zeroed()
 
     var __local_len__goto_486_14: c_uint = 0
 
@@ -4926,7 +4926,7 @@ pub unsafe fn inflateCopy(__param_dest: *mut z_stream_s, __param_source: *mut z_
         return -4
     }
 
-    with_memset(((__local_copy_ as *mut c_void) as *mut u8), (0 as c_int), ((sizeof[inflate_state]() as c_ulong) as i64))
+    (*__local_copy_) = inflate_state.zeroed()
 
     (__local_window = null)
 
@@ -5219,7 +5219,7 @@ pub unsafe fn inflateInit2_(__param_strm: *mut z_stream_s, __param_windowBits: c
         return -4
     }
 
-    with_memset(((__local_state as *mut c_void) as *mut u8), (0 as c_int), ((sizeof[inflate_state]() as c_ulong) as i64))
+    (*__local_state) = inflate_state.zeroed()
 
 
     ((*__param_strm).state = ((__local_state as *mut internal_state)))

@@ -84,7 +84,7 @@ pub unsafe fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param
 
     var __local_ovecsave__goto_762_12: [2]c_ulong
 
-    var __local_scb__goto_763_32: pcre2_substitute_callout_block_8 = pcre2_substitute_callout_block_8 {  }
+    var __local_scb__goto_763_32: pcre2_substitute_callout_block_8 = pcre2_substitute_callout_block_8.zeroed()
 
     var __local_sub_start_extra_needed__goto_764_12: c_ulong = 0
 
@@ -104,7 +104,7 @@ pub unsafe fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param
 
     var __local_ptrstackptr__goto_961_12: c_uint = 0
 
-    var __local_forcecase__goto_962_14: case_state = case_state {  }
+    var __local_forcecase__goto_962_14: case_state = case_state.zeroed()
 
     var __local_casestart_offset__goto_963_14: c_ulong = 0
 
@@ -174,7 +174,7 @@ pub unsafe fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param
 
     var __local_errorcode__goto_1441_11: c_int = 0
 
-    var __local_new_forcecase__goto_1442_18: case_state = case_state {  }
+    var __local_new_forcecase__goto_1442_18: case_state = case_state.zeroed()
 
     var __local_chars_outstanding__goto_1500_11: c_ulong = 0
 
@@ -859,7 +859,7 @@ pub unsafe fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param
 
     '__ci_bb_69 {
         (__local_ptrstackptr__goto_961_12 = ((0 as c_uint)))
-        (__local_forcecase__goto_962_14 = case_state {  })
+        (__local_forcecase__goto_962_14 = case_state.zeroed())
         (__local_casestart_offset__goto_963_14 = ((0 as c_ulong)))
         (__local_casestart_extra_needed__goto_964_14 = ((0 as c_ulong)))
         if (__local_use_existing_match__goto_751_6 != 0) {
@@ -2673,7 +2673,7 @@ pub unsafe fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param
     }
 
     '__ci_bb_333 {
-        (__local_new_forcecase__goto_1442_18 = case_state {  })
+        (__local_new_forcecase__goto_1442_18 = case_state.zeroed())
         if ((if __local_ptr__goto_757_12 < (__local_repend__goto_758_12 - ((1 as isize) as usize)): 1 else: 0) != 0) {
             goto '__ci_bb_336
         } else {

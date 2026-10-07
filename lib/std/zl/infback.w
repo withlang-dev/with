@@ -34,9 +34,9 @@ pub unsafe fn inflateBack(__param_strm: *mut z_stream_s, __param_in_: Option[uns
 
     var __local_from__goto_200_24: *mut u8 = null
 
-    var __local_here__goto_201_10: code = code {  }
+    var __local_here__goto_201_10: code = code.zeroed()
 
-    var __local_last__goto_202_10: code = code {  }
+    var __local_last__goto_202_10: code = code.zeroed()
 
     var __local_len__goto_203_14: c_uint = 0
 

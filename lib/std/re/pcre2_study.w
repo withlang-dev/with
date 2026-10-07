@@ -599,7 +599,7 @@ unsafe fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *co
 
     var __local_cc__goto_116_12: *const u8 = null
 
-    var __local_this_recurse__goto_117_15: recurse_check = recurse_check {  }
+    var __local_this_recurse__goto_117_15: recurse_check = recurse_check.zeroed()
 
     var __local_d__goto_137_7: c_int = 0
 
