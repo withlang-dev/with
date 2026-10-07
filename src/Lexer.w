@@ -77,10 +77,16 @@ pub type Lexer {
     token_start: i32,
     emit_comments: i32,
     last_sig_tag: i32,
+    // #2233: a `/` that is the first token on its line, outside every
+    // bracket, opens a statement — a regex literal, never a division (a
+    // newline ends a statement at depth 0). `line_start` is 1 from the file
+    // start and after each NEWLINE; `bracket_depth` counts ( [ { open.
+    line_start: i32,
+    bracket_depth: i32,
 }
 
 fn Lexer.init(source: &str, file_id: i32) -> Lexer:
-    Lexer { source: with_str_clone_ref(source), pos: 0, file_id, token_start: 0, emit_comments: 0, last_sig_tag: -1 }
+    Lexer { source: with_str_clone_ref(source), pos: 0, file_id, token_start: 0, emit_comments: 0, last_sig_tag: -1, line_start: 1, bracket_depth: 0 }
 
 // Tokenize the entire source, returning a token list ending with EOF.
 impl Lexer:
@@ -91,6 +97,11 @@ impl Lexer:
             tokens.append(tag, self.token_start, self.pos)
             if lexer_token_is_significant(tag) != 0:
                 self.last_sig_tag = tag
+            self.line_start = if tag == TokenKind.TK_NEWLINE: 1 else if tag == TokenKind.TK_COMMENT: self.line_start else: 0
+            if tag == TokenKind.TK_L_PAREN or tag == TokenKind.TK_L_BRACKET or tag == TokenKind.TK_L_BRACE:
+                self.bracket_depth = self.bracket_depth + 1
+            else if (tag == TokenKind.TK_R_PAREN or tag == TokenKind.TK_R_BRACKET or tag == TokenKind.TK_R_BRACE) and self.bracket_depth > 0:
+                self.bracket_depth = self.bracket_depth - 1
             if tag == TokenKind.TK_EOF:
                 break
         tokens
@@ -348,7 +359,9 @@ impl Lexer:
                 if c2 == CharCode.Eq:  // /=
                     self.pos = self.pos + 2
                     return TokenKind.TK_SLASH_EQ
-            if lexer_slash_starts_regex(self.last_sig_tag) != 0:
+            // #2233: first on its line outside every bracket, `/` opens a
+            // statement; the previous line's last token says nothing.
+            if (self.line_start != 0 and self.bracket_depth == 0) or lexer_slash_starts_regex(self.last_sig_tag) != 0:
                 return self.lex_regex()
             self.pos = self.pos + 1
             return TokenKind.TK_SLASH
