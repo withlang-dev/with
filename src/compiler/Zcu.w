@@ -14,6 +14,8 @@ use compiler.EmbeddedRuntime
 use std.collections.HashMap
 use MirCore
 use compiler.EmbeddedStdlib
+use compiler.BundleInterfaces
+use FnAbi
 extern fn with_str_clone_ref(s: &str) -> str
 
 fn zcu_owned_text(text: &str) -> str:
@@ -51,6 +53,9 @@ pub type Zcu {
     frontend_pool: InternPool,
     diagnostics: DiagnosticList,
     imported_paths: Vec[str],
+    imported_std_identities: Vec[str],
+    imported_std_files: Vec[str],
+    import_conflicts: Vec[str],
     // #682-inc1: pool decl count (and its non-use subset) of the pre-expanded
     // prelude closure prefix — [use decl, closure decls...] parsed BEFORE the
     // user source so the prefix's node/intern/file ids are deterministic for
@@ -141,6 +146,9 @@ fn Zcu.init -> Zcu:
         // independent empty list so neither field aliases or moves from the other.
         diagnostics,
         imported_paths: zcu_new_vec_str(),
+        imported_std_identities: zcu_new_vec_str(),
+        imported_std_files: zcu_new_vec_str(),
+        import_conflicts: zcu_new_vec_str(),
         prelude_prefix_decls: 0,
         prelude_prefix_non_use: 0,
         decl_source_paths: zcu_new_vec_str(),
@@ -201,6 +209,9 @@ impl Zcu:
     mut fn reset_import_state():
         let empty = zcu_new_vec_str()
         self.imported_paths = empty
+        self.imported_std_identities = zcu_new_vec_str()
+        self.imported_std_files = zcu_new_vec_str()
+        self.import_conflicts = zcu_new_vec_str()
         self.decl_source_paths = zcu_new_vec_str()
         self.decl_source_file_ids = Vec.new()
         self.decl_is_c_import = Vec.new()
@@ -217,8 +228,41 @@ impl Zcu:
                 return 1
         0
 
+    // A `std` module has ONE source in a compilation. Its identity is the
+    // canonical module path (`<embedded-std>/std/re/defs.w`, the spelling
+    // every checkout's lib/std tree maps to); two different files under
+    // that identity are two module instances of one source — two sets of
+    // globals, two copies of every function — and the program that mixes
+    // them panics (pcre2test over a migrated tree, with the prelude's
+    // std.regex reaching the checked-in lib/std/re). Recorded here, emitted
+    // once the graph is loaded (Frontend check_internal_imports_frontend).
     fn add_imported_path(path: &str) -> Unit:
-        self.imported_paths.push(zcu_owned_text(resolve_canonical_module_key(path)))
+        let key = resolve_canonical_module_key(path)
+        self.imported_paths.push(zcu_owned_text(key))
+        let identity = codegen_canonical_module_path(path)
+        // WITH_DEBUG_IMPORTS=1: every module the loader registers, with the
+        // key it dedups on and the identity a std module is one source under.
+        if runtime_getenv("WITH_DEBUG_IMPORTS").len() > 0:
+            eprint("[imports] " ++ path ++ "\n  key " ++ key ++ "\n  identity " ++ identity)
+        // Only two files on disk conflict: a tree file beside its embedded
+        // spelling (`<embedded-std>/...`, the interface or embedded copy of
+        // the same module) is one module, the way a stage compiler resolves
+        // its own std from the tree (Resolve resolve_own_tree_candidate).
+        if not identity.starts_with("<embedded-std>/") or key.starts_with("<"): return
+        for i in 0..self.imported_std_identities.len() as i32:
+            if self.imported_std_identities[i] == identity:
+                if self.imported_std_files[i] != key:
+                    let dotted = bundle_module_dotted_name(identity)
+                    self.import_conflicts.push("module '" ++ dotted ++ "' is loaded from two files in one compilation: " ++ self.imported_std_files[i] ++ " and " ++ key ++ "; a std module has one source, so every `use " ++ dotted ++ "` must reach the same file (a harness compiled from its own lib/std tree while the prelude reaches the checkout's: compile it with --no-prelude, or run it from its tree)")
+                return
+        self.imported_std_identities.push(zcu_owned_text(identity))
+        self.imported_std_files.push(zcu_owned_text(key))
+
+    fn import_conflict_messages() -> Vec[str]:
+        var out = zcu_new_vec_str()
+        for i in 0..self.import_conflicts.len() as i32:
+            out.push(zcu_owned_text(self.import_conflicts[i]))
+        out
 
     mut fn seed_decl_source_paths(new_pool: AstPool, path: &str, file_id: i32):
         self.decl_source_paths = Vec.new()

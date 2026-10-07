@@ -280,7 +280,7 @@ fn pcre2_ensure_generated_dependencies(ctx: &ActionCtx, generated_dir: &str) -> 
             return pcre2_fail(ctx, "could not update imports in " ++ pcre2test_path)
     0
 
-pub fn pcre2_count_generated_errors(ctx: &ActionCtx, generated_dir: &str, print_summary: bool) -> i32:
+pub fn pcre2_count_generated_errors(ctx: &ActionCtx, generated_dir: &str, compiler: &str, print_summary: bool) -> i32:
     let fs = ctx.fs()
     if not fs.is_dir(generated_dir):
         let _ = pcre2_fail(ctx, "missing generated directory: " ++ generated_dir)
@@ -294,6 +294,16 @@ pub fn pcre2_count_generated_errors(ctx: &ActionCtx, generated_dir: &str, print_
     // in isolation with its `use std.re.*` imports stripped, so every cross-module
     // reference was undefined: it manufactured hundreds of false errors and never
     // validated a real migration (it was added after the last promote).
+    // The release compiler runs it with `--bundle-corpus std/re --no-prelude`, as
+    // corpus_check_every_module and the bundle build do: without it the
+    // compiler's embedded std.re interface answers every `use std.re.X`
+    // and the migrated siblings are never read, so a migration that changed
+    // a signature could not pass (D107's first re-promote found it; the
+    // Workspace API has no corpus option, so this is a subprocess). The
+    // corpus is migrated C and compiles without the prelude, as its bundle
+    // does: with the prelude on, std.regex reaches the checkout's lib/std/re
+    // while the harness reaches the tree under check, and one std module
+    // loaded from two files is refused (Zcu add_imported_path).
     let check_root = pcre2_join(pcre2_scratch_dir(ctx), "cohesive-check-" ++ ctx.target_name())
     let re_dir = pcre2_join(pcre2_join(pcre2_join(check_root, "lib"), "std"), "re")
     if fs.exists(check_root) and fs.remove_tree(check_root) != 0:
@@ -305,29 +315,24 @@ pub fn pcre2_count_generated_errors(ctx: &ActionCtx, generated_dir: &str, print_
     let pcre2test = pcre2_join(re_dir, "pcre2test.w")
     if not fs.exists(pcre2test):
         return pcre2_fail(ctx, "missing pcre2test.w for cohesive check: " ++ pcre2test)
-    let ws = ctx.create_workspace("pcre2-cohesive-check")
-    ws.add_file(pcre2test)
-    var options = ws.options()
-    options.output_kind = BuildOutputKind.Check
-    ws.set_options(options)
-    ws.begin_intercept()
-    let result = ws.compile()
-    var saw_complete = false
-    var rc = result.rc
-    while not saw_complete:
-        var envelope = ws.wait_for_message()
-        match move envelope.message:
-            CompilerMessage.Complete(done) =>
-                rc = done.rc
-                saw_complete = true
-            CompilerMessage.Error(_, message, _) =>
-                let _ = pcre2_fail(ctx, "cohesive-check workspace error: " ++ message)
-                return -1
-            _ => false
-    ws.end_intercept()
+    let root = ctx.project_info().project_root()
+    var argv: Vec[str] = Vec.new()
+    argv.push(pcre2_abs(root, compiler))
+    argv.push("check")
+    argv.push(pcre2_abs(root, pcre2test))
+    argv.push("--bundle-corpus")
+    argv.push("std/re")
+    argv.push("--no-prelude")
+    let stdout = pcre2_abs(root, pcre2_join(check_root, "check.stdout"))
+    let stderr = pcre2_abs(root, pcre2_join(check_root, "check.stderr"))
+    let checked = ctx.process_runner().run_capture_cwd(argv, stdout, stderr.clone(), 600000, root)
+    let rc = checked.rc
     if print_summary:
         print(f"pcre2 cohesive check rc={rc}")
-    if rc == 0: 0 else: 1
+    if rc == 0: 0 else:
+        eprint(fs.read_text(stderr))
+        let _ = pcre2_fail(ctx, f"the migrated library does not type-check with its harness (exit {rc}); see " ++ stderr)
+        1
 
 fn pcre2_prepare_reference_tree(ctx: &ActionCtx, ref_dir: &str) -> i32:
     let fs = ctx.fs()
@@ -461,9 +466,10 @@ pub fn run_pcre2_build_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()
     let root = ctx.project_info().project_root()
     let output_dir = ctx.output()
-    if inputs.len() == 0 or output_dir.len() == 0:
-        return pcre2_fail(ctx, "requires migrated-dir input and output directory")
+    if inputs.len() < 2 or output_dir.len() == 0:
+        return pcre2_fail(ctx, "requires migrated-dir and compiler inputs and an output directory")
     let migrated_dir = inputs[0]
+    let compiler = inputs[1]
     if not fs.is_dir(migrated_dir):
         return pcre2_fail(ctx, "missing migrated PCRE2 directory: " ++ migrated_dir ++ " - run pcre2-migrate deliberately")
     let scratch_dir = pcre2_scratch_dir(ctx)
@@ -480,7 +486,7 @@ pub fn run_pcre2_build_action(ctx: ActionCtx) -> i32:
     let copy_rc = pcre2_copy_w_files(ctx, migrated_dir, re_dir)
     if copy_rc != 0:
         return copy_rc
-    let errors = pcre2_count_generated_errors(ctx, re_dir, true)
+    let errors = pcre2_count_generated_errors(ctx, re_dir, compiler, true)
     if errors < 0:
         return 1
     if errors != 0:
@@ -490,14 +496,25 @@ pub fn run_pcre2_build_action(ctx: ActionCtx) -> i32:
     let pcre2test_bin = pcre2_join(bin_dir, "pcre2test")
     if not fs.exists(pcre2test_src):
         return pcre2_fail(ctx, "missing pcre2test source after copy: " ++ pcre2test_src)
-    let workspace = ctx.create_workspace("pcre2-build")
-    workspace.add_file(pcre2test_src)
-    var options = workspace.options()
-    options.output_path = pcre2_owned_text(pcre2test_bin)
-    workspace.set_options(options)
-    let result = workspace.compile()
+    // The harness over the MIGRATED corpus, compiled in-unit by the release
+    // compiler (`--bundle-corpus std/re`, as the cohesive check above):
+    // through the Workspace API the embedded std.re bundle would stand in
+    // for the sources just copied.
+    var build_argv: Vec[str] = Vec.new()
+    build_argv.push(pcre2_abs(root, compiler))
+    build_argv.push("build")
+    build_argv.push(pcre2_abs(root, pcre2test_src))
+    build_argv.push("--bundle-corpus")
+    build_argv.push("std/re")
+    build_argv.push("--no-prelude")
+    build_argv.push("-o")
+    build_argv.push(pcre2_abs(root, pcre2test_bin))
+    let build_stdout = pcre2_abs(root, pcre2_join(tmp_dir, "build.stdout"))
+    let build_stderr = pcre2_abs(root, pcre2_join(tmp_dir, "build.stderr"))
+    let result = ctx.process_runner().run_capture_cwd(build_argv, build_stdout, build_stderr.clone(), 900000, root)
     if result.rc != 0:
-        return pcre2_fail(ctx, f"failed building pcre2test with exit code {result.rc}")
+        eprint(fs.read_text(build_stderr))
+        return pcre2_fail(ctx, f"failed building pcre2test with exit code {result.rc}; see " ++ build_stderr)
     if not fs.exists(pcre2test_bin):
         return pcre2_fail(ctx, "did not produce pcre2test binary: " ++ pcre2test_bin)
     let remove_old_rc = pcre2_remove_tree_if_exists(ctx, output_dir)
@@ -587,8 +604,8 @@ fn pcre2_stage(ctx: &ActionCtx, corpus: &Corpus, reference: &str, source: &str) 
 fn pcre2_finish(ctx: &ActionCtx, corpus: &Corpus, generated: &str) -> i32:
     pcre2_ensure_generated_dependencies(ctx, generated)
 
-fn pcre2_verify(ctx: &ActionCtx, corpus: &Corpus, generated: &str) -> i32:
-    let errors = pcre2_count_generated_errors(ctx, generated, true)
+fn pcre2_verify(ctx: &ActionCtx, corpus: &Corpus, generated: &str, compiler: &str) -> i32:
+    let errors = pcre2_count_generated_errors(ctx, generated, compiler, true)
     if errors < 0: return 1
     if errors != 0: return pcre2_fail(ctx, f"generated sources have {errors} remaining errors")
     0
@@ -610,7 +627,7 @@ fn pcre2_lanes(out: Build, ctx: &BuildCtx, corpus: &Corpus, release_compiler: &s
     var build = target_new(.Action, "pcre2-build", "").output("out/pcre2_build")
     build.action = run_pcre2_build_action
     build = build.write_scope("out/tmp/action-scratch/pcre2-build")
-    build = build.input("out/pcre2_migrated").dep("build").dep("pcre2-migrate")
+    build = build.input("out/pcre2_migrated").input(release_compiler.clone()).dep("build").dep("pcre2-migrate")
     graph = graph.add_target(build)
 
     var test = target_new(.Action, "pcre2-test", "").output("out/corpus/pcre2-test")

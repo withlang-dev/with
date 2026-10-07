@@ -70,7 +70,12 @@ fn dump_side(label: &str, src_dir: &str, main: &str, sub: &str) -> str:
         let name = parts[parts.len() as i32 - 1].to_owned()
         let text = read_or_fail(src_dir ++ "/" ++ name)
         if write_file(lib_dir ++ "/" ++ name, text) != 0: fail("could not copy " ++ name)
-    let argv: Vec[str] = ["with", "check", "lib/std/" ++ sub ++ "/" ++ main, "--dump-mir"]
+    // The corpus on its source and without the prelude, as its bundle
+    // builds: with the embedded interface answering `use std.<sub>.X` the
+    // dump holds no corpus body at all, and with the prelude on its
+    // std.regex reaches the checkout's lib/std/re beside this tree (refused:
+    // one std module, one source).
+    let argv: Vec[str] = ["with", "check", "lib/std/" ++ sub ++ "/" ++ main, "--dump-mir", "--bundle-corpus", "std/" ++ sub, "--no-prelude"]
     let out_path = root ++ "/mir.txt"
     let finished = run_to_files_in(root, &argv, out_path, root ++ "/mir.stderr")
     if finished.code != 0:

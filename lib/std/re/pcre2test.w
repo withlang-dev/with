@@ -16058,7 +16058,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_276 {
-        unsafe { pcre2_jit_stack_assign_8(dat_context_8, jit_callback_8, (jit_stack_8 as *mut c_void)) }
+        unsafe { pcre2_jit_stack_assign_8(dat_context_8, Some(jit_callback_8), (jit_stack_8 as *mut c_void)) }
         goto '__ci_bb_274
     }
 
@@ -16075,7 +16075,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_279 {
-        unsafe { pcre2_jit_stack_assign_8(dat_context_8, jit_callback_8, null) }
+        unsafe { pcre2_jit_stack_assign_8(dat_context_8, Some(jit_callback_8), null) }
         goto '__ci_bb_280
     }
 

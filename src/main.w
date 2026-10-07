@@ -3763,6 +3763,10 @@ fn cli_check_compilation(no_std: bool, alloc_mode: bool, runtime_available: bool
     comp.configure(0, no_std, alloc_mode, runtime_available)
     comp.set_prelude_mode(prelude_mode)
     comp.set_link_bundles(&driver_link_bundle_args(with_arg_count()))
+    // D38: a dump or trace of a bundle corpus reads the corpus's source,
+    // as `check` does; without this every `--dump-*`/`--trace-*` resolved
+    // the corpus to the embedded interface and dumped no corpus body.
+    comp.set_bundle_fingerprint(driver_bundle_corpus_arg(with_arg_count()), "")
     comp
 
 fn dump_typed_artifact(source_file: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:

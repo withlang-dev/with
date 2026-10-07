@@ -1134,6 +1134,10 @@ impl CiProject:
                     i = i + 1
                     continue
                 if with_cimport_fn_storage_class(session, i) == CX_SC_STATIC:
+                    // D107: a static definition's NULL arguments are corpus
+                    // caller evidence even though it is no project symbol.
+                    if cursor >= 0 and with_ci_cursor_is_definition(session, cursor) != 0:
+                        self.record_call_evidence(session, cursor, name)
                     // A `static inline` function DEFINED in a header is the
                     // header's API: every includer compiles a private copy,
                     // and the unit of the same name (tommyhashdyn.c for
@@ -1656,6 +1660,20 @@ impl CiProject:
             else if (parts[0] == "field" or parts[0] == "global") and parts.len() == 2:
                 let pi = ci_index_of_name(&names, parts[1])
                 if pi >= 0: self.symbols[symbol_id].param_sinks[pi] = self.symbols[symbol_id].param_sinks[pi] ++ parts[0] ++ ";"
+
+    // A static definition is not a project symbol, but its calls are corpus
+    // calls: a NULL it passes to a corpus function is caller evidence
+    // (pcre2test's `pcre2_jit_stack_assign(ctx, NULL, NULL)`).
+    mut fn record_call_evidence(session: i64, cursor: i32, fname: &str):
+        let none: Vec[str] = Vec.new()
+        for line in ci_body_call_evidence(session, cursor, &none).split("\n"):
+            let parts = line.split(":")
+            if parts.len() != 3 or parts[0] != "null": continue
+            let callee = self.ensure_symbol(CiProjectSymbolKind.CIPS_FN, parts[1])
+            let index = parse(parts[2])
+            self.symbols[callee].grow_params(index + 1)
+            if self.symbols[callee].param_null_caller[index].len() == 0:
+                self.symbols[callee].param_null_caller[index] = fname.to_owned()
 
     // The least fixed point over the corpus (D107): a parameter is Option
     // when its body tests it with a continuing NULL branch, a corpus caller

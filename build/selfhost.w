@@ -8340,7 +8340,7 @@ fn bs_check_pcre2_compile_builds(ctx: &ActionCtx, compiler_path: &str, base_dir:
     let root = ctx.project_info().project_root()
     let src = bs_join(base_dir, "pcre2_compile_builds.w")
     let bin = bs_join(base_dir, "pcre2_compile_builds")
-    var rc = bs_write_fixture(ctx, src, "use std.re.defs\nuse std.re.pcre2_compile\n\nfn main:\n    let _ = pcre2_compile_8((null as *const u8), 0, 0, (null as *mut c_int), (null as *mut c_ulong), (null as *mut pcre2_real_compile_context_8))\n    print(\"ok\")\n", "pcre2 compile builds")
+    var rc = bs_write_fixture(ctx, src, "use std.re.defs\nuse std.re.pcre2_compile\n\nfn main:\n    let _ = unsafe { pcre2_compile_8((null as *const u8), 0, 0, (null as *mut c_int), (null as *mut c_ulong), (null as *mut pcre2_real_compile_context_8)) }\n    print(\"ok\")\n", "pcre2 compile builds")
     if rc != 0: return rc
     var args: Vec[str] = Vec.new()
     args |> push("build")
@@ -8360,24 +8360,63 @@ fn bs_check_pcre2_compile_builds(ctx: &ActionCtx, compiler_path: &str, base_dir:
 fn bs_check_pcre2_jit_no_support(ctx: &ActionCtx, compiler_path: &str, base_dir: &str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(base_dir, "pcre2_jit_no_support.w")
-    let text = "use std.re.defs\nuse std.re.pcre2_jit_compile\n\n// D107: the callback parameter is non-null (no corpus caller passes NULL); the\n// smoke call hands it a function.\nfn no_jit_stack(_data: *mut c_void) -> *mut pcre2_real_jit_stack_8: null\n\nfn main() -> i32:\n    let rc_null = pcre2_jit_compile_8((null as *mut pcre2_real_code_8), 0)\n    if rc_null != PCRE2_ERROR_NULL: return 1\n\n    let rc_test_alloc = pcre2_jit_compile_8((null as *mut pcre2_real_code_8), PCRE2_JIT_TEST_ALLOC)\n    if rc_test_alloc != PCRE2_ERROR_JIT_UNSUPPORTED: return 2\n\n    let stack = pcre2_jit_stack_create_8(1, 1024, (null as *mut pcre2_real_general_context_8))\n    if stack != null: return 3\n\n    pcre2_jit_stack_assign_8((null as *mut pcre2_real_match_context_8), no_jit_stack, (null as *mut c_void))\n    pcre2_jit_stack_free_8(stack)\n    pcre2_jit_free_unused_memory_8((null as *mut pcre2_real_general_context_8))\n    _pcre2_jit_free_rodata_8((null as *mut c_void), (null as *mut c_void))\n    _pcre2_jit_free_8((null as *mut c_void), (null as *mut pcre2_memctl))\n\n    if _pcre2_jit_get_size_8((null as *mut c_void)) != 0: return 4\n    if _pcre2_jit_get_target_8() == null: return 5\n    return 0\n"
+    let bin = bs_join(base_dir, "pcre2_jit_no_support")
+    let text = "use std.re.defs\nuse std.re.pcre2_jit_compile\n\nfn main() -> i32:\n    unsafe {\n        let rc_null = pcre2_jit_compile_8((null as *mut pcre2_real_code_8), 0)\n        if rc_null != PCRE2_ERROR_NULL: return 1\n\n        let rc_test_alloc = pcre2_jit_compile_8((null as *mut pcre2_real_code_8), PCRE2_JIT_TEST_ALLOC)\n        if rc_test_alloc != PCRE2_ERROR_JIT_UNSUPPORTED: return 2\n\n        let stack = pcre2_jit_stack_create_8(1, 1024, (null as *mut pcre2_real_general_context_8))\n        if stack != null: return 3\n\n        pcre2_jit_stack_assign_8((null as *mut pcre2_real_match_context_8), null, (null as *mut c_void))\n        pcre2_jit_stack_free_8(stack)\n        pcre2_jit_free_unused_memory_8((null as *mut pcre2_real_general_context_8))\n        _pcre2_jit_free_rodata_8((null as *mut c_void), (null as *mut c_void))\n        _pcre2_jit_free_8((null as *mut c_void), (null as *mut pcre2_memctl))\n\n        if _pcre2_jit_get_size_8((null as *mut c_void)) != 0: return 4\n        if _pcre2_jit_get_target_8() == null: return 5\n        return 0\n    }\n"
     var rc = bs_write_fixture(ctx, src, text, "pcre2 jit no support")
     if rc != 0: return rc
-    // The migrated pcre2 jit surface is module-private (no pub); external
-    // code must be REJECTED. This case used to expect success — which only
-    // ever held while the pre-#660 pattern-binding corruption silently
-    // disabled visibility checks here — so it now guards the privacy
-    // enforcement instead. Re-testing the jit-unsupported contract needs a
-    // pub surface from the migrator: #662.
+    // The jit-unsupported contract of the migrated pcre2 (SUPPORT_JIT off):
+    // every jit entry point answers "unsupported" or does nothing, and the
+    // migrator exports the surface (`pub unsafe fn`, #662 resolved), so the
+    // fixture builds against it and runs to exit 0. (Between #660 and #662
+    // this case guarded the module-private surface instead.)
+    var args: Vec[str] = Vec.new()
+    args |> push("build")
+    args |> push(bs_abs(root, src))
+    args |> push("-o")
+    args |> push(bs_abs(root, bin))
+    let built = bs_pcre2_expect_success(ctx, compiler_path, base_dir, "pcre2-jit-no-support", args)
+    if built.rc != 0: return built.rc
+    let ran = bs_run_binary_capture(ctx, bs_abs(root, bin), "pcre2-jit-no-support-run", 120000)
+    if ran.rc != 0:
+        return bs_fail(ctx, f"pcre2 jit-unsupported contract failed with exit code {ran.rc}: " ++ ran.stderr)
+    0
+
+// One std module, one source: a harness under its own lib/std/re tree,
+// compiled with the prelude on and the corpus on source, has its `use
+// std.re.defs` reach its tree while the prelude's std.regex reaches the
+// checkout's lib/std/re. Two module instances of one source is refused,
+// never compiled into two sets of globals (the pcre2test panic that found
+// it). The same harness compiles with --no-prelude.
+fn bs_check_std_module_two_sources(ctx: &ActionCtx, compiler_path: &str, base_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let re_dir = bs_join(bs_join(bs_join(base_dir, "lib"), "std"), "re")
+    var rc = bs_write_fixture(ctx, bs_join(re_dir, "defs.w"), "pub type c_int = i32\n", "std module two sources defs")
+    if rc != 0: return rc
+    let src = bs_join(re_dir, "harness.w")
+    rc = bs_write_fixture(ctx, src, "use std.re.defs\n\nfn main -> i32:\n    let n: c_int = 0\n    n\n", "std module two sources harness")
+    if rc != 0: return rc
     var args: Vec[str] = Vec.new()
     args |> push("check")
     args |> push(bs_abs(root, src))
-    let result = bs_run_cli_capture_cwd(ctx, compiler_path, "pcre2-jit-no-support", args, 120000, base_dir)
+    args |> push("--bundle-corpus")
+    args |> push("std/re")
+    let result = bs_run_cli_capture_cwd(ctx, compiler_path, "std-module-two-sources", args, 120000, root)
     if result.rc == 0:
-        return bs_fail(ctx, "private pcre2 jit symbols were visible to external code")
-    bs_assert_contains(ctx, result.stderr, "is private to its package", "pcre2_jit_no_support")
+        return bs_fail(ctx, "compiled std.re.defs from two files in one compilation")
+    rc = bs_assert_contains(ctx, result.stderr, "module 'std.re.defs' is loaded from two files in one compilation", "std_module_two_sources")
+    if rc != 0: return rc
+    var ok_args: Vec[str] = Vec.new()
+    ok_args |> push("check")
+    ok_args |> push(bs_abs(root, src))
+    ok_args |> push("--bundle-corpus")
+    ok_args |> push("std/re")
+    ok_args |> push("--no-prelude")
+    let ok = bs_run_cli_capture_cwd(ctx, compiler_path, "std-module-one-source", ok_args, 120000, root)
+    if ok.rc != 0:
+        return bs_fail(ctx, "the harness did not compile on its own tree with --no-prelude: " ++ ok.stderr)
+    0
 
-fn bs_check_pcre2_generated_existing_main(ctx: &ActionCtx, case_dir: &str) -> i32:
+fn bs_check_pcre2_generated_existing_main(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let generated_dir = bs_join(case_dir, "generated")
     var rc = bs_write_fixture(ctx, bs_join(generated_dir, "defs.w"), "// std.re.defs\ntype c_int = i32\n", "pcre2 generated defs")
     if rc != 0: return rc
@@ -8385,7 +8424,7 @@ fn bs_check_pcre2_generated_existing_main(ctx: &ActionCtx, case_dir: &str) -> i3
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(generated_dir, "pcre2test.w"), "// Migrated from PCRE2\nuse std.re.defs\n\nfn main() -> i32:\n    0\n", "pcre2 generated existing main")
     if rc != 0: return rc
-    let errors = pcre2_count_generated_errors(ctx, generated_dir, true)
+    let errors = pcre2_count_generated_errors(ctx, generated_dir, compiler_path, true)
     if errors < 0:
         return 1
     if errors != 0:
@@ -8429,7 +8468,9 @@ pub fn run_cli_selfhost_pcre2_prep_action(ctx: ActionCtx) -> i32:
     if rc != 0: return rc
     rc = bs_check_pcre2_jit_no_support(ctx, compiler_path, bs_join(output_dir, "pcre2_jit_no_support_case"))
     if rc != 0: return rc
-    bs_check_pcre2_generated_existing_main(ctx, bs_join(output_dir, "pcre2_generated_existing_main_case"))
+    rc = bs_check_std_module_two_sources(ctx, compiler_path, bs_join(output_dir, "std_module_two_sources_case"))
+    if rc != 0: return rc
+    bs_check_pcre2_generated_existing_main(ctx, compiler_path, bs_join(output_dir, "pcre2_generated_existing_main_case"))
 
 fn bs_split_words(line: &str) -> Vec[str]:
     let words: Vec[str] = Vec.new()

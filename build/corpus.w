@@ -71,7 +71,7 @@ pub type Corpus ephemeral {
     // fix up the generated tree before the root is written
     finish_generated: fn(&ActionCtx, &Corpus, &str) -> i32,
     // extra checks over the generated tree (check-generated and promote)
-    verify_generated: fn(&ActionCtx, &Corpus, &str) -> i32,
+    verify_generated: fn(&ActionCtx, &Corpus, &str, &str) -> i32,
     // the corpus's test lanes; receives the release compiler path
     lanes: fn(Build, &BuildCtx, &Corpus, &str) -> Build,
 }
@@ -100,7 +100,7 @@ pub fn upstream_release(name: &str, release: &str, url: &str, sha256: &str) -> U
 
 pub fn corpus_no_prepare(ctx: &ActionCtx, corpus: &Corpus, reference: &str) -> i32: 0
 pub fn corpus_no_finish(ctx: &ActionCtx, corpus: &Corpus, generated: &str) -> i32: 0
-pub fn corpus_no_verify(ctx: &ActionCtx, corpus: &Corpus, generated: &str) -> i32: 0
+pub fn corpus_no_verify(ctx: &ActionCtx, corpus: &Corpus, generated: &str, compiler: &str) -> i32: 0
 pub fn corpus_no_lanes(out: Build, ctx: &BuildCtx, corpus: &Corpus, release_compiler: &str) -> Build: out
 
 // ── shared helpers ──────────────────────────────────────────────

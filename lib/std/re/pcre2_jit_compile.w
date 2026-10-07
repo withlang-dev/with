@@ -28,6 +28,7 @@ use std.re.pcre2_string_utils
 use std.re.pcre2_study
 use std.re.pcre2_valid_utf
 use std.re.pcre2_xclass
+use std.option
 
 pub unsafe fn pcre2_jit_compile_8(__param_code: *mut pcre2_real_code_8, __param_options: c_uint) -> c_int {
     var __local_re: *mut pcre2_real_code_8 = __param_code
@@ -87,7 +88,7 @@ pub unsafe fn pcre2_jit_stack_create_8(__param_startsize: c_ulong, __param_maxsi
 
 }
 
-pub unsafe fn pcre2_jit_stack_assign_8(__param_mcontext: *mut pcre2_real_match_context_8, __param_callback: unsafe extern "C" fn(*mut c_void) -> *mut pcre2_real_jit_stack_8, __param_callback_data: *mut c_void) {
+pub unsafe fn pcre2_jit_stack_assign_8(__param_mcontext: *mut pcre2_real_match_context_8, __param_callback: Option[unsafe extern "C" fn(*mut c_void) -> *mut pcre2_real_jit_stack_8], __param_callback_data: *mut c_void) {
     return
 }
 

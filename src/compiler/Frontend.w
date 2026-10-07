@@ -2007,6 +2007,12 @@ impl Zcu:
         if do_profile:
             let imports_ns = runtime_clock_nanos() - t_imports
             runtime_eprint(f"[profile] frontend.imports  {imports_ns / 1000000}.{(imports_ns % 1000000) / 1000} ms")
+        // Every module is registered now (the prelude closure first, the
+        // root's imports here): a std module loaded from two files is
+        // refused before anything resolves against two instances of it
+        // (Zcu add_imported_path).
+        for message in self.import_conflict_messages():
+            self.diagnostics.emit(Diagnostic.err(message, Span { file: 0, start: 0, end: 0 }))
         if self.pending_iface_paths.len() as i32 > 0:
             let pending_paths = move self.pending_iface_paths
             let pending_texts = move self.pending_iface_texts

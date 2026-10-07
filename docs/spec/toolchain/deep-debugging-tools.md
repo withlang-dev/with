@@ -235,7 +235,11 @@ sites, three rebuilds, and the failure was not in the text). The order:
    ```
 
    lays each side out as `lib/std/<subdir>/` under `out/tmp/migrate-diff/`,
-   checks `<main.w>` with `--dump-mir`, splits the dump per function and
+   checks `<main.w>` with `--dump-mir --bundle-corpus std/<subdir> --no-prelude`
+   (the corpus on its source: the embedded interface would answer every
+   `use std.<subdir>.X` and the dump would hold no corpus body; the prelude
+   off, as the bundle builds, or its std.regex reaches the checkout's
+   lib/std/re beside this tree), splits the dump per function and
    compares the statements with every id normalized (`symN`, `_N`, `bbN`,
    `tyN`, `.fN` are positions, not meaning). It names each function whose
    lowering differs and prints the statements present on one side only;
@@ -978,7 +982,7 @@ CLI dumps (`with check <file> <flag>`):
 | `--dump-tokens`, `--dump-ast`, `--dump-resolved`, `--dump-typed` | the lexer's tokens, the AST, resolution, and Sema's types per node |
 | `WITH_DEBUG_PERMUTE_TAGS=1` | compiler | plain enums get reversed tags, meaning unchanged: any behavior change is code that assumed a tag (route: a wrong variant) |
 | `WITH_TRACE_VARIANT_FALLBACK=1` | compiler | each variant lookup MirLower answered by name in a type that does not declare the variant |
-| `--dump-mir`, `--dump-async-mir` | the lowered MIR bodies (synchronous, and after the async transform); also when the typed validator refused one (`internal compiler error: invalid MIR before codegen … in \`Type.fn\``): the ICE names the body, and `--dump-mir` / `--explain-mir-origin '<fn>:_N'` read the invalid statement |
+| `--dump-mir`, `--dump-async-mir` | the lowered MIR bodies (synchronous, and after the async transform); every dump and trace flag reads `--bundle-corpus <corpus>` as `check` does, so a corpus module dumps from its source rather than vanishing behind its embedded interface; also when the typed validator refused one (`internal compiler error: invalid MIR before codegen … in \`Type.fn\``): the ICE names the body, and `--dump-mir` / `--explain-mir-origin '<fn>:_N'` read the invalid statement |
 | `--dump-place-map`, `--dump-drop-state`, `--dump-drop-plan`, `--dump-abi` | see the drop-state view and `--dump-abi` above |
 | `--trace-place`, `--explain-mir-origin`, `--trace-ownership`, `--trace-cleanup-edge` | one place's history, where a MIR local came from, its ownership states, one CFG edge |
 | `--validate-ownership`, `--validate-all` | the MIR validators |
@@ -994,6 +998,7 @@ Environment switches (set on the compiler's run unless noted):
 |---|---|---|
 | `WITH_PROFILE=1` | frontend, Sema | one `[profile]` line per phase with its time |
 | `WITH_DEBUG_STAGE1_TRACE=1` | Sema | each unknown type name with what lookup saw |
+| `WITH_DEBUG_IMPORTS=1` | frontend | every module file the loader registers, the key it dedups on and the identity a std module is one source under (two files under one identity is the refused "loaded from two files" case) |
 | `WITH_TRACE_INST=1` | Sema | every generic instance added, and the eager pass's preregistration |
 | `WITH_DEBUG_BORROWS=1` | Sema | each view binding's dependencies and the borrow table at every read and mutation check |
 | `WITH_DEBUG_MOVE=1` | Sema | move state per binding (`[state]`) and non-Copy classifications |

@@ -108,14 +108,14 @@ pub fn run_corpus_migrate_action(ctx: ActionCtx) -> i32:
     print("migrated " ++ corpus.name ++ f": {corpus_count_w_files(ctx, output)} modules in " ++ corpus_abs(ctx, output))
     0
 
-fn corpus_check_generated(ctx: &ActionCtx, corpus: &Corpus, generated: &str) -> i32:
+fn corpus_check_generated(ctx: &ActionCtx, corpus: &Corpus, generated: &str, compiler: &str) -> i32:
     if corpus_reject_bad_output(ctx, corpus, generated) != 0: return 1
     if corpus_reject_foreign_symbols(ctx, corpus, generated) != 0: return 1
-    corpus.verify_generated(ctx, corpus, generated)
+    corpus.verify_generated(ctx, corpus, generated, compiler)
 
 pub fn run_corpus_check_generated_action(ctx: ActionCtx) -> i32:
     let owned = action_corpus(ctx)
-    if corpus_check_generated(ctx, &owned, ctx.inputs()[0]) != 0: return 1
+    if corpus_check_generated(ctx, &owned, ctx.inputs()[0], ctx.inputs()[1]) != 0: return 1
     if corpus_check_every_module(ctx, &owned, ctx.inputs()[0], ctx.inputs()[1]) != 0: return 1
     if ctx.fs().write_text(ctx.output(), "ok\n") != 0: return corpus_fail(ctx, "cannot write " ++ ctx.output())
     0
@@ -128,7 +128,7 @@ pub fn run_corpus_promote_action(ctx: ActionCtx) -> i32:
     let corpus = &owned
     let generated = ctx.inputs()[0]
     let destination = ctx.output()
-    if corpus_check_generated(ctx, corpus, generated) != 0: return 1
+    if corpus_check_generated(ctx, corpus, generated, ctx.inputs()[1]) != 0: return 1
     if fs.mkdir_all(destination) != 0: return corpus_fail(ctx, "cannot create " ++ destination)
     for path in fs.list_files(destination):
         if path.ends_with(".w") and fs.remove_file(path) != 0: return corpus_fail(ctx, "cannot remove " ++ path)
@@ -246,7 +246,7 @@ pub fn corpus_pipeline(out: Build, ctx: &BuildCtx, corpus: &Corpus, release_comp
 
     var promote = corpus_target(.Action, corpus, "promote", corpus.corpus_dir.clone())
     promote.action = run_corpus_promote_action
-    promote = promote.input(corpus_migrated_dir(corpus)).dep(corpus.stem ++ "-check-generated")
+    promote = promote.input(corpus_migrated_dir(corpus)).input(release_compiler.clone()).dep(corpus.stem ++ "-check-generated")
     for after in corpus.promote_after: promote = promote.dep(after.clone())
     graph = graph.add_target(promote)
 
