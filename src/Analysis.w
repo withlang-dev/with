@@ -2504,6 +2504,8 @@ fn analysis_help() -> str:
         "  audit:calls|effects|storage|methods|mir|returns|receivers|receiver-surface|phase|pool-views|contract|resolution|codegen|trait-tables|all\n" ++
         "  audit:resolution                        D65: every MIR callee and argument count agrees with Sema's resolution of the call it lowers, and every expression's operand has Sema's type\n" ++
         "  select:kind=operator,detail~fn:<fn>     how codegen lowered each binary operator (route, operand types)\n" ++
+        "  explain:visible:<name>                 every declaration a name could resolve to from the root, its module marks, and the verdict with each rule and walk edge\n" ++
+        "  explain:modules                        why each module is loaded: package, engine, prelude-closure, corpus-private, and its importers\n" ++
         "  explain:origin:<fn>[:<binding>]         the view origins Sema recorded: per parameter and per view binding\n" ++
         "  contract                                the modeled foreign contract (§16.2b): every fact with its provenance, then audit:contract\n" ++
         "  move-sites | seam-sites                 ownership worklists (owned-param call sites; aliasing/blanking seams)\n" ++

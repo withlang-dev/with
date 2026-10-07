@@ -2272,6 +2272,10 @@ pub type Sema {
     decl_visibility_nodes: Vec[i32],           // parallel declaration node
     decl_visibility_index: HashMap[i32, i32],  // symbol → its newest record; older records chain through decl_visibility_prev
     decl_visibility_prev: Vec[i32],
+    // #2249: the visibility explainer (`with analyze … explain:visible:<name>`):
+    // every rule a verdict passed through, when on.
+    visibility_explain_on: i32,
+    visibility_explain_log: Vec[str],
     decl_visibility_node_index: HashMap[i32, i32], // declaration node → its record
     // #1350: fns the flat merge displaced to a module-qualified identity
     // (`name$in$<module>`), chained per short name like decl_visibility.
@@ -3807,6 +3811,8 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         decl_visibility_pub: Vec.new(),
         decl_visibility_nodes: Vec.new(),
         decl_visibility_index: sema_new_map_i32_i32(),
+        visibility_explain_on: 0,
+        visibility_explain_log: sema_new_vec_str(),
         decl_visibility_prev: Vec.new(),
         decl_visibility_node_index: sema_new_map_i32_i32(),
         displaced_fn_index: sema_new_map_i32_i32(),
@@ -4361,6 +4367,83 @@ impl Sema:
 
     // D100: a module path's package; a path the Zcu never saw is the
     // program's (std's when it is a std path).
+    fn vis_note(text: &str):
+        if self.visibility_explain_on != 0: self.visibility_explain_log.push(with_str_clone_ref(text))
+
+    // `with analyze file.w 'explain:visible:<name>'` (#2249): every
+    // declaration `name` could resolve to from the root module — values and
+    // types — with its module, package, engine id, prelude-closure and
+    // corpus-private marks, then the verdict and every rule and walk edge it
+    // passed through. A hunt that was "toggle a rule and rebuild" is one run.
+    pub mut fn explain_visibility(name: &str) -> str:
+        let sym = self.pool_lookup_symbol(name)
+        if sym == 0: return "explain:visible " ++ name ++ "\n  no declaration or use of that name anywhere in the compilation\n"
+        var out = "explain:visible " ++ name ++ "\n"
+        let saved_module = with_str_clone_ref(self.current_module_path)
+        if self.module_paths.len() > 0: self.current_module_path = with_str_clone_ref(self.module_paths[0])
+        out = out ++ "  from module " ++ self.current_module_path ++ " (package " ++ self.package_of(self.current_module_path) ++ ")\n"
+        var candidates = 0
+        var vi = if self.decl_visibility_index.contains(sym): self.decl_visibility_index.get(sym).unwrap() else: -1
+        while vi >= 0:
+            candidates = candidates + 1
+            let path = with_str_clone_ref(self.decl_visibility_paths[vi])
+            let is_pub: i32 = self.decl_visibility_pub[vi] + 0
+            out = out ++ self.explain_one_candidate("value", sym, path, is_pub)
+            vi = if vi < self.decl_visibility_prev.len() as i32: self.decl_visibility_prev[vi] else: -1
+        var ti = self.named_type_candidate_head(sym)
+        while ti >= 0:
+            candidates = candidates + 1
+            let path = with_str_clone_ref(self.named_type_candidate_paths[ti])
+            out = out ++ self.explain_one_candidate("type", sym, path, self.named_type_candidate_pub[ti])
+            ti = self.named_type_candidate_next[ti]
+        var di = if self.displaced_fn_index.contains(sym): self.displaced_fn_index.get(sym).unwrap() else: -1
+        while di >= 0:
+            candidates = candidates + 1
+            let path = with_str_clone_ref(self.displaced_fn_paths[di])
+            let dpub: i32 = self.displaced_fn_pub[di] + 0
+            out = out ++ self.explain_one_candidate("displaced value (#1350: another std module declares the name)", sym, path, dpub)
+            di = self.displaced_fn_prev[di]
+        if candidates == 0: out = out ++ "  no declaration of that name in any loaded module\n"
+        // The §18.2 fallback bridge: the module a bare, displaced std name
+        // resolves to from user code, with the bridge's own reasoning.
+        self.visibility_explain_log = sema_new_vec_str()
+        self.visibility_explain_on = 1
+        let bridge = self.std_fallback_bridge_path(sym)
+        self.visibility_explain_on = 0
+        for line in self.visibility_explain_log: out = out ++ "  " ++ line ++ "\n"
+        out = out ++ "  fallback bridge: " ++ (if bridge.len() > 0: "resolves the bare name to " ++ bridge else: "names no module (the bare name does not resolve through it)".to_owned()) ++ "\n"
+        self.current_module_path = saved_module
+        out
+
+    mut fn explain_one_candidate(what: &str, sym: i32, path: &str, is_pub: i32) -> str:
+        var out = "  " ++ what ++ " declared in " ++ (if path.len() > 0: with_str_clone_ref(path) else: "<no module path: the registration-time module was unset>".to_owned()) ++ " (package " ++ self.package_of(path) ++ f", pub={is_pub}, engine={self.engine_corpus_id(path)}, prelude-closure={self.module_in_prelude_closure(path)}, corpus-private={if self.corpus_private_modules.contains(path): 1 else: 0})\n"
+        self.visibility_explain_log = sema_new_vec_str()
+        self.visibility_explain_on = 1
+        self.module_visibility_cache = sema_new_map_str_i32()
+        let verdict = self.decl_visible_from_current_gated(path, is_pub, sym)
+        self.visibility_explain_on = 0
+        for line in self.visibility_explain_log: out = out ++ "    " ++ line ++ "\n"
+        out ++ f"    verdict: {verdict}\n"
+
+    // `with analyze file.w explain:modules`: why each module is in the
+    // compilation — its package, engine id, prelude-closure and
+    // corpus-private marks, and the modules that import it (the chain that
+    // pulled it in). The loaded set is what two compiler generations
+    // disagreed on (#2248).
+    pub fn explain_modules() -> str:
+        var out = "explain:modules\n"
+        for mi in 0..self.module_paths.len() as i32:
+            let path = with_str_clone_ref(self.module_paths[mi])
+            var importers = ""
+            for from in 0..self.module_paths.len() as i32:
+                if from >= self.module_import_starts.len() as i32: continue
+                let start = self.module_import_starts[from]
+                for ei in 0..self.module_import_counts[from]:
+                    if self.module_import_targets[start + ei] == mi:
+                        importers = importers ++ (if importers.len() > 0: ", " else: "") ++ self.module_paths[from]
+            out = out ++ f"  [{mi}] " ++ path ++ " package=" ++ self.package_of(path) ++ f" engine={self.engine_corpus_id(path)} prelude-closure={self.module_in_prelude_closure(path)} corpus-private={if self.corpus_private_modules.contains(path): 1 else: 0}" ++ (if importers.len() > 0: " imported-by: " ++ importers else: " imported-by: (root)") ++ "\n"
+        out
+
     fn package_of(path: &str) -> str:
         if self.package_keys.contains(path): return self.package_keys.get(path).unwrap().clone()
         if sema_tier_path_is_std_implementation(path) != 0: "<std>" else: "<program>"
@@ -4385,11 +4468,13 @@ impl Sema:
             return 1
         // #2248: a std module loaded only for a corpus's sake is not part of
         // any program's namespace (record_engine_corpora).
+        if self.corpus_private_modules.contains(target_path): self.vis_note("  refused: the module is corpus-private (#2248: loaded only for a corpus)")
         if self.corpus_private_modules.contains(target_path):
             return 0
         // D100 (§18.3): without `pub`, a declaration is visible throughout
         // its package — `pub` is what other packages need. It waives `pub`,
         // not the import: the module must still be visible from here.
+        if is_pub == 0 and self.package_of(target_path) != self.package_of(self.current_module_path): self.vis_note("  refused: not pub and another package (D100 §18.3): " ++ self.package_of(target_path) ++ " vs " ++ self.package_of(self.current_module_path))
         if is_pub == 0 and self.package_of(target_path) != self.package_of(self.current_module_path):
             return 0
         self.module_is_visible_from_current(target_path)
@@ -4424,13 +4509,19 @@ impl Sema:
             return 1
         let current_is_std = sema_tier_path_is_std_implementation(self.current_module_path)
         let target_is_std = sema_tier_path_is_std_implementation(target_path)
+        self.vis_note("gate: current=" ++ self.current_module_path ++ " target=" ++ target_path ++ f" current-std={current_is_std} target-std={target_is_std} pub={is_pub}")
         if current_is_std != 0 and target_is_std == 0:
+            self.vis_note("  refused: a std module never resolves a user-tier declaration")
             return 0
+        if current_is_std == 0 and target_is_std != 0 and sema_prelude_gate_allows_name(self.pool_resolve(sym)) != 0: self.vis_note("  §18.2 enumerated prelude name: the gate allows it")
         if current_is_std == 0 and target_is_std != 0 and sema_prelude_gate_allows_name(self.pool_resolve(sym)) == 0:
+            self.vis_note(f"  not an enumerated prelude name; engine={self.engine_corpus_id(target_path)} prelude-closure={self.module_in_prelude_closure(target_path)} corpus-private={if self.corpus_private_modules.contains(target_path): 1 else: 0}")
             if self.engine_corpus_id(target_path) != 0 or self.module_in_prelude_closure(target_path) != 0:
                 if self.module_visible_no_prelude(target_path) == 0:
+                    self.vis_note("  refused: an engine or prelude-closure module needs an explicit import path (no-prelude walk found none)")
                     return 0
         if target_is_std == 0 and self.unselected_import_path(target_path, sym).len() > 0:
+            self.vis_note("  refused: the import of that module selects names and not this one (#1744)")
             return 0
         self.decl_visible_from_current(target_path, is_pub)
 
@@ -4556,7 +4647,9 @@ impl Sema:
             return 0
         let cache_key = "noprelude|" ++ sema_visibility_cache_key(self.current_module_path, target_path)
         if self.module_visibility_cache.contains(cache_key):
-            return self.module_visibility_cache.get(cache_key).unwrap()
+            let cached: i32 = self.module_visibility_cache.get(cache_key).unwrap()
+            self.vis_note("  walk " ++ cache_key ++ f": cached verdict {cached}")
+            return cached
         let start_idx: i32 = self.module_index_by_path.get(with_str_clone_ref(self.current_module_path)).unwrap()
         let target_idx: i32 = self.module_index_by_path.get(target_path).unwrap()
         let seen: HashMap[i32, i32] = sema_new_map_i32_i32()
@@ -4570,6 +4663,7 @@ impl Sema:
                 continue
             seen.insert(current, 1)
             if current == target_idx:
+                self.vis_note("  walk reached " ++ target_path)
                 self.module_visibility_cache.insert(sema_owned_text(cache_key), 1)
                 return 1
             // D39 §3.4: a bundle corpus module compiled in-unit (--emit-c,
@@ -4597,9 +4691,11 @@ impl Sema:
                     if idx >= 0 and idx < self.module_import_paths.len() as i32:
                         let ip: str = with_str_clone_ref(self.module_import_paths[idx])
                         if ip == "std.prelude" or ip == "std.prelude_core" or ip == "std.prelude_alloc":
+                            self.vis_note("    no-prelude walk: skip " ++ self.module_paths[self.module_import_targets[idx]] ++ " (the synthetic prelude edge)")
                             continue
                         let target = self.module_import_targets[idx]
                         if corpus_boundary and not self.module_in_bundle_corpus(target):
+                            self.vis_note("    no-prelude walk: skip " ++ self.module_paths[target] ++ " (in-unit corpus boundary)")
                             continue
                         if current_engine >= 0 and target >= 0 and target < self.module_paths.len() as i32:
                             let target_engine = self.engine_corpus_id(self.module_paths[target])
@@ -4612,9 +4708,12 @@ impl Sema:
                             // import pulled std.os into every program's bare
                             // names on stage1 and not on the release compiler
                             // (#2248).
-                            if target_engine != current_engine:
+                            if target_engine != 0 and target_engine != current_engine:
+                                self.vis_note("    no-prelude walk: skip " ++ self.module_paths[target] ++ f" (corpus boundary: engine {current_engine} -> {target_engine})")
                                 continue
+                        self.vis_note("    no-prelude walk: " ++ self.module_paths[current] ++ " -> " ++ self.module_paths[target])
                         stack.push(target)
+        self.vis_note("  no-prelude walk: " ++ target_path ++ " not reached from " ++ self.current_module_path)
         self.module_visibility_cache.insert(sema_owned_text(cache_key), 0)
         0
 
@@ -4677,18 +4776,32 @@ impl Sema:
             paths.push(sema_owned_text(self.displaced_fn_paths[i]))
             pubs.push(self.displaced_fn_pub[i])
             i = self.displaced_fn_prev[i]
-        var engine_twin_was_ambient = false
+        // A bare name that two std modules declare is displaced (#1350); the
+        // fallback tier names the one non-engine std module declaring it.
+        // This used to require the engine twin to be "ambient" (reachable
+        // through the std-tier walk) — a proxy for "the prelude's closure
+        // loaded the corpus" that was always true, until D39 §3.4's corpus
+        // boundary made a corpus never ambient (#2248) and the proxy went
+        // false for every program (#2249, `is_alnum`). The engine twin's
+        // reachability says nothing about the std module's; the unique
+        // non-engine std declaration is the answer on its own.
+        var engine_twin = ""
         let modules = sema_new_vec_str()
         for pi in 0..paths.len() as i32:
             let path = paths[pi]
             if pubs[pi] == 0 or sema_tier_path_is_std_implementation(path) == 0:
+                self.vis_note("  bridge: skip " ++ path ++ (if pubs[pi] == 0: " (not pub)" else: " (not std)"))
                 continue
             if self.engine_corpus_id(path) != 0:
-                if self.module_is_visible_from_current(path) != 0:
-                    engine_twin_was_ambient = true
+                engine_twin = sema_owned_text(path)
+            else if self.corpus_private_modules.contains(path):
+                self.vis_note("  bridge: skip " ++ path ++ " (corpus-private, #2248)")
             else if sema_vec_str_contains(&modules, path) == 0:
                 modules.push(sema_owned_text(path))
-        if engine_twin_was_ambient and modules.len() as i32 == 1: sema_owned_text(modules[0]) else: ""
+        self.vis_note(f"  bridge: {modules.len()} non-engine std module(s) declare it" ++ (if engine_twin.len() > 0: "; engine twin " ++ engine_twin else: "; no engine twin"))
+        // Only a name an engine twin displaced takes the bridge: a std name
+        // nothing displaces resolves (or not) through the gate alone.
+        if engine_twin.len() > 0 and modules.len() as i32 == 1: sema_owned_text(modules[0]) else: ""
 
     fn decl_node_visible_from_current(node: i32) -> i32:
         if node == 0:
@@ -4805,7 +4918,9 @@ impl Sema:
             return 1
         let cache_key = sema_visibility_cache_key(self.current_module_path, target_path)
         if self.module_visibility_cache.contains(cache_key):
-            return self.module_visibility_cache.get(cache_key).unwrap()
+            let cached: i32 = self.module_visibility_cache.get(cache_key).unwrap()
+            self.vis_note("  walk " ++ cache_key ++ f": cached verdict {cached}")
+            return cached
         let start_idx: i32 = self.module_index_by_path.get(with_str_clone_ref(self.current_module_path)).unwrap()
         let target_idx: i32 = self.module_index_by_path.get(target_path).unwrap()
         if start_idx == target_idx:
@@ -4822,6 +4937,7 @@ impl Sema:
                 continue
             seen.insert(current, 1)
             if current == target_idx:
+                self.vis_note("  walk reached " ++ target_path)
                 self.module_visibility_cache.insert(sema_owned_text(cache_key), 1)
                 return 1
             if current >= 0 and current < self.module_import_starts.len() as i32:
@@ -4844,8 +4960,11 @@ impl Sema:
                         // std.libc import reached std.os for every program).
                         if current != start_idx and target >= 0 and target < self.module_paths.len() as i32:
                             if self.engine_corpus_id(self.module_paths[target]) != self.engine_corpus_id(self.module_paths[current]):
+                                self.vis_note("    std-tier walk: skip " ++ self.module_paths[target] ++ f" (corpus boundary: engine {self.engine_corpus_id(self.module_paths[current])} -> {self.engine_corpus_id(self.module_paths[target])})")
                                 continue
+                        self.vis_note("    std-tier walk: " ++ self.module_paths[current] ++ " -> " ++ self.module_paths[target])
                         stack.push(target)
+        self.vis_note("  std-tier walk: " ++ target_path ++ " not reached from " ++ self.current_module_path)
         self.module_visibility_cache.insert(sema_owned_text(cache_key), 0)
         0
 

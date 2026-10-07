@@ -595,6 +595,37 @@ on erroring inputs.
 
 ## View Origins
 
+### A name resolves on one compiler generation and not the other, or a std helper stops resolving
+
+Visibility is three walks, a gate of rules and a fallback bridge; a 0 out
+of them says nothing. `with analyze file.w 'explain:visible:<name>'` lists
+every declaration the name could mean from the root module — values,
+types and displaced identities (#1350) — with its module, package, engine
+id, prelude-closure and corpus-private marks, then the verdict and every
+rule and walk edge it passed through (`skip … (corpus boundary: engine 1
+-> 0)`, `not reached from …`, `cached verdict`), and the fallback bridge's
+own reasoning. `explain:modules` says why each module is in the
+compilation: its marks and the modules that import it, the chain that
+pulled it in. Run both under each generation (`out/bootstrap/bin/with-stage1`
+and `out/release/bin/with`) and diff: #2248 was a module stage1 loads through
+a corpus and the release never does; #2249 was a bridge that required an
+engine twin to be ambient after the corpus boundary made no corpus ambient.
+A rule toggled and rebuilt to see what changes is the bisect this replaces.
+
+```
+explain:visible is_alnum
+  from module test/behavior/behav_1362_std_helper_resolves_unimported.w (package <program>)
+  value declared in lib/std/re/defs.w (package <std>, pub=1, engine=1, prelude-closure=0, corpus-private=0)
+    gate: … not an enumerated prelude name; engine=1 prelude-closure=0 corpus-private=0
+      no-prelude walk: skip <embedded-std>/std/prelude.w (the synthetic prelude edge)
+      refused: an engine or prelude-closure module needs an explicit import path
+    verdict: 0
+  displaced value (#1350) declared in <embedded-std>/std/string.w (… prelude-closure=1 …)
+    verdict: 0
+    bridge: 1 non-engine std module(s) declare it; engine twin lib/std/re/defs.w
+  fallback bridge: resolves the bare name to <embedded-std>/std/string.w
+```
+
 `analyze <file> 'explain:origin:<fn>[:<binding>]'` prints what Sema recorded
 about the views of `<fn>` (a generic function by its plain name: every
 specialization matches), even when the check fails:

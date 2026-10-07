@@ -15243,7 +15243,10 @@ impl Sema:
 
     fn fn_symbol_is_std_str_comptime_allowed(fn_sym: i32) -> i32:
         let source_path = self.fn_symbol_source_path(fn_sym)
-        if source_path.ends_with("string.w") and self.pool_resolve(fn_sym) == "str.to_owned": 1 else: 0
+        // D104 (#2225): every `impl str` method std.string spells with a With
+        // body runs at compile time (the evaluator takes the user-method path
+        // for one it has no builtin for); `to_owned` was the one allowed.
+        if source_path.ends_with("string.w") and self.pool_resolve(fn_sym).starts_with("str."): 1 else: 0
 
     // The comptime evaluator implements the Vec core (push/pop/get/set/
     // clear/len/is_empty) directly; the flip's method registration exposed
@@ -16464,7 +16467,7 @@ impl Sema:
                     // a binding or a return of this result is rejected.
                     if views_storage and self.typed_expr_types.contains(origin_arg):
                         let arg_ty: i32 = self.typed_expr_types.get(origin_arg).unwrap()
-                        if arg_ty != 0 and unpack_place_kind(self.classify_place(origin_arg)) == PlaceKind.PK_NotPlace and self.type_needs_drop(arg_ty) != 0 and self.type_is_view_handle(arg_ty) == 0:
+                        if arg_ty != 0 and self.ast.kind(origin_arg) == NodeKind.NK_CALL and unpack_place_kind(self.classify_place(origin_arg)) == PlaceKind.PK_NotPlace and self.type_needs_drop(arg_ty) != 0 and self.type_is_view_handle(arg_ty) == 0 and self.type_is_ephemeral_value(arg_ty) == 0:
                             self.expr_view_into_temporary.insert(call_node, arg_ty)
                     let carried_temp = self.view_into_temporary_type(origin_arg)
                     if carried_temp != 0:

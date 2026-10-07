@@ -1828,6 +1828,15 @@ impl Compilation:
         // Sema diagnostics return an empty public AstPool, but the synchronized
         // last_sema retains the complete declaration/effect state for the flag-day
         // receiver work list and for semantic diagnosis queries.
+        // The visibility explainers walk through the finalized Sema as a
+        // mutable place (they switch the current module to the root and
+        // reset the walk cache per candidate), so they run here, where the
+        // Zcu owns it, not through the read-only analysis entry (#2249).
+        if inner_request.starts_with("explain:visible:") and self.zcu.last_sema.ast.decl_count() > 0:
+            let ev_name = inner_request.slice(16, inner_request.len())
+            return CompilerAnalysisResult { text: self.zcu.last_sema.explain_visibility(ev_name), status: 0, needs_codegen: false, codegen_query: "", report: AnalysisReport.init() }
+        if inner_request == "explain:modules" and self.zcu.last_sema.ast.decl_count() > 0:
+            return CompilerAnalysisResult { text: self.zcu.last_sema.explain_modules(), status: 0, needs_codegen: false, codegen_query: "", report: AnalysisReport.init() }
         if not after_mir and analysis_request_is_semantic_snapshot(inner_request) and self.zcu.last_sema.ast.decl_count() > 0:
             var snapshot = compiler_analysis_run(self.zcu.last_sema, self.zcu.last_mir_module, self.zcu.pool, self.zcu.current_source_path, self.zcu.current_source_text, inner_request, self.zcu.diagnostics)
             // A snapshot over a failed compilation is still shown (it is what
