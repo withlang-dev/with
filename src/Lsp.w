@@ -804,7 +804,7 @@ fn lsp_extract_doc_comment(text: &str, decl_start: i32) -> str:
             line_start = line_start - 1
         let line = text.slice(line_start as i64, (pos + 1) as i64).trim()
         if line.starts_with("///"):
-            let content = line.slice(3, line.len()).trim()
+            let content = line.slice(3, line.len()).trim().to_owned()
             doc_lines.push(content)
             // Move to previous line
             pos = line_start - 1

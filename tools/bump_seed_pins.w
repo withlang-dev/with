@@ -30,7 +30,7 @@ fn lock_value(lock: &str, key: &str) -> str:
 fn value_after(line: &str, key: &str) -> str:
     let at = line.index_of(key)
     if at < 0: return ""
-    line.slice(at + key.len(), line.len()).trim()
+    line.slice(at + key.len(), line.len()).trim().to_owned()
 
 fn key_prefix(line: &str, key: &str) -> str:
     let at = line.index_of(key)

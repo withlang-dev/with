@@ -240,6 +240,20 @@ impl str:
             start += 1
         self[start..self.len()]
 
+    /// The view between any leading and trailing ASCII whitespace (#2225):
+    /// `trim_start` and `trim_end` in one, a view, never a copy. (It was
+    /// the `STR_TRIM` intrinsic over an owned runtime copy, from before D71
+    /// made `s[a..b]` a view; a caller that keeps the result past `s`
+    /// spells `.to_owned()`.)
+    pub fn trim() -> &str:
+        var start: i64 = 0
+        while start < self.len() and str_is_ascii_space(self[start]):
+            start += 1
+        var end = self.len()
+        while end > start and str_is_ascii_space(self[end - 1]):
+            end -= 1
+        self[start..end]
+
     /// The view before any trailing ASCII whitespace (#2206). A view, never
     /// a copy.
     pub fn trim_end() -> &str:

@@ -86,7 +86,7 @@ fn rp_trim_lines(text: &str) -> Vec[str]:
 
 /// The digest recorded in `<asset>.sha256` (first field), or "".
 fn rp_sidecar_digest(fs: &ToolFs, asset: &str) -> str:
-    let text = fs.read_text(asset ++ ".sha256").trim()
+    let text = fs.read_text(asset ++ ".sha256").trim().to_owned()
     let sp = text.index_of(" ")
     let digest = if sp > 0: text.slice(0, sp) else: text
     if digest.len() == 64: digest ++ "" else: ""
@@ -113,7 +113,7 @@ fn rp_notes(channel: &str, version: &str, source_sha: &str, rows: &Vec[str]) -> 
 fn rp_field(text: &str, key: &str) -> str:
     for line in text.split("\n"):
         let eq = line.index_of("=")
-        if eq > 0 and line.slice(0, eq) == key: return line.slice(eq + 1, line.len()).trim()
+        if eq > 0 and line.slice(0, eq) == key: return line.slice(eq + 1, line.len()).trim().to_owned()
     ""
 
 pub fn run_publish_release_asset_action(ctx: ActionCtx) -> i32:
@@ -246,7 +246,7 @@ pub fn run_publish_release_asset_action(ctx: ActionCtx) -> i32:
     date_args.push("-u")
     date_args.push("+%Y-%m-%dT%H:%M:%SZ")
     let when = ctx.process_runner().run_capture(date_args, rp_join(root, rp_join(scratch, "date.stdout")), rp_join(root, rp_join(scratch, "date.stderr")), 60000)
-    let built_at = if when.rc == 0: when.stdout.trim() else: "unknown"
+    let built_at = if when.rc == 0: when.stdout.trim().to_owned() else: "unknown"
     for asset in assets:
         let name = rp_basename(asset)
         let provenance = asset ++ ".provenance"

@@ -92,7 +92,6 @@ extern fn with_str_from_byte(byte: i32) -> str
 extern fn with_str_starts_with_ref(s: &str, prefix: &str) -> i32
 extern fn with_str_ends_with_ref(s: &str, suffix: &str) -> i32
 extern fn with_str_replace_ref(s: &str, old: &str, new_s: &str) -> str
-extern fn with_str_trim_ref(s: &str) -> str
 extern fn with_str_to_upper_ref(s: &str) -> str
 extern fn with_str_to_lower_ref(s: &str) -> str
 extern fn with_str_index_of_ref(hay: &str, needle: &str) -> i64
@@ -3511,11 +3510,9 @@ impl ComptimeEvaluator:
         // runs here whenever the native runner cannot be linked yet, and
         // build/seed.w's seed_lock_value trims every lock line. Same runtime
         // helpers as codegen, so comptime and runtime agree byte for byte.
-        if method == "trim" or method == "to_upper" or method == "upper" or method == "to_lower" or method == "lower":
+        if method == "to_upper" or method == "upper" or method == "to_lower" or method == "lower":
             if arg_count != 0:
                 return self.fail(node, "str." ++ method ++ "() takes no arguments")
-            if method == "trim":
-                return comptime_control_value(comptime_value_str(with_str_trim_ref(text)))
             if method == "to_upper" or method == "upper":
                 return comptime_control_value(comptime_value_str(with_str_to_upper_ref(text)))
             return comptime_control_value(comptime_value_str(with_str_to_lower_ref(text)))
@@ -3540,7 +3537,12 @@ impl ComptimeEvaluator:
             if count < 0:
                 return self.fail(node, "str.repeat() count is negative in comptime")
             return comptime_control_value(comptime_value_str(with_str_repeat_ref(text, count)))
-        self.fail(node, "str method '" ++ method ++ "' is not comptime-evaluable yet")
+        // Not a runtime-helper builtin: a std `impl str` method with a With
+        // body (`trim`, `trim_start`, `trim_end`, #2225/#2206) evaluates as
+        // any plain function does (D104), through the user-method path.
+        var typed_recv = comptime_value_clone(recv_value)
+        if typed_recv.type_id == 0: typed_recv.type_id = self.sema.ty_str as i32
+        self.eval_user_method_value(0, &typed_recv, field, extra_start, arg_count, node, 0)
 
     mut fn concrete_method_comptime_type_args(fn_sym: i32, concrete_sig: i32, node: i32) -> ComptimeGenericResolvedArgs:
         let out_syms: Vec[i32] = Vec.new()
@@ -6747,6 +6749,32 @@ impl ComptimeEvaluator:
             return comptime_control_value(self.extra_value_at((base_signal.value.extra_start + field_index) as i64))
         self.fail(node, "comptime field access requires a struct value, got " ++ comptime_value_kind_name(base_signal.value.kind))
 
+    // `s[a..b]` on a comptime str (D71: a view; here the bytes it names),
+    // bounds-checked; `s[..b]` and `s[a..]` spell 0 and the length. The std
+    // `trim`/`trim_start`/`trim_end` bodies are built on it (#2225).
+    mut fn eval_slice(node: i32) -> ComptimeControl:
+        var base_signal = self.eval_expr(self.ast.get_data0(node))
+        if base_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return base_signal
+        let base = move base_signal.value
+        if base.kind != ComptimeValueKind.CV_STR:
+            return self.fail(node, "comptime slicing is supported on str only")
+        var start: i64 = 0
+        if self.ast.get_data1(node) != 0:
+            let s = self.eval_expr(self.ast.get_data1(node))
+            if s.kind != ComptimeControlKind.CTL_VALUE: return s
+            if comptime_value_is_intlike(s.value) == 0: return self.fail(node, "comptime slice start must be an integer")
+            start = comptime_value_intlike(s.value)
+        var end: i64 = base.text.len()
+        if self.ast.get_data2(node) != 0:
+            let e = self.eval_expr(self.ast.get_data2(node))
+            if e.kind != ComptimeControlKind.CTL_VALUE: return e
+            if comptime_value_is_intlike(e.value) == 0: return self.fail(node, "comptime slice end must be an integer")
+            end = comptime_value_intlike(e.value)
+        if start < 0 or end > base.text.len() or start > end:
+            return self.fail(node, "comptime str slice out of bounds")
+        comptime_control_value(comptime_value_str(base.text.slice(start, end)))
+
     mut fn eval_index(node: i32) -> ComptimeControl:
         var base_signal = self.eval_expr(self.ast.get_data0(node))
         if base_signal.kind != ComptimeControlKind.CTL_VALUE:
@@ -8417,6 +8445,8 @@ impl ComptimeEvaluator:
             return self.eval_ident(node)
         if kind == NodeKind.NK_FIELD_ACCESS:
             return self.eval_field_access(node)
+        if kind == NodeKind.NK_SLICE:
+            return self.eval_slice(node)
         if kind == NodeKind.NK_INDEX:
             return self.eval_index(node)
         if kind == NodeKind.NK_UNARY:

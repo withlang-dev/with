@@ -2846,11 +2846,11 @@ fn facade_render_callable_parts(raw: &str) -> (str, Vec[str], str):
         if params[k] == '(' or params[k] == '[': depth = depth + 1
         else if params[k] == ')' or params[k] == ']': depth = depth - 1
         else if params[k] == ',' and depth == 0:
-            parts.push(params.slice(start, k).trim())
+            parts.push(params.slice(start, k).trim().to_owned())
             start = k + 1
         k = k + 1
     if params.trim().len() > 0:
-        parts.push(params.slice(start, params.len()).trim())
+        parts.push(params.slice(start, params.len()).trim().to_owned())
     (raw.slice(0, open + 1), parts, raw.slice(close, raw.len()))
 
 // The typed callback: the C signature with its one `void *` parameter —

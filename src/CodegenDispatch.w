@@ -12147,15 +12147,6 @@ impl Codegen:
             else:
                 result = wl_const_int(wl_i1_type(self.context), 0, 0)
 
-        else if intrinsic == MirIntrinsic.STR_TRIM:
-            let r1 = self.mir_intrinsic_recv_str_value(body, args_id)
-            let t1 = wl_type_of(r1)
-            let p1: Vec[i64] = Vec.new()
-            p1.push(self.str_llvm_type())
-            let a1: Vec[i64] = Vec.new()
-            a1.push(self.str_view_arg(r1))
-            result = self.call_internal_runtime_fn("with_str_trim_ref", p1, a1, 1, t1)
-
         else if intrinsic == MirIntrinsic.STR_TO_UPPER:
             let r2 = self.mir_intrinsic_recv_str_value(body, args_id)
             let t2 = wl_type_of(r2)

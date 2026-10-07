@@ -427,7 +427,7 @@ fn seed_lock_block_asset(lines: &Vec[str], i: i64) -> str:
         let line = lines[j]
         for akey in ["seed_asset:", "WITH_SEED_ASSET:"]:
             let at = line.index_of(akey)
-            if at >= 0: return line.slice(at + akey.len(), line.len()).trim()
+            if at >= 0: return line.slice(at + akey.len(), line.len()).trim().to_owned()
         j = j + 1
     ""
 
@@ -507,6 +507,6 @@ fn sdk_lock_block_asset(lines: &Vec[str], i: i64) -> str:
         let line = lines[j]
         for akey in ["sdk_asset:", "WITH_SDK_ASSET:"]:
             let at = line.index_of(akey)
-            if at >= 0: return line.slice(at + akey.len(), line.len()).trim()
+            if at >= 0: return line.slice(at + akey.len(), line.len()).trim().to_owned()
         j = j + 1
     ""

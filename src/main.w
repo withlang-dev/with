@@ -5310,7 +5310,7 @@ fn doc_source_line_at(text: &str, offset: i32) -> str:
         end = start
     while end < text.len() as i32 and text[end] != 10:
         end = end + 1
-    text.slice(start as i64, end as i64).trim()
+    text.slice(start as i64, end as i64).trim().to_owned()
 
 fn doc_extract_comment(text: &str, decl_start: i32) -> str:
     var pos = decl_start - 1
@@ -5324,7 +5324,7 @@ fn doc_extract_comment(text: &str, decl_start: i32) -> str:
         let line = text.slice(line_start as i64, (pos + 1) as i64).trim()
         if not line.starts_with("///"):
             break
-        lines.push(line.slice(3, line.len()).trim())
+        lines.push(line.slice(3, line.len()).trim().to_owned())
         pos = line_start - 1
         while pos >= 0 and (text[pos] == 32 or text[pos] == 9 or text[pos] == 13 or text[pos] == 10):
             pos = pos - 1

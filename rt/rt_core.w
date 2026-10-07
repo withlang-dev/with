@@ -2927,6 +2927,9 @@ fn str_index_of_ref(hay: &str, needle: &str) -> i64:
 pub fn with_str_index_of_ref(hay: &str, needle: &str) -> i64:
     str_index_of_ref(hay, needle)
 
+// #2225: `str.trim()` is a std view method now; this owned copy serves only
+// the STR_TRIM intrinsic a PINNED SEED still lowers the compiler's own
+// `.trim()` calls to. It retires with the next seed bump (seed-gated).
 fn str_trim_ref(s: &str) -> str:
     let slen = str_length(s)
     let sp = str_data(s)

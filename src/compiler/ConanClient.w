@@ -442,7 +442,7 @@ fn conan_range_term_holds(version: &str, term: &str) -> bool:
 // a `,` is an option (`include_prerelease`), without which a pre-release
 // (`3.0.0-beta`) is in no range.
 pub fn conan_version_in_range(version: &str, range: &str) -> bool:
-    var body = range.trim()
+    var body: str = range.trim().to_owned()
     if body.starts_with("["): body = body.slice(1, body.len())
     if body.ends_with("]"): body = body.slice(0, body.len() - 1)
     let comma = body.find(",")

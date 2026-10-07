@@ -101,7 +101,6 @@ enum CcBuiltin: i32:
     VEC_ITER
     OPT_IS_NONE
     STR_SPLIT
-    STR_TRIM
     STR_TO_UPPER
     STR_TO_LOWER
     STR_REPLACE
@@ -5897,7 +5896,7 @@ impl CCodegen:
             if dst != 0 and self.is_void_tid(dst) == 0:
                 return dst
             return CC_PSEUDO_TID_VEC
-        if kind == CcBuiltin.STR_TRIM or kind == CcBuiltin.STR_TO_UPPER or kind == CcBuiltin.STR_TO_LOWER or kind == CcBuiltin.STR_REPLACE or kind == CcBuiltin.STR_REPEAT:
+        if kind == CcBuiltin.STR_TO_UPPER or kind == CcBuiltin.STR_TO_LOWER or kind == CcBuiltin.STR_REPLACE or kind == CcBuiltin.STR_REPEAT:
             return self.sema.ty_str as i32
         if kind == CcBuiltin.ARR_LEN:
             return self.sema.ty_usize as i32
@@ -6629,7 +6628,6 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: MirIntrinsic) -> CcBuiltin:
     if intrinsic == MirIntrinsic.VEC_ITER: return CcBuiltin.VEC_ITER
     if intrinsic == MirIntrinsic.OPT_IS_NONE: return CcBuiltin.OPT_IS_NONE
     if intrinsic == MirIntrinsic.STR_SPLIT: return CcBuiltin.STR_SPLIT
-    if intrinsic == MirIntrinsic.STR_TRIM: return CcBuiltin.STR_TRIM
     if intrinsic == MirIntrinsic.STR_TO_UPPER: return CcBuiltin.STR_TO_UPPER
     if intrinsic == MirIntrinsic.STR_TO_LOWER: return CcBuiltin.STR_TO_LOWER
     if intrinsic == MirIntrinsic.STR_REPLACE: return CcBuiltin.STR_REPLACE
@@ -7435,19 +7433,6 @@ impl CCodegen:
                 out = out ++ "    with_str_split_vec_ref(&(" ++ self.place_text(body, dest_place) ++ "), " ++ recv ++ ", " ++ delim ++ ");\n"
             else:
                 out = out ++ "    " ++ cc_lbrace() ++ " with_vec __with_tmp_split; with_str_split_vec_ref(&__with_tmp_split, " ++ recv ++ ", " ++ delim ++ "); " ++ cc_rbrace() ++ "\n"
-            out = out ++ f"    goto bb{next_bb};"
-            return out
-
-        if kind == CcBuiltin.STR_TRIM:
-            if argc < 1:
-                self.fail("str.trim expects one argument")
-                return "    abort();"
-            let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
-            var out = ""
-            if has_ret != 0:
-                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_trim_ref(" ++ recv ++ ");\n"
-            else:
-                out = out ++ "    (void)with_str_trim_ref(" ++ recv ++ ");\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 
@@ -10977,7 +10962,6 @@ impl CCodegen:
         out.write("extern with_str with_sysinfo_os(void);\n")
         out.write("extern with_str with_sysinfo_arch(void);\n")
         out.write("extern with_str with_sysinfo_hostname(void);\n")
-        out.write("extern with_str with_str_trim_ref(with_str);\n")
         // §16.3c, D47: a str lent to a `const char *` parameter.
         out.write("extern uint8_t* with_cstr_lend(with_str);\n")
         out.write("extern void with_cstr_release(uint8_t*);\n\n")

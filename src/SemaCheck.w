@@ -7574,7 +7574,6 @@ impl Sema:
             if method_name == "ends_with": return MirIntrinsic.STR_ENDS_WITH
             if method_name == "find": return MirIntrinsic.STR_FIND
             if method_name == "split": return MirIntrinsic.STR_SPLIT
-            if method_name == "trim": return MirIntrinsic.STR_TRIM
             if method_name == "to_upper" or method_name == "upper": return MirIntrinsic.STR_TO_UPPER
             if method_name == "to_lower" or method_name == "lower": return MirIntrinsic.STR_TO_LOWER
             if method_name == "replace": return MirIntrinsic.STR_REPLACE
@@ -29873,7 +29872,7 @@ impl Sema:
                 return self.ty_bool as i32
             if method_name == "find" or method_name == "index_of":
                 return self.ty_i64 as i32
-            if field == self.syms.trim or field == self.syms.to_lower or field == self.syms.to_upper or field == self.syms.lower or field == self.syms.upper or field == self.syms.replace or field == self.syms.slice or method_name == "repeat":
+            if field == self.syms.to_lower or field == self.syms.to_upper or field == self.syms.lower or field == self.syms.upper or field == self.syms.replace or field == self.syms.slice or method_name == "repeat":
                 return self.ty_str as i32
             if method_name == "split":
                 return self.ensure_vec_str_type()

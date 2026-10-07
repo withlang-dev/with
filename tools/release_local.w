@@ -61,7 +61,7 @@ fn argv3(a: &str, b: &str, c: &str) -> Vec[str]:
 fn lock_value(text: &str, key: &str) -> str:
     for line in text.split("\n"):
         let l = line.trim()
-        if l.starts_with(key ++ "="): return l.slice(key.len() + 1, l.len()).trim()
+        if l.starts_with(key ++ "="): return l.slice(key.len() + 1, l.len()).trim().to_owned()
     ""
 
 fn publish_env(version: &str, channel: &str, assets: &str, extras: &str, builder: &str):

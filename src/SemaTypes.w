@@ -153,7 +153,6 @@ pub enum MirIntrinsic: i32:
     VEC_ITER
     OPT_IS_NONE
     STR_SPLIT
-    STR_TRIM
     STR_TO_UPPER
     STR_TO_LOWER
     STR_REPLACE
