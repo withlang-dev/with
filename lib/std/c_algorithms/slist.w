@@ -1,5 +1,6 @@
 // Migrated from C
 use std.c_algorithms.defs
+use std.option
 
 pub unsafe fn slist_free(__param_list: *mut _SListEntry) {
     var __local_entry: *mut _SListEntry
@@ -278,7 +279,7 @@ pub unsafe fn slist_remove_data(__param_list: *mut *mut _SListEntry, __param_cal
 }
 
 pub unsafe fn slist_sort(__param_list: *mut *mut _SListEntry, __param_compare_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int) -> Unit {
-    slist_sort_internal(__param_list, __param_compare_func)
+    slist_sort_internal(__param_list, Some(__param_compare_func))
 
 }
 
@@ -379,7 +380,7 @@ pub unsafe fn slist_iter_remove(__param_iter: *mut _SListIterator) {
 
 }
 
-unsafe fn slist_sort_internal(__param_list: *mut *mut _SListEntry, __param_compare_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int) -> *mut _SListEntry {
+unsafe fn slist_sort_internal(__param_list: *mut *mut _SListEntry, __param_compare_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int]) -> *mut _SListEntry {
     var __local_pivot: *mut _SListEntry
 
     var __local_rover: *mut _SListEntry
@@ -419,7 +420,7 @@ unsafe fn slist_sort_internal(__param_list: *mut *mut _SListEntry, __param_compa
     while ((if __local_rover != null: 1 else: 0) != 0) {
         var __local_next: *mut _SListEntry = (*__local_rover).next
 
-        if ((if __param_compare_func((*__local_rover).data, (*__local_pivot).data) < 0: 1 else: 0) != 0) {
+        if ((if __param_compare_func.unwrap()((*__local_rover).data, (*__local_pivot).data) < 0: 1 else: 0) != 0) {
             ((*__local_rover).next = __local_less_list)
 
             (__local_less_list = __local_rover)

@@ -660,7 +660,7 @@ pub fn test_list_sort() -> Unit writes allocation_limit {
     }
 
 
-    unsafe { list_sort((&raw mut __local_list as *mut *mut _ListEntry), int_compare) }
+    unsafe { list_sort((&raw mut __local_list as *mut *mut _ListEntry), Some(int_compare)) }
 
     if (((if not ((if unsafe { list_length(__local_list) } == __local_num_entries: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_list_sort".ptr, c"test-list.c".ptr, (322 as c_int), c"list_length(list) == num_entries".ptr)
@@ -691,7 +691,7 @@ pub fn test_list_sort() -> Unit writes allocation_limit {
 
     (__local_list = ((null as *mut _ListEntry)))
 
-    unsafe { list_sort((&raw mut __local_list as *mut *mut _ListEntry), int_compare) }
+    unsafe { list_sort((&raw mut __local_list as *mut *mut _ListEntry), Some(int_compare)) }
 
     if (((if not ((if __local_list == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_list_sort".ptr, c"test-list.c".ptr, (339 as c_int), c"list == NULL".ptr)

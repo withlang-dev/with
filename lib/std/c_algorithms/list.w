@@ -337,7 +337,7 @@ pub unsafe fn list_remove_data(__param_list: *mut *mut _ListEntry, __param_callb
 
 }
 
-pub unsafe fn list_sort(__param_list: *mut *mut _ListEntry, __param_compare_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int) -> Unit {
+pub unsafe fn list_sort(__param_list: *mut *mut _ListEntry, __param_compare_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int]) -> Unit {
     list_sort_internal(__param_list, __param_compare_func)
 
 }
@@ -444,7 +444,7 @@ pub unsafe fn list_iter_remove(__param_iter: *mut _ListIterator) {
 
 }
 
-unsafe fn list_sort_internal(__param_list: *mut *mut _ListEntry, __param_compare_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int) -> *mut _ListEntry {
+unsafe fn list_sort_internal(__param_list: *mut *mut _ListEntry, __param_compare_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int]) -> *mut _ListEntry {
     var __local_pivot: *mut _ListEntry
 
     var __local_rover: *mut _ListEntry
@@ -464,7 +464,7 @@ unsafe fn list_sort_internal(__param_list: *mut *mut _ListEntry, __param_compare
     if ((if __param_list == null: 1 else: 0) != 0) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_0 = (if 0 != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if (if __param_compare_func == null: 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_0 != 0) {
@@ -498,7 +498,7 @@ unsafe fn list_sort_internal(__param_list: *mut *mut _ListEntry, __param_compare
     while ((if __local_rover != null: 1 else: 0) != 0) {
         var __local_next: *mut _ListEntry = (*__local_rover).next
 
-        if ((if __param_compare_func((*__local_rover).data, (*__local_pivot).data) < 0: 1 else: 0) != 0) {
+        if ((if __param_compare_func.unwrap()((*__local_rover).data, (*__local_pivot).data) < 0: 1 else: 0) != 0) {
             ((*__local_rover).prev = ((null as *mut _ListEntry)))
 
             ((*__local_rover).next = __local_less_list)

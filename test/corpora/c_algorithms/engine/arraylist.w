@@ -1,6 +1,7 @@
 // Migrated from C
 use std.calg_testing.defs
 use std.calg_testing.alloc_testing
+use std.option
 
 pub fn arraylist_new(__param_length: c_uint) -> *mut _ArrayList writes allocation_limit {
     var __local_length = __param_length
@@ -132,7 +133,7 @@ pub unsafe fn arraylist_clear(__param_arraylist: *mut _ArrayList) {
 }
 
 pub unsafe fn arraylist_sort(__param_arraylist: *mut _ArrayList, __param_compare_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int) {
-    arraylist_sort_internal((*__param_arraylist).data, (*__param_arraylist).length, __param_compare_func)
+    arraylist_sort_internal((*__param_arraylist).data, (*__param_arraylist).length, Some(__param_compare_func))
 
 }
 
@@ -158,7 +159,7 @@ unsafe fn arraylist_enlarge(__param_arraylist: *mut _ArrayList) -> c_int {
 
 }
 
-unsafe fn arraylist_sort_internal(__param_list_data: *mut *mut c_void, __param_list_length: c_uint, __param_compare_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int) {
+unsafe fn arraylist_sort_internal(__param_list_data: *mut *mut c_void, __param_list_length: c_uint, __param_compare_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int]) {
     var __local_pivot: *mut c_void
 
     var __local_tmp: *mut c_void
@@ -181,7 +182,7 @@ unsafe fn arraylist_sort_internal(__param_list_data: *mut *mut c_void, __param_l
     (__local_i = ((0 as c_uint)))
 
     while ((if __local_i < ((__param_list_length as c_uint) -% (1 as c_uint)): 1 else: 0) != 0) {
-        if ((if __param_compare_func((__param_list_data[__local_i]), __local_pivot) < 0: 1 else: 0) != 0) {
+        if ((if __param_compare_func.unwrap()((__param_list_data[__local_i]), __local_pivot) < 0: 1 else: 0) != 0) {
             (__local_tmp = (__param_list_data[__local_i]))
 
             ((__param_list_data[__local_i]) = (__param_list_data[__local_list1_length]))
