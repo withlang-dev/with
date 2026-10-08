@@ -14,6 +14,7 @@
 //   str-clone              `.clone()` on a str
 //   ref-at-ref-param       an explicit `&x` at a `&T` parameter
 //   some-at-option-demand  `Some(x)` where an Option is demanded
+//   str-move               `move x` where x is a str
 //
 // The bar is main's own counts, recorded when main's compiler is installed
 // (`:install-user` publishes `--record-bar`'s file) into the green store beside green.tsv
@@ -147,7 +148,7 @@ fn main:
     for line in typed.split("\n"):
         let cols = line.split("\t")
         // Build-generated modules (out/gen) are not source anyone writes.
-        if cols.len() == 3 and not cols[1].starts_with("out/"): census.bump(f"{cols[0]}\t{area_of(cols[1])}")
+        if cols.len() >= 3 and not cols[1].starts_with("out/"): census.bump(f"{cols[0]}\t{area_of(cols[1])}")
     let bar_file = green_dir() ++ "/ceremony-bar.tsv"
     if record_bar_to.len() > 0:
         var text = ""

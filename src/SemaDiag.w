@@ -214,7 +214,7 @@ impl Sema:
         line
 
     // `with check --ceremony-census`: one line per recorded ceremony site,
-    // `pattern<TAB>path<TAB>line`, in the order Sema met them.
+    // `pattern<TAB>path<TAB>line<TAB>start<TAB>end`, in the order Sema met them.
     fn ceremony_census_text() -> str:
         var paths: HashMap[i32, str] = HashMap.new()
         for di in 0..self.decl_source_file_ids.len():
@@ -226,7 +226,15 @@ impl Sema:
             let name = if pattern == 1: "str-clone" else: if pattern == 2: "ref-at-ref-param" else: "some-at-option-demand"
             let file_id = self.ast.file(node as NodeId) as i32
             let path = paths.get(file_id) ?? &""
-            out = out ++ f"{name}\t{path}\t{self.node_line(node)}\n"
+            out = out ++ f"{name}\t{path}\t{self.node_line(node)}\t{self.ast.get_start(node)}\t{self.ast.get_end(node)}\n"
+        // `move` of a str (D111: passing a str copies, so the spelling says
+        // nothing). Read off the recorded types, off the checker's hot path.
+        for n in 1..self.ast.node_count():
+            if self.ast.kind(n) != NodeKind.NK_MOVE_ARG: continue
+            let ty = self.recorded_expr_type_or_zero(n)
+            if ty == 0 or self.get_type_kind(self.resolve_alias(ty as TypeId)) != TypeKind.TY_STR: continue
+            let path = paths.get(self.ast.file(n as NodeId) as i32) ?? &""
+            out = out ++ f"str-move\t{path}\t{self.node_line(n)}\t{self.ast.get_start(n)}\t{self.ast.get_end(n)}\n"
         out
 
     fn diagnostic_node_span(node: i32) -> Span:
