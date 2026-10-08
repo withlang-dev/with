@@ -368,14 +368,6 @@ pub enum MirIntrinsic: i32:
     SIMD_MASK_LANE
     // (mask, index, bool) -> the mask with that lane set, range-checked.
     SIMD_MASK_LANE_SET
-    // D111: (copy x) -> x as one more holder of every str it carries. MirLower
-    // routes a consumed copy of a Copy type with drop glue through it; codegen
-    // emits the copy glue (a retain per str).
-    VALUE_COPY
-    // D111: (copy x) at x's last use -> x, handed over: x is blanked, no
-    // hold is taken, and x's later drop releases nothing (MirLower's
-    // mark_last_use_copies proves no later read and no view of x).
-    VALUE_TAKE
 
 // Copy: MirIntrinsic is a lightweight integer tag passed by value, stored in
 // Vec/HashMap, and compared throughout MIR lowering and codegen.

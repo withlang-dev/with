@@ -936,13 +936,101 @@ fn suspend_liveness(sema: &Sema, body: &MirBody) -> SuspendLiveness:
             bb = bb - 1
     SuspendLiveness { live_in, live_out }
 
-// D111: the live-in bits of every block, flattened: entry bb * local_count
-// + local is 1 when that local is read on some path after control enters bb.
-pub fn mir_body_live_in(sema: &Sema, body: &MirBody) -> Vec[i32]:
-    let liveness = suspend_liveness(sema, body)
+// The operand ids a statement's rvalue reads — the operands
+// suspend_gen_rvalue gens.
+fn suspend_rvalue_operands(body: &MirBody, rval_id: i32) -> Vec[i32]:
     var out: Vec[i32] = Vec.new()
-    for i in 0..liveness.live_in.vlen():
-        out.push(liveness.live_in.vget(i))
+    if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
+        return out
+    let kind = body.rval_kinds[rval_id]
+    let d0 = body.rval_d0[rval_id]
+    let d1 = body.rval_d1[rval_id]
+    if kind == RvalueKind.RK_USE or kind == RvalueKind.RK_CAST or kind == RvalueKind.RK_ARRAY_FILL:
+        out.push(d0)
+    else if kind == RvalueKind.RK_BIN_OP:
+        out.push(d1)
+        out.push(body.rval_d2[rval_id])
+    else if kind == RvalueKind.RK_UN_OP:
+        out.push(d1)
+    else if kind == RvalueKind.RK_AGGREGATE and d1 >= 0 and d1 < body.agg_field_starts.len() as i32:
+        for fi in 0..body.agg_field_counts[d1]:
+            out.push(body.agg_field_operands[body.agg_field_starts[d1] + fi])
+    else if kind == RvalueKind.RK_STR_CONCAT_N:
+        out = suspend_call_operands(body, d0)
+    out
+
+fn suspend_call_operands(body: &MirBody, call_id: i32) -> Vec[i32]:
+    var out: Vec[i32] = Vec.new()
+    if call_id < 0 or call_id >= body.call_arg_starts.len() as i32:
+        return out
+    for ai in 0..body.call_arg_counts[call_id]:
+        out.push(body.call_arg_operands[body.call_arg_starts[call_id] + ai])
+    out
+
+// The whole local a retained copy operand names, or -1.
+fn suspend_held_copy_local(body: &MirBody, operand_id: i32) -> i32:
+    if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32 or body.operand_kinds[operand_id] != OperandKind.OK_COPY or body.operand_hold(operand_id) != MIR_HOLD_RETAIN:
+        return -1
+    suspend_direct_place_local(body, body.operand_d0[operand_id])
+
+// D111: at one point (a statement, or a block's terminator) with `live` the
+// locals read after it, each retained copy of a local read only there, read
+// once there, and dead after becomes a take.
+fn suspend_mark_point_takes(body: MirBody, operands: &Vec[i32], live: SuspendBits, view_free: &Vec[i32]) -> MirBody:
+    var out = body
+    for oi in 0..operands.len():
+        let local = suspend_held_copy_local(&out, operands[oi])
+        if local <= 0 or view_free[local] == 0 or suspend_get_bit(live, local) != 0:
+            continue
+        if out.local_is_global[local] != 0 or out.local_is_caller_place[local] != 0:
+            continue
+        var reads = 0
+        for oj in 0..operands.len():
+            if suspend_place_root_local(&out, out.operand_d0[operands[oj]]) == local and (out.operand_kinds[operands[oj]] == OperandKind.OK_COPY or out.operand_kinds[operands[oj]] == OperandKind.OK_MOVE):
+                reads = reads + 1
+        if reads == 1:
+            out.set_operand_hold(operands[oi], MIR_HOLD_TAKE)
+    out
+
+// D111: at a variable's last use a copy is a move. A retained copy of a
+// whole local that nothing reads afterwards on any path (a drop is not a
+// read) becomes a take: codegen hands the value over and blanks the local,
+// so its later drop releases nothing — no retain, no release. Only a local
+// no view can reach qualifies: nothing borrows it and every operand naming
+// it is a retained copy, since a view of its buffer must not outlive the
+// last hold.
+pub fn mir_mark_last_use_holds(sema: &Sema, body: MirBody) -> MirBody:
+    var out = body
+    if out.operand_holds.len() == 0:
+        return out
+    let local_count = out.local_count()
+    var view_free: Vec[i32] = Vec.new()
+    for _ in 0..local_count: view_free.push(1)
+    for oi in 0..out.operand_kinds.len():
+        let kind = out.operand_kinds[oi]
+        if (kind == OperandKind.OK_COPY or kind == OperandKind.OK_MOVE) and out.operand_hold(oi as i32) != MIR_HOLD_RETAIN:
+            let root = suspend_place_root_local(&out, out.operand_d0[oi])
+            if root >= 0 and root < local_count: view_free[root] = 0
+    for ri in 0..out.rval_kinds.len():
+        let rk = out.rval_kinds[ri]
+        let borrowed = if rk == RvalueKind.RK_REF: out.rval_d1[ri] else: if rk == RvalueKind.RK_ADDR_OF: out.rval_d0[ri] else: -1
+        let root = suspend_place_root_local(&out, borrowed)
+        if root >= 0 and root < local_count: view_free[root] = 0
+    let liveness = suspend_liveness(sema, &out)
+    for bb in 0..out.block_count():
+        let live = suspend_copy_block_bits(liveness.live_out, local_count, bb)
+        if out.term_kind(bb) == TermKind.TK_CALL:
+            let term_operands = suspend_call_operands(&out, out.term_data1(bb))
+            out = suspend_mark_point_takes(move out, &term_operands, live, &view_free)
+        suspend_transfer_term(live, sema, &out, bb)
+        var si = out.bb_stmt_counts[bb] - 1
+        while si >= 0:
+            let stmt_id = out.bb_stmt_starts[bb] + si
+            if out.stmt_kind(stmt_id) == StmtKind.Assign:
+                let stmt_operands = suspend_rvalue_operands(&out, out.stmt_data1(stmt_id))
+                out = suspend_mark_point_takes(move out, &stmt_operands, live, &view_free)
+            suspend_transfer_stmt(live, sema, &out, stmt_id)
+            si = si - 1
     out
 
 pub fn check_no_await_guard_suspends(mir_mod: &MirModule, ast: AstPool, sema: &Sema, diags: DiagnosticList) -> DiagnosticList:

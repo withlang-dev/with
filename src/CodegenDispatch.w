@@ -1921,7 +1921,37 @@ impl Codegen:
 
         self.mir_bug_undef(f"MIR constant {const_id} of kind {ck} has no lowering", fallback_ty)
 
+    // D111: an operand's value with the hold MIR recorded for it applied
+    // where the consumer reads it, through the operand's source place (the
+    // value may already be coerced for its use): a retained copy takes a hold
+    // on every str the source carries; a taken copy hands the value over and
+    // blanks the source, so the source's drop releases nothing.
     mut fn mir_eval_operand(body: &MirBody, operand_id: i32, expected_ty: i64) -> i64:
+        let value = self.mir_eval_operand_raw(body, operand_id, expected_ty)
+        let hold = body.operand_hold(operand_id)
+        if hold == 0:
+            return value
+        let place = body.operand_d0[operand_id]
+        let sema_ty = if place >= 0 and place < body.place_sema_types.len(): body.place_sema_types[place] else: 0
+        let place_ty = if sema_ty > 0: self.mir_sema_type_to_llvm(sema_ty) else: 0
+        let src_ptr = if place_ty != 0: self.mir_place_ptr(body, place, false, 0) else: 0
+        if src_ptr == 0:
+            // A value local (SSA) has no storage to blank: its uncoerced
+            // value is retained through a slot, and its own drop releases.
+            let ssa_value = if place >= 0 and place < body.place_locals.len() and body.place_proj_counts[place] == 0: self.mir_local_values.get(body.place_locals[place]) else: None
+            if place_ty == 0 or ssa_value.is_none():
+                sema_phase_bug(f"BUG: operand {operand_id} holds a copy (D111) but its place {place} has no storage in {self.intern.resolve(self.current_function_name_sym)}")
+            let slot = self.create_entry_alloca(place_ty)
+            wl_build_store(self.builder, ssa_value.unwrap() as i64, slot)
+            self.mir_emit_copy_glue_ptr(slot, place_ty, sema_ty)
+            return value
+        if hold == MIR_HOLD_TAKE:
+            wl_build_store(self.builder, self.build_default_value(place_ty), src_ptr)
+        else:
+            self.mir_emit_copy_glue_ptr(src_ptr, place_ty, sema_ty)
+        value
+
+    mut fn mir_eval_operand_raw(body: &MirBody, operand_id: i32, expected_ty: i64) -> i64:
         let fallback_ty = if expected_ty != 0: expected_ty else: wl_i32_type(self.context)
         if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
             return self.mir_bug_undef(f"MIR operand id {operand_id} is out of range", fallback_ty)
@@ -10112,30 +10142,6 @@ impl Codegen:
             let value_llvm = if recv_base_sym == self.sym_hashmap: self.mir_hashmap_value_type(body, recv_op) else: byte_ty
             self.mir_emit_owned_map_insert(fn_val, fn_ty, args, key_sema, value_sema, wl_type_of(key), value_llvm)
             result = 0
-
-        else if intrinsic == MirIntrinsic.VALUE_TAKE:
-            // D111: the local's last use: its value is handed over and its
-            // storage blanked, so its later drop releases nothing — no retain,
-            // no release. A local with no storage to blank keeps the copy.
-            let take_sema = self.mir_operand_sema_type(body, body.call_arg_operands[arg_start])
-            let take_val = self.mir_intrinsic_arg(body, args_id, 0)
-            let take_ptr = self.mir_operand_place_addr(body, body.call_arg_operands[arg_start])
-            if take_ptr != 0:
-                wl_build_store(self.builder, self.build_default_value(wl_type_of(take_val)), take_ptr)
-            else:
-                let take_slot = self.create_entry_alloca(wl_type_of(take_val))
-                wl_build_store(self.builder, take_val, take_slot)
-                self.mir_emit_copy_glue_ptr(take_slot, wl_type_of(take_val), take_sema)
-            result = take_val
-
-        else if intrinsic == MirIntrinsic.VALUE_COPY:
-            // D111: the copied value, one more holder of every str it carries.
-            let copy_sema = self.mir_operand_sema_type(body, body.call_arg_operands[arg_start])
-            let copy_val = self.mir_intrinsic_arg(body, args_id, 0)
-            let copy_slot = self.create_entry_alloca(wl_type_of(copy_val))
-            wl_build_store(self.builder, copy_val, copy_slot)
-            self.mir_emit_copy_glue_ptr(copy_slot, wl_type_of(copy_val), copy_sema)
-            result = copy_val
 
         else if intrinsic == MirIntrinsic.MAP_GET:
             let recv_op = body.call_arg_operands[arg_start]

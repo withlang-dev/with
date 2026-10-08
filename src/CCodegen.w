@@ -70,7 +70,6 @@ impl Copy for CcPlaceKind
 
 enum CcBuiltin: i32:
     NONE
-    VALUE_COPY
     VEC_NEW
     VEC_PUSH
     VEC_GET
@@ -5698,8 +5697,6 @@ impl CCodegen:
             return self.place_tid_no_infer(body, dest_place)
         // D75: the list binding, the argument's Sema-chosen type, the
         // end's i32 status temp — each destination is typed by MirLower.
-        if kind == CcBuiltin.VALUE_COPY:
-            return self.place_tid_no_infer(body, dest_place)
         if kind == CcBuiltin.VA_START or kind == CcBuiltin.VA_ARG or kind == CcBuiltin.VA_END:
             return self.place_tid_no_infer(body, dest_place)
         if kind == CcBuiltin.VEC_SLOT:
@@ -6572,7 +6569,6 @@ impl CCodegen:
         out ++ " " ++ cc_rbrace() ++ "\n"
 
 fn cc_builtin_from_mir_intrinsic(intrinsic: MirIntrinsic) -> CcBuiltin:
-    if intrinsic == MirIntrinsic.VALUE_COPY or intrinsic == MirIntrinsic.VALUE_TAKE: return CcBuiltin.VALUE_COPY
     if intrinsic == MirIntrinsic.MATH_FN: return CcBuiltin.MATH_FN
     if intrinsic == MirIntrinsic.VA_START: return CcBuiltin.VA_START
     if intrinsic == MirIntrinsic.VA_ARG: return CcBuiltin.VA_ARG
@@ -8329,10 +8325,6 @@ impl CCodegen:
         let argc = self.call_arg_count(body, args_id)
         let ret_tid = self.call_builtin_ret_tid(body, callee_operand, args_id, dest_place)
         let has_ret = if self.is_void_tid(ret_tid) == 0: 1 else: 0
-        // D111: emit-c releases nothing (its drops are comments), so a
-        // consumed copy takes no hold either: the copy is the value itself.
-        if kind == CcBuiltin.VALUE_COPY:
-            return "    " ++ self.place_text(body, dest_place) ++ " = " ++ self.operand_text(body, self.call_arg_operand(body, args_id, 0)) ++ f";\n    goto bb{next_bb};"
         if kind == CcBuiltin.VA_START or kind == CcBuiltin.VA_ARG or kind == CcBuiltin.VA_END:
             return self.emit_c_variadic_call_term(body, kind, args_id, dest_place, next_bb)
 

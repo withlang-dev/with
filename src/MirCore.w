@@ -9,6 +9,10 @@ use SemaTypes
 use std.collections.HashMap
 use std.string.StringBuilder
 
+// D111: MirBody.operand_holds values.
+pub const MIR_HOLD_RETAIN: i32 = 1
+pub const MIR_HOLD_TAKE: i32 = 2
+
 pub type BlockId = distinct i32
 impl Copy for BlockId
 impl Copy for TermKind
@@ -232,6 +236,11 @@ pub type MirBody {
 
     // Call intrinsic markers (parallel to call_arg_starts)
     call_intrinsic_kinds: Vec[MirIntrinsic],
+    // D111: what a consumed copy operand takes (MirLower decides; codegen
+    // applies it where it evaluates the operand): MIR_HOLD_RETAIN, a hold on
+    // every str it carries; MIR_HOLD_TAKE, the value itself at the source's last
+    // use (the source is blanked: no retain, no release).
+    operand_holds: HashMap[i32, i32],
     // MathBuiltins row id for MATH_FN calls (parallel; -1 otherwise)
     call_math_fn_ids: Vec[i32],
     // AST call node for generic calls (parallel to call_arg_starts, 0 if N/A)
@@ -543,6 +552,7 @@ fn MirBody.init_for_fn(fn_sym: i32) -> MirBody:
         call_arg_counts: Vec.new(),
         call_arg_operands: Vec.new(),
         call_intrinsic_kinds: Vec.new(),
+        operand_holds: HashMap.new(),
         call_math_fn_ids: Vec.new(),
         call_ast_nodes: Vec.new(),
         call_sig_indices: Vec.new(),
@@ -815,6 +825,10 @@ impl MirBody:
         for i in 0..count:
             self.call_arg_operands.push(operands[i])
         id
+
+    mut fn set_operand_hold(operand_id: i32, hold: i32): self.operand_holds.insert(operand_id, hold)
+
+    fn operand_hold(operand_id: i32) -> i32: self.operand_holds.get(operand_id) ?? 0
 
     mut fn set_call_intrinsic(call_id: i32, kind: MirIntrinsic):
         if call_id >= 0 and call_id < self.call_intrinsic_kinds.len():
