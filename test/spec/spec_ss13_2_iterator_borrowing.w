@@ -1,4 +1,3 @@
-//! known-issue: #723 iterator borrowing surface incomplete (pre-existing; red on the seed too)
 // Spec test: Section 13.2 — Iterator Borrowing (formerly 25.75)
 // Negative iterator-retains-source coverage lives in:
 //   - test/compile_errors/err_iter_of_self_vec_iter.w

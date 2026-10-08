@@ -9119,8 +9119,10 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
 
     // §12.4 (D75): across the boundary a consuming closure may reach only a
     // parameter the interface declares `once`; `call_twice` does not.
+    // The capture is a Vec: a str is a value (D111), so a closure that
+    // passes one on copies it and may run twice.
     let twice_src = bs_join(case_dir, "consume_twice.w")
-    rc = bs_write_fixture(ctx, twice_src, "use std.wi_demo\nfn owned_len(s: str) -> i32: s.len() as i32\nfn main:\n    let word = \"four\".clone()\n    print(call_twice(() => owned_len(word)))\n", "consuming closure to a plain bundle parameter")
+    rc = bs_write_fixture(ctx, twice_src, "use std.wi_demo\nfn owned_len(v: Vec[i32]) -> i32: v.len() as i32\nfn main:\n    let word: Vec[i32] = [1, 2, 3, 4]\n    print(call_twice(() => owned_len(word)))\n", "consuming closure to a plain bundle parameter")
     if rc != 0: return rc
     let twice_build = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-once-refused", bs_bundle_build_args(twice_src, bundle, bs_join(case_dir, "consume_twice"), false), 120000)
     if twice_build.rc == 0: return bs_fail(ctx, "a consuming closure passed across the bundle boundary to a parameter not declared `once` was accepted")

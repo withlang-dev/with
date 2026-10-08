@@ -323,12 +323,15 @@ fn build_cells() -> Vec[Cell]:
         cells.push(Cell { name: f"let_else_else_move_then_reuse/{shape}", source: sc_let_else_else_move_then_reuse(shape), expect: "MOVE-ERR" })
 
     // #1395: a field value reaching an owned result, on every base.
+    // D111: a str is a value; reading its field anywhere copies it, so a
+    // str field never makes an implicit move (OK on every form). A Vec
+    // keeps D32: only the view forms, `.clone()` and `move` are OK.
     for shape in ["str", "vec"]:
         for base in ["mutrecv", "readrecv", "local"]:
             for form in ["plain", "if", "match", "coalesce", "block", "break", "arg", "retinfer", "clone", "move", "ifview", "matchview", "blockview", "viewarg"]:
                 if form == "move" and base == "readrecv":
                     continue
-                let expect = if form == "plain" or form == "clone" or form == "move" or form == "ifview" or form == "matchview" or form == "blockview": "OK" else: "FIELD-ERR"
+                let expect = if shape == "str" or form == "plain" or form == "clone" or form == "move" or form == "ifview" or form == "matchview" or form == "blockview": "OK" else: "FIELD-ERR"
                 cells.push(Cell { name: f"field_{form}/{base}/{shape}", source: sc_field(shape, base, form), expect })
     cells
 

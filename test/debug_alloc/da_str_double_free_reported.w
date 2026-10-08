@@ -14,5 +14,9 @@ fn main:
     let s = read_file(path) ?? ""
     let _rm = remove_file(path)
     unsafe:
-        var alias = *(&raw const s)
+        // D111: reading `*(&raw const s)` would be a copy with its own hold;
+        // copying the {ptr, len} words as plain bits makes a second holder
+        // the count does not know about.
+        var alias = ""
+        *(&raw mut alias as *mut [2]i64) = *(&raw const s as *const [2]i64)
         with_str_free(&raw mut alias as *mut u8)
