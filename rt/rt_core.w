@@ -3215,7 +3215,10 @@ pub fn with_getenv_str(name: &str) -> str:
     cstr_free(cname)
     if val as i64 == 0:
         return make_str("" as *const u8, 0)
-    make_str(val, cstr_len(val))
+    // An owned copy: the environment block is libc's, and a later
+    // setenv may free or rewrite the bytes a shared str would still name
+    // (D111 copies share their buffer).
+    alloc_str(val, cstr_len(val))
 
 // with_setenv_str: provided by compat_runtime.w (needs libc)
 
