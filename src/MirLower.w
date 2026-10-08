@@ -972,11 +972,37 @@ impl MirBuilder:
             return op
         self.body.new_operand(OperandKind.OK_COPY, self.body.operand_d0[op])
 
+    // D111: a consumed copy of a Copy type with drop glue (a str, or a value
+    // holding one) is one more holder, since the source and the consumer each
+    // drop theirs. The copy goes through VALUE_COPY, which retains, and the
+    // consumer takes its result by move; the source keeps its own hold.
+    mut fn retain_consumed_copy(operand_id: i32):
+        let place = self.body.operand_d0[operand_id]
+        let ty = if place >= 0 and place < self.body.place_sema_types.len(): self.body.place_sema_types[place] else: 0
+        if ty <= 0 or self.sema.is_copy_frozen(ty as TypeId) == 0 or self.sema.type_needs_drop_frozen(ty) == 0:
+            return
+        let call_args: Vec[i32] = Vec.new()
+        call_args.push(self.body.new_operand(OperandKind.OK_COPY, place))
+        let args_id = self.body.new_call_args(call_args)
+        let result_local = self.new_temp(ty)
+        let result_place = self.place_for_local(result_local)
+        let next_bb = self.new_block()
+        self.body.set_call_intrinsic(args_id, MirIntrinsic.VALUE_COPY)
+        self.terminate(TermKind.TK_CALL, self.const_operand(ConstKind.CK_FN, 0, self.sema.ty_void), args_id, result_place, next_bb)
+        self.switch_to(next_bb)
+        self.register_stmt_temp(result_local, ty)
+        // By move: consume_moved_operand goes on to mark the temp moved, so its
+        // statement-end drop does not release the hold the consumer took.
+        self.body.operand_kinds[operand_id] = OperandKind.OK_MOVE
+        self.body.operand_d0[operand_id] = result_place
+
     mut fn consume_moved_operand(operand_id: i32) -> Unit:
         if operand_id < 0 or operand_id >= self.body.operand_kinds.len():
             return
         if with_getenv_str("WITH_TRACE_RESETS").len() > 0:
             with_eprint(f"[consume] op={operand_id} kind={self.body.operand_kinds[operand_id]} place={self.body.operand_d0[operand_id]}")
+        if self.body.operand_kinds[operand_id] == OperandKind.OK_COPY:
+            self.retain_consumed_copy(operand_id)
         if self.body.operand_kinds[operand_id] != OperandKind.OK_MOVE:
             return
         let place = self.body.operand_d0[operand_id]
