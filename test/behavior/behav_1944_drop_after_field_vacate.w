@@ -25,23 +25,23 @@ impl Drop for Tagged:
     move fn drop():
         assert(self.text == "")
         DROPS += 1
-    mut fn take() -> str: self.text
+    mut fn take() -> str: move self.text
 
 type Holder { kind: i32, value: Value }
 
 fn one():
     var v = Value { text: "a".to_owned() }
-    let t = v.text
+    let t = move v.text
     assert(t == "a")
 
 fn two(kind: i32):
     var v = Tagged { kind: kind, text: "b".to_owned() }
-    let t = v.text
+    let t = move v.text
     assert(t == "b")
 
 fn nested():
     var h = Holder { kind: 0, value: Value { text: "c".to_owned() } }
-    let t = h.value.text
+    let t = move h.value.text
     assert(t == "c")
 
 fn callee():

@@ -227,10 +227,11 @@ impl Sema:
             let file_id = self.ast.file(node as NodeId) as i32
             let path = paths.get(file_id) ?? &""
             out = out ++ f"{name}\t{path}\t{self.node_line(node)}\t{self.ast.get_start(node)}\t{self.ast.get_end(node)}\n"
-        // `move` of a str (D111: passing a str copies, so the spelling says
-        // nothing). Read off the recorded types, off the checker's hot path.
+        // `move` of a str binding (D111: passing a str copies, so the spelling
+        // says nothing; a field `move` vacates the field, D82, and is not
+        // counted). Read off the recorded types, off the checker's hot path.
         for n in 1..self.ast.node_count():
-            if self.ast.kind(n) != NodeKind.NK_MOVE_ARG: continue
+            if self.ast.kind(n) != NodeKind.NK_MOVE_ARG or self.ast.kind(self.ast.get_data0(n)) != NodeKind.NK_IDENT: continue
             let ty = self.recorded_expr_type_or_zero(n)
             if ty == 0 or self.get_type_kind(self.resolve_alias(ty as TypeId)) != TypeKind.TY_STR: continue
             let path = paths.get(self.ast.file(n as NodeId) as i32) ?? &""

@@ -14,7 +14,8 @@
 //   str-clone              `.clone()` on a str
 //   ref-at-ref-param       an explicit `&x` at a `&T` parameter
 //   some-at-option-demand  `Some(x)` where an Option is demanded
-//   str-move               `move x` where x is a str
+//   str-move               `move x` where x is a str binding (a field
+//                          `move` vacates it, D82, and is not counted)
 //
 // The bar is main's own counts, recorded when main's compiler is installed
 // (`:install-user` publishes `--record-bar`'s file) into the green store beside green.tsv
