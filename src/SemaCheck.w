@@ -31410,7 +31410,7 @@ impl Sema:
             // `Iterable.iter`, declared `-> VecIter[T]`), it is what is made.
             let wanted = if self.has_expected_type != 0 and self.expected_expr_type != 0: self.resolve_alias(self.expected_expr_type) as i32 else: 0
             let wants_by_value = wanted != 0 and self.get_type_kind(wanted as TypeId) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(wanted) == self.syms.veciter
-            if not wants_by_value and vec_ty != 0 and self.std_generic_of(vec_ty) == StdGeneric.Vec and self.is_copy(self.get_generic_inst_arg(vec_ty, 0) as TypeId) == 0:
+            if not wants_by_value and vec_ty != 0 and self.std_generic_of(vec_ty) == StdGeneric.Vec and not self.copy_is_bits(self.get_generic_inst_arg(vec_ty, 0)):
                 field = self.syms.iter_ref
         let ret = self.check_method_call_parts_inner(expr, field, extra_start, arg_count, node, known_recv_ty)
         // §15.3: `next()` advances the iterator, so it needs a place. The
@@ -35935,10 +35935,11 @@ impl Sema:
     // ── Helper functions ─────────────────────────────────────────────
 
     // D44 / §13.5: map traversal observes. One element rule with Vec above:
-    // a Copy-class key or value binds by value, a Drop-class one binds as a
-    // view into the map's slot (copying it would make a second owner, §2.3).
+    // a plain-bits key or value binds by value; one with drop glue (a str,
+    // D111, or a Drop-class value) binds as a view into the map's slot
+    // (copying a Drop-class one would make a second owner, §2.3).
     mut fn traversal_binding_type(elem: i32) -> i32:
-        if self.type_needs_drop(elem) != 0 and self.is_copy(elem as TypeId) == 0:
+        if self.type_needs_drop(elem) != 0:
             return self.ensure_exact_type(TypeKind.TY_REF, elem, 0, 0) as i32
         elem
 
@@ -35972,7 +35973,7 @@ impl Sema:
             // array's strings under the caller (the second traversal read
             // freed memory).
             let seq_elem = self.get_type_d0(resolved)
-            if self.type_needs_drop(seq_elem) != 0 and self.is_copy(seq_elem as TypeId) == 0:
+            if self.type_needs_drop(seq_elem) != 0:
                 return self.ensure_exact_type(TypeKind.TY_REF, seq_elem, 0, 0) as i32
             return seq_elem
         if tk == TypeKind.TY_REF:
@@ -36006,7 +36007,7 @@ impl Sema:
                 // §13: the implicit form borrows the collection. Copy-class
                 // elements bind by value; Drop-class elements bind as &T
                 // views (copying one would double-drop it).
-                if self.type_needs_drop(vec_elem) != 0 and self.is_copy(vec_elem as TypeId) == 0:
+                if self.type_needs_drop(vec_elem) != 0:
                     return self.ensure_exact_type(TypeKind.TY_REF, vec_elem, 0, 0) as i32
                 return vec_elem
             if base_name == "HashMap" and self.get_generic_inst_arg_count(resolved as i32) >= 2:
@@ -36925,7 +36926,7 @@ impl Sema:
                     if self.get_type_kind(recv_resolved) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_arg_count(recv_resolved as i32) > 0:
                         if self.pool_resolve(self.get_type_d0(recv_resolved)) == "Vec":
                             let vec_elem = self.get_generic_inst_arg(recv_resolved as i32, 0)
-                            if self.type_needs_drop(vec_elem) != 0 and self.is_copy(vec_elem as TypeId) == 0:
+                            if self.type_needs_drop(vec_elem) != 0:
                                 return self.ensure_exact_type(TypeKind.TY_REF, vec_elem, 0, 0) as i32
                             return vec_elem
         self.infer_for_element_type(iter_type)
@@ -36942,21 +36943,21 @@ impl Sema:
             if self.get_type_kind(seq_resolved) == TypeKind.TY_REF: seq_resolved = self.resolve_alias(self.get_type_d0(seq_resolved) as TypeId)
             if self.get_type_kind(seq_resolved) == TypeKind.TY_ARRAY or self.get_type_kind(seq_resolved) == TypeKind.TY_SLICE:
                 let seq_elem = self.get_type_d0(seq_resolved)
-                return if self.type_needs_drop(seq_elem) != 0 and self.is_copy(seq_elem as TypeId) == 0: 1 else: 0
+                return if self.type_needs_drop(seq_elem) != 0: 1 else: 0
             // A `&Vec[T]` / `&HashMap[K, V]` iterable (a borrowed parameter,
             // a match-bound payload) yields the same views as the owned
             // collection (#1297).
             if self.get_type_kind(seq_resolved) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_arg_count(seq_resolved as i32) > 0:
                 if self.pool_resolve(self.get_type_d0(seq_resolved)) == "Vec":
                     let bare_elem = self.get_generic_inst_arg(seq_resolved as i32, 0)
-                    if self.type_needs_drop(bare_elem) != 0 and self.is_copy(bare_elem as TypeId) == 0:
+                    if self.type_needs_drop(bare_elem) != 0:
                         return 1
                 // D44: a map's Drop-class keys and values bind as views too.
                 let seq_base = self.pool_resolve(self.get_type_d0(seq_resolved))
                 if (seq_base == "HashMap" or seq_base == "BTreeMap") and self.get_generic_inst_arg_count(seq_resolved as i32) >= 2:
                     for ai in 0..2:
                         let map_elem = self.get_generic_inst_arg(seq_resolved as i32, ai)
-                        if self.type_needs_drop(map_elem) != 0 and self.is_copy(map_elem as TypeId) == 0:
+                        if self.type_needs_drop(map_elem) != 0:
                             return 1
         if self.iter_of_self_call_receiver(iterable) != 0: 1 else: 0
 

@@ -10498,6 +10498,10 @@ impl Sema:
             return lhs_numeric as TypeId
         rhs_numeric as TypeId
 
+    // D111: a copy of this type is plain bits — Copy, with no drop glue —
+    // so nothing retains or releases it. A str is Copy with drop glue.
+    mut fn copy_is_bits(tid: i32) -> bool: self.is_copy(tid as TypeId) != 0 and self.type_needs_drop(tid) == 0
+
     mut fn is_copy(tid: TypeId) -> i32:
         if tid == 0:
             return 1
