@@ -213,6 +213,22 @@ impl Sema:
             if i < text.len() as i32 and text[i] == '\n': line += 1
         line
 
+    // `with check --ceremony-census`: one line per recorded ceremony site,
+    // `pattern<TAB>path<TAB>line`, in the order Sema met them.
+    fn ceremony_census_text() -> str:
+        var paths: HashMap[i32, str] = HashMap.new()
+        for di in 0..self.decl_source_file_ids.len():
+            let file_id = self.decl_source_file_ids[di]
+            if not paths.contains(file_id) and di < self.decl_source_paths.len():
+                paths.insert(file_id, self.decl_source_paths[di].clone())
+        var out = ""
+        for (node, pattern) in self.ceremony_sites:
+            let name = if *pattern == 1: "str-clone" else: if *pattern == 2: "ref-at-ref-param" else: "some-at-option-demand"
+            let file_id = self.ast.file(*node as NodeId) as i32
+            let path = paths.get(file_id) ?? &""
+            out = out ++ f"{name}\t{path}\t{self.node_line(*node)}\n"
+        out
+
     fn diagnostic_node_span(node: i32) -> Span:
         // A deferred judgment can run after another module's body. Each
         // parser node owns its source identity, independent of that context.

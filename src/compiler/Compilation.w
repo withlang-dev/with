@@ -1799,6 +1799,13 @@ impl Compilation:
             return ""
         self.zcu.last_sema.dump_abi()
 
+    // CLAUDE.md ceremony census: the typed ceremony sites of one compilation.
+    mut fn ceremony_census_file(source_path: &str) -> str:
+        let pool = self.compile_entry_file(source_path)
+        if pool.decl_count() == 0:
+            return ""
+        self.zcu.last_sema.ceremony_census_text()
+
 fn analysis_request_is_semantic_snapshot(request: &str) -> bool:
     if request == "audit:receivers" or request == "audit:receiver-surface" or request == "audit:effects" or request == "audit:storage": return true
     if request == "audit:methods": return true

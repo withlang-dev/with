@@ -25578,6 +25578,10 @@ impl Sema:
         // belong to the declaration's module. Explicit arguments keep the
         // caller's visibility, including after checking a default here.
         let is_default = self.resolved_call_arg_is_default(call_node, arg_index) != 0
+        // Ceremony census: an explicit `&x` at a `&T` parameter, which
+        // auto-references a plain `x` (§3.8).
+        if not is_default and expected_ty != 0 and self.ast.kind(arg_node) == NodeKind.NK_UNARY and self.ast.get_data0(arg_node) == UnaryOp.UOP_REF and self.get_type_kind(self.resolve_alias(expected_ty as TypeId)) == TypeKind.TY_REF:
+            self.ceremony_sites.insert(arg_node, 2)
         if not is_default:
             return if self.join_meets_ref_param(arg_node, expected_ty): self.check_join_arg_at_ref_param(arg_node, expected_ty)
                 else if expected_ty != 0: self.check_expr_with_expected(arg_node, expected_ty as TypeId)
@@ -25840,6 +25844,23 @@ impl Sema:
             return 0 as TypeId
         self.get_generic_inst_arg(exp_r as i32, 0) as TypeId
 
+    // Ceremony census: `Some(x)` where `Option[T]` is demanded and `x` is a
+    // `T` that is not itself an Option — the demand converts `x` (D103).
+    mut fn note_some_at_option_demand(node: i32, expected_option: i32):
+        if self.ast.kind(node) != NodeKind.NK_CALL or self.ast.get_data2(node) != 1:
+            return
+        let callee = self.ast.get_data0(node)
+        if self.ast.kind(callee) != NodeKind.NK_IDENT or self.pool_resolve(self.ast.get_data0(callee)) != "Some":
+            return
+        let arg_ty = self.recorded_expr_type_or_zero(self.ast.get_extra(self.ast.get_data1(node)))
+        if arg_ty == 0:
+            return
+        let arg_r = self.resolve_alias(arg_ty as TypeId)
+        if self.get_type_kind(arg_r) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(arg_r as i32) == self.syms.option:
+            return
+        if self.types_compatible(self.get_generic_inst_arg(expected_option, 0) as TypeId, arg_ty as TypeId) != 0:
+            self.ceremony_sites.insert(node, 3)
+
     mut fn value_to_option_at_demand(node: i32, expected: TypeId, actual: TypeId) -> TypeId:
         if node == 0 or expected == 0 or actual == 0 or self.ast.kind(node) == NodeKind.NK_NULL_LIT:
             return actual
@@ -25851,6 +25872,7 @@ impl Sema:
             return actual
         let act_r = self.resolve_alias(actual)
         if self.get_type_kind(act_r) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(act_r as i32) == self.syms.option:
+            self.note_some_at_option_demand(node, exp_r as i32)
             return actual
         if self.types_compatible(expected, actual) != 0:
             return actual
@@ -31139,7 +31161,13 @@ impl Sema:
             if target == 0:
                 return 0
             return self.check_method_call_parts(expr, target, extra_start, arg_count, node, recv_ty)
-        self.check_method_call_parts(expr, field, extra_start, arg_count, node, 0)
+        let result = self.check_method_call_parts(expr, field, extra_start, arg_count, node, 0)
+        // Ceremony census: `.clone()` on a str (D111: a str is a value).
+        if arg_count == 0 and self.pool_resolve(field) == "clone":
+            let recv = self.recorded_expr_type_or_zero(expr)
+            if recv != 0 and self.get_type_kind(self.auto_deref_ref_ptr_type(self.resolve_alias(recv as TypeId))) == TypeKind.TY_STR:
+                self.ceremony_sites.insert(node, 1)
+        result
 
     // D87 (§7.3a): an implicit fill observes the binding and never consumes
     // it. An `implicit &T` parameter borrows the binding; an `implicit T`

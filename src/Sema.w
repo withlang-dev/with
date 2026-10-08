@@ -1786,6 +1786,9 @@ pub type Sema {
     // payload (`Some(ctx)` for `Option[&Ctx]`): each is a view of its place,
     // exactly as `&ctx` is (collect_expr_view_deps).
     auto_ref_payload_args: HashMap[i32, i32],
+    // CLAUDE.md ceremony census: node -> pattern (1 `.clone()` on a str, 2 an
+    // explicit `&` at a `&T` parameter, 3 `Some(x)` where Option is demanded).
+    ceremony_sites: HashMap[i32, i32],
     // #1627/#1618: the `Some(...)` a nullable facade callback's userdata
     // argument is, while facade_prepare_callback_call checks it: the
     // parameter is `Option[&U]`, so its payload is borrowed, not moved.
@@ -3032,6 +3035,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let drop_consumed_binding_values = sema_new_map_i32_i32()
     let auto_ref_binding_values = sema_new_map_i32_i32()
     let auto_ref_payload_args = sema_new_map_i32_i32()
+    let ceremony_sites = sema_new_map_i32_i32()
     let typed_binding_names = sema_new_map_i32_i32()
     let typed_binding_muts = sema_new_map_i32_i32()
     let ephemeral_task_binding_nodes = sema_new_map_i32_i32()
@@ -3580,6 +3584,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         drop_consumed_binding_values,
         auto_ref_binding_values,
         auto_ref_payload_args,
+        ceremony_sites,
         facade_userdata_ctor: 0,
         typed_binding_names,
         typed_binding_muts,

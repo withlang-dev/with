@@ -305,7 +305,7 @@ fn cli_value_or_prefix(argc: i32, flag: &str, prefix: &str) -> str:
 // Every flag the driver reads, for any command (#2198). A flag is known by
 // its name, the part before any `=`.
 fn cli_known_flags() -> Vec[str]:
-    ["--abi-sha", "--alloc", "--bundle-corpus", "--bundle-fingerprint", "--c-export-functions", "--c-export", "--c-sysroot", "--c-target", "--check", "--contains", "--convert-goto-to-structured", "--debug-alloc-filter", "--debug-alloc", "--deterministic", "--diff", "--dry-run", "--dump-abi", "--dump-ast", "--dump-async-mir", "--dump-drop-plan", "--dump-drop-state", "--dump-mir", "--dump-place-map", "--dump-project-info", "--dump-resolved", "--dump-tokens", "--dump-typed", "--emit-bundle-interface", "--emit-bundle-manifest", "--emit-c", "--emit-obj", "--exclude", "--exit-code", "--explain-mir-origin", "--explain", "--fail-fast", "--filter", "--force-reinstall", "--force", "--freestanding", "--from-source", "--generation", "--graph", "--help", "--ir-roundtrip", "--keep-binary", "--lib", "--link-bundle", "--link-object", "--migrate-one", "--name", "--no-c-export", "--no-deps", "--no-prelude", "--no-runtime", "--no-std", "--open", "--out", "--output", "--overflow", "--prefer-brace", "--prefer-colon", "--prefer-curly", "--prelude", "--quiet", "--release", "--runtime-generation", "--self-id", "--sema-body-order-reverse", "--shared-defs", "--shared-fragment", "--stats", "--strict-effects", "--target", "--test", "--trace-alloc", "--trace-cleanup-edge", "--trace-ownership", "--trace-place", "--validate-all", "--validate-ownership", "--verbose", "--version", "--width-slice", "-D", "-e", "-f", "-g0", "-h", "-I", "-include", "-l", "-n", "-o", "-O0", "-O1", "-O2", "-O3", "-p", "-q", "-v", "-w"]
+    ["--abi-sha", "--alloc", "--bundle-corpus", "--bundle-fingerprint", "--c-export-functions", "--c-export", "--c-sysroot", "--c-target", "--ceremony-census", "--check", "--contains", "--convert-goto-to-structured", "--debug-alloc-filter", "--debug-alloc", "--deterministic", "--diff", "--dry-run", "--dump-abi", "--dump-ast", "--dump-async-mir", "--dump-drop-plan", "--dump-drop-state", "--dump-mir", "--dump-place-map", "--dump-project-info", "--dump-resolved", "--dump-tokens", "--dump-typed", "--emit-bundle-interface", "--emit-bundle-manifest", "--emit-c", "--emit-obj", "--exclude", "--exit-code", "--explain-mir-origin", "--explain", "--fail-fast", "--filter", "--force-reinstall", "--force", "--freestanding", "--from-source", "--generation", "--graph", "--help", "--ir-roundtrip", "--keep-binary", "--lib", "--link-bundle", "--link-object", "--migrate-one", "--name", "--no-c-export", "--no-deps", "--no-prelude", "--no-runtime", "--no-std", "--open", "--out", "--output", "--overflow", "--prefer-brace", "--prefer-colon", "--prefer-curly", "--prelude", "--quiet", "--release", "--runtime-generation", "--self-id", "--sema-body-order-reverse", "--shared-defs", "--shared-fragment", "--stats", "--strict-effects", "--target", "--test", "--trace-alloc", "--trace-cleanup-edge", "--trace-ownership", "--trace-place", "--validate-all", "--validate-ownership", "--verbose", "--version", "--width-slice", "-D", "-e", "-f", "-g0", "-h", "-I", "-include", "-l", "-n", "-o", "-O0", "-O1", "-O2", "-O3", "-p", "-q", "-v", "-w"]
 
 // The first argument that looks like a flag and names none the driver
 // knows, or "". A flag's value (`-o out`, `--target x`) is skipped.
@@ -959,6 +959,7 @@ fn run_cli(full_argc: i32) -> i32:
     let trace_ownership_spec = cli_value_or_prefix(argc, "--trace-ownership", "--trace-ownership=")
     let dump_drop_plan_flag = cli_has_flag(argc, "--dump-drop-plan")
     let dump_abi_flag = cli_has_flag(argc, "--dump-abi")
+    let ceremony_census_flag = cli_has_flag(argc, "--ceremony-census")
     let validate_ownership_flag = cli_has_flag(argc, "--validate-ownership")
     let dump_place_map_flag = cli_has_flag(argc, "--dump-place-map")
     let trace_cleanup_edge_spec = cli_value_or_prefix(argc, "--trace-cleanup-edge", "--trace-cleanup-edge=")
@@ -1122,6 +1123,8 @@ fn run_cli(full_argc: i32) -> i32:
             return trace_ownership_artifact(source, trace_ownership_spec, no_std, alloc_mode, runtime_available, prelude_mode)
         if dump_drop_plan_flag:
             return dump_drop_plan_artifact(source, no_std, alloc_mode, runtime_available, prelude_mode)
+        if ceremony_census_flag:
+            return ceremony_census_artifact(source, no_std, alloc_mode, runtime_available, prelude_mode)
         if dump_abi_flag:
             return dump_abi_artifact(source, no_std, alloc_mode, runtime_available, prelude_mode)
         if validate_ownership_flag:
@@ -3838,6 +3841,13 @@ fn dump_drop_plan_artifact(source_file: &str, no_std: bool, alloc_mode: bool, ru
         return 1
     with_write(text)
     0
+
+// CLAUDE.md ceremony census: the typed ceremony sites of one compilation,
+// one `pattern<TAB>path<TAB>line` per site (tools/ceremony_census.w totals them).
+fn ceremony_census_artifact(source_file: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
+    var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
+    with_write(comp.ceremony_census_file(source_file))
+    if comp.has_errors(): 1 else: 0
 
 fn dump_abi_artifact(source_file: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
     var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
