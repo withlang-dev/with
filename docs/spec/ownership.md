@@ -130,6 +130,18 @@ binds user code. An operation that needs an independent value of a
 non-`Copy` type clones it, under a `Clone` bound, where the program asks for
 that; an operation that only needs to look yields a view.
 
+**Values and resources (D111).** Copy-or-move is decided by identity, not
+by representation. Values have no identity (integers, floats, strings,
+keys): passing one copies it, and the caller's is untouched. Resources have
+identity (files, tasks, sockets, handles, buffers being filled): passing one
+transfers it. Having a heap buffer does not make something a resource. `str`
+is a value. Passing a `str` always copies. Code using `str` never sees "use
+of moved value" and never needs `.clone()`. Semantics are copy; the
+implementation is an immutable, shared, reference-counted buffer: a copy is a
+pointer plus a count increment, the last holder frees. At a variable's last
+use the compiler turns the copy into a move, with no count traffic. Text that
+is built or edited goes through a builder type that produces a `str`.
+
 **Size warning:** The compiler emits a **warning** (not an error)
 when `Copy` is implemented for types exceeding a size threshold. The
 default threshold is 128 bytes. It is configurable via `with.toml`

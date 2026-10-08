@@ -230,6 +230,16 @@ take(move alice)   // explicit spelling of the same consume
 dup(copy xs)       // duplicate via Copy or Clone instead of consuming
 ```
 
+**A parameter's mode is what the callee does with it (D110).** If the
+callee stores the argument, ownership transfers. If it only reads it, the
+argument is observed. This is a reading of the function, not a design
+choice. `get`, `contains`, `remove` take their key as a probe and observe
+it. `insert` stores its key and takes it. `increment`/`decrement` observe
+the probe and take their own copy of the key only on the insert path.
+Builtin container methods have declared signatures
+(`fn remove(key: &K) -> Option[V]`), and every stage reads the mode from
+them; a builtin has no second ownership system.
+
 The mode is declared exactly once, in the signature — the boundary
 where §4.6 already requires explicitness — and never at call sites.
 A function that only reads a by-value parameter, or returns a view

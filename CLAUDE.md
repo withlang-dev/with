@@ -179,6 +179,31 @@ explicitly. During migrations the compiler may diagnose a legacy read-only `T`
 and offer an exact `&T` fix-it, but canonical mode never silently reinterprets
 the declared type. See specification §3.8 and `docs/meetings/2026-07-05-D5-historical-share-place-free-parameter-design-superseded.md` D5.
 
+**A parameter's mode is what the callee does with it (D110, Eric
+2026-10-08).** If the callee stores the argument, ownership transfers; if it
+only reads it, the argument is observed. This is a reading of the function,
+not a design choice: `get`, `contains`, `remove` take their key as a probe
+and observe it; `insert` stores its key and takes it; `increment`/`decrement`
+observe the probe and take their own copy of the key only on the insert
+path. Modes come from signatures, once: builtin container methods have
+declared signatures (`fn remove(key: &K) -> Option[V]`), and Sema's move
+checking, MIR lowering and drop emission all read the mode from the
+signature. A builtin never has a second ownership system — no hand list of
+"observed" or "consumed" intrinsic arguments in any stage.
+
+**Copy-or-move is decided by identity, not representation (D111, Eric
+2026-10-08).** Values have no identity (integers, floats, strings, keys):
+passing one copies it, and the caller's is untouched. Resources have identity
+(files, tasks, sockets, handles, buffers being filled): passing one transfers
+it. A heap buffer does not make something a resource. `str` is a value:
+passing a `str` always copies, code using `str` never sees "use of moved
+value" and never needs `.clone()`. The implementation is an immutable,
+shared, reference-counted buffer (atomic count — `str` is `Send`; literals
+immortal): a copy is a pointer plus a count increment, the last holder frees,
+and a variable's last use is a move with no count traffic (the drop plan's
+last-use facts). Text that is built or edited goes through a builder type
+that produces a `str`.
+
 **Receiver modes are separate.** `fn`/`&self` reads, `mut fn`/`mut self` mutates
 the receiver place in place, `move fn`/`move self` consumes it. Retiring
 free-parameter SHARE-PLACE doesn't change `mut fn` receiver semantics or D21's
@@ -706,6 +731,12 @@ all four parts in one brief, then wait for the ruling:
 4. **Predict what Eric would say.** A committed BDFL prediction with confidence,
    derived from his decision record — not a menu of options with no stake. It's
    falsifiable; being wrong and told why improves the record.
+
+**An ownership question states two facts first (Eric, 2026-10-08).**
+Before bringing Eric an ownership question, state what the callee does with
+the argument (stores it, or only reads it) and whether the type has identity
+(a resource, or a value). If those two facts decide it, it is not a ruling:
+do the work (D110, D111).
 
 **Never present an option that plainly fails `docs/mission.md`.** If an
 option obviously and unambiguously violates the mission (it makes the

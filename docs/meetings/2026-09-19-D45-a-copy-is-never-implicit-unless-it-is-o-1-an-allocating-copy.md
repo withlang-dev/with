@@ -1,5 +1,7 @@
 # D45 — A copy is never implicit unless it is O(1); an allocating copy is spelled
 
+**Superseded for `str` by D111 (2026-10-08):** `str` is a value; a copy is a count increment and is never spelled.
+
 **Laws:** 5, 1 (docs/mission.md).
 
 **Date:** 2026-09-19. **Status:** ruled (Eric: "unless copy is O(1) we
