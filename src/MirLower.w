@@ -16848,7 +16848,11 @@ impl MirBuilder:
                     if self.ast.get_extra(extra_start + fi) != first_node:
                         is_fill = false
                         break
-            let fill_value_is_bits = self.copy_is_bits(self.expr_type(first_node))
+            // The element the array holds decides, not the value spelled: `[s; N]`
+            // with `s: &str` under a `[str; N]` demand fills owned strs.
+            let fill_arr_ty = self.sema.resolve_alias(self.expr_type(node))
+            let fill_elem_ty = if self.sema.get_type_kind(fill_arr_ty) == TypeKind.TY_ARRAY: self.sema.get_type_d0(fill_arr_ty) else: self.expr_type(first_node)
+            let fill_value_is_bits = self.copy_is_bits(fill_elem_ty)
             // §4.3a, §2.3 (#1814): a non-Copy fill evaluates its value once
             // per element at every N, so each element owns its own value. It
             // took the one-evaluation fill over 64 elements: one `s.clone()`
