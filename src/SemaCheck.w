@@ -31150,25 +31150,6 @@ impl Sema:
         let method_name: str = with_str_clone_ref(self.pool_resolve(field))
         self.emit_error("method '" ++ owner_name ++ "." ++ method_name ++ "' requires a mutable receiver", node)
 
-    mut fn check_method_call(callee: i32, extra_start: i32, arg_count: i32, node: i32) -> i32:
-        let expr = self.ast.get_data0(callee)
-        let field = self.ast.get_data1(callee)
-        // D66 (§16.2b.5): as check_call, the case a variadic contract's
-        // selector picks.
-        if self.facade_variadic_method_names.contains(field):
-            let recv_ty = self.check_expr(expr) as i32
-            let target = self.facade_variadic_retarget_method(recv_ty, field, extra_start, arg_count, node)
-            if target == 0:
-                return 0
-            return self.check_method_call_parts(expr, target, extra_start, arg_count, node, recv_ty)
-        let result = self.check_method_call_parts(expr, field, extra_start, arg_count, node, 0)
-        // Ceremony census: `.clone()` on a str (D111: a str is a value).
-        if arg_count == 0 and self.pool_resolve(field) == "clone":
-            let recv = self.recorded_expr_type_or_zero(expr)
-            if recv != 0 and self.get_type_kind(self.auto_deref_ref_ptr_type(self.resolve_alias(recv as TypeId))) == TypeKind.TY_STR:
-                self.ceremony_sites.insert(node, 1)
-        result
-
     // D87 (§7.3a): an implicit fill observes the binding and never consumes
     // it. An `implicit &T` parameter borrows the binding; an `implicit T`
     // parameter is filled only when T is Copy. #2049: a non-Copy `implicit T`
@@ -31377,7 +31358,16 @@ impl Sema:
     // #2043 (D65): a method call that is a compiler builtin records which
     // one, decided here from the resolution this check made; codegen's
     // dispatch switches on the record.
-    mut fn check_method_call_parts(expr0: i32, field0: i32, extra_start: i32, arg_count: i32, node: i32, known_recv_ty0: i32) -> i32:
+    mut fn check_method_call_parts(expr: i32, field: i32, extra_start: i32, arg_count: i32, node: i32, known_recv_ty: i32) -> i32:
+        let result = self.check_method_call_parts_body(expr, field, extra_start, arg_count, node, known_recv_ty)
+        // Ceremony census: `.clone()` on a str (D111: a str is a value).
+        if arg_count == 0 and self.pool_resolve(field) == "clone":
+            let recv = self.recorded_expr_type_or_zero(expr)
+            if recv != 0 and self.get_type_kind(self.auto_deref_ref_ptr_type(self.resolve_alias(recv as TypeId))) == TypeKind.TY_STR:
+                self.ceremony_sites.insert(node, 1)
+        result
+
+    mut fn check_method_call_parts_body(expr0: i32, field0: i32, extra_start: i32, arg_count: i32, node: i32, known_recv_ty0: i32) -> i32:
         let expr = expr0
         var field = field0
         var known_recv_ty = known_recv_ty0
