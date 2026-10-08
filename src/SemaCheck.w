@@ -32548,6 +32548,13 @@ impl Sema:
                     let range_arg_ty = arg_types[0]
                     if range_arg_ty != 0 and self.get_type_kind(self.resolve_alias(range_arg_ty as TypeId)) != TypeKind.TY_RANGE:
                         self.emit_error("range() expects a range argument, `v.range(start..end)`, found " ++ self.type_name(range_arg_ty), self.ast.get_extra(extra_start))
+            else if type_name_sym == self.syms.vec and field == self.syms.join:
+                // Vec.join(sep: &str) concatenates str elements. Any other
+                // element was read as a str's {ptr, len} at run time: a
+                // Vec[i32] printed nothing or crashed in memcpy.
+                let join_elem_ty = self.get_generic_inst_arg(recv_type, 0)
+                if join_elem_ty != 0 and self.get_type_kind(self.auto_deref_ref_ptr_type(self.resolve_alias(join_elem_ty as TypeId))) != TypeKind.TY_STR and self.type_has_unresolved_parts(join_elem_ty) == 0:
+                    self.emit_error(f"Vec.join joins str elements, and this Vec holds `{self.type_name(join_elem_ty)}`; turn each element into text first: `v.iter() |> map(f\"\{it\}\") |> collect[Vec]()`", node)
             else if type_name_sym == self.syms.vec and field == self.syms.contains:
                 // D22: Vec.contains(value: &T) observes — arg[0] is &T; an
                 // owned argument auto-refs at the call site.
