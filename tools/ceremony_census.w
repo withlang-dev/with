@@ -15,11 +15,16 @@
 //   ref-at-ref-param       an explicit `&x` at a `&T` parameter
 //   some-at-option-demand  `Some(x)` where an Option is demanded
 //
-// The record is build/ceremony-census.tsv. A count above the record fails;
-// a count below it passes (lower the record with --write to keep it tight).
+// The bar is main's own counts, recorded when main's compiler is installed
+// (`:install-user` publishes `--record-bar`'s file) into the green store beside green.tsv
+// ($WITH_GREEN_DIR, else ~/.local/with-green). A tree is measured against it:
+// a count that falls passes, and the bar falls with it at the next reseed; a
+// count that rises fails unless build/ceremony-allowances.tsv grants it, one
+// line `pattern<TAB>area<TAB>bar<TAB>ceiling<TAB>why` (the PR says why too).
+// A grant names the bar it was made against and lapses once the bar moves.
 //
-//   with run tools/ceremony_census.w                   # check against the record
-//   with run tools/ceremony_census.w --write           # rewrite the record
+//   with run tools/ceremony_census.w                   # check against the bar
+//   with run tools/ceremony_census.w --record-bar FILE # write this tree's counts as a bar
 //   with run tools/ceremony_census.w --sites PATTERN   # list one typed pattern's sites
 //   --compiler PATH                                    # default out/release/bin/with
 
@@ -29,7 +34,11 @@ use std.string
 use Lexer
 use Token
 
-let RECORD = "build/ceremony-census.tsv"
+let ALLOWANCES = "build/ceremony-allowances.tsv"
+
+fn green_dir():
+    let dir = env("WITH_GREEN_DIR")
+    if dir.len() > 0: dir.clone() else: env("HOME") ++ "/.local/with-green"
 
 fn area_of(path: &str):
     if path.starts_with("<embedded-std>/"): "lib"
@@ -90,21 +99,34 @@ fn typed_sites(compiler: &str) -> str:
         exit_code(2)
     read_file("out/ceremony-typed.txt") ?? ""
 
-fn read_record() -> HashMap[str, i64]:
-    var record: HashMap[str, i64] = HashMap.new()
-    for line in (read_file(RECORD) ?? "").split("\n"):
+fn read_counts(path: &str) -> HashMap[str, i64]:
+    var counts: HashMap[str, i64] = HashMap.new()
+    for line in (read_file(path) ?? "").split("\n"):
         let cols = line.split("\t")
-        if cols.len() == 3: record.insert(f"{cols[0]}\t{cols[1]}", string_to_int(cols[2]))
-    record
+        if cols.len() == 3: counts.insert(f"{cols[0]}\t{cols[1]}", string_to_int(cols[2]))
+    counts
+
+// The ceiling each grant allows, keyed like the counts, for grants made
+// against the bar as it stands.
+fn read_allowances(bar: &HashMap[str, i64]) -> HashMap[str, i64]:
+    var allowed: HashMap[str, i64] = HashMap.new()
+    for line in (read_file(ALLOWANCES) ?? "").split("\n"):
+        let cols = line.split("\t")
+        if cols.len() < 5 or line.starts_with("#"): continue
+        let key = f"{cols[0]}\t{cols[1]}"
+        if string_to_int(cols[2]) == bar.get(key) ?? 0: allowed.insert(key, string_to_int(cols[3]))
+    allowed
 
 fn main:
     let argv = args()
-    var write = false
+    var record_bar_to = ""
     var sites_of = ""
     var compiler = "out/release/bin/with"
     var i = 1
     while i < argv.len():
-        if argv[i] == "--write": write = true
+        if argv[i] == "--record-bar" and i + 1 < argv.len():
+            i = i + 1
+            record_bar_to = argv[i]
         else if argv[i] == "--sites" and i + 1 < argv.len():
             i = i + 1
             sites_of = argv[i]
@@ -126,26 +148,28 @@ fn main:
         let cols = line.split("\t")
         // Build-generated modules (out/gen) are not source anyone writes.
         if cols.len() == 3 and not cols[1].starts_with("out/"): census.bump(f"{cols[0]}\t{area_of(cols[1])}")
-    var text = ""
-    for (key, n) in census.counts: text = text ++ f"{key}\t{n}\n"
-    if write:
-        write_file(RECORD, text)
-        print(f"ceremony-census: wrote {RECORD} ({census.counts.len()} counts)")
+    let bar_file = green_dir() ++ "/ceremony-bar.tsv"
+    if record_bar_to.len() > 0:
+        var text = ""
+        for (key, n) in census.counts: text = text ++ f"{key}\t{n}\n"
+        if write_file(record_bar_to, text) != 0:
+            eprint(f"ceremony-census: could not write {record_bar_to}")
+            exit_code(2)
+        print(f"ceremony-census: wrote the bar to {record_bar_to} ({census.counts.len()} counts)")
         return
-    // The record is a ceiling: a count above it is new ceremony and fails; a
-    // count below it is a cleanup and passes (lowering the record keeps the
-    // ceiling tight, so a later rise cannot hide under it).
-    let record = read_record()
+    if not file_exists(bar_file):
+        print(f"ceremony-census: no bar at {bar_file} yet; the next reseed (:install-user) records main's counts")
+        return
+    let bar = read_counts(bar_file)
+    let allowed = read_allowances(&bar)
     var rose = 0
     for (key, now) in census.counts:
-        let was = record.get(key) ?? 0
-        if now > was:
+        let was = bar.get(key) ?? 0
+        let ceiling = allowed.get(key) ?? was
+        if now > ceiling:
             rose = rose + 1
-            eprint(f"ceremony-census: {key.replace("\t", " in ")} rose {was} -> {now}; remove the new ceremony, or raise the record (--write) and say why in the PR")
+            eprint(f"ceremony-census: {key.replace("\t", " in ")} rose {was} -> {now}; remove the new ceremony, or grant it in {ALLOWANCES} (`{key}\t{was}\t{now}\t<why>`) and say why in the PR")
         else if now < was:
-            print(f"ceremony-census: {key.replace("\t", " in ")} fell {was} -> {now}; lower the record with --write")
-    for (key, was) in record:
-        if not census.counts.contains(key) and was > 0:
-            print(f"ceremony-census: {key.replace("\t", " in ")} fell {was} -> 0; lower the record with --write")
+            print(f"ceremony-census: {key.replace("\t", " in ")} fell {was} -> {now}; the bar follows at the next reseed")
     if rose > 0: exit_code(1)
     print("ceremony-census: ok")

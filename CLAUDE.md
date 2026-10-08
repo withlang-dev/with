@@ -336,12 +336,14 @@ not of what's correct. If you are about to write the same workaround a second
 time, that's a report.
 
 **The backstop: the ceremony census.** `tools/ceremony_census.w` counts the
-known ceremony patterns across the tree and `build/ceremony-census.tsv`
-records the counts. `src/main build :ceremony-census` (in the gate) fails
-when a count rises above the record; a PR that raises one updates the record
-and says why in its description. A count that falls passes; lowering the
-record with it (`with run tools/ceremony_census.w --write`) keeps the ceiling
-tight. A report that identifies a new pattern adds it to the census.
+known ceremony patterns across the tree. The bar is main's own counts:
+`:install-user` publishes them to the green store when main is reseeded, so
+a cleanup lowers the bar by itself once it merges. `src/main build
+:ceremony-census` (in the gate) measures a tree against the bar: a count that
+falls passes; a count that rises fails unless the PR grants it in
+`build/ceremony-allowances.tsv` (pattern, area, the bar it was granted
+against, the new ceiling, why) and says why in its description. A report
+that identifies a new pattern adds it to the census.
 
 ## No Silent Fallbacks
 

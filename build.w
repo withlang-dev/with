@@ -1676,13 +1676,15 @@ fn install_file_target(name: &str, source: &str, dest: &str, mode: &str, dep: &s
 // two). The kind writes outside the project only under `$HOME/`. The home
 // is build/compiler.w comp_home_dir's (#1884: %USERPROFILE% on Windows
 // without HOME, a loud stop with neither).
-fn green_store_install_path(ctx: &BuildCtx) -> str:
+fn green_store_install_path(ctx: &BuildCtx) -> str: green_store_install_dir(ctx) ++ "/green.tsv"
+
+fn green_store_install_dir(ctx: &BuildCtx) -> str:
     let explicit = ctx.env_input("WITH_GREEN_DIR")
     let home = if explicit.len() > 0: comp_home_lookup(ctx) else: comp_home_dir(ctx)
     let dir = if explicit.len() > 0: explicit else: home ++ "/.local/with-green"
     if home.len() > 0 and dir.starts_with(home ++ "/"):
-        return "$HOME/" ++ dir.slice(home.len() + 1, dir.len()) ++ "/green.tsv"
-    dir ++ "/green.tsv"
+        return "$HOME/" ++ dir.slice(home.len() + 1, dir.len())
+    dir
 
 // A compiler's debug info is part of the link's output: the dSYM beside
 // the binary, where the SDK links dsymutil. Undeclared, a link restored
@@ -2342,9 +2344,11 @@ fn run_ceremony_check_action(ctx: ActionCtx) -> i32:
     0
 
 // CLAUDE.md "Ceremony is a design defect": tools/ceremony_census.w counts the
-// known ceremony patterns across the tree against build/ceremony-census.tsv.
-// A count above the record is a red; a count below it passes.
-fn run_ceremony_census_action(ctx: ActionCtx) -> i32:
+// known ceremony patterns across the tree. The check measures the tree
+// against main's bar (a fall passes; a rise needs a grant in
+// build/ceremony-allowances.tsv); the record writes this tree's counts for
+// `:install-user` to publish as the bar.
+fn ceremony_census_run(ctx: ActionCtx, record: bool) -> i32:
     let fs = ctx.fs()
     let out_dir = ctx.output()
     if fs.mkdir_all(out_dir) != 0: return 1
@@ -2356,13 +2360,20 @@ fn run_ceremony_census_action(ctx: ActionCtx) -> i32:
     args.push("tools/ceremony_census.w")
     args.push("--compiler")
     args.push(compiler.clone())
+    if record:
+        args.push("--record-bar")
+        args.push(build_project_abs(root, build_project_join(out_dir, "ceremony-bar.tsv")))
     let stdout_rel = build_project_join(out_dir, "census.stdout")
     let stderr_rel = build_project_join(out_dir, "census.stderr")
     let result = ctx.process_runner().run_capture_cwd(args, build_project_abs(root, stdout_rel), build_project_abs(root, stderr_rel), 1200000, root)
     print(fs.read_text(stdout_rel))
     if result.rc != 0:
-        ctx.diagnostics().error("ceremony-census: the counts moved from build/ceremony-census.tsv\n" ++ fs.read_text(stderr_rel))
+        ctx.diagnostics().error("ceremony-census: a count rose above main's bar\n" ++ fs.read_text(stderr_rel))
     0
+
+fn run_ceremony_census_action(ctx: ActionCtx) -> i32: ceremony_census_run(ctx, false)
+
+fn run_ceremony_bar_action(ctx: ActionCtx) -> i32: ceremony_census_run(ctx, true)
 
 fn run_rt_decl_audit_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
@@ -4198,7 +4209,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     ceremony_census.action = run_ceremony_census_action
     ceremony_census = ceremony_census.input(release_compiler_bin("with"))
     ceremony_census = ceremony_census.input("tools/ceremony_census.w")
-    ceremony_census = ceremony_census.input("build/ceremony-census.tsv")
     ceremony_census = ceremony_census.input("src")
     ceremony_census = ceremony_census.input("lib")
     ceremony_census = ceremony_census.input("tools")
@@ -4207,6 +4217,21 @@ pub fn build(ctx: BuildCtx) -> Build:
     ceremony_census = ceremony_census.dep("build")
     ceremony_census = ceremony_census.write_scope("out/ceremony-census")
     out = out.add_target(ceremony_census)
+    // The installed compiler's tree sets the bar every later tree is measured
+    // against: `:install-user` publishes this tree's counts to the green store.
+    var ceremony_bar = target_new(.Action, "ceremony-bar-record", "").output("out/ceremony-bar")
+    ceremony_bar.action = run_ceremony_bar_action
+    ceremony_bar = ceremony_bar.input(release_compiler_bin("with"))
+    ceremony_bar = ceremony_bar.input("tools/ceremony_census.w")
+    ceremony_bar = ceremony_bar.input("src")
+    ceremony_bar = ceremony_bar.input("lib")
+    ceremony_bar = ceremony_bar.input("tools")
+    ceremony_bar = ceremony_bar.input("build")
+    ceremony_bar = ceremony_bar.input("examples")
+    ceremony_bar = ceremony_bar.dep("build")
+    ceremony_bar = ceremony_bar.write_scope("out/ceremony-bar")
+    out = out.add_target(ceremony_bar)
+    out = out.add_target(install_file_target("ceremony-bar-publish", "out/ceremony-bar/ceremony-bar.tsv", green_store_install_dir(ctx) ++ "/ceremony-bar.tsv", "0644", "ceremony-bar-record"))
     var rt_decl_audit = target_new(.Action, "rt-decl-audit", "").output("out/rt-decl-audit")
     rt_decl_audit.action = run_rt_decl_audit_action
     rt_decl_audit = rt_decl_audit.allow_parallel()
@@ -4781,7 +4806,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     check_committed = check_committed.write_scope("out/command/check-committed-state")
     out = out.add_target(check_committed)
 
-    out = out.add_target(install_compiler_target("install-user", release_compiler_bin("with"), "$HOME/.local/bin/with", "require-last-green"))
+    out = out.add_target(install_compiler_target("install-user", release_compiler_bin("with"), "$HOME/.local/bin/with", "require-last-green").dep("ceremony-bar-publish"))
 
     out = out.add_target(install_compiler_target("install-compiler", release_compiler_bin("with"), "$INSTALL_BINDIR/with" ++ host_exe_suffix(), "build"))
     out = out.add_target(install_file_target("install-rt-core", "out/lib/rt_core.o", "$INSTALL_LIBDIR/rt_core.o", "0644", "runtime"))
