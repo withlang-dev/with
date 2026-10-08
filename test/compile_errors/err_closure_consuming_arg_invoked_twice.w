@@ -3,11 +3,12 @@
 // D63 (§12.4): a closure that consumes its capture is call-once, so it may
 // only be handed to a callee that invokes its parameter at most once —
 // proved from the callee's body. `twice` calls `f` twice.
-fn twice(f: fn() -> str) -> str:
+// A Vec capture, not a str: a str capture is copied (D111).
+fn twice(f: fn() -> Vec[i32]) -> i64:
     let a = f()
     let b = f()
-    a ++ b
+    a.len() + b.len()
 
 fn main:
-    let s = "abc".clone()
+    let s: Vec[i32] = [1, 2, 3]
     print(twice(() => s))
