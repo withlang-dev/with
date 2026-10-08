@@ -5480,7 +5480,7 @@ impl MirBuilder:
         let ret_ty = self.fn_return_type()
         let break_downcast = self.body.new_downcast_place(branch_place, break_idx)
         let break_payload_place = self.body.new_field_place(break_downcast, 0, break_ty)
-        let break_op = self.operand_for_place(break_payload_place, break_ty)
+        let break_op = self.body.new_operand(self.carrier_read_kind(break_ty, self.local_type(self.place_base_local(break_payload_place))), break_payload_place)
         let from_break_args: Vec[i32] = Vec.new()
         from_break_args.push(break_op)
         let ret_op = self.lower_resolved_call_with_operand_args_contract(from_break_fn, from_break_args, ret_ty, node, from_break_sig, from_break_mono_sym)
@@ -5496,7 +5496,7 @@ impl MirBuilder:
         let result_place = self.place_for_local(result_local)
         let continue_downcast = self.body.new_downcast_place(branch_place, continue_idx)
         let payload_place = self.body.new_field_place(continue_downcast, 0, continue_ty)
-        let pass_op = self.operand_for_place(payload_place, continue_ty)
+        let pass_op = self.body.new_operand(self.carrier_read_kind(continue_ty, self.local_type(self.place_base_local(payload_place))), payload_place)
         self.assign_operand_to_place(result_place, pass_op, self.ast.get_start(expr))
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
@@ -13576,7 +13576,7 @@ impl MirBuilder:
                 else:
                     let err_downcast = self.body.new_downcast_place(value_place, err_idx)
                     let err_payload_place = self.body.new_field_place(err_downcast, 0, source_err_ty)
-                    var target_err_op = self.operand_for_place(err_payload_place, source_err_ty)
+                    var target_err_op = self.body.new_operand(self.carrier_read_kind(source_err_ty, self.local_type(self.place_base_local(err_payload_place))), err_payload_place)
                     let conversion_chain = self.sema.error_conversion_chain_frozen(target_err_ty, source_err_ty)
                     if conversion_chain.found == 0 or conversion_chain.ambiguous != 0:
                         self.mark_unsupported()
@@ -13972,7 +13972,7 @@ impl MirBuilder:
         let some_option_local = self.new_temp(result_ok_ty)
         let some_option_place = self.place_for_local(some_option_local)
         let some_fields: Vec[i32] = Vec.new()
-        some_fields.push(self.operand_for_place(ok_payload_place, inner_ok_ty))
+        some_fields.push(self.body.new_operand(self.carrier_read_kind(inner_ok_ty, self.local_type(self.place_base_local(ok_payload_place))), ok_payload_place))
         self.assign_enum_variant_to_place(some_option_place, result_ok_ty, self.sema.syms.some, some_fields, span)
         let ok_fields: Vec[i32] = Vec.new()
         ok_fields.push(self.operand_for_place(some_option_place, result_ok_ty))
@@ -13984,7 +13984,7 @@ impl MirBuilder:
         let err_downcast = self.body.new_downcast_place(inner_result_place, err_idx)
         let err_payload_place = self.body.new_field_place(err_downcast, 0, inner_err_ty)
         let err_fields: Vec[i32] = Vec.new()
-        err_fields.push(self.operand_for_place(err_payload_place, inner_err_ty))
+        err_fields.push(self.body.new_operand(self.carrier_read_kind(inner_err_ty, self.local_type(self.place_base_local(err_payload_place))), err_payload_place))
         self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.err, err_fields, span)
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
@@ -14033,7 +14033,7 @@ impl MirBuilder:
         let err_result_local = self.new_temp(result_some_ty)
         let err_result_place = self.place_for_local(err_result_local)
         let err_fields: Vec[i32] = Vec.new()
-        err_fields.push(self.operand_for_place(err_payload_place, inner_err_ty))
+        err_fields.push(self.body.new_operand(self.carrier_read_kind(inner_err_ty, self.local_type(self.place_base_local(err_payload_place))), err_payload_place))
         self.assign_enum_variant_to_place(err_result_place, result_some_ty, self.sema.syms.err, err_fields, span)
         let err_some_fields: Vec[i32] = Vec.new()
         err_some_fields.push(self.operand_for_place(err_result_place, result_some_ty))
@@ -14064,7 +14064,7 @@ impl MirBuilder:
         let ok_result_local = self.new_temp(result_some_ty)
         let ok_result_place = self.place_for_local(ok_result_local)
         let ok_fields: Vec[i32] = Vec.new()
-        ok_fields.push(self.operand_for_place(some_payload_place, inner_some_ty))
+        ok_fields.push(self.body.new_operand(self.carrier_read_kind(inner_some_ty, self.local_type(self.place_base_local(some_payload_place))), some_payload_place))
         self.assign_enum_variant_to_place(ok_result_place, result_some_ty, self.sema.syms.ok, ok_fields, span)
         let some_fields: Vec[i32] = Vec.new()
         some_fields.push(self.operand_for_place(ok_result_place, result_some_ty))
@@ -14192,7 +14192,7 @@ impl MirBuilder:
         let downcast = self.body.new_downcast_place(value_place, variant_idx)
         let payload_place = self.body.new_field_place(downcast, 0, payload_ty)
         let some_fields: Vec[i32] = Vec.new()
-        let ok_err_payload_op = self.operand_for_place(payload_place, payload_ty)
+        let ok_err_payload_op = self.body.new_operand(self.carrier_read_kind(payload_ty, self.local_type(self.place_base_local(payload_place))), payload_place)
         some_fields.push(ok_err_payload_op)
         // Consuming the payload into the Option queues its reset-on-move
         // (§2.5.1): the blank lands on this path, before the goto, so the
@@ -14926,7 +14926,7 @@ impl MirBuilder:
             let err_idx = self.enum_variant_index_for_type(value_ty, self.sema.syms.err)
             let err_downcast = self.body.new_downcast_place(value_place, err_idx)
             let err_payload_place = self.body.new_field_place(err_downcast, 0, err_ty)
-            call_args.push(self.operand_for_place(err_payload_place, err_ty))
+            call_args.push(self.body.new_operand(self.carrier_read_kind(err_ty, value_ty), err_payload_place))
         // #2049: calling the fallback closure reads it, as any closure call
         // does (`call copy _f()`); its owner's drop frees it on both arms. A
         // `move` callee here left the success arm's scope-exit drop running
