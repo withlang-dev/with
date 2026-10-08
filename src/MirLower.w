@@ -7480,6 +7480,8 @@ impl MirBuilder:
                     self.finish_stmt_temp_frame(diverging_frame)
                 if tail_read != 0:
                     self.cancel_scheduled_value_drop_for_receiver_expr(self.ast.get_data0(tail_read))
+                if tail_read == 0:
+                    result = self.tail_local_moves_out(result, tail_expr)
                 result = self.materialize_tail_field_move(result, tail_expr)
                 result = self.materialize_tail_read_of_dropped_local(result, tail_expr)
             else:
@@ -13284,6 +13286,22 @@ impl MirBuilder:
     mut fn lower_vtable_call(dyn_expr: i32, _trait_sym: i32, method_sym: i32, args_start: i32, args_count: i32, node: i32) -> i32:
         // Conservative lowering: treat as method call on dynamic receiver.
         self.lower_method_call(dyn_expr, method_sym, args_start, args_count, node)
+
+    // D111: a block tail naming a local is that local's last use, and
+    // cancel_scheduled_value_drop_for_receiver_expr retired its drop: a value
+    // with copy glue moves out (no hold taken), as a non-Copy local does; a
+    // copy would retain what nothing then releases.
+    mut fn tail_local_moves_out(op: i32, tail_expr: i32) -> i32:
+        var expr = tail_expr
+        while expr != 0 and self.ast.kind(expr) == NodeKind.NK_GROUPED:
+            expr = self.ast.get_data0(expr)
+        if expr == 0 or self.ast.kind(expr) != NodeKind.NK_IDENT or op < 0 or self.body.operand_kinds[op] != OperandKind.OK_COPY:
+            return op
+        let local = self.lookup_local(self.ast.get_data0(expr))
+        let place: i32 = self.body.operand_d0[op]
+        if local < 0 or mir_place_plain_local(&self.body, place) != local or self.copy_is_bits(self.local_type(local)):
+            return op
+        self.body.new_operand(OperandKind.OK_MOVE, place)
 
     mut fn cancel_scheduled_value_drop_for_receiver_expr(expr: i32):
         if expr == 0:
