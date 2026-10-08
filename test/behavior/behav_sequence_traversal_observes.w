@@ -10,8 +10,8 @@ use std.fs
 use std.process
 
 fn main:
-    let previous_reuse = env("WITH_ALLOC_NO_REUSE").clone()
-    let previous_scribble = env("WITH_DEBUG_ALLOC_SCRIBBLE").clone()
+    let previous_reuse = env("WITH_ALLOC_NO_REUSE")
+    let previous_scribble = env("WITH_DEBUG_ALLOC_SCRIBBLE")
     assert(set_env("WITH_DEBUG_ALLOC_SCRIBBLE", "1") == 0)
     let root = p7_prepare_case("sequence_traversal_observes", "seqtraversal")
     p7_write(root, "src/main.w", read_file(p7_abs("test/behavior/lib/sequence_traversal_cases.w")).unwrap())

@@ -24,14 +24,14 @@ enum Outer[T]:
 fn nested(g: Outer[i64]) -> str:
     match g:
         Outer.A(.X(t)) => f"nested {t}"
-        Outer.A(.Y) => "nested Y".clone()
-        Outer.B(_) => "B".clone()
+        Outer.A(.Y) => "nested Y"
+        Outer.B(_) => "B"
 
 fn nested_qualified(g: Outer[i64]) -> str:
     match g:
         Outer.A(H.X(t)) => f"nested {t}"
-        Outer.A(H.Y) => "nested Y".clone()
-        Outer.B(_) => "B".clone()
+        Outer.A(H.Y) => "nested Y"
+        Outer.B(_) => "B"
 
 fn main:
     let f: G[i64] = G.V(2)

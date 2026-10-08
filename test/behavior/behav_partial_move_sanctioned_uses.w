@@ -11,7 +11,7 @@ fn use_whole(p: &Pair) -> i64: p.left.len() + p.right.len()
 fn main:
     var p = Pair { left: "ab" ++ "", right: "cdef" ++ "" }
     var taken = "" ++ ""
-    taken = move p.left
+    taken = p.left
     // Sibling read while p is partially moved: legal.
     if p.right.len() != 4:
         return 1

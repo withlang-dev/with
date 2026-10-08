@@ -19,20 +19,20 @@ impl Bag:
 
 fn main:
     var b = Bag { items: Vec.new(), count: 0 }
-    b.items.push(KV { key: "a".clone(), n: 1 })
-    b.items.push(KV { key: "b".clone(), n: 1 })
+    b.items.push(KV { key: "a", n: 1 })
+    b.items.push(KV { key: "b", n: 1 })
     b.tally()
     print(f"{b.count}")
     var xs: Vec[KV] = Vec.new()
-    xs.push(KV { key: "a".clone(), n: 1 })
-    xs.push(KV { key: "b".clone(), n: 2 })
+    xs.push(KV { key: "a", n: 1 })
+    xs.push(KV { key: "b", n: 2 })
     var keys: Vec[str] = Vec.new()
     for e in xs:
-        keys.push(e.key.clone())
+        keys.push(e.key)
     for e in xs.iter():
         b.count += 0
     print(f"{keys.len()}")
     for k in keys:
         print(k)
-    xs.push(KV { key: "c".clone(), n: 3 })
+    xs.push(KV { key: "c", n: 3 })
     print(f"{xs.len()}")

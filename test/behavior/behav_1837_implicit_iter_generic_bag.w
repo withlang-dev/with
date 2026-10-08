@@ -45,7 +45,7 @@ fn main:
     let bag = Bag { items: toks }
     var out = ""
     for t in bag:
-        out = if out.len() == 0: t.name.clone() else: out ++ " " ++ t.name
+        out = if out.len() == 0: t.name else: out ++ " " ++ t.name
     print(out)
     print(shout(&bag))
     var nums: Vec[i32] = Vec.new()

@@ -10,7 +10,7 @@ impl Drop for BoxDropGuard:
 fn test_box_drops_payload_at_scope_exit:
     BOX_DROP_TRACE = ""
     {
-        let guard = Box.new(BoxDropGuard { id: "G".clone() })
+        let guard = Box.new(BoxDropGuard { id: "G" })
         assert(BOX_DROP_TRACE == "")
         assert(guard.id == "G")
         assert(guard.id != "H")

@@ -15,7 +15,7 @@ fn main:
     let b = "hey".as_bytes()
     print(b.len())
     print(b[1])
-    let owned = "hey".clone()
+    let owned = "hey"
     let r: &str = &owned
     let through_ref = r as []u8
     print(through_ref.len())

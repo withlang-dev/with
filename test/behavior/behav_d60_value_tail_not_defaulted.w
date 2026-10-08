@@ -16,8 +16,8 @@ fn borrowed_len(v: &str) -> i64: v.len
 fn owned_len(v: str) -> i64: v.len
 
 fn main:
-    let s = "abc".clone() ++ "de"
-    print(f"{borrowed_len(&s)} {owned_len(s.clone())}")
+    let s = "abc" ++ "de"
+    print(f"{borrowed_len(&s)} {owned_len(s)}")
     print(f"{view_len(&s)} {view_is_empty(&s)}")
     let e = ""
     print(f"{view_len(e)} {view_is_empty(e)}")

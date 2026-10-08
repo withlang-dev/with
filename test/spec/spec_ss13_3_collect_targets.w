@@ -44,7 +44,7 @@ fn test_collect_hashset:
 
 fn test_collect_hashmap:
     let xs = pairs()
-    let map: HashMap[str, i32] = xs.iter() |> map(pair => (pair.0.clone(), pair.1)) |> collect[HashMap[str, i32]]()
+    let map: HashMap[str, i32] = xs.iter() |> map(pair => (pair.0, pair.1)) |> collect[HashMap[str, i32]]()
     assert(map.get("a").unwrap() == 3)
     assert(map.get("b").unwrap() == 2)
     assert(map.get("missing").is_none())
@@ -63,7 +63,7 @@ fn test_collect_btreeset:
 
 fn test_collect_btreemap:
     let xs = pairs()
-    let map: BTreeMap[str, i32] = xs.iter() |> map(pair => (pair.0.clone(), pair.1)) |> collect[BTreeMap[str, i32]]()
+    let map: BTreeMap[str, i32] = xs.iter() |> map(pair => (pair.0, pair.1)) |> collect[BTreeMap[str, i32]]()
     assert(map.len() == 2)
     assert(map.get("a").unwrap() == 3)
     assert(map.get("b").unwrap() == 2)

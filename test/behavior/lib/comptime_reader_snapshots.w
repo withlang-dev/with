@@ -11,7 +11,7 @@ comptime fn advance() -> Reader:
     var text = "0123456789abcdef"
     for _ in 0..12:
         text = text ++ text
-    var reader = Reader { bytes: move text, at: 0, checksum: 0 }
+    var reader = Reader { bytes: text, at: 0, checksum: 0 }
     while reader.at < 512:
         reader.checksum = reader.checksum + reader.byte()
     // Replace the shared field, then materialize an independent owned value.

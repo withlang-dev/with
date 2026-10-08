@@ -28,7 +28,7 @@ fn bump:
     }
 
 fn scoped_tracer:
-    let t = Tracer { id: "drop".clone() }
+    let t = Tracer { id: "drop" }
     assert(t.id == "drop")
 
 fn main:

@@ -7,7 +7,7 @@ trait Named:
 type Person { text: str }
 
 impl Named for Person:
-    fn name: self.text.clone()
+    fn name: self.text
 
 fn main:
     let person = Person { text: "Ada" }

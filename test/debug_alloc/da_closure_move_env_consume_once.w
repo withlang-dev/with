@@ -8,6 +8,6 @@
 fn mk(s: str) -> fn() -> str: move () => s
 
 fn main:
-    let take = mk("abc".clone())
+    let take = mk("abc")
     print(take())
     print("done")

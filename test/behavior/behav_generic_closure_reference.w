@@ -21,7 +21,7 @@ fn test_generic_closure_reference_identity:
     let wide_compare = make_pointer_compare(wide_left)
     assert(unsafe { wide_compare((&raw mut wide_left) as *mut u8, (&raw mut wide_right) as *mut u8) } == 1)
 
-    var text_left = "alpha".clone()
-    var text_right = "beta".clone()
+    var text_left = "alpha"
+    var text_right = "beta"
     let text_compare = make_pointer_compare(text_left)
     assert(unsafe { text_compare((&raw mut text_left) as *mut u8, (&raw mut text_right) as *mut u8) } == -1)

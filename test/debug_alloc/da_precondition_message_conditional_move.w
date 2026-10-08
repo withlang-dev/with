@@ -12,12 +12,12 @@ fn consume(s: str) -> str:
     s ++ "!"
 
 fn main:
-    let s = "hel".clone() ++ "lo"
+    let s = "hel" ++ "lo"
     require(true, consume(s))
     check(true, consume(s))
     assert(true, consume(s))
     testing.require(true, consume(s))
     print(s)
-    let t = "ke".clone() ++ "pt"
+    let t = "ke" ++ "pt"
     testing.check(true, t)
     print(t)

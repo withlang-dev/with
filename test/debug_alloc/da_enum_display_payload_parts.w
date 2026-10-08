@@ -55,7 +55,7 @@ fn main:
         print(f"{s:?}")
         print(s.t)
         var m: HashMap[str, str] = HashMap.new()
-        m.insert("a".clone(), "b" ++ "c")
+        m.insert("a", "b" ++ "c")
         let g = m.get(if k == 0: "a" else: "z")
         print(f"{g}")
         print(m.get("a").unwrap())

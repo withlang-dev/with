@@ -24,8 +24,8 @@ fn run_cases(case_name: &str, package: &str, source: &str):
         assert(not result.stderr.contains("ledger full"))
 
 fn main:
-    let previous_reuse = env("WITH_ALLOC_NO_REUSE").clone()
-    let previous_scribble = env("WITH_DEBUG_ALLOC_SCRIBBLE").clone()
+    let previous_reuse = env("WITH_ALLOC_NO_REUSE")
+    let previous_scribble = env("WITH_DEBUG_ALLOC_SCRIBBLE")
     assert(set_env("WITH_DEBUG_ALLOC_SCRIBBLE", "1") == 0)
     run_cases("d44_map_traversal", "d44maptraversal", "test/behavior/lib/map_traversal_cases.w")
     run_cases("d44_map_snapshots", "d44mapsnapshots", "test/behavior/lib/map_snapshot_cases.w")

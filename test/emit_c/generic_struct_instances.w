@@ -33,7 +33,7 @@ fn main:
     if let Some(b) = next:
         total += b.v
     print(total)
-    let h = Holder { w: Wrap { value: 7 }, tag: Wrap { value: "x".clone() } }
+    let h = Holder { w: Wrap { value: 7 }, tag: Wrap { value: "x" } }
     print(f"{h.w.value} {h.tag.value}")
     var m: BTreeMap[i32, str] = BTreeMap.new()
     m.insert(2, "b")

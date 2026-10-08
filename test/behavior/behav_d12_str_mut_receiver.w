@@ -32,7 +32,7 @@ fn main:
 
     // By-value param: the callee owns an explicit clone (D28: str moves),
     // the caller is untouched.
-    assert(shout_a_copy(s.clone()) == "ello!!")
+    assert(shout_a_copy(s) == "ello!!")
     assert(s == "ello!")
 
     // Branch and loop shapes drive the caller's place.

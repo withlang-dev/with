@@ -21,7 +21,7 @@ trait Makeable:
 
 type P { n: str }
 impl Named for P:
-    fn name() -> str: self.n.clone()
+    fn name() -> str: self.n
 
 type Q { v: i32 }
 impl Makeable for Q:

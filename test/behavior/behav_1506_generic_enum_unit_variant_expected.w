@@ -25,12 +25,12 @@ enum Maybe[T]:
 fn g_text(g: G[i64]) -> str:
     match g:
         G.V(t) => f"t={t}"
-        G.E => "E".clone()
+        G.E => "E"
 
 fn maybe_text(m: Maybe[i32]) -> str:
     match m:
         Just(v) => f"{v}"
-        Nothing => "n".clone()
+        Nothing => "n"
 
 fn main:
     print(g_text(G.E))

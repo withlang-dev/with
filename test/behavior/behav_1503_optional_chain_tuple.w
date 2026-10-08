@@ -12,13 +12,13 @@
 fn first(o: Option[(str, i32)]) -> Option[i32]: o?.1
 
 fn main:
-    let o: Option[(str, i32)] = Some(("xyz".clone(), 4))
+    let o: Option[(str, i32)] = Some(("xyz", 4))
     print(f"{first(o) ?? 0}")
     let n: Option[(str, i32)] = None
     print(f"{first(n) ?? 0}")
-    let p: Option[(str, i32)] = Some(("xyz".clone(), 4))
+    let p: Option[(str, i32)] = Some(("xyz", 4))
     print(f"{p?.1}")
-    let s: Option[(str, i32)] = Some(("xyz".clone(), 4))
+    let s: Option[(str, i32)] = Some(("xyz", 4))
     print(f"{s?.0}")
     let q: Option[(i32, i32)] = Some((3, 7))
     print(f"{q?.1 ?? 0}")

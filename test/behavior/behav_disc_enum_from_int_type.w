@@ -41,14 +41,14 @@ enum Plain:
 
 fn color_name(c: Color) -> str:
     match c:
-        .Red => "red".clone()
-        .Green => "green".clone()
-        .Blue => "blue".clone()
+        .Red => "red"
+        .Green => "green"
+        .Blue => "blue"
 
 fn show(o: Option[Color]) -> str:
     match o:
         Some(c) => color_name(c)
-        None => "none".clone()
+        None => "none"
 
 fn decode(n: i32) -> Option[Color]: Color.from_int(n)
 

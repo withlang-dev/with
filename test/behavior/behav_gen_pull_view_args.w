@@ -33,7 +33,7 @@ fn lockstep[A, B](left: impl Iter[A], right: impl Iter[B]) -> Vec[(A, B)]:
     out
 
 fn main:
-    let v: Vec[str] = ["a".clone(), "".clone(), "c".clone()]
+    let v: Vec[str] = ["a", "", "c"]
     var p = nonempty(&v).pull()
     print(p.next().unwrap())
     print(p.next().unwrap())

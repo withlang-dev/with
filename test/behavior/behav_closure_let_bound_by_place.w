@@ -25,7 +25,7 @@ fn main:
     let read_id = () => r.id
     print(f"{read_id()} {r.id}")
 
-    let s = "abc".clone()
+    let s = "abc"
     let len = () => s.len() as i32
     print(f"{len()} {len()}")
     print(s.len())

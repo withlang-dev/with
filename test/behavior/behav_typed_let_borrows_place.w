@@ -10,8 +10,8 @@ fn main:
     let x = "hel" ++ "lo"
     let s: &str = x
     var v: Vec[str] = Vec.new()
-    v.push("a".clone())
-    v.push("b".clone())
+    v.push("a")
+    v.push("b")
     let vv: &Vec[str] = v
     let p = Point { x: 1, y: 2 }
     let pr: &Point = p

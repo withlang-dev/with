@@ -23,7 +23,7 @@ fn build_object(case_dir: &str, label: &str, mapped: bool) -> str:
     read_file(p7_join(case_dir, "out/helper.o")).unwrap()
 
 fn main:
-    let previous = env("WITH_FILE_PREFIX_MAP").clone()
+    let previous = env("WITH_FILE_PREFIX_MAP")
     let first = p7_prepare_case("file_prefix_map_first", "prefixmap")
     let second = p7_prepare_case("file_prefix_map_second_longer_name", "prefixmap")
 

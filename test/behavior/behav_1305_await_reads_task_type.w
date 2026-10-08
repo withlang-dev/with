@@ -9,7 +9,7 @@
 use std.task
 
 async fn num() -> i64: 42
-async fn text() -> str: "hello, world".clone()
+async fn text() -> str: "hello, world"
 async fn warm() -> i64: num().await
 
 async fn helper(t: Task[str]) -> i64:
@@ -24,7 +24,7 @@ async fn pair(a: Task[i64], b: Task[str]) -> i64:
 async fn main:
     let n = warm().await
     let m = helper(text()).await
-    let p = pair(num(), fn_text("abc".clone())).await
+    let p = pair(num(), fn_text("abc")).await
     print(f"{n} {m} {p - 38}")
 
 async fn fn_text(s: str) -> str: s

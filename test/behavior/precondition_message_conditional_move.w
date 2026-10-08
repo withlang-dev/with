@@ -17,7 +17,7 @@ impl Drop for Res:
 
 fn consume(r: Res) -> str:
     print("consumed? yes")
-    r.name.clone()
+    r.name
 
 fn main:
     let r = Res { name: "a" }
@@ -27,6 +27,6 @@ fn main:
     testing.require(true, consume(r))
     print("consumed? no")
     print(r.name)
-    let s = "kept".clone()
+    let s = "kept"
     testing.check(true, s)
     print(s)

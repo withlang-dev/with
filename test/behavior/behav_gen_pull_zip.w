@@ -16,7 +16,7 @@ gen fn letters(all: Vec[str]) -> str:
     defer:
         print(f"letters stopped at {last}")
     for s in all:
-        last = s.clone()
+        last = s
         yield s
 
 fn lockstep[A, B](left: impl Iter[A], right: impl Iter[B]) -> Vec[(A, B)]:
@@ -34,7 +34,7 @@ fn lockstep[A, B](left: impl Iter[A], right: impl Iter[B]) -> Vec[(A, B)]:
     out
 
 fn main:
-    let pairs = lockstep(odds_from(3, 3).pull(), letters(["c".clone(), "e".clone(), "g".clone(), "i".clone(), "k".clone()]).pull())
+    let pairs = lockstep(odds_from(3, 3).pull(), letters(["c", "e", "g", "i", "k"]).pull())
     var out = ""
     for (x, s) in pairs:
         out = if out.len() == 0: f"{x}:{s}" else: out ++ f" {x}:{s}"

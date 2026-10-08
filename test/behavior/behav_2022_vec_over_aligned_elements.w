@@ -39,7 +39,7 @@ fn main:
     print(f"capacity aligned {count_aligned_al(&reserved)}")
 
     var named: Vec[Named] = Vec.new()
-    for i in 0..12: named.push(Named { s: "hello".clone() ++ f"{i}", k: i as i64 })
+    for i in 0..12: named.push(Named { s: "hello" ++ f"{i}", k: i as i64 })
     var named_ok = 0
     for i in 0..named.len() as i32:
         if (&raw const named[i].s as i64) % 64 == 0: named_ok += 1

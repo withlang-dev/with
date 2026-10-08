@@ -11,7 +11,7 @@ fn mk() -> Option[M]: Some(M { text: "hi" ++ "", n: 1 })
 
 fn take_text() -> str:
     match mk():
-        Some(found) => { var taken = found; move taken.text }
+        Some(found) => { var taken = found; taken.text }
         None => ""
 
 fn main:

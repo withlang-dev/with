@@ -40,7 +40,7 @@ fn check(h: &str):
     if h < "world": print("lt")
     print(f"fmt {h}|{h:>7}|{h:?}")
     print(h ++ "!")
-    let c: str = h.clone()
+    let c: str = h
     print(c)
     print(h.to_upper())
     match h:

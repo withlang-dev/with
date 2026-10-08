@@ -56,7 +56,7 @@ fn main:
     qy = qy * 3
     print(f"{qx} {qy}")
 
-    var (w, _, z) = (1, "dropped".clone(), 3)
+    var (w, _, z) = (1, "dropped", 3)
     w += 1
     z = z * 2
     print(f"{w} {z}")

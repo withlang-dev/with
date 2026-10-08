@@ -15,7 +15,7 @@ fn main:
     // branch-local cleanup was restored (#1944).
     // This bounds the actual allocation path, independent of host RSS noise.
     assert(set_env("WITH_MEMORY_LIMIT_BYTES", "33554432") == 0)
-    let checked = run_to_files(&[compiler.clone(), "check", "test/behavior/lib/comptime_reader_snapshots.w"], stdout_path, stderr_path, 30000)
+    let checked = run_to_files(&[compiler, "check", "test/behavior/lib/comptime_reader_snapshots.w"], stdout_path, stderr_path, 30000)
     assert(set_env("WITH_MEMORY_LIMIT_BYTES", saved_limit) == 0)
     if checked.code != 0:
         print(read_file(stderr_path).unwrap())

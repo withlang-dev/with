@@ -26,8 +26,8 @@ fn accepted_paths(mode: &str):
     p7_assert_file_contains(case_dir, "out/result.txt", "result")
 
 pub fn run_mode(mode: &str):
-    let previous_worker = env("WITH_BUILD_ACTION_WORKER").clone()
-    let previous_force = env("WITH_BUILD_ACTION_FORCE").clone()
+    let previous_worker = env("WITH_BUILD_ACTION_WORKER")
+    let previous_force = env("WITH_BUILD_ACTION_FORCE")
     assert(set_env("WITH_BUILD_ACTION_WORKER", if mode == "comptime": "generate" else: "") == 0)
     assert(set_env("WITH_BUILD_ACTION_FORCE", "1") == 0)
     accepted_paths(mode)

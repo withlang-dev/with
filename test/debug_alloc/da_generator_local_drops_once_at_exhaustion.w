@@ -6,15 +6,15 @@
 // own drop then finds the state field blanked.
 fn words() -> Vec[str]:
     var v: Vec[str] = Vec.new()
-    v.push("a".clone())
-    v.push("bb".clone())
-    v.push("ccc".clone())
+    v.push("a")
+    v.push("bb")
+    v.push("ccc")
     v
 gen fn each() -> str:
     let v = words()
     var i = 0
     while i < v.len() as i32:
-        yield v[i].clone()
+        yield v[i]
         i += 1
 fn main:
     var n = 0

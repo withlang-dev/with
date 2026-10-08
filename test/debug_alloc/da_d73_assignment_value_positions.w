@@ -16,7 +16,7 @@ fn next() -> i32:
     ticks += 1
     if ticks > 3: 0 else: ticks
 
-fn compute(s: &str): s.clone() ++ "!"
+fn compute(s: &str): s ++ "!"
 
 type P { n: i32 }
 
@@ -30,7 +30,7 @@ fn main:
     while (n = next()) != 0:
         seen = seen ++ f" {n}"
     print(f"cond{seen}")
-    var s = "".clone()
+    var s = ""
     let t = (s = compute("x"))
     print(f"view {t} {s}")
     let u = compute("y")

@@ -26,7 +26,7 @@ fn main:
     let js = "{\"method\":\"initialize\",\"id\":1,\"params\":{\"rootUri\":\"/tmp\"}}"
     // The document keeps its source (parse takes an owned str), so the
     // copy the round-trip test compares against is spelled.
-    let doc = JsonDocument.parse(js.clone())
+    let doc = JsonDocument.parse(js)
     let root = doc.root()
     expect("method val", root.field("method").raw() == "initialize")
     expect("id val", i32.deserialize(root.field("id")) == 1)

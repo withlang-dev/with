@@ -36,7 +36,7 @@ impl Drop for Res:
         print(f"drop {self.name}")
 
 gen fn items(tag: str, count: i32) -> str:
-    let r = Res { name: tag.clone() }
+    let r = Res { name: tag }
     defer:
         print(f"defer {tag}")
     for i in 0..count:
@@ -47,12 +47,12 @@ gen fn items(tag: str, count: i32) -> str:
 fn first_kept() -> str:
     var seen = ""
     for s in items("b", 5):
-        seen = s.clone()
+        seen = s
         return s ++ "-kept"
     seen
 
 fn check(s: &str) -> Result[i32, str]:
-    if s == "c1": return Err(s.clone())
+    if s == "c1": return Err(s)
     Ok(1)
 
 fn count_until_bad() -> Result[i32, str]:

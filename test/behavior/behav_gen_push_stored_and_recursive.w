@@ -31,7 +31,7 @@ gen fn walk(nodes: &Vec[Node], at: i32) -> i32:
 fn node(value: i32, kids: Vec[i32]) -> Node: Node { value, kids }
 
 fn main:
-    let job = Job { name: "later".clone(), source: upto(4) }
+    let job = Job { name: "later", source: upto(4) }
     print(job.name)
     var out = ""
     for v in move job.source:

@@ -20,9 +20,9 @@ fn peek(x: i32, ctx: implicit &Ctx) -> i32: x + ctx.name.len() as i32
 fn take(x: i32, ctx: Ctx) -> i32: x + ctx.name.len() as i32
 
 fn main:
-    with c(Ctx { name: "a".clone() }):
+    with c(Ctx { name: "a" }):
         print(f"{peek(3)} {peek(5)}")
-    with c(Ctx { name: "abc".clone() }):
+    with c(Ctx { name: "abc" }):
         let n = take(1, ctx: c)
         print(f"took {n}")
     print("done")

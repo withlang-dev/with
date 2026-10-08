@@ -23,7 +23,7 @@ impl S:
 
 fn mk(t: &str) -> S:
     var v: Vec[str] = Vec.new()
-    v.push(t.clone())
+    v.push(t)
     S { s: t ++ "!", v }
 
 fn main:

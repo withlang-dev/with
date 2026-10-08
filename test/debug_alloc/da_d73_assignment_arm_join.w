@@ -9,10 +9,10 @@
 // field view. The base lowered each arm's operand as a second owner of the
 // stored buffer (DOUBLE FREE).
 
-fn compute(s: &str): s.clone() ++ "!"
+fn compute(s: &str): s ++ "!"
 
 fn pick(p: bool):
-    var s = "".clone()
+    var s = ""
     let t = if p: s = compute("y") else: s = compute("n")
     print(f"{t} {s}")
 

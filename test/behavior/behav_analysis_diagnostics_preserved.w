@@ -12,7 +12,7 @@ fn main:
     assert(mkdir_p(dir) == 0)
     for reverse in [false, true]:
         var argv: Vec[str] = Vec.new()
-        argv.push(compiler.clone())
+        argv.push(compiler)
         argv.push("analyze")
         argv.push("test/compile_errors/err_d21_mut_receiver_owned_escape.w")
         argv.push("select:kind=diagnostic")

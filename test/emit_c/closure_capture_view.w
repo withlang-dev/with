@@ -8,7 +8,7 @@
 type Resource { id: i32 }
 
 fn main:
-    let s = "abc".clone()
+    let s = "abc"
     let len = () => s.len() as i32
     print(f"{len()} {len()}")
     print(s.len())

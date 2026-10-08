@@ -35,10 +35,10 @@ fn main:
     let (first, .., last) = (1, 2, 3, 4)
     let (_, ..inner, _) = (1, 2, 3, 4)
     print(f"{first} {last} {inner.0} {inner.1}")
-    let (x, ..rest) = ("a".clone(), "bb".clone(), "c".clone())
+    let (x, ..rest) = ("a", "bb", "c")
     let (mid, end) = rest
     print(f"{x} {end} {mid}")
-    print(describe(("x".clone(), "y".clone(), "z".clone())))
+    print(describe(("x", "y", "z")))
     print(ends(&(1, 5, 6, 9)))
     print("done")
     let (p, q, ..none) = (5, 6)

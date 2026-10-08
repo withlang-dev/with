@@ -8,16 +8,16 @@
 type P { a: str, b: str, n: i32 }
 
 fn set(p: P, slot: i32) -> P:
-    if slot == 0: return { p with a: "A2".clone() }
+    if slot == 0: return { p with a: "A2" }
     if slot == 1: return { p with n: p.n + 4 }
     p
 
 fn main:
-    let p = P { a: "a".clone(), b: "b".clone(), n: 1 }
+    let p = P { a: "a", b: "b", n: 1 }
     let q = set(p, 0)
     let r = set(q, 1)
     let s = set(r, 2)
     print(f"{s.a} {s.b} {s.n}")
-    var t = P { a: "x".clone(), b: "y".clone(), n: 1 }
-    t = { t with b: "z".clone() }
+    var t = P { a: "x", b: "y", n: 1 }
+    t = { t with b: "z" }
     print(f"{t.a} {t.b} {t.n}")

@@ -19,7 +19,7 @@
 
 type Holder { n: i32, name: str }
 
-fn compute(s: &str): s.clone() ++ "!"
+fn compute(s: &str): s ++ "!"
 
 fn nums -> Vec[i32]:
     var v: Vec[i32] = Vec.new()
@@ -28,7 +28,7 @@ fn nums -> Vec[i32]:
     v
 
 fn local_str -> str:
-    var s = "a".clone()
+    var s = "a"
     s = compute("hi")
 
 fn local_vec -> Vec[i32]:
@@ -37,34 +37,34 @@ fn local_vec -> Vec[i32]:
     v = nums()
 
 fn local_struct -> Holder:
-    var h = Holder { n: 1, name: "one".clone() }
+    var h = Holder { n: 1, name: "one" }
     h = Holder { n: 2, name: compute("hi") }
 
 fn local_opt -> Option[str]:
-    var o: Option[str] = Some("old".clone())
+    var o: Option[str] = Some("old")
     o = Some(compute("hi"))
 
 fn local_concat -> str:
-    var s = "a".clone()
+    var s = "a"
     s = s ++ compute("b")
 
 fn arms(p: bool) -> str:
-    var s = "".clone()
+    var s = ""
     if p: s = compute("yes") else: s = compute("no")
 
 fn block_arm(p: bool) -> str:
     if p:
-        var t = "old".clone()
+        var t = "old"
         t = compute("made")
     else:
         compute("other")
 
 fn parse(ok: bool) -> Result[str, str]:
-    if ok: Ok(compute("ok")) else: Err("err".clone())
+    if ok: Ok(compute("ok")) else: Err("err")
 
 // An early `?` exit in the stored value still drops the old value.
 fn try_store(ok: bool) -> Result[str, str]:
-    var s = "old".clone()
+    var s = "old"
     s = parse(ok)?
 
 fn main:
@@ -72,17 +72,17 @@ fn main:
     print(f"vec {local_vec().len()}")
     let h = local_struct()
     print(f"struct {h.n} {h.name}")
-    let o = local_opt() ?? "none".clone()
+    let o = local_opt() ?? "none"
     print(f"option {o}")
     print(f"concat {local_concat()}")
     print(f"arms {arms(true)} {arms(false)}")
     print(f"block arm {block_arm(true)}")
-    let good = try_store(true) ?? "bad".clone()
+    let good = try_store(true) ?? "bad"
     let bad = match try_store(false):
         Ok(v) => v
         Err(e) => e
     print(f"try {good} {bad}")
     let f: fn() -> str = () =>
-        var c = "".clone()
+        var c = ""
         c = compute("fresh")
     print(f"closure {f()}")

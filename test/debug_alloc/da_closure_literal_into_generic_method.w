@@ -30,7 +30,7 @@ gen fn nums() -> i32:
 
 fn main:
     let h = Holder { v: 1 }
-    let s = "hello".clone()
+    let s = "hello"
     print(f"apply {h.apply(3, move (x: i32) -> i32 => x + s.len() as i32)}")
     let doubled = nums() |> map(p => p * 2) |> take(2) |> collect[Vec]()
     print(f"collect {doubled[0]} {doubled[1]}")

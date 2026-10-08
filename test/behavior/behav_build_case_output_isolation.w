@@ -9,7 +9,7 @@ fn main:
     let first = p7_prepare_case("output_isolation_first", "output_isolation_first")
     let second = p7_prepare_case("output_isolation_second", "output_isolation_second")
     let parent_out = p7_join(first, "parent-out")
-    let saved_out = env("WITH_OUT_DIR").clone()
+    let saved_out = env("WITH_OUT_DIR")
     assert(set_env("WITH_OUT_DIR", parent_out) == 0)
     p7_write(first, "src/main.w", "fn main: print(\"first\")\n")
     p7_write(second, "src/main.w", "fn main: print(\"second\")\n")

@@ -14,13 +14,13 @@ fn describe(t: (str, str, str)) -> str:
         (h, ..rest) => f"first:{h} rest:{rest.0},{rest.1}"
 
 fn main:
-    let (x, ..rest) = ("a".clone(), "bb".clone(), "c".clone())
+    let (x, ..rest) = ("a", "bb", "c")
     let (mid, end) = rest
     print(f"{x} {end} {mid}")
-    print(describe(("x".clone(), "y".clone(), "z".clone())))
-    let (k, .., last) = ("keep".clone(), "skip".clone(), "skip2".clone(), "q".clone())
+    print(describe(("x", "y", "z")))
+    let (k, .., last) = ("keep", "skip", "skip2", "q")
     print(f"{k} {last}")
     var n = 0
-    let (_, ..tail) = ("v".clone(), 1, "w".clone())
+    let (_, ..tail) = ("v", 1, "w")
     n = n + tail.0 + tail.1.len() as i32
     print(f"{n}")

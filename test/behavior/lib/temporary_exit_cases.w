@@ -15,7 +15,7 @@ impl Try[i32, str] for Validation:
     fn from_break(message: str) -> Self: Invalid(message)
 
 fn validate(text: &str) -> Validation:
-    if text == "bad": return Invalid(text.clone())
+    if text == "bad": return Invalid(text)
     Valid(1)
 
 fn loop_user_try(text: &str) -> Validation:
@@ -33,18 +33,18 @@ async fn cancellable(text: str) -> i32:
     0
 
 fn cancel_loop():
-    let parent = cancellable("bad,held".clone())
+    let parent = cancellable("bad,held")
     while started.load(.Acquire) == 0: tick().await
     parent.cancel()
     parent.join_cleanup()
 
 fn fallible(text: &str) -> Result[i32, str]:
-    if text == "bad": return Err(text.clone())
+    if text == "bad": return Err(text)
     1
 
 fn loop_return(text: &str) -> Result[i32, str]:
     for part in text.split(","):
-        if part == "bad": return Err(part.clone())
+        if part == "bad": return Err(part)
     0
 
 fn loop_try(text: &str) -> Result[i32, str]:
@@ -55,23 +55,23 @@ fn loop_try(text: &str) -> Result[i32, str]:
 fn nested_return(text: &str) -> Result[i32, str]:
     for part in text.split(","):
         for word in part.split("-"):
-            if word == "bad": return Err(word.clone())
+            if word == "bad": return Err(word)
     0
 
 fn use_pair(first: &str, second: i32): first.len() + second
 
 fn argument_return(stop: bool) -> i64:
-    use_pair("temporary argument".clone(), if stop: return 7 else: 3)
+    use_pair("temporary argument", if stop: return 7 else: 3)
 
 fn branch_return(stop: bool) -> str:
-    let result = if stop: return "returned".clone() else: "continued".clone()
+    let result = if stop: return "returned" else: "continued"
     result
 
 fn choose_option(input: Option[str]) -> str:
-    input ?? return "fallback".clone()
+    input ?? return "fallback"
 
 fn choose_result(input: Result[str, str]) -> str:
-    input ?? return "fallback".clone()
+    input ?? return "fallback"
 
 var match_drops: Atomic[i32]
 type ExitObserver { id: i32 }
@@ -110,8 +110,8 @@ fn named_iflet_exit():
         return
 
 fn observe_part(part: &str):
-    let first = "new".clone()
-    let second = "now".clone()
+    let first = "new"
+    let second = "now"
     assert(part == "bad")
     assert(first == "new" and second == "now")
 
@@ -174,9 +174,9 @@ fn main:
             Invalid(_) => assert(false)
     else if mode == "cancel": cancel_loop()
     else if mode == "coalesce-none": assert(choose_option(None) == "fallback")
-    else if mode == "coalesce-some": assert(choose_option(Some("held".clone())) == "held")
-    else if mode == "coalesce-error": assert(choose_result(Err("error".clone())) == "fallback")
-    else if mode == "coalesce-ok": assert(choose_result(Ok("held".clone())) == "held")
+    else if mode == "coalesce-some": assert(choose_option(Some("held")) == "held")
+    else if mode == "coalesce-error": assert(choose_result(Err("error")) == "fallback")
+    else if mode == "coalesce-ok": assert(choose_result(Ok("held")) == "held")
     else if mode == "match-return":
         match_exit(true, true)
         assert(match_drops.load(.Relaxed) == 1)

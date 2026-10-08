@@ -34,12 +34,12 @@ enum Wrap[T]:
 fn show_h(h: H[i64]) -> str:
     match h:
         H.X(t) => f"X {t}"
-        H.Y => "Y".clone()
+        H.Y => "Y"
 
 fn show_hs(h: &H[str]) -> str:
     match h:
         .X(t) => f"X {t}"
-        .Y => "Y".clone()
+        .Y => "Y"
 
 fn g_text(g: G[i64]) -> str:
     match g:
@@ -54,7 +54,7 @@ fn gs_text(g: &G[str]) -> str:
 fn maybe_text(m: Maybe[i64]) -> str:
     match m:
         .Just(v) => f"just {v}"
-        .Nothing => "nothing".clone()
+        .Nothing => "nothing"
 
 fn wrap_text(w: Wrap[i64]) -> str:
     match w:
@@ -69,7 +69,7 @@ fn main:
         G.B(n) => print(f"B {n}")
     print(g_text(G.A(H.X(4))))
     print(g_text(G.B(5)))
-    let gs: G[str] = G.A(H.X("owned".clone()))
+    let gs: G[str] = G.A(H.X("owned"))
     print(gs_text(gs))
     print(maybe_text(Maybe.Just(7)))
     print(wrap_text(Wrap.One(Maybe.Just(8))))

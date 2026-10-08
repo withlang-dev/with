@@ -28,7 +28,7 @@ impl Drop for Res:
         print(f"drop {self.name}")
 
 gen fn items(tag: str, count: i32) -> str:
-    let r = Res { name: tag.clone() }
+    let r = Res { name: tag }
     defer:
         print(f"defer {r.name}")
     for i in 0..count:
@@ -39,13 +39,13 @@ type Holder {
 }
 
 fn early():
-    var p = items("a".clone(), 5).pull()
+    var p = items("a", 5).pull()
     let x = p.next().unwrap()
     let y = p.next().unwrap()
     print(f"got {x} {y}")
 
 fn to_end():
-    var p = items("b".clone(), 3).pull()
+    var p = items("b", 3).pull()
     var seen = ""
     while true:
         match p.next():
@@ -54,12 +54,12 @@ fn to_end():
     print(f"ran out: {seen}")
 
 fn unstarted():
-    let p = items("u".clone(), 3).pull()
+    let p = items("u", 3).pull()
     let _ = p
     print("unstarted: nothing ran")
 
 fn moved():
-    var h = Holder { seq: items("c".clone(), 4).pull() }
+    var h = Holder { seq: items("c", 4).pull() }
     print(f"moved: {h.seq.next().unwrap()}")
 
 fn main:

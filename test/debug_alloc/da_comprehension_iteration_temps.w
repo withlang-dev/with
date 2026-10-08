@@ -23,7 +23,7 @@
 use std.collections.{HashMap}
 
 fn check(w: &str) -> Result[str, str]:
-    if w == "w2": return Err(w.clone())
+    if w == "w2": return Err(w)
     Ok(w ++ "!")
 
 fn all_checked(ws: &Vec[str]) -> Result[Vec[str], str]:
@@ -34,7 +34,7 @@ fn shouted(ws: &Vec[str]) -> Vec[str]: [w ++ "!" for w in ws]
 
 fn words(csv: &str) -> Vec[str]:
     var ws: Vec[str] = Vec.new()
-    for n in csv.split(","): ws.push(n.clone())
+    for n in csv.split(","): ws.push(n)
     ws
 
 fn main:
@@ -48,7 +48,7 @@ fn main:
     print(f"filter {kept[0]}|{kept[1]}|{kept[2]}")
 
     let src = words("aa,b,c")
-    let keys = [s.clone() for s in src if f"{s}!" != "b!"]
+    let keys = [s for s in src if f"{s}!" != "b!"]
     print(f"keys {keys.join("|")}")
 
     let ws = words("w1,w3,w4")

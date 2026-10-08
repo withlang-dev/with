@@ -7,9 +7,9 @@ fn pick(f: fn() -> str, g: fn() -> str, first: bool) -> str:
     if first: f() else: g()
 
 fn main:
-    let a = "abc".clone()
-    let b = "xyz".clone()
+    let a = "abc"
+    let b = "xyz"
     print(pick(() => a, () => b, true))
-    let c = "abc".clone()
-    let d = "xyz".clone()
+    let c = "abc"
+    let d = "xyz"
     print(pick(() => c, () => d, false))

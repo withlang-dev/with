@@ -17,7 +17,7 @@ fn leaf(id: str) -> Box[Node]:
 fn test_option_box_drops_payload_at_scope_exit:
     TRACE = ""
     {
-        let maybe: Option[Box[Guard]] = Some(Box.new(Guard { id: "A".clone() }))
+        let maybe: Option[Box[Guard]] = Some(Box.new(Guard { id: "A" }))
         assert(maybe.is_some())
         assert(TRACE == "")
     }
@@ -34,7 +34,7 @@ fn test_none_drops_nothing:
 fn test_moved_out_payload_drops_once:
     TRACE = ""
     {
-        let maybe: Option[Box[Guard]] = Some(Box.new(Guard { id: "M".clone() }))
+        let maybe: Option[Box[Guard]] = Some(Box.new(Guard { id: "M" }))
         let Some(taken) = maybe else return
         assert(taken.id == "M")
         assert(TRACE == "")
@@ -45,9 +45,9 @@ fn test_tree_releases_every_node:
     TRACE = ""
     {
         let root = Box.new(Node {
-            left: Some(Box.new(Node { left: Some(leaf("1".clone())), right: Some(leaf("2".clone())), tag: Guard { id: "L".clone() } })),
-            right: Some(leaf("3".clone())),
-            tag: Guard { id: "R".clone() },
+            left: Some(Box.new(Node { left: Some(leaf("1")), right: Some(leaf("2")), tag: Guard { id: "L" } })),
+            right: Some(leaf("3")),
+            tag: Guard { id: "R" },
         })
         assert(root.tag.id == "R")
         assert(TRACE == "")

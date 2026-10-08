@@ -5,7 +5,7 @@
 // reference like any other `&T` use; `&shout` is a reference to the
 // callable, not the code address.
 fn apply(s: &str, read: &fn(&str) -> str) -> str: read(s)
-fn shout(s: &str) -> str: s.clone() ++ "!"
+fn shout(s: &str) -> str: s ++ "!"
 fn main:
     var i = 0
     while i < 2:

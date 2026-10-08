@@ -11,7 +11,7 @@
 // `once` parameter, and on a method.
 fn apply(f: once fn() -> str) -> str: f()
 
-fn ignore(f: once fn() -> str) -> str: "none".clone()
+fn ignore(f: once fn() -> str) -> str: "none"
 
 fn one(f: once fn() -> str) -> str: f()
 
@@ -23,13 +23,13 @@ impl Runner:
     fn run(f: once fn() -> str) -> str: f()
 
 fn main:
-    let s = "abc".clone()
+    let s = "abc"
     print(apply(() => s))
-    let unused = "unused".clone()
+    let unused = "unused"
     print(ignore(() => unused))
-    print(apply(() => "x".clone()))
-    let fwd = "fwd".clone()
+    print(apply(() => "x"))
+    let fwd = "fwd"
     print(forward(() => fwd))
     let r = Runner { n: 1 }
-    let word = "run".clone()
+    let word = "run"
     print(r.run(() => word))

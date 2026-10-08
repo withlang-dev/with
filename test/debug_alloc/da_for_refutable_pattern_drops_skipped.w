@@ -6,8 +6,8 @@
 // nothing else owns it.
 fn main:
     var ps: Vec[(i32, str)] = Vec.new()
-    ps.push((0, "a".clone()))
-    ps.push((1, "b".clone()))
+    ps.push((0, "a"))
+    ps.push((1, "b"))
     var n = 0
     for (0, s) in ps.into_iter():
         n = n + s.len() as i32

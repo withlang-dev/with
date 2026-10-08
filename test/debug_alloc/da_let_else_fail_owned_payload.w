@@ -15,7 +15,7 @@ enum Shape:
     Listed(Vec[str])
     Empty
 
-fn owned(s: &str): s.clone()
+fn owned(s: &str): s
 
 fn words(n: i32) -> Vec[str]:
     var v: Vec[str] = Vec.new()
@@ -138,7 +138,7 @@ fn keep_block(k: i32) -> i32:
 
 fn keep_field(k: i32) -> i32:
     var h = Holder { f: owned("f"), g: owned("gg") }
-    let Ok(v) = vec_or_err(k) else: return consume(move h.f) - 100
+    let Ok(v) = vec_or_err(k) else: return consume(h.f) - 100
     h.f.len() as i32 + h.g.len() as i32 + v.len() as i32
 
 fn keep_twice(k: i32) -> i32:

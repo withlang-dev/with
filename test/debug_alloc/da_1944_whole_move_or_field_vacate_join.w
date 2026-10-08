@@ -28,7 +28,7 @@ fn mixed(whole: bool):
     if whole:
         eat(v)
     else:
-        let t = move v.text
+        let t = v.text
         assert(t == "a")
 
 fn member_mixed(whole: bool):
@@ -36,7 +36,7 @@ fn member_mixed(whole: bool):
     if whole:
         eat(move h.value)
     else:
-        let t = move h.value.text
+        let t = h.value.text
         assert(t == "a")
     assert(h.kind == 3)
 

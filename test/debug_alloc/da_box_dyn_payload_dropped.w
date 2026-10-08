@@ -49,7 +49,7 @@ fn main:
     }
     // A str-holding struct: its field is freed with the cell.
     {
-        let b: Box[dyn Named] = Box.new(Label { text: "ab".clone() ++ "cd" })
+        let b: Box[dyn Named] = Box.new(Label { text: "ab" ++ "cd" })
         print(f"name {b.name()}")
     }
     // A Copy struct: nothing to drop but the cell.
@@ -73,7 +73,7 @@ fn main:
     {
         var v: Vec[Box[dyn Named]] = Vec.new()
         v.push(Box.new(Tok { n: 7 }))
-        v.push(Box.new(Label { text: "x".clone() ++ "y" }))
+        v.push(Box.new(Label { text: "x" ++ "y" }))
         print(f"len {v.len()}")
     }
     // In a struct field.

@@ -15,10 +15,10 @@ fn both(s: str) -> i64:
     a.len() + b.len()
 
 fn main:
-    let input = "abc".clone()
+    let input = "abc"
     let a = input as []u8
     let b = input as []u8
-    let d = Doc { body: "hello".clone(), n: 1 }
+    let d = Doc { body: "hello", n: 1 }
     let c = d.body as []u8
     let e = d.body as []u8
-    print(a.len() + b.len() + c.len() + e.len() + both("xy".clone()))
+    print(a.len() + b.len() + c.len() + e.len() + both("xy"))

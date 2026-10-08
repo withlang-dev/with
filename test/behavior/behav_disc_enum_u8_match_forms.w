@@ -44,7 +44,7 @@ fn opt(o: Option[Kind]) -> i32:
 
 fn describe(m: &Msg) -> str:
     match m:
-        .Quit => "quit".clone()
+        .Quit => "quit"
         .Move(x, y) => f"move {x} {y}"
         .Write(s) => f"write {s}"
 
@@ -60,5 +60,5 @@ fn main:
     print(f"{opt(Some(Kind.Hi))} {opt(Some(Kind.Blue))} {opt(None)}")
     if let .Hi = Kind.Hi:
         print("if-let hi")
-    for m in [Msg.Quit, Msg.Move(3, 4), Msg.Write("hi".clone())]:
+    for m in [Msg.Quit, Msg.Move(3, 4), Msg.Write("hi")]:
         print(f"{describe(m)} {code(m)}")

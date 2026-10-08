@@ -28,7 +28,7 @@ fn worker_peak_rss(dir: &str, count: i32) -> i64:
 
 fn main:
     let dir = p7_prepare_case("comptime_string_builder_bytes", "sb_bytes")
-    let saved_out = env("WITH_OUT_DIR").clone()
+    let saved_out = env("WITH_OUT_DIR")
     let saved_worker = env("WITH_BUILD_ACTION_WORKER")
     let saved_force = env("WITH_BUILD_ACTION_FORCE")
     assert(set_env("WITH_OUT_DIR", p7_join(dir, "out")) == 0)

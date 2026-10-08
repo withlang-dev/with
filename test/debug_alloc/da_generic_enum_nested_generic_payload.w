@@ -29,8 +29,8 @@ fn peek(g: &G[str]) -> i64:
         .B(n) => n
 
 fn main:
-    print(outer(G.A(H.X("four".clone()))))
-    let kept: G[str] = G.A(H.X("seven!!".clone()))
+    print(outer(G.A(H.X("four"))))
+    let kept: G[str] = G.A(H.X("seven!!"))
     print(peek(kept))
-    let whole: G[str] = G.A(H.X("dropped".clone()))
+    let whole: G[str] = G.A(H.X("dropped"))
     print(peek(whole))

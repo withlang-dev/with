@@ -20,10 +20,10 @@ fn main:
     print(f"{f(&xs)} {g(&xs, 5)} {h(xs.clone())}")
     let pair = (w: &W, m: &HashMap[str, i32]) => w.n + m.len() as i32
     var m: HashMap[str, i32] = HashMap.new()
-    m.insert("a".clone(), 1)
-    m.insert("b".clone(), 2)
-    let pick = (o: Option[str]) => o ?? "none".clone()
-    print(f"{pair(&W { n: 1 }, &m)} {pick(Some("ab".clone()))}")
+    m.insert("a", 1)
+    m.insert("b", 2)
+    let pick = (o: Option[str]) => o ?? "none"
+    print(f"{pair(&W { n: 1 }, &m)} {pick(Some("ab"))}")
     let total = (a: &Vec[i32], b: &Vec[i64]) => a.len() + b.len() + 3
     var ys: Vec[i64] = Vec.new()
     ys.push(9)

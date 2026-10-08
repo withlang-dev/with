@@ -12,17 +12,17 @@
 type P { a: str, b: i32 }
 
 fn main:
-    let o: Option[P] = Some(P { a: "xyz".clone(), b: 4 })
+    let o: Option[P] = Some(P { a: "xyz", b: 4 })
     print(f"{o?.b}")
     print(f"{o?.a}")
-    let t: Option[(str, i32)] = Some(("pq".clone(), 7))
+    let t: Option[(str, i32)] = Some(("pq", 7))
     let first = t?.1
     print(f"{first} {t?.0}")
-    let s: Option[str] = Some("abc".clone())
+    let s: Option[str] = Some("abc")
     let n1 = s?.len()
     let n2 = s?.len()
     print(f"{n1} {n2} {s.unwrap()}")
-    let q: Option[P] = Some(P { a: "xyz".clone(), b: 4 })
+    let q: Option[P] = Some(P { a: "xyz", b: 4 })
     let b = q?.b ?? 0
     match q:
         Some(p) => print(f"{b} {p.a}")

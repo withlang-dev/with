@@ -4,7 +4,7 @@ type Inner[T] { value: T }
 type Outer[T] { left: i32, inner: Inner[T], right: i32 }
 
 fn integers() -> Outer[i32]: Outer { left: 11, inner: Inner { value: 22 }, right: 33 }
-fn strings() -> Outer[str]: Outer { right: 55, inner: Inner { value: "owned".clone() }, left: 44 }
+fn strings() -> Outer[str]: Outer { right: 55, inner: Inner { value: "owned" }, left: 44 }
 
 fn main:
     let ints = integers()

@@ -31,18 +31,18 @@ enum Tri[T]:
 fn g_text(g: G[i64]) -> str:
     match g:
         G.V(t, k) => f"t={t} k={k}"
-        G.E => "E".clone()
+        G.E => "E"
 
 fn g_ref_text(g: &G[str]) -> str:
     match g:
         .V(t, k) => f"{t}/{k}"
-        .E => "E".clone()
+        .E => "E"
 
 fn p_text(p: P[i32, str]) -> str:
     match p:
         .Both(a, b) => f"both {a} {b}"
         .Left(a) => f"left {a}"
-        .Neither => "neither".clone()
+        .Neither => "neither"
 
 fn tri_sum(t: Tri[i64]) -> i64:
     match t:
@@ -60,13 +60,13 @@ fn main:
         G.V(t, k) => print(f"t={t} k={k}")
         G.E => print("E")
     print(g_text(G.V(1, 2)))
-    let gs: G[str] = G.V("owned".clone(), 3)
+    let gs: G[str] = G.V("owned", 3)
     print(g_ref_text(gs))
-    print(p_text(P.Both(5, "five".clone())))
+    print(p_text(P.Both(5, "five")))
     print(p_text(P.Left(6)))
     print(tri_sum(Tri.Three(1, 2, 3)))
     print(f"{first_is_seven(G.V(7, 0))} {first_is_seven(G.V(8, 0))}")
-    let dropped: P[str, str] = P.Both("x".clone(), "y".clone())
+    let dropped: P[str, str] = P.Both("x", "y")
     match dropped:
         .Both(a, b) => print(a ++ b)
         _ => print("other")

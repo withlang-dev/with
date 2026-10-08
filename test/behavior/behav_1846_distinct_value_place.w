@@ -34,7 +34,7 @@ fn by_ref(r: &Name): print(f"ref {r.value}")
 fn nums_ref(r: &Nums) -> i32: r.value[1]
 
 fn main:
-    let n = Name("abc".clone())
+    let n = Name("abc")
     print(n.value)
     let k = n.value
     print(k)
@@ -47,12 +47,12 @@ fn main:
     nums.push(5)
     let v = Nums(nums)
     print(f"vlen {v.value.len()} v0 {v.value[0]} v1 {nums_ref(&v)}")
-    let p = Place(Pt { x: 7, label: "pt".clone() })
+    let p = Place(Pt { x: 7, label: "pt" })
     print(f"px {p.value.x} pl {p.value.label}")
     let id = Id(9)
     let raw = id.value
     print(f"id {raw}")
-    var m = Name("old".clone())
-    m.value = "new".clone()
+    var m = Name("old")
+    m.value = "new"
     print(m.value)
     print("end")

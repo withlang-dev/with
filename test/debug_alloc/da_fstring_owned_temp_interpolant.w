@@ -20,7 +20,7 @@ fn holes(t: &str):
     print(f"{x}{x}:{x:>3}")
     print(x)
     let y = t.slice(1, 3)
-    print(f"{move y}")
+    print(f"{y}")
 
 fn main:
     let s = "abc" ++ "def"

@@ -11,7 +11,7 @@ type Person { name: str }
 
 impl Named for Person:
     fn name(self: &Self) -> str:
-        self.name.clone()
+        self.name
 
 impl[T: Named] WrapNamed for Box[T]:
     fn marker(self: &Self) -> i32:

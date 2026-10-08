@@ -7,7 +7,7 @@
 // `len` on element 0 and `n.0.1` is a nested index. Float literals, a range
 // after an index, and indices inside f-string holes keep working.
 fn main:
-    let t = ("ab".clone(), 3)
+    let t = ("ab", 3)
     let n = ((1, 2), 3)
     let deep = (((4, 5), 6), 7)
     let tl = t.0.len()

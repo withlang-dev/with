@@ -21,7 +21,7 @@ impl Drop for Res:
         print(f"drop {self.name}")
 
 gen fn items(tag: str, count: i32) -> str:
-    let r = Res { name: tag.clone() }
+    let r = Res { name: tag }
     defer:
         print(f"defer {tag}")
     for i in 0..count:

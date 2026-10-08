@@ -30,9 +30,9 @@ gen fn over(xs: &Vec[i32]) -> i32:
         yield x
 
 fn main:
-    var d = Doc { lines: ["a".clone(), "b".clone()], title: "".clone() }
+    var d = Doc { lines: ["a", "b"], title: "" }
     for l in each_line(&d.lines):
-        d.title = if d.title.len() == 0: l.clone() else: d.title ++ "+" ++ l
+        d.title = if d.title.len() == 0: l else: d.title ++ "+" ++ l
     print(f"title {d.title} lines {d.lines.len()}")
 
     let c = Counter { items: [1, 2, 3] }

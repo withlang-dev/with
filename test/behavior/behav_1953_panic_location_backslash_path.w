@@ -23,7 +23,7 @@ fn main:
     assert(write_file(src, "fn main:\n    print(__FILE__)\n    panic(\"boom\")\n") == 0)
     let stdout_path = base ++ "\\stdout"
     let stderr_path = base ++ "\\stderr"
-    let ran = run_to_files(&[compiler, "run", src.clone()], stdout_path, stderr_path, 120000)
+    let ran = run_to_files(&[compiler, "run", src], stdout_path, stderr_path, 120000)
     assert(not ran.timed_out)
     let out = read_file(stdout_path).unwrap()
     let err = read_file(stderr_path).unwrap()

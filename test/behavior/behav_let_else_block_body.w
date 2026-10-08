@@ -32,7 +32,7 @@ enum Shape:
     Empty
 
 fn int_or_err(k: i32) -> Result[i32, str]:
-    if k == 0: return Err("none".clone())
+    if k == 0: return Err("none")
     k
 
 fn indented(k: i32) -> i32:

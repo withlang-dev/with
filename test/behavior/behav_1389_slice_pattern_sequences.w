@@ -64,9 +64,9 @@ fn main:
     let [p, q, r] = &arr
     print(f"{arr_sum(&arr)} {p} {q} {r}")
     var s: Vec[str] = Vec.new()
-    s.push("ab".clone())
-    s.push("xx".clone())
-    s.push("cd".clone())
+    s.push("ab")
+    s.push("xx")
+    s.push("cd")
     print(names(s))
     let nums = [9, 2, 7, 5]
     print(f"{slice_head(nums[2..4])} {slice_head(nums[0..0])} {slice_head(nums[0..1])}")

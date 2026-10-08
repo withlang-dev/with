@@ -43,28 +43,28 @@ impl Res:
             yield f"{self.name}-{i}"
 
 fn generic_stop():
-    for s in tagged(Res { name: "k-res".clone() }, "k".clone()):
+    for s in tagged(Res { name: "k-res" }, "k"):
         print(f"first {s}")
         break
 
 fn generic_unconsumed():
-    let unused = tagged(Res { name: "u".clone() }, "never".clone())
+    let unused = tagged(Res { name: "u" }, "never")
     print("unconsumed: nothing ran")
 
 fn moved_receiver():
-    let owner = Res { name: "owner".clone() }
+    let owner = Res { name: "owner" }
     var last = ""
     for p in owner.parts():
-        last = p.clone()
+        last = p
         if p == "owner-1":
             break
     print(f"moved receiver stopped at {last}")
 
 fn borrowed_receiver():
-    let borrowed = Res { name: "borrowed".clone() }
+    let borrowed = Res { name: "borrowed" }
     var first = ""
     for p in borrowed.peek_parts():
-        first = p.clone()
+        first = p
         break
     print(f"borrowed receiver stopped at {first}, still here")
 

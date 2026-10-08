@@ -8,7 +8,7 @@ use std.collections.HashMap
 
 fn names(m: &HashMap[str, i32]) -> str:
     var out: Vec[str] = Vec.new()
-    for (name, _) in m: out.push(name.clone())
+    for (name, _) in m: out.push(name)
     out.join(" ")
 
 fn main:

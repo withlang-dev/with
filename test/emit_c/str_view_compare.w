@@ -13,6 +13,6 @@ fn mixed(a: &str, b: str) -> bool: a == b
 fn main:
     let x = "ab"
     let y = "a" ++ "b"
-    let z = "b".clone()
+    let z = "b"
     print(f"{eq(x, y)} {x == y} {ne(x, y)} {lt(x, z)} {lt(z, x)} {ge(x, y)}")
-    print(f"{mixed(x, y.clone())} {mixed(z, y.clone())}")
+    print(f"{mixed(x, y)} {mixed(z, y)}")

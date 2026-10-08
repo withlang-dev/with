@@ -59,7 +59,7 @@ fn main:
     print(f"{g.show(.Cleared, .Block) + 1} {g.look(.Block)}")
     assert(g.n == 3)
     let long = g.n > 2
-    let who = "ab".clone()
+    let who = "ab"
     assert(g.label(if long: who ++ "(...)" else: "the generator") == 7)
     assert(g.label(if g.n > 9: who ++ "(...)" else: "the generator") == 13)
     var s = Slot { v: 1 }

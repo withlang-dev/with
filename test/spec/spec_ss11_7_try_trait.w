@@ -26,7 +26,7 @@ fn parse_digit(input: str) -> ParseResult[ParseValue]:
 
 fn parse_pair(input: str) -> ParseResult[(i32, i32)]:
     var left = parse_digit(input)?
-    let right = parse_digit(move left.remaining)?
+    let right = parse_digit(left.remaining)?
     ParseOk((left.value, right.value))
 
 enum Validation:

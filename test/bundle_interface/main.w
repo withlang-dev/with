@@ -25,7 +25,7 @@ fn main:
     let packet = Packet { tag: 7, word: 42 }
     // §12.4 (D75): a consuming closure crosses to the `once` parameter the
     // interface records; a plain one takes a closure that consumes nothing.
-    let word = "four".clone()
+    let word = "four"
     let once_len = call_once(() => owned_len(word))
     let twice = call_twice(() => 3)
     print(f"{a} {s} {take(p)} {table_at(2)} {K} {TABLE[1]} {sum_slice(xs)} {level_value(Level.High)} {GREETING.len()} {w} {COUNTER} {packet_word(packet)} {sizeof[Packet]()} {once_len} {twice} {counted}")

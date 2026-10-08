@@ -62,7 +62,7 @@ fn main:
     for (k, v) in names:
         mtext = mtext ++ f" {k}:{v}"
     print(mtext)
-    let kept = [s.clone() for s in labels(3)]
+    let kept = [s for s in labels(3)]
     var ltext = ""
     for s in kept:
         ltext = ltext ++ (if ltext.len() > 0: "|" else: "") ++ s

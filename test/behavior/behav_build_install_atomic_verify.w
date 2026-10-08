@@ -19,8 +19,8 @@ fn text(path: &str): read_file(path) ?? ""
 fn hard_link(existing: &str, alias: &str) -> bool:
     var argv: Vec[str] = Vec.new()
     argv.push("/bin/ln")
-    argv.push(existing.clone())
-    argv.push(alias.clone())
+    argv.push(existing)
+    argv.push(alias)
     run(&argv) == 0
 
 // A plain file: the rename leaves a hard link to the old destination holding

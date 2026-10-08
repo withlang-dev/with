@@ -26,7 +26,7 @@ fn break_after_write() -> str:
     var seen = ""
     var k = 0
     while k < 5:
-        seen = p.clone()
+        seen = p
         if k == 1:
             x.s = "zz" ++ "zz"
             break

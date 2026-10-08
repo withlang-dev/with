@@ -20,15 +20,15 @@ impl Bag:
 
 fn main:
     var xs: Vec[KV] = Vec.new()
-    xs.push(KV { key: "a".clone(), n: 1 })
-    xs.push(KV { key: "b".clone(), n: 2 })
+    xs.push(KV { key: "a", n: 1 })
+    xs.push(KV { key: "b", n: 2 })
     for e in xs:
         if e.n == 2:
-            xs.push(KV { key: "c".clone(), n: 3 })
+            xs.push(KV { key: "c", n: 3 })
             break
     print(f"{xs.len()}")
     var b = Bag { items: Vec.new() }
-    b.items.push(KV { key: "a".clone(), n: 1 })
+    b.items.push(KV { key: "a", n: 1 })
     if b.clear_if_found(1):
         print("1")
     print(f"{b.items.len()}")

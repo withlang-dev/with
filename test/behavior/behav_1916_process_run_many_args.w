@@ -13,7 +13,7 @@ fn main:
         print(f"child saw {argv.len() - 2} arguments")
         exit_code(if argv.len() - 2 == 300: 0 else: 3)
     var cmd: Vec[str] = Vec.new()
-    cmd.push(argv[0].clone())
+    cmd.push(argv[0])
     cmd.push("--child")
     for i in 0..300:
         cmd.push(f"a{i}")

@@ -68,7 +68,7 @@ fn parse_telemetry(raw: &str) -> Option[Telemetry]:
         return None
 
     Some(Telemetry {
-        device_id: raw.clone(),
+        device_id: raw,
         temp: 0.0,
         status: .Active,
     })

@@ -26,7 +26,7 @@ fn main:
         assert(ir.stdout.contains("@ints(i32 %0, ...)"))
         let ints = va_ir_body(ir.stdout, "ints")
         let doubles = va_ir_body(ir.stdout, "doubles")
-        for body in [ints.clone(), doubles.clone()]:
+        for body in [ints, doubles]:
             assert(body.contains("call void @llvm.va_start.p0(ptr"))
             assert(body.contains("call void @llvm.va_end.p0(ptr"))
         if target == "linux_x86_64" or target == "darwin_x86_64":

@@ -12,7 +12,7 @@ fn joined(p: P[str, str]) -> str:
     match p:
         .Both(a, b) => a ++ b
         .Left(a) => a
-        .Neither => "".clone()
+        .Neither => ""
 
 fn lens(p: &P[str, str]) -> i64:
     match p:
@@ -21,8 +21,8 @@ fn lens(p: &P[str, str]) -> i64:
         .Neither => 0
 
 fn main:
-    print(joined(P.Both("ab".clone(), "cd".clone())))
-    let kept: P[str, str] = P.Both("xyz".clone(), "w".clone())
+    print(joined(P.Both("ab", "cd")))
+    let kept: P[str, str] = P.Both("xyz", "w")
     print(lens(kept))
-    let whole: P[str, str] = P.Both("dropped".clone(), "unmatched".clone())
+    let whole: P[str, str] = P.Both("dropped", "unmatched")
     print(lens(whole))

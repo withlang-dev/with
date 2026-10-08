@@ -16,16 +16,16 @@ fn identity[T](value: T): value
 fn accept(value: ResultGuard): assert(value.text == "owned")
 
 fn exercise:
-    identity(ResultGuard { text: "discarded".clone() })
+    identity(ResultGuard { text: "discarded" })
     assert(result_drops == 1)
-    Producer { value: ResultGuard { text: "discarded method".clone() } }.take()
+    Producer { value: ResultGuard { text: "discarded method" } }.take()
     assert(result_drops == 2)
     for i in 0..3:
-        Producer { value: ResultGuard { text: "loop".clone() } }.take()
+        Producer { value: ResultGuard { text: "loop" } }.take()
     assert(result_drops == 5)
-    accept(identity(ResultGuard { text: "owned".clone() }))
+    accept(identity(ResultGuard { text: "owned" }))
     assert(result_drops == 6)
-    let retained = Producer { value: ResultGuard { text: "retained".clone() } }.take()
+    let retained = Producer { value: ResultGuard { text: "retained" } }.take()
     assert(retained.text == "retained")
     assert(result_drops == 6)
 

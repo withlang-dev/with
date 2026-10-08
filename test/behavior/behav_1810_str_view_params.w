@@ -43,7 +43,7 @@ fn fwd(s: &str): show(s)
 fn first(s: &str) -> &str: s
 fn id[T](x: T) -> T: x
 fn apply(s: &str, read: &fn(&str) -> str) -> str: read(s)
-fn shout(s: &str) -> str: s.clone() ++ "!"
+fn shout(s: &str) -> str: s ++ "!"
 fn pick(c: bool, a: &str, b: &str) -> &str: if c: a else: b
 fn call0(f: fn() -> str) -> str: f()
 fn len2(r: &&str) -> i64: r.len()

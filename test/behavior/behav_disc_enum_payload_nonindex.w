@@ -42,8 +42,8 @@ fn msg_code(m: &Msg) -> i32:
 
 fn byte_text(b: &Byte) -> str:
     match b:
-        .Write(s) => s.clone()
-        .Stop => "stop".clone()
+        .Write(s) => s
+        .Stop => "stop"
 
 fn wide_sum(w: Wide) -> i64:
     match w:
@@ -62,8 +62,8 @@ fn make_move(n: i32) -> Msg: .Move(n, n + 1)
 fn literal_payload(m: &Msg) -> str:
     match m:
         .Move(1, y) => f"one-{y}"
-        .Move(_, _) => "move".clone()
-        .Quit => "quit".clone()
+        .Move(_, _) => "move"
+        .Quit => "quit"
 
 fn main:
     // qualified call, shorthand with expected type, bare payloadless
@@ -78,7 +78,7 @@ fn main:
         Some((x, y)) => print(f"as_move {x} {y}")
         None => print("as_move none")
     // u8 repr, owned payload, variant order not by value
-    let bs = [Byte.Write("hi".clone()), Byte.Stop, .Write("yo".clone())]
+    let bs = [Byte.Write("hi"), Byte.Stop, .Write("yo")]
     for b in bs:
         print(byte_text(b))
     // i64 repr, payloadless on both sides of a payload variant

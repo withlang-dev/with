@@ -29,7 +29,7 @@ impl Try[i32, str] for Validation:
     fn from_break(message: str) -> Self: Invalid(message)
 
 fn validate(text: &str) -> Validation:
-    if text == "bad": return Invalid(text.clone())
+    if text == "bad": return Invalid(text)
     Valid(1)
 
 fn one(text: &str) -> Validation:
@@ -48,8 +48,8 @@ impl Try[str, str] for Named:
     fn from_break(message: str) -> Self: Missing(message)
 
 fn lookup(key: &str) -> Named:
-    if key == "bad": return Missing(key.clone() ++ "!")
-    Found(key.clone() ++ "?")
+    if key == "bad": return Missing(key ++ "!")
+    Found(key ++ "?")
 
 fn decorate(key: &str) -> Named:
     let value = lookup(key)?

@@ -58,7 +58,7 @@ fn main:
     assert(read_file(p7_join(case_dir, "out/use/result.txt")).unwrap() == "beta!")
 
     // The escape hatch: identical output, and use runs anyway.
-    let previous = env("WITH_BUILD_NO_EARLY_CUTOFF").clone()
+    let previous = env("WITH_BUILD_NO_EARLY_CUTOFF")
     assert(set_env("WITH_BUILD_NO_EARLY_CUTOFF", "1") == 0)
     p7_write(case_dir, "src/seed.txt", "beta\nline two, edited again\n")
     let forced = p7_run(case_dir, "cutoff-disabled", p7_build_args())

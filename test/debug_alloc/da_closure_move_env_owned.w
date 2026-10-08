@@ -30,9 +30,9 @@ fn mk_drop(r: R) -> fn() -> i32: move () => r.id
 fn main:
     let ten = mk_copy(2)
     print(ten())
-    let len = mk_str("hello".clone())
+    let len = mk_str("hello")
     print(len())
-    let h = Holder { f: mk_str("world".clone()), tag: 1 }
+    let h = Holder { f: mk_str("world"), tag: 1 }
     print(h.f())
     let seven = mk_drop(R { id: 7 })
     let _ = seven()

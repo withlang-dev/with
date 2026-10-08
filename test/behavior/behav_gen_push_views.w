@@ -34,7 +34,7 @@ fn main:
     for s in labels(3):
         out = out ++ (if out.len() > 0: " " else: "") ++ s
     print(out)
-    let lines: Vec[str] = ["alpha".clone(), "".clone(), "gamma".clone()]
+    let lines: Vec[str] = ["alpha", "", "gamma"]
     var joined = ""
     for line in nonempty(&lines):
         joined = joined ++ (if joined.len() > 0: " " else: "") ++ line
@@ -46,5 +46,5 @@ fn main:
     var kept = ""
     for s in labels(3):
         if s == "item-1":
-            kept = s.clone()
+            kept = s
     print("kept " ++ kept)

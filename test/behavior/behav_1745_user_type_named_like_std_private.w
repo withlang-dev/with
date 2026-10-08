@@ -22,7 +22,7 @@ fn main:
     let m = Mutex.new(40)
     m.set(38)
     print(f"{c.x} {m.enter().exit()}")
-    let core = PullCore { tag: "a".clone(), n: 7 }
+    let core = PullCore { tag: "a", n: 7 }
     var p = upto(3).pull()
     let _ = p.next()
     let _ = p.next()

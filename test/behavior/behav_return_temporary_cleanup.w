@@ -14,8 +14,8 @@ fn main:
     let bin = root ++ "/out/temporary_exit_cases"
     let built = p7_run(root, "build", "build\0src/main.w\0-o\0" ++ bin ++ "\0")
     p7_assert_success(built, "build")
-    let previous = env("WITH_ALLOC_NO_REUSE").clone()
-    let previous_debug = env("WITH_DEBUG_ALLOC").clone()
+    let previous = env("WITH_ALLOC_NO_REUSE")
+    let previous_debug = env("WITH_DEBUG_ALLOC")
     assert(set_env("WITH_ALLOC_NO_REUSE", "1") == 0)
     assert(set_env("WITH_DEBUG_ALLOC", "1") == 0)
     for mode in ["return", "normal", "try", "try-normal", "nested", "argument", "argument-normal", "branch", "branch-normal", "break", "continue", "user-try", "user-try-normal", "cancel", "coalesce-none", "coalesce-some", "coalesce-error", "coalesce-ok", "match-return", "match-normal", "match-none", "iflet-return", "iflet-normal", "iflet-none", "named-match-return", "named-iflet-return", "defer", "destructor", "errdefer", "user-errdefer"]:

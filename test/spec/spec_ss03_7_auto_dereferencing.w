@@ -4,7 +4,7 @@ type AutoDerefUser { name: str, score: i32 }
 
 impl AutoDerefUser:
     fn label(self: &Self) -> str:
-        self.name.clone()
+        self.name
 
 type AutoDerefHandle { ptr: *const AutoDerefUser }
 

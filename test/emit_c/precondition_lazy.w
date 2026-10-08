@@ -17,6 +17,6 @@ fn main:
     check(1 < 2, side_effect())
     assert(true, side_effect())
     print("ok")
-    let s = "ke".clone() ++ "pt"
+    let s = "ke" ++ "pt"
     require(true, consume(s))
     print(s)

@@ -23,7 +23,7 @@ fn main:
     let base: i64 = 10
     let v: Vec[i64] = [base, base * 2, base * 3]
     print(f"vec {v.len()} {v[0]} {v[2]}")
-    let strs: Vec[str] = ["a".clone() ++ "b", "cd".clone()]
+    let strs: Vec[str] = ["a" ++ "b", "cd"]
     print(f"strs {strs[0]} {strs[1]}")
     let points: Vec[Point] = [Point { x: 1, y: 2 }, Point { x: 3, y: 4 }]
     print(f"points {points.len()} {points[1].y}")

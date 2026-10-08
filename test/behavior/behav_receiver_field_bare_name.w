@@ -42,7 +42,7 @@ impl Counter:
     // A bare callee names the field: it calls the field's value.
     fn stepped -> i32: step(count)
     // Struct-literal shorthand reads the field.
-    fn copy_of -> Counter: Counter { count, items: items.clone(), step: x => x * 3, label: label.clone() }
+    fn copy_of -> Counter: Counter { count, items: items.clone(), step: x => x * 3, label: label }
     move fn into_count -> i32: apply(y => y * count, 2)
 
 type Pair[T] {

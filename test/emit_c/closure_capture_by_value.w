@@ -12,7 +12,7 @@ fn main:
     n = 5
     print(snap())
     print(n)
-    let s = "abc".clone()
+    let s = "abc"
     let shout = move () => s ++ "!"
     print(shout())
     var a = 1

@@ -39,9 +39,9 @@ fn main:
     show(&p)
     let t = Shape.Triple(5, 6, 7)
     show(&t)
-    let n = Shape.Named("hel".clone() ++ "lo", 9)
+    let n = Shape.Named("hel" ++ "lo", 9)
     show(&n)
-    let g: Tagged[str] = Tagged.Two(1, 2, "x".clone())
+    let g: Tagged[str] = Tagged.Two(1, 2, "x")
     match g:
         .Two(a, b, s) => print(f"generic {a} {b} {s}")
         .Nothing => print("generic none")

@@ -24,8 +24,8 @@ async fn inc(k: i32) -> i32:
     n += 1
 
 async fn name -> str:
-    var s = "".clone()
-    s = "hi".clone() ++ "!"
+    var s = ""
+    s = "hi" ++ "!"
 
 fn keep[T](x: T) -> T:
     var y = x
@@ -46,7 +46,7 @@ fn main:
     let s = name().await
     print(f"async {n} {s}")
     let k = keep(4)
-    let ks = keep("x".clone() ++ "!")
+    let ks = keep("x" ++ "!")
     print(f"generic {k} {ks}")
     print(f"brace {brace()}")
     var cell = 0

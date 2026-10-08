@@ -35,7 +35,7 @@ fn prog -> str:
 fn subprogram_id(ir: &str, name: &str, line: i32) -> str:
     for l in ir.split("\n"):
         if l.contains(f"!DISubprogram(name: \"{name}") and l.contains(f", line: {line},"):
-            return l.slice(1, l.find(" = ")).clone()
+            return l.slice(1, l.find(" = "))
     eprint(f"no subprogram `{name}` at line {line}")
     assert(false)
     ""

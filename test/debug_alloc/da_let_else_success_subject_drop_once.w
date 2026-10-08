@@ -24,7 +24,7 @@ fn new_w(drops: *mut i32, n: i32) -> W:
     unsafe { W { ptr: with_alloc(24), drops, n } }
 
 fn copy_or(k: i32) -> Result[i32, str]:
-    if k == 0: return Err("none".clone())
+    if k == 0: return Err("none")
     k
 
 fn w_or(drops: *mut i32, k: i32) -> Result[W, W]:

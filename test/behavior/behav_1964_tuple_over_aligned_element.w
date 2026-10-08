@@ -109,7 +109,7 @@ fn main:
     let s = make(1, 2, 4)
     print(f"eq {p == q} {p == s}")
 
-    let d: (Al, str) = (Al { a: 8, b: 9 }, "hello".clone())
+    let d: (Al, str) = (Al { a: 8, b: 9 }, "hello")
     let (da, ds) = d
     print(f"drop {ds} {da.a} {da.b}")
 

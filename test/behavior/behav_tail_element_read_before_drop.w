@@ -10,8 +10,8 @@ type Row { name: str, arity: i32 }
 
 fn table() -> Vec[Row]:
     let t: Vec[Row] = Vec.new()
-    t.push(Row { name: "sin".clone(), arity: 1 })
-    t.push(Row { name: "cos".clone(), arity: 2 })
+    t.push(Row { name: "sin", arity: 1 })
+    t.push(Row { name: "cos", arity: 2 })
     t
 
 fn arity_tail(id: i32) -> i32:
@@ -20,7 +20,7 @@ fn arity_tail(id: i32) -> i32:
 
 fn name_tail(id: i32) -> str:
     let t = table()
-    t[id].name.clone()
+    t[id].name
 
 fn main:
     print(arity_tail(0))

@@ -70,15 +70,15 @@ enum Mixed: u64:
 
 fn b64_name(k: &B64) -> str:
     match k:
-        .A => "a".clone()
-        .B => "b".clone()
+        .A => "a"
+        .B => "b"
 
 fn c64_name(k: C64) -> str:
     match k:
-        .Mid => "mid".clone()
-        .Past => "past".clone()
-        .Top => "top".clone()
-        .Last => "last".clone()
+        .Mid => "mid"
+        .Past => "past"
+        .Top => "top"
+        .Last => "last"
 
 fn main:
     print(f"{A8.Hi as i8} {B8.Hi as u8} {A16.Hi as i16} {B16.Hi as u16}")

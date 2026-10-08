@@ -14,10 +14,10 @@ fn choose(early: bool, take: bool) -> Signal:
         var assembled = Signal { kind: 0, value: Value { text: "retained".to_owned() } }
         if early:
             return assembled
-        move assembled.value.text
+        assembled.value.text
     else:
         "other".to_owned()
-    Signal { kind: 1, value: Value { text: move text } }
+    Signal { kind: 1, value: Value { text: text } }
 
 fn exercise(early: bool, take: bool):
     let result = choose(early, take)

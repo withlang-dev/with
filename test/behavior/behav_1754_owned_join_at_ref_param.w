@@ -15,8 +15,8 @@ extend W:
     fn label(self: &Self, s: &str) -> i64: s.len() + self.n
 
 fn main:
-    let a = "x".clone()
-    let b = "longer".clone()
+    let a = "x"
+    let b = "longer"
     let c = true
     let k = 2
     let one = f(a ++ "yy")
@@ -26,12 +26,12 @@ fn main:
     let matched = f(match k:
         1 => a ++ "1"
         2 => "twenty"
-        _ => a.clone())
+        _ => a)
     print(f"{one} {owned} {literal_arm} {views} {matched}")
     let w = W { n: 5 }
     let widened = g(if c: 41 else: 40)
     let method_owned = w.label(if c: a ++ "y" else: "zz")
     let method_match = w.label(match k:
         2 => "four"
-        _ => a.clone())
+        _ => a)
     print(f"{widened} {method_owned} {method_match}")

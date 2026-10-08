@@ -23,7 +23,7 @@ impl Drop for Res:
         print(f"drop {self.name}")
 
 gen fn words(n: i32) -> str:
-    let r = Res { name: "words".clone() }
+    let r = Res { name: "words" }
     defer:
         print("defer words")
     for i in 0..n:
@@ -31,7 +31,7 @@ gen fn words(n: i32) -> str:
     let _ = r.name.len()
 
 fn check(w: &str) -> Result[str, str]:
-    if w == "w2": return Err(w.clone())
+    if w == "w2": return Err(w)
     Ok(w ++ "!")
 
 fn all_checked() -> Result[Vec[str], str]:
@@ -47,5 +47,5 @@ fn main:
     match all_checked():
         Ok(all) => print(f"no stop {all.len()}")
         Err(e) => print(f"stopped at {e}")
-    let pairs = [a ++ b for a in words(2) for b in ["x".clone(), "y".clone()]]
+    let pairs = [a ++ b for a in words(2) for b in ["x", "y"]]
     print(f"pairs {pairs.len()}")

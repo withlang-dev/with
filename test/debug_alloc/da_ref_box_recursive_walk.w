@@ -12,7 +12,7 @@ enum T:
 
 fn show(t: &T) -> str:
     match t:
-        T.Leaf(v) => v.clone()
+        T.Leaf(v) => v
         T.Node(l, r) => "(" ++ show(l.as_ref()) ++ " " ++ show(r.as_ref()) ++ ")"
 
 fn leaves(t: &T) -> i64:
@@ -21,6 +21,6 @@ fn leaves(t: &T) -> i64:
         T.Node(l, r) => leaves(l.as_ref()) + leaves(r.as_ref())
 
 fn main:
-    let t = T.Node(Box.new(T.Leaf("a".clone())), Box.new(T.Node(Box.new(T.Leaf("b".clone())), Box.new(T.Leaf("c".clone())))))
+    let t = T.Node(Box.new(T.Leaf("a")), Box.new(T.Node(Box.new(T.Leaf("b")), Box.new(T.Leaf("c")))))
     print(show(&t))
     print(leaves(&t))

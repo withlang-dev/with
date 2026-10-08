@@ -20,7 +20,7 @@ fn h(ud: Option[&Ctx]) -> i32: match ud:
     None => -1
 
 fn main:
-    let ctx = Ctx { n: 40, tag: "alpha".clone() }
+    let ctx = Ctx { n: 40, tag: "alpha" }
     print(h(Some(ctx)))
     let z: Option[&Ctx] = Some(ctx)
     print(h(z) + 1)

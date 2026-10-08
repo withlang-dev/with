@@ -15,16 +15,16 @@ fn main:
     let a = "x" ++ "y"
     let b = "u" ++ "v"
     let c = args().len() < 100
-    let p = if c: a.clone() else: b.clone()
-    let q = if c: a.clone() else: b.clone()
+    let p = if c: a else: b
+    let q = if c: a else: b
     print(f"[{p}] [{q}] [{a}] [{b}]")
 
-    let n = (if c: a.clone() else: b.clone()).len()
+    let n = (if c: a else: b).len()
     print(f"{n} [{a}]")
 
     let r = match c:
-        true => a.clone()
-        false => b.clone()
+        true => a
+        false => b
     print(f"[{r}] [{a}]")
 
     // the arm that moves is the last use: nothing is read after it

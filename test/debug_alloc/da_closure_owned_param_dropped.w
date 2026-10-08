@@ -15,9 +15,9 @@ use std.process
 
 fn main:
     let unused = (x: str) => 1
-    print(unused(args()[0].clone() ++ "?"))
+    print(unused(args()[0] ++ "?"))
     let reads = (x: str) => x.len() as i32 * 0 + 7
-    print(reads(args()[0].clone() ++ "!"))
+    print(reads(args()[0] ++ "!"))
     let keeps = (x: str) => x
     print(keeps("kept" ++ "!"))
     let t = read_file("out/tmp/da_closure_owned_param_dropped.missing").unwrap_or_else((_) => "")

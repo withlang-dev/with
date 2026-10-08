@@ -34,7 +34,7 @@ fn main:
     match f:
         .A(k, v) => print(f"vector {k} {v[0]} {v[7]}")
         .B => print("vector b")
-    let d = D.A(Al { a: 7, b: 8 }, "hello".clone())
+    let d = D.A(Al { a: 7, b: 8 }, "hello")
     match d:
         .A(al, s) => print(f"drop {s} {al.a} {al.b}")
         .B => print("drop b")

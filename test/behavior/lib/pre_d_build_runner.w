@@ -68,7 +68,7 @@ fn p7_argv_append(blob: &str, arg: &str) -> str:
 pub fn p7_compiler_path -> str:
     let running = env("WITH_TEST_COMPILER")
     if running.len() > 0:
-        return running.clone()
+        return running
     let ext = if os() == "Windows": ".exe" else: ""
     for rel in ["out/stage/bin/with-stage2", "out/release/bin/with", "out/bin/with-stage2", "out/bin/with"]:
         let candidate = p7_abs(rel ++ ext)
@@ -112,7 +112,7 @@ pub fn p7_run(case_dir: &str, label: &str, args_blob: &str) -> P7Run:
 pub fn p7_run_with_compiler(compiler: &str, case_dir: &str, label: &str, args_blob: &str) -> P7Run:
     // Each test file runs in its own process. Keep this synchronous child's
     // objects and runtime cache inside its case, then restore the runner env.
-    let previous_out = env("WITH_OUT_DIR").clone()
+    let previous_out = env("WITH_OUT_DIR")
     assert(set_env("WITH_OUT_DIR", p7_join(case_dir, "out")) == 0)
     let result = p7_run_with_compiler_keeping_env(compiler, case_dir, label, args_blob)
     assert(set_env("WITH_OUT_DIR", previous_out) == 0)
@@ -121,7 +121,7 @@ pub fn p7_run_with_compiler(compiler: &str, case_dir: &str, label: &str, args_bl
 // The child runs with no WITH_OUT_DIR at all, as a developer's shell does:
 // the compiler resolves its artifact root from the case directory alone.
 pub fn p7_run_without_out_dir(case_dir: &str, label: &str, args_blob: &str) -> P7Run:
-    let previous_out = env("WITH_OUT_DIR").clone()
+    let previous_out = env("WITH_OUT_DIR")
     assert(set_env("WITH_OUT_DIR", "") == 0)
     let result = p7_run_with_compiler_keeping_env(p7_compiler_path(), case_dir, label, args_blob)
     assert(set_env("WITH_OUT_DIR", previous_out) == 0)

@@ -21,7 +21,7 @@ type Person { name_text: str }
 
 impl Named for Person:
     fn name(self: &Self) -> str:
-        self.name_text.clone()
+        self.name_text
 
 trait Echo[T]:
     fn echo(self: &Self, value: T) -> T:

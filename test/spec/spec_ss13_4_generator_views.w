@@ -31,12 +31,12 @@ fn test_view_of_own_local:
     var last = ""
     for label in labels(3):
         count += 1
-        last = label.clone()
+        last = label
     assert(count == 3)
     assert(last == "item-2")
 
 fn test_view_into_argument:
-    let lines: Vec[str] = ["a".clone(), "".clone(), "c".clone()]
+    let lines: Vec[str] = ["a", "", "c"]
     var joined = ""
     for line in nonempty(&lines):
         joined = joined ++ line

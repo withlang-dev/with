@@ -12,11 +12,11 @@ fn owned_len(s: str) -> i32: s.len() as i32
 fn call(f: fn() -> i32) -> i32: f()
 
 fn main:
-    let word = "four".clone()
+    let word = "four"
     let c = () => owned_len(word)
     print(c())
-    let abc = "abc".clone()
+    let abc = "abc"
     print(call(() => owned_len(abc)))
-    let hello = "hello".clone()
+    let hello = "hello"
     let unused = () => owned_len(hello)
     print(hello.len())

@@ -16,7 +16,7 @@ trait Named:
 type Person { text: str }
 
 impl Named for Person:
-    fn name: self.text.clone()
+    fn name: self.text
     fn size: 2
 
 fn main:

@@ -17,23 +17,23 @@ type Bag { items: Vec[i32], name: str, n: i32 }
 fn make -> (Vec[i32], str):
     var v: Vec[i32] = Vec.new()
     v.push(1)
-    (v, "a".clone())
+    (v, "a")
 
 fn make_bag -> Bag:
     var items: Vec[i32] = Vec.new()
     items.push(7)
-    Bag { items, name: "bag".clone(), n: 1 }
+    Bag { items, name: "bag", n: 1 }
 
 fn items(k: i32) -> Option[Vec[str]]:
     if k == 0: return None
     var v: Vec[str] = Vec.new()
-    v.push("a".clone())
+    v.push("a")
     Some(v)
 
 fn refutable(k: i32) -> i32:
     var Some(v) = items(k) else: return -1
-    v.push("b".clone())
-    v.push("c".clone())
+    v.push("b")
+    v.push("c")
     30 + v.len() as i32
 
 fn main:
@@ -51,6 +51,6 @@ fn main:
     n += 1
     print(f"{items.len()} {name} {n}")
 
-    var (_, keep) = ("dropped".clone(), 1)
+    var (_, keep) = ("dropped", 1)
     keep += 0
     print(f"{refutable(1) + keep - 1} {refutable(0)}")

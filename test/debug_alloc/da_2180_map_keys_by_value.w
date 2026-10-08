@@ -41,4 +41,4 @@ fn main:
     tags.insert(Tag { text: "Red".to_lower() }, 3)
     tags.insert(Tag { text: "RED".to_upper() }, 7)
     tags.insert(Tag { text: "blue".to_lower() }, 1)
-    print(f"{tags.len()} {tags.contains(Tag { text: "rEd".clone() })} {tags.get(Tag { text: "red".clone() }) ?? 0}")
+    print(f"{tags.len()} {tags.contains(Tag { text: "rEd" })} {tags.get(Tag { text: "red" }) ?? 0}")

@@ -17,8 +17,8 @@ fn width(n: &Name): print((n as []u8).len())
 fn retag(n: &Name): print((n as Tag) as str)
 
 fn main:
-    let n = "abc".clone() as Name
+    let n = "abc" as Name
     show(n)
     width(n)
-    let t = "xyz".clone() as Name
+    let t = "xyz" as Name
     retag(t)

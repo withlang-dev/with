@@ -29,10 +29,10 @@ fn main:
 
     // Views of a non-Copy element: nothing moves out of `ps`.
     var ps: Vec[(i32, str)] = Vec.new()
-    ps.push((0, "a".clone()))
-    ps.push((1, "b".clone()))
-    ps.push((0, "c".clone()))
-    let ss = [s.clone() for (0, s) in ps]
+    ps.push((0, "a"))
+    ps.push((1, "b"))
+    ps.push((0, "c"))
+    let ss = [s for (0, s) in ps]
     print(f"{ss.len()} {ss[0]} {ss[1]} {ps[1].1}")
 
     // Consuming iteration: the skipped element is dropped, the rest move.

@@ -34,20 +34,20 @@ fn vec3() -> Vec[i32]:
     v
 
 fn main:
-    let n = "abc".clone() as Name
+    let n = "abc" as Name
     show(n)
     show(n)
     let v = n as &str
     print(v)
     print((n as []u8).len())
-    let s = "abc".clone()
+    let s = "abc"
     let as_name = s as &Name
     show(as_name)
     let b = vec3() as Bag
     bag_len(b)
     let bv = b as &Vec[i32]
     print(bv.len())
-    let d = Rec { s: "rec".clone() } as RecD
+    let d = Rec { s: "rec" } as RecD
     rec_show(d)
     rec_show(d)
     let bytes = s as []u8

@@ -16,8 +16,8 @@ impl Iter[i32] for Counter:
         Some(self.n)
 
 gen fn letters() -> str:
-    yield "a".clone()
-    yield "b".clone()
+    yield "a"
+    yield "b"
 
 fn main:
     let a = Counter { n: 0, limit: 3 }

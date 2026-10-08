@@ -7,10 +7,10 @@
 type S { p: str, v: Vec[i32] }
 impl S:
     mut fn keep(c: bool) -> str:
-        let path = if c: self.p.clone() else: ""
+        let path = if c: self.p else: ""
         path
     mut fn take(c: bool) -> str:
-        let path = if c: move self.p else: ""
+        let path = if c: self.p else: ""
         path
     fn peek() -> i64:
         let view = self.v
@@ -27,7 +27,7 @@ fn main:
     var t = S { p: "xyz" ++ "", v: Vec.new() }
     let w = match t.p.len():
         0 => ""
-        _ => move t.p
+        _ => t.p
     assert(w == "xyz")
     t.p = "again" ++ ""
     assert(t.p == "again")

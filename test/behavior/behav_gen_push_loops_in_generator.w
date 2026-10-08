@@ -41,7 +41,7 @@ fn main:
     for d in doubled(&arr[1..3]):
         twice += d
     print(twice - 1)
-    let words: Vec[str] = ["a".clone(), "bb".clone()]
+    let words: Vec[str] = ["a", "bb"]
     for s in shouted(&words):
         print(s)
     var n = 0

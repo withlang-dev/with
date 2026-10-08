@@ -36,8 +36,8 @@ fn on(c: &Ctx, n: c_int) -> c_int: c.base + n + c.label.len() as i32 - 1
 
 fn main:
     let d = Database.new(0).unwrap()
-    print(f"temporary {d.exec(Some(on), .Some(Ctx { base: 7, label: "x".clone() }), 101)}")
-    let ctx = Ctx { base: 11, label: "z".clone() }
+    print(f"temporary {d.exec(Some(on), .Some(Ctx { base: 7, label: "x" }), 101)}")
+    let ctx = Ctx { base: 11, label: "z" }
     print(f"place {d.exec(Some(on), .Some(ctx), 100)}")
     print(f"place again {d.exec(Some(on), .Some(ctx), 101)}")
     print(f"none {d.exec(None, .None, 100)}")

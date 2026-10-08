@@ -8,13 +8,13 @@ fn observe(source: &str):
 
 fn main:
     var values: Vec[str] = Vec.new()
-    values.push("alpha".clone())
-    values.push("gamma".clone())
+    values.push("alpha")
+    values.push("gamma")
     for i in 0..32:
         observe(values[0])
         assert(values[0].cmp(values[1]) < 0)
         assert(values[1].cmp(values[0]) > 0)
-        let scratch = "other".clone()
+        let scratch = "other"
         assert(scratch == "other")
         assert(values[0] == "alpha")
         assert(values[1] == "gamma")

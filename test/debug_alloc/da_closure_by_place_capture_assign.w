@@ -17,14 +17,14 @@
 
 type S { name: str, n: i32 }
 
-fn compute(s: &str): s.clone() ++ "!"
+fn compute(s: &str): s ++ "!"
 fn run_unit(f: fn() -> Unit): f()
 fn run_twice(f: fn() -> Unit):
     f()
     f()
 
 fn main:
-    var c = "".clone()
+    var c = ""
     run_unit(() => c = compute("x"))
     print(c)
 
@@ -35,17 +35,17 @@ fn main:
     run_unit(() => v.push(5))
     print(v[0])
 
-    var s = S { name: "a".clone(), n: 1 }
-    run_unit(() => s.name = "bb".clone())
+    var s = S { name: "a", n: 1 }
+    run_unit(() => s.name = "bb")
     print(s.name)
-    run_unit(() => s = S { name: "cc".clone(), n: 2 })
+    run_unit(() => s = S { name: "cc", n: 2 })
     print(s.name)
 
-    var acc = "".clone()
+    var acc = ""
     for i in 0..3:
-        run_unit(() => acc = acc.clone() ++ "x")
+        run_unit(() => acc = acc ++ "x")
     print(acc)
 
-    var t = "a".clone()
-    run_twice(() => t = t.clone() ++ "b")
+    var t = "a"
+    run_twice(() => t = t ++ "b")
     print(t)

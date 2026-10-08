@@ -22,8 +22,8 @@ pub fn area_a(s: &Shape) -> i64:
 pub fn kind_a() -> Kind: Kind.Hi
 pub fn kind_name_a(k: Kind) -> str:
     match k:
-        .Lo => "a-lo".clone()
-        .Hi => "a-hi".clone()
+        .Lo => "a-lo"
+        .Hi => "a-hi"
 pub fn show_a(i: &Item) -> Unit: print(f"a {i.x} {i.y} {i.sum_a()}")
 pub fn items_a() -> Vec[Item]:
     var v: Vec[Item] = Vec.new()

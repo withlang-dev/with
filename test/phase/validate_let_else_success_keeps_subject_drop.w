@@ -10,7 +10,7 @@
 
 type Pair { name: str, tags: Vec[str] }
 
-fn owned(s: &str): s.clone()
+fn owned(s: &str): s
 
 fn int_or_err(k: i32) -> Result[i32, str]:
     if k == 0: return Err(owned("none"))

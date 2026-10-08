@@ -46,7 +46,7 @@ fn main:
     var drops3 = 0
     var slots: Vec[Slot] = Vec.new()
     slots.push(Slot.Full(w(&raw mut drops3, 1)))
-    slots.push(Slot.Held("h".clone()))
+    slots.push(Slot.Held("h"))
     slots.push(Slot.Empty)
     slots.push(Slot.Full(w(&raw mut drops3, 2)))
     let full = [x.n for .Full(x) in slots.into_iter()]
@@ -54,8 +54,8 @@ fn main:
     assert(drops3 == 3)
 
     var names: Vec[(i32, str)] = Vec.new()
-    names.push((0, "a".clone()))
-    names.push((1, "b".clone()))
+    names.push((0, "a"))
+    names.push((1, "b"))
     let named = [s for (0, s) in names.into_iter()]
     assert(named.len() == 1)
     print_i32(kept.len() as i32 + zeros.len() as i32 + full.len() as i32 + named.len() as i32)

@@ -20,12 +20,12 @@
 use std.generators.{map, take, collect}
 
 gen fn twice[T: Clone](x: T) -> T:
-    yield x.clone()
+    yield x
     yield x
 
 gen fn pairs[A: Clone, B: Clone](a: A, b: B, n: i32) -> (A, B):
     for _ in 0..n:
-        yield (a.clone(), b.clone())
+        yield (a, b)
 
 gen fn over[T](xs: &Vec[T]) -> &T:
     for x in xs:
@@ -83,14 +83,14 @@ fn main:
     for v in twice(21):
         total += v
     var text = ""
-    for w in twice("ab".clone()):
+    for w in twice("ab"):
         text = text ++ w
     print(f"twice {total} {text}")
 
     var ps = ""
-    for (a, b) in pairs(1, "z".clone(), 2):
+    for (a, b) in pairs(1, "z", 2):
         ps = ps ++ f" {a}{b}"
-    for (a, b) in pairs("x".clone(), 7, 5):
+    for (a, b) in pairs("x", 7, 5):
         ps = ps ++ f" | {a}{b}"
         break
     print(f"pairs{ps}")
@@ -99,7 +99,7 @@ fn main:
     var sum: i64 = 0
     for x in over(&nums):
         sum += x
-    let letters: Vec[str] = ["a".clone(), "c".clone(), "e".clone()]
+    let letters: Vec[str] = ["a", "c", "e"]
     var joined = ""
     for s in over(&letters):
         joined = joined ++ s
@@ -131,13 +131,13 @@ fn main:
     for v in t.walk():
         tsum += v
     print(f"explicit self {tsum}")
-    let st: Stack[str] = Stack { items: ["p".clone(), "q".clone()] }
+    let st: Stack[str] = Stack { items: ["p", "q"] }
     var ss = ""
     for x in st.each_item():
         ss = ss ++ x
     print(f"generic owner {ss}")
 
-    let s = "abcdef".clone()
+    let s = "abcdef"
     var halves = ""
     for h in s.halves():
         halves = halves ++ "[" ++ h ++ "]"

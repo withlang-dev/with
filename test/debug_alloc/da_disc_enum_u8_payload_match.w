@@ -16,14 +16,14 @@ fn size(m: &Msg) -> i64:
 
 fn consume(m: Msg) -> str:
     match m:
-        .Quit => "".clone()
+        .Quit => ""
         .Write(s) => s
         .Pair(a, b) => a ++ b
 
 fn main:
     var total: i64 = 0
-    for m in [Msg.Quit, Msg.Write("alpha".clone()), Msg.Pair("be".clone(), "ta".clone())]:
+    for m in [Msg.Quit, Msg.Write("alpha"), Msg.Pair("be", "ta")]:
         total = total + size(m)
     print(total)
-    print(consume(Msg.Pair("x".clone(), "y".clone())))
-    print(consume(Msg.Write("z".clone())))
+    print(consume(Msg.Pair("x", "y")))
+    print(consume(Msg.Write("z")))

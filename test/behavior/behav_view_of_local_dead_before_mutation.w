@@ -8,10 +8,10 @@ type Box2 { n: i32 }
 
 fn main:
     var v: Vec[str] = Vec.new()
-    v.push("a".clone())
+    v.push("a")
     let s = &v
     let n1 = s.len()
-    v.push("b".clone())
+    v.push("b")
     let t = &v
     let n2 = t.len()
     var b = Box2 { n: 3 }

@@ -6,6 +6,6 @@
 fn total[T](xs: &Vec[T]) -> i64: xs.len()
 
 fn main:
-    let xs: Vec[str] = ["a".clone(), "b".clone(), "c".clone()]
+    let xs: Vec[str] = ["a", "b", "c"]
     let n = xs |> total()
     print(f"{n} {xs.len()}")

@@ -25,17 +25,17 @@ fn vec3() -> Vec[i32]:
     v.push(3)
     v
 
-fn mk_name() -> Name: "mk".clone() as Name
+fn mk_name() -> Name: "mk" as Name
 
 fn main:
     // into, from a binding: `s` moves into `n`
-    let s = "abc".clone()
+    let s = "abc"
     let n = s as Name
     // out, to a binding: `n` moves into `t`
     let t = n as str
     print(t)
     // out of a temporary into a statement temporary, dropped at the `;`
-    let m = "abc".clone() as Name
+    let m = "abc" as Name
     print(m as str)
     print(mk_name() as str)
     // a Vec
@@ -46,13 +46,13 @@ fn main:
     let b2 = vec3() as Bag
     print((b2 as Vec[i32]).len())
     // a struct holding an owned str
-    let r = Rec { s: "rec".clone() }
+    let r = Rec { s: "rec" }
     let d = r as RecD
     let back = d as Rec
     print(back.s)
-    let d2 = Rec { s: "rec".clone() } as RecD
+    let d2 = Rec { s: "rec" } as RecD
     print((d2 as Rec).s)
     // the same type: a relabel that moves
-    let x = "xyz".clone()
+    let x = "xyz"
     let y = x as str
     print(y)

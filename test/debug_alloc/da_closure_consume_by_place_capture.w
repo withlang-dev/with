@@ -17,10 +17,10 @@ impl Drop for R:
 fn run_str(f: fn() -> str) -> str: f()
 
 fn main:
-    var c = "a".clone()
+    var c = "a"
     let f: fn() -> str = () => c
     print(f())
-    var d = "b".clone()
+    var d = "b"
     print(run_str(() => d))
     let r = R { id: 7 }
     let take = () => r

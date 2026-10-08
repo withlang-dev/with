@@ -86,8 +86,8 @@ extend UserService:
         var request = req
         User {
             id: UserId { value: 0 },
-            name: move request.name,
-            email: move request.email,
+            name: request.name,
+            email: request.email,
             role: request.role,
         }
 
@@ -123,7 +123,7 @@ extend UserService:
 
     pub fn make_welcome_notification(user: &User) -> Notification:
         Notification {
-            recipient: user.email.clone(),
+            recipient: user.email,
             subject: "Welcome to the platform",
             body: self.welcome_body(user.role),
             priority: .Normal,

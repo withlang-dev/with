@@ -32,12 +32,12 @@ fn count_of[T](xs: &Vec[T]) -> i32:
 fn describe[A, B](p: &Pair[A, B], fa: fn(&A) -> str, fb: fn(&B) -> str) -> str: fa(&p.first) ++ " " ++ fb(&p.second)
 
 fn main:
-    let words: Vec[str] = ["a".clone(), "b".clone()]
-    print(f"str {joined(&words, w => w.clone())} {count_of(&words)}")
+    let words: Vec[str] = ["a", "b"]
+    print(f"str {joined(&words, w => w)} {count_of(&words)}")
     let nums: Vec[i32] = [3, 4]
     print(f"i32 {nums[0] + nums[1]} {count_of(&nums)}")
-    let p = Pair { first: "x".clone(), second: 3 }
-    let q = Pair { first: 4, second: "y".clone() }
-    let left = describe(&p, s => s.clone(), n => f"{n}")
-    let right = describe(&q, n => f"{n}", s => s.clone())
+    let p = Pair { first: "x", second: 3 }
+    let q = Pair { first: 4, second: "y" }
+    let left = describe(&p, s => s, n => f"{n}")
+    let right = describe(&q, n => f"{n}", s => s)
     print(f"pair {left} | {right}")

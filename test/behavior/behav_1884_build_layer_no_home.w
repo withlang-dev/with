@@ -16,8 +16,8 @@ use std.process
 use std.sysinfo
 
 fn main:
-    let saved_home = env("HOME").clone()
-    let saved_profile = env("USERPROFILE").clone()
+    let saved_home = env("HOME")
+    let saved_profile = env("USERPROFILE")
     assert(set_env("HOME", "") == 0)
     if os() == "Windows":
         assert(set_env("USERPROFILE", "") == 0)

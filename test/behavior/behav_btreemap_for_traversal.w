@@ -21,8 +21,8 @@ fn show[K: Ord, V](m: &BTreeMap[K, V]):
 
 fn main:
     var bt: BTreeMap[i32, str] = BTreeMap.new()
-    bt.insert(10, "ten".clone())
-    bt.insert(1, "one".clone())
+    bt.insert(10, "ten")
+    bt.insert(1, "one")
     for (k, v) in bt:
         print(f"{k} {v}")
     print(f"{bt.len()}")

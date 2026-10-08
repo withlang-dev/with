@@ -49,7 +49,7 @@ fn main:
     let e2 = if p.next().is_none(): "end" else: "more"
     print(f"{e1} {e2}")
 
-    var t = tagged(["alpha".clone(), "beta".clone(), "gamma".clone()]).pull()
+    var t = tagged(["alpha", "beta", "gamma"]).pull()
     print(f"first={t.next().unwrap()}")
     var rest = ""
     for s in t:
@@ -62,7 +62,7 @@ fn main:
     let third = parser.take()
     print(f"parser: {head} then {second} {third}")
 
-    var w = doubled(["ab".clone(), "cd".clone()]).pull()
+    var w = doubled(["ab", "cd"]).pull()
     var joined = ""
     // `match`, not `let … else: break`: #1733.
     while true:

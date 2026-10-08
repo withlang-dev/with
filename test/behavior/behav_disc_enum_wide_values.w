@@ -112,45 +112,45 @@ impl Copy for U32
 
 fn s64_name(v: S64) -> str:
     match v:
-        .Lo => "lo".clone()
-        .Neg => "neg".clone()
-        .Big => "big".clone()
-        .Hi => "hi".clone()
+        .Lo => "lo"
+        .Neg => "neg"
+        .Big => "big"
+        .Hi => "hi"
 
 fn u32_name(v: U32) -> str:
     match v:
-        U32.A => "a".clone()
-        U32.B => "b".clone()
-        U32.Big => "big".clone()
-        U32.Hi => "hi".clone()
+        U32.A => "a"
+        U32.B => "b"
+        U32.Big => "big"
+        U32.Hi => "hi"
 
 fn u64_name(v: &U64) -> str:
     match v:
-        .A => "a".clone()
-        .Big => "big".clone()
-        .Top => "top".clone()
+        .A => "a"
+        .Big => "big"
+        .Top => "top"
 
 fn s8_name(v: S8) -> str:
     match v:
-        .Lo => "lo".clone()
-        .Neg => "neg".clone()
-        .Hi => "hi".clone()
+        .Lo => "lo"
+        .Neg => "neg"
+        .Hi => "hi"
 
 fn p_name(v: P) -> str:
     match v:
-        .X => "px".clone()
-        .Y => "py".clone()
+        .X => "px"
+        .Y => "py"
 
 fn q_name(v: Q) -> str:
     match v:
-        .Y => "qy".clone()
-        .X => "qx".clone()
+        .Y => "qy"
+        .X => "qx"
 
 fn msg_text(m: &Msg) -> str:
     match m:
-        .Quit => "quit".clone()
+        .Quit => "quit"
         .Move(a, b) => f"move {a + b}"
-        .Stop => "stop".clone()
+        .Stop => "stop"
 
 fn main:
     print(f"{S8.Lo as i8} {S8.Neg as i8} {S8.Hi as i8}")

@@ -21,7 +21,7 @@ fn main:
     assert(lens.len() == 3)
     let kept = names.iter() |> filter(it.len() == 1) |> collect[Vec]()
     assert(kept.len() == 2)
-    let owned = names.iter() |> filter(it.len() == 1) |> map(it.clone()) |> collect[Vec]()
+    let owned = names.iter() |> filter(it.len() == 1) |> map(it) |> collect[Vec]()
     assert(owned.len() == 2)
     let upper = names.iter() |> map(it.to_upper()) |> collect[Vec]()
     assert(upper[2] == "BC")

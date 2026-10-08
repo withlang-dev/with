@@ -39,6 +39,6 @@ fn main:
         if probe(): aligned += 1
     print(f"loop {aligned}")
 
-    let named = Named { s: "hel".clone() ++ "lo", k: 8 }
+    let named = Named { s: "hel" ++ "lo", k: 8 }
     let show = move () => if (&raw const named.s as i64) % 64 == 0: f"{named.s} {named.k}" else: "misaligned"
     print(f"drop {show()}")

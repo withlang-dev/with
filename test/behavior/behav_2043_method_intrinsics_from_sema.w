@@ -15,9 +15,9 @@ fn main:
     xs.push(1)
     xs.push(2)
     xs.push(3)
-    let words: Vec[str] = ["a".clone(), "b".clone()]
+    let words: Vec[str] = ["a", "b"]
     var m: HashMap[str, i32] = HashMap.new()
-    m.insert("k".clone(), 4)
+    m.insert("k", 4)
     let joined = words[0] ++ words[1]
     let o: Option[i32] = Some(9)
     print(f"{count_of(&xs)} {count_of(&words)} {joined.contains(\"b\")} {m.get(\"k\").unwrap()} {joined} {o.unwrap()}")

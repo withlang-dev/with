@@ -18,9 +18,9 @@ enum T:
     Node(n: i32)
 
 fn main:
-    let w = Wrap.new(Some("maybe".clone()))
+    let w = Wrap.new(Some("maybe"))
     let kids: Vec[T] = Vec.new()
-    kids.push(T.Leaf("x".clone()))
+    kids.push(T.Leaf("x"))
     match &kids[0]:
         .Leaf(s) => print(f"{if w.v.is_some(): "some" else: "none"} {kids.len()} leaf {s}")
         .Node(_) => print("node")

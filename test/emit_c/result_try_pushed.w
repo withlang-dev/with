@@ -10,7 +10,7 @@
 type Entry { name: str, size: i64 }
 
 fn get(i: i32) -> Result[Entry, str]:
-    if i > 5: return Err("big".clone())
+    if i > 5: return Err("big")
     Ok(Entry { name: f"e{i}", size: i as i64 })
 
 fn all(n: i32) -> Result[Vec[Entry], str]:
