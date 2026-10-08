@@ -69,7 +69,7 @@ extend AppState:
     mut fn handle_create(req: HttpRequest) -> HttpResponse:
         var request = req
         let user_req = CreateUserRequest {
-            name: request.body,
+            name: move request.body,
             email: "user@example.com",
             role: .Member,
         }

@@ -86,8 +86,8 @@ extend UserService:
         var request = req
         User {
             id: UserId { value: 0 },
-            name: request.name,
-            email: request.email,
+            name: move request.name,
+            email: move request.email,
             role: request.role,
         }
 
