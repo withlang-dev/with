@@ -902,7 +902,7 @@ impl MirBuilder:
             return 0
         if self.type_is_channel_endpoint(type_id) != 0:
             return 1
-        if self.sema.is_copy_frozen(type_id as TypeId) != 0:
+        if self.copy_is_bits(type_id):
             return 0
         if self.sema.type_is_task(type_id) != 0 or self.sema.type_is_scoped_task(type_id) != 0 or self.sema.type_is_scoped_join_handle(type_id) != 0:
             return 0
@@ -917,10 +917,15 @@ impl MirBuilder:
         let std_kind = self.sema.std_generic_of(resolved as i32)
         if std_kind == StdGeneric.Sender or std_kind == StdGeneric.Receiver: 1 else: 0
 
+    // D111: a copy of this type is plain bits — Copy, with no drop glue —
+    // so it has nothing to drop and nothing to retain. A str, or a value
+    // holding one, is Copy with drop glue: every holder is dropped.
+    fn copy_is_bits(ty: i32) -> bool: self.sema.is_copy_frozen(ty as TypeId) != 0 and self.sema.type_needs_drop_frozen(ty) == 0
+
     fn type_needs_value_drop(type_id: i32) -> i32:
         if self.type_is_channel_endpoint(type_id) != 0:
             return 1
-        if self.sema.is_copy_frozen(type_id) == 0:
+        if not self.copy_is_bits(type_id):
             return 1
         0
 
@@ -6971,14 +6976,14 @@ impl MirBuilder:
             if mutable == 0 and self.ast.kind(rhs_expr) == NodeKind.NK_IF_EXPR and self.last_if_result_view != 0:
                 rhs_is_view_if = 1
         if is_discard_binding != 0:
-            if self.sema.is_copy_frozen(bind_ty) == 0 and rhs_is_view_if == 0:
+            if not self.copy_is_bits(bind_ty) and rhs_is_view_if == 0:
                 self.emit_drop_entry(local_id, scheduled_drop_kind)
             else:
                 self.body.push_stmt(self.cur_bb, StmtKind.StorageDead, local_id, 0, self.ast.get_start(node))
             return
         // An initializer may return, break, continue, or propagate an error.
         // Only the edge that acquired the value owns its eventual cleanup.
-        if self.sema.is_copy_frozen(bind_ty) == 0 and rhs_is_view_if == 0:
+        if not self.copy_is_bits(bind_ty) and rhs_is_view_if == 0:
             self.schedule_drop(local_id, scheduled_drop_kind)
         self.bind_local(name_sym, local_id)
 
@@ -7994,7 +7999,7 @@ impl MirBuilder:
                         // elements keep owned bindings read through the
                         // borrowed place (lower_for_vec no longer moves it).
                         let bare_elem = self.sema.get_generic_inst_arg(resolved as i32, 0)
-                        if self.sema.type_needs_drop_frozen(bare_elem) != 0 and self.sema.is_copy_frozen(bare_elem) == 0:
+                        if not self.copy_is_bits(bare_elem):
                             return self.lower_for_iter_ref(for_node, pat_or_sym, iter_expr, body_expr)
                         return self.lower_for_vec(for_node, pat_or_sym, iter_expr, body_expr)
                     if iter_std == StdGeneric.HashMap:
@@ -8019,7 +8024,7 @@ impl MirBuilder:
                         // borrow split as the bare-Vec dispatch.
                         self.body.note_elided_call_node(iter_expr)
                         let it_elem = self.sema.get_generic_inst_arg(recv_resolved as i32, 0)
-                        if self.sema.type_needs_drop_frozen(it_elem) != 0 and self.sema.is_copy_frozen(it_elem) == 0:
+                        if not self.copy_is_bits(it_elem):
                             return self.lower_for_iter_ref(for_node, pat_or_sym, recv, body_expr)
                         return self.lower_for_vec(for_node, pat_or_sym, recv, body_expr)
                 if iter_intrinsic == MirIntrinsic.VEC_ITER_REF and self.sema.std_generic_of(self.expr_type(recv)) == StdGeneric.Vec:
@@ -8470,7 +8475,7 @@ impl MirBuilder:
             let bind_local = self.body.new_local(elem_ty, 0, pat_or_sym, 1)
             self.bind_local(pat_or_sym, bind_local)
             self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, bind_local, 0, self.ast.get_start(body_expr))
-            if self.sema.is_copy_frozen(elem_ty) == 0:
+            if not self.copy_is_bits(elem_ty):
                 self.schedule_drop(bind_local, DropKind.DK_VALUE)
             let bind_place = self.place_for_local(bind_local)
             let item_op = self.body.new_operand(OperandKind.OK_COPY, item_place)
@@ -8521,7 +8526,7 @@ impl MirBuilder:
             let bind_local = self.body.new_local(elem_ty, 0, pat_or_sym, 1)
             self.bind_local(pat_or_sym, bind_local)
             self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, bind_local, 0, self.ast.get_start(span_node))
-            if self.sema.is_copy_frozen(elem_ty) == 0:
+            if not self.copy_is_bits(elem_ty):
                 self.schedule_drop(bind_local, DropKind.DK_VALUE)
             let bind_place = self.place_for_local(bind_local)
             let item_op = self.body.new_operand(OperandKind.OK_COPY, item_place)
@@ -8536,7 +8541,11 @@ impl MirBuilder:
     // may already produce the OK_MOVE (Sema's owned demand) without
     // registering it — register either way.
     mut fn move_into_comprehension_output(op: i32, ty: i32) -> i32:
-        if ty <= 0 or self.sema.is_copy_frozen(ty) != 0:
+        if ty <= 0 or self.copy_is_bits(ty):
+            return op
+        // D111: a value with copy glue is copied in, one more holder.
+        if self.sema.is_copy_frozen(ty as TypeId) != 0:
+            self.consume_moved_operand(op)
             return op
         var moved = op
         if self.body.operand_kinds[moved] == OperandKind.OK_COPY:
@@ -9598,7 +9607,7 @@ impl MirBuilder:
         let entries_place = self.named_field_place(map_place, self.pool.intern("entries"), storage_ty, 0)
         let resolved_storage = self.sema.resolve_alias(storage_ty)
         let pair_ty = self.sema.get_generic_inst_arg(resolved_storage as i32, 0)
-        if self.sema.type_needs_drop_frozen(pair_ty) != 0 and self.sema.is_copy_frozen(pair_ty) == 0:
+        if not self.copy_is_bits(pair_ty):
             return self.lower_for_iter_ref_place(for_node, pat_or_sym, entries_place, self.ast.get_start(iter_expr), body_expr)
         self.lower_for_vec_place(for_node, pat_or_sym, entries_place, self.loop_element_type(for_node), self.ast.get_start(iter_expr), body_expr)
 
@@ -11149,7 +11158,7 @@ impl MirBuilder:
                 let local_id = self.body.new_local(bind_ty, self.pattern_bind_mut, raw, 1)
                 self.bind_local(raw, local_id)
                 self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, self.ast.get_start(pat_node))
-                if self.sema.is_copy_frozen(bind_ty) == 0:
+                if not self.copy_is_bits(bind_ty):
                     self.schedule_drop(local_id, DropKind.DK_VALUE)
                 let src_op = self.body.new_operand(if self.sema.is_copy_frozen(bind_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, child_place)
                 let local_place = self.place_for_local(local_id)
@@ -11220,7 +11229,7 @@ impl MirBuilder:
                     let local_id = self.body.new_local(bind_ty, self.pattern_bind_mut, field_name, 1)
                     self.bind_local(field_name, local_id)
                     self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, self.ast.get_start(pat_node))
-                    if self.sema.is_copy_frozen(bind_ty) == 0:
+                    if not self.copy_is_bits(bind_ty):
                         self.schedule_drop(local_id, DropKind.DK_VALUE)
                     let src_op = self.body.new_operand(if self.sema.is_copy_frozen(bind_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, child_place)
                     let local_place = self.place_for_local(local_id)
@@ -13464,7 +13473,7 @@ impl MirBuilder:
         self.terminate(TermKind.TK_SWITCH_INT, disc, table, none_bb, 0)
 
         self.switch_to(none_bb)
-        if accessor_kind == 2 and self.sema.is_copy_frozen(enum_ty) == 0:
+        if accessor_kind == 2 and not self.copy_is_bits(enum_ty):
             self.emit_drop_stmt(recv_place, "enum-accessor", span)
         let none_fields: Vec[i32] = Vec.new()
         self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.none, none_fields, span)
@@ -14973,7 +14982,7 @@ impl MirBuilder:
         let local = self.body.new_local(ty, is_mut, sym, 1)
         self.bind_local(sym, local)
         self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local, 0, span)
-        if self.sema.is_copy_frozen(ty) == 0:
+        if not self.copy_is_bits(ty):
             self.schedule_drop(local, DropKind.DK_VALUE)
         let rhs = self.lower_expr(rhs_expr)
         let local_place = self.place_for_local(local)
@@ -15042,7 +15051,7 @@ impl MirBuilder:
             let local = self.body.new_local(ty, 0, sym, 1)
             self.bind_local(sym, local)
             self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local, 0, self.ast.get_start(pat_or_name))
-            if self.sema.is_copy_frozen(ty) == 0:
+            if not self.copy_is_bits(ty):
                 self.schedule_drop(local, DropKind.DK_VALUE)
             let rhs = self.lower_expr(rhs_expr)
             let local_place = self.place_for_local(local)
@@ -15063,8 +15072,8 @@ impl MirBuilder:
         // its drop retired: Init at return (`{ c with width: 300 }`), and a
         // moved String field the owner's glue could still reach.
         let base_local = if base_place >= 0 and base_place < self.body.place_locals.len() and self.body.place_proj_counts[base_place] == 0: self.body.place_locals[base_place] else: -1
-        let base_owned = ty != 0 and self.sema.is_copy_frozen(ty) == 0 and base_local > 0 and self.body.local_is_global[base_local] == 0 and self.body.local_is_caller_place[base_local] == 0 and (self.local_has_scheduled_value_drop(base_local) != 0 or self.stmt_temp_slot_for_local(base_local) >= 0)
-        if not base_owned and base_local >= 0 and ty != 0 and self.sema.is_copy_frozen(ty) == 0:
+        let base_owned = ty != 0 and not self.copy_is_bits(ty) and base_local > 0 and self.body.local_is_global[base_local] == 0 and self.body.local_is_caller_place[base_local] == 0 and (self.local_has_scheduled_value_drop(base_local) != 0 or self.stmt_temp_slot_for_local(base_local) >= 0)
+        if not base_owned and base_local >= 0 and ty != 0 and not self.copy_is_bits(ty):
             self.cancel_scheduled_value_drop_for_local(base_local)
         let resolved_ty = self.sema.resolve_alias(ty)
         var struct_extra = self.sema.get_type_d1(resolved_ty)
@@ -15112,7 +15121,7 @@ impl MirBuilder:
                     update_idx = ui
                     break
             if update_idx >= 0:
-                if field_ty != 0 and self.sema.is_copy_frozen(field_ty) == 0:
+                if field_ty != 0 and not self.copy_is_bits(field_ty):
                     let old_field_tmp = self.new_temp(field_ty)
                     let old_field_place = self.place_for_local(old_field_tmp)
                     let old_field_op = self.body.new_operand(OperandKind.OK_MOVE, src_field_place)
@@ -15628,7 +15637,7 @@ impl MirBuilder:
             // the body owns it and drops what it did not move on (#1363: an
             // unused `(_) => ""` fallback leaked the Err payload; any unused
             // owned closure argument leaked).
-            if self.sema.is_copy_frozen(param_ty) == 0:
+            if not self.copy_is_bits(param_ty):
                 child.schedule_drop(local, DropKind.DK_VALUE)
         child.body.n_params = captures.len() as i32 + param_count
         child.expected_type = ret_ty
@@ -17299,7 +17308,7 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> Lowered
             // parameter, recorded for the ownership validator to read.
             if drop_receiver_self != 0 or borrowed_receiver or share_place_param:
                 builder.body.mark_caller_place_local(local_id)
-            else if builder.sema.is_copy_frozen(p_ty) == 0:
+            else if not builder.copy_is_bits(p_ty):
                 builder.schedule_drop(local_id, DropKind.DK_VALUE)
             param_locals.push(local_id)
         builder.body.n_params = param_count
@@ -17463,7 +17472,7 @@ fn lower_fn_clause_dispatcher(sema: &Sema, ast_pool: AstPool, pool: InternPool, 
         // #D5/P1: share-place (value_ref_abi) params are borrows — not callee-dropped.
         // A move-self receiver is owned (§9.5/#D5) and dropped by the callee.
         let clause_share_place = sig_idx >= 0 and sema.sig_param_uses_value_ref_abi(sig_idx, pi) != 0 and not clause_move_self
-        if sema.is_copy_frozen(p_ty) == 0 and not clause_borrowed_receiver and not clause_share_place:
+        if not builder.copy_is_bits(p_ty) and not clause_borrowed_receiver and not clause_share_place:
             builder.schedule_drop(local_id, DropKind.DK_VALUE)
         param_locals.push(local_id)
     builder.body.n_params = param_count
