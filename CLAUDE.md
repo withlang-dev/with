@@ -296,6 +296,53 @@ physical ABI is indirect. See `docs/meetings/2026-07-06-D6-fnabi-is-the-single-a
 
 ---
 
+## Ceremony is a design defect, not a user error
+
+With's first law is that the user never writes what the compiler knows. Code
+that exists only to satisfy the compiler is evidence the language is wrong
+somewhere, and it is your job to notice it and raise it, not to write more of
+it.
+
+**The test.** For any token you write or encounter, ask: *would a person
+reading this think it means something?* If the honest answer is "no, it's
+there because the compiler requires it," you have found ceremony.
+
+**Signals that always trigger the test:**
+- `.clone()`, `copy`, `move`, an explicit `&`, an `as` cast, `Some(...)`,
+  `let _ =`, or a type annotation written only to make code compile.
+- A compiler error on code a person would consider obviously correct ("use of
+  moved value" on a lookup key, a cast on `len()` used as an index).
+- A rule you have to explain with "because of how X is represented" rather
+  than "because the program means Y."
+- The same fact encoded in two or more places (passes, tables, files), so
+  that adding a case means updating all of them.
+- A comment explaining a workaround for the language rather than the
+  program's intent.
+- A fix that leaves users or future agents with something to remember.
+
+**What to do.** Stop and raise it before writing more code in that pattern. A
+ceremony report is not a ruling request. It's always welcome, and you should
+send it even mid-task. Give:
+1. The code, as a person would read it.
+2. Why it exists (the rule or representation forcing it).
+3. Which law it violates.
+4. How many times the pattern occurs in the tree (count it).
+5. What the code would look like if the language were right, and what would
+   have to change.
+
+Do not copy a ceremonial pattern from neighboring code because it's local
+precedent. Precedent is evidence of how long the defect has gone unraised,
+not of what's correct. If you are about to write the same workaround a second
+time, that's a report.
+
+**The backstop: the ceremony census.** `tools/ceremony_census.w` counts the
+known ceremony patterns across the tree and `build/ceremony-census.tsv`
+records the counts. `src/main build :ceremony-census` (in the gate) fails
+when a count rises above the record; a PR that raises one updates the record
+and says why in its description, and a PR that lowers one lowers the record
+(`with run tools/ceremony_census.w --write`). A report that identifies a new
+pattern adds it to the census.
+
 ## No Silent Fallbacks
 
 When code can't be correctly generated, the only acceptable behavior is to fail
