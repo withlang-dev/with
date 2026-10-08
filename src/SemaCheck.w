@@ -19171,10 +19171,15 @@ impl Sema:
         let start = self.ast.get_data1(node)
         let end = self.ast.get_data2(node)
         let arr_type = self.check_expr(expr)
-        if start != 0:
-            self.check_expr(start)
-        if end != 0:
-            self.check_expr(end)
+        // A bound is an owned demand for its integer (D22 §6.2), as in
+        // check_range: an element view `let at = cuts[i]` used as `s[at..]`
+        // reached codegen as the pointer.
+        for bound in [start, end]:
+            if bound == 0: continue
+            let bound_ty = self.check_expr(bound) as i32
+            let bound_value = self.shared_copy_pointee(bound_ty)
+            if bound_value != 0:
+                let _ = self.record_contextual_copy_adjustment(bound, bound_value, bound_ty)
 
         if arr_type == 0:
             return 0
