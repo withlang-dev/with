@@ -10071,7 +10071,9 @@ impl MirBuilder:
         if value_expr != 0:
             self.cancel_scheduled_value_drop_for_receiver_expr(value_expr)
         let ret_op_raw = if value_expr != 0:
-            self.lower_expr(value_expr)
+            // D111: a returned local is its last use, as a block tail is.
+            let returned = self.lower_expr(value_expr)
+            self.tail_local_moves_out(returned, value_expr)
         else if ret_ty > 0 and ret_ty != self.sema.ty_void as i32:
             // Bare `return` in a value-returning fn yields the implicit
             // default (spec: implicit default return) — a unit operand

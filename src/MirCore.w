@@ -2485,6 +2485,11 @@ fn mir_copy_into_consuming_param(mir_mod: &MirModule, body: &MirBody, bb: i32, d
         let op = body.call_arg_operands[start + ai]
         if op < 0 or op >= body.operand_kinds.len() or body.operand_kinds[op] != OperandKind.OK_COPY:
             continue
+        // D111: a copy that carries a hold is its own owner — a retain is
+        // one more holder, a take blanks the source — so the callee and this
+        // body each drop their own. An unheld copy is still two owners.
+        if body.operand_hold(op) != 0:
+            continue
         let place = body.operand_d0[op]
         if place < 0 or place >= body.place_locals.len() or body.place_proj_counts[place] != 0:
             continue
