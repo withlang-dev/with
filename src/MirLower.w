@@ -4705,7 +4705,7 @@ impl MirBuilder:
         let place = self.place_for_local(temp)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rv, self.ast.get_start(node))
         self.set_string_local_flags(temp, 2)
-        if self.sema.is_copy_frozen(ty) != 0:
+        if self.copy_is_bits(ty):
             return self.body.new_operand(OperandKind.OK_COPY, place)
         self.body.new_operand(OperandKind.OK_MOVE, place)
 
@@ -5110,7 +5110,7 @@ impl MirBuilder:
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rv, self.ast.get_start(node))
         if op == BinaryOp.OP_CONCAT and self.type_id_is_str(ty) != 0:
             self.set_string_local_flags(temp, 2)
-        if self.sema.is_copy_frozen(ty) != 0:
+        if self.copy_is_bits(ty):
             return self.body.new_operand(OperandKind.OK_COPY, place)
         self.body.new_operand(OperandKind.OK_MOVE, place)
 
@@ -6180,7 +6180,7 @@ impl MirBuilder:
         self.lower_vec_literal_push(vec_place, first_elem, elem_ty)
         if second_elem != 0:
             self.lower_vec_literal_push(vec_place, second_elem, elem_ty)
-        if self.sema.is_copy_frozen(vec_ty) != 0:
+        if self.copy_is_bits(vec_ty):
             return self.body.new_operand(OperandKind.OK_COPY, vec_place)
         self.body.new_operand(OperandKind.OK_MOVE, vec_place)
 
@@ -6285,7 +6285,7 @@ impl MirBuilder:
             let elem_op = self.lower_expr(elem_node)
             self.expected_type = saved_expected
             self.emit_btree_set_insert(out_place, elem_op, elem_node)
-        if self.sema.is_copy_frozen(target_ty) != 0:
+        if self.copy_is_bits(target_ty):
             return self.body.new_operand(OperandKind.OK_COPY, out_place)
         self.body.new_operand(OperandKind.OK_MOVE, out_place)
 
@@ -6313,7 +6313,7 @@ impl MirBuilder:
             let val_op = self.lower_expr(val_node)
             self.expected_type = saved_expected
             self.emit_btree_map_insert(out_place, key_op, val_op, key_node)
-        if self.sema.is_copy_frozen(target_ty) != 0:
+        if self.copy_is_bits(target_ty):
             return self.body.new_operand(OperandKind.OK_COPY, out_place)
         self.body.new_operand(OperandKind.OK_MOVE, out_place)
 
@@ -6339,7 +6339,7 @@ impl MirBuilder:
         // builds the aggregate in its place and states the elision.
         self.body.note_elided_call_node(node)
         self.emit_btree_new_into(out_place, target_ty, self.ast.get_start(node))
-        if self.sema.is_copy_frozen(target_ty) != 0:
+        if self.copy_is_bits(target_ty):
             return self.body.new_operand(OperandKind.OK_COPY, out_place)
         self.body.new_operand(OperandKind.OK_MOVE, out_place)
 
@@ -6357,7 +6357,7 @@ impl MirBuilder:
         self.body.set_call_intrinsic(args_id, intrinsic)
         self.body.set_call_ast_node(args_id, node)
         self.switch_to(next_bb)
-        if self.sema.is_copy_frozen(ret_type) != 0:
+        if self.copy_is_bits(ret_type):
             return self.body.new_operand(OperandKind.OK_COPY, result_place)
         self.body.new_operand(OperandKind.OK_MOVE, result_place)
 
@@ -7670,7 +7670,7 @@ impl MirBuilder:
         if self.last_if_result_view != 0:
             return self.body.new_operand(OperandKind.OK_COPY, result_place)
         self.register_stmt_temp(result_local, result_ty)
-        if self.sema.is_copy_frozen(result_ty) != 0:
+        if self.copy_is_bits(result_ty):
             return self.body.new_operand(OperandKind.OK_COPY, result_place)
         self.body.new_operand(OperandKind.OK_MOVE, result_place)
 
@@ -7726,7 +7726,7 @@ impl MirBuilder:
         self.switch_to(join_bb)
         self.forget_string_flow_facts()
         self.register_stmt_temp(result_local, result_ty)
-        if self.sema.is_copy_frozen(result_ty) != 0:
+        if self.copy_is_bits(result_ty):
             return self.body.new_operand(OperandKind.OK_COPY, result_place)
         self.body.new_operand(OperandKind.OK_MOVE, result_place)
 
@@ -9139,7 +9139,7 @@ impl MirBuilder:
             self.emit_vec_new_into(out_place, self.ast.get_start(comp_node))
         self.lower_comprehension_clause(comp_node, 0, out_place, elem_ty)
 
-        if self.sema.is_copy_frozen(out_ty) != 0:
+        if self.copy_is_bits(out_ty):
             return self.body.new_operand(OperandKind.OK_COPY, out_place)
         self.body.new_operand(OperandKind.OK_MOVE, out_place)
 
@@ -11558,7 +11558,7 @@ impl MirBuilder:
         self.forget_string_flow_facts()
         if result_is_void != 0:
             return self.unit_operand()
-        if self.sema.is_copy_frozen(result_ty) != 0:
+        if self.copy_is_bits(result_ty):
             return self.body.new_operand(OperandKind.OK_COPY, result_place)
         self.body.new_operand(OperandKind.OK_MOVE, result_place)
 
@@ -11605,7 +11605,7 @@ impl MirBuilder:
         self.terminate(TermKind.TK_CALL, math_unit, math_args_id, math_place, math_next)
         self.switch_to(math_next)
         self.register_stmt_temp(math_local, ret_type_id)
-        if self.sema.is_copy_frozen(ret_type_id) != 0:
+        if self.copy_is_bits(ret_type_id):
             return self.body.new_operand(OperandKind.OK_COPY, math_place)
         self.body.new_operand(OperandKind.OK_MOVE, math_place)
 
@@ -11730,7 +11730,7 @@ impl MirBuilder:
 
         if conv_sym != 0:
             return self.lower_value_conversion(conv_sym, result_place, node)
-        if self.sema.is_copy_frozen(actual_ret_type_id) != 0:
+        if self.copy_is_bits(actual_ret_type_id):
             return self.body.new_operand(OperandKind.OK_COPY, result_place)
         self.body.new_operand(OperandKind.OK_MOVE, result_place)
 
@@ -11860,7 +11860,7 @@ impl MirBuilder:
         self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
         self.switch_to(next_bb)
         self.register_stmt_temp(result_local, actual_ret_type_id)
-        if self.sema.is_copy_frozen(actual_ret_type_id) != 0:
+        if self.copy_is_bits(actual_ret_type_id):
             return self.body.new_operand(OperandKind.OK_COPY, result_place)
         self.body.new_operand(OperandKind.OK_MOVE, result_place)
 
@@ -11914,7 +11914,7 @@ impl MirBuilder:
         self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
         self.switch_to(next_bb)
         self.register_stmt_temp(result_local, actual_ret_type_id)
-        if self.sema.is_copy_frozen(actual_ret_type_id) != 0:
+        if self.copy_is_bits(actual_ret_type_id):
             return self.body.new_operand(OperandKind.OK_COPY, result_place)
         self.body.new_operand(OperandKind.OK_MOVE, result_place)
 
@@ -12726,7 +12726,7 @@ impl MirBuilder:
         // #693 (secondary): the constructed variant is OWNED by this temp — a
         // Drop-payload enum must MOVE into its destination; Copy stays for
         // Copy enums only, matching every other result-operand site.
-        if self.sema.is_copy_frozen(result_ty) != 0:
+        if self.copy_is_bits(result_ty):
             return self.body.new_operand(OperandKind.OK_COPY, place)
         self.body.new_operand(OperandKind.OK_MOVE, place)
 
@@ -13628,7 +13628,7 @@ impl MirBuilder:
 
         self.switch_to(join_bb)
         self.forget_string_flow_facts()
-        if self.sema.is_copy_frozen(result_ty) != 0:
+        if self.copy_is_bits(result_ty):
             return self.body.new_operand(OperandKind.OK_COPY, result_place)
         self.body.new_operand(OperandKind.OK_MOVE, result_place)
 
@@ -13752,7 +13752,7 @@ impl MirBuilder:
         self.switch_to(join_bb)
         self.mark_local_value_moved(dq_scrut_local)
         self.forget_string_flow_facts()
-        if self.sema.is_copy_frozen(result_ty) != 0:
+        if self.copy_is_bits(result_ty):
             return self.body.new_operand(OperandKind.OK_COPY, result_place)
         self.body.new_operand(OperandKind.OK_MOVE, result_place)
 
@@ -14836,7 +14836,7 @@ impl MirBuilder:
         self.switch_to(join_bb)
         self.mark_local_value_moved(uo_scrut_local)
         self.forget_string_flow_facts()
-        if self.sema.is_copy_frozen(result_ty) != 0:
+        if self.copy_is_bits(result_ty):
             return self.body.new_operand(OperandKind.OK_COPY, result_place)
         self.body.new_operand(OperandKind.OK_MOVE, result_place)
 
@@ -15316,9 +15316,12 @@ impl MirBuilder:
         let op_kind = if self.sema.is_copy_frozen(type_id) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE
         self.body.new_operand(op_kind, place)
 
+    // A call result is fresh and used once: it moves out, unless a copy of
+    // it is plain bits (D111: a copied str would retain what its temp's drop
+    // then releases — the right count, for nothing).
     mut fn call_result_operand(local: i32, place: i32, type_id: i32) -> i32:
         self.register_stmt_temp(local, type_id)
-        self.operand_for_place(place, type_id)
+        self.body.new_operand(if self.copy_is_bits(type_id): OperandKind.OK_COPY else: OperandKind.OK_MOVE, place)
 
     mut fn lower_call_with_operand_args(fn_op: i32, args: &Vec[i32], ret_type: i32, node: i32) -> i32:
         for ai in 0..args.len():
@@ -15331,7 +15334,7 @@ impl MirBuilder:
         self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
         self.switch_to(next_bb)
         self.register_stmt_temp(result_local, ret_type)
-        if self.sema.is_copy_frozen(ret_type) != 0:
+        if self.copy_is_bits(ret_type):
             return self.body.new_operand(OperandKind.OK_COPY, result_place)
         self.body.new_operand(OperandKind.OK_MOVE, result_place)
 
@@ -15412,7 +15415,7 @@ impl MirBuilder:
         self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
         self.switch_to(next_bb)
         self.register_stmt_temp(result_local, ret_type)
-        if self.sema.is_copy_frozen(ret_type) != 0:
+        if self.copy_is_bits(ret_type):
             return self.body.new_operand(OperandKind.OK_COPY, result_place)
         self.body.new_operand(OperandKind.OK_MOVE, result_place)
 
@@ -15436,7 +15439,7 @@ impl MirBuilder:
         self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
         self.switch_to(next_bb)
         self.register_stmt_temp(result_local, ret_type)
-        if self.sema.is_copy_frozen(ret_type) != 0:
+        if self.copy_is_bits(ret_type):
             return self.body.new_operand(OperandKind.OK_COPY, result_place)
         self.body.new_operand(OperandKind.OK_MOVE, result_place)
 
@@ -15801,7 +15804,7 @@ impl MirBuilder:
 
         self.switch_to(join_bb)
         self.forget_string_flow_facts()
-        if self.sema.is_copy_frozen(result_ty) != 0:
+        if self.copy_is_bits(result_ty):
             return self.body.new_operand(OperandKind.OK_COPY, result_place)
         self.body.new_operand(OperandKind.OK_MOVE, result_place)
 
