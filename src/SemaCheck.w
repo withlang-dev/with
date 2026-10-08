@@ -15932,7 +15932,12 @@ impl Sema:
         let temp_ty = self.view_into_temporary_type(node)
         if temp_ty == 0: return 0
         let temp_name = self.type_name(temp_ty)
-        self.emit_error(what ++ " a view into a temporary `" ++ temp_name ++ "` that is freed when this statement ends (§21.1); bind the `" ++ temp_name ++ "` first, or take an owned value (`.clone()`)", node)
+        // A Copy value (an i32, a str under D111) is copied by an owned
+        // demand (D22 §6.2): the annotation, never a `.clone()`.
+        let viewed = self.recorded_expr_type_or_zero(node)
+        let owned = if viewed != 0: self.auto_deref_ref_ptr_type(self.resolve_alias(viewed as TypeId)) as i32 else: 0
+        let remedy = if owned != 0 and self.is_copy(owned as TypeId) != 0: f"or demand an owned `{self.type_name(owned)}` (`: {self.type_name(owned)}` on the binding or the return) to copy it" else: "or take an owned value (`.clone()`)"
+        self.emit_error(what ++ " a view into a temporary `" ++ temp_name ++ "` that is freed when this statement ends (§21.1); bind the `" ++ temp_name ++ "` first, " ++ remedy, node)
         1
 
     // Rule 10: a variant whose type says nothing (`Option[fn() -> i32]`)
