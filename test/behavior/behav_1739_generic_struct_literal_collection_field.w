@@ -24,12 +24,12 @@ impl[K, V] Tally[K, V]:
 fn count_all[T](xs: Vec[T]) -> i64: xs.len()
 
 fn main:
-    let st = Stack { items: ["p".clone(), "q".clone()] }
+    let st = Stack { items: ["p", "q"] }
     print(f"{st.count()} {st.first()}{st.items[1]}")
     let nums = Stack { items: [1, 2, 3] }
     var sum = 0
     for n in nums.items: sum = sum + n
     print(f"{nums.count()} {sum}")
-    let t = Tally { seen: [2: "b".clone(), 1: "a".clone()], total: 0 }
+    let t = Tally { seen: [2: "b", 1: "a"], total: 0 }
     print(f"{t.size()} {t.seen.get(1).unwrap() == \"a\"}")
-    print(f"{count_all([\"a\".clone(), \"b\".clone()])} {[1, 2, 3] |> count_all()}")
+    print(f"{count_all([\"a\", \"b\"])} {[1, 2, 3] |> count_all()}")

@@ -5,8 +5,8 @@
 
 fn mkv() -> Vec[str]:
     var v: Vec[str] = Vec.new()
-    v.push("alpha".clone())
-    v.push("beta".clone())
+    v.push("alpha")
+    v.push("beta")
     v
 
 fn joins(c: bool) -> i64:
@@ -16,9 +16,9 @@ fn joins(c: bool) -> i64:
     let o = if c: Some(v[1]) else: None
     let y = o ?? v[0]
     var n = x.len() + (t.0).len() + (t.1).len() + y.len()
-    let kept = if c: v[0].clone() else: v[1].clone()
+    let kept: str = if c: v[0] else: v[1]
     for i in 0..64:
-        v.push("gamma".clone())
+        v.push("gamma")
     n = n + kept.len() + v.len()
     n
 

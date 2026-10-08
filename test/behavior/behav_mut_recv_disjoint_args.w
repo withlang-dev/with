@@ -25,12 +25,12 @@ fn main:
     let b = Acc { buf: "wxyz", n: 7 }
 
     // Sibling binding's field: disjoint; cloned because `add` consumes.
-    let r1 = a.add(b.buf.clone())
+    let r1 = a.add(b.buf)
     assert(r1 == 4)
 
     // An owned copy of the receiver's own field: nothing of `a` is retained
     // across the call.
-    let piece = a.buf.clone()
+    let piece: str = a.buf
     let r2 = a.add(piece)
     assert(r2 == 3)
 

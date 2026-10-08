@@ -32,15 +32,15 @@ const WIDE = 70
 fn show(n: i32, first: &str, last: &str): print(f"{n} {first} {last}")
 
 fn fills(s: &str):
-    let a64 = [s.clone(); 64]
+    let a64: [str; 64] = [s; 64]
     show(64, a64[0], a64[63])
-    let a65 = [s.clone(); 65]
+    let a65: [str; 65] = [s; 65]
     show(65, a65[0], a65[64])
-    let a100 = [s.clone(); 100]
+    let a100: [str; 100] = [s; 100]
     show(100, a100[0], a100[99])
-    let a1000 = [s.clone(); 1000]
+    let a1000: [str; 1000] = [s; 1000]
     show(1000, a1000[0], a1000[999])
-    let w = [s.clone(); WIDE]
+    let w: [str; WIDE] = [s; WIDE]
     print(f"const {WIDE} {w[WIDE - 1]}")
 
 fn toks():

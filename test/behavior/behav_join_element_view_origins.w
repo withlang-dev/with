@@ -17,15 +17,15 @@
 
 fn mkv() -> Vec[str]:
     var v: Vec[str] = Vec.new()
-    v.push("a".clone())
-    v.push("b".clone())
+    v.push("a")
+    v.push("b")
     v
 
 fn joined_then_mutated(c: bool):
     var v = mkv()
-    let x = if c: v[0] else: v[1]
+    let x: str = if c: v[0] else: v[1]
     print(x)
-    v.push("q".clone())
+    v.push("q")
     print(v.len())
 
 fn matched_then_mutated(k: i32):
@@ -34,7 +34,7 @@ fn matched_then_mutated(k: i32):
         0 => v[0]
         _ => v[1]
     print(x)
-    v.push("q".clone())
+    v.push("q")
     print(v.len())
 
 fn arm_block_tail(c: bool):
@@ -74,8 +74,8 @@ fn pick_arm_block(v: &Vec[str], c: bool) -> &str:
 
 fn cloned_across_mutation(c: bool):
     var v = mkv()
-    let x = if c: v[0].clone() else: v[1].clone()
-    v[0] = "q".clone()
+    let x: str = if c: v[0] else: v[1]
+    v[0] = "q"
     print(f"{x} {v[0]}")
 
 fn copy_join(c: bool):
