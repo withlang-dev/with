@@ -662,6 +662,15 @@ impl MirBuilder:
     fn carrier_read_kind(read_ty: i32, carrier_ty: i32) -> i32:
         if self.copy_is_bits(read_ty) or (self.sema.is_copy_frozen(read_ty as TypeId) != 0 and self.carrier_copies(carrier_ty)): OperandKind.OK_COPY else: OperandKind.OK_MOVE
 
+    // A pattern binding over an observed subject (`match m:` on a place)
+    // copies a Copy payload with its own hold; the subject keeps its own.
+    fn pattern_read_kind(read_ty: i32, carrier_ty: i32) -> i32:
+        if self.pattern_subject_observed != 0 and self.sema.is_copy_frozen(read_ty as TypeId) != 0: OperandKind.OK_COPY else: self.carrier_read_kind(read_ty, carrier_ty)
+
+    // The whole subject bound by name (`s =>`, `s @ ...`): same rule.
+    fn pattern_whole_read_kind(ty: i32) -> i32:
+        if self.type_needs_value_drop(ty) == 0 or (self.pattern_subject_observed != 0 and self.sema.is_copy_frozen(ty as TypeId) != 0): OperandKind.OK_COPY else: OperandKind.OK_MOVE
+
     mut fn mark_carrier_consumed(local: i32):
         if local >= 0 and not self.carrier_copies(self.local_type(local)):
             self.mark_local_value_moved(local)
@@ -7102,14 +7111,18 @@ impl MirBuilder:
                 let obs_cont_bb = self.new_block()
                 self.pattern_subject_observed = 1
                 self.lower_pattern_match(observed_place, pat, obs_success_bb, obs_fail_bb)
-                self.switch_to(obs_success_bb)
-                self.lower_let_pattern_bindings(node, pat, observed_place)
+                // The failing path first, as below (#1365): a binding's drop
+                // (a str under D111) is scheduled only on the success path.
                 self.pattern_subject_observed = saved_observed
-                self.terminate(TermKind.TK_GOTO, obs_cont_bb, 0, 0, 0)
                 self.switch_to(obs_fail_bb)
                 let obs_move_state = self.save_move_state()
                 self.lower_let_else_branch(else_body)
                 self.restore_move_state(&obs_move_state)
+                self.switch_to(obs_success_bb)
+                self.pattern_subject_observed = 1
+                self.lower_let_pattern_bindings(node, pat, observed_place)
+                self.pattern_subject_observed = saved_observed
+                self.terminate(TermKind.TK_GOTO, obs_cont_bb, 0, 0, 0)
                 self.switch_to(obs_cont_bb)
             return
         let rhs_reset_start = self.pending_reset_locals.len() as i32
@@ -11087,7 +11100,7 @@ impl MirBuilder:
             self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, self.ast.get_start(pat_node))
             if self.type_needs_value_drop(bind_ty) != 0:
                 self.schedule_drop(local_id, DropKind.DK_VALUE)
-            let src_op = self.body.new_operand(if self.type_needs_value_drop(bind_ty) == 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, scrutinee_place)
+            let src_op = self.body.new_operand(self.pattern_whole_read_kind(bind_ty), scrutinee_place)
             let local_place = self.place_for_local(local_id)
             self.bind_pattern_value(local_place, src_op, self.ast.get_start(pat_node))
             out.push(local_id)
@@ -11102,7 +11115,7 @@ impl MirBuilder:
             self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, outer_local, 0, self.ast.get_start(pat_node))
             if self.type_needs_value_drop(outer_ty) != 0:
                 self.schedule_drop(outer_local, DropKind.DK_VALUE)
-            let outer_op = self.body.new_operand(if self.type_needs_value_drop(outer_ty) == 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, scrutinee_place)
+            let outer_op = self.body.new_operand(self.pattern_whole_read_kind(outer_ty), scrutinee_place)
             let outer_place = self.place_for_local(outer_local)
             self.bind_pattern_value(outer_place, outer_op, self.ast.get_start(pat_node))
             out.push(outer_local)
@@ -11188,7 +11201,7 @@ impl MirBuilder:
                 self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, self.ast.get_start(pat_node))
                 if not self.copy_is_bits(bind_ty):
                     self.schedule_drop(local_id, DropKind.DK_VALUE)
-                let src_op = self.body.new_operand(self.carrier_read_kind(bind_ty, self.local_type(self.place_base_local(child_place))), child_place)
+                let src_op = self.body.new_operand(self.pattern_read_kind(bind_ty, self.local_type(self.place_base_local(child_place))), child_place)
                 let local_place = self.place_for_local(local_id)
                 self.bind_pattern_value(local_place, src_op, self.ast.get_start(pat_node))
                 out.push(local_id)
@@ -11259,7 +11272,7 @@ impl MirBuilder:
                     self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, self.ast.get_start(pat_node))
                     if not self.copy_is_bits(bind_ty):
                         self.schedule_drop(local_id, DropKind.DK_VALUE)
-                    let src_op = self.body.new_operand(self.carrier_read_kind(bind_ty, self.local_type(self.place_base_local(child_place))), child_place)
+                    let src_op = self.body.new_operand(self.pattern_read_kind(bind_ty, self.local_type(self.place_base_local(child_place))), child_place)
                     let local_place = self.place_for_local(local_id)
                     self.bind_pattern_value(local_place, src_op, self.ast.get_start(pat_node))
                     out.push(local_id)
@@ -11357,7 +11370,7 @@ impl MirBuilder:
                 let local_id = self.body.new_local(sp_elem_ty, self.pattern_bind_mut, sym, 1)
                 self.bind_local(sym, local_id)
                 self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, self.ast.get_start(pat_node))
-                let src_op = self.body.new_operand(self.carrier_read_kind(sp_elem_ty, self.local_type(self.place_base_local(field_place))), field_place)
+                let src_op = self.body.new_operand(self.pattern_read_kind(sp_elem_ty, self.local_type(self.place_base_local(field_place))), field_place)
                 let local_place = self.place_for_local(local_id)
                 self.assign_operand_to_place(local_place, src_op, self.ast.get_start(pat_node))
                 out.push(local_id)
@@ -11384,7 +11397,7 @@ impl MirBuilder:
                 let local_id = self.body.new_local(sp_elem_ty, self.pattern_bind_mut, sym, 1)
                 self.bind_local(sym, local_id)
                 self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, self.ast.get_start(pat_node))
-                let src_op = self.body.new_operand(self.carrier_read_kind(sp_elem_ty, self.local_type(self.place_base_local(field_place))), field_place)
+                let src_op = self.body.new_operand(self.pattern_read_kind(sp_elem_ty, self.local_type(self.place_base_local(field_place))), field_place)
                 let local_place = self.place_for_local(local_id)
                 self.assign_operand_to_place(local_place, src_op, self.ast.get_start(pat_node))
                 out.push(local_id)
@@ -11424,7 +11437,7 @@ impl MirBuilder:
         else if kind != NodeKind.NK_FIELD_ACCESS and kind != NodeKind.NK_INDEX:
             return -1
         let ty = self.expr_type(expr)
-        if ty == 0 or self.sema.is_copy_frozen(ty) != 0:
+        if ty == 0 or self.copy_is_bits(ty):
             return -1
         let tk = self.sema.get_type_kind(self.sema.resolve_alias(ty as TypeId))
         if tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR:
