@@ -8376,7 +8376,7 @@ impl MirBuilder:
         let used_codes = child.gen_loop_used_codes
         let exit_labels = mir_clone_i32_vec(&child.gen_loop_exit_labels)
         let exit_kinds = mir_clone_i32_vec(&child.gen_loop_exit_kinds)
-        child.body = mir_mark_last_use_holds(child.sema, move child.body)
+        child.body = mir_mark_last_use_holds(move child.body)
         var finished = LoweredFunction { body: move child.body, anonymous_bodies: move child.anonymous_bodies }
         self.anonymous_bodies.push(move finished.body)
         while finished.anonymous_bodies.len() > 0:
@@ -15727,7 +15727,7 @@ impl MirBuilder:
         child.pop_scope_inline()
         child.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
         child.verify_goto_labels()
-        child.body = mir_mark_last_use_holds(child.sema, move child.body)
+        child.body = mir_mark_last_use_holds(move child.body)
         var finished = LoweredFunction { body: move child.body, anonymous_bodies: move child.anonymous_bodies }
         self.anonymous_bodies.push(move finished.body)
         while finished.anonymous_bodies.len() > 0:
@@ -17502,7 +17502,7 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> Lowered
     // D32: field vacates need a mutable path — rebind the owned param.
     var owned_builder = builder
     owned_builder.verify_goto_labels()
-    owned_builder.body = mir_mark_last_use_holds(owned_builder.sema, move owned_builder.body)
+    owned_builder.body = mir_mark_last_use_holds(move owned_builder.body)
     LoweredFunction { body: move owned_builder.body, anonymous_bodies: move owned_builder.anonymous_bodies }
 
 fn lower_fn_clause_dispatcher(sema: &Sema, ast_pool: AstPool, pool: InternPool, group: i32) -> MirBody:
