@@ -52,11 +52,11 @@ fn tracked_files() -> Vec[str]:
         if counted(path): files.push(path.clone())
     files
 
-type Census { counts: BTreeMap[str, i32] }
+type Census { counts: BTreeMap[str, i64] }
 
 impl Census:
     mut fn bump(key: str):
-        let now = self.counts.get(key) ?? &0
+        let now = self.counts.get(key) ?? 0
         self.counts.insert(key, now + 1)
 
     mut fn count_lexical(path: &str):
@@ -90,11 +90,11 @@ fn typed_sites(compiler: &str) -> str:
         exit_code(2)
     read_file("out/ceremony-typed.txt") ?? ""
 
-fn read_record() -> HashMap[str, i32]:
-    var record: HashMap[str, i32] = HashMap.new()
+fn read_record() -> HashMap[str, i64]:
+    var record: HashMap[str, i64] = HashMap.new()
     for line in (read_file(RECORD) ?? "").split("\n"):
         let cols = line.split("\t")
-        if cols.len() == 3: record.insert(f"{cols[0]}\t{cols[1]}", parse(cols[2]))
+        if cols.len() == 3: record.insert(f"{cols[0]}\t{cols[1]}", string_to_int(cols[2]))
     record
 
 fn main:
@@ -137,7 +137,7 @@ fn main:
     let record = read_record()
     var off = 0
     for (key, now) in census.counts:
-        let was = record.get(key) ?? &0
+        let was = record.get(key) ?? 0
         if now > was:
             off = off + 1
             eprint(f"ceremony-census: {key.replace("\t", " in ")} rose {was} -> {now}; remove the new ceremony, or raise the record (--write) and say why in the PR")
