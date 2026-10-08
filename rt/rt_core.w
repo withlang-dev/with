@@ -868,8 +868,11 @@ fn alloc_header_ptr(ptr: *const u8) -> *mut u8:
 fn alloc_payload_size(ptr: *const u8) -> i64:
     unsafe *(alloc_header_ptr(ptr) as *const i64)
 
+// The header's second word is a str buffer's holder count (D111, see
+// with_str_retain); a recycled block's count starts over at zero.
 fn alloc_store_small_header(block: i64, size: i64):
     unsafe *(block as *mut i64) = size
+    unsafe *((block + 8) as *mut i64) = 0
 
 // Reset-on-move drop guard (spec §2.5.1). Returns 1 if all `size` bytes at `ptr`
 // are zero (the reset sentinel), else 0. The compiler emits a call to this in
