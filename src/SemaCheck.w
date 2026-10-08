@@ -12,6 +12,7 @@ use InternPool
 use TypeLayout
 use render
 use MathBuiltins
+use BuiltinSigs
 use std.builtins.int_to_string
 use std.regex.Regex
 use SemaTypes
@@ -1343,6 +1344,24 @@ impl Sema:
         self.check_borrow_create(arg_node, BorrowKind.SHARED, arg_node)
         self.auto_ref_payload_args.insert(arg_node, 1)
         true
+
+    // D110: a hash collection's key argument against its declared parameter
+    // (BuiltinSigs): `&K` when the method observes it, `K` when it stores it.
+    mut fn check_builtin_key_arg(call_name: &str, recv_type: i32, call_node: i32, arg_index: i32, actual: i32, arg_node: i32) -> i32:
+        let key_ty = self.get_generic_inst_arg(recv_type, 0)
+        if key_ty == 0 or actual == 0:
+            return 1
+        let expected = if self.builtin_row_observed(self.builtin_call_sig(call_node), arg_index) == 1: self.ensure_exact_type(TypeKind.TY_REF, key_ty, 0, 0) as i32 else: key_ty
+        self.check_builtin_method_call_arg(call_name, arg_index, expected, actual, arg_node)
+
+    // D110: increment/decrement/update observe their key and take their own
+    // copy of it only when they insert it, so the key must be a value they can
+    // copy: no destructor, or `str`.
+    mut fn check_inserted_key_copy(call_name: &str, recv_type: i32, node: i32):
+        let key_ty = self.get_generic_inst_arg(recv_type, 0)
+        if key_ty == 0 or self.get_type_kind(self.resolve_alias(key_ty as TypeId)) == TypeKind.TY_STR or self.type_needs_drop(key_ty) == 0:
+            return
+        self.emit_error(f"{call_name} copies its key when it inserts it, and `{self.type_name(key_ty)}` is not a value it can copy; use `entry(key)`", node)
 
     mut fn check_builtin_method_call_arg(call_name: &str, arg_index: i32, expected: i32, actual: i32, arg_node: i32) -> i32:
         if expected == 0 or actual == 0:
@@ -7561,6 +7580,73 @@ impl Sema:
     // the answer (it types these calls by the same table); MIR and codegen
     // read it — MirLower through classify_intrinsic, codegen through the
     // per-call record (method_intrinsic_in_body).
+    // D110: load BuiltinSigs once. Each row is indexed by (owner symbol,
+    // method symbol) and its parameter modes are computed here, once. The
+    // owner aliases map a receiver to the owner its methods are declared
+    // under: the iterator adapters to `Iter`, `ScopedTask` to `Task`, and each
+    // primitive type kind (keyed by its negated TypeKind) to `str`, `array`,
+    // `int` or `float`. The float math methods (MathBuiltins) share one row
+    // that takes every operand.
+    mut fn load_builtin_sigs():
+        var row_index = 0
+        for row in builtin_sig_table():
+            self.builtin_sig_index.insert((self.pool_intern(row.owner), self.pool_intern(row.method)), row_index)
+            self.builtin_sig_modes.push(builtin_param_modes(row.params))
+            row_index = row_index + 1
+        self.builtin_sig_index.insert((self.pool_intern("float"), 0), row_index)
+        self.builtin_sig_modes.push("tttt")
+        let iter = self.pool_intern("Iter")
+        for name in "VecIter VecIterRef MappedIter FilterIter FilterMapIter TakeIter DropIter TakeWhileIter DropWhileIter ZipIter EnumerateIter ChainIter ZipWithIter StepByIter FlatMapIter".split(" "):
+            self.builtin_sig_owner_alias.insert(self.pool_intern(name), iter)
+        self.builtin_sig_owner_alias.insert(self.pool_intern("ScopedTask"), self.pool_intern("Task"))
+        self.builtin_sig_owner_alias.insert(-(TypeKind.TY_STR as i32), self.pool_intern("str"))
+        self.builtin_sig_owner_alias.insert(-(TypeKind.TY_ARRAY as i32), self.pool_intern("array"))
+        self.builtin_sig_owner_alias.insert(-(TypeKind.TY_SLICE as i32), self.pool_intern("array"))
+        self.builtin_sig_owner_alias.insert(-(TypeKind.TY_INT as i32), self.pool_intern("int"))
+        self.builtin_sig_owner_alias.insert(-(TypeKind.TY_FLOAT as i32), self.pool_intern("float"))
+
+    // D110: the BuiltinSigs row `recv.method` is declared by, or -1.
+    mut fn builtin_sig_row_for(recv_type: i32, method: i32) -> i32:
+        if recv_type == 0:
+            return -1
+        if self.builtin_sig_modes.len() == 0:
+            self.load_builtin_sigs()
+        let resolved = self.auto_deref_ref_ptr_type(self.resolve_alias(recv_type as TypeId))
+        let tk = self.get_type_kind(resolved)
+        let named = if tk == TypeKind.TY_STR or tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE or tk == TypeKind.TY_INT or tk == TypeKind.TY_FLOAT: -(tk as i32) else: self.get_type_name(resolved)
+        if named == 0:
+            return -1
+        let owner = self.builtin_sig_owner_alias.get(named) ?? &named
+        if tk == TypeKind.TY_FLOAT and math_fn_lookup(self.pool_resolve(method)) >= 0:
+            return self.builtin_sig_index.get((owner, 0)) ?? &-1
+        match self.builtin_sig_index.get((owner, method)):
+            Some(row) => row
+            None =>
+                // `FixedString[N]` instances are named `FixedString__N`.
+                let fixed = self.pool_intern("FixedString")
+                if self.builtin_sig_index.contains((fixed, method)) and self.pool_resolve(named).starts_with("FixedString"): self.builtin_sig_index.get((fixed, method)) ?? &-1 else: -1
+
+    // D110: resolve builtin call `node` to its declared signature once, when
+    // Sema checks it; MIR lowering reads the row from the node.
+    mut fn record_builtin_call_sig(node: i32, recv_type: i32, method: i32) -> i32:
+        let row = self.builtin_sig_row_for(recv_type, method)
+        if row >= 0:
+            self.builtin_call_sigs.insert(node, row)
+        row
+
+    // The row call `node` resolved to, or -1.
+    pub fn builtin_call_sig(node: i32) -> i32: self.builtin_call_sigs.get(node) ?? &-1
+
+    // D110: argument `i` of a call resolved to `row` — 1 observed (`&T`), 0
+    // taken, -1 when there is no row or no such parameter.
+    pub fn builtin_row_observed(row: i32, i: i32) -> i32:
+        if row < 0 or i < 0 or i >= self.builtin_sig_modes[row].len(): -1 else: if self.builtin_sig_modes[row].byte_at(i) == 'o': 1 else: 0
+
+    // D110: whether a call resolved to `row` stores argument `i`: taken as one
+    // of the receiver's type parameters.
+    fn builtin_row_stored(row: i32, i: i32) -> bool:
+        row >= 0 and i >= 0 and i < self.builtin_sig_modes[row].len() and self.builtin_sig_modes[row].byte_at(i) == 's'
+
     fn builtin_method_intrinsic(recv_type: i32, method_name: &str) -> MirIntrinsic:
         if recv_type == 0 or method_name.len() == 0:
             return MirIntrinsic.NONE
@@ -30326,72 +30412,11 @@ impl Sema:
         // check_join_arg_at_ref_param (#1754).
         if self.type_is_dyn_object(self.resolve_alias(param_ty as TypeId) as i32) != 0: 0 else: param_ty
 
-    fn method_arg_stores_value(recv_type: i32, field: i32, arg_index: i32) -> i32:
-        if recv_type == 0:
-            return 0
-        var resolved = self.resolve_alias(recv_type as TypeId)
-        resolved = self.auto_deref_ref_ptr_type(resolved) as TypeId
-        let rtk = self.get_type_kind(resolved)
-        // A container receiver may be a full GENERIC_INST (Vec[View]) or a bare /
-        // element-erased container type (an inferred `var v = Vec.new()` before its
-        // element binds). Extract the base symbol from either — the storing-method
-        // classification only needs the base, not the element type.
-        let owner_sym = if rtk == TypeKind.TY_GENERIC_INST:
-            self.get_generic_inst_base(resolved as i32)
-        else if rtk == TypeKind.TY_STRUCT:
-            self.get_type_d0(resolved)
-        else:
-            0
-        if owner_sym == 0:
-            return 0
-        let method_name = self.pool_resolve(field)
-        if owner_sym == self.syms.vec:
-            if field == self.syms.push and arg_index == 0:
-                return 1
-        if owner_sym == self.syms.hashset:
-            if field == self.syms.insert and arg_index == 0:
-                return 1
-        if owner_sym == self.syms.hashmap:
-            if field == self.syms.insert and (arg_index == 0 or arg_index == 1):
-                return 1
-            if method_name == "update" and (arg_index == 0 or arg_index == 1):
-                return 1
-        if owner_sym == self.syms.hashmapentry:
-            if field == self.syms.or_insert and arg_index == 0:
-                return 1
-            if method_name == "set" and arg_index == 0:
-                return 1
-        if owner_sym == self.syms.slotmap:
-            if field == self.syms.insert and arg_index == 0:
-                return 1
-            if field == self.syms.replace and arg_index == 1:
-                return 1
-        if owner_sym == self.syms.slotmapslot and method_name == "set" and arg_index == 0:
-            return 1
-        if self.pool_resolve(owner_sym) == "Sender" and method_name == "send" and arg_index == 0:
-            return 1
-        if self.method_arg_stores_through_shared_receiver(recv_type, field, arg_index):
-            return 1
-        0
-
-    // #2265: the builtin container arguments a call consumes without storing:
-    // the owned key of HashMap.remove/increment/decrement and the owned
-    // element of HashSet.remove (their declared parameter is `K`/`T`, and MIR
-    // lowers it as a move). A plain named argument is moved like any owned
-    // parameter, so a later use is "use of moved value"; without the mark
-    // it compiled clean and read the move-blanked string (the migrator's
-    // macro capture stored every macro under the key "").
-    fn method_arg_consumes_key(recv_type: i32, field: i32, arg_index: i32) -> bool:
-        if recv_type == 0 or arg_index != 0:
-            return false
-        let resolved = self.auto_deref_ref_ptr_type(self.resolve_alias(recv_type as TypeId)) as TypeId
-        let owner_sym = if self.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST: self.get_generic_inst_base(resolved as i32)
-            else if self.get_type_kind(resolved) == TypeKind.TY_STRUCT: self.get_type_d0(resolved)
-            else: 0
-        let method_name = self.pool_resolve(field)
-        if owner_sym == self.syms.hashmap:
-            return field == self.syms.remove or method_name == "increment" or method_name == "decrement"
-        owner_sym == self.syms.hashset and field == self.syms.remove
+    // D110: a builtin stores an argument its declared signature takes as one
+    // of the receiver's type parameters (BuiltinSigs); a std.sync interior
+    // store keeps its own rule (#1778).
+    fn method_arg_stores_value(sig_row: i32, recv_type: i32, field: i32, arg_index: i32) -> i32:
+        if self.builtin_row_stored(sig_row, arg_index) or self.method_arg_stores_through_shared_receiver(recv_type, field, arg_index): 1 else: 0
 
     // #1778: the stores std.sync makes through a `&self` receiver — interior
     // mutability (`Mutex.set`, `RwLock.write`): the value goes into the
@@ -31804,6 +31829,9 @@ impl Sema:
         // against its own signature as a C function pointer (SemaFacade.w).
         let facade_pair_cb_arg = self.facade_pair_callback_arg(obj_type as i32, field, mc_resolved_arg_count)
         let facade_pair_ud_arg = self.facade_pair_userdata_arg(obj_type as i32, field, mc_resolved_arg_count)
+        // D110: the builtin's declared signature, resolved once for this call;
+        // the argument checks below and MIR lowering read the row.
+        let mc_sig_row = self.record_builtin_call_sig(node, obj_type as i32, field)
         for ai in 0..mc_resolved_arg_count:
             let mc_arg_node = if mc_has_resolved_args != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(extra_start + ai)
             if mc_arg_node == 0:
@@ -31894,16 +31922,15 @@ impl Sema:
                     let mc_recv_tk = self.get_type_kind(mc_recv_num)
                     if (mc_recv_tk == TypeKind.TY_INT or mc_recv_tk == TypeKind.TY_FLOAT) and self.int_narrowing_requires_cast(mc_expected as TypeId, mc_arg_ty as TypeId) != 0:
                         self.emit_error("min/max operands must be the same type; use an explicit `as` cast", mc_arg_node)
-            if self.method_arg_stores_value(obj_type as i32, field, ai) != 0:
+            if self.method_arg_stores_value(mc_sig_row, obj_type as i32, field, ai) != 0:
                 // #1827: the container owns it now; it drops it (§2.4).
                 self.global_consumed_args.insert(mc_arg_node, 1)
                 self.check_ephemeral_task_storage(mc_arg_node, "generic container")
                 // Container stores take ownership of their element just like an
-                // owned function parameter. Builtins have no ordinary signature
-                // for finalize_call_site_ownership to inspect, so enforce D5 at
-                // this semantic boundary instead of silently moving a plain named
-                // binding in MIR. Rvalues need no spelling; `copy` keeps the
-                // source; `move` is invalidated by check_expr itself.
+                // owned function parameter. A builtin's signature is declared in
+                // BuiltinSigs (D110), which finalize_call_site_ownership does not
+                // read, so the move is marked here. Rvalues need no spelling;
+                // `copy` keeps the source; `move` is invalidated by check_expr itself.
                 // #714 (D5 supersession, spec §3.8): "a plain call f(x) is always
                 // legal and means whatever the signature says." A store consumes;
                 // mark the binding moved — the same transition `move x` performs —
@@ -31925,12 +31952,6 @@ impl Sema:
                 // a method, `self.v.push(x)` into the caller's place).
                 if mc_arg_ty as i32 != 0:
                     self.note_view_store(expr, mc_arg_node, mc_arg_ty as i32, mc_expected as i32, node, "this call")
-            if self.method_arg_consumes_key(obj_type as i32, field, ai):
-                let mc_key_arg_kind = self.ast.kind(mc_arg_node)
-                if mc_key_arg_kind != NodeKind.NK_MOVE_ARG and mc_key_arg_kind != NodeKind.NK_COPY_ARG and self.is_copy(mc_arg_ty as TypeId) == 0:
-                    let mc_key_root = self.place_root_sym(mc_arg_node)
-                    if mc_key_root != 0 and self.scope_has(mc_key_root) != 0:
-                        self.mark_moved_if_consumed(mc_arg_node)
             let mc_sender_elem_ty = self.sender_send_element_type(obj_type as i32, field, ai)
             if mc_sender_elem_ty != 0:
                 if mc_arg_ty as i32 != 0 and self.types_compatible(mc_sender_elem_ty, mc_arg_ty as i32) == 0 and self.arithmetic_result_type(mc_sender_elem_ty, mc_arg_ty as i32) == 0:
@@ -32536,37 +32557,18 @@ impl Sema:
                     if elem_ty != 0 and a0_ty != 0:
                         let elem_ref_ty = self.ensure_exact_type(TypeKind.TY_REF, elem_ty, 0, 0) as i32
                         let _ = self.check_builtin_method_call_arg(mc_call_name, 0, elem_ref_ty, a0_ty, self.ast.get_extra(extra_start))
-            else if type_name_sym == self.syms.hashmap and (field == self.syms.get or field == self.syms.contains):
-                // D22: HashMap.get/contains(key: &K) observe — arg[0] is &K;
+            else if type_name_sym == self.syms.hashmap and (field == self.syms.get or field == self.syms.contains or field == self.syms.remove or mc_method_name_raw == "increment" or mc_method_name_raw == "decrement"):
+                // D110: the key in its declared mode (BuiltinSigs): a `&K` probe;
                 // an owned argument auto-refs at the call site.
                 if arg_count >= 1:
-                    let key_ty = self.get_generic_inst_arg(recv_type, 0)
-                    let a0_ty = arg_types[0]
-                    if key_ty != 0 and a0_ty != 0:
-                        let key_ref_ty = self.ensure_exact_type(TypeKind.TY_REF, key_ty, 0, 0) as i32
-                        let _ = self.check_builtin_method_call_arg(mc_call_name, 0, key_ref_ty, a0_ty, self.ast.get_extra(extra_start))
-            else if type_name_sym == self.syms.hashmap and field == self.syms.remove:
-                // D22: remove(key: K) is the ownership-transfer operation —
-                // arg[0] stays owned K.
-                if arg_count >= 1:
-                    let key_ty = self.get_generic_inst_arg(recv_type, 0)
-                    let a0_ty = arg_types[0]
-                    if key_ty != 0 and a0_ty != 0:
-                        let _ = self.check_builtin_method_call_arg(mc_call_name, 0, key_ty, a0_ty, self.ast.get_extra(extra_start))
-            else if type_name_sym == self.syms.hashmap and (mc_method_name_raw == "increment" or mc_method_name_raw == "decrement"):
-                // HashMap.increment/decrement(key: K) — arg[0] must be K
-                if arg_count >= 1:
-                    let inc_key_ty = self.get_generic_inst_arg(recv_type, 0)
-                    let inc_a0_ty = arg_types[0]
-                    if inc_key_ty != 0 and inc_a0_ty != 0:
-                        let _ = self.check_builtin_method_call_arg(mc_call_name, 0, inc_key_ty, inc_a0_ty, self.ast.get_extra(extra_start))
+                    let _ = self.check_builtin_key_arg(mc_call_name, recv_type, node, 0, arg_types[0], self.ast.get_extra(extra_start))
+                if mc_method_name_raw == "increment" or mc_method_name_raw == "decrement":
+                    self.check_inserted_key_copy(mc_call_name, recv_type, node)
             else if type_name_sym == self.syms.hashmap and mc_method_name_raw == "update":
-                // HashMap.update(key: K, default: V, f: fn(V) -> V)
+                // HashMap.update(key: &K, default: V, f: fn(V) -> V)
                 if arg_count >= 1:
-                    let update_key_ty = self.get_generic_inst_arg(recv_type, 0)
-                    let update_a0_ty = arg_types[0]
-                    if update_key_ty != 0 and update_a0_ty != 0:
-                        let _ = self.check_builtin_method_call_arg(mc_call_name, 0, update_key_ty, update_a0_ty, self.ast.get_extra(extra_start))
+                    let _ = self.check_builtin_key_arg(mc_call_name, recv_type, node, 0, arg_types[0], self.ast.get_extra(extra_start))
+                self.check_inserted_key_copy(mc_call_name, recv_type, node)
                 if arg_count >= 2:
                     let update_val_ty = self.get_generic_inst_arg(recv_type, 1)
                     let update_a1_ty = arg_types[1]
@@ -32582,12 +32584,9 @@ impl Sema:
                         if update_val_ty2 != 0 and updater_ret_ty != 0 and self.builtin_arg_type_compatible(update_val_ty2, updater_ret_ty) == 0:
                             self.emit_argument_type_mismatch(mc_call_name, 0, 2, 2, update_val_ty2, updater_ret_ty, self.ast.get_extra(extra_start + 2))
             else if type_name_sym == self.syms.hashset and (field == self.syms.insert or field == self.syms.contains or field == self.syms.remove):
-                // HashSet.insert/contains/remove(value: T) — arg[0] must be T
+                // D110: insert(value: T) stores it; contains/remove(value: &T) observe.
                 if arg_count >= 1:
-                    let elem_ty = self.get_generic_inst_arg(recv_type, 0)
-                    let a0_ty = arg_types[0]
-                    if elem_ty != 0 and a0_ty != 0:
-                        let _ = self.check_builtin_method_call_arg(mc_call_name, 0, elem_ty, a0_ty, self.ast.get_extra(extra_start))
+                    let _ = self.check_builtin_key_arg(mc_call_name, recv_type, node, 0, arg_types[0], self.ast.get_extra(extra_start))
             else if type_name_sym == self.syms.slotmap:
                 let sm_elem_ty = self.get_generic_inst_arg(recv_type, 0)
                 let sm_handle_ty = self.ensure_handle_type_for(sm_elem_ty)

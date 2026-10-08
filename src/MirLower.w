@@ -13088,18 +13088,19 @@ impl MirBuilder:
             self.mark_string_place_copied(place)
         self.body.new_operand(OperandKind.OK_COPY, place)
 
-    // #747: str reader intrinsics observe their needle/delim/pattern
-    // arguments — the runtime reads the bytes transiently and every result
-    // is an independent owned value (rt copies; no view returns), so the
-    // caller keeps ownership. The checker already models these as borrows
-    // (only method_arg_stores_value args consume); consuming them in MIR was
-    // the same moved-arg-reset class as extern str args.
-    fn str_intrinsic_observer_arg(intrinsic: MirIntrinsic, i: i32) -> i32:
-        if i == 0 and (intrinsic == MirIntrinsic.STR_CONTAINS or intrinsic == MirIntrinsic.STR_STARTS_WITH or intrinsic == MirIntrinsic.STR_ENDS_WITH or intrinsic == MirIntrinsic.STR_FIND or intrinsic == MirIntrinsic.STR_INDEX_OF or intrinsic == MirIntrinsic.STR_SPLIT):
-            return 1
-        if (i == 0 or i == 1) and intrinsic == MirIntrinsic.STR_REPLACE:
-            return 1
-        0
+    // D110: one builtin argument in the mode its declared signature states
+    // (BuiltinSigs): a `&T` parameter is a probe the runtime reads and the
+    // caller keeps (#747: a moved str key read empty after the first lookup);
+    // a plain one moves in. `sig_row` is the row Sema resolved the call to.
+    mut fn lower_builtin_arg(sig_row: i32, recv_type: i32, method_sym: i32, arg_node: i32, i: i32) -> i32:
+        let observed = self.sema.builtin_row_observed(sig_row, i)
+        if observed < 0:
+            sema_phase_bug(f"BUG: builtin method `{self.sema.pool_resolve(method_sym)}` argument {i} reached MIR with no declared signature (Sema resolves the BuiltinSigs row when it checks the call, D110)")
+        if observed == 1:
+            return self.lower_observer_probe_arg(arg_node)
+        let arg_op = self.lower_method_arg_with_expected(recv_type, method_sym, arg_node, i)
+        self.consume_moved_operand(arg_op)
+        arg_op
 
     // `recv.is_empty()` as `recv.len() == 0`, through the receiver's own len
     // intrinsic, so both backends lower it the way they lower `len()`.
@@ -13158,20 +13159,9 @@ impl MirBuilder:
                 if intrinsic != MirIntrinsic.FIBER_CANCEL and not channel_endpoint_method:
                     self.consume_moved_operand(recv_op)
                 call_args.push(recv_op)
+        let sig_row = self.sema.builtin_call_sig(node)
         for i in 0..arg_count:
-            let arg_node = self.ast.get_extra(arg_start + i)
-            // D22: get/contains observe their key/probe argument — the runtime
-            // reads it transiently and the caller keeps ownership. Never lower
-            // it as a consuming move (#747: a moved str key was blanked after
-            // the first lookup, so every later use of the key read empty).
-            // #747: str reader needles (contains/starts_with/…/replace/split)
-            // are the same observer class.
-            if (i == 0 and (intrinsic == MirIntrinsic.MAP_GET or intrinsic == MirIntrinsic.MAP_CONTAINS or intrinsic == MirIntrinsic.VEC_CONTAINS)) or self.str_intrinsic_observer_arg(intrinsic, i) != 0:
-                call_args.push(self.lower_observer_probe_arg(arg_node))
-                continue
-            let arg_op = self.lower_method_arg_with_expected(recv_type_for_args, method_sym, arg_node, i)
-            self.consume_moved_operand(arg_op)
-            call_args.push(arg_op)
+            call_args.push(self.lower_builtin_arg(sig_row, recv_type_for_args, method_sym, self.ast.get_extra(arg_start + i), i))
         if intrinsic == MirIntrinsic.OPT_UNWRAP or intrinsic == MirIntrinsic.OPT_EXPECT:
             call_args.push(self.source_location_operand(node))
         // §14.17.1 (#1861): an Atomic method's omitted ordering is SeqCst.
@@ -15233,14 +15223,9 @@ impl MirBuilder:
         let call_args: Vec[i32] = Vec.new()
         self.consume_moved_operand(recv_op)
         call_args.push(recv_op)
+        let sig_row = self.sema.builtin_call_sig(node)
         for ai in 0..arg_count:
-            // #747: str reader needles observe (see str_intrinsic_observer_arg).
-            if self.str_intrinsic_observer_arg(intrinsic, ai) != 0:
-                call_args.push(self.lower_observer_probe_arg(self.ast.get_extra(arg_start + ai)))
-                continue
-            let arg_op = self.lower_method_arg_with_expected(recv_type, method_sym, self.ast.get_extra(arg_start + ai), ai)
-            self.consume_moved_operand(arg_op)
-            call_args.push(arg_op)
+            call_args.push(self.lower_builtin_arg(sig_row, recv_type, method_sym, self.ast.get_extra(arg_start + ai), ai))
 
         let args_id = self.body.new_call_args(call_args)
         self.body.set_call_ast_node(args_id, node)

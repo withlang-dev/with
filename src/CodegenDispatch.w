@@ -10191,9 +10191,8 @@ impl Codegen:
                 if rm_key_llvm == 0: args.push(is_str_val)
                 let found = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 4)
                 if rm_key_llvm != 0:
+                    // The stored key drops; the probe is the caller's (D110).
                     self.mir_emit_drop_ptr_for_sema_type(stored_key_alloca, rm_key_llvm, rm_key_sema)
-                    // `remove(key: K)` consumes its key: the probe is dropped too.
-                    self.mir_emit_drop_ptr_for_sema_type(key_alloca, rm_key_llvm, rm_key_sema)
                 let val = wl_build_load(self.builder, val_ty, out_alloca)
                 var dest_llvm = self.get_or_create_option_type(0, val_ty)
                 if dest_llvm != 0:
@@ -10209,7 +10208,6 @@ impl Codegen:
                 let raw = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 4)
                 if rm_key_llvm != 0:
                     self.mir_emit_drop_ptr_for_sema_type(stored_key_alloca, rm_key_llvm, rm_key_sema)
-                    self.mir_emit_drop_ptr_for_sema_type(key_alloca, rm_key_llvm, rm_key_sema)
                 result = wl_build_icmp(self.builder, wl_int_ne(), raw, wl_const_int(wl_i32_type(self.context), 0, 0))
 
         else if intrinsic == MirIntrinsic.MAP_CLEAR:
@@ -12296,7 +12294,8 @@ impl Codegen:
             let upd_updated_raw = wl_build_call(self.builder, upd_call_ty, upd_fn_ptr, vec_data_i64(&upd_call_args), upd_call_args.len() as i32)
             let upd_updated = if wl_type_of(upd_updated_raw) != upd_val_ty: self.coerce_value_to_type(upd_updated_raw, upd_val_ty) else: upd_updated_raw
             wl_build_store(self.builder, upd_updated, upd_val_alloca)
-            let upd_insert_fn = self.ensure_hm_fn("with_hashmap_insert", wl_void_type(self.context))
+            // D110: update observes its key; an absent key goes in as the map's copy.
+            let upd_insert_fn = self.ensure_hm_fn("with_hashmap_put_copy_key", wl_void_type(self.context))
             let upd_insert_ty = wl_function_type(wl_void_type(self.context), vec_data_i64(&upd_hm_params), 4, 0)
             let upd_insert_args: Vec[i64] = Vec.new()
             upd_insert_args.push(upd_map_ptr)

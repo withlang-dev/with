@@ -1652,6 +1652,14 @@ pub type Sema {
     method_owner_keys: HashMap[i32, i32],
     // #2043: each builtin call's CallBuiltin, by call node.
     call_builtins: HashMap[i32, i32],
+    // D110: the builtin methods' declared signatures (BuiltinSigs.w), loaded
+    // once: (owner sym, method sym) -> row, each row's parameter modes, the
+    // receiver type names that share an owner (the iterator adapters), and
+    // the row each checked builtin call resolved to (call node -> row).
+    builtin_sig_index: HashMap[(i32, i32), i32],
+    builtin_sig_modes: Vec[str],
+    builtin_sig_owner_alias: HashMap[i32, i32],
+    builtin_call_sigs: HashMap[i32, i32],
     // D109: each `offsetof[T](field)` call's field index in T's declaration,
     // by call node (Law 3: Sema names the field; codegen reads the layout).
     offsetof_field_indices: HashMap[i32, i32],
@@ -3565,6 +3573,10 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         embed_file_contents: HashMap.new(),
         method_owner_keys: sema_new_map_i32_i32(),
         call_builtins: sema_new_map_i32_i32(),
+        builtin_sig_index: HashMap.new(),
+        builtin_sig_modes: sema_new_vec_str(),
+        builtin_sig_owner_alias: sema_new_map_i32_i32(),
+        builtin_call_sigs: sema_new_map_i32_i32(),
         offsetof_field_indices: sema_new_map_i32_i32(),
         offsetof_owner_types: sema_new_map_i32_i32(),
         method_intrinsics: sema_new_map_i64_i32(),

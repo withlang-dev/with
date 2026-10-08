@@ -4068,17 +4068,38 @@ pub fn with_hashmap_free(map: *mut u8):
     rt_free_sized(hm_index(m) as *mut u8, hm_icap(m) * 4)
     rt_free_sized(map, HM_SIZE)
 
-pub fn with_hashmap_increment(map: *mut u8, key: *const u8, is_str_key: i64):
-    var val: i64 = 0
-    let _ = with_hashmap_get(map, key, &val as *mut u8, is_str_key)
-    val = val + 1
-    with_hashmap_insert(map, key, &val as *const u8, is_str_key)
+// D110: insert `val` under an observed key: a present key's value is replaced
+// where it stands; an absent key goes in as the map's own copy (a str key's
+// bytes are copied; Sema admits only str or drop-free keys here). Raw words,
+// not a str binding: the map owns the copy, nothing here drops it.
+pub fn with_hashmap_put_copy_key(map: *mut u8, key: *const u8, val: *const u8, is_str_key: i64):
+    if is_str_key == 0 or with_hashmap_get_ptr(map, key, is_str_key) as i64 != 0:
+        with_hashmap_insert(map, key, val, is_str_key)
+        return
+    let len = unsafe *((key as i64 + 8) as *const i64)
+    let bytes = rt_alloc(len + 1)
+    rt_memcpy(bytes, unsafe *(key as *const *const u8), len)
+    unsafe *((bytes as i64 + len) as *mut u8) = 0
+    let key_copy: [2]i64 = [bytes as i64, len]
+    with_hashmap_insert(map, &raw const key_copy as *const u8, val, 1)
 
-pub fn with_hashmap_decrement(map: *mut u8, key: *const u8, is_str_key: i64):
+// D110: increment/decrement observe their key: a present key's count moves
+// where it stands; an absent one is inserted under the map's own copy.
+fn hm_add_count(map: *mut u8, key: *const u8, delta: i64, is_str_key: i64):
+    let m = map as i64
+    let slot_val = with_hashmap_get_ptr(map, key, is_str_key)
     var val: i64 = 0
-    let _ = with_hashmap_get(map, key, &val as *mut u8, is_str_key)
-    val = val - 1
-    with_hashmap_insert(map, key, &val as *const u8, is_str_key)
+    if slot_val as i64 != 0:
+        rt_memcpy(&raw mut val as *mut u8, slot_val as *const u8, hm_val_size(m))
+        val = val + delta
+        rt_memcpy(slot_val, &raw const val as *const u8, hm_val_size(m))
+        return
+    val = delta
+    with_hashmap_put_copy_key(map, key, &raw const val as *const u8, is_str_key)
+
+pub fn with_hashmap_increment(map: *mut u8, key: *const u8, is_str_key: i64): hm_add_count(map, key, 1, is_str_key)
+
+pub fn with_hashmap_decrement(map: *mut u8, key: *const u8, is_str_key: i64): hm_add_count(map, key, -1, is_str_key)
 
 // ── StringBuilder ──────────────────────────────────────────────────
 //
