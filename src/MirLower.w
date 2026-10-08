@@ -645,6 +645,11 @@ impl MirBuilder:
     // subject is not a plain local (nothing of ours was scheduled).
     mut fn retire_decomposed_carrier(value_place: i32) -> i32:
         let local = mir_place_plain_local(&self.body, value_place)
+        // D111: a Copy carrier with drop glue (an Option[str]) had its payload
+        // copied out with its own hold, so the carrier still holds one and
+        // keeps its drop.
+        if local >= 0 and not self.copy_is_bits(self.local_type(local)) and self.sema.is_copy_frozen(self.local_type(local) as TypeId) != 0:
+            return local
         if local >= 0:
             self.cancel_stmt_temp_for_local(local)
             self.cancel_scheduled_value_drop_for_local(local)
