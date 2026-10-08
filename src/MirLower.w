@@ -13193,7 +13193,9 @@ impl MirBuilder:
                 else:
                     recv_op = self.lower_receiver_with_method_autoderef_for_method(self_expr, method_sym)
                 let channel_endpoint_method = intrinsic == MirIntrinsic.CHAN_SEND or intrinsic == MirIntrinsic.CHAN_RECV or intrinsic == MirIntrinsic.CHAN_CLOSE
-                if intrinsic != MirIntrinsic.FIBER_CANCEL and not channel_endpoint_method:
+                // A builtin reads its receiver in place (D110): only a move
+                // receiver transfers, so a copied one takes no hold.
+                if intrinsic != MirIntrinsic.FIBER_CANCEL and not channel_endpoint_method and self.body.operand_kinds[recv_op] == OperandKind.OK_MOVE:
                     self.consume_moved_operand(recv_op)
                 call_args.push(recv_op)
         let sig_row = self.sema.builtin_call_sig(node)
@@ -15258,7 +15260,9 @@ impl MirBuilder:
     mut fn lower_intrinsic_call_with_receiver_operand(intrinsic: MirIntrinsic, recv_op: i32, recv_type: i32, method_sym: i32, arg_start: i32, arg_count: i32, ret_type: i32, node: i32) -> i32:
         let fn_op = self.const_operand(ConstKind.CK_FN, method_sym, self.sema.ty_void)
         let call_args: Vec[i32] = Vec.new()
-        self.consume_moved_operand(recv_op)
+        // A builtin reads its receiver in place (D110): a copy takes no hold.
+        if self.body.operand_kinds[recv_op] == OperandKind.OK_MOVE:
+            self.consume_moved_operand(recv_op)
         call_args.push(recv_op)
         let sig_row = self.sema.builtin_call_sig(node)
         for ai in 0..arg_count:
