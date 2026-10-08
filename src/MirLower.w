@@ -643,12 +643,22 @@ impl MirBuilder:
     // unwrap_or and unwrap_or_else: `read_file(p).unwrap_or("")` returned a
     // str over a freed buffer). Returns the subject's local, or -1 when the
     // subject is not a plain local (nothing of ours was scheduled).
+    // D111: an eliminator's subject that is Copy with drop glue (an
+    // Option[str]) holds its own count: its payload is copied out with
+    // another, so the subject is neither retired nor marked moved — it drops
+    // like any statement temp, and a named one stays its binding's.
+    fn carrier_copies(ty: i32) -> bool: self.sema.is_copy_frozen(ty as TypeId) != 0 and not self.copy_is_bits(ty)
+
+    mut fn mark_carrier_consumed(local: i32):
+        if local >= 0 and not self.carrier_copies(self.local_type(local)):
+            self.mark_local_value_moved(local)
+
     mut fn retire_decomposed_carrier(value_place: i32) -> i32:
         let local = mir_place_plain_local(&self.body, value_place)
         // D111: a Copy carrier with drop glue (an Option[str]) had its payload
         // copied out with its own hold, so the carrier still holds one and
         // keeps its drop.
-        if local >= 0 and not self.copy_is_bits(self.local_type(local)) and self.sema.is_copy_frozen(self.local_type(local) as TypeId) != 0:
+        if local >= 0 and self.carrier_copies(self.local_type(local)):
             return local
         if local >= 0:
             self.cancel_stmt_temp_for_local(local)
@@ -7134,7 +7144,7 @@ impl MirBuilder:
         if le_scrut_local >= 0:
             self.cancel_stmt_temp_for_local(le_scrut_local)
             self.cancel_scheduled_value_drop_for_local(le_scrut_local)
-            self.mark_local_value_moved(le_scrut_local)
+            self.mark_carrier_consumed(le_scrut_local)
         self.cancel_scheduled_value_drop_for_receiver_expr(rhs)
         let branch_move_state = self.save_move_state()
 
@@ -7711,7 +7721,7 @@ impl MirBuilder:
         if iflet_scrut_local >= 0:
             self.cancel_stmt_temp_for_local(iflet_scrut_local)
             self.cancel_scheduled_value_drop_for_local(iflet_scrut_local)
-            self.mark_local_value_moved(iflet_scrut_local)
+            self.mark_carrier_consumed(iflet_scrut_local)
         self.cancel_scheduled_value_drop_for_receiver_expr(scrutinee_expr)
 
         self.switch_to(join_bb)
@@ -11438,7 +11448,7 @@ impl MirBuilder:
             if match_scrut_local >= 0:
                 self.cancel_stmt_temp_for_local(match_scrut_local)
                 self.cancel_scheduled_value_drop_for_local(match_scrut_local)
-                self.mark_local_value_moved(match_scrut_local)
+                self.mark_carrier_consumed(match_scrut_local)
             self.cancel_scheduled_value_drop_for_receiver_expr(scrutinee_expr)
 
         let match_entry_bb = self.cur_bb as i32
@@ -13736,7 +13746,7 @@ impl MirBuilder:
         // A Copy subject has nothing to drop: a drop of it made it owned
         // storage to the ownership validator, which then found it Init at
         // return on the success path when this default diverges.
-        if mir_place_plain_local(&self.body, value_place) >= 0 and self.sema.type_needs_drop_frozen(value_ty) != 0:
+        if mir_place_plain_local(&self.body, value_place) >= 0 and self.sema.type_needs_drop_frozen(value_ty) != 0 and not self.carrier_copies(value_ty):
             self.emit_drop_stmt(value_place, "coalesce-default", self.ast.get_start(expr))
         let dq_scrut_local = self.retire_decomposed_carrier(value_place)
         // #772: a lazy-arm frame + divergence guard, exactly like lower_if's
@@ -13751,7 +13761,7 @@ impl MirBuilder:
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
         self.switch_to(join_bb)
-        self.mark_local_value_moved(dq_scrut_local)
+        self.mark_carrier_consumed(dq_scrut_local)
         self.forget_string_flow_facts()
         if self.copy_is_bits(result_ty):
             return self.body.new_operand(OperandKind.OK_COPY, result_place)
@@ -13792,6 +13802,12 @@ impl MirBuilder:
 
     mut fn lower_owned_receiver_place(self_expr: i32, value_ty: i32) -> i32:
         let source_place = self.lower_expr_place(self_expr)
+        // D111: a Copy receiver with drop glue is copied in with its own hold;
+        // the source keeps its value.
+        if self.carrier_copies(value_ty):
+            let copy_op = self.body.new_operand(OperandKind.OK_COPY, source_place)
+            self.body.set_operand_hold(copy_op, MIR_HOLD_RETAIN)
+            return self.materialize_operand(copy_op, value_ty, self.ast.get_start(self_expr))
         let value_op = self.body.new_operand(OperandKind.OK_MOVE, source_place)
         // #724 acceptance chase: an UNREGISTERED move leaves the source's
         // scheduled drop live — r.err() extracted the payload while r's
@@ -14825,7 +14841,7 @@ impl MirBuilder:
         // the failure path, nothing moved out: drop what is left (an Err
         // payload, or nothing) once, and retire the subject's own drop.
         self.switch_to(none_bb)
-        if mir_place_plain_local(&self.body, value_place) >= 0:
+        if mir_place_plain_local(&self.body, value_place) >= 0 and not self.carrier_copies(value_ty):
             self.emit_drop_stmt(value_place, "unwrap-or-default", self.ast.get_start(node))
         let uo_scrut_local = self.retire_decomposed_carrier(value_place)
         let uo_arm = self.begin_lazy_arm()
@@ -14835,7 +14851,7 @@ impl MirBuilder:
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
         self.switch_to(join_bb)
-        self.mark_local_value_moved(uo_scrut_local)
+        self.mark_carrier_consumed(uo_scrut_local)
         self.forget_string_flow_facts()
         if self.copy_is_bits(result_ty):
             return self.body.new_operand(OperandKind.OK_COPY, result_place)
@@ -14916,7 +14932,7 @@ impl MirBuilder:
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
         self.switch_to(join_bb)
-        self.mark_local_value_moved(uoe_scrut_local)
+        self.mark_carrier_consumed(uoe_scrut_local)
         self.forget_string_flow_facts()
         self.operand_for_place(result_place, result_ty)
 
