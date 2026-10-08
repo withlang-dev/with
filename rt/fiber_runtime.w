@@ -41,8 +41,9 @@ type RawStr:
 
 pub fn make_str(ptr: *const u8, len: i64) -> str:
     let raw = RawStr { ptr: ptr, len: len }
-    let p = &raw as *const str
-    unsafe *p
+    // D111: built from its parts, not copied out of memory: a raw-pointer
+    // read of a str is a copy, one more holder, and these parts hold nothing.
+    unsafe { transmute[str](raw) }
 
 var last_await_fiber_id: i32 = 0
 var last_await_cancelled_return: i32 = 0

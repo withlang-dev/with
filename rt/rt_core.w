@@ -513,8 +513,9 @@ fn str_length(s: &str): s.len()
 
 fn make_str(ptr: *const u8, len: i64) -> str:
     let raw = RawStr { ptr: ptr, len: len }
-    let p = &raw as *const str
-    unsafe *p
+    // D111: built from its parts, not copied out of memory: a raw-pointer
+    // read of a str is a copy, one more holder, and these parts hold nothing.
+    unsafe { transmute[str](raw) }
 
 fn cstr_len(s: *const u8) -> i64:
     if s as i64 == 0:
