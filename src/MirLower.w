@@ -16076,7 +16076,9 @@ impl MirBuilder:
             let place = self.lower_field_access(node)
             self.mark_string_place_copied(place)
             let fa_val_ty = self.expr_type(node)
-            if fa_val_ty != 0 and self.sema.type_needs_drop_frozen(fa_val_ty) != 0:
+            // D111: a Copy field with drop glue (a str) is copied; the consumer
+            // retains it. Only a non-Copy owned field moves out.
+            if fa_val_ty != 0 and self.sema.type_needs_drop_frozen(fa_val_ty) != 0 and self.sema.is_copy_frozen(fa_val_ty) == 0:
                 // #780: a field value read whose base chain passes through a
                 // shared borrow (&T param or & field) cannot move out — this
                 // frame doesn't own the place (an explicit `return fact.name`
