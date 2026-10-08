@@ -22,3 +22,5 @@ ref-at-ref-param	lib	5
 ref-at-ref-param	src	1838
 some-at-option-demand	lib	1
 some-at-option-demand	src	7
+str-clone	lib	4
+str-clone	src	501

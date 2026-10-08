@@ -124,7 +124,8 @@ fn main:
     for path in tracked_files(): census.count_lexical(path)
     for line in typed.split("\n"):
         let cols = line.split("\t")
-        if cols.len() == 3: census.bump(f"{cols[0]}\t{area_of(cols[1])}")
+        // Build-generated modules (out/gen) are not source anyone writes.
+        if cols.len() == 3 and not cols[1].starts_with("out/"): census.bump(f"{cols[0]}\t{area_of(cols[1])}")
     var text = ""
     for (key, n) in census.counts: text = text ++ f"{key}\t{n}\n"
     if write:
