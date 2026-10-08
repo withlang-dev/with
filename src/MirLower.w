@@ -977,18 +977,20 @@ impl MirBuilder:
     // drop theirs. The copy goes through VALUE_COPY, which retains, and the
     // consumer takes its result by move; the source keeps its own hold.
     mut fn retain_consumed_copy(operand_id: i32):
-        let place = self.body.operand_d0[operand_id]
+        let place: i32 = self.body.operand_d0[operand_id]
         let ty = if place >= 0 and place < self.body.place_sema_types.len(): self.body.place_sema_types[place] else: 0
         if ty <= 0 or self.sema.is_copy_frozen(ty as TypeId) == 0 or self.sema.type_needs_drop_frozen(ty) == 0:
             return
         let call_args: Vec[i32] = Vec.new()
-        call_args.push(self.body.new_operand(OperandKind.OK_COPY, place))
+        let source = self.body.new_operand(OperandKind.OK_COPY, place)
+        call_args.push(source)
         let args_id = self.body.new_call_args(call_args)
         let result_local = self.new_temp(ty)
         let result_place = self.place_for_local(result_local)
         let next_bb = self.new_block()
         self.body.set_call_intrinsic(args_id, MirIntrinsic.VALUE_COPY)
-        self.terminate(TermKind.TK_CALL, self.const_operand(ConstKind.CK_FN, 0, self.sema.ty_void), args_id, result_place, next_bb)
+        let fn_op = self.const_operand(ConstKind.CK_FN, 0, self.sema.ty_void)
+        self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
         self.switch_to(next_bb)
         self.register_stmt_temp(result_local, ty)
         // By move: consume_moved_operand goes on to mark the temp moved, so its

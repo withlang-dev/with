@@ -5869,7 +5869,9 @@ impl Codegen:
             for i in 0..self.sema.get_type_d1(resolved as TypeId):
                 let elem_sema = self.mir_project_field_sema_type(resolved, i)
                 if elem_sema > 0 and self.sema.type_needs_drop_frozen(elem_sema) != 0:
-                    self.mir_emit_copy_glue_ptr(self.tuple_elem_ptr(ty, ptr, i), self.mir_sema_type_to_llvm(elem_sema), elem_sema)
+                    let elem_ptr = self.tuple_elem_ptr(ty, ptr, i)
+                    let elem_llvm = self.mir_sema_type_to_llvm(elem_sema)
+                    self.mir_emit_copy_glue_ptr(elem_ptr, elem_llvm, elem_sema)
             return
         if tk == TypeKind.TY_ARRAY:
             let elem_sema = self.sema.get_type_d0(resolved as TypeId)
@@ -5887,7 +5889,10 @@ impl Codegen:
             let field_start: i32 = self.struct_field_starts[struct_idx]
             for fi in 0..self.struct_field_counts[struct_idx]:
                 let field_sema = self.mir_project_field_sema_type(resolved, self.struct_field_names[field_start + fi])
-                self.mir_emit_copy_glue_ptr(wl_build_struct_gep(self.builder, ty, ptr, self.get_llvm_field_index(ty, fi)), self.struct_field_types[field_start + fi], field_sema)
+                let field_index = self.get_llvm_field_index(ty, fi)
+                let field_ptr = wl_build_struct_gep(self.builder, ty, ptr, field_index)
+                let field_llvm: i64 = self.struct_field_types[field_start + fi]
+                self.mir_emit_copy_glue_ptr(field_ptr, field_llvm, field_sema)
             return
         if (tk == TypeKind.TY_ENUM or tk == TypeKind.TY_GENERIC_INST) and wl_get_type_kind(ty) == wl_struct_type_kind() and wl_count_struct_elem_types(ty) >= 2:
             self.mir_emit_copy_glue_enum_ptr(ptr, ty, resolved)
@@ -5914,10 +5919,14 @@ impl Codegen:
             wl_position_at_end(self.builder, case_bb)
             let payload_ty = self.mir_enum_variant_payload_llvm_type(enum_sema_ty, vi)
             if pc == 1:
-                self.mir_emit_copy_glue_ptr(data_ptr, payload_ty, self.mir_enum_payload_sema_type(enum_sema_ty, vi, 0))
+                let payload_sema = self.mir_enum_payload_sema_type(enum_sema_ty, vi, 0)
+                self.mir_emit_copy_glue_ptr(data_ptr, payload_ty, payload_sema)
             else if payload_ty != 0 and wl_get_type_kind(payload_ty) == wl_struct_type_kind():
                 for pf in 0..pc:
-                    self.mir_emit_copy_glue_ptr(self.tuple_elem_ptr(payload_ty, data_ptr, pf), self.tuple_elem_type(payload_ty, pf), self.mir_enum_payload_sema_type(enum_sema_ty, vi, pf))
+                    let field_ptr = self.tuple_elem_ptr(payload_ty, data_ptr, pf)
+                    let field_llvm = self.tuple_elem_type(payload_ty, pf)
+                    let field_sema = self.mir_enum_payload_sema_type(enum_sema_ty, vi, pf)
+                    self.mir_emit_copy_glue_ptr(field_ptr, field_llvm, field_sema)
             wl_build_br(self.builder, merge_bb)
             wl_position_at_end(self.builder, next_bb)
         wl_build_br(self.builder, merge_bb)
