@@ -24058,6 +24058,8 @@ impl Sema:
             return 0
         self.note_type_level_arg(type_arg_node, owner_ty)
         self.offsetof_field_indices.insert(node, field_index)
+        if self.current_specialization_sym == 0:
+            self.offsetof_owner_types.insert(node, owner_ty)
         self.typed_expr_types.insert(node, self.ty_i64 as i32)
         self.ty_i64 as i32
 
@@ -26656,6 +26658,14 @@ impl Sema:
     // resolves the same everywhere, so frozen resolution answers.
     // A body's type nodes a backend reads — a sizeof/alignof or transmute
     // type argument, an asm output type (#2043) — are this record.
+    // D109: the record an `offsetof[T](f)` call measures in body `body_sym`:
+    // a specialization's own instance, else the type Sema checked the call
+    // with.
+    fn offsetof_owner_in_body(body_sym: i32, node: i32, type_node: i32) -> i32:
+        if self.concrete_specialization_by_sym.contains(body_sym):
+            return self.specialization_type_args.get(sema_pair_key(body_sym, type_node)) ?? 0
+        self.offsetof_owner_types.get(node) ?? 0
+
     fn type_level_arg_in_body(body_sym: i32, type_node: i32) -> i32:
         if self.concrete_specialization_by_sym.contains(body_sym):
             return self.specialization_type_args.get(sema_pair_key(body_sym, type_node)) ?? 0

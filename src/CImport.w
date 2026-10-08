@@ -3205,31 +3205,51 @@ fn ci_offsetof_text_args(expr: &str) -> Vec[str]:
     out.push(designator)
     out
 
-// The With spelling of field `field`'s type in the record `record` names
-// (a tag, or a typedef of one resolved through typedefs, or a typedef of an
-// anonymous record), "" when the record has no such field. The record
-// index (#744) names the first DEFINITION of a tag: a forward declaration
-// of the same name has no fields (pcre2's `struct pcre2_real_match_data`).
-fn ci_record_field_type_spelling(session: i64, record: &str, field: &str) -> str:
+// The name c_import gives field `fi` of `count` (typed `ty`): a trailing
+// `[0]T` or `[1]T` array in a struct is the flexible array member, renamed
+// `_name` beside its accessor method (ci_build_struct).
+fn ci_offsetof_field_emitted_name(field: &str, ty: &str, fi: i32, count: i32, is_union: bool) -> str:
+    if not is_union and fi == count - 1 and (ci_starts_with(ty, "[0]") or ci_starts_with(ty, "[1]")):
+        return "_" ++ ci_escape_reserved(field)
+    ci_escape_reserved(field)
+
+// Field `field` of the record `record` names (a tag, or a typedef of one
+// resolved through typedefs, or a typedef of an anonymous record), as
+// [With type, emitted field name]; empty when the record has no such field.
+// The record index (#744) names the first DEFINITION of a tag: a forward
+// declaration of the same name has no fields (pcre2's
+// `struct pcre2_real_match_data`).
+fn ci_record_field_for_offsetof(session: i64, record: &str, field: &str) -> Vec[str]:
+    let out: Vec[str] = Vec.new()
     var cur = with_str_clone_ref(record)
     for _ in 0..8:
         let sidx = ci_record_index_struct(session, cur)
         if sidx >= 0:
-            for fi in 0..with_cimport_struct_field_count(session, sidx):
+            let count = with_cimport_struct_field_count(session, sidx)
+            let is_union = with_cimport_decl_kind(session, sidx) == CK_UNION
+            for fi in 0..count:
                 if with_cimport_struct_field_name(session, sidx, fi) == field:
-                    return with_cimport_struct_field_type_translated(session, sidx, fi)
-            return ""
+                    let ty = with_cimport_struct_field_type_translated(session, sidx, fi)
+                    out.push(ty.clone())
+                    out.push(ci_offsetof_field_emitted_name(field, ty, fi, count, is_union))
+                    return out
+            return out
         let tidx = ci_record_index_typedef(session, cur)
         if tidx < 0:
-            return ""
+            return out
         let target = ci_offsetof_record_type_name(with_cimport_typedef_underlying(session, tidx))
         if target.len() == 0 or target == cur or not ci_is_c_identifier(target):
-            for fi in 0..with_cimport_typedef_anon_record_field_count(session, tidx):
+            let count = with_cimport_typedef_anon_record_field_count(session, tidx)
+            let is_union = with_cimport_typedef_anon_is_union(session, tidx) != 0
+            for fi in 0..count:
                 if with_cimport_typedef_anon_field_name(session, tidx, fi) == field:
-                    return with_cimport_typedef_anon_field_type(session, tidx, fi)
-            return ""
+                    let ty = with_cimport_typedef_anon_field_type(session, tidx, fi)
+                    out.push(ty.clone())
+                    out.push(ci_offsetof_field_emitted_name(field, ty, fi, count, is_union))
+                    return out
+            return out
         cur = target
-    ""
+    out
 
 // D109 (#2131): `offsetof(T, a.b)` as the `offsetof[T](a) + offsetof[A](b)`
 // builtins, so the offset is the target's and never the host's folded
@@ -3245,12 +3265,12 @@ fn ci_offsetof_spelling(session: i64, record: &str, designator: &str) -> str:
         let field = ci_trim(step)
         if not ci_is_c_identifier(field) or not ci_is_c_identifier(cur):
             return ""
-        let field_ty = ci_record_field_type_spelling(session, cur, field)
-        if field_ty.len() == 0:
+        let found = ci_record_field_for_offsetof(session, cur, field)
+        if found.len() == 0:
             return ""
-        let step_text = "offsetof[" ++ ci_escape_reserved(cur) ++ "](" ++ ci_escape_reserved(field) ++ ")"
+        let step_text = "offsetof[" ++ ci_escape_reserved(cur) ++ "](" ++ found[1] ++ ")"
         out = if out.len() == 0: step_text else: out ++ " + " ++ step_text
-        cur = field_ty
+        cur = found[0].clone()
     // C's offsetof is a size_t, as `sizeof` is spelled in an object macro
     // (a chain's sum is parenthesized: `as` binds tighter than `+`).
     if designator.contains("."):

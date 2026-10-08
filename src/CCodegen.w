@@ -8206,6 +8206,24 @@ impl CCodegen:
             out = out ++ f"    goto bb{next_bb};"
             return out
 
+        // D109: TypeLayout's offset, which every emitted struct is
+        // static-asserted to match (layout_static_asserts).
+        if name == "offsetof" or name == "offset_of":
+            let call_node = body.call_ast_node(args_id)
+            let type_node = self.generic_call_type_arg_node(body, args_id)
+            let target_tid = self.sema.offsetof_owner_in_body(self.body_owner_sym(body.fn_sym), call_node, type_node)
+            let field_index = self.sema.offsetof_field_indices.get(call_node) ?? -1
+            let offset = self.sema.layout_field_offset_cache.get(sema_pair_key(self.sema.resolve_alias(target_tid as TypeId) as i32, field_index))
+            if target_tid <= 0 or field_index < 0 or offset.is_none():
+                self.fail("emit-c has no TypeLayout offset for offsetof in '" ++ cc_intern_resolve(self.intern, body.fn_sym) ++ "'")
+                return "\n"
+            let dst = self.place_text(body, dest_place)
+            let dst_tid = self.place_tid(body, dest_place)
+            let dst_ty = self.c_type(dst_tid, 0)
+            var out = "    " ++ dst ++ " = (" ++ dst_ty ++ ")" ++ f"{offset.unwrap()}" ++ ";\n"
+            out = out ++ f"    goto bb{next_bb};"
+            return out
+
         let intrinsic = body.call_intrinsic(args_id)
         if intrinsic == MirIntrinsic.COLLECTION_LITERAL or intrinsic == MirIntrinsic.MAP_LITERAL:
             return self.emit_collection_literal_term(body, intrinsic, args_id, dest_place, next_bb)

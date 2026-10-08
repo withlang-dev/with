@@ -20113,7 +20113,8 @@ impl Codegen:
         let callee_kind = self.pool.kind(callee_node)
         let tp_node = if callee_kind == NodeKind.NK_TYPE_GENERIC: self.pool.get_extra(self.pool.get_data1(callee_node))
             else: self.pool.get_data1(callee_node)
-        let sema_tid = self.sema_type_level_arg(tp_node)
+        let owner = if self.current_body_owner_sym != 0: self.sema.pool_lookup_symbol(self.intern.resolve(self.current_body_owner_sym)) else: 0
+        let sema_tid = self.sema.offsetof_owner_in_body(owner, node, tp_node)
         let field_index = self.sema.offsetof_field_indices.get(node) ?? -1
         if sema_tid <= 0 or field_index < 0:
             with_eprint(f"error: BUG: offsetof call {node} in {self.sema_symbol_text(self.current_function_name_sym)} has no Sema type or field (D109)")
