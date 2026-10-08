@@ -4099,11 +4099,13 @@ impl MirBuilder:
             // reset-on-move (§2.5.1). Borrowed bases — mut-fn receiver place,
             // share/ref params — have no scheduled value drop here and keep
             // the pure view.
+            // D111: a Copy field (a str) is read by copy; its consumer takes
+            // its own hold, and the field keeps its value.
             let alias_path_count = self.place_field_projection_count(alias_place)
             if alias_path_count > 0:
                 let alias_base = self.place_base_local(alias_place)
                 let alias_ty = self.place_local_type(alias_place)
-                if alias_base >= 0 and alias_ty > 0 and self.sema.type_needs_drop_frozen(alias_ty) != 0 and self.local_has_scheduled_value_drop(alias_base) != 0:
+                if alias_base >= 0 and alias_ty > 0 and self.sema.type_needs_drop_frozen(alias_ty) != 0 and self.sema.is_copy_frozen(alias_ty as TypeId) == 0 and self.local_has_scheduled_value_drop(alias_base) != 0:
                     return self.body.new_operand(OperandKind.OK_MOVE, alias_place)
             if self.place_type_is_str(alias_place) != 0:
                 self.mark_string_place_copied(alias_place)
@@ -7516,6 +7518,9 @@ impl MirBuilder:
                     self.finish_stmt_temp_frame(diverging_frame)
                 if tail_read != 0:
                     self.cancel_scheduled_value_drop_for_receiver_expr(self.ast.get_data0(tail_read))
+                    // D111: the read moves the local out, as a plain tail does
+                    // (its drop was cancelled just above).
+                    result = self.tail_local_moves_out(result, self.ast.get_data0(tail_read))
                 if tail_read == 0:
                     result = self.tail_local_moves_out(result, tail_expr)
                 result = self.materialize_tail_field_move(result, tail_expr)

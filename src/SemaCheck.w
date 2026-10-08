@@ -10945,7 +10945,15 @@ impl Sema:
                     let filter_ty = self.check_expr(filter)
                     if filter_ty != 0 and self.types_compatible(self.ty_bool as i32, filter_ty as i32) == 0:
                         self.emit_error("comprehension filter must be bool", filter)
-            let result_elem = if result_expected != 0: self.check_expr_with_owned_demand(expr, result_expected as TypeId) else: self.check_expr(expr)
+            var result_elem = if result_expected != 0: self.check_expr_with_owned_demand(expr, result_expected as TypeId) else: self.check_expr(expr)
+            // A collection stores its element, so the element is an owned
+            // demand (D22 §6.2): a view of a Copy value (a str under D111) is
+            // copied in. Stored as a view it outlived its origin: a
+            // generator's yielded `&buf` was overwritten by the next resume.
+            if result_expected == 0:
+                let elem_value = self.shared_copy_pointee(result_elem as i32)
+                if elem_value != 0 and self.record_contextual_copy_adjustment(expr, elem_value, result_elem as i32) != 0:
+                    result_elem = elem_value as TypeId
             self.record_gen_comprehension_captures(node, comp_start, &gen_outer_counts)
             for _ in 0..pushed_scopes:
                 self.pop_scope()
@@ -11225,7 +11233,7 @@ impl Sema:
                 self.record_name_use(node, "global", self.decl_path_of_symbol(sym), self.pool_resolve(sym))
             if sym != self.assign_target_revive_sym:
                 self.record_global_data_race_access(sym, node, GLOBAL_RACE_ACCESS_READ)
-            if self.in_comptime_fn != 0 and self.is_mutable_global(sym) != 0:
+            if not is_local and self.in_comptime_fn != 0 and self.is_mutable_global(sym) != 0:
                 self.emit_error("mutable global access is not allowed in comptime", node)
             if self.binding_poisoned_origin_sym(sym) != 0:
                 self.emit_returned_view_origin_use_error(sym, node)
@@ -12935,6 +12943,8 @@ impl Sema:
             // `sub in text` lowers as `text.contains(sub)`.
             if rhs_ty != 0 and self.get_type_kind(self.resolve_alias(rhs_ty as TypeId)) == TypeKind.TY_STR:
                 self.record_method_lowering(rhs_node, self.syms.contains, 1, node, self.ty_bool as i32, rhs_ty)
+                // D110: the call it lowers as reads its modes from the row.
+                let _ = self.record_builtin_call_sig(node, rhs_ty, self.syms.contains)
             self.typed_expr_types.insert(node, self.ty_bool as i32)
             return self.ty_bool as i32
         let contains_sym: i32 = self.syms.contains
