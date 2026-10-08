@@ -511,6 +511,8 @@ impl Sema:
     // - a `&T` source relabeled (`r as str`, `r as &Tag`) is the same
     //   reference, typed `&Target`, with the source's origins. A Copy target
     //   keeps D22 §6.2: a cast target is an owned demand, met by a copy.
+    //   (D111: a Copy target with drop glue, a str, stays the view until an
+    //   owned demand copies it, as any `&str` does.)
     // - an owned source cast to a view (`n as &str`, `s as []u8`) borrows
     //   it, exactly as `&n` does.
     // - an owned non-Copy source relabeled moves into the result; one that
@@ -527,7 +529,7 @@ impl Sema:
         if src_kind == TypeKind.TY_REF:
             if self.get_type_d1(src as TypeId) != 0 or not self.cast_relabels_value(self.get_type_d0(src as TypeId), target_value):
                 return cast_tid
-            if not target_is_view and self.is_copy(target as TypeId) != 0:
+            if not target_is_view and self.is_copy(target as TypeId) != 0 and self.type_needs_drop(target) == 0:
                 return cast_tid
             self.cast_modes.insert(node, CastMode.REF_RELABEL as i32)
             self.record_transparent_view_origins(node, src_node)
