@@ -17,7 +17,7 @@
 // methods are MathBuiltins' and take every operand. A builtin method called
 // with arguments must resolve to a row; MirLower refuses one that did not.
 
-pub type BuiltinSigRow { pub owner: str, pub method: str, pub params: str }
+pub type BuiltinSigRow { owner: str, method: str, params: str }
 
 fn sig(owner: str, method: str, params: str) -> BuiltinSigRow: BuiltinSigRow { owner, method, params }
 
