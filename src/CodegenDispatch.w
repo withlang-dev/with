@@ -1938,8 +1938,9 @@ impl Codegen:
         if src_ptr == 0:
             // A value local (SSA) has no storage to blank: its uncoerced
             // value is retained through a slot, and its own drop releases.
-            let ssa_value = if place >= 0 and place < body.place_locals.len() and body.place_proj_counts[place] == 0: self.mir_local_values.get(body.place_locals[place]) else: None
-            if place_ty == 0 or ssa_value.is_none():
+            let whole_local = if place >= 0 and place < body.place_locals.len() and body.place_proj_counts[place] == 0: body.place_locals[place] else: -1
+            let ssa_value = self.mir_local_values.get(whole_local)
+            if place_ty == 0 or whole_local < 0 or ssa_value.is_none():
                 sema_phase_bug(f"BUG: operand {operand_id} holds a copy (D111) but its place {place} has no storage in {self.intern.resolve(self.current_function_name_sym)}")
             let slot = self.create_entry_alloca(place_ty)
             wl_build_store(self.builder, ssa_value.unwrap() as i64, slot)
