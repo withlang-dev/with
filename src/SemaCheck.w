@@ -26913,6 +26913,12 @@ impl Sema:
             exact_i = exact_i - 1
         if existing != 0:
             if self.types_compatible(existing, tid) == 0:
+                // D22/D111: a parameter already bound to a Copy `X` (a
+                // `BTreeMap[str, V]` receiver's K) is an owned demand; a `&X`
+                // argument meets it with a copy.
+                let tid_r = self.resolve_alias(tid as TypeId)
+                if self.get_type_kind(tid_r) == TypeKind.TY_REF and self.get_type_d1(tid_r) == 0 and self.is_copy(existing as TypeId) != 0 and self.types_identical(self.get_type_d0(tid_r), existing):
+                    return
                 if self.arithmetic_result_type(existing, tid) == 0:
                     let tp_name: str = with_str_clone_ref(self.pool_resolve(param_sym))
                     let a = self.type_name(existing)

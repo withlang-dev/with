@@ -12129,9 +12129,16 @@ impl MirBuilder:
             let param_kind = self.sema.get_type_kind(self.sema.resolve_alias(param_ty))
             if param_kind != TypeKind.TY_REF and self.sema.is_copy_frozen(param_ty) == 0:
                 sema_phase_bug(f"BUG: an implicit fill reached a non-Copy by-value parameter {param_i} (D87: an implicit fill never consumes; Sema fills only `implicit &T` or a Copy `implicit T`)")
-        if op >= 0 and self.body.operand_kinds[op] == OperandKind.OK_MOVE:
-            return self.body.new_operand(OperandKind.OK_COPY, self.body.operand_d0[op])
-        op
+        let fill = if op >= 0 and self.body.operand_kinds[op] == OperandKind.OK_MOVE: self.body.new_operand(OperandKind.OK_COPY, self.body.operand_d0[op]) else: op
+        // D111: a Copy fill with drop glue (an `implicit str`) takes its own hold.
+        if fill >= 0 and self.body.operand_kinds[fill] == OperandKind.OK_COPY and not self.call_param_borrows(sig_idx, param_i, 0):
+            self.retain_consumed_copy(fill)
+        fill
+
+    // A share-place (value_ref_abi) parameter borrows its argument; any other
+    // parameter owns what it is passed.
+    fn call_param_borrows(sig_idx: i32, arg_i: i32, expected_ty: i32) -> bool:
+        if sig_idx >= 0: arg_i >= 0 and self.sema.sig_param_uses_value_ref_abi(sig_idx, arg_i) != 0 else: self.sema.type_uses_c_va_list_place(expected_ty) != 0
 
     mut fn lower_call_arg(arg_node: i32, sig_idx: i32, callable_fn_tid: i32, arg_i: i32, callee_sym: i32 = 0) -> i32:
         let saved_expected = self.expected_type
@@ -12148,13 +12155,18 @@ impl MirBuilder:
         if autoref_op >= 0:
             self.expected_type = saved_expected
             return autoref_op
+        // A copy through a reference into an owning parameter takes its own
+        // hold (D111: a str element passed to `s: str`); the callee drops it.
+        let callee_share_place = self.call_param_borrows(sig_idx, arg_i, expected_ty)
         let autocopy_ref_op = self.lower_auto_copy_ref_call_arg(arg_node, expected_ty)
         if autocopy_ref_op >= 0:
             self.expected_type = saved_expected
+            if not callee_share_place: self.consume_moved_operand(autocopy_ref_op)
             return autocopy_ref_op
         let autoderef_op = self.lower_auto_deref_call_arg(arg_node, expected_ty)
         if autoderef_op >= 0:
             self.expected_type = saved_expected
+            if not callee_share_place: self.consume_moved_operand(autoderef_op)
             return autoderef_op
         // #604 stage 1: a Vec/array arg coerced to a []T / []mut T param borrows
         // the place into a fat-pointer view. Never materialize the collection —
@@ -12184,10 +12196,6 @@ impl MirBuilder:
         // a non-share-place param is extern/copy — keep the existing behavior.)
         let arg_kind = self.ast.kind(arg_node)
         let arg_is_copy = arg_kind == NodeKind.NK_COPY_ARG
-        let callee_share_place = if sig_idx >= 0:
-            arg_i >= 0 and self.sema.sig_param_uses_value_ref_abi(sig_idx, arg_i) != 0
-        else:
-            self.sema.type_uses_c_va_list_place(expected_ty) != 0
         // D16 (rvalue-uniform `move`): `move x` always moves, callee-independent.
         // Into a share-place callee, the moved value becomes a statement
         // temporary — the callee borrows the temporary, the source is reset now
@@ -12395,23 +12403,11 @@ impl MirBuilder:
         // takes the pointee's bits and owns nothing.
         if self.observing_str_read == node and node != 0 and self.type_id_is_str(adjustment.owned_value_type) != 0:
             return self.body.new_operand(OperandKind.OK_COPY, pointee_place)
-        // #781: a str materialization mints an independent owner (two-part
-        // concat copy); a shallow pointee copy would alias the buffer into a
-        // double free.
-        if self.type_id_is_str(adjustment.owned_value_type) != 0:
-            let sc_parts: Vec[i32] = Vec.new()
-            sc_parts.push(self.body.new_operand(OperandKind.OK_COPY, pointee_place))
-            sc_parts.push(self.lower_str_lit(self.pool.intern("")))
-            let sc_args = self.body.new_call_args(sc_parts)
-            let sc_rv = self.body.new_rvalue(RvalueKind.RK_STR_CONCAT_N, sc_args, 2, 0)
-            let sc_tmp = self.new_temp(adjustment.owned_value_type)
-            let sc_place = self.place_for_local(sc_tmp)
-            self.body.push_stmt(self.cur_bb, StmtKind.Assign, sc_place, sc_rv, self.ast.get_start(node))
-            self.set_string_local_flags(sc_tmp, 2)
-            // The materialized owner is a statement temp: whatever takes it moves
-            // it; otherwise it drops at the statement's end.
-            self.register_stmt_temp(sc_tmp, adjustment.owned_value_type)
-            return self.body.new_operand(OperandKind.OK_MOVE, sc_place)
+        // D111: a str materializes as every Copy value does, a pointee copy;
+        // whatever consumes it takes its own hold (retain_consumed_copy).
+        // The old fresh-buffer concat was a statement temp that a consuming
+        // Copy argument never cancelled: it was dropped after the callee
+        // freed it.
         let owned_op = self.body.new_operand(OperandKind.OK_COPY, pointee_place)
         if adjustment.post_copy_type == 0:
             return owned_op
