@@ -16,7 +16,7 @@
 //   some-at-option-demand  `Some(x)` where an Option is demanded
 //
 // The record is build/ceremony-census.tsv. A count above the record fails;
-// a count below it fails until the record is lowered (a ratchet).
+// a count below it passes (lower the record with --write to keep it tight).
 //
 //   with run tools/ceremony_census.w                   # check against the record
 //   with run tools/ceremony_census.w --write           # rewrite the record
@@ -132,21 +132,20 @@ fn main:
         write_file(RECORD, text)
         print(f"ceremony-census: wrote {RECORD} ({census.counts.len()} counts)")
         return
-    // A ratchet: a count above the record is new ceremony; one below it is a
-    // cleanup the record must keep, or the next rise hides behind it.
+    // The record is a ceiling: a count above it is new ceremony and fails; a
+    // count below it is a cleanup and passes (lowering the record keeps the
+    // ceiling tight, so a later rise cannot hide under it).
     let record = read_record()
-    var off = 0
+    var rose = 0
     for (key, now) in census.counts:
         let was = record.get(key) ?? 0
         if now > was:
-            off = off + 1
+            rose = rose + 1
             eprint(f"ceremony-census: {key.replace("\t", " in ")} rose {was} -> {now}; remove the new ceremony, or raise the record (--write) and say why in the PR")
         else if now < was:
-            off = off + 1
-            eprint(f"ceremony-census: {key.replace("\t", " in ")} fell {was} -> {now}; lower the record (--write)")
+            print(f"ceremony-census: {key.replace("\t", " in ")} fell {was} -> {now}; lower the record with --write")
     for (key, was) in record:
         if not census.counts.contains(key) and was > 0:
-            off = off + 1
-            eprint(f"ceremony-census: {key.replace("\t", " in ")} fell {was} -> 0; lower the record (--write)")
-    if off > 0: exit_code(1)
+            print(f"ceremony-census: {key.replace("\t", " in ")} fell {was} -> 0; lower the record with --write")
+    if rose > 0: exit_code(1)
     print("ceremony-census: ok")

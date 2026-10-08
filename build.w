@@ -2343,7 +2343,7 @@ fn run_ceremony_check_action(ctx: ActionCtx) -> i32:
 
 // CLAUDE.md "Ceremony is a design defect": tools/ceremony_census.w counts the
 // known ceremony patterns across the tree against build/ceremony-census.tsv.
-// A count that moves either way is a red until the record moves with it.
+// A count above the record is a red; a count below it passes.
 fn run_ceremony_census_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let out_dir = ctx.output()

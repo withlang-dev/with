@@ -339,9 +339,9 @@ time, that's a report.
 known ceremony patterns across the tree and `build/ceremony-census.tsv`
 records the counts. `src/main build :ceremony-census` (in the gate) fails
 when a count rises above the record; a PR that raises one updates the record
-and says why in its description, and a PR that lowers one lowers the record
-(`with run tools/ceremony_census.w --write`). A report that identifies a new
-pattern adds it to the census.
+and says why in its description. A count that falls passes; lowering the
+record with it (`with run tools/ceremony_census.w --write`) keeps the ceiling
+tight. A report that identifies a new pattern adds it to the census.
 
 ## No Silent Fallbacks
 
