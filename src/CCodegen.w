@@ -6572,7 +6572,7 @@ impl CCodegen:
         out ++ " " ++ cc_rbrace() ++ "\n"
 
 fn cc_builtin_from_mir_intrinsic(intrinsic: MirIntrinsic) -> CcBuiltin:
-    if intrinsic == MirIntrinsic.VALUE_COPY: return CcBuiltin.VALUE_COPY
+    if intrinsic == MirIntrinsic.VALUE_COPY or intrinsic == MirIntrinsic.VALUE_TAKE: return CcBuiltin.VALUE_COPY
     if intrinsic == MirIntrinsic.MATH_FN: return CcBuiltin.MATH_FN
     if intrinsic == MirIntrinsic.VA_START: return CcBuiltin.VA_START
     if intrinsic == MirIntrinsic.VA_ARG: return CcBuiltin.VA_ARG

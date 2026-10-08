@@ -12,6 +12,7 @@ use MathBuiltins
 use MirCore
 use SemaTypes
 use MirVector
+use MirSuspendCheck
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_eprint(s: &str) -> Unit
 
@@ -976,6 +977,50 @@ impl MirBuilder:
         if op < 0 or op >= self.body.operand_kinds.len() or self.body.operand_kinds[op] != OperandKind.OK_MOVE:
             return op
         self.body.new_operand(OperandKind.OK_COPY, self.body.operand_d0[op])
+
+    // D111: at a variable's last use a copy is a move. A VALUE_COPY of a
+    // whole local that nothing reads afterwards on any path (a drop is not a
+    // read: mir_body_live_in) becomes VALUE_TAKE: codegen hands the value
+    // over and blanks the local, so its later drop releases nothing — no
+    // retain and no release. Only a local no view can reach qualifies:
+    // nothing borrows it and every operand naming it is a VALUE_COPY
+    // argument, since a view of its buffer must not outlive the last hold.
+    mut fn mark_last_use_copies():
+        let operand_count = self.body.operand_kinds.len()
+        var copy_arg: Vec[i32] = Vec.new()
+        for _ in 0..operand_count: copy_arg.push(0)
+        var any = false
+        for bb in 0..self.body.block_count():
+            if self.body.term_kind(bb) == TermKind.TK_CALL and self.body.call_intrinsic(self.body.term_data1(bb)) == MirIntrinsic.VALUE_COPY:
+                copy_arg[self.body.call_arg_operands[self.body.call_arg_starts[self.body.term_data1(bb)]]] = 1
+                any = true
+        if not any:
+            return
+        let local_count = self.body.local_count()
+        var view_free: Vec[i32] = Vec.new()
+        for _ in 0..local_count: view_free.push(1)
+        for oi in 0..operand_count:
+            let kind = self.body.operand_kinds[oi]
+            if (kind == OperandKind.OK_COPY or kind == OperandKind.OK_MOVE) and copy_arg[oi] == 0:
+                let root = self.place_base_local(self.body.operand_d0[oi])
+                if root >= 0 and root < local_count: view_free[root] = 0
+        for ri in 0..self.body.rval_kinds.len():
+            let rk = self.body.rval_kinds[ri]
+            let borrowed = if rk == RvalueKind.RK_REF: self.body.rval_d1[ri] else: if rk == RvalueKind.RK_ADDR_OF: self.body.rval_d0[ri] else: -1
+            let root = if borrowed >= 0: self.place_base_local(borrowed) else: -1
+            if root >= 0 and root < local_count: view_free[root] = 0
+        let live_in = mir_body_live_in(self.sema, &self.body)
+        for bb in 0..self.body.block_count():
+            if self.body.term_kind(bb) != TermKind.TK_CALL:
+                continue
+            let args_id = self.body.term_data1(bb)
+            if self.body.call_intrinsic(args_id) != MirIntrinsic.VALUE_COPY:
+                continue
+            let local = mir_place_plain_local(&self.body, self.body.operand_d0[self.body.call_arg_operands[self.body.call_arg_starts[args_id]]])
+            if local <= 0 or view_free[local] == 0 or self.body.local_is_global[local] != 0 or self.body.local_is_caller_place[local] != 0:
+                continue
+            if live_in[self.body.term_data3(bb) * local_count + local] == 0:
+                self.body.set_call_intrinsic(args_id, MirIntrinsic.VALUE_TAKE)
 
     // D111: a consumed copy of a Copy type with drop glue (a str, or a value
     // holding one) is one more holder, since the source and the consumer each
@@ -8353,6 +8398,7 @@ impl MirBuilder:
         let used_codes = child.gen_loop_used_codes
         let exit_labels = mir_clone_i32_vec(&child.gen_loop_exit_labels)
         let exit_kinds = mir_clone_i32_vec(&child.gen_loop_exit_kinds)
+        child.mark_last_use_copies()
         var finished = LoweredFunction { body: move child.body, anonymous_bodies: move child.anonymous_bodies }
         self.anonymous_bodies.push(move finished.body)
         while finished.anonymous_bodies.len() > 0:
@@ -15681,6 +15727,7 @@ impl MirBuilder:
         child.pop_scope_inline()
         child.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
         child.verify_goto_labels()
+        child.mark_last_use_copies()
         var finished = LoweredFunction { body: move child.body, anonymous_bodies: move child.anonymous_bodies }
         self.anonymous_bodies.push(move finished.body)
         while finished.anonymous_bodies.len() > 0:
@@ -17455,6 +17502,7 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> Lowered
     // D32: field vacates need a mutable path — rebind the owned param.
     var owned_builder = builder
     owned_builder.verify_goto_labels()
+    owned_builder.mark_last_use_copies()
     LoweredFunction { body: move owned_builder.body, anonymous_bodies: move owned_builder.anonymous_bodies }
 
 fn lower_fn_clause_dispatcher(sema: &Sema, ast_pool: AstPool, pool: InternPool, group: i32) -> MirBody:

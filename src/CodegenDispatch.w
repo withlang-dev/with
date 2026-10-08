@@ -10113,6 +10113,21 @@ impl Codegen:
             self.mir_emit_owned_map_insert(fn_val, fn_ty, args, key_sema, value_sema, wl_type_of(key), value_llvm)
             result = 0
 
+        else if intrinsic == MirIntrinsic.VALUE_TAKE:
+            // D111: the local's last use: its value is handed over and its
+            // storage blanked, so its later drop releases nothing — no retain,
+            // no release. A local with no storage to blank keeps the copy.
+            let take_sema = self.mir_operand_sema_type(body, body.call_arg_operands[arg_start])
+            let take_val = self.mir_intrinsic_arg(body, args_id, 0)
+            let take_ptr = self.mir_operand_place_addr(body, body.call_arg_operands[arg_start])
+            if take_ptr != 0:
+                wl_build_store(self.builder, self.build_default_value(wl_type_of(take_val)), take_ptr)
+            else:
+                let take_slot = self.create_entry_alloca(wl_type_of(take_val))
+                wl_build_store(self.builder, take_val, take_slot)
+                self.mir_emit_copy_glue_ptr(take_slot, wl_type_of(take_val), take_sema)
+            result = take_val
+
         else if intrinsic == MirIntrinsic.VALUE_COPY:
             // D111: the copied value, one more holder of every str it carries.
             let copy_sema = self.mir_operand_sema_type(body, body.call_arg_operands[arg_start])

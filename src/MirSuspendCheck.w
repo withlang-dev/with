@@ -835,27 +835,13 @@ fn suspend_check_body(ast: AstPool, sema: &Sema, body_by_fn: &HashMap[i32, i32],
     if suspend_body_has_may_suspend_term(body, body_by_fn, body_may_suspend) == 0:
         return out
 
-    let bit_count = local_count * bb_count
-    let live_in = suspend_bits_fill(bit_count, 0)
-    let live_out = suspend_bits_fill(bit_count, 0)
+    let liveness = suspend_liveness(sema, body)
+    let live_out = liveness.live_out
     let prov_in = suspend_compute_prov_in_for_body(sema, body, guard_locals)
     let reported_starts: Vec[i32] = Vec.new()
     let reported_ends: Vec[i32] = Vec.new()
     let reported_locals: Vec[i32] = Vec.new()
     let reported_origins: Vec[i32] = Vec.new()
-
-    var changed = 1
-    while changed != 0:
-        changed = 0
-        var bb = bb_count - 1
-        while bb >= 0:
-            let out_bits = suspend_compute_live_out_for_block(body, live_in, local_count, bb)
-            if suspend_store_block_bits(live_out, local_count, bb, out_bits) != 0:
-                changed = 1
-            let in_bits = suspend_compute_live_in_for_block(body, sema, live_out, local_count, bb)
-            if suspend_store_block_bits(live_in, local_count, bb, in_bits) != 0:
-                changed = 1
-            bb = bb - 1
 
     for bb in 0..bb_count:
         if suspend_term_may_suspend(body, body_by_fn, body_may_suspend, bb) == 0:
@@ -922,6 +908,41 @@ fn suspend_check_no_suspend_body(ast: AstPool, sema: &Sema, body_by_fn: &HashMap
         reported_ends.push(site.end)
         reported_nodes.push(no_suspend_node)
         out = suspend_emit_no_suspend_error(move out, sema, body, body_by_fn, body_may_suspend, site, bb)
+    out
+
+// Backward liveness of a body's locals to a fixed point: live_in holds, per
+// block, the locals some later statement on some path reads before the block
+// starts; live_out the same at its end. A drop of a value with no user Drop
+// is not a read. One analysis for the suspend check below and for MirLower's
+// last-use copies (D111).
+type SuspendLiveness { live_in: SuspendBits, live_out: SuspendBits }
+
+fn suspend_liveness(sema: &Sema, body: &MirBody) -> SuspendLiveness:
+    let local_count = body.local_count()
+    let bb_count = body.block_count()
+    let live_in = suspend_bits_fill(local_count * bb_count, 0)
+    let live_out = suspend_bits_fill(local_count * bb_count, 0)
+    var changed = 1
+    while changed != 0:
+        changed = 0
+        var bb = bb_count - 1
+        while bb >= 0:
+            let out_bits = suspend_compute_live_out_for_block(body, live_in, local_count, bb)
+            if suspend_store_block_bits(live_out, local_count, bb, out_bits) != 0:
+                changed = 1
+            let in_bits = suspend_compute_live_in_for_block(body, sema, live_out, local_count, bb)
+            if suspend_store_block_bits(live_in, local_count, bb, in_bits) != 0:
+                changed = 1
+            bb = bb - 1
+    SuspendLiveness { live_in, live_out }
+
+// D111: the live-in bits of every block, flattened: entry bb * local_count
+// + local is 1 when that local is read on some path after control enters bb.
+pub fn mir_body_live_in(sema: &Sema, body: &MirBody) -> Vec[i32]:
+    let liveness = suspend_liveness(sema, body)
+    var out: Vec[i32] = Vec.new()
+    for i in 0..liveness.live_in.vlen():
+        out.push(liveness.live_in.vget(i))
     out
 
 pub fn check_no_await_guard_suspends(mir_mod: &MirModule, ast: AstPool, sema: &Sema, diags: DiagnosticList) -> DiagnosticList:
