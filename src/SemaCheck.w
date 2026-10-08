@@ -30352,6 +30352,25 @@ impl Sema:
             return 1
         0
 
+    // #2265: the builtin container arguments a call consumes without storing:
+    // the owned key of HashMap.remove/increment/decrement and the owned
+    // element of HashSet.remove (their declared parameter is `K`/`T`, and MIR
+    // lowers it as a move). A plain named argument is moved like any owned
+    // parameter, so a later use is "use of moved value"; without the mark
+    // it compiled clean and read the move-blanked string (the migrator's
+    // macro capture stored every macro under the key "").
+    fn method_arg_consumes_key(recv_type: i32, field: i32, arg_index: i32) -> bool:
+        if recv_type == 0 or arg_index != 0:
+            return false
+        let resolved = self.auto_deref_ref_ptr_type(self.resolve_alias(recv_type as TypeId)) as TypeId
+        let owner_sym = if self.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST: self.get_generic_inst_base(resolved as i32)
+            else if self.get_type_kind(resolved) == TypeKind.TY_STRUCT: self.get_type_d0(resolved)
+            else: 0
+        let method_name = self.pool_resolve(field)
+        if owner_sym == self.syms.hashmap:
+            return field == self.syms.remove or method_name == "increment" or method_name == "decrement"
+        owner_sym == self.syms.hashset and field == self.syms.remove
+
     // #1778: the stores std.sync makes through a `&self` receiver — interior
     // mutability (`Mutex.set`, `RwLock.write`): the value goes into the
     // receiver's storage while the receiver is only borrowed, so no mutation
@@ -31888,6 +31907,12 @@ impl Sema:
                 // a method, `self.v.push(x)` into the caller's place).
                 if mc_arg_ty as i32 != 0:
                     self.note_view_store(expr, mc_arg_node, mc_arg_ty as i32, mc_expected as i32, node, "this call")
+            if self.method_arg_consumes_key(obj_type as i32, field, ai):
+                let mc_key_arg_kind = self.ast.kind(mc_arg_node)
+                if mc_key_arg_kind != NodeKind.NK_MOVE_ARG and mc_key_arg_kind != NodeKind.NK_COPY_ARG and self.is_copy(mc_arg_ty as TypeId) == 0:
+                    let mc_key_root = self.place_root_sym(mc_arg_node)
+                    if mc_key_root != 0 and self.scope_has(mc_key_root) != 0:
+                        self.mark_moved_if_consumed(mc_arg_node)
             let mc_sender_elem_ty = self.sender_send_element_type(obj_type as i32, field, ai)
             if mc_sender_elem_ty != 0:
                 if mc_arg_ty as i32 != 0 and self.types_compatible(mc_sender_elem_ty, mc_arg_ty as i32) == 0 and self.arithmetic_result_type(mc_sender_elem_ty, mc_arg_ty as i32) == 0:

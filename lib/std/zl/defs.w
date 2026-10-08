@@ -472,10 +472,10 @@ pub let deflate_copyright: [68]c_char = [32, 100, 101, 102, 108, 97, 116, 101, 3
 
 pub let LENGTH_CODES: c_int = 29
 pub let LITERALS: c_int = 256
-pub let L_CODES: c_int = ((256 + 1) + 29)
+pub let L_CODES: c_int = 286
 pub let D_CODES: c_int = 30
 pub let BL_CODES: c_int = 19
-pub let HEAP_SIZE: c_int = (((2 * L_CODES) + 1) as c_int)
+pub let HEAP_SIZE: c_int = 573
 pub let MAX_BITS: c_int = 15
 pub let Buf_size: c_int = 16
 pub let INIT_STATE: c_int = 42
@@ -487,7 +487,7 @@ pub let HCRC_STATE: c_int = 103
 pub let BUSY_STATE: c_int = 113
 pub let FINISH_STATE: c_int = 666
 pub let LIT_BUFS: c_int = 4
-pub let MIN_LOOKAHEAD: c_int = ((258 + 3) + 1)
+pub let MIN_LOOKAHEAD: c_int = 262
 pub let WIN_INIT: c_int = 258
 pub fn d_code[T](dist: T) -> T {
     (if (dist < 256): _dist_code[dist] else: _dist_code[(256 + (dist >> 7))])

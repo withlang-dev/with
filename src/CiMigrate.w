@@ -918,8 +918,10 @@ fn ci_capture_macro_values(session: i64):
         if with_cimport_macro_is_fn_like(session, i) == 0:
             let name = with_cimport_macro_name(session, i)
             let value = with_cimport_macro_value(session, i)
+            // The last definition wins: insert replaces the value. (A
+            // `remove(name)` here consumed `name`, so every later use read
+            // "" and both maps held only that key, #2265.)
             if name.len() > 0 and value.len() > 0:
-                g_migrate_macro_last_values.remove(name)
                 g_migrate_macro_last_values.insert(ci_ir_owned_text(name), ci_ir_owned_text(value))
             if name.len() > 0 and value.len() > 0 and not g_migrate_macro_values.contains(name):
                 g_migrate_macro_values.insert(ci_ir_owned_text(name), ci_ir_owned_text(value))

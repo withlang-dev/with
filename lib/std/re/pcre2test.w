@@ -3261,7 +3261,7 @@ unsafe fn my_malloc(__param_size: c_ulong, __param_data: *mut c_void) -> *mut c_
 
     var __ci_expr_logic_1: c_int = 0
 
-    if ((if mallocs_until_failure != 2147483647: 1 else: 0) != 0) {
+    if ((if mallocs_until_failure != libc.INT_MAX: 1 else: 0) != 0) {
         var __ci_expr_old_0: c_int = mallocs_until_failure
 
         (mallocs_until_failure = mallocs_until_failure - 1)
@@ -3697,7 +3697,7 @@ unsafe fn extend_inputline(__param_f: *mut c_void, __param_start: *mut u8, __par
             var __local_rlen_trunc: c_int = with 0 as __ci_expr_seq_12 {
                 var __ci_expr_ternary_0: c_int = 0
                 if ((if __local_rlen > 2147483647: 1 else: 0) != 0) {
-                    (__ci_expr_ternary_0 = ((2147483647 as c_int)))
+                    (__ci_expr_ternary_0 = ((libc.INT_MAX as c_int)))
                 } else {
                     (__ci_expr_ternary_0 = ((__local_rlen as c_int)))
                 }
@@ -11351,7 +11351,7 @@ fn process_pattern_8() -> c_int {
         (__local_erroroffset__goto_2021_12 = ((0 as c_ulong)))
         (mallocs_until_failure = __local_i__goto_2750_12)
         (compiled_code_8 = unsafe { pcre2_compile_8(__local_use_pbuffer__goto_2017_12, __local_patlen__goto_2019_12, ((((*(&raw const pat_patctl as *const patctl)).options as c_uint) | (__local_use_forbid_utf__goto_2018_10 as c_uint)) as c_uint), (&raw mut __local_errorcode__goto_2015_9 as *mut c_int), (&raw mut __local_erroroffset__goto_2021_12 as *mut c_ulong), __local_use_pat_context__goto_2016_24) })
-        (mallocs_until_failure = ((2147483647 as c_int)))
+        (mallocs_until_failure = ((libc.INT_MAX as c_int)))
         (__ci_expr_logic_35 = 0)
         if ((if __local_i__goto_2750_12 < __local_target_mallocs__goto_2750_19: 1 else: 0) != 0) {
             var __ci_expr_logic_34: c_int = 0
@@ -11552,7 +11552,7 @@ fn process_pattern_8() -> c_int {
     '__ci_bb_264 {
         (mallocs_until_failure = __local_i__goto_2828_14)
         (jitrc = ((unsafe { pcre2_jit_compile_8(compiled_code_8, (*(&raw const pat_patctl as *const patctl)).jit) } as c_int)))
-        (mallocs_until_failure = ((2147483647 as c_int)))
+        (mallocs_until_failure = ((libc.INT_MAX as c_int)))
         (__ci_expr_logic_37 = 0)
         if ((if __local_i__goto_2828_14 < __local_target_mallocs__goto_2828_21: 1 else: 0) != 0) {
             (__ci_expr_logic_37 = (if (if jitrc != -48: 1 else: 0) != 0: 1 else: 0))
@@ -14154,7 +14154,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_26 {
-        if ((if dbuffer_size < ((libc.UINTPTR_MAX as c_ulong) / (2 as c_ulong)): 1 else: 0) != 0) {
+        if ((if dbuffer_size < ((libc.SIZE_MAX as c_ulong) / (2 as c_ulong)): 1 else: 0) != 0) {
             goto '__ci_bb_28
         } else {
             goto '__ci_bb_29
@@ -14315,7 +14315,7 @@ fn process_data_8() -> c_int {
         (__local_replen__goto_3956_10 = ((((((__local_q__goto_3851_14 as usize) -% (__local_start_rep__goto_3852_14 as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         (__ci_expr_logic_10 = 0)
         if ((if __local_i__goto_3955_7 > 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_10 = (if (if __local_replen__goto_3956_10 > ((((libc.UINTPTR_MAX as c_ulong) -% (__local_needlen__goto_3842_8 as c_ulong)) as c_ulong) / (__local_i__goto_3955_7 as c_ulong)): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_10 = (if (if __local_replen__goto_3956_10 > ((((libc.SIZE_MAX as c_ulong) -% (__local_needlen__goto_3842_8 as c_ulong)) as c_ulong) / (__local_i__goto_3955_7 as c_ulong)): 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_10 != 0) {
             goto '__ci_bb_46
@@ -14359,7 +14359,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_51 {
-        if ((if dbuffer_size < ((libc.UINTPTR_MAX as c_ulong) / (2 as c_ulong)): 1 else: 0) != 0) {
+        if ((if dbuffer_size < ((libc.SIZE_MAX as c_ulong) / (2 as c_ulong)): 1 else: 0) != 0) {
             goto '__ci_bb_53
         } else {
             goto '__ci_bb_54
@@ -16688,7 +16688,7 @@ fn process_data_8() -> c_int {
         (outfile = null)
         (__local_nsize__goto_4653_34 = __local_nsize_input__goto_4653_41)
         (__local_rc__goto_4646_7 = ((unsafe { pcre2_substitute_8((compiled_code_8 as *const pcre2_real_code_8), (__local_sbptr__goto_4650_16 as *const u8), __local_slen__goto_4653_54, (*(&raw const dat_datctl as *const datctl)).offset, ((((*(&raw const dat_datctl as *const datctl)).options as c_uint) | (__local_xoptions__goto_4651_12 as c_uint)) as c_uint), __local_smatch_data__goto_4654_21, __local_use_dat_context__goto_3843_22, (__local_rbptr__goto_4649_16 as *const u8), __local_rlen__goto_4653_17, rep_out_buffer_8, (&raw mut __local_nsize__goto_4653_34 as *mut c_ulong)) } as c_int)))
-        (mallocs_until_failure = ((2147483647 as c_int)))
+        (mallocs_until_failure = ((libc.INT_MAX as c_int)))
         (outfile = __local_saved_outfile__goto_4844_13)
         (__ci_expr_logic_75 = 0)
         if ((if __local_i__goto_4842_14 < __local_target_mallocs__goto_4842_21: 1 else: 0) != 0) {
@@ -17374,7 +17374,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_448 {
-        (mallocs_until_failure = ((2147483647 as c_int)))
+        (mallocs_until_failure = ((libc.INT_MAX as c_int)))
         (outfile = __local_saved_outfile__goto_5063_15)
         if ((if __local_capcount__goto_4919_7 == 0: 1 else: 0) != 0) {
             goto '__ci_bb_454
@@ -18768,7 +18768,7 @@ fn unittest_8() -> Unit {
     }
 
     '__ci_bb_6 {
-        (mallocs_until_failure = ((2147483647 as c_int)))
+        (mallocs_until_failure = ((libc.INT_MAX as c_int)))
         unsafe { pcre2_regfree((&raw mut __local_test_preg__goto_5662_9 as *mut regex_t)) }
         if ((if __local_test_compiled_code__goto_5638_13 != null: 1 else: 0) != 0) {
             goto '__ci_bb_652
@@ -19640,7 +19640,7 @@ fn unittest_8() -> Unit {
 
     '__ci_bb_149 {
         unsafe { pcre2_convert_context_free_8(__local_test_con_context__goto_5636_24) }
-        (mallocs_until_failure = ((2147483647 as c_int)))
+        (mallocs_until_failure = ((libc.INT_MAX as c_int)))
         (__local_test_pat_context__goto_5634_24 = unsafe { pcre2_compile_context_create_8(__local_test_gen_context__goto_5633_24) })
         goto '__ci_bb_152
     }
@@ -19852,7 +19852,7 @@ fn unittest_8() -> Unit {
     }
 
     '__ci_bb_184 {
-        (mallocs_until_failure = ((2147483647 as c_int)))
+        (mallocs_until_failure = ((libc.INT_MAX as c_int)))
         (__local_test_gen_context_copy__goto_5633_50 = unsafe { pcre2_general_context_copy_8(__local_test_gen_context__goto_5633_24) })
         goto '__ci_bb_187
     }
@@ -20645,7 +20645,7 @@ fn unittest_8() -> Unit {
     }
 
     '__ci_bb_314 {
-        (mallocs_until_failure = ((2147483647 as c_int)))
+        (mallocs_until_failure = ((libc.INT_MAX as c_int)))
         unsafe { pcre2_match_data_free_8(__local_test_match_data__goto_5637_19) }
         (__local_test_match_data__goto_5637_19 = unsafe { pcre2_match_data_create_8((0 as c_uint), __local_test_gen_context__goto_5633_24) })
         goto '__ci_bb_317
@@ -20828,7 +20828,7 @@ fn unittest_8() -> Unit {
     }
 
     '__ci_bb_344 {
-        (mallocs_until_failure = ((2147483647 as c_int)))
+        (mallocs_until_failure = ((libc.INT_MAX as c_int)))
         unsafe { pcre2_match_data_free_8(__local_test_match_data__goto_5637_19) }
         (__local_test_match_data__goto_5637_19 = unsafe { pcre2_match_data_create_from_pattern_8((__local_test_compiled_code__goto_5638_13 as *const pcre2_real_code_8), __local_test_gen_context__goto_5633_24) })
         goto '__ci_bb_347
@@ -21534,7 +21534,7 @@ fn unittest_8() -> Unit {
     }
 
     '__ci_bb_454 {
-        (mallocs_until_failure = ((2147483647 as c_int)))
+        (mallocs_until_failure = ((libc.INT_MAX as c_int)))
         (__local_rc__goto_5628_5 = ((unsafe { pcre2_callout_enumerate_8((null as *const pcre2_real_code_8), callout_enumerate_function_void_8, null) } as c_int)))
         goto '__ci_bb_457
     }
@@ -22090,7 +22090,7 @@ fn unittest_8() -> Unit {
     }
 
     '__ci_bb_539 {
-        (mallocs_until_failure = ((2147483647 as c_int)))
+        (mallocs_until_failure = ((libc.INT_MAX as c_int)))
         (__local_sizeval__goto_5630_12 = ((0 as c_ulong)))
         (__local_rc__goto_5628_5 = ((unsafe { pcre2_substring_length_bynumber_8(__local_test_match_data__goto_5637_19, (1 as c_uint), (&raw mut __local_sizeval__goto_5630_12 as *mut c_ulong)) } as c_int)))
         goto '__ci_bb_542
@@ -22332,7 +22332,7 @@ fn unittest_8() -> Unit {
     }
 
     '__ci_bb_574 {
-        (mallocs_until_failure = ((2147483647 as c_int)))
+        (mallocs_until_failure = ((libc.INT_MAX as c_int)))
         (__local_rc__goto_5628_5 = ((unsafe { pcre2_match_8((__local_test_compiled_code__goto_5638_13 as *const pcre2_real_code_8), (&__local_subject_abcz__goto_5649_13[0] as *mut u8), ((~(0 as c_ulong)) as c_ulong), (2 as c_ulong), (0 as c_uint), __local_test_match_data__goto_5637_19, (null as *mut pcre2_real_match_context_8)) } as c_int)))
         goto '__ci_bb_577
     }

@@ -1356,7 +1356,7 @@ unsafe fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *co
     '__ci_bb_94 {
         (__local_count__goto_481_11 = ((((((((__local_cc__goto_116_12[(1 + 2)]) as c_int) << (8 as c_uint)) as c_int) | ((__local_cc__goto_116_12[((1 + 2) + 1)]) as c_int)) as c_uint) as c_int)))
         (__local_slot__goto_482_18 = ((__param_re as *const u8) + (sizeof[pcre2_real_code_8]() as usize)) + ((((((((__local_cc__goto_116_12[1]) as c_int) << (8 as c_uint)) as c_int) | ((__local_cc__goto_116_12[(1 + 1)]) as c_int)) as c_uint) *% (((*__param_re).name_entry_size as c_int) as c_uint)) as usize))
-        (__local_d__goto_137_7 = ((2147483647 as c_int)))
+        (__local_d__goto_137_7 = ((libc.INT_MAX as c_int)))
         goto '__ci_bb_97
     }
 
@@ -1814,7 +1814,7 @@ unsafe fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *co
     '__ci_bb_165 {
         (__ci_expr_logic_25 = 0)
         if ((if __local_d__goto_137_7 > 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_25 = (if (if (2147483647 / __local_d__goto_137_7) < __local_min__goto_137_10: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_25 = (if (if (libc.INT_MAX / __local_d__goto_137_7) < __local_min__goto_137_10: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_25 != 0) {
             (__ci_expr_logic_26 = (if true: 1 else: 0))

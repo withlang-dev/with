@@ -3804,7 +3804,7 @@ pub unsafe fn _pcre2_check_escape_8(__param_ptrptr: *mut *const u8, __param_ptre
     }
 
     '__ci_bb_153 {
-        (__local_s__goto_1611_7 = ((2147483647 as c_int)))
+        (__local_s__goto_1611_7 = ((libc.INT_MAX as c_int)))
         goto '__ci_bb_154
     }
 
@@ -5354,7 +5354,7 @@ unsafe fn get_branchlength(__param_pptrptr: *mut *mut c_uint, __param_minptr: *m
     }
 
     '__ci_bb_9 {
-        if ((if (2147483647 - __local_branchlength__goto_9580_5) < ((__local_itemlength__goto_9608_12 as c_int)): 1 else: 0) != 0) {
+        if ((if (libc.INT_MAX - __local_branchlength__goto_9580_5) < ((__local_itemlength__goto_9608_12 as c_int)): 1 else: 0) != 0) {
             (__ci_expr_logic_10 = (if true: 1 else: 0))
         } else {
             (__local_branchlength__goto_9580_5 = ((((__local_branchlength__goto_9580_5 as c_uint) + __local_itemlength__goto_9608_12) as c_int)))
@@ -6081,7 +6081,7 @@ unsafe fn get_branchlength(__param_pptrptr: *mut *mut c_uint, __param_minptr: *m
             (__ci_expr_logic_8 = (if (if __local_max__goto_9606_17 != 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_8 != 0) {
-            (__ci_expr_logic_9 = (if (if (((2147483647 - __local_branchlength__goto_9580_5) as c_uint) / (__local_lastitemlength__goto_9583_10 as c_uint)) < ((__local_max__goto_9606_17 as c_uint) -% (1 as c_uint)): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_9 = (if (if (((libc.INT_MAX - __local_branchlength__goto_9580_5) as c_uint) / (__local_lastitemlength__goto_9583_10 as c_uint)) < ((__local_max__goto_9606_17 as c_uint) -% (1 as c_uint)): 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_9 != 0) {
             goto '__ci_bb_121
@@ -6593,7 +6593,7 @@ unsafe fn set_lookbehind_lengths(__param_pptrptr: *mut *mut c_uint, __param_errc
 
     var __local_maxlength: c_int = ((0 as c_int))
 
-    var __local_minlength: c_int = ((2147483647 as c_int))
+    var __local_minlength: c_int = ((libc.INT_MAX as c_int))
 
     var __local_variable: c_int = ((0 as c_int))
 
@@ -26723,7 +26723,7 @@ unsafe fn get_grouplength(__param_pptrptr: *mut *mut c_uint, __param_minptr: *mu
     '__ci_bb_0 {
         (__local_gi__goto_9506_11 = (*__param_cb).groupinfo + (((2 * __param_group) as isize) as usize))
         (__local_grouplength__goto_9508_5 = ((-1 as c_int)))
-        (__local_groupminlength__goto_9509_5 = ((2147483647 as c_int)))
+        (__local_groupminlength__goto_9509_5 = ((libc.INT_MAX as c_int)))
         (__ci_expr_logic_0 = 0)
         if ((if __param_group > 0: 1 else: 0) != 0) {
             (__ci_expr_logic_0 = (if (if (((*__param_cb).external_flags as c_uint) & (2097152 as c_uint)) == 0: 1 else: 0) != 0: 1 else: 0))

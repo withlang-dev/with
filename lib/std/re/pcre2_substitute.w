@@ -28,6 +28,7 @@ use std.re.pcre2_string_utils
 use std.re.pcre2_study
 use std.re.pcre2_valid_utf
 use std.re.pcre2_xclass
+use std.libc
 use std.option
 
 pub unsafe fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *const u8, __param_length: c_ulong, __param_start_offset: c_ulong, __param_options: c_uint, __param_match_data: *mut pcre2_real_match_data_8, __param_mcontext: *mut pcre2_real_match_context_8, __param_replacement: *const u8, __param_rlength: c_ulong, __param_buffer: *mut u8, __param_blength: *mut c_ulong) -> c_int writes _pcre2_default_match_context_8 {
@@ -988,7 +989,7 @@ pub unsafe fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param
     '__ci_bb_84 {
         (__local_ovecsave__goto_762_12[0] = (((__local_ovector__goto_761_13[0]) as c_ulong)))
         (__local_ovecsave__goto_762_12[1] = (((__local_ovector__goto_761_13[1]) as c_ulong)))
-        if ((if __local_subs__goto_744_5 == 2147483647: 1 else: 0) != 0) {
+        if ((if __local_subs__goto_744_5 == libc.INT_MAX: 1 else: 0) != 0) {
             goto '__ci_bb_88
         } else {
             goto '__ci_bb_89

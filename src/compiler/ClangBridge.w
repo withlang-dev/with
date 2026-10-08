@@ -2245,7 +2245,12 @@ unsafe fn cimport_build_args(args: *mut *const u8, cxx: bool):
     args[n + 1] = if cxx: "c++\0" as *const u8 else: "c\0" as *const u8
     // Restore glibc's ordinary POSIX/BSD surface, as the C importer does.
     args[n + 2] = "-D_DEFAULT_SOURCE\0" as *const u8
-    n += 3
+    // Every error keeps its location: past clang's default limit of 20 the
+    // rest collapse into one location-less "too many errors emitted", which
+    // the macro probe reads as a header error and so threw away every probe
+    // of every pcre2 unit (#2265).
+    args[n + 3] = "-ferror-limit=0\0" as *const u8
+    n += 4
     var ip = 0
     while ip < g_cimport_include_count:
         args[n] = "-I\0" as *const u8
@@ -2258,10 +2263,10 @@ unsafe fn cimport_build_args(args: *mut *const u8, cxx: bool):
 // array here so every declaration/macro parse gets the complete search path.
 unsafe fn cimport_parse_translation_unit(index: *mut u8, path: *const u8, cxx: bool, options: u32) -> *mut u8:
     if g_cimport_include_error: return 0 as *mut u8
-    // At most fourteen fixed arguments: sysroot(2), host library dirs(4),
-    // target(3), resource(2), mode(3) — or, with a C model, target(5) in
+    // At most fifteen fixed arguments: sysroot(2), host library dirs(4),
+    // target(3), resource(2), mode(4) — or, with a C model, target(5) in
     // place of the first nine.
-    let capacity = 14 + g_cimport_include_count as i64 * 2
+    let capacity = 15 + g_cimport_include_count as i64 * 2
     let args = with_alloc(capacity * 8) as *mut *const u8
     if args as i64 == 0: return 0 as *mut u8
     let nargs = cimport_build_args(args, cxx)
