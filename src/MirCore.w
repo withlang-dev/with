@@ -4546,7 +4546,7 @@ pub fn validate_typed_mir_body(mir_mod: &MirModule, body: &MirBody) -> MirValida
                     return mir_validation_fail(body.fn_sym, span, f"array_fill assigned to a non-array place (ty={dest_ty})")
                 let fill_elem = mir_mod.mir_get_type_d0(fill_arr)
                 if mir_mod.sema_non_copy_fill_types.contains(fill_elem):
-                    return mir_validation_fail(body.fn_sym, span, f"array_fill of a non-Copy element (ty={fill_elem}) copies one value into every slot: N owners of one value (§2.3); a non-Copy fill evaluates its value once per element")
+                    return mir_validation_fail(body.fn_sym, span, f"array_fill of an element that is not plain bits (ty={fill_elem}: not Copy, or Copy with drop glue) copies one value into every slot: N owners of one value (§2.3); such a fill evaluates its value once per element (§4.3a)")
             else if rk == RvalueKind.RK_REF:
                 if mir_validate_place_type(mir_mod, body, rv_d1) == 0:
                     return mir_validation_fail(body.fn_sym, span, "ref rvalue does not resolve to a concrete place type")

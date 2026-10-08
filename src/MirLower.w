@@ -6593,7 +6593,7 @@ impl MirBuilder:
             if rhs_kind == OperandKind.OK_MOVE or rhs_kind == OperandKind.OK_COPY:
                 if self.places_are_identical(place, self.body.operand_d0[rhs]) != 0:
                     return rhs
-        if dest_ty != 0 and not self.copy_is_bits(dest_ty):
+        if dest_ty != 0 and self.sema.type_needs_drop_frozen(dest_ty) != 0:
             // #747 (03h): D27 — a binding names WHAT'S THERE. A live view
             // binding aliasing exactly this place names the OLD value, so
             // re-targeting the place must not free or re-read it through the
@@ -8032,12 +8032,14 @@ impl MirBuilder:
                 let iter_std = self.sema.std_generic_of(resolved as i32)
                 if iter_std != StdGeneric.None:
                     if iter_std == StdGeneric.Vec:
-                        // §13 implicit iteration borrows the collection.
-                        // Drop-class elements iterate as &T views; Copy-class
-                        // elements keep owned bindings read through the
-                        // borrowed place (lower_for_vec no longer moves it).
+                        // §13 implicit iteration borrows the collection. An
+                        // element with drop glue (Drop-class, or a str under
+                        // D111) iterates as a &T view, as Sema binds it
+                        // (for_iterable_yields_views); any other element keeps
+                        // an owned binding read through the borrowed place
+                        // (lower_for_vec no longer moves it).
                         let bare_elem = self.sema.get_generic_inst_arg(resolved as i32, 0)
-                        if not self.copy_is_bits(bare_elem):
+                        if self.sema.type_needs_drop_frozen(bare_elem) != 0:
                             return self.lower_for_iter_ref(for_node, pat_or_sym, iter_expr, body_expr)
                         return self.lower_for_vec(for_node, pat_or_sym, iter_expr, body_expr)
                     if iter_std == StdGeneric.HashMap:
@@ -8062,7 +8064,7 @@ impl MirBuilder:
                         // borrow split as the bare-Vec dispatch.
                         self.body.note_elided_call_node(iter_expr)
                         let it_elem = self.sema.get_generic_inst_arg(recv_resolved as i32, 0)
-                        if not self.copy_is_bits(it_elem):
+                        if self.sema.type_needs_drop_frozen(it_elem) != 0:
                             return self.lower_for_iter_ref(for_node, pat_or_sym, recv, body_expr)
                         return self.lower_for_vec(for_node, pat_or_sym, recv, body_expr)
                 if iter_intrinsic == MirIntrinsic.VEC_ITER_REF and self.sema.std_generic_of(self.expr_type(recv)) == StdGeneric.Vec:
@@ -9646,7 +9648,7 @@ impl MirBuilder:
         let entries_place = self.named_field_place(map_place, self.pool.intern("entries"), storage_ty, 0)
         let resolved_storage = self.sema.resolve_alias(storage_ty)
         let pair_ty = self.sema.get_generic_inst_arg(resolved_storage as i32, 0)
-        if not self.copy_is_bits(pair_ty):
+        if self.sema.type_needs_drop_frozen(pair_ty) != 0:
             return self.lower_for_iter_ref_place(for_node, pat_or_sym, entries_place, self.ast.get_start(iter_expr), body_expr)
         self.lower_for_vec_place(for_node, pat_or_sym, entries_place, self.loop_element_type(for_node), self.ast.get_start(iter_expr), body_expr)
 
@@ -12131,14 +12133,20 @@ impl MirBuilder:
                 sema_phase_bug(f"BUG: an implicit fill reached a non-Copy by-value parameter {param_i} (D87: an implicit fill never consumes; Sema fills only `implicit &T` or a Copy `implicit T`)")
         let fill = if op >= 0 and self.body.operand_kinds[op] == OperandKind.OK_MOVE: self.body.new_operand(OperandKind.OK_COPY, self.body.operand_d0[op]) else: op
         // D111: a Copy fill with drop glue (an `implicit str`) takes its own hold.
-        if fill >= 0 and self.body.operand_kinds[fill] == OperandKind.OK_COPY and not self.call_param_borrows(sig_idx, param_i, 0):
+        if fill >= 0 and self.body.operand_kinds[fill] == OperandKind.OK_COPY and sig_idx >= 0 and param_i >= 0 and param_i < self.sema.sig_get_param_count(sig_idx) and self.call_param_owns(sig_idx, param_i, self.sema.sig_param_type(sig_idx, param_i)):
             self.retain_consumed_copy(fill)
         fill
 
-    // A share-place (value_ref_abi) parameter borrows its argument; any other
-    // parameter owns what it is passed.
+    // A share-place (value_ref_abi) parameter borrows its argument.
     fn call_param_borrows(sig_idx: i32, arg_i: i32, expected_ty: i32) -> bool:
         if sig_idx >= 0: arg_i >= 0 and self.sema.sig_param_uses_value_ref_abi(sig_idx, arg_i) != 0 else: self.sema.type_uses_c_va_list_place(expected_ty) != 0
+
+    // A parameter that owns what it is passed: neither a `&T` nor a
+    // share-place one. A copy into it takes its own hold (D111).
+    fn call_param_owns(sig_idx: i32, arg_i: i32, expected_ty: i32) -> bool:
+        if expected_ty > 0 and self.sema.get_type_kind(self.sema.resolve_alias(expected_ty as TypeId)) == TypeKind.TY_REF:
+            return false
+        not self.call_param_borrows(sig_idx, arg_i, expected_ty)
 
     mut fn lower_call_arg(arg_node: i32, sig_idx: i32, callable_fn_tid: i32, arg_i: i32, callee_sym: i32 = 0) -> i32:
         let saved_expected = self.expected_type
@@ -12161,12 +12169,12 @@ impl MirBuilder:
         let autocopy_ref_op = self.lower_auto_copy_ref_call_arg(arg_node, expected_ty)
         if autocopy_ref_op >= 0:
             self.expected_type = saved_expected
-            if not callee_share_place: self.consume_moved_operand(autocopy_ref_op)
+            if self.call_param_owns(sig_idx, arg_i, expected_ty): self.consume_moved_operand(autocopy_ref_op)
             return autocopy_ref_op
         let autoderef_op = self.lower_auto_deref_call_arg(arg_node, expected_ty)
         if autoderef_op >= 0:
             self.expected_type = saved_expected
-            if not callee_share_place: self.consume_moved_operand(autoderef_op)
+            if self.call_param_owns(sig_idx, arg_i, expected_ty): self.consume_moved_operand(autoderef_op)
             return autoderef_op
         // #604 stage 1: a Vec/array arg coerced to a []T / []mut T param borrows
         // the place into a fat-pointer view. Never materialize the collection —
@@ -16840,14 +16848,16 @@ impl MirBuilder:
                     if self.ast.get_extra(extra_start + fi) != first_node:
                         is_fill = false
                         break
-            let fill_value_is_copy = self.sema.is_copy_frozen(self.expr_type(first_node)) != 0
+            let fill_value_is_bits = self.copy_is_bits(self.expr_type(first_node))
             // §4.3a, §2.3 (#1814): a non-Copy fill evaluates its value once
             // per element at every N, so each element owns its own value. It
             // took the one-evaluation fill over 64 elements: one `s.clone()`
             // in N slots was N owners of one buffer (SIGSEGV at 65).
-            if is_fill and not fill_value_is_copy:
+            // A Copy value with drop glue (a str, D111) is the same: each slot
+            // holds its own copy.
+            if is_fill and not fill_value_is_bits:
                 return self.lower_non_copy_array_fill(node, first_node, elem_count)
-            // A Copy fill is one evaluation copied N times.
+            // A plain-bits fill is one evaluation copied N times.
             if is_fill and (elem_count > 64 or fill_count_node != 0):
                 let fill_op = self.lower_expr(first_node)
                 let fill_rv = self.body.new_rvalue(RvalueKind.RK_ARRAY_FILL, fill_op, elem_count, 0)

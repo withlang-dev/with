@@ -126,9 +126,10 @@ impl MirModule:
                 let arr_ty = mir_validate_place_type(self, body, body.stmt_d0[si])
                 if arr_ty > 0 and sema.get_type_kind(sema.resolve_alias(arr_ty as TypeId)) == TypeKind.TY_ARRAY:
                     filled.push(sema.get_type_d0(sema.resolve_alias(arr_ty as TypeId)))
+        // D111: a Copy element with drop glue (a str) needs a copy per slot too.
         for i in 0..filled.len():
             let ty = filled[i]
-            if ty > 0 and not self.sema_non_copy_fill_types.contains(ty) and sema.is_copy_frozen(ty) == 0:
+            if ty > 0 and not self.sema_non_copy_fill_types.contains(ty) and (sema.is_copy_frozen(ty) == 0 or sema.type_needs_drop_frozen(ty) != 0):
                 self.sema_non_copy_fill_types.insert(ty, 1)
         // #2108: every local typed as a generic declaration itself.
         for bi in 0..self.bodies.len():
@@ -450,10 +451,14 @@ pub fn mir_operand_text(body: &MirBody, operand_id: i32, pool: &InternPool, sema
     let k = body.operand_kinds[operand_id]
     let d0 = body.operand_d0[operand_id]
 
+    // D111: a copy's hold is part of what it does (codegen retains, or
+    // takes and blanks the source), so the dump names it.
+    let hold = body.operand_hold(operand_id)
+    let held = if hold == MIR_HOLD_RETAIN: "+retain" else if hold == MIR_HOLD_TAKE: "+take" else: ""
     if k == OperandKind.OK_COPY:
-        return "copy " ++ mir_place_text_named(body, d0, pool, sema)
+        return "copy" ++ held ++ " " ++ mir_place_text_named(body, d0, pool, sema)
     if k == OperandKind.OK_MOVE:
-        return "move " ++ mir_place_text_named(body, d0, pool, sema)
+        return "move" ++ held ++ " " ++ mir_place_text_named(body, d0, pool, sema)
     if k == OperandKind.OK_CONSTANT:
         return mir_const_text(body, d0, pool, sema)
 

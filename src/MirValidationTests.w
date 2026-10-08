@@ -1500,7 +1500,7 @@ fn array_fill_verdict(elem_is_copy: bool) -> str:
     with_str_clone_ref(validate_typed_mir_body(mir_mod, body).message)
 
 pub fn mir_test_non_copy_array_fill:
-    assert(array_fill_verdict(false).contains("array_fill of a non-Copy element (ty=2)"))
+    assert(array_fill_verdict(false).contains("array_fill of an element that is not plain bits (ty=2"))
     assert(array_fill_verdict(true) == "")
 
 // #2108: a local typed as a generic declaration with no type arguments

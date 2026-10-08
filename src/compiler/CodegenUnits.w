@@ -148,6 +148,13 @@ fn codegen_unit_emit_module(ctx: i64, unit_module: i64, obj_path: &str, opt_leve
         wl_module_dispose(unit_module)
         wl_context_dispose(ctx)
         return 1
+    // WITH_DUMP_LLIR_PRE: the unit as codegen built it, before any pass
+    // (the promotion below crashed on a malformed GEP before the
+    // single-module dump could run; WITH_CODEGEN_UNITS=1 for one unit).
+    if runtime_getenv("WITH_DUMP_LLIR_PRE").len() > 0:
+        runtime_eprint(f"===== PRE-PIPELINE LLVM IR (unit {k}) =====\n")
+        wl_print_ir(unit_module)
+        runtime_eprint(f"===== END PRE-PIPELINE LLVM IR (unit {k}) =====\n")
     // The promotion each function would have had at generation
     // (Codegen.run_mir_cleanup_passes), off the serial path.
     if wl_run_module_passes(unit_module, tm, "function(sroa,mem2reg)") != 0:
