@@ -278,6 +278,10 @@ pub type MirBuilder = ephemeral {
     // only view/constant result arms — the result is a VIEW of storage owned
     // elsewhere, so neither the result temp nor a binding of it may drop.
     last_if_result_view: i32,
+    // D111: the operand node being lowered that only reads its bytes (a
+    // str comparison or concat part): a &str read there is its pointee's
+    // bits, never a materialized owner.
+    observing_str_read: i32,
     string_field_alias_base_locals: Vec[i32],
     string_field_alias_path_starts: Vec[i32],
     string_field_alias_path_counts: Vec[i32],
@@ -379,6 +383,7 @@ fn MirBuilder.init(sema: &Sema, ast: AstPool, pool: InternPool, fn_sym: i32) -> 
         string_alias_local_ids: Vec.new(),
         string_alias_flags: Vec.new(),
         last_if_result_view: 0,
+        observing_str_read: 0,
         string_field_alias_base_locals: Vec.new(),
         string_field_alias_path_starts: Vec.new(),
         string_field_alias_path_counts: Vec.new(),
@@ -4729,7 +4734,11 @@ impl MirBuilder:
         0
 
     mut fn lower_str_concat_part(node: i32) -> i32:
+        // D111: a concat part only reads its bytes.
+        let saved_observing = self.observing_str_read
+        self.observing_str_read = node
         let lowered = self.lower_expr(node)
+        self.observing_str_read = saved_observing
         if self.body.operand_kinds[lowered] != OperandKind.OK_MOVE:
             return lowered
         let place: i32 = self.body.operand_d0[lowered]
@@ -5092,6 +5101,9 @@ impl MirBuilder:
         // value it read `move v.text` (#1394), a move no reset follows and
         // the owner's drop frees again.
         let observes_strings = is_cmp and self.type_id_is_str_or_str_ref(lhs_ty) != 0 and self.type_id_is_str_or_str_ref(rhs_ty) != 0
+        // D111: a compared &str reads its bytes; it is never materialized.
+        let saved_observing = self.observing_str_read
+        if observes_strings: self.observing_str_read = lhs_expr
         let lhs = if observes_strings and self.type_id_is_str(lhs_ty) != 0: self.lower_observer_probe_arg(lhs_expr) else: self.lower_comparison_operand(is_cmp, lhs_expr)
         if self.is_bare_none(rhs_expr) and (lhs_tk == TypeKind.TY_PTR or lhs_tk == TypeKind.TY_REF):
             self.expected_type = lhs_ty
@@ -5099,7 +5111,9 @@ impl MirBuilder:
             self.expected_type = lhs_ty
         else:
             self.expected_type = saved_expected
+        if observes_strings: self.observing_str_read = rhs_expr
         let rhs = if observes_strings and self.type_id_is_str(rhs_ty) != 0: self.lower_observer_probe_arg(rhs_expr) else: self.lower_comparison_operand(is_cmp, rhs_expr)
+        self.observing_str_read = saved_observing
         self.expected_type = saved_expected
         let rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, op, lhs, rhs)
         var ty = self.expr_type(node)
@@ -12364,6 +12378,10 @@ impl MirBuilder:
 
         let reference_place = self.materialize_operand(reference_op, adjustment.exact_source_type, self.ast.get_start(node))
         let pointee_place = self.new_deref_place(reference_place)
+        // D111: an operand that only reads bytes (a comparison, a concat part)
+        // takes the pointee's bits and owns nothing.
+        if self.observing_str_read == node and node != 0 and self.type_id_is_str(adjustment.owned_value_type) != 0:
+            return self.body.new_operand(OperandKind.OK_COPY, pointee_place)
         // #781: a str materialization mints an independent owner (two-part
         // concat copy); a shallow pointee copy would alias the buffer into a
         // double free.
@@ -12377,6 +12395,9 @@ impl MirBuilder:
             let sc_place = self.place_for_local(sc_tmp)
             self.body.push_stmt(self.cur_bb, StmtKind.Assign, sc_place, sc_rv, self.ast.get_start(node))
             self.set_string_local_flags(sc_tmp, 2)
+            // The materialized owner is a statement temp: whatever takes it moves
+            // it; otherwise it drops at the statement's end.
+            self.register_stmt_temp(sc_tmp, adjustment.owned_value_type)
             return self.body.new_operand(OperandKind.OK_MOVE, sc_place)
         let owned_op = self.body.new_operand(OperandKind.OK_COPY, pointee_place)
         if adjustment.post_copy_type == 0:
