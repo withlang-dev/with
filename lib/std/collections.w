@@ -72,8 +72,7 @@ impl[K, V] BTreeMap[K, V]:
     fn value_at(index: i64) -> &V: &self.entries[index].1
 
 impl[K: Ord, V] BTreeMap[K, V]:
-    // #773: pure read — takes &K so both view-holding callers (get/contains)
-    // and owning callers (remove, whose D22 contract keeps `key: K`) borrow.
+    // #773: pure read — takes &K; get/contains/remove all observe the key (D110).
     fn last_index_of(key: &K) -> i64:
         var found = -1
         var i = 0
@@ -121,7 +120,7 @@ impl[K: Ord, V] BTreeMap[K, V]:
             i = i + 1
         self.entries.push((key, value))
 
-    pub mut fn remove(key: K) -> Option[V]:
+    pub mut fn remove(key: &K) -> Option[V]:
         let idx = self.last_index_of(key)
         if idx < 0:
             return None
@@ -229,7 +228,7 @@ impl[T] BTreeSet[T]:
         self.values.clear()
 
 impl[T: Ord] BTreeSet[T]:
-    fn index_of(value: T) -> i64:
+    fn index_of(value: &T) -> i64:
         var i = 0
         while i < self.values.len():
             let existing = self.values[i]
@@ -273,7 +272,7 @@ impl[T: Ord] BTreeSet[T]:
             i = i + 1
         self.values.push(value)
 
-    pub mut fn remove(value: T) -> bool:
+    pub mut fn remove(value: &T) -> bool:
         let idx = self.index_of(value)
         if idx < 0:
             return false
