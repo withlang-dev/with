@@ -6547,7 +6547,7 @@ impl MirBuilder:
             if rhs_kind == OperandKind.OK_MOVE or rhs_kind == OperandKind.OK_COPY:
                 if self.places_are_identical(place, self.body.operand_d0[rhs]) != 0:
                     return rhs
-        if dest_ty != 0 and self.sema.is_copy_frozen(dest_ty) == 0 and self.sema.type_needs_drop_frozen(dest_ty) != 0:
+        if dest_ty != 0 and not self.copy_is_bits(dest_ty):
             // #747 (03h): D27 — a binding names WHAT'S THERE. A live view
             // binding aliasing exactly this place names the OLD value, so
             // re-targeting the place must not free or re-read it through the
