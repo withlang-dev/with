@@ -15790,7 +15790,8 @@ impl Codegen:
                 // user generic-function map.
                 let gc_is_generic_builtin = gc_call_builtin == CallBuiltin.Transmute or gc_call_builtin == CallBuiltin.SizeOf or
                     gc_call_builtin == CallBuiltin.AlignOf or gc_call_builtin == CallBuiltin.NameOf or
-                    gc_call_builtin == CallBuiltin.EmbedFile or gc_call_builtin == CallBuiltin.Chan or gc_call_builtin == CallBuiltin.KeyHash
+                    gc_call_builtin == CallBuiltin.EmbedFile or gc_call_builtin == CallBuiltin.Chan or gc_call_builtin == CallBuiltin.KeyHash or
+                    gc_call_builtin == CallBuiltin.OffsetOf
                 let gc_fallback_mir_count = body.call_arg_counts[args_id]
                 let gc_fallback_ast_count = if self.pool.kind(gc_node) == NodeKind.NK_CALL: self.pool.get_data2(gc_node) else: -1
                 var gc_is_static_field_access_call = false
@@ -15984,8 +15985,9 @@ impl Codegen:
                             let gc_next_val = self.mir_bb_values[next_bb]
                             wl_build_br(self.builder, gc_next_val)
                         return true
-                    if gc_builtin == CallBuiltin.SizeOf or gc_builtin == CallBuiltin.AlignOf:
-                        let gc_result = self.gen_sizeof_alignof(gc_builtin == CallBuiltin.SizeOf, gc_node)
+                    if gc_builtin == CallBuiltin.SizeOf or gc_builtin == CallBuiltin.AlignOf or gc_builtin == CallBuiltin.OffsetOf:
+                        let gc_result = if gc_builtin == CallBuiltin.OffsetOf: self.gen_offsetof(gc_node)
+                            else: self.gen_sizeof_alignof(gc_builtin == CallBuiltin.SizeOf, gc_node)
                         if dest_place >= 0 and gc_result != 0:
                             let gc_ret_ty = wl_type_of(gc_result)
                             if gc_ret_ty != wl_void_type(self.context):
@@ -20100,6 +20102,24 @@ impl Codegen:
             self.had_error = 1
             return wl_const_int(wl_i64_type(self.context), 0, 0)
         wl_const_int(wl_i64_type(self.context), self.sema.type_layout_align_of_frozen(sema_tid), 0)
+
+    // D109 (#2131): `offsetof[T](field)` is the field's offset in T's
+    // layout for this target: Sema named the field (offsetof_field_indices)
+    // and the layout model places it, so a 32-bit target gets its own offsets
+    // and never the host's (the migrated pcre2 carried 64-bit frame offsets
+    // onto wasm32).
+    mut fn gen_offsetof(node: i32) -> i64:
+        let callee_node = self.pool.get_data0(node)
+        let callee_kind = self.pool.kind(callee_node)
+        let tp_node = if callee_kind == NodeKind.NK_TYPE_GENERIC: self.pool.get_extra(self.pool.get_data1(callee_node))
+            else: self.pool.get_data1(callee_node)
+        let sema_tid = self.sema_type_level_arg(tp_node)
+        let field_index = self.sema.offsetof_field_indices.get(node) ?? -1
+        if sema_tid <= 0 or field_index < 0:
+            with_eprint(f"error: BUG: offsetof call {node} in {self.sema_symbol_text(self.current_function_name_sym)} has no Sema type or field (D109)")
+            self.had_error = 1
+            return wl_const_int(wl_i64_type(self.context), 0, 0)
+        wl_const_int(wl_i64_type(self.context), self.sema.type_layout_struct_field_offset_frozen(sema_tid, field_index), 0)
 
     // ── nameof/type_name intrinsic ─────────────────────────────────────
 

@@ -674,7 +674,7 @@ pub unsafe fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param
     }
 
     '__ci_bb_41 {
-        with_memcpy(((__local_internal_match_data__goto_748_19 as *mut c_void) as *mut u8), ((__local_match_data as *const c_void) as *const u8), ((((120 as c_ulong) +% ((((2 * __local_pairs__goto_887_7) as c_ulong) *% (sizeof[usize]() as c_ulong)) as c_ulong)) as c_ulong) as i64))
+        with_memcpy(((__local_internal_match_data__goto_748_19 as *mut c_void) as *mut u8), ((__local_match_data as *const c_void) as *const u8), (((((offsetof[pcre2_real_match_data_8](ovector) as usize) as c_ulong) +% ((((2 * __local_pairs__goto_887_7) as c_ulong) *% (sizeof[usize]() as c_ulong)) as c_ulong)) as c_ulong) as i64))
         ((*__local_internal_match_data__goto_748_19).heapframes = ((null as *mut heapframe)))
         ((*__local_internal_match_data__goto_748_19).heapframes_size = ((0 as c_ulong)))
         ((*__local_internal_match_data__goto_748_19).flags = ((*__local_internal_match_data__goto_748_19).flags as u8) & ((~1) as u8))

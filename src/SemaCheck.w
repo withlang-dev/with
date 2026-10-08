@@ -7122,7 +7122,7 @@ impl Sema:
                 return true
         // A type-level builtin (`transmute[T](f)`, `sizeof[T]()`, …) never
         // invokes its operand: handing it a callable is not a suspend site.
-        if self.is_sizeof_or_alignof(callee) != 0 or self.is_nameof_call(callee) != 0 or self.is_transmute_call(callee) != 0 or self.is_chan_call(callee) != 0 or self.is_key_hash_call(callee) != 0:
+        if self.is_sizeof_or_alignof(callee) != 0 or self.is_nameof_call(callee) != 0 or self.is_transmute_call(callee) != 0 or self.is_chan_call(callee) != 0 or self.is_key_hash_call(callee) != 0 or self.is_offsetof_call(callee) != 0:
             return false
         self.args_hand_over_suspending_callable(node, self.ast.get_data1(node), self.ast.get_data2(node), site)
 
@@ -23992,6 +23992,14 @@ impl Sema:
             return 1
         0
 
+    // D109: `offsetof[T](field)`.
+    fn is_offsetof_call(callee: i32) -> i32:
+        let kind = self.ast.kind(callee)
+        if kind != NodeKind.NK_TYPE_GENERIC and kind != NodeKind.NK_INDEX:
+            return 0
+        let gi_name = self.generic_builtin_callee_name(callee)
+        if gi_name == "offsetof" or gi_name == "offset_of": 1 else: 0
+
     fn generic_builtin_callee_name(callee: i32) -> str:
         let kind = self.ast.kind(callee)
         let gi_base = self.ast.get_data0(callee)
@@ -24012,6 +24020,46 @@ impl Sema:
         if kind == NodeKind.NK_INDEX:
             return self.ast.get_data1(callee)
         0
+
+    // D109 (#2131): `offsetof[T](field)` — T a struct (a generic instance
+    // included), `field` the bare name of one of its fields. The field is a
+    // name in T's declaration, never an expression: it is resolved here and
+    // recorded by index; MIR lowers no operand for it and codegen reads the
+    // target's layout. The result is the byte offset, `i64` like `sizeof`.
+    mut fn check_offsetof_call(node: i32, callee: i32, extra_start: i32, arg_count: i32) -> i32:
+        let type_arg_node = self.sizeof_alignof_type_arg_node(callee)
+        if type_arg_node == 0:
+            self.emit_error("offsetof expects exactly one type argument", callee)
+            return 0
+        let owner_ty = self.resolve_type_level_arg_expr(type_arg_node)
+        if owner_ty == 0:
+            self.emit_error("offsetof type argument could not be resolved", type_arg_node)
+            return 0
+        if self.reject_opaque_value_type(owner_ty, type_arg_node, "offsetof") != 0:
+            return 0
+        if arg_count != 1:
+            self.emit_error("offsetof takes the field's name: offsetof[T](field)", node)
+            return 0
+        let field_node = self.ast.get_extra(extra_start)
+        if self.ast.kind(field_node) != NodeKind.NK_IDENT:
+            self.emit_error("offsetof takes a field name, not an expression", field_node)
+            return 0
+        let field_sym = self.ast.get_data0(field_node)
+        let field_count = self.type_reflection_field_count(owner_ty)
+        if field_count == 0 and self.get_type_kind(self.resolve_alias(owner_ty as TypeId)) != TypeKind.TY_STRUCT:
+            self.emit_error("offsetof's type argument is not a struct: " ++ self.type_name(owner_ty), type_arg_node)
+            return 0
+        var field_index = -1
+        for fi in 0..field_count:
+            if self.type_reflection_field_name(owner_ty, fi) == field_sym:
+                field_index = fi
+        if field_index < 0:
+            self.emit_error("unknown field '" ++ self.pool_resolve(field_sym) ++ "' for type '" ++ self.type_name(owner_ty) ++ "'", field_node)
+            return 0
+        self.note_type_level_arg(type_arg_node, owner_ty)
+        self.offsetof_field_indices.insert(node, field_index)
+        self.typed_expr_types.insert(node, self.ty_i64 as i32)
+        self.ty_i64 as i32
 
     fn sizeof_alignof_name(callee: i32) -> str:
         let name = self.generic_builtin_callee_name(callee)
@@ -24640,7 +24688,7 @@ impl Sema:
             return vector_call
 
         // sizeof[T]() / alignof[T]() / transmute[T]() / nameof[T]() builtins
-        if self.is_sizeof_or_alignof(callee) != 0 or self.is_nameof_call(callee) != 0 or self.is_transmute_call(callee) != 0 or self.is_chan_call(callee) != 0 or self.is_key_hash_call(callee) != 0:
+        if self.is_sizeof_or_alignof(callee) != 0 or self.is_nameof_call(callee) != 0 or self.is_transmute_call(callee) != 0 or self.is_chan_call(callee) != 0 or self.is_key_hash_call(callee) != 0 or self.is_offsetof_call(callee) != 0:
             self.note_call_callee(node, CallCalleeKind.TypeLevelBuiltin)
             let tl_name = self.generic_builtin_callee_name(callee)
             let tl_builtin = if tl_name == "sizeof" or tl_name == "size_of": CallBuiltin.SizeOf
@@ -24648,8 +24696,11 @@ impl Sema:
                 else if tl_name == "nameof" or tl_name == "type_name": CallBuiltin.NameOf
                 else if tl_name == "transmute": CallBuiltin.Transmute
                 else if tl_name == "with_key_hash": CallBuiltin.KeyHash
+                else if tl_name == "offsetof" or tl_name == "offset_of": CallBuiltin.OffsetOf
                 else: CallBuiltin.Chan
             self.call_builtins.insert(node, tl_builtin as i32)
+        if self.is_offsetof_call(callee) != 0:
+            return self.check_offsetof_call(node, callee, extra_start, arg_count)
         if self.is_sizeof_or_alignof(callee) != 0:
             let type_arg_node = self.sizeof_alignof_type_arg_node(callee)
             if type_arg_node == 0:
@@ -33118,7 +33169,7 @@ impl Sema:
     // those predicates.
     fn generic_builtin_syms() -> Vec[i32]:
         let out: Vec[i32] = Vec.new()
-        let names = ["sizeof", "size_of", "alignof", "align_of", "transmute", "nameof", "type_name", "chan", "with_key_hash"]
+        let names = ["sizeof", "size_of", "alignof", "align_of", "transmute", "nameof", "type_name", "chan", "with_key_hash", "offsetof", "offset_of"]
         for i in 0..names.len() as i32:
             let sym = self.pool_lookup_symbol(names[i])
             if sym != 0: out.push(sym)
@@ -33146,7 +33197,7 @@ impl Sema:
             if self.is_intrinsic_fn_sym(sym) != 0 or self.fn_symbol_is_std_builtins_drop(sym) != 0:
                 return 1
             return 0
-        if self.is_sizeof_or_alignof(callee) != 0 or self.is_transmute_call(callee) != 0 or self.is_nameof_call(callee) != 0 or self.is_chan_call(callee) != 0 or self.is_key_hash_call(callee) != 0:
+        if self.is_sizeof_or_alignof(callee) != 0 or self.is_transmute_call(callee) != 0 or self.is_nameof_call(callee) != 0 or self.is_chan_call(callee) != 0 or self.is_key_hash_call(callee) != 0 or self.is_offsetof_call(callee) != 0:
             return 1
         if self.typeinfo_module_field(callee) != 0:
             return 1

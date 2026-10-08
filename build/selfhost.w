@@ -4494,6 +4494,41 @@ fn bs_check_migrate_enum_constants_are_int(ctx: &ActionCtx, compiler_path: &str,
     if run.rc != 0: return run.rc
     0
 
+// D109 (#2131): `offsetof(T, f)` migrates to the `offsetof[T](f)` builtin,
+// never to clang's folded number (the host's layout; pcre2's frame offsets
+// were wrong on wasm32). An initializer, a macro constant and an expression
+// through a cast all spell it; a nested designator stays loud.
+fn bs_check_migrate_offsetof(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "offsetof.c")
+    let out_w = bs_join(case_dir, "offsetof.w")
+    let c_text = "#include <stddef.h>\ntypedef struct frame { unsigned char tag; const char *eptr; unsigned long ovector[4]; } frame;\ntypedef struct real_md { int a; frame inner; } md_t;\n#define md md_t\n#define OVECTOR_AT offsetof(frame, ovector)\nstatic const unsigned long eptr_at = offsetof(frame, eptr);\n\nunsigned long frame_size(int extra) {\n  return (unsigned long)offsetof(frame, ovector) + (unsigned long)extra * sizeof(unsigned long);\n}\n\nunsigned long nested_at(void) { return offsetof(md, inner.ovector); }\n\nint main(void) {\n  frame f;\n  md_t m;\n  if (nested_at() != (unsigned long)((char *)&m.inner.ovector[0] - (char *)&m)) return 5;\n  if (eptr_at != (unsigned long)((char *)&f.eptr - (char *)&f)) return 1;\n  if (OVECTOR_AT != (unsigned long)((char *)&f.ovector[0] - (char *)&f)) return 2;\n  if (frame_size(4) != sizeof(frame)) return 3;\n  return 0;\n}\n"
+    var rc = bs_write_fixture(ctx, src, c_text, "migrate offsetof")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-offsetof", args)
+    if result.rc != 0: return result.rc
+    let out_text = ctx.fs().read_text(out_w)
+    rc = bs_assert_contains(ctx, out_text, "offsetof[frame](eptr)", "offsetof")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "offsetof[frame](ovector)", "offsetof")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "((offsetof[real_md](inner) + offsetof[frame](ovector)) as usize)", "offsetof: macro-named record, nested designator")
+    if rc != 0: return rc
+    rc = bs_assert_not_contains(ctx, out_text, "= 16", "offsetof: folded host offset")
+    if rc != 0: return rc
+    var run_args: Vec[str] = Vec.new()
+    run_args |> push("run")
+    run_args |> push(bs_abs(root, out_w))
+    let run = bs_migrate_expect_success(ctx, compiler_path, case_dir, "run-offsetof", run_args)
+    if run.rc != 0: return run.rc
+    0
+
 fn bs_check_migrate_rvalue_sequencing(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "rvalue_sequencing.c")
@@ -5160,6 +5195,8 @@ pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     rc = bs_check_migrate_enum_constants_are_int(ctx, compiler_path, bs_join(output_dir, "enum_constants_are_int"))
     if rc != 0: return rc
     rc = bs_check_migrate_rvalue_sequencing(ctx, compiler_path, bs_join(output_dir, "rvalue_sequencing"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_offsetof(ctx, compiler_path, bs_join(output_dir, "offsetof"))
     if rc != 0: return rc
     rc = bs_check_migrate_directory_progress(ctx, compiler_path, bs_join(output_dir, "directory_progress"))
     if rc != 0: return rc

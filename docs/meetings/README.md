@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D109 — `offsetof[T](field)` is a built-in beside `sizeof`; a migrated `offsetof(T, f)` is spelled, never folded (delegated)](2026-10-07-D109-offsetof-builtin.md)
 - [D108 — Length is pointer-width: `len()`, `count()` and `position()` return `isize`; `usize`/`isize` are 32 bits on wasm32](2026-10-07-D108-length-is-pointer-width-isize.md)
 - [D107 — A migrated definition's function-pointer parameter is `Option` by evidence (body test, NULL caller, nullable sink), computed as a corpus fixed point; system prototypes stay under D102](2026-10-06-D107-nullable-by-evidence.md)
 - [D106 — Law 2 has an order: a demand binds the signature's unknowns first, conversions bind nothing, and an expression's own operands bind before the outer demand](2026-10-06-D106-law2-demand-order.md)

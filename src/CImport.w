@@ -48,6 +48,32 @@ var g_cimport_no_methods_types: Vec[str] = Vec.new()
 var g_ci_prior_macro_consts: str = "|"
 var g_ci_current_macro_consts: str = "|"
 
+// D109 (#2131): the `offsetof[T](f)` spelling of object macro `name` when
+// its value is an offsetof (`#define HEAPFRAME_ALIGNMENT offsetof(
+// heapframe_align, frame)`), "" otherwise. A body's use of such a macro is
+// spelled with the builtin, like the macro's own `let`, never clang's
+// folded value (the host's layout: 8 on every target for pcre2's).
+fn ci_offsetof_macro_text(session: i64, name: &str) -> str:
+    let value = ci_peek_macro_value(name)
+    if value.len() == 0 or not value.contains("offsetof"):
+        return ""
+    ci_try_translate_offsetof_expr(session, value)
+
+// Whether `src` names an offsetof macro anywhere among its identifiers.
+fn ci_source_names_offsetof_macro(session: i64, src: &str) -> bool:
+    var i = 0
+    while i < src.len():
+        if ci_is_ident_start(src[i]):
+            var j = i + 1
+            while j < src.len() and ci_is_ident_char(src[j]):
+                j += 1
+            if ci_offsetof_macro_text(session, src.slice(i, j)).len() > 0:
+                return true
+            i = j
+        else:
+            i += 1
+    false
+
 // A compilation's first c_import starts with no earlier constants
 // (Zcu.expand_c_imports_frontend, beside with_cimport_reset_names).
 pub fn ci_reset_macro_consts():
@@ -3154,12 +3180,15 @@ fn ci_offsetof_record_type_name(raw_type: &str) -> str:
         return ci_trim(t.slice(6, t.len()))
     t
 
-fn ci_try_translate_offsetof_expr(session: i64, expr: &str) -> str:
+// D109 (#2131): the text of `offsetof(T, designator)`, as [T, designator],
+// or empty when `expr` is not an offsetof invocation.
+fn ci_offsetof_text_args(expr: &str) -> Vec[str]:
+    let out: Vec[str] = Vec.new()
     let t = ci_trim(ci_strip_parens(expr))
     var fn_name = ""
     var args = ""
     var call_paren = 0
-    while call_paren < t.len() as i32 and t[call_paren] != 40:
+    while call_paren < t.len() as i32 and t[call_paren] != '(':
         call_paren = call_paren + 1
     if call_paren > 0 and call_paren < t.len() as i32:
         fn_name = ci_trim(t.slice(0, call_paren as i64))
@@ -3167,15 +3196,84 @@ fn ci_try_translate_offsetof_expr(session: i64, expr: &str) -> str:
         if close_paren == t.len() as i32 - 1 and t.len() > call_paren as i64 + 1:
             args = t.slice(call_paren as i64 + 1, t.len() - 1)
     if fn_name != "offsetof" and fn_name != "__builtin_offsetof":
-        return ""
+        return out
     let type_arg = ci_offsetof_record_type_name(ci_extract_first_arg(args))
-    let field_arg = ci_trim(ci_after_first_arg(args))
-    if type_arg.len() == 0 or field_arg.len() == 0:
+    let designator = ci_trim(ci_after_first_arg(args))
+    if type_arg.len() == 0 or designator.len() == 0:
+        return out
+    out.push(type_arg)
+    out.push(designator)
+    out
+
+// The With spelling of field `field`'s type in the record `record` names
+// (a tag, or a typedef of one resolved through typedefs, or a typedef of an
+// anonymous record), "" when the record has no such field. The record
+// index (#744) names the first DEFINITION of a tag: a forward declaration
+// of the same name has no fields (pcre2's `struct pcre2_real_match_data`).
+fn ci_record_field_type_spelling(session: i64, record: &str, field: &str) -> str:
+    var cur = with_str_clone_ref(record)
+    for _ in 0..8:
+        let sidx = ci_record_index_struct(session, cur)
+        if sidx >= 0:
+            for fi in 0..with_cimport_struct_field_count(session, sidx):
+                if with_cimport_struct_field_name(session, sidx, fi) == field:
+                    return with_cimport_struct_field_type_translated(session, sidx, fi)
+            return ""
+        let tidx = ci_record_index_typedef(session, cur)
+        if tidx < 0:
+            return ""
+        let target = ci_offsetof_record_type_name(with_cimport_typedef_underlying(session, tidx))
+        if target.len() == 0 or target == cur or not ci_is_c_identifier(target):
+            for fi in 0..with_cimport_typedef_anon_record_field_count(session, tidx):
+                if with_cimport_typedef_anon_field_name(session, tidx, fi) == field:
+                    return with_cimport_typedef_anon_field_type(session, tidx, fi)
+            return ""
+        cur = target
+    ""
+
+// D109 (#2131): `offsetof(T, a.b)` as the `offsetof[T](a) + offsetof[A](b)`
+// builtins, so the offset is the target's and never the host's folded
+// number (pcre2's `offsetof(heapframe, ovector)` folded to 136 and was
+// wrong on wasm32). Each step's record is the previous field's type; an
+// index component (`a[2]`) or an unknown field is "" (loud at the caller).
+fn ci_offsetof_spelling(session: i64, record: &str, designator: &str) -> str:
+    if designator.contains("["):
         return ""
-    let offset = with_cimport_record_field_offset_by_name(session, type_arg, field_arg)
-    if offset < 0:
+    var cur = with_str_clone_ref(record)
+    var out = ""
+    for step in designator.split("."):
+        let field = ci_trim(step)
+        if not ci_is_c_identifier(field) or not ci_is_c_identifier(cur):
+            return ""
+        let field_ty = ci_record_field_type_spelling(session, cur, field)
+        if field_ty.len() == 0:
+            return ""
+        let step_text = "offsetof[" ++ ci_escape_reserved(cur) ++ "](" ++ ci_escape_reserved(field) ++ ")"
+        out = if out.len() == 0: step_text else: out ++ " + " ++ step_text
+        cur = field_ty
+    // C's offsetof is a size_t, as `sizeof` is spelled in an object macro
+    // (a chain's sum is parenthesized: `as` binds tighter than `+`).
+    if designator.contains("."):
+        return "((" ++ out ++ ") as usize)"
+    "(" ++ out ++ " as usize)"
+
+// The text path: an object macro's value, an initializer, or a use of an
+// offsetof macro by name. A macro-suffixed record name (`pcre2_match_data`
+// for `pcre2_match_data_8`) expands first.
+fn ci_try_translate_offsetof_expr(session: i64, expr: &str) -> str:
+    let t = ci_trim(ci_strip_parens(expr))
+    if ci_is_c_identifier(t):
+        return ci_offsetof_macro_text(session, t)
+    let args = ci_offsetof_text_args(t)
+    if args.len() == 0:
         return ""
-    i64_to_string(offset)
+    var type_arg = args[0].clone()
+    for _ in 0..8:
+        let expanded = ci_peek_macro_value(type_arg)
+        if expanded.len() == 0 or not ci_is_c_identifier(expanded):
+            break
+        type_arg = expanded
+    ci_offsetof_spelling(session, type_arg, args[1])
 
 fn ci_strip_c_type_qualifier_prefixes(raw: &str) -> str:
     var t = ci_trim(raw)
@@ -3803,7 +3901,10 @@ pub fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) 
             if compound_literal_ty.len() > 0 and compound_literal_result.len() == 0:
                 ci_record_untranslated_object_macro(name, macro_is_system)
                 continue
-            if compound_literal_result.len() == 0:
+            // D109: an offsetof macro is spelled with the builtin, never probed
+            // for the host's number.
+            let offsetof_result = if compound_literal_result.len() > 0: "" else: ci_try_translate_offsetof_expr(type_session, stripped)
+            if compound_literal_result.len() == 0 and offsetof_result.len() == 0:
                 let probe_result = if macro_is_system == 0: probes.result(session, macro_source, name, cxx) else: ""
                 if probe_result.len() > 0:
                     ci_mark_macro_const_emitted(name)
@@ -3811,7 +3912,6 @@ pub fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) 
                     if not ci_migrate_shared_decl_add("let", ci_escape_reserved(name), probe_result):
                         output = output ++ probe_result ++ "\n"
                     continue
-            let offsetof_result = if compound_literal_result.len() > 0: "" else: ci_try_translate_offsetof_expr(type_session, stripped)
             // Give constant macro invocations and offsetof their semantic
             // translation before rejecting calls with no constant value.
             if compound_literal_result.len() == 0 and offsetof_result.len() == 0 and ci_object_macro_has_call_shape(stripped):
@@ -5226,6 +5326,15 @@ pub fn ci_is_ident_start(c: i32) -> bool:
 
 pub fn ci_is_ident_char(c: i32) -> bool:
     (c >= 65 and c <= 90) or (c >= 97 and c <= 122) or (c >= 48 and c <= 57) or c == 95
+
+// Whether `s` is one C identifier and nothing else.
+fn ci_is_c_identifier(s: &str) -> bool:
+    if s.len() == 0 or not ci_is_ident_start(s[0]):
+        return false
+    for i in 1..s.len():
+        if not ci_is_ident_char(s[i]):
+            return false
+    true
 
 // Translates to just evaluating X (discarding the result)
 
@@ -8578,6 +8687,8 @@ impl CiExprPool:
             if ci_unexposed_expr_is_va_arg(session, cursor):
                 return self.va_arg_expr(session, cursor, types, scope)
             let form = ci_unexposed_expr_form(session, cursor)
+            if form == CI_UNEXPOSED_OFFSETOF:
+                return self.lower_offsetof_value_expr(session, cursor)
             if form == CI_UNEXPOSED_CHOOSE:
                 let selected = ci_choose_expr_selected(session, cursor)
                 if selected < 0:
@@ -8590,7 +8701,7 @@ impl CiExprPool:
                 ci_bail_unsupported_unexposed(session, cursor)
                 return 0 as CiExprId
             let nc = with_ci_num_children(session, cursor)
-            if with_ci_eval_int_valid(session, cursor) != 0 and not ci_expr_children_need_rvalue_lowering(session, cursor):
+            if ci_fold_int_ok(session, cursor) and not ci_expr_children_need_rvalue_lowering(session, cursor):
                 let ival = with_ci_eval_int_value(session, cursor)
                 let text_idx = self.add_string(i64_to_string(ival))
                 return self.int_lit(text_idx, 0 as CiTypeId)
@@ -8639,7 +8750,7 @@ impl CiExprPool:
             let ptr_asgn_id = self.lower_binary_ptr_assign(session, cursor, types, scope)
             if (ptr_asgn_id as i32) != 0:
                 return ptr_asgn_id
-            if with_ci_eval_int_valid(session, cursor) != 0:
+            if ci_fold_int_ok(session, cursor):
                 let text_idx = self.add_string(ci_eval_int_text(session, cursor))
                 return self.int_lit(text_idx, 0 as CiTypeId)
             return 0 as CiExprId
@@ -8707,7 +8818,7 @@ impl CiExprPool:
                         let else_id = self.lower_expr_ir(session, else_cursor, types, scope)
                         if (else_id as i32) != 0:
                             return self.add(CiExprKind.CIE_TERNARY, cond_id as i32, then_id as i32, else_id as i32, 0 as CiTypeId)
-            if with_ci_eval_int_valid(session, cursor) != 0:
+            if ci_fold_int_ok(session, cursor):
                 let text_idx = self.add_string(ci_eval_int_text(session, cursor))
                 return self.int_lit(text_idx, 0 as CiTypeId)
             return 0 as CiExprId
@@ -8772,7 +8883,7 @@ impl CiExprPool:
                         let factor_id = self.int_lit(factor_idx, 0 as CiTypeId)
                         return self.binary(CiBinOp.CIBO_MUL, factor_id, sizeof_id, 0 as CiTypeId)
                 else:
-                    if with_ci_eval_int_valid(session, cursor) != 0:
+                    if ci_fold_int_ok(session, cursor):
                         let text_idx = self.add_string(ci_eval_int_text(session, cursor))
                         return self.int_lit(text_idx, 0 as CiTypeId)
             return 0 as CiExprId
@@ -9959,6 +10070,20 @@ pub fn ci_call_callee_name(session: i64, cursor: i32) -> str:
         return with_ci_cursor_spelling(session, c)
     ""
 
+// D109: `offsetof(T, designator)` at an OffsetOfExpr cursor: the record is
+// clang's TypeRef child (a typedef or a macro-suffixed name resolves to its
+// declaration), the designator the invocation's text; "" when the record
+// is not written (the text path then serves a macro's name).
+fn ci_offsetof_from_cursor(session: i64, cursor: i32) -> str:
+    let args = ci_offsetof_text_args(with_ci_cursor_source_text(session, cursor))
+    if args.len() == 0:
+        return ""
+    let type_ref = ci_find_child_of_kind(session, cursor, 43)
+    if type_ref < 0:
+        return ""
+    let record = ci_offsetof_record_type_name(with_ci_type_translated(session, with_ci_cursor_type(session, type_ref)))
+    ci_offsetof_spelling(session, record, args[1])
+
 fn ci_note_unsupported_offsetof(session: i64, cursor: i32):
     if g_ci_bail_message.len() == 0:
         g_ci_bail_message = "unsupported __builtin_offsetof expression"
@@ -9967,11 +10092,14 @@ fn ci_note_unsupported_offsetof(session: i64, cursor: i32):
 
 impl CiExprPool:
     fn lower_offsetof_value_expr(session: i64, cursor: i32) -> CiExprId:
-        if with_ci_eval_int_valid(session, cursor) != 0:
-            let text_idx = self.add_string(ci_eval_int_text(session, cursor))
-            return self.int_lit(text_idx, 0 as CiTypeId)
-        let src = with_ci_cursor_source_text(session, cursor)
-        let offset_text = ci_try_translate_offsetof_expr(session, src)
+        // D109: the symbolic `offsetof[T](field)`, never clang's folded
+        // value (the host's layout); the builtin is a literal to the IR (its
+        // text is printed verbatim, through any cast around it). The record
+        // and the members are clang's (through a typedef or a macro name);
+        // the source text serves a use of an offsetof macro by name.
+        var offset_text = ci_offsetof_from_cursor(session, cursor)
+        if offset_text.len() == 0:
+            offset_text = ci_try_translate_offsetof_expr(session, with_ci_cursor_source_text(session, cursor))
         if offset_text.len() > 0:
             let text_idx = self.add_string(offset_text)
             return self.int_lit(text_idx, 0 as CiTypeId)
@@ -9984,7 +10112,7 @@ impl CiExprPool:
     fn lower_literal_or_ref(session: i64, cursor: i32, kind: i32, types: CiTypePool, scope: CiScope) -> CiExprId:
         if kind == CXK_INT_LITERAL:
             var text: str = ""
-            if with_ci_eval_int_valid(session, cursor) != 0:
+            if ci_fold_int_ok(session, cursor):
                 text = ci_eval_int_text(session, cursor)
             else:
                 text = with_ci_cursor_source_text(session, cursor)
@@ -10127,7 +10255,7 @@ impl CiExprPool:
             var text: str = ""
             if literal_src.len() >= 4 and literal_src[1] == 92 and parsed_text.len() > 0:
                 text = parsed_text
-            else if with_ci_eval_int_valid(session, cursor) != 0:
+            else if ci_fold_int_ok(session, cursor):
                 text = ci_eval_int_text(session, cursor)
             else if parsed_text.len() > 0:
                 text = parsed_text
@@ -11342,6 +11470,11 @@ impl CiStmtPool:
 
         if kind == 100:
             let form = ci_unexposed_expr_form(session, cursor)
+            if form == CI_UNEXPOSED_OFFSETOF:
+                let offset_id = exprs.lower_offsetof_value_expr(session, cursor)
+                if (offset_id as i32) == 0:
+                    return ci_value_ir_invalid()
+                return ci_value_ir_plain(offset_id)
             if form == CI_UNEXPOSED_CHOOSE:
                 let selected = ci_choose_expr_selected(session, cursor)
                 if selected < 0:
@@ -11367,7 +11500,7 @@ impl CiStmtPool:
             if cast_inner >= 0:
                 let cast_kind = ci_classify_implicit_cast_safe(session, cursor, cast_inner)
                 if cast_kind == CI_CAST_INT_TO_BOOL or cast_kind == CI_CAST_PTR_TO_BOOL or cast_kind == CI_CAST_FLOAT_TO_BOOL:
-                    if with_ci_eval_int_valid(session, cursor) != 0 and not ci_expr_children_need_rvalue_lowering(session, cursor):
+                    if ci_fold_int_ok(session, cursor) and not ci_expr_children_need_rvalue_lowering(session, cursor):
                         let bval = with_ci_eval_int_value(session, cursor)
                         if bval == 0 or bval == 1:
                             return ci_value_ir_plain(exprs.bool_lit(bval as i32, 0 as CiTypeId))
@@ -11381,7 +11514,7 @@ impl CiStmtPool:
                         setup_stmt: inner_v.setup_stmt,
                         value_expr: bridged,
                     }
-            if with_ci_eval_int_valid(session, cursor) != 0 and not ci_expr_children_need_rvalue_lowering(session, cursor):
+            if ci_fold_int_ok(session, cursor) and not ci_expr_children_need_rvalue_lowering(session, cursor):
                 let text_idx = exprs.add_string(ci_eval_int_text(session, cursor))
                 return ci_value_ir_plain(exprs.int_lit(text_idx, 0 as CiTypeId))
             // A conversion With does not make implicitly materializes the
@@ -11546,7 +11679,7 @@ impl CiStmtPool:
                         setup_stmt: self.merge_ir( lhs.setup_stmt, rhs.setup_stmt),
                         value_expr: expr_id,
                     }
-            if with_ci_eval_int_valid(session, cursor) != 0:
+            if ci_fold_int_ok(session, cursor):
                 let text_idx = exprs.add_string(ci_eval_int_text(session, cursor))
                 return ci_value_ir_plain(exprs.int_lit(text_idx, 0 as CiTypeId))
             return ci_value_ir_invalid()
@@ -11727,7 +11860,7 @@ impl CiStmtPool:
                     setup_stmt: self.merge3_ir( decl_id, cond.setup_stmt, if_stmt),
                     value_expr: exprs.ident(result_expr_name, result_ty),
                 }
-            if with_ci_eval_int_valid(session, cursor) != 0:
+            if ci_fold_int_ok(session, cursor):
                 let text_idx = exprs.add_string(ci_eval_int_text(session, cursor))
                 return ci_value_ir_plain(exprs.int_lit(text_idx, 0 as CiTypeId))
             return ci_value_ir_invalid()
@@ -12573,7 +12706,7 @@ impl CiStmtPool:
 
 impl CiExprPool:
     fn lower_case_value_ir(session: i64, cursor: i32, types: CiTypePool, scope: CiScope) -> CiExprId:
-        if with_ci_eval_int_valid(session, cursor) != 0:
+        if ci_fold_int_ok(session, cursor):
             let text_idx = self.add_string(ci_eval_int_text(session, cursor))
             return self.int_lit(text_idx, 0 as CiTypeId)
         self.lower_expr_ir(session, cursor, types, scope)
@@ -12999,12 +13132,20 @@ pub fn ci_try_eval_var_init_for_type(session: i64, idx: i32, target_type: &str) 
                 let from_decl_source = ci_var_init_expr_from_decl_source_for_type(session, var_cursor, init_type)
                 if from_decl_source.len() > 0:
                     return ci_option_fn_init_fixup(from_decl_source, init_type)
-            if with_ci_eval_int_valid(session, init_cursor) != 0:
+            if ci_fold_int_ok(session, init_cursor):
                 return ci_option_fn_init_fixup(ci_eval_int_text(session, init_cursor), init_type)
         let expr = ci_var_init_expr_for_type(session, var_cursor, CiScope.new(""), init_type)
         if expr.len() > 0:
-            return ci_option_fn_init_fixup(expr, init_type)
+            return ci_option_fn_init_fixup(ci_offsetof_init_for_type(expr, init_type), init_type)
     ""
+
+// D109: an initializer spelled with `offsetof[T](f)` (a `usize`, as C's
+// size_t) converts to the object's integer type, as C's initializer does
+// implicitly; a folded literal needed no conversion.
+fn ci_offsetof_init_for_type(expr: &str, ty: &str) -> str:
+    if expr.contains("offsetof[") and ty.len() > 0 and ty[0] != '*' and ty[0] != '[' and not ci_starts_with(ty, "Option[") and ty != "usize":
+        return "(" ++ expr ++ " as " ++ ty ++ ")"
+    with_str_clone_ref(expr)
 
 pub fn ci_str_compare(a: &str, b: &str) -> i32:
     let alen = a.len() as i32
@@ -15014,6 +15155,24 @@ fn ci_resolve_pp_conditionals(src: &str) -> str:
         return ""
     out
 
+// D109: the object macro `name`'s value, read without touching the lookup
+// caches. ci_lookup_macro_value records hits and misses, and the text
+// translator's literal fallback reads that cache; a question asked only to
+// spell offsetof must not change how other macros translate.
+fn ci_peek_macro_value(name: &str) -> str:
+    if name.len() == 0:
+        return ""
+    let found = g_migrate_macro_values.get(name)
+    if found.is_some():
+        return ci_ir_owned_text(found.unwrap())
+    let macro_session = g_migrate_macro_session
+    if macro_session == 0:
+        return ""
+    for i in 0..with_cimport_macro_count(macro_session):
+        if with_cimport_macro_is_fn_like(macro_session, i) == 0 and with_cimport_macro_name(macro_session, i) == name:
+            return ci_trim(ci_strip_c_comments(with_cimport_macro_value(macro_session, i)))
+    ""
+
 fn ci_lookup_macro_value(session: i64, name: &str) -> str:
     if name.len() == 0:
         return ""
@@ -15686,7 +15845,9 @@ fn ci_translate_c_initializer_for_cursor_type(session: i64, init_src: &str, ty: 
         // (pcre2test's modlist: `PO(name)` = offsetof(patctl, name) as a field.)
         let offsetof_translated = ci_try_translate_offsetof_expr(session, trimmed)
         if offsetof_translated.len() > 0:
-            return ci_coerce_init_value_for_type(offsetof_translated, ty)
+            // The builtin is `i64`; C converts the initializer to the
+            // object's integer type.
+            return ci_offsetof_init_for_type(offsetof_translated, ty)
         var translated = ci_translate_c_expr(trimmed, "", "")
         if translated.len() == 0:
             return ""
@@ -18087,10 +18248,15 @@ let CI_UNEXPOSED_WRAPPER: i32 = 0
 let CI_UNEXPOSED_CHOOSE: i32 = 1
 let CI_UNEXPOSED_ELVIS: i32 = 2
 let CI_UNEXPOSED_UNSUPPORTED: i32 = 3
+// D109: clang's OffsetOfExpr, which libclang leaves unexposed; it is the
+// `offsetof[T](field)` builtin, never the host's folded number.
+let CI_UNEXPOSED_OFFSETOF: i32 = 4
 
 fn ci_unexposed_expr_form(session: i64, cursor: i32) -> i32:
     if with_ci_cursor_kind(session, cursor) != 100 or ci_unexposed_expr_is_va_arg(session, cursor):
         return CI_UNEXPOSED_WRAPPER
+    if ci_source_is_offsetof_call(session, with_ci_cursor_source_text(session, cursor)):
+        return CI_UNEXPOSED_OFFSETOF
     let nc = with_ci_num_children(session, cursor)
     var expr_children = 0
     for i in 0..nc:
@@ -18133,6 +18299,28 @@ fn ci_find_last_expr_child(session: i64, cursor: i32) -> i32:
             return child
         i = i - 1
     -1
+
+// D109 (#2131): whether clang's folded integer value of `cursor` may stand
+// in for the expression. A subtree naming `offsetof` folds to the HOST's
+// layout (pcre2's frame offsets were 64-bit numbers on wasm32), so it is
+// lowered structurally instead, where `offsetof(T, f)` becomes the
+// `offsetof[T](f)` builtin and the target decides.
+fn ci_fold_int_ok(session: i64, cursor: i32) -> bool:
+    if with_ci_eval_int_valid(session, cursor) == 0:
+        return false
+    not ci_source_names_offsetof(session, with_ci_cursor_source_text(session, cursor))
+
+fn ci_source_names_offsetof(session: i64, src: &str) -> bool:
+    src.contains("offsetof") or ci_source_names_offsetof_macro(session, src)
+
+// `offsetof(T, f)` / `__builtin_offsetof(T, f)` spelled at this cursor
+// (through the stddef macro its text is the invocation's), or an offsetof
+// macro's name.
+fn ci_source_is_offsetof_call(session: i64, src: &str) -> bool:
+    let t = ci_trim(ci_strip_parens(src))
+    if ci_is_c_identifier(t):
+        return ci_offsetof_macro_text(session, t).len() > 0
+    ci_starts_with(t, "offsetof") or ci_starts_with(t, "__builtin_offsetof")
 
 fn ci_expr_children_need_rvalue_lowering(session: i64, cursor: i32) -> bool:
     let nc = with_ci_num_children(session, cursor)

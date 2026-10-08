@@ -16276,7 +16276,9 @@ impl MirBuilder:
                 let gc_fn_op = self.const_operand(ConstKind.CK_FN, generic_builtin_sym, 0)
                 let gc_args: Vec[i32] = Vec.new()
                 let gc_as = self.ast.get_data1(node)
-                let gc_ac = self.ast.get_data2(node)
+                // D109: `offsetof[T](field)` names a field of T's declaration;
+                // Sema recorded its index, and nothing is evaluated.
+                let gc_ac = if self.sema.call_builtin(node) == CallBuiltin.OffsetOf: 0 else: self.ast.get_data2(node)
                 for gc_ai in 0..gc_ac:
                     let gc_arg_node = self.ast.get_extra(gc_as + gc_ai)
                     let gc_arg_op = self.lower_expr(gc_arg_node)

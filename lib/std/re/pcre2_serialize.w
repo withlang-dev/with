@@ -145,11 +145,11 @@ pub unsafe fn pcre2_serialize_encode_8(__param_codes: *mut *const pcre2_real_cod
 
         with_memcpy(((__local_dst_bytes as *mut c_void) as *mut u8), (((__local_re as *const c_char) as *const c_void) as *const u8), ((*__local_re).blocksize as i64))
 
-        with_memset((((__local_dst_bytes + (0 as usize)) as *mut c_void) as *mut u8), (0 as c_int), ((sizeof[pcre2_memctl]() as c_ulong) as i64))
+        with_memset((((__local_dst_bytes + ((offsetof[pcre2_real_code_8](memctl) as usize) as usize)) as *mut c_void) as *mut u8), (0 as c_int), ((sizeof[pcre2_memctl]() as c_ulong) as i64))
 
-        with_memset((((__local_dst_bytes + (24 as usize)) as *mut c_void) as *mut u8), (0 as c_int), ((sizeof[usize]() as c_ulong) as i64))
+        with_memset((((__local_dst_bytes + ((offsetof[pcre2_real_code_8](tables) as usize) as usize)) as *mut c_void) as *mut u8), (0 as c_int), ((sizeof[usize]() as c_ulong) as i64))
 
-        with_memset((((__local_dst_bytes + (32 as usize)) as *mut c_void) as *mut u8), (0 as c_int), ((sizeof[usize]() as c_ulong) as i64))
+        with_memset((((__local_dst_bytes + ((offsetof[pcre2_real_code_8](executable_jit) as usize) as usize)) as *mut c_void) as *mut u8), (0 as c_int), ((sizeof[usize]() as c_ulong) as i64))
 
         (__local_dst_bytes = __local_dst_bytes + ((*__local_re).blocksize as usize))
 
@@ -248,7 +248,7 @@ pub unsafe fn pcre2_serialize_decode_8(__param_codes: *mut *mut pcre2_real_code_
     while ((if __local_i < __local_number_of_codes: 1 else: 0) != 0) {
         var __local_blocksize: c_ulong
 
-        with_memcpy((((&raw mut __local_blocksize as *mut c_ulong) as *mut c_void) as *mut u8), (((__local_src_bytes + (72 as usize)) as *const c_void) as *const u8), ((sizeof[c_ulong]() as c_ulong) as i64))
+        with_memcpy((((&raw mut __local_blocksize as *mut c_ulong) as *mut c_void) as *mut u8), (((__local_src_bytes + ((offsetof[pcre2_real_code_8](blocksize) as usize) as usize)) as *const c_void) as *const u8), ((sizeof[c_ulong]() as c_ulong) as i64))
 
         if ((if __local_blocksize <= (sizeof[pcre2_real_code_8]() as usize): 1 else: 0) != 0) {
             return -62

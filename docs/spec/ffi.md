@@ -1725,6 +1725,24 @@ ABI alignment of a type at compile time. Required for allocator
 implementations, C interop buffer sizing, and packed struct
 calculations.
 
+**`offsetof`:**
+
+```
+type Frame { tag: u8, eptr: *const u8, ovector: [4]usize }
+let o = offsetof[Frame](ovector)    // 16 on a 64-bit target, 8 on wasm32
+```
+
+A built-in generic function that returns the byte offset of a field
+in a struct's layout, as `i64` like `sizeof`. The type argument is a
+struct, a generic instance included; the argument is the bare name
+of one of its fields, a name in the declaration and never an
+expression, so it is spelled without quotes and nothing is
+evaluated. Naming a field the type does not declare, or a type that
+is not a struct, is a compile error. The offset is the compilation
+target's, the same layout `sizeof`, `alignof` and field access use;
+code the migrator produces for C's `offsetof(T, f)` spells it so,
+and never a number folded from the host (D109).
+
 **`transmute`:**
 
 ```

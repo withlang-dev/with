@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.27
+# The With Programming Language — Specification v7.29
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,12 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.29:** `offsetof[T](field)`, 2026-10-07 (D109, delegated).
+§16.12: a built-in generic function returning a field's byte offset in a
+struct's layout for the compilation target, beside `sizeof` and
+`alignof`; the field is named bare, never evaluated. The migrator spells
+C's `offsetof(T, f)` with it instead of folding the host's number
+(#2131).
 **Changelog v7.28:** the width of a length, 2026-10-07 (D108). §18.6:
 `len()`, `count()` and `position()` return `isize`, the signed
 pointer-width integer; `Int` stays the fixed 64-bit alias. §4.2: `usize`

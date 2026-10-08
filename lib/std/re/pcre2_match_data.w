@@ -41,7 +41,7 @@ pub unsafe fn pcre2_match_data_create_8(__param_oveccount: c_uint, __param_gcont
         (__local_oveccount = ((65535 as c_uint)))
     }
 
-    (__local_yield_ = ((_pcre2_memctl_malloc_8((((120 as c_ulong) +% (((((2 as c_uint) *% (__local_oveccount as c_uint)) as c_ulong) *% (sizeof[usize]() as c_ulong)) as c_ulong)) as c_ulong), (__param_gcontext as *mut pcre2_memctl)) as *mut pcre2_real_match_data_8)))
+    (__local_yield_ = ((_pcre2_memctl_malloc_8(((((offsetof[pcre2_real_match_data_8](ovector) as usize) as c_ulong) +% (((((2 as c_uint) *% (__local_oveccount as c_uint)) as c_ulong) *% (sizeof[usize]() as c_ulong)) as c_ulong)) as c_ulong), (__param_gcontext as *mut pcre2_memctl)) as *mut pcre2_real_match_data_8)))
 
     if ((if __local_yield_ == null: 1 else: 0) != 0) {
         return ((null as *mut pcre2_real_match_data_8))
@@ -95,7 +95,7 @@ pub unsafe fn pcre2_get_mark_8(__param_match_data: *mut pcre2_real_match_data_8)
 }
 
 pub unsafe fn pcre2_get_match_data_size_8(__param_match_data: *mut pcre2_real_match_data_8) -> c_ulong {
-    return ((120 as c_ulong) +% ((((2 * ((*__param_match_data).oveccount as c_int)) as c_ulong) *% (sizeof[usize]() as c_ulong)) as c_ulong))
+    return (((offsetof[pcre2_real_match_data_8](ovector) as usize) as c_ulong) +% ((((2 * ((*__param_match_data).oveccount as c_int)) as c_ulong) *% (sizeof[usize]() as c_ulong)) as c_ulong))
 
 }
 
