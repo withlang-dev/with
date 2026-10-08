@@ -6920,7 +6920,7 @@ impl MirBuilder:
             // path (an alias left the field glue skipping a field nobody
             // owned: the 84ebff6d leak, now bound as an owning local whose
             // drop precedes the glue — spec_ss02_4 pins the WFN order).
-            if self.sema.is_copy_frozen(bind_ty) == 0 and not self.sema.drop_consumed_binding_values.contains(rhs_expr):
+            if not self.copy_is_bits(bind_ty) and not self.sema.drop_consumed_binding_values.contains(rhs_expr):
                 let alias_place = self.lower_binding_alias_place(rhs_expr)
                 if alias_place >= 0:
                     // A live str view of this place: later self-appends must
