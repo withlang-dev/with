@@ -1,7 +1,10 @@
 //! expect-error: cannot take ownership of a non-Copy value through a borrow
 
-fn observe(source: &str):
+// A Vec, not a str: `*source` of a `&str` copies the str (D111).
+fn observe(source: &Vec[i32]):
     var observed = *source
-    print(observed)
+    print(observed.len())
 
-fn main: observe("alpha")
+fn main:
+    let v: Vec[i32] = [1, 2]
+    observe(&v)
