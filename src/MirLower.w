@@ -649,6 +649,14 @@ impl MirBuilder:
     // like any statement temp, and a named one stays its binding's.
     fn carrier_copies(ty: i32) -> bool: self.sema.is_copy_frozen(ty as TypeId) != 0 and not self.copy_is_bits(ty)
 
+    // D111: a payload or field read out of a carrier the read consumes (an
+    // eliminator's subject, a pattern's scrutinee, an iterator's Some):
+    // plain bits are copied; one with drop glue moves out of a non-Copy
+    // carrier (as before D111) and is copied, with its own hold, out of a
+    // Copy carrier, which keeps its own hold and its drop.
+    fn carrier_read_kind(read_ty: i32, carrier_ty: i32) -> i32:
+        if self.copy_is_bits(read_ty) or (self.sema.is_copy_frozen(read_ty as TypeId) != 0 and self.carrier_copies(carrier_ty)): OperandKind.OK_COPY else: OperandKind.OK_MOVE
+
     mut fn mark_carrier_consumed(local: i32):
         if local >= 0 and not self.carrier_copies(self.local_type(local)):
             self.mark_local_value_moved(local)
@@ -8119,7 +8127,7 @@ impl MirBuilder:
         let payload_place = self.body.new_field_place(downcast_place, 0, elem_ty)
         // Drop-class elements MOVE out of the Option temp (the `?` idiom) —
         // a copy leaves the stale Some to double-drop the payload at cleanup.
-        let next_payload = self.body.new_operand(if self.sema.is_copy_frozen(elem_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, payload_place)
+        let next_payload = self.body.new_operand(self.carrier_read_kind(elem_ty, self.local_type(self.place_base_local(payload_place))), payload_place)
         self.assign_operand_to_place(item_place, next_payload, self.ast.get_start(iter_expr))
 
         // #614b + D33: the binding itself lives in a per-iteration scope. A
@@ -9002,7 +9010,7 @@ impl MirBuilder:
         let payload_place = self.body.new_field_place(downcast_place, 0, elem_ty)
         // Drop-class elements MOVE out of the Option temp (the `?` idiom) —
         // a copy leaves the stale Some to double-drop the payload at cleanup.
-        let next_payload = self.body.new_operand(if self.sema.is_copy_frozen(elem_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, payload_place)
+        let next_payload = self.body.new_operand(self.carrier_read_kind(elem_ty, self.local_type(self.place_base_local(payload_place))), payload_place)
         self.assign_operand_to_place(item_place, next_payload, self.ast.get_start(iter_expr))
         // #614b + D33: the binding lives in a per-iteration scope so an
         // owned Drop element drops once on the back-edge — including
@@ -11166,7 +11174,7 @@ impl MirBuilder:
                 self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, self.ast.get_start(pat_node))
                 if not self.copy_is_bits(bind_ty):
                     self.schedule_drop(local_id, DropKind.DK_VALUE)
-                let src_op = self.body.new_operand(if self.sema.is_copy_frozen(bind_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, child_place)
+                let src_op = self.body.new_operand(self.carrier_read_kind(bind_ty, self.local_type(self.place_base_local(child_place))), child_place)
                 let local_place = self.place_for_local(local_id)
                 self.bind_pattern_value(local_place, src_op, self.ast.get_start(pat_node))
                 out.push(local_id)
@@ -11237,7 +11245,7 @@ impl MirBuilder:
                     self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, self.ast.get_start(pat_node))
                     if not self.copy_is_bits(bind_ty):
                         self.schedule_drop(local_id, DropKind.DK_VALUE)
-                    let src_op = self.body.new_operand(if self.sema.is_copy_frozen(bind_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, child_place)
+                    let src_op = self.body.new_operand(self.carrier_read_kind(bind_ty, self.local_type(self.place_base_local(child_place))), child_place)
                     let local_place = self.place_for_local(local_id)
                     self.bind_pattern_value(local_place, src_op, self.ast.get_start(pat_node))
                     out.push(local_id)
@@ -11335,7 +11343,7 @@ impl MirBuilder:
                 let local_id = self.body.new_local(sp_elem_ty, self.pattern_bind_mut, sym, 1)
                 self.bind_local(sym, local_id)
                 self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, self.ast.get_start(pat_node))
-                let src_op = self.body.new_operand(if self.sema.is_copy_frozen(sp_elem_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, field_place)
+                let src_op = self.body.new_operand(self.carrier_read_kind(sp_elem_ty, self.local_type(self.place_base_local(field_place))), field_place)
                 let local_place = self.place_for_local(local_id)
                 self.assign_operand_to_place(local_place, src_op, self.ast.get_start(pat_node))
                 out.push(local_id)
@@ -11362,7 +11370,7 @@ impl MirBuilder:
                 let local_id = self.body.new_local(sp_elem_ty, self.pattern_bind_mut, sym, 1)
                 self.bind_local(sym, local_id)
                 self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, self.ast.get_start(pat_node))
-                let src_op = self.body.new_operand(if self.sema.is_copy_frozen(sp_elem_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, field_place)
+                let src_op = self.body.new_operand(self.carrier_read_kind(sp_elem_ty, self.local_type(self.place_base_local(field_place))), field_place)
                 let local_place = self.place_for_local(local_id)
                 self.assign_operand_to_place(local_place, src_op, self.ast.get_start(pat_node))
                 out.push(local_id)
@@ -12398,7 +12406,7 @@ impl MirBuilder:
         let exact_type: i32 = self.sema.contextual_join_arm_types[arm_index]
         let arm_kind: i32 = self.sema.contextual_join_arm_kinds[arm_index]
         var source_type: i32 = exact_type
-        var op = self.operand_for_place(exact_place, exact_type)
+        var op = self.body.new_operand(self.carrier_read_kind(exact_type, self.local_type(self.place_base_local(exact_place))), exact_place)
         if arm_kind == D22_JOIN_ARM_MATERIALIZED_REF:
             let resolved = self.sema.resolve_alias(exact_type as TypeId)
             if self.sema.get_type_kind(resolved) != TypeKind.TY_REF:
@@ -13383,7 +13391,7 @@ impl MirBuilder:
                 let ref_place = self.place_for_local(ref_tmp)
                 self.body.push_stmt(self.cur_bb, StmtKind.Assign, ref_place, ref_rv, span)
                 return self.body.new_operand(OperandKind.OK_COPY, ref_place)
-            let op_kind = if self.sema.is_copy_frozen(payload_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE
+            let op_kind = self.carrier_read_kind(payload_ty, enum_ty)
             return self.body.new_operand(op_kind, field_place)
 
         let tuple_fields: Vec[i32] = Vec.new()
@@ -13402,7 +13410,7 @@ impl MirBuilder:
                 self.body.push_stmt(self.cur_bb, StmtKind.Assign, ref_place, ref_rv, span)
                 tuple_fields.push(self.body.new_operand(OperandKind.OK_COPY, ref_place))
             else:
-                let op_kind = if self.sema.is_copy_frozen(payload_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE
+                let op_kind = self.carrier_read_kind(payload_ty, enum_ty)
                 tuple_fields.push(self.body.new_operand(op_kind, field_place))
             tuple_names.push(0)
         let tuple_fid = self.body.new_agg_fields(tuple_fields, tuple_names)
@@ -13410,7 +13418,7 @@ impl MirBuilder:
         let tuple_tmp = self.new_temp(unwrapped_ty)
         let tuple_place = self.place_for_local(tuple_tmp)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, tuple_place, tuple_rv, span)
-        self.body.new_operand(if self.sema.is_copy_frozen(unwrapped_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, tuple_place)
+        self.body.new_operand(if self.copy_is_bits(unwrapped_ty): OperandKind.OK_COPY else: OperandKind.OK_MOVE, tuple_place)
 
     mut fn assign_enum_variant_to_place(result_place: i32, result_ty: i32, variant_sym: i32, fields: &Vec[i32], span: i32):
         let names: Vec[i32] = Vec.new()
