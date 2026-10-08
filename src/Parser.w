@@ -145,6 +145,10 @@ type InterpolatedExprParseAttempt {
     // (seam-sites' move-through-ref row for this fn was this exact bug).
     diags: DiagnosticList,
     used_shared_diags: i32,
+    // §9.3.1: an `it` in the hole belongs to the enclosing argument; the
+    // caller takes these back when it keeps the node.
+    saw_implicit_it: i32,
+    implicit_it_depth: i32,
 }
 
 fn Parser.init(tokens: TokenList, source: &str, file_id: i32, intern: InternPool, diags: DiagnosticList) -> Parser:
@@ -5482,6 +5486,7 @@ impl Parser:
                     // self.diags was never moved, so nothing to restore.
                     if full_attempt.consumed_all != 0 and full_attempt.had_errors == 0:
                         expr_node = full_attempt.node
+                        self.take_interpolated_it(full_attempt.saw_implicit_it, full_attempt.implicit_it_depth)
                     else:
                         let expr_text = content.slice(expr_start_pos as i64, colon_pos as i64)
                         expr_node = self.parse_interpolated_expr(expr_text, hole_source_start)
@@ -5707,12 +5712,19 @@ impl Parser:
         let flags = mode | ((fill & 255) << 8) | ((align & 3) << 16) | ((sign_plus & 1) << 18) | ((alternate & 1) << 19) | ((zero_pad & 1) << 20)
         self.pool.add_node(NodeKind.NK_FSTRING_SPEC, start, end, flags, width, precision)
 
+    // §9.3.1: `f"{it}"` is an expression that uses `it`: the hole's
+    // sub-parser reports it, and the enclosing argument becomes the closure.
+    mut fn take_interpolated_it(saw: i32, depth: i32):
+        if saw != 0: self.saw_implicit_it = 1
+        self.implicit_it_depth = depth
+
     mut fn parse_interpolated_expr(expr_text: &str, base_start: i32) -> NodeId:
         var attempt = self.parse_interpolated_expr_attempt(expr_text, 1, base_start)
         self.intern = attempt.intern
         self.pool = attempt.pool
         // Shared mode moved self.diags into the sub-parser; put it back.
         self.diags = move attempt.diags
+        self.take_interpolated_it(attempt.saw_implicit_it, attempt.implicit_it_depth)
         attempt.node
 
 // §15.4.1 align: 1 left `<`, 2 right `>`, 3 center `^`; 0 for any other byte.
@@ -5748,6 +5760,7 @@ impl Parser:
         let parse_diags = if use_shared_diags != 0: move self.diags else: DiagnosticList.init()
         let first_node = self.pool.node_count()
         var sub_parser = Parser.init_with_pool(move sub_tokens, source_text, self.file_id, self.intern, move parse_diags, self.pool)
+        sub_parser.implicit_it_depth = self.implicit_it_depth
         let result = sub_parser.parse_expr()
         sub_parser.skip_newlines()
         offset_interpolated_expr_spans(sub_parser.pool, first_node, base_start)
@@ -5761,6 +5774,8 @@ impl Parser:
             intern: sub_parser.intern,
             diags: move sub_parser.diags,
             used_shared_diags: use_shared_diags,
+            saw_implicit_it: sub_parser.saw_implicit_it,
+            implicit_it_depth: sub_parser.implicit_it_depth,
         }
 
     mut fn parse_c_string_literal() -> NodeId:
