@@ -441,6 +441,21 @@ impl Sema:
             return 64
         count
 
+    // The adjustments in the program's own sources, without the embedded
+    // stdlib's: what a fixture pins, unmoved by an edit to std.
+    fn contextual_copy_adjustments_outside_std() -> i32:
+        var paths: HashMap[i32, str] = HashMap.new()
+        for di in 0..self.decl_source_file_ids.len():
+            let file_id = self.decl_source_file_ids[di]
+            if not paths.contains(file_id) and di < self.decl_source_paths.len():
+                paths.insert(file_id, self.decl_source_paths[di].clone())
+        var n = 0
+        for ai in 0..self.contextual_copy_adjustments.len() as i32:
+            let file_id = self.ast.file(self.contextual_copy_adjustments[ai].source_node as NodeId) as i32
+            let path = paths.get(file_id) ?? &""
+            if sema_tier_path_is_std_implementation(path) == 0: n += 1
+        n
+
     mut fn dump_typed_module() -> str:
         self.reset_typed_dump_safety()
         var out = StringBuilder.new()
@@ -448,6 +463,7 @@ impl Sema:
         let dump_decl_count = total_decl_count
         out.push_str(f"typed module decls={dump_decl_count}\n")
         out.push_str(f"typed contextual-copy-adjustments={self.contextual_copy_adjustments.len()}\n")
+        out.push_str(f"typed contextual-copy-adjustments-outside-std={self.contextual_copy_adjustments_outside_std()}\n")
         for ai in 0..self.contextual_copy_adjustments.len() as i32:
             let adjustment = self.contextual_copy_adjustments[ai]
             out.push_str(f"adjust[{ai}] node={adjustment.source_node} exact={self.type_name(adjustment.exact_source_type)} owned={self.type_name(adjustment.owned_value_type)} target={self.type_name(adjustment.target_type)}")
@@ -625,6 +641,7 @@ impl Sema:
             dump_decl_count = requested_limit
         with_write(f"typed module decls={dump_decl_count}\n")
         with_write(f"typed contextual-copy-adjustments={self.contextual_copy_adjustments.len()}\n")
+        with_write(f"typed contextual-copy-adjustments-outside-std={self.contextual_copy_adjustments_outside_std()}\n")
         for ai in 0..self.contextual_copy_adjustments.len() as i32:
             let adjustment = self.contextual_copy_adjustments[ai]
             with_write(f"adjust[{ai}] node={adjustment.source_node} exact={self.type_name(adjustment.exact_source_type)} owned={self.type_name(adjustment.owned_value_type)} target={self.type_name(adjustment.target_type)}")
