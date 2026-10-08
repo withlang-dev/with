@@ -13183,7 +13183,14 @@ impl MirBuilder:
                     recv_op = self.lower_expr(self_expr)
                 else if recv_owner != 0 and self.sema.builtin_method_requires_move_receiver(recv_owner, method_sym) != 0:
                     let recv_place = self.lower_expr_place(self_expr)
-                    recv_op = self.body.new_operand(OperandKind.OK_MOVE, recv_place)
+                    // D111: a Copy receiver with drop glue (an Option[str]) is
+                    // copied in with its own hold, not moved: the source keeps
+                    // its value and the method takes the copy.
+                    if not self.copy_is_bits(recv_type_for_args) and self.sema.is_copy_frozen(recv_type_for_args as TypeId) != 0:
+                        recv_op = self.body.new_operand(OperandKind.OK_COPY, recv_place)
+                        self.body.set_operand_hold(recv_op, MIR_HOLD_RETAIN)
+                    else:
+                        recv_op = self.body.new_operand(OperandKind.OK_MOVE, recv_place)
                 else if raw_pointer_option_receiver:
                     recv_op = self.lower_expr(self_expr)
                 else:
