@@ -882,9 +882,17 @@ match items:
 
 For fixed-size arrays, the compiler performs compile-time length matching:
 - `[a, b, c]` matches exactly 3 elements
-- `[first, ..rest]` matches any array with 1+ elements, `rest` is bound to the remaining count
+- `[first, ..rest]` matches any array with 1+ elements
 - `[first, ..mid, last]` matches 2+ elements, extracting both ends
 - `[]` matches empty arrays (`[0]T`)
+
+`[first, ..rest]` matches one or more elements, and `rest` names the
+elements between the matched ends. If the subject is owned — a temporary,
+or a place moved with `move` — the pattern takes it apart by value: each
+binding is an owned element, and `rest` is the owned remainder (`[T; N-k]`
+for a fixed array, `Vec[T]` for a `Vec`). If the subject is a place, the
+pattern observes it: elements bind as views and `rest` is a `[]T` view of
+it. Its length is `rest.len()`.
 
 **`let` destructuring:**
 
