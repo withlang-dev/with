@@ -5273,6 +5273,25 @@ fn bs_check_migrate_libc_ctype(ctx: &ActionCtx, compiler_path: &str, case_dir: &
     if check.rc != 0: return check.rc
     0
 
+// A ternary inside a call argument inside an initializer-list element
+// (STC's `{_i_new_n(T, n), 0, n}` expands to `malloc((size_t)(1 ? n : -1))`)
+// is a pure expression: it lowers to `if` there, never to a hoisted temp
+// the initializer cannot take.
+fn bs_check_migrate_ternary_in_initializer_call(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "ternary_in_initializer_call.c")
+    let out_w = bs_join(case_dir, "ternary_in_initializer_call.w")
+    let c_text = "#include <stdlib.h>\n#include <stddef.h>\ntypedef struct { int* data; size_t size; ptrdiff_t cap; } V;\nV make(ptrdiff_t c) { V out = {(int*)malloc((size_t)(1 ? c : -1) * sizeof(int)), 0, c}; return out; }\n"
+    var rc = bs_write_fixture(ctx, src, c_text, "ternary in an initializer call")
+    if rc != 0: return rc
+    let migrate = ["migrate", bs_abs(root, src), "--no-c-export", "-o", bs_abs(root, out_w)]
+    rc = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-ternary-in-initializer-call", migrate).rc
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, ctx.fs().read_text(out_w), "if 1 != 0: __param_c else: ", "ternary_in_initializer_call")
+    if rc != 0: return rc
+    let check = ["check", bs_abs(root, out_w)]
+    bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-ternary-in-initializer-call", check).rc
+
 fn bs_check_migrate_macro_unsigned_minus(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "macro_initializer_unsigned_minus.c")
@@ -6023,6 +6042,8 @@ pub fn run_cli_selfhost_migrate_core_action(ctx: ActionCtx) -> i32:
     var rc = bs_check_migrate_libc_ctype(ctx, compiler_path, bs_join(output_dir, "libc_ctype"))
     if rc != 0: return rc
     rc = bs_check_migrate_macro_unsigned_minus(ctx, compiler_path, bs_join(output_dir, "macro_unsigned_minus"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_ternary_in_initializer_call(ctx, compiler_path, bs_join(output_dir, "ternary_in_initializer_call"))
     if rc != 0: return rc
     rc = bs_check_migrate_ulong_max_width(ctx, compiler_path, bs_join(output_dir, "ulong_max_width"))
     if rc != 0: return rc
