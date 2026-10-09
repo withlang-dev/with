@@ -59,23 +59,50 @@ compiler: a literal that's never grown or retained needn't touch the heap."
   `var out = []` is a `Vec`; the spellings that failed on 2026-10-08 (a
   literal at a `&Vec[str]` argument, `f(&args)`, `Vec.new() |> push(..)`
   inference) are covered by the one rule.
-- A fixed array is produced only where a fixed array type `[T; N]` is
+- Another collection is built only where its type is demanded: a fixed array
+  `[T; N]` or a set (`HashSet[T]`, `BTreeSet[T]`), wherever that type is
   demanded (an annotation, a field, a parameter, a C-facing signature). The
   migrator's C tables keep their `[T; N]` types.
+- The repeat form `[value; N]` follows the same rule: a `Vec` of N elements
+  unless a fixed array is demanded.
 - Storage is the compiler's choice: a literal never grown or retained may
   live on the stack or in static data, with no observable difference.
 
-**Open, for Eric to rule before the specification projection lands.**
-1. *Element default.* The ruling says `[1, 2, 3]` is a `Vec[i64]`; §4.2.1
-   says unsuffixed integer literals default to `i32`. (a) elements follow
-   §4.2.1 (`Vec[i32]`); (b) a bracket literal defaults its integers to
-   `i64`; (c) the integer default itself becomes `i64`. Agent's prediction:
-   (a), ~80% ("the obvious way" with one default rule).
-2. *Set literals.* The spec line reads "unless a fixed array type is
-   demanded"; point 2 reads "unless the variable's type says otherwise".
-   Today `let s: HashSet[str] = ["a", "b"]` and `BTreeSet` literals are
-   valid (§4.3c). Agent's prediction: the set forms stay (the broader
-   reading), ~75%. The `[k: v]` map form is unaffected.
+**Ruled after the first entry (Eric, 2026-10-08).**
+1. *Element default.* Ruled by D114: unsuffixed integer literals default to
+   `isize`, "everywhere, including in bracket literals". `[1, 2, 3]` is a
+   `Vec[isize]`.
+2. *Set literals.* Eric, verbatim: "A, and the brief earns its place: it
+   isn't re-asking a settled question, it's caught D113 contradicting itself,
+   and that collision is yours to resolve. The closing spec line was my
+   narrow wording leaking into the ruling. Fix it to match point 2:"
+
+   "*A bracket literal is a `Vec[T]`, unless the demanded type is another
+   collection that can be built from a list, such as a fixed array or a set.
+   Then the literal builds that collection.*"
+
+   "That keeps §4.3c rule 1 valid as it stands, matches Swift, and costs
+   nothing for anyone who never writes a set type. B would turn valid code
+   into errors to make a sentence shorter, which is the wrong trade."
+
+   "**Duplicate constants in a set literal warn.** `["a", "a"]` demanded as a
+   set is almost always a typo, and silently deduplicating it hides that."
+
+   "**Whether the list stays closed is a follow-up, not part of this
+   ruling.** §4.3c names `Vec`, `HashSet`, `BTreeSet` and fixed arrays.
+   Swift's version is open: any collection that declares it can be built
+   from a list literal gets bracket syntax, which would cover a user's
+   `Deque` or `SmallVec` too. That's the more Withy end state, since a
+   library type shouldn't need ceremony a stdlib type doesn't. But it needs
+   a mechanism (a trait or declared constructor), so it's its own brief when
+   someone actually wants it."
+
+   Clarified (Eric, verbatim): "no we should treate val myvec = ["a", "a"]
+   as a valid Vector of size 2.  myvec[0] is "a" and myvec[1] is also "a"".
+   The warning is for a set demand only; a `Vec` keeps every element.
+
+   The specification sentence is the corrected one above; the closing line
+   "unless a fixed array type is demanded" is withdrawn.
 
 **What would reopen it.** A measured cost that the compiler's storage choice
 cannot remove, or a C-facing use where a fixed array cannot be demanded by a
